@@ -12,7 +12,170 @@ from fealpy.fem.linear_form import LinearForm
 from fealpy.fem.dirichlet_bc import DirichletBC
 from fealpy.solver import cg, spsolve
 
+import re
 
+def parse_file(file_path):
+    # 初始化数据结构
+    nodes = []
+    cells = []
+    element_stiffness_matrices = {}
+    material_params = {}
+    cell_data = {}
+    
+    # 读取整个文件内容
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # 定义各个部分的正则表达式模式
+    solid_pattern = re.compile(r"Solid:\s*(.*?)\s*EndSolid", re.DOTALL)
+    element_stiffness_pattern = re.compile(r"ElementEtiffnessMatrix:\s*(.*?)\s*EndElementEtiffnessMatrix", re.DOTALL)
+    material_pattern = re.compile(r"Material:\s*(.*?)\s*EndMaterial", re.DOTALL)
+    cell_data_pattern = re.compile(r"CellData:\s*(.*?)\s*EndCellData", re.DOTALL)
+    
+    # 解析 Solid 部分
+    solid_match = solid_pattern.search(content)
+    if solid_match:
+        solid_content = solid_match.group(1)
+        
+        # 解析 Nodes
+        nodes_section_match = re.search(r"Nodes:\s*(.*?)\s*(?:Cells:|$)", solid_content, re.DOTALL)
+        if nodes_section_match:
+            nodes_section = nodes_section_match.group(1)
+            # 每行节点格式: <id>: (<x>, <y>, <z>)
+            node_lines = nodes_section.strip().split('\n')
+            for line in node_lines:
+                line = line.strip()
+                if not line:
+                    continue
+                match = re.match(r'\d+:\s*\(([^)]+)\)', line)
+                if match:
+                    coords = tuple(map(float, match.group(1).split(',')))
+                    nodes.append(coords)
+        
+        # 解析 Cells
+        cells_section_match = re.search(r"Cells:\s*(.*?)\s*$", solid_content, re.DOTALL)
+        if cells_section_match:
+            cells_section = cells_section_match.group(1)
+            # 每行单元格式: <id>: (<n1>, <n2>, <n3>, <n4>)
+            cell_lines = cells_section.strip().split('\n')
+            for line in cell_lines:
+                line = line.strip()
+                if not line:
+                    continue
+                match = re.match(r'\d+:\s*\(([^)]+)\)', line)
+                if match:
+                    node_ids = tuple(map(int, match.group(1).split(',')))
+                    cells.append(node_ids)
+    
+    # 解析 ElementEtiffnessMatrix 部分
+    element_stiffness_match = element_stiffness_pattern.search(content)
+    if element_stiffness_match:
+        element_stiffness_content = element_stiffness_match.group(1)
+        # 将内容按行分割
+        lines = element_stiffness_content.strip().split('\n')
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if line.startswith("Cell"):
+                match = re.match(r"Cell\s+(\d+)", line)
+                if match:
+                    cell_id = int(match.group(1))
+                    i += 1
+                    matrix = []
+                    # 读取接下来的12行作为矩阵
+                    for _ in range(12):
+                        if i >= len(lines):
+                            break
+                        matrix_line = lines[i].strip()
+                        if not matrix_line:
+                            i += 1
+                            continue
+                        # 提取所有浮点数，包括科学计数法
+                        numbers = list(map(float, re.findall(r'[-+]?\d*\.?\d+(?:e[-+]?\d+)?', matrix_line)))
+                        if numbers:
+                            matrix.append(numbers)
+                        i += 1
+                    element_stiffness_matrices[cell_id] = matrix
+            else:
+                i += 1
+    
+    # 解析 Material 部分
+    material_match = material_pattern.search(content)
+    if material_match:
+        material_content = material_match.group(1)
+        # 解析材料参数，例如: E = 30000
+        lines = material_content.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            match = re.match(r'(E|nu|Lam|mu)\s*=\s*([-+]?\d*\.?\d+(?:e[-+]?\d+)?)', line)
+            if match:
+                key = match.group(1)
+                value = float(match.group(2))
+                material_params[key] = value
+    
+    # 解析 CellData 部分
+    cell_data_match = cell_data_pattern.search(content)
+    if cell_data_match:
+        cell_data_content = cell_data_match.group(1)
+        # 按 'Cell <id>' 分割
+        cell_sections = re.split(r"Cell\s+(\d+)", cell_data_content)
+        # split 结果: [前导内容, id, 内容, id, 内容, ...]
+        for j in range(1, len(cell_sections), 2):
+            cell_id = int(cell_sections[j])
+            cell_content = cell_sections[j+1]
+            cell_data[cell_id] = {}
+            
+            # 解析 Grad Lambda
+            grad_lambda_match = re.search(r"Grad Lambda\s*(.*?)\s*(Displacement\s*:|Strain\s*:|Stress\s*:|$)", cell_content, re.DOTALL)
+            if grad_lambda_match:
+                grad_lambda_content = grad_lambda_match.group(1).strip()
+                grad_lambda_lines = grad_lambda_content.split('\n')
+                grad_lambda = []
+                for g_line in grad_lambda_lines:
+                    g_line = g_line.strip()
+                    if not g_line:
+                        continue
+                    grad = list(map(float, g_line.split()))
+                    grad_lambda.append(grad)
+                cell_data[cell_id]['Grad Lambda'] = grad_lambda
+            
+            # 解析 Displacement
+            displacement_match = re.search(r"Displacement\s*:\s*(.*?)\s*(Strain\s*:|Stress\s*:|Grad Lambda|$)", cell_content, re.DOTALL)
+            if displacement_match:
+                displacement_content = displacement_match.group(1).strip()
+                displacement_lines = displacement_content.split('\n')
+                displacement = []
+                for d_line in displacement_lines:
+                    d_line = d_line.strip()
+                    if not d_line:
+                        continue
+                    disp = list(map(float, d_line.split()))
+                    displacement.append(disp)
+                cell_data[cell_id]['Displacement'] = displacement
+            
+            # 解析 Strain
+            strain_match = re.search(r"Strain\s*:\s*([-+]?\d*\.?\d+(?:e[-+]?\d+)?(?:\s+[-+]?\d*\.?\d+(?:e[-+]?\d+)?)*)", cell_content)
+            if strain_match:
+                strain_str = strain_match.group(1).strip()
+                strain = list(map(float, strain_str.split()))
+                cell_data[cell_id]['Strain'] = strain
+            
+            # 解析 Stress
+            stress_match = re.search(r"Stress\s*:\s*([-+]?\d*\.?\d+(?:e[-+]?\d+)?(?:\s+[-+]?\d*\.?\d+(?:e[-+]?\d+)?)*)", cell_content)
+            if stress_match:
+                stress_str = stress_match.group(1).strip()
+                stress = list(map(float, stress_str.split()))
+                cell_data[cell_id]['Stress'] = stress
+    
+    return {
+        'nodes': nodes,
+        'cells': cells,
+        'element_stiffness_matrices': element_stiffness_matrices,
+        'material_params': material_params,
+        'cell_data': cell_data
+    }
 
 def rotate_point(point, rotation_axis, angle_deg, translation):
     """
@@ -43,6 +206,58 @@ def rotate_point(point, rotation_axis, angle_deg, translation):
     translated_point = point - translation  # Subtract translation
     rotated_point = bm.dot(R, translated_point.T).T  # Apply rotation
     return rotated_point + translation  # Add translation back
+
+def compute_strain_stress_at_centers(space, uh, mu, lam):
+    """在单元中心处计算应变和应力"""
+    mesh = space.mesh
+    cell = mesh.entity('cell')
+    cell2dof = space.cell_to_dof()
+    NC = mesh.number_of_cells()
+    NN = mesh.number_of_nodes()
+
+    # 计算中心点处的基函数梯度
+    qf1 = mesh.quadrature_formula(1)
+    bcs_q1, ws = qf1.get_quadrature_points_and_weights()
+    gphix_q1 = space.grad_basis(bcs_q1, variable='x')
+    gphix_q1 = gphix_q1.squeeze(axis=1)   # (NC, LDOF, GD)
+
+    cuh = uh[cell2dof]   # (NC, LDOF)
+
+    # 计算应变
+    strain = bm.zeros((NC, 6), dtype=bm.float64)
+    strain[:, 0:3] = bm.einsum('cid, cid -> cd', cuh, gphix_q1)
+    strain[:, 3] = bm.sum(
+            cuh[:, :, 2]*gphix_q1[:, :, 1] + cuh[:, :, 1]*gphix_q1[:, :, 2], 
+            axis=-1)/2.0
+    strain[:, 4] = bm.sum(
+            cuh[:, :, 2]*gphix_q1[:, :, 0] + cuh[:, :, 0]*gphix_q1[:, :, 2], 
+            axis=-1)/2.0
+    strain[:, 5] = bm.sum(
+            cuh[:, :, 1]*gphix_q1[:, :, 0] + cuh[:, :, 0]*gphix_q1[:, :, 1], 
+            axis=-1)/2.0
+
+    # 计算应力
+    val = 2*mu + lam
+    stress = bm.zeros((NC, 6), dtype=bm.float64)
+    stress[:, 0] = val * strain[:, 0] + lam * (strain[:, 1] + strain[:, 2])
+    stress[:, 1] = val * strain[:, 1] + lam * (strain[:, 2] + strain[:, 0])
+    stress[:, 2] = val * strain[:, 2] + lam * (strain[:, 0] + strain[:, 1])
+    stress[:, 3] = 2*mu * strain[:, 3]
+    stress[:, 4] = 2*mu * strain[:, 4]
+    stress[:, 5] = 2*mu * strain[:, 5]
+
+    # 计算节点应变和应力
+    nstrain = bm.zeros((NN, 6), dtype=bm.float64)
+    nstress = bm.zeros((NN, 6), dtype=bm.float64)
+    nc = bm.zeros(NN, dtype=bm.int32)
+    bm.add_at(nc, cell, 1)
+    for i in range(6):
+        bm.add_at(nstrain[:, i], cell, strain[:, i, None] * bm.ones_like(cell))
+        nstrain[:, i] /= nc
+        bm.add_at(nstress[:, i], cell, stress[:, i, None] * bm.ones_like(cell))
+        nstress[:, i] /= nc
+        
+    return strain, stress, nstrain, nstress
 
 
 if __name__ == '__main__':
@@ -2158,6 +2373,8 @@ if __name__ == '__main__':
     NN = mesh.number_of_nodes()
     NC = mesh.number_of_cells()
     GD = mesh.geo_dimension()
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
 
     p = 1
     q = p+1
@@ -2178,6 +2395,11 @@ if __name__ == '__main__':
                                                     elastic_modulus=E, poisson_ratio=nu, 
                                                     hypo='3D', device=bm.get_device(mesh))
     integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=q, method='voigt')
+    KE = integrator_K.voigt_assembly(space=tensor_space)
+    KE0 = KE[0]
+    KE1 = KE[1]
+    KE100 = KE[100]
+    KE1611 =KE[1611]
     bform = BilinearForm(tensor_space)
     bform.add_integrator(integrator_K)
     K = bform.assembly(format='csr')
@@ -2228,77 +2450,105 @@ if __name__ == '__main__':
     # uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
     uh[:] = spsolve(K, F, solver="mumps")
 
-    if tensor_space.dof_priority:
-        uh_show = uh.reshape(GD, NN).T
-    else:
-        uh_show = uh.reshape(NN, GD)
-    uh_x = uh_show[:, 0]
-    uh_y = uh_show[:, 1]
-    uh_z = uh_show[:, 2]
+    cell2dof = space.cell_to_dof()
+    uh = uh.reshape(NN, GD) # (NN, GD)
 
-    uh_magnitude = bm.linalg.norm(uh_show, axis=1)
-
-    mesh.nodedata['uh'] = uh_show[:]
-    mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
-
-    uh_cell = bm.zeros((NC, tldof)) # (NC, tldof)
-    for c in range(NC):
-        uh_cell[c] = uh[cell2tdof[c]]
+    strain2, stress2, nstrain2, nstress2 = compute_strain_stress_at_centers(space, 
+                                                                    uh, mu, lam)
+    nstress2_xx = nstress2[:, 0]
 
     qf1 = mesh.quadrature_formula(1)
     bcs_q1, ws = qf1.get_quadrature_points_and_weights()
-    tgphi_q1 = tensor_space.grad_basis(bcs_q1)                      # (NC, 1, tldof, GD, GD)
-    tgrad_q1 = bm.einsum('cqimn, ci -> cqmn', tgphi_q1, uh_cell)    # (NC, 1, GD, GD)
+    gphiu = space.grad_basis(bcs_q1, variable='u') # (NQ, LDOF, BC)
+    gphix = space.grad_basis(bcs_q1, variable='x') # (NC, NQ, LDOF, GD)
+    glambda = mesh.grad_lambda()                   # (NC, LDOF, GD)
 
-    # 应变张量
-    strain_element = (tgrad_q1 + bm.transpose(tgrad_q1, (0, 1, 3, 2))) / 2    # (NC, 1, GD, GD)
-    strain_element_xx = strain_element[..., 0, 0]  # (NC, 1)
-    strain_element_yy = strain_element[..., 1, 1]  # (NC, 1)
-    strain_element_zz = strain_element[..., 2, 2]  # (NC, 1)
-    strain_element_xy = strain_element[..., 0, 1]  # (NC, 1)
-    strain_element_yz = strain_element[..., 1, 2]  # (NC, 1)
-    strain_element_xz = strain_element[..., 0, 2]  # (NC, 1)
+    cuh = uh[cell2dof] # (NC, 4, GD)
 
-    # 应力张量
-    trace_e = bm.einsum("...ii", strain_element) # (NC, 1)
-    I = bm.eye(GD, dtype=bm.float64)
-    stress_element = 2 * mu * strain_element + lam * trace_e[..., None, None] * I # (NC, 1, GD, GD)
-    stress_element_xx = stress_element[..., 0, 0] # (NC, 1)
-    stress_element_yy = stress_element[..., 1, 1] # (NC, 1)
-    stress_element_zz = stress_element[..., 2, 2] # (NC, 1)
-    stress_element_xy = stress_element[..., 0, 1] # (NC, 1)
-    stress_element_yz = stress_element[..., 1, 2] # (NC, 1)
-    stress_element_xz = stress_element[..., 0, 2] # (NC, 1)
+    strain = bm.zeros((NC, 6), dtype=bm.float64)
+    stress = bm.zeros((NC, 6), dtype=bm.float64)
 
-    qf2 = mesh.quadrature_formula(2)
-    bcs_q2, ws = qf2.get_quadrature_points_and_weights() 
-    # 单元积分点处的位移梯度
-    tgphi_q2 = tensor_space.grad_basis(bcs_q2)             # (NC, NQ, tldof, GD, GD)
-    tgrad_q2 = bm.einsum('cqimn, ci -> cqmn', tgphi_q2, uh_cell)      # (NC, NQ, GD, GD)
+    strain[:, 0:3] = bm.einsum('cid, cid->cd', cuh, glambda) # (NC, GD) 
+    strain[:, 3] = bm.sum(
+            cuh[:, :, 2]*glambda[:, :, 1] + cuh[:, :, 1]*glambda[:, :, 2], 
+            axis=-1)/2.0 # (NC,)
+    strain[:, 4] = bm.sum(
+            cuh[:, :, 2]*glambda[:, :, 0] + cuh[:, :, 0]*glambda[:, :, 2], 
+            axis=-1)/2.0 # (NC,)
+    strain[:, 5] = bm.sum(
+            cuh[:, :, 1]*glambda[:, :, 0] + cuh[:, :, 0]*glambda[:, :, 1], 
+            axis=-1)/2.0 # (NC,)
 
-    # 应变张量
-    strain = (tgrad_q2 + bm.transpose(tgrad_q2, (0, 1, 3, 2))) / 2    # (NC, NQ, GD, GD)
-    strain_xx = strain[..., 0, 0]  # (NC, NQ)
-    strain_yy = strain[..., 1, 1]  # (NC, NQ)
-    strain_zz = strain[..., 2, 2]  # (NC, NQ)
-    strain_xy = strain[..., 0, 1]  # (NC, NQ)
-    strain_yz = strain[..., 1, 2]  # (NC, NQ)
-    strain_xz = strain[..., 0, 2]  # (NC, NQ)
+    strain_norm = bm.einsum('ij -> i', bm.abs(strain))
 
-    # 应力张量
-    trace_e = bm.einsum("...ii", strain) # (NC, NQ)
-    I = bm.eye(GD, dtype=bm.float64)
-    stress = 2 * mu * strain + lam * trace_e[..., None, None] * I # (NC, NQ, GD, GD)
-    stress_xx = stress[..., 0, 0] # (NC, NQ)
-    stress_yy = stress[..., 1, 1] # (NC, NQ)
-    stress_zz = stress[..., 2, 2] # (NC, NQ)
-    stress_xy = stress[..., 0, 1] # (NC, NQ)
-    stress_yz = stress[..., 1, 2] # (NC, NQ)
-    stress_xz = stress[..., 0, 2] # (NC, NQ)
+    val = 2*mu + lam
+    stress[:, 0] = val * strain[:, 0] + lam * (strain[:, 1] + strain[:, 2]) 
+    stress[:, 1] = val * strain[:, 1] + lam * (strain[:, 2] + strain[:, 0]) 
+    stress[:, 2] = val * strain[:, 2] + lam * (strain[:, 0] + strain[:, 1]) 
+    stress[:, 3] = 2*mu * strain[:, 3]
+    stress[:, 4] = 2*mu * strain[:, 4]
+    stress[:, 5] = 2*mu * strain[:, 5]
 
-    mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/beam_fealpy.vtu')
-    print("-----------")
+    stress_xx = stress[:, 0]
+    stress_norm = bm.einsum('ij -> i', bm.abs(stress))
+    
+    file_path = '/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/log.txt'
+    data = parse_file(file_path)
+
+    nodes = data['nodes']
+    cells = data['cells']
+    element_stiffness_matrices = data['element_stiffness_matrices']
+    material_params = data['material_params']
+    cell_data = data['cell_data']
+
+    NN = len(nodes)
+    NC = len(cells)
+
+    import numpy as np
+    real_nodes = np.zeros((NN, 3), dtype=np.float64)
+    real_cells = np.zeros((NC, 4), dtype=np.int32)
+    for i, node in enumerate(nodes):
+        real_nodes[i] = np.array(node)
+    for i, cell in enumerate(cells):
+        real_cells[i] = np.array(cell)
+
+    K_real_elem = np.zeros((NC, 12, 12), dtype=np.float64)
+    for i in range(NC):
+        K_real_elem[i] = np.array(element_stiffness_matrices[i])
+
+    E = material_params['E']
+    nu = material_params['nu']
+    Lam = material_params['Lam']
+    mu = material_params['mu']
+
+    grad_lambda_elem = np.zeros((NC, 4, 3), dtype=np.float64)
+    displacement_elem = np.zeros((NC, 4, 3), dtype=np.float64)
+    strain_elem = np.zeros((NC, 6), dtype=np.float64)
+    stress_elem = np.zeros((NC, 6), dtype=np.float64)
+
+    for i in range(NC):
+        grad_lambda_elem[i] = np.array(cell_data[i]['Grad Lambda'])
+        displacement_elem[i] = np.array(cell_data[i]['Displacement'])
+        strain_elem[i] = np.array(cell_data[i]['Strain'])
+        stress_elem[i] = np.array(cell_data[i]['Stress'])
+    stress_elem_xx = stress_elem[:, 0]
+
+    error_KE = KE - K_real_elem
+    error_cuh = cuh - displacement_elem
+    error_glambda = glambda - grad_lambda_elem
+    error_strain = strain - strain_elem
+    error_stress = stress - stress_elem
+
+    mesh.celldata['strain_fealpy'] = strain
+    mesh.celldata['stress_fealpy'] = stress
+    mesh.celldata['strian_zj'] = strain_elem
+    mesh.celldata['stress_zj'] = stress_elem
+
+    mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/zj_beam_fealpy.vtu')
 
 
-
+    print(f"max of S11: {bm.max(stress[:, 0])}")
+    print(f"max of S11: {bm.min(stress[:, 0])}")
+    print(f"mu: {mu}")
+    print(f"lam: {lam}")
 
