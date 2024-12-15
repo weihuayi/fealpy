@@ -43,6 +43,7 @@ class Form(Generic[_I], ABC):
     def copy(self):
         new_obj = self.__class__(self._spaces, batch_size=self.batch_size)
         new_obj.integrators.update(self.integrators)
+        new_obj.chunk_sizes.update(self.chunk_sizes)
         new_obj._values_ravel_shape = self._values_ravel_shape
         new_obj.sparse_shape = tuple(reversed(self.sparse_shape))
         return new_obj
@@ -141,7 +142,7 @@ class Form(Generic[_I], ABC):
                 logger.debug(f"(ASSEMBLY LOCAL FULL) {key}")
                 yield self._assembly_group(key)
             else:
-                logger.debug(f"(ASSEMBLY LOCAL ITER) {key}, {chunk_size} chunks")
+                logger.debug(f"(ASSEMBLY LOCAL ITER) {key}, {chunk_size} for each chunk")
                 yield from IntegralIter.split(int_, chunk_size)(self.space)
 
 
@@ -176,7 +177,7 @@ class IntegralIter():
         length = segments.shape[0] + 1
 
         for i in range(length):
-            logger.debug(f"(ITERATION) {i}/{length}")
+            logger.debug(f"(FORM ITER) {i+1}/{length}")
             stop = segments[i] if (i + 1 < length) else None
             slicing = slice(start, stop, 1)
             yield self.kernel(spaces, slicing)
@@ -185,5 +186,8 @@ class IntegralIter():
     @classmethod
     def split(cls, integrator: Integrator, /, chunk_size=0):
         size = integrator.get_region().shape[0]
-        segments = bm.arange(chunk_size, size, chunk_size)
+        if chunk_size >= size:
+            segments = bm.empty((0,), dtype=bm.int64)
+        else:
+            segments = bm.arange(chunk_size, size, chunk_size, dtype=bm.int64)
         return cls(integrator, segments)

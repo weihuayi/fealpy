@@ -25,6 +25,7 @@ class DirectSolverResult:
 class AssemblyMethod(Enum):
     """矩阵组装方法的枚举类"""
     STANDARD = auto()     # 标准组装方法
+    VOIGT = auto()        # Voigt 格式组装
     FAST_STRAIN = auto()  # 应变快速组装
     FAST_STRESS = auto()  # 应力快速组装
     FAST_3D = auto()      # 3D 快速组装
@@ -32,7 +33,7 @@ class AssemblyMethod(Enum):
 @dataclass
 class AssemblyConfig:
     """矩阵组装的配置类"""
-    method: AssemblyMethod = AssemblyMethod.STANDARD
+    method: AssemblyMethod = AssemblyMethod.VOIGT
     quadrature_degree_increase: int = 3 
 
 class ElasticFEMSolver:
@@ -149,6 +150,7 @@ class ElasticFEMSolver:
         # 根据 assembly_config.method 选择对应的组装函数
         method_map = {
             AssemblyMethod.STANDARD: integrator.assembly,
+            AssemblyMethod.VOIGT: integrator.voigt_assembly,
             AssemblyMethod.FAST_STRAIN: integrator.fast_assembly_strain,
             AssemblyMethod.FAST_STRESS: integrator.fast_assembly_stress,
             AssemblyMethod.FAST_3D: integrator.fast_assembly
@@ -175,6 +177,7 @@ class ElasticFEMSolver:
         # 确定积分方法
         method_map = {
             AssemblyMethod.STANDARD: 'assembly',
+            AssemblyMethod.VOIGT: 'voigt',
             AssemblyMethod.FAST_STRAIN: 'fast_strain',
             AssemblyMethod.FAST_STRESS: 'fast_stress',
             AssemblyMethod.FAST_3D: 'fast_3d'
@@ -246,9 +249,10 @@ class ElasticFEMSolver:
         uh_bd = bm.zeros(self.tensor_space.number_of_global_dofs(),
                         dtype=bm.float64, device=bm.get_device(self.tensor_space))
                         
-        isBdDof = self.tensor_space.is_boundary_dof(threshold=threshold, method='interp')
+        # isBdDof = self.tensor_space.is_boundary_dof(threshold=threshold, method='interp')
+        uh_bd, isBdDof = self.tensor_space.boundary_interpolate(gd=dirichlet, threshold=threshold, method='interp')
 
-        F = F - K.matmul(uh_bd)  # in-place operations
+        F = F - K.matmul(uh_bd[:])  
         F[isBdDof] = uh_bd[isBdDof]
         
         dbc = DirichletBC(space=self.tensor_space, gd=dirichlet,

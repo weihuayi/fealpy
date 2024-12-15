@@ -1,20 +1,59 @@
+"""论文中带有线性位移真解的算例（应变和应力为常数）"""
 from fealpy.backend import backend_manager as bm
-from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.sparse import COOTensor
-from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+
+from fealpy.mesh import HexahedronMesh, TetrahedronMesh
 from fealpy.material.elastic_material import LinearElasticMaterial
+from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
+from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
 from fealpy.fem.bilinear_form import BilinearForm
+from fealpy.fem.linear_form import LinearForm
 from fealpy.fem.dirichlet_bc import DirichletBC
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
+from fealpy.sparse import COOTensor, CSRTensor
 from fealpy.solver import cg, spsolve
 
-from soptx.utils import timer
-
-import pickle
-from app.gearx.gear import ExternalGear, InternalGear
 from app.gearx.utils import *
+    
+bm.set_backend('numpy')
 
-from fealpy.mesh import HexahedronMesh
+def read_mtx_file(filename):
+    """
+    读取 mtx 文件并将数据转换为三维数组
+    
+    参数:
+    filename : str
+        mtx 文件的路径
+        
+    返回:
+    numpy.ndarray
+        形状为 (7, 24, 24) 的三维数组
+    """
+    # 初始化一个 7x24x24 的零矩阵
+    result = np.zeros((7, 24, 24))
+    
+    # 读取文件
+    with open(filename, 'r') as file:
+        for line in file:
+            # 跳过空行
+            if not line.strip():
+                continue
+                
+            # 将每行分割成数组
+            parts = line.strip().split()
+            if len(parts) == 4:  # 确保行格式正确
+                # 解析数据
+                matrix_idx = int(parts[0])     # 矩阵索引 (0-6)
+                i = int(parts[1]) - 1          # 行索引 (0-23)
+                j = int(parts[2]) - 1          # 列索引 (0-23)
+                value = float(parts[3])        # 值
+                
+                # 将值存入对应位置
+                if 0 <= matrix_idx < 7 and 0 <= i < 24 and 0 <= j < 24:
+                    result[matrix_idx, i, j] = value
+    
+    return result
 
 def compute_strain_stress_at_vertices(space, uh, mu, lam):
     """在网格顶点处计算应变和应力"""
@@ -326,180 +365,177 @@ def compute_equivalent_stress(stress, nu):
     
     return equiv_stress
 
-with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/external_gear_data_part.pkl', 'rb') as f:
-    data = pickle.load(f)
+class BoxDomainLinear3d():
+    def __init__(self):
+        self.eps = 1e-12
 
-external_gear = data['external_gear']
-hex_mesh = data['hex_mesh']
-helix_node = data['helix_node']
-is_inner_node = data['is_inner_node']
+    def domain(self):
+        return [0, 1, 0, 1, 0, 1]
 
-t = timer(f"总计算时间")
-next(t)
+    @cartesian
+    def source(self, points: TensorLike):
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=bm.get_device(points))
+        
+        return val
 
-hex_cell = hex_mesh.cell
-hex_node = hex_mesh.node
-mesh = HexahedronMesh(hex_node, hex_cell)
+    @cartesian
+    def solution(self, points: TensorLike):
+        x = points[..., 0]
+        y = points[..., 1]
+        z = points[..., 2]
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=bm.get_device(points))
+        
+        val[..., 0] = 1e-3 * (2*x + y + z) / 2
+        val[..., 1] = 1e-3 * (x + 2*y + z) / 2
+        val[..., 2] = 1e-3 * (x + y + 2*z) / 2
 
-GD = mesh.geo_dimension()   
-NC = mesh.number_of_cells()
-print(f"NC: {NC}")
+        return val
+
+    @cartesian
+    def dirichlet(self, points: TensorLike) -> TensorLike:
+
+        result = self.solution(points)
+
+        return result
+
+node = bm.array([[0.249, 0.342, 0.192],
+                [0.826, 0.288, 0.288],
+                [0.850, 0.649, 0.263],
+                [0.273, 0.750, 0.230],
+                [0.320, 0.186, 0.643],
+                [0.677, 0.305, 0.683],
+                [0.788, 0.693, 0.644],
+                [0.165, 0.745, 0.702],
+                [0, 0, 0],
+                [1, 0, 0],
+                [1, 1, 0],
+                [0, 1, 0],
+                [0, 0, 1],
+                [1, 0, 1],
+                [1, 1, 1],
+                [0, 1, 1]],
+            dtype=bm.float64)
+
+cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7],
+                [0, 3, 2, 1, 8, 11, 10, 9],
+                [4, 5, 6, 7, 12, 13, 14, 15],
+                [3, 7, 6, 2, 11, 15, 14, 10],
+                [0, 1, 5, 4, 8, 9, 13, 12],
+                [1, 2, 6, 5, 9, 10, 14, 13],
+                [0, 4, 7, 3, 8, 12, 15, 11]],
+                dtype=bm.int32)
+mesh = HexahedronMesh(node, cell)
+
+# nx, ny, nz = 2, 2, 2 
+# mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
+#                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
+# mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], 
+#                             nx=nx, ny=ny, nz=ny, device=bm.get_device('cpu'))
+
+GD = mesh.geo_dimension()
 NN = mesh.number_of_nodes()
-print(f"NN: {NN}")
+NC = mesh.number_of_cells()
+print(f"NN = {NN} NC = {NC}")
+cm = mesh.cell_volume()
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 
-# 节点载荷
-# load_values = 100 * bm.array([131.0, 131.0], dtype=bm.float64) # (2, )
-load_values = 100 * bm.array([131.0], dtype=bm.float64) # (2, )
-
-n = 1
-helix_d = bm.array([(external_gear.d+external_gear.effective_da)/2], dtype=bm.float64)
-helix_width = bm.array([0], dtype=bm.float64)
-# helix_width = bm.array([external_gear.tooth_width], dtype=bm.float64)
-helix_node = external_gear.cylindrical_to_cartesian(helix_d, helix_width)
-
-target_cell_idx = bm.zeros(n, bm.int32)
-face_normal = bm.zeros((n, 3), bm.float64)
-parameters = bm.zeros((n, 3), bm.float64)
-for i, t_node in enumerate(helix_node):
-    target_cell_idx[i], face_normal[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
-
-average_normal = bm.mean(face_normal, axis=0)
-average_normal /= bm.linalg.norm(average_normal)
-
-threshold = 0.1
-for i in range(len(face_normal)):
-    deviation = np.linalg.norm(face_normal[i] - average_normal)
-    if deviation > threshold:
-        face_normal[i] = average_normal
-
-P = bm.einsum('p, pd -> pd', load_values, face_normal)  # (1, GD)
-
-u = parameters[..., 0]
-v = parameters[..., 1]
-w = parameters[..., 2]
-
-bcs_list = [
-    (
-        bm.tensor([[u, 1 - u]]),
-        bm.tensor([[v, 1 - v]]),
-        bm.tensor([[w, 1 - w]])
-    )
-    for u, v, w in zip(u, v, w)
-]
-
 p = 1
+q = p+2
 space = LagrangeFESpace(mesh, p=p, ctype='C')
-scalar_gdof = space.number_of_global_dofs()
-print(f"gdof: {scalar_gdof}")
-cell2dof = space.cell_to_dof()
-
-q = p+1
+sgdof = space.number_of_global_dofs()
+print(f"sgdof: {sgdof}")
 tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
-
+# tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
+tldof = tensor_space.number_of_local_dofs()
 tgdof = tensor_space.number_of_global_dofs()
 print(f"tgdof: {tgdof}")
-tldof = tensor_space.number_of_local_dofs()
-cell2tdof = tensor_space.cell_to_dof()
+pde = BoxDomainLinear3d()
 
-load_node_indices = cell[target_cell_idx].flatten() # (1*8, )
-# 带有载荷的节点对应的全局自由度编号
-dof_indices = bm.stack([scalar_gdof * d + 
-                        load_node_indices for d in range(GD)], axis=1)  # (1*8, GD)
+filename = "/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_linear_exact_fealpy_STIF2.mtx"
+matrices = read_mtx_file(filename)
+# matrices1 = matrices + bm.transpose(matrices, axes=(0, 2, 1))
+KE0_true = matrices[0]
+KE0_true_sum = bm.sum(bm.abs(KE0_true[0, :]))
 
-phi_loads = []
-for bcs in bcs_list:
-    phi = tensor_space.basis(bcs)
-    phi_loads.append(phi)
-
-phi_loads_array = bm.concatenate(phi_loads, axis=1) # (1, 1, tldof, GD)
-
-FE_load = bm.einsum('pd, cpld -> pl', P, phi_loads_array) # (1, 24)
-
-FE = bm.zeros((NC, tldof), dtype=bm.float64)
-FE[target_cell_idx, :] = FE_load[:, :] # (NC, tldof)
-
-F = COOTensor(indices = bm.empty((1, 0), dtype=bm.int32, device=bm.get_device(space)),
-            values = bm.empty((0, ), dtype=bm.float64, device=bm.get_device(space)),
-            spshape = (tgdof, ))
-indices = cell2tdof.reshape(1, -1)
-F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
-
-# 从全局载荷向量中提取有载荷节点处的值
-F_load_nodes = F[dof_indices] # (1*8, GD)
-
-# 
-# load_node_indices = bm.tensor([20049], dtype=bm.int32)
-# F = bm.zeros(tgdof, dtype=bm.float64)
-# F = bm.set_at(F, 20049, 1000*-3.6292831049748364)
-
-# # 从全局载荷向量中提取有载荷节点处的值
-# F_load_nodes = bm.tensor([[1000*-3.6292831049748364, 0, 0]], dtype=bm.float64)
-
-fixed_node_index = bm.where(is_inner_node)[0]
-export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/gear_F1_anays_fealpy.inp', 
-              nodes=node, elements=cell, 
-              fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
-              young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9,
-              used_app='ansys', mesh_type='hex')
-export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/gear_F1_abaqus_fealpy.inp', 
-              nodes=node, elements=cell, 
-              fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
-              young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9,
-              used_app='abaqus', mesh_type='hex')
-
-E = 206e3
+# 刚度矩阵
+E = 2.1e5
 nu = 0.3
+# E = 1e6
+# nu = 0.25
 lam = (E * nu) / ((1.0 + nu) * (1.0 - 2.0 * nu))
 mu = E / (2.0 * (1.0 + nu))
 linear_elastic_material = LinearElasticMaterial(name='E_nu', 
                                                 elastic_modulus=E, poisson_ratio=nu, 
                                                 hypo='3D', device=bm.get_device(mesh))
-integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=q)
+integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
+                                    q=q, method='voigt_bbar')
+KE = integrator_K.voigt_bbar_assembly(space=tensor_space)
+KE0 = KE[0]
+KE0_sum = bm.sum(bm.abs(KE0[0, :]))
+integrator_K1 = LinearElasticIntegrator(material=linear_elastic_material, 
+                                    q=q, method='voigt')
+KE1 = integrator_K.voigt_assembly(space=tensor_space)
+KE10 = KE1[0]
+KE10_sum = bm.sum(bm.abs(KE10[0, :]))
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
+Kdense = K.to_dense()
 values = K.values()
 K_norm = bm.sqrt(bm.sum(values * values))
-F_norm = bm.sqrt(bm.sum(F * F))   
-print(f"Matrix norm after dc: {K_norm:.6f}")
-print(f"Load vector norm after dc: {F_norm:.6f}")
+print(f"K.shape = {K.shape}")
+print(f"Matrix norm before dc: {K_norm:.6f}")
 
-scalar_is_bd_dof = bm.zeros(scalar_gdof, dtype=bm.bool)
-scalar_is_bd_dof[:NN] = is_inner_node
-tensor_is_bd_dof = tensor_space.is_boundary_dof(
-        threshold=(scalar_is_bd_dof, scalar_is_bd_dof, scalar_is_bd_dof), 
-        method='interp')
-dbc = DirichletBC(space=tensor_space, 
-                    gd=0, 
-                    threshold=tensor_is_bd_dof, 
-                    method='interp')
-K = dbc.apply_matrix(matrix=K, check=True)
-uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-# uh_bd, isDDof = tensor_space.boundary_interpolate(gd=0, 
-#                                                 uh=uh_bd, 
-#                                                 threshold=tensor_is_bd_dof, 
-#                                                 method='interp')
-isDDof = tensor_is_bd_dof
+# 载荷向量
+integrator_F = VectorSourceIntegrator(source=pde.source, q=q)
+lform = LinearForm(tensor_space)    
+lform.add_integrator(integrator_F)
+F = lform.assembly()
+F_norm = bm.sqrt(bm.sum(F * F))   
+print(f"F.shape = {F.shape}")
+print(f"Load vector norm before dc: {F_norm:.6f}")
+
+# 导入 inp 文件
+u = lambda p: (1e-3*(2*p[..., 0]+p[..., 1]+p[..., 2])/2).reshape(-1, 1)
+v = lambda p: (1e-3*(p[..., 0]+2*p[..., 1]+p[..., 2])/2).reshape(-1, 1)
+w = lambda p: (1e-3*(p[..., 0]+p[..., 1]+2*p[..., 2])/2).reshape(-1, 1)
+isBdNode = space.is_boundary_dof(threshold=None)
+boundary_nodes_idx = bm.where(isBdNode)[0]
+boundary_nodes = node[boundary_nodes_idx]
+boundary_nodes_u = bm.concatenate([u(boundary_nodes), v(boundary_nodes), w(boundary_nodes)], axis=1)
+
+export_to_inp_by_u(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_linear_exact_ansys_fealpy.inp', 
+              nodes=node, elements=cell, 
+              boundary_nodes_idx=boundary_nodes_idx, boundary_nodes_u=boundary_nodes_u,
+              young_modulus=E, poisson_ratio=nu, density=7.85e-9, 
+              used_app='ansys', mesh_type='hex')
+
+# 边界条件处理
+uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
+                dtype=bm.float64, device=bm.get_device(mesh))
+uh_bd, isDDof = tensor_space.boundary_interpolate(gd=pde.dirichlet, 
+                                                uh=uh_bd, threshold=None, method='interp')
+print(f"isDDof: {isDDof.shape} :\n {isDDof}")
+print(f"uh_bd: {uh_bd.shape} :\n {uh_bd}")
 F = F - K.matmul(uh_bd)
 F = bm.set_at(F, isDDof, uh_bd[isDDof])
-values = K.values()
-K_norm = bm.sqrt(bm.sum(values * values))
-F_norm = bm.sqrt(bm.sum(F * F))   
-print(f"Matrix norm after dc: {K_norm:.6f}")
-print(f"Load vector norm after dc: {F_norm:.6f}")
 
-from fealpy import logger
-logger.setLevel('INFO')
+dbc = DirichletBC(space=tensor_space, 
+                gd=pde.dirichlet, 
+                threshold=None, 
+                method='interp')
+K = dbc.apply_matrix(matrix=K, check=True)
+Kdense1 = K.to_dense()
+# 求解
 uh = tensor_space.function()
-# uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
+# uh[:] = cg(K, F, maxiter=1000, atol=1e-8, rtol=1e-8)
 uh[:] = spsolve(K, F, solver="mumps")
-
-# 计算残差向量和范数
-residual = K.matmul(uh[:]) - F  # 使用 CSRTensor 的 matmul 方法
-residual_norm = bm.sqrt(bm.sum(residual * residual))
-print(f"Final residual norm: {residual_norm:.6e}")
+print(f"uh: {uh.shape}:\n {uh[:]}")
+u_exact = tensor_space.interpolate(pde.solution)
+print(f"u_exact: {u_exact[:].shape}:\n {u_exact[:]}")
 
 if tensor_space.dof_priority:
     uh_show = uh.reshape(GD, NN).T
@@ -508,7 +544,9 @@ else:
 uh_x = uh_show[:, 0]
 uh_y = uh_show[:, 1]
 uh_z = uh_show[:, 2]
-
+print(f"uh_x: {uh_x.shape}:\n {uh_x}")
+print(f"uh_y: {uh_y.shape}:\n {uh_y}")
+print(f"uh_z: {uh_z.shape}:\n {uh_z}")
 uh_magnitude = bm.linalg.norm(uh_show, axis=1)
 
 # 计算方式一：在顶点处计算
@@ -527,15 +565,104 @@ strain3, stress3, nstrain3, nstress3 = compute_strain_stress_at_quadpoints1(spac
 strain4, stress4, nstrain4, nstress4 = compute_strain_stress_at_quadpoints2(space, 
                                                                         uh_show, mu, lam)
 
+uh_cell = bm.zeros((NC, tldof)) # (NC, tldof)
+cell2tdof = tensor_space.cell_to_dof()
+for c in range(NC):
+    uh_cell[c] = uh[cell2tdof[c]]
+
+# 单元积分点处的位移梯度
+q = 2
+qf = mesh.quadrature_formula(q)
+bcs_quadrature, ws = qf.get_quadrature_points_and_weights()
+tgphi = tensor_space.grad_basis(bcs_quadrature)             # (NC, NQ, tldof, GD, GD)
+tgrad = bm.einsum('cqimn, ci -> cqmn', tgphi, uh_cell)      # (NC, NQ, GD, GD)
+
+# 应变张量
+strain = (tgrad + bm.transpose(tgrad, (0, 1, 3, 2))) / 2    # (NC, NQ, GD, GD)
+strain_xx = strain[..., 0, 0] # (NC, NQ)
+strain_yy = strain[..., 1, 1] # (NC, NQ)
+strain_zz = strain[..., 2, 2] # (NC, NQ)
+strain_xy = strain[..., 0, 1] # (NC, NQ)
+strain_yz = strain[..., 1, 2] # (NC, NQ)
+strain_xz = strain[..., 0, 2] # (NC, NQ)
+
+# 应力张量
+trace_e = bm.einsum("...ii", strain) # (NC, NQ)
+I = bm.eye(GD, dtype=bm.float64)
+stress = 2 * mu * strain + lam * trace_e[..., None, None] * I # (NC, NQ, GD, GD)
+stress_xx = stress[..., 0, 0] # (NC, 8)
+stress_yy = stress[..., 1, 1] # (NC, 8)
+stress_zz = stress[..., 2, 2] # (NC, 8)
+stress_xy = stress[..., 0, 1] # (NC, 8)
+stress_yz = stress[..., 1, 2] # (NC, 8)
+stress_xz = stress[..., 0, 2] # (NC, 8)
+
+
 mesh.nodedata['uh'] = uh_show[:]
 mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
 mesh.nodedata['strain_vertices'] = nstrain1
 mesh.nodedata['stress_vertices'] = nstress1
 mesh.nodedata['strian_centers'] = nstrain2
 mesh.nodedata['stress_centers'] = nstress2
-mesh.nodedata['strain_quadpoints1'] = nstrain3
-mesh.nodedata['stress_quadpoints1'] = nstress3
-mesh.nodedata['strain_quadpoints2'] = nstrain4
-mesh.nodedata['stress_quadpoints2'] = nstress4
-mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/gear_1F_fealpy_2.vtu')
-print("-----------")
+mesh.nodedata['strain_quadpoints'] = nstrain3
+mesh.nodedata['stress_quadpoints'] = nstress3
+mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_hex_linear_exact_fealpy.vtu')
+
+
+# 验证收敛阶
+maxit = 4
+errorType = ['$|| u_{bd} - uh_{bd}$', '$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
+errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
+NDof = bm.zeros(maxit, dtype=bm.int32)
+for i in range(maxit):
+    space = LagrangeFESpace(mesh, p=p, ctype='C')
+    # tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
+    tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
+
+    NDof[i] = tensor_space.number_of_global_dofs()
+
+    linear_elastic_material = LinearElasticMaterial(name='E_nu', 
+                                                elastic_modulus=E, poisson_ratio=nu, 
+                                                hypo='3D', device=bm.get_device(mesh))
+
+    integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=q, method='voigt')
+    bform = BilinearForm(tensor_space)
+    bform.add_integrator(integrator_K)
+    K = bform.assembly(format='csr')
+
+    integrator_F = VectorSourceIntegrator(source=pde.source, q=q)
+    lform = LinearForm(tensor_space)    
+    lform.add_integrator(integrator_F)
+    F = lform.assembly()
+
+    dbc = DirichletBC(space=tensor_space, 
+                    gd=pde.dirichlet, 
+                    threshold=None, 
+                    method='interp')
+    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
+                    dtype=bm.float64, device=bm.get_device(mesh))
+    uh_bd, isDDof = tensor_space.boundary_interpolate(gd=pde.dirichlet, 
+                                                    uh=uh_bd, threshold=None, method='interp')
+    F = F - K.matmul(uh_bd)
+    F = bm.set_at(F, isDDof, uh_bd[isDDof])
+
+    K = dbc.apply_matrix(matrix=K, check=True)
+
+    uh = tensor_space.function()
+    # uh[:] = cg(K, F, maxiter=1000, atol=1e-8, rtol=1e-8)
+    uh[:] = spsolve(K, F, solver="mumps")
+
+    u_exact = tensor_space.interpolate(pde.solution)
+    errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh[:] - u_exact)**2 * (1 / NDof[i])))
+    errorMatrix[1, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
+    errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
+
+    if i < maxit-1:
+        mesh.uniform_refine()
+
+print("errorMatrix:\n", errorType, "\n", errorMatrix)
+print("NDof:", NDof)
+print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))
+print("----------------------")
+

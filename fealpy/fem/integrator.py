@@ -1,10 +1,11 @@
 
-from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Sequence
-from typing import overload, Generic
+from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict
+from typing import Generic
 import logging
 
 from .. import logger
 from ..typing import TensorLike, Index, CoefLike
+from ..backend import backend_manager as bm
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import ftype_memory_size
 
@@ -85,21 +86,23 @@ def enable_cache(func: Self) -> Self:
 
     Use `Integrator.keep_data(True)` to enable the cache.
     """
-    def wrapper(integrator_obj, space: _FS) -> TensorLike:
-        if not integrator_obj._keep_data:
-            return func(integrator_obj, space)
+    def wrapper(integrator_obj, space, /, indices=None) -> TensorLike:
+        if (indices is None) and (integrator_obj._keep_data):
+            assert hasattr(integrator_obj, '_cache')
+            _cache = integrator_obj._cache
+            key = (func.__name__, id(space))
 
-        assert hasattr(integrator_obj, '_cache')
-        _cache = integrator_obj._cache
-        key = (func.__name__, id(space))
+            if key in _cache:
+                return _cache[key]
 
-        if key in _cache:
-            return _cache[key]
+            data = func(integrator_obj, space)
+            _cache[key] = data
 
-        data = func(integrator_obj, space)
-        _cache[key] = data
-
-        return data
+            return data
+        else:
+            if indices is None:
+                return func(integrator_obj, space)
+            return func(integrator_obj, space, indices)
 
     return wrapper
 
@@ -107,14 +110,37 @@ def enable_cache(func: Self) -> Self:
 class Integrator(metaclass=IntegratorMeta):
     """The base class for integrators.
 
+    ## Introduction
+
     Integrators are designed to integral given functions in input spaces.
     Output of integrators are tensors on entities (0-axis), containing data
     of each local DoFs (1-axis). There may be extra dimensions.
 
-    All integrators should inplement the `assembly` and `to_global_dof` method.
+    Integrators have a concept called `region` to specify the region of integration,
+    given as indices of mesh entities.
+    Integrators are expected to output tensor fields on these mesh entities
+    (i.e. tensors sized the number of entity in the 0-dimension).
+
+    All integrators should implement methods named `assembly` and `to_global_dof`.
+    See examples below:
+    ```
+    def to_global_dof(space, /, indices):
+        pass
+
+    def assembly(space, /, indices):
+        pass
+    ```
     These two methods indicate two functions of an integrator: calculation of the integral,
     and getting relationship between local DoFs and global DoFs, repectively.
+    The `indices` argument is designed to select a subset of integrator's working region,
+    and the final indices of entities can be fetched by
+    ```
+    # inside the methods of integrators
+    index = self.entity_selection(indices)
+    ```
     Users can customize an integrator by implementing them in a subclass.
+
+    ## Features
 
     ### Multiple Assembly Methods
 
@@ -167,6 +193,25 @@ class Integrator(metaclass=IntegratorMeta):
             raise RuntimeError("Region of integration not specified. "
                                "Use Integrator.set_region to set indices.")
         return self._region
+
+    def entity_selection(self, indices: _OpIndex = None) -> Index:
+        if self._region is None:
+            if indices is None:
+                return slice(None, None, None)
+            else:
+                return indices
+        else:
+            if indices is None:
+                return self._region
+            else:
+                if bm.is_tensor(self._region):
+                    if self._region.dtype == bm.bool:
+                        return bm.nonzero(self._region)[0][indices]
+                    return self._region[indices]
+                else:
+                    raise TypeError(f"region of type '{self._region.__class__.__name__}' "
+                                    "is not supported when indices is given.")
+
     ### END: Region of Integration ###
 
     def const(self, space: _SpaceGroup, /):
@@ -181,18 +226,14 @@ class Integrator(metaclass=IntegratorMeta):
             val = meth(space) # Old API
         else:
             val = meth(space, indices=indices)
-        if logger.level == logging._nameToLevel['INFO']:
+        if logger.level <= logging._nameToLevel['INFO']:
             logger.info(f"Local tensor sized {ftype_memory_size(val)} Mb.")
         return val
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self._method})"
 
-    @overload
-    def to_global_dof(self, space: _FS, /, indices: _OpIndex = None) -> TensorLike: ...
-    @overload
-    def to_global_dof(self, space: Tuple[_FS, ...], /, indices: _OpIndex = None) -> Tuple[TensorLike, ...]: ...
-    def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None):
+    def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> Union[TensorLike, Tuple[TensorLike, ...]]:
         """Return the relationship between the integral entities
         and the global dofs."""
         raise NotImplementedError
@@ -344,10 +385,6 @@ class GroupIntegrator(Integrator):
             integrator.set_region(region)
         return super().set_region(region)
 
-    @overload
-    def to_global_dof(self, space: _FS, /, indices: _OpIndex = None) -> TensorLike: ...
-    @overload
-    def to_global_dof(self, space: Tuple[_FS, ...], /, indices: _OpIndex = None) -> Tuple[TensorLike, ...]: ...
     def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None):
         if indices is None:
             return self.ints[0].to_global_dof(space)
