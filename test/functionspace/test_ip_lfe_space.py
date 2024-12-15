@@ -24,9 +24,13 @@ class TestInteriorPenaltyFESpace2d:
         bcs, ws = qf.get_quadrature_points_and_weights()
         rval = space.grad_normal_jump_basis(bcs)
         print('rv:', rval)
-        #space.grad_grad_normal_jump_basis(bcs)
+        bval = space.boundary_edge_grad_normal_jump_basis(bcs)
+        print('bv:', bval)
+        ggval = space.grad_grad_normal_jump_basis(bcs)
+        print('ggv:', ggval)
+        
 
-bm.set_backend('numpy')
+bm.set_backend('pytorch')
 dof = TestInteriorPenaltyDof2d()
 dof.test_ip_lfe_dof_2d()
 test_space = TestInteriorPenaltyFESpace2d()

@@ -104,11 +104,20 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
-        edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
-        edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
+        slice_operations = {
+            0: lambda x: x,  # slice(None) -> 保持原样
+            1: lambda x: bm.flip(x)  # slice(None, None, -1) -> 反转
+        }
+
+        # 初始化 edof2lcdof 和 edof2rcdof 以匹配 slice_operations
+        edof2lcdof = [0, 1, 0]  # 索引对应 slice(None), slice(None, None, -1), slice(None)
+        edof2rcdof = [1, 0, 1]  # 索引对应 slice(None, None, -1), slice(None), slice(None, None, -1)
+
+        #edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
+        #edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
         rval0  = bm.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
         rval1  = bm.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
@@ -119,8 +128,14 @@ class InteriorPenaltyFESpace2d:
             bcsi    = bcss[i] 
             
             edgeidx = ie2c[:, 2]==i
+            
+
+            # 应用操作映射来获取正确的索引
+            zero_indices = bm.where(self.dof.multiIndex[:, i] == 0)[0]
+            dofidx1 = slice_operations[edof2lcdof[i]](zero_indices)
+            
             dofidx0 = bm.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
+            #dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
             gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
             val  = bm.einsum('eqdi, ei->qed', gval, en[edgeidx]) # (NQ, NIEi, cdof)
@@ -129,14 +144,18 @@ class InteriorPenaltyFESpace2d:
             rval0 = bm.set_at(rval0, indices, val[..., dofidx0])
             rval2 = bm.add_at(rval2, indices, val[..., dofidx1])
 
-        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss = [bm.insert(bm.flip(bcs, axis=-1), i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
         # 右边单元的基函数的法向导数跳量
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 3]==i
             dofidx0 = bm.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
+
+            # 应用操作映射来获取正确的索引
+            zero_indices = bm.where(self.dof.multiIndex[:, i] == 0)[0]
+            dofidx1 = slice_operations[edof2rcdof[i]](zero_indices)
+            #dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
             gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
             val  = bm.einsum('eqdi, ei->qed', gval, -en[edgeidx]) # (NQ, NIEi, cdof)
@@ -166,11 +185,20 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
-        edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
-        edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
+        slice_operations = {
+            0: lambda x: x,  # slice(None) -> 保持原样
+            1: lambda x: bm.flip(x)  # slice(None, None, -1) -> 反转
+        }
+
+        # 初始化 edof2lcdof 和 edof2rcdof 以匹配 slice_operations
+        edof2lcdof = [0, 1, 0]  # 索引 0, 1 对应 slice(None), slice(None, None, -1), slice(None)
+        edof2rcdof = [1, 0, 1]  # 索引 0, 1 对应 slice(None, None, -1), slice(None), slice(None, None, -1)
+
+        #edof2lcdof = [slice(None), slice(None, None, -1), slice(None)]
+        #edof2rcdof = [slice(None, None, -1), slice(None), slice(None, None, -1)]
 
         rval0  = bm.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
         rval1  = bm.zeros(shape+(NIE, cdof-edof), dtype=self.mesh.ftype)
@@ -181,8 +209,11 @@ class InteriorPenaltyFESpace2d:
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 2]==i
             dofidx0 = bm.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
+            zero_indices = bm.where(self.dof.multiIndex[:, i] == 0)[0]
+            dofidx1 = slice_operations[edof2lcdof[i]](zero_indices)
+            #dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
 
+            print(bcsi, ie2c[edgeidx, 0])
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
             val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
                     en[edgeidx])/2.0# (NQ, NIEi, cdof)
@@ -191,14 +222,16 @@ class InteriorPenaltyFESpace2d:
             rval0 = bm.set_at(rval0, indices, val[..., dofidx0])
             rval2 = bm.add_at(rval2, indices, val[..., dofidx1])
 
-        bcss = [np.insert(bcs[..., ::-1], i, 0, axis=-1) for i in range(3)]
+        bcss = [bm.insert(bm.flip(bcs, axis=-1), i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
         # 右边单元
         for i in range(3):
             bcsi    = bcss[i] 
             edgeidx = ie2c[:, 3]==i
             dofidx0 = bm.where(self.dof.multiIndex[:, i] != 0)[0]
-            dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
+            zero_indices = bm.where(self.dof.multiIndex[:, i] == 0)[0]
+            dofidx1 = slice_operations[edof2rcdof[i]](zero_indices)
+            #dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
 
             hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
             val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
@@ -227,7 +260,7 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         rval = bm.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
@@ -261,7 +294,7 @@ class InteriorPenaltyFESpace2d:
 
         # 扩充重心坐标 
         shape = bcs.shape[:-1]
-        bcss = [np.insert(bcs, i, 0, axis=-1) for i in range(3)]
+        bcss = [bm.insert(bcs, i, 0, axis=-1) for i in range(3)]
         bcss[1] = bcss[1][..., [2, 1, 0]]
 
         rval = bm.zeros(shape+(NBE, cdof), dtype=self.mesh.ftype)
