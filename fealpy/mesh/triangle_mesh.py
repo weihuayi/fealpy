@@ -147,6 +147,20 @@ class TriangleMesh(SimplexMesh, Plotable):
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
 
+    def hess_shape_function(self, bc, p=1, index: Index=_S, variables='x'):
+        """
+        """
+        TD = bc.shape[1] - 1
+        H = bm.simplex_hess_shape_function(bc, p)
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index, TD=TD)
+            Hphi = bm.einsum('...ijk, kjm -> k...imk', H, Dlambda)
+            return Hphi
+        elif variables == 'u':
+            return H
+        
+    cell_hess_shape_function = hess_shape_function
+
     cell_grad_shape_function = grad_shape_function
 
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
@@ -266,6 +280,9 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
+
+    def boundary_edge_flag(self):
+        return self.boundary_face_flag()
 
     def cell_to_face_sign(self):
         """
@@ -1185,7 +1202,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         @return TriangleMesh instance
         """
         if itype is None:
-            itype = bm.int32
+            itype = bm.int64
         if ftype is None:
             ftype = bm.float64
         
