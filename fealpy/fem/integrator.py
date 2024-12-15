@@ -110,14 +110,37 @@ def enable_cache(func: Self) -> Self:
 class Integrator(metaclass=IntegratorMeta):
     """The base class for integrators.
 
+    ## Introduction
+
     Integrators are designed to integral given functions in input spaces.
     Output of integrators are tensors on entities (0-axis), containing data
     of each local DoFs (1-axis). There may be extra dimensions.
 
-    All integrators should inplement the `assembly` and `to_global_dof` method.
+    Integrators have a concept called `region` to specify the region of integration,
+    given as indices of mesh entities.
+    Integrators are expected to output tensor fields on these mesh entities
+    (i.e. tensors sized the number of entity in the 0-dimension).
+
+    All integrators should implement methods named `assembly` and `to_global_dof`.
+    See examples below:
+    ```
+    def to_global_dof(space, /, indices):
+        pass
+
+    def assembly(space, /, indices):
+        pass
+    ```
     These two methods indicate two functions of an integrator: calculation of the integral,
     and getting relationship between local DoFs and global DoFs, repectively.
+    The `indices` argument is designed to select a subset of integrator's working region,
+    and the final indices of entities can be fetched by
+    ```
+    # inside the methods of integrators
+    index = self.entity_selection(indices)
+    ```
     Users can customize an integrator by implementing them in a subclass.
+
+    ## Features
 
     ### Multiple Assembly Methods
 
