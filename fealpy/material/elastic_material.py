@@ -173,7 +173,7 @@ class LinearElasticMaterial(ElasticMaterial):
                     gphi: TensorLike, 
                     shear_order: List[str]=['yz', 'xz', 'xy'],
                     # shear_order: List[str]=['xy', 'yz', 'xz'],
-                    bbar: bool = False, 
+                    correction: Optional[str] = None,  # 'None', 'BBar' 或 'SRI'
                     cm: TensorLike = None, ws: TensorLike = None, detJ: TensorLike = None) -> TensorLike:
         '''
         Constructs the strain-displacement matrix B for the material \n
@@ -216,8 +216,12 @@ class LinearElasticMaterial(ElasticMaterial):
             indices = flatten_indices((ldof, GD), (1, 0))
         else:
             indices = flatten_indices((ldof, GD), (0, 1))
-        if bbar:
+        if correction == 'BBar':
+            if any(param is None for param in (cm, ws, detJ)):  
+                raise ValueError("BBar correction requires cm, ws, and detJ parameters")
             normal_B = self._normal_strain_bbar(gphi, cm, ws, detJ, indices)
+        elif correction == 'SRI':
+            normal_B = self._normal_strain_sri(gphi, indices)
         else:
             normal_B = self._normal_strain(gphi, indices)
         
@@ -255,12 +259,41 @@ class LinearElasticMaterial(ElasticMaterial):
 
         return out
     
+    def _normal_strain_sri(self, gphi: TensorLike,
+                    indices: TensorLike, *,
+                    out: Optional[TensorLike]=None) -> TensorLike:
+        """Assembly normal strain tensor with SRI correction.
+
+        Parameters:
+            gphi - (NC, NQ, LDOF, GD).
+            indices - (LDOF, GD): Indices of DoF components in the flattened DoF, shaped .
+            out - (TensorLike | None, optional): Output tensor. Defaults to None.
+
+        Returns:
+            out: SRI corrected normal strain shaped (NC, NQ, GD, GD*LDOF).
+        """
+        kwargs = bm.context(gphi)
+        ldof, GD = gphi.shape[-2:]
+        new_shape = gphi.shape[:-2] + (3, GD*ldof)
+
+        if out is None:
+            out = bm.zeros(new_shape, **kwargs)
+        else:
+            if out.shape != new_shape:
+                raise ValueError(f'out.shape={out.shape} != {new_shape}')
+
+        # 构建修正的正应变矩阵，所有分量都使用完整积分
+        for i in range(GD):
+            for j in range(GD):
+                out = bm.set_at(out, (..., i, indices[:, j]), gphi[..., :, j])
+
+        return out
+    
     def _normal_strain_bbar(self, gphi: TensorLike,
                         cm, ws, detJ,
                         indices: TensorLike, *,
                         out: Optional[TensorLike] = None) -> TensorLike:
-        """
-        Assembly normal strain tensor with B-Bar correction.
+        """Assembly normal strain tensor with B-Bar correction.
 
         Parameters:
             gphi - (NC, NQ, LDOF, GD).
@@ -268,7 +301,7 @@ class LinearElasticMaterial(ElasticMaterial):
             out (TensorLike | None, optional): Output tensor. Defaults to None.
 
         Returns:
-            TensorLike: Corrected normal strain shaped (NC, NQ, GD, GD*LDOF).
+            out: B-Bar corrected normal strain shaped (NC, NQ, GD, GD*LDOF).
         """
         kwargs = bm.context(gphi)
         ldof, GD = gphi.shape[-2:]
