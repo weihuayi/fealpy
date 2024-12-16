@@ -154,7 +154,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         H = bm.simplex_hess_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index, TD=TD)
-            Hphi = bm.einsum('...ijk, kjm -> k...imk', H, Dlambda)
+            Hphi = bm.einsum('...ijl, kjm -> k...iml', H, Dlambda)
             return Hphi
         elif variables == 'u':
             return H
