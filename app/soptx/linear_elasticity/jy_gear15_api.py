@@ -289,6 +289,32 @@ def compute_strain_stress_at_quadpoints2(space, uh, mu, lam):
 
     return strain, stress, nstrain, nstress
 
+def compute_strain_stress_at_quadpoints3(space, uh, B_BBar, D):
+    cell2tdof = space.cell_to_dof()
+    cuh = uh[cell2tdof]  # (NC, TLDOF) 
+    strain5 = bm.einsum('cqil, cl -> cqi', B_BBar, cuh) # (NC, NQ, 6)
+    stress5 = bm.einsum('cqij, cqi -> cqj', D, strain5) # (NC, NQ, 6)
+
+    # 初始化节点累加器和计数器
+    mesh = space.mesh
+    NN = mesh.number_of_nodes()
+    nstrain5 = bm.zeros((NN, 6), dtype=bm.float64)
+    nstress5 = bm.zeros((NN, 6), dtype=bm.float64)
+
+    map = bm.array([0, 4, 6, 2, 1, 5, 7, 3], dtype=bm.int32)
+    strain5 = strain5[:, map, :] # (NC, 8, 6)
+    stress5 = stress5[:, map, :] # (NC, 8, 6)
+    nc = bm.zeros(NN, dtype=bm.int32)
+    bm.add_at(nc, cell, 1)
+    for i in range(6):
+        bm.add_at(nstrain5[:, i], cell.flatten(), strain5[:, :, i].flatten())
+        nstrain5[:, i] /= nc
+        bm.add_at(nstress5[:, i], cell.flatten(), stress5[:, :, i].flatten())
+        nstress5[:, i] /= nc
+    
+    return strain5, stress5, nstrain5, nstress5
+
+
 def compute_equivalent_strain(strain, nu):
     exx = strain[..., 0, 0]
     eyy = strain[..., 1, 1]
@@ -330,31 +356,41 @@ with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/e
     data = pickle.load(f)
 
 # Ansys 位移结果
-u_x_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_x_100.txt', 
+u_x_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/u_x.txt', 
+                                skiprows=1, usecols=1), dtype=bm.float64)  # (NN, )
+u_y_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/u_y.txt',
                                 skiprows=1, usecols=1), dtype=bm.float64)
-u_y_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_y_100.txt',
-                                skiprows=1, usecols=1), dtype=bm.float64)
-u_z_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/u_z_100.txt',
+u_z_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/u_z.txt',
                                 skiprows=1, usecols=1), dtype=bm.float64)
 uh_ansys_show = bm.stack([u_x_ansys, u_y_ansys, u_z_ansys], axis=1)  # (NN, GD)
 
-# # Ansys 应变结果     # (NN, )
-# strain_xx_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_x.txt',
-#                                 skiprows=1, usecols=1), dtype=bm.float64)
-# strain_yy_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_y.txt',
-#                                 skiprows=1, usecols=1), dtype=bm.float64)
-# strain_zz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_z.txt',
-#                                 skiprows=1, usecols=1), dtype=bm.float64)
-# strain_xy_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_xy.txt',
-#                                 skiprows=1, usecols=1), dtype=bm.float64)
-# strain_yz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_yz.txt',
-#                                 skiprows=1, usecols=1), dtype=bm.float64)
-# strain_xz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/ns_xz.txt',
-#                                 skiprows=1, usecols=1), dtype=bm.float64)
+# Ansys 应变结果     
+strain_xx_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/e_x.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64) # (NN, )
+strain_yy_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/e_y.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+strain_zz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/e_z.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+strain_xy_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/e_xy.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+strain_yz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/e_yz.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+strain_xz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/e_xz.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
 
-# # Ansys 节点等效应力 # (NN)
-# nodal_equiv_stress_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/es_100.txt',
-#                                 skiprows=1, usecols=1), dtype=bm.float64)
+# Ansys 应力结果
+stress_xx_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/s_x.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64) # (NN, )
+stress_yy_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/s_y.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+stress_zz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/s_z.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+stress_xy_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/s_xy.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+stress_yz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/s_yz.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
+stress_xz_ansys = bm.tensor(np.loadtxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/s_xz.txt',
+                                skiprows=1, usecols=1), dtype=bm.float64)
 
 external_gear = data['external_gear']
 hex_mesh = data['hex_mesh']
@@ -454,11 +490,11 @@ F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 F_load_nodes = F[dof_indices] # (15*8, GD)
 
 fixed_node_index = bm.where(is_inner_node)[0]
-export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/gear_fealpy.inp', 
+export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/inp/external_gear_analys.inp', 
               nodes=node, elements=cell, 
               fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
               young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
-              used_app='abaqus', mesh_type='hex')
+              used_app='ansys', mesh_type='hex')
 
 E = 206e3
 nu = 0.3
@@ -467,7 +503,10 @@ mu = E / (2.0 * (1.0 + nu))
 linear_elastic_material = LinearElasticMaterial(name='E_nu', 
                                                 elastic_modulus=E, poisson_ratio=nu, 
                                                 hypo='3D', device=bm.get_device(mesh))
-integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=q, method='voigt')
+integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
+                                       q=q, method='C3D8_BBar')
+integrator_K.keep_data(True)
+_, _, D, B_BBar = integrator_K.fetch_c3d8_bbar_assembly(tensor_space)
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
@@ -484,15 +523,15 @@ tensor_is_bd_dof = tensor_space.is_boundary_dof(
                                 threshold=(scalar_is_bd_dof, scalar_is_bd_dof, scalar_is_bd_dof), 
                                 method='interp')
 dbc = DirichletBC(space=tensor_space, 
-                    gd=0, 
+                    gd=bm.zeros(tgdof), 
                     threshold=tensor_is_bd_dof, 
                     method='interp')
 uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-# uh_bd, isDDof = tensor_space.boundary_interpolate(gd=0, 
-#                                                 uh=uh_bd, 
-#                                                 threshold=tensor_is_bd_dof, 
-#                                                 method='interp')
-isDDof = tensor_is_bd_dof
+uh_bd, isDDof = tensor_space.boundary_interpolate(gd=bm.zeros(tgdof), 
+                                                uh=uh_bd, 
+                                                threshold=tensor_is_bd_dof, 
+                                                method='interp')
+# isDDof = tensor_is_bd_dof
 # 处理载荷
 F = F - K.matmul(uh_bd)
 F = bm.set_at(F, isDDof, uh_bd[isDDof])
@@ -530,26 +569,22 @@ uh_y = uh_show[:, 1]
 uh_z = uh_show[:, 2]
 
 # 位移误差
-error_x = uh_x - u_x_ansys # (NN, )
-error_y = uh_y - u_y_ansys
-error_z = uh_z - u_z_ansys
-relative_error_x = bm.linalg.norm(error_x) / (bm.linalg.norm(u_x_ansys)+bm.linalg.norm(uh_x))
-relative_error_y = bm.linalg.norm(error_y) / (bm.linalg.norm(u_y_ansys)+bm.linalg.norm(uh_y))
-relative_error_z = bm.linalg.norm(error_z) / (bm.linalg.norm(u_z_ansys)+bm.linalg.norm(uh_z))
-print(f"Relative error_x: {relative_error_x:.12e}")
-print(f"Relative error_y: {relative_error_y:.12e}")
-print(f"Relative error_z: {relative_error_z:.12e}")
+error_u_x = uh_x - u_x_ansys # (NN, )
+error_u_y = uh_y - u_y_ansys
+error_u_z = uh_z - u_z_ansys
+relative_error_u_x = bm.linalg.norm(error_u_x) / (bm.linalg.norm(u_x_ansys)+bm.linalg.norm(uh_x))
+relative_error_u_y = bm.linalg.norm(error_u_y) / (bm.linalg.norm(u_y_ansys)+bm.linalg.norm(uh_y))
+relative_error_u_z = bm.linalg.norm(error_u_z) / (bm.linalg.norm(u_z_ansys)+bm.linalg.norm(uh_z))
+print(f"Relative error_u_x: {relative_error_u_x:.12e}")
+print(f"Relative error_u_y: {relative_error_u_y:.12e}")
+print(f"Relative error_u_z: {relative_error_u_z:.12e}")
 
 uh_magnitude = bm.linalg.norm(uh_show, axis=1)
 
 mesh.nodedata['uh'] = uh_show[:]
 mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
 
-uh_cell = bm.zeros((NC, tldof)) # (NC, tldof)
-uh_cell_ansys = bm.zeros((NC, tldof))
-for c in range(NC):
-    uh_cell[c] = uh[cell2tdof[c]]
-    uh_cell_ansys[c] = uh_ansys[cell2tdof[c]]
+mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/vtu/external_gear_fealpy.vtu')
 
 # 计算方式一：在顶点处计算
 strain1, stress1, nstrain1, nstress1 = compute_strain_stress_at_vertices(space, 
@@ -567,6 +602,214 @@ strain3, stress3, nstrain3, nstress3 = compute_strain_stress_at_quadpoints1(spac
 strain4, stress4, nstrain4, nstress4 = compute_strain_stress_at_quadpoints2(space, 
                                                                         uh_show, mu, lam)
 
+# 计算方式五：使用 B-Bar 修正后的 B 计算
+strain5, stress5, nstrain5, nstress5 = compute_strain_stress_at_quadpoints3(tensor_space,
+                                                                        uh, B_BBar, D)
+
+
+# 计算方式一的应变误差
+error_e_x_1 = nstrain1[:, 0] - strain_xx_ansys # (NN, )
+error_e_y_1 = nstrain1[:, 1] - strain_yy_ansys
+error_e_z_1 = nstrain1[:, 2] - strain_zz_ansys
+error_e_xy_1 = nstrain1[:, 3] - strain_xy_ansys
+error_e_yz_1 = nstrain1[:, 4] - strain_yz_ansys
+error_e_xz_1 = nstrain1[:, 5] - strain_xz_ansys
+relative_error_e_x_1 = bm.linalg.norm(error_e_x_1) / \
+                        (bm.linalg.norm(strain_xx_ansys)+bm.linalg.norm(nstrain1[:, 0]))
+print(f"Relative error_e_x_1: {relative_error_e_x_1:.12e}")
+relative_error_e_y_1 = bm.linalg.norm(error_e_y_1) / \
+                        (bm.linalg.norm(strain_yy_ansys)+bm.linalg.norm(nstrain1[:, 1]))
+print(f"Relative error_e_y_1: {relative_error_e_y_1:.12e}")
+relative_error_e_z_1 = bm.linalg.norm(error_e_z_1) / \
+                        (bm.linalg.norm(strain_zz_ansys)+bm.linalg.norm(nstrain1[:, 2]))
+print(f"Relative error_e_z_1: {relative_error_e_z_1:.12e}")
+relative_error_e_xy_1 = bm.linalg.norm(error_e_xy_1) / \
+                        (bm.linalg.norm(strain_xy_ansys)+bm.linalg.norm(nstrain1[:, 3]))
+print(f"Relative error_e_xy_1: {relative_error_e_xy_1:.12e}")
+relative_error_e_yz_1 = bm.linalg.norm(error_e_yz_1) / \
+                        (bm.linalg.norm(strain_yz_ansys)+bm.linalg.norm(nstrain1[:, 4]))
+print(f"Relative error_e_yz_1: {relative_error_e_yz_1:.12e}")
+relative_error_e_xz_1 = bm.linalg.norm(error_e_xz_1) / \
+                        (bm.linalg.norm(strain_xz_ansys)+bm.linalg.norm(nstrain1[:, 5]))
+print(f"Relative error_e_xz_1: {relative_error_e_xz_1:.12e}")
+# 计算方式一的应力误差
+error_s_x_1 = nstress1[:, 0] - stress_xx_ansys # (NN, )
+error_s_y_1 = nstress1[:, 1] - stress_yy_ansys
+error_s_z_1 = nstress1[:, 2] - stress_zz_ansys
+error_s_xy_1 = nstress1[:, 3] - stress_xy_ansys
+error_s_yz_1 = nstress1[:, 4] - stress_yz_ansys
+error_s_xz_1 = nstress1[:, 5] - stress_xz_ansys
+relative_error_s_x_1 = bm.linalg.norm(error_s_x_1) / \
+                        (bm.linalg.norm(stress_xx_ansys)+bm.linalg.norm(nstress1[:, 0]))
+print(f"Relative error_s_x_1: {relative_error_s_x_1:.12e}")
+relative_error_s_y_1 = bm.linalg.norm(error_s_y_1) / \
+                        (bm.linalg.norm(stress_yy_ansys)+bm.linalg.norm(nstress1[:, 1]))
+print(f"Relative error_s_y_1: {relative_error_s_y_1:.12e}")
+relative_error_s_z_1 = bm.linalg.norm(error_s_z_1) / \
+                        (bm.linalg.norm(stress_zz_ansys)+bm.linalg.norm(nstress1[:, 2]))
+print(f"Relative error_s_z_1: {relative_error_s_z_1:.12e}")
+relative_error_s_xy_1 = bm.linalg.norm(error_s_xy_1) / \
+                        (bm.linalg.norm(stress_xy_ansys)+bm.linalg.norm(nstress1[:, 3]))
+print(f"Relative error_s_xy_1: {relative_error_s_xy_1:.12e}")
+relative_error_s_yz_1 = bm.linalg.norm(error_s_yz_1) / \
+                        (bm.linalg.norm(stress_yz_ansys)+bm.linalg.norm(nstress1[:, 4]))
+print(f"Relative error_s_yz_1: {relative_error_s_yz_1:.12e}")
+relative_error_s_xz_1 = bm.linalg.norm(error_s_xz_1) / \
+                        (bm.linalg.norm(stress_xz_ansys)+bm.linalg.norm(nstress1[:, 5]))
+print(f"Relative error_s_xz_1: {relative_error_s_xz_1:.12e}")
+
+# 计算方式二的应变误差
+error_e_x_2 = nstrain2[:, 0] - strain_xx_ansys # (NN, )
+error_e_y_2 = nstrain2[:, 1] - strain_yy_ansys
+error_e_z_2 = nstrain2[:, 2] - strain_zz_ansys
+error_e_xy_2 = nstrain2[:, 3] - strain_xy_ansys
+error_e_yz_2 = nstrain2[:, 4] - strain_yz_ansys
+error_e_xz_2 = nstrain2[:, 5] - strain_xz_ansys
+relative_error_e_x_2 = bm.linalg.norm(error_e_x_2) / \
+                        (bm.linalg.norm(strain_xx_ansys)+bm.linalg.norm(nstrain2[:, 0]))
+print(f"Relative error_e_x_2: {relative_error_e_x_2:.12e}")
+relative_error_e_y_2 = bm.linalg.norm(error_e_y_2) / \
+                        (bm.linalg.norm(strain_yy_ansys)+bm.linalg.norm(nstrain2[:, 1]))
+print(f"Relative error_e_y_2: {relative_error_e_y_2:.12e}")
+relative_error_e_z_2 = bm.linalg.norm(error_e_z_2) / \
+                        (bm.linalg.norm(strain_zz_ansys)+bm.linalg.norm(nstrain2[:, 2]))
+print(f"Relative error_e_z_2: {relative_error_e_z_2:.12e}")
+relative_error_e_xy_2 = bm.linalg.norm(error_e_xy_2) / \
+                        (bm.linalg.norm(strain_xy_ansys)+bm.linalg.norm(nstrain2[:, 3]))
+print(f"Relative error_e_xy_2: {relative_error_e_xy_2:.12e}")
+relative_error_e_yz_2 = bm.linalg.norm(error_e_yz_2) / \
+                        (bm.linalg.norm(strain_yz_ansys)+bm.linalg.norm(nstrain2[:, 4]))
+print(f"Relative error_e_yz_2: {relative_error_e_yz_2:.12e}")
+relative_error_e_xz_2 = bm.linalg.norm(error_e_xz_2) / \
+                        (bm.linalg.norm(strain_xz_ansys)+bm.linalg.norm(nstrain2[:, 5]))
+print(f"Relative error_e_xz_2: {relative_error_e_xz_2:.12e}")
+# 计算方式二的应力误差
+error_s_x_2 = nstress2[:, 0] - stress_xx_ansys # (NN, )
+error_s_y_2 = nstress2[:, 1] - stress_yy_ansys
+error_s_z_2 = nstress2[:, 2] - stress_zz_ansys
+error_s_xy_2 = nstress2[:, 3] - stress_xy_ansys
+error_s_yz_2 = nstress2[:, 4] - stress_yz_ansys
+error_s_xz_2 = nstress2[:, 5] - stress_xz_ansys
+relative_error_s_x_2 = bm.linalg.norm(error_s_x_2) / \
+                        (bm.linalg.norm(stress_xx_ansys)+bm.linalg.norm(nstress2[:, 0]))
+print(f"Relative error_s_x_2: {relative_error_s_x_2:.12e}")
+relative_error_s_y_2 = bm.linalg.norm(error_s_y_2) / \
+                        (bm.linalg.norm(stress_yy_ansys)+bm.linalg.norm(nstress2[:, 1]))
+print(f"Relative error_s_y_2: {relative_error_s_y_2:.12e}")
+relative_error_s_z_2 = bm.linalg.norm(error_s_z_2) / \
+                        (bm.linalg.norm(stress_zz_ansys)+bm.linalg.norm(nstress2[:, 2]))
+print(f"Relative error_s_z_2: {relative_error_s_z_2:.12e}")
+relative_error_s_xy_2 = bm.linalg.norm(error_s_xy_2) / \
+                        (bm.linalg.norm(stress_xy_ansys)+bm.linalg.norm(nstress2[:, 3]))
+print(f"Relative error_s_xy_2: {relative_error_s_xy_2:.12e}")
+relative_error_s_yz_2 = bm.linalg.norm(error_s_yz_2) / \
+                        (bm.linalg.norm(stress_yz_ansys)+bm.linalg.norm(nstress2[:, 4]))
+print(f"Relative error_s_yz_2: {relative_error_s_yz_2:.12e}")
+relative_error_s_xz_2 = bm.linalg.norm(error_s_xz_2) / \
+                        (bm.linalg.norm(stress_xz_ansys)+bm.linalg.norm(nstress2[:, 5]))
+print(f"Relative error_s_xz_2: {relative_error_s_xz_2:.12e}")
+
+# 计算方式三的应变误差
+error_e_x_3 = nstrain3[:, 0] - strain_xx_ansys # (NN, )
+error_e_y_3 = nstrain3[:, 1] - strain_yy_ansys
+error_e_z_3 = nstrain3[:, 2] - strain_zz_ansys
+error_e_xy_3 = nstrain3[:, 3] - strain_xy_ansys
+error_e_yz_3 = nstrain3[:, 4] - strain_yz_ansys
+error_e_xz_3 = nstrain3[:, 5] - strain_xz_ansys
+relative_error_e_x_3 = bm.linalg.norm(error_e_x_3) / \
+                        (bm.linalg.norm(strain_xx_ansys)+bm.linalg.norm(nstrain3[:, 0]))
+print(f"Relative error_e_x_3: {relative_error_e_x_3:.12e}")
+relative_error_e_y_3 = bm.linalg.norm(error_e_y_3) / \
+                        (bm.linalg.norm(strain_yy_ansys)+bm.linalg.norm(nstrain3[:, 1]))
+print(f"Relative error_e_y_3: {relative_error_e_y_3:.12e}")
+relative_error_e_z_3 = bm.linalg.norm(error_e_z_3) / \
+                        (bm.linalg.norm(strain_zz_ansys)+bm.linalg.norm(nstrain3[:, 2]))
+print(f"Relative error_e_z_3: {relative_error_e_z_3:.12e}")
+relative_error_e_xy_3 = bm.linalg.norm(error_e_xy_3) / \
+                        (bm.linalg.norm(strain_xy_ansys)+bm.linalg.norm(nstrain3[:, 3]))
+print(f"Relative error_e_xy_3: {relative_error_e_xy_3:.12e}")
+relative_error_e_yz_3 = bm.linalg.norm(error_e_yz_3) / \
+                        (bm.linalg.norm(strain_yz_ansys)+bm.linalg.norm(nstrain3[:, 4]))
+print(f"Relative error_e_yz_3: {relative_error_e_yz_3:.12e}")
+relative_error_e_xz_3 = bm.linalg.norm(error_e_xz_3) / \
+                        (bm.linalg.norm(strain_xz_ansys)+bm.linalg.norm(nstrain3[:, 5]))
+print(f"Relative error_e_xz_3: {relative_error_e_xz_3:.12e}")
+# 计算方式三的应力误差
+error_s_x_3 = nstress3[:, 0] - stress_xx_ansys # (NN, )
+error_s_y_3 = nstress3[:, 1] - stress_yy_ansys
+error_s_z_3 = nstress3[:, 2] - stress_zz_ansys
+error_s_xy_3 = nstress3[:, 3] - stress_xy_ansys
+error_s_yz_3 = nstress3[:, 4] - stress_yz_ansys
+error_s_xz_3 = nstress3[:, 5] - stress_xz_ansys
+relative_error_s_x_3 = bm.linalg.norm(error_s_x_3) / \
+                        (bm.linalg.norm(stress_xx_ansys)+bm.linalg.norm(nstress3[:, 0]))
+print(f"Relative error_s_x_3: {relative_error_s_x_3:.12e}")
+relative_error_s_y_3 = bm.linalg.norm(error_s_y_3) / \
+                        (bm.linalg.norm(stress_yy_ansys)+bm.linalg.norm(nstress3[:, 1]))
+print(f"Relative error_s_y_3: {relative_error_s_y_3:.12e}")
+relative_error_s_z_3 = bm.linalg.norm(error_s_z_3) / \
+                        (bm.linalg.norm(stress_zz_ansys)+bm.linalg.norm(nstress3[:, 2]))
+print(f"Relative error_s_z_3: {relative_error_s_z_3:.12e}")
+relative_error_s_xy_3 = bm.linalg.norm(error_s_xy_3) / \
+                        (bm.linalg.norm(stress_xy_ansys)+bm.linalg.norm(nstress3[:, 3]))
+print(f"Relative error_s_xy_3: {relative_error_s_xy_3:.12e}")
+relative_error_s_yz_3 = bm.linalg.norm(error_s_yz_3) / \
+                        (bm.linalg.norm(stress_yz_ansys)+bm.linalg.norm(nstress3[:, 4]))
+print(f"Relative error_s_yz_3: {relative_error_s_yz_3:.12e}")
+relative_error_s_xz_3 = bm.linalg.norm(error_s_xz_3) / \
+                        (bm.linalg.norm(stress_xz_ansys)+bm.linalg.norm(nstress3[:, 5]))
+print(f"Relative error_s_xz_3: {relative_error_s_xz_3:.12e}")
+
+# 计算方式五的应变误差
+error_e_x_5 = nstrain5[:, 0] - strain_xx_ansys # (NN, )
+error_e_y_5 = nstrain5[:, 1] - strain_yy_ansys
+error_e_z_5 = nstrain5[:, 2] - strain_zz_ansys
+error_e_xy_5 = nstrain5[:, 3] - strain_xy_ansys
+error_e_yz_5 = nstrain5[:, 4] - strain_yz_ansys
+error_e_xz_5 = nstrain5[:, 5] - strain_xz_ansys
+relative_error_e_x_5 = bm.linalg.norm(error_e_x_5) / \
+                        (bm.linalg.norm(strain_xx_ansys)+bm.linalg.norm(nstrain5[:, 0]))
+print(f"Relative error_e_x_5: {relative_error_e_x_5:.12e}")
+relative_error_e_y_5 = bm.linalg.norm(error_e_y_5) / \
+                        (bm.linalg.norm(strain_yy_ansys)+bm.linalg.norm(nstrain5[:, 1]))
+print(f"Relative error_e_y_5: {relative_error_e_y_5:.12e}")
+relative_error_e_z_5 = bm.linalg.norm(error_e_z_5) / \
+                        (bm.linalg.norm(strain_zz_ansys)+bm.linalg.norm(nstrain5[:, 2]))
+print(f"Relative error_e_z_5: {relative_error_e_z_5:.12e}")
+relative_error_e_xy_5 = bm.linalg.norm(error_e_xy_5) / \
+                        (bm.linalg.norm(strain_xy_ansys)+bm.linalg.norm(nstrain5[:, 3]))
+print(f"Relative error_e_xy_5: {relative_error_e_xy_5:.12e}")
+relative_error_e_yz_5 = bm.linalg.norm(error_e_yz_5) / \
+                        (bm.linalg.norm(strain_yz_ansys)+bm.linalg.norm(nstrain5[:, 4]))
+print(f"Relative error_e_yz_5: {relative_error_e_yz_5:.12e}")
+relative_error_e_xz_5 = bm.linalg.norm(error_e_xz_5) / \
+                        (bm.linalg.norm(strain_xz_ansys)+bm.linalg.norm(nstrain5[:, 5]))
+print(f"Relative error_e_xz_5: {relative_error_e_xz_5:.12e}")
+# 计算方式五的应力误差
+error_s_x_5 = nstress5[:, 0] - stress_xx_ansys # (NN, )
+error_s_y_5 = nstress5[:, 1] - stress_yy_ansys
+error_s_z_5 = nstress5[:, 2] - stress_zz_ansys
+error_s_xy_5 = nstress5[:, 3] - stress_xy_ansys
+error_s_yz_5 = nstress5[:, 4] - stress_yz_ansys
+error_s_xz_5 = nstress5[:, 5] - stress_xz_ansys
+relative_error_s_x_5 = bm.linalg.norm(error_s_x_5) / \
+                        (bm.linalg.norm(stress_xx_ansys)+bm.linalg.norm(nstress5[:, 0]))
+print(f"Relative error_s_x_5: {relative_error_s_x_5:.12e}")
+relative_error_s_y_5 = bm.linalg.norm(error_s_y_5) / \
+                        (bm.linalg.norm(stress_yy_ansys)+bm.linalg.norm(nstress5[:, 1]))
+print(f"Relative error_s_y_5: {relative_error_s_y_5:.12e}")
+relative_error_s_z_5 = bm.linalg.norm(error_s_z_5) / \
+                        (bm.linalg.norm(stress_zz_ansys)+bm.linalg.norm(nstress5[:, 2]))
+print(f"Relative error_s_z_5: {relative_error_s_z_5:.12e}")
+relative_error_s_xy_5 = bm.linalg.norm(error_s_xy_5) / \
+                        (bm.linalg.norm(stress_xy_ansys)+bm.linalg.norm(nstress5[:, 3]))
+print(f"Relative error_s_xy_5: {relative_error_s_xy_5:.12e}")
+relative_error_s_yz_5 = bm.linalg.norm(error_s_yz_5) / \
+                        (bm.linalg.norm(stress_yz_ansys)+bm.linalg.norm(nstress5[:, 4]))
+print(f"Relative error_s_yz_5: {relative_error_s_yz_5:.12e}")
+relative_error_s_xz_5 = bm.linalg.norm(error_s_xz_5) / \
+                        (bm.linalg.norm(stress_xz_ansys)+bm.linalg.norm(nstress5[:, 5]))
+print(f"Relative error_s_xz_5: {relative_error_s_xz_5:.12e}")
 
 # 节点应变张量和 Ansys 中节点应变张量的误差
 error_s_xx = strain1[:, 0] - strain_xx_ansys

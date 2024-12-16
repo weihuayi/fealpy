@@ -3,7 +3,7 @@ from typing import Optional
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 
-from ..mesh import HomogeneousMesh, SimplexMesh
+from ..mesh import HomogeneousMesh, SimplexMesh, TensorMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..functionspace.tensor_space import TensorFunctionSpace as _TS
 from .integrator import (
@@ -49,33 +49,13 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = space.grad_basis(bcs, index=index, variable='x')
 
-        if isinstance(mesh, SimplexMesh):
-            J = None
-            detJ = None
-            is_constant_J = True  
-        else:
+        if isinstance(mesh, TensorMesh):
             J = mesh.jacobi_matrix(bcs)
             detJ = bm.linalg.det(J)
-
-        return cm, bcs, ws, gphi, detJ, is_constant_J
-    
-    @enable_cache
-    def fetch_tensor_assembly(self, space: _FS):
-        index = self.index
-        mesh = getattr(space, 'mesh', None)
-        if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
-                               f"homogeneous meshes, but {type(mesh).__name__} is"
-                               "not a subclass of HomoMesh.")
-    
-        cm = mesh.entity_measure('cell', index=index)
-        q = space.p+3 if self.q is None else self.q
-        qf = mesh.quadrature_formula(q)
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index, variable='x')
-        J = mesh.jacobi_matrix(bcs)
-        detJ = bm.linalg.det(J)
-
+        else:
+            J = None
+            detJ = None
+            
         return cm, bcs, ws, gphi, detJ
     
     @enable_cache
@@ -125,6 +105,33 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return cm, mesh, glambda_x, bm.asarray(M, dtype=bm.float64)
     
     @enable_cache
+    def fetch_c3d8_bbar_assembly(self, space: _FS):
+        index = self.index
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
+    
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+    
+        cm = mesh.entity_measure('cell', index=index)
+        q = scalar_space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        gphi = scalar_space.grad_basis(bcs, index=index, variable='x')
+
+        J = mesh.jacobi_matrix(bcs)
+        detJ = bm.linalg.det(J)
+
+        D = self.material.elastic_matrix(bcs)
+        B = self.material.strain_matrix(dof_priority=space.dof_priority, 
+                                        gphi=gphi, 
+                                        bbar=True, cm=cm, ws=ws, detJ=detJ)
+            
+        return ws, detJ, D, B
+
+    @enable_cache
     def fetch_c3d8_sri_assembly(self, space: _FS):
         index = self.index
         mesh = getattr(space, 'mesh', None)
@@ -152,34 +159,33 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
-        cm, bcs, ws, gphi, detJ, is_constant_J = self.fetch_assembly(scalar_space)
+        cm, bcs, ws, gphi, detJ = self.fetch_assembly(scalar_space)
 
-        if is_constant_J:
-            # 常数 Jacobian：使用单元测度
-            A_xx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 0], cm)
-            A_yy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 1], cm)
-            A_xy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 1], cm)
-        else:
-            # 非常数 Jacobian：使用行列式
+        if isinstance(mesh, TensorMesh):
             J = mesh.jacobi_matrix(bcs)
             detJ = bm.linalg.det(J)
             A_xx = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 0], gphi[..., 0], detJ)
             A_yy = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 1], gphi[..., 1], detJ)
             A_xy = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 0], gphi[..., 1], detJ)
+        else:
+            A_xx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 0], cm)
+            A_yy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 1], cm)
+            A_xy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 1], cm)
+
         
         A_yx = A_xy.transpose((0, 2, 1))
 
         GD = mesh.geo_dimension()
         if GD == 3:
-            if is_constant_J:
-                A_xz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 2], cm)
-                A_yz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 2], cm)
-                A_zz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 2], cm)
-            else:
+            if isinstance(mesh, TensorMesh):
                 A_xz = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 0], gphi[..., 2], detJ)
                 A_yz = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 1], gphi[..., 2], detJ)
                 A_zz = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 2], gphi[..., 2], detJ)
-            
+            else:
+                A_xz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 2], cm)
+                A_yz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 2], cm)
+                A_zz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 2], cm)
+                
             A_zx = A_xz.transpose((0, 2, 1))
             A_zy = A_yz.transpose((0, 2, 1))
 
@@ -272,17 +278,37 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         return KK 
     
-    @assemblymethod('voigt_tensor')
-    def voigt_tensor_assembly(self, space: _TS) -> TensorLike:
+    @assemblymethod('voigt')
+    def voigt_assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
-        _, bcs, ws, gphi, detJ = self.fetch_tensor_assembly(scalar_space)
-        
+        mesh = getattr(space, 'mesh', None)
+        cm, bcs, ws, gphi, detJ = self.fetch_assembly(scalar_space)
+
         D = self.material.elastic_matrix(bcs)
         B = self.material.strain_matrix(dof_priority=space.dof_priority, 
                                         gphi=gphi)
-        KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
-                        ws, detJ, B, D, B)
+        
+        if isinstance(mesh, TensorMesh):
+            KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
+                            ws, detJ, B, D, B)
+        else:
+            KK = bm.einsum('q, c, cqki, cqkl, cqlj, cq -> cij',
+                            ws, cm, B, D, B)
+            
+        return KK
+    
+    @assemblymethod('voigt_uniform')
+    def voigt_uniform_assembly(self, space: _TS) -> TensorLike:
+        scalar_space = space.scalar_space
+        cm, bcs, ws, gphi, _ = self.fetch_assembly(scalar_space)
 
+        D = self.material.elastic_matrix(bcs)
+        B = self.material.strain_matrix(dof_priority=space.dof_priority, 
+                                        gphi=gphi)
+        
+        KK = bm.einsum('q, c, cqki, cqkl, cqlj, cq -> cij',
+                            ws, cm, B, D, B)
+            
         return KK
 
     @assemblymethod('fast_strain')
@@ -609,13 +635,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     
     @assemblymethod('C3D8_BBar')
     def c3d8_bbar_assembly(self, space: _TS) -> TensorLike:
-        scalar_space = space.scalar_space
-        cm, bcs, ws, gphi, detJ  = self.fetch_tensor_assembly(scalar_space)
-        
-        D = self.material.elastic_matrix(bcs)
-        B = self.material.strain_matrix(dof_priority=space.dof_priority, 
-                                        gphi=gphi, 
-                                        bbar=True, cm=cm, ws=ws, detJ=detJ)
+        ws, detJ, D, B  = self.fetch_c3d8_bbar_assembly(space)
         
         KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
                         ws, detJ, B, D, B)
