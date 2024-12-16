@@ -509,12 +509,12 @@ print(f"KE_bbar_yz_xz_xy_max: {bm.max(KE_bbar_yz_xz_xy)}")
 print(f"KE_bbar_yz_xz_xy_abs_min: {bm.min(bm.abs(KE_bbar_yz_xz_xy))}")
 print(f"KE_bbar_yz_xz_xy_min: {bm.min(KE_bbar_yz_xz_xy)}")
 
-# integrator_K_sri = LinearElasticIntegrator(material=linear_elastic_material,
-#                                            q=q, method='C3D8_SRI')
-# KE_sri_yz_xz_xy = integrator_K_sri.c3d8_sri_assembly(space=tensor_space)
-# KE0_sri_yz_xz_xy = KE_sri_yz_xz_xy[0].round(4)
-# print(f"KE0_sri_yz_xz_xy_max: {bm.max(KE0_sri_yz_xz_xy)}")
-# print(f"KE0_sri_yz_xz_xy_min: {bm.min(KE0_sri_yz_xz_xy)}")
+integrator_K_sri = LinearElasticIntegrator(material=linear_elastic_material,
+                                           q=q, method='C3D8_SRI')
+KE_sri_yz_xz_xy = integrator_K_sri.c3d8_sri_assembly(space=tensor_space)
+KE0_sri_yz_xz_xy = KE_sri_yz_xz_xy[0].round(4)
+print(f"KE0_sri_yz_xz_xy_max: {bm.max(KE0_sri_yz_xz_xy)}")
+print(f"KE0_sri_yz_xz_xy_min: {bm.min(KE0_sri_yz_xz_xy)}")
 
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
                                         q=q, method='voigt')
@@ -525,7 +525,7 @@ print(f"KE0_yz_xz_xy_min: {bm.min(KE0_yz_xz_xy)}")
 
 
 bform = BilinearForm(tensor_space)
-bform.add_integrator(integrator_K_bbar)
+bform.add_integrator(integrator_K_sri)
 K = bform.assembly(format='csr')
 Kdense = K.to_dense()
 values = K.values()

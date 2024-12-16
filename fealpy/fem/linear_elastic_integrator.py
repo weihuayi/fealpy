@@ -127,7 +127,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         D = self.material.elastic_matrix(bcs)
         B = self.material.strain_matrix(dof_priority=space.dof_priority, 
                                         gphi=gphi, 
-                                        bbar=True, cm=cm, ws=ws, detJ=detJ)
+                                        correction='BBar', 
+                                        cm=cm, ws=ws, detJ=detJ)
             
         return ws, detJ, D, B
 
@@ -652,13 +653,13 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         D0_q1 = D_q1[..., :3, :3] # (1, 1, 3, 3)
         B_q1 = self.material.strain_matrix(dof_priority=space.dof_priority, 
                                         gphi=gphi1, 
-                                        bbar=None)
+                                        correction='SRI')
         B0_q1 = B_q1[..., :3, :]  # (NC, NQ, 3, TLDOF)
 
         D_q2 = self.material.elastic_matrix(bcs2)
         B_q2 = self.material.strain_matrix(dof_priority=space.dof_priority, 
                                         gphi=gphi2, 
-                                        bbar=None)
+                                        correction=None)
 
         KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
                         ws2, detJ2, B_q2, D_q2, B_q2)
