@@ -630,7 +630,7 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
     @classmethod
     def simplex_hess_shape_function(cls, bcs: Tensor, p: int, mi=None) -> Tensor:
-        fn = vmap(jacrev(jacfwd(
+        fn = vmap(jacfwd(jacfwd(
             partial(cls._simplex_shape_function_kernel, p=p, mi=mi)
         )))
         return fn(bcs)
