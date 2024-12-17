@@ -14,17 +14,19 @@ from .integrator import (
     assemblymethod,
     CoefLike
 )
+from scipy.sparse import csr_matrix
 
 
-class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
-    r"""The biharmonic integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, coef: Optional[CoefLike] = None, q: Optional[int] = None, *,
+class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
+    r"""The interior penalty integrator for function spaces based on homogeneous meshes."""
+    def __init__(self, coef: Optional[CoefLike] = None, q: Optional[int] = None, gamma: Optional[float] = 1, *,
                  index: Index = _S,
                  batched: bool = False,
                  method: Literal['fast', 'nonlinear', 'isopara', None] = None) -> None:
         super().__init__(method=method if method else 'assembly')
         self.coef = coef
         self.q = q
+        self.gamma = gamma
         self.index = index
         self.batched = batched
 
@@ -42,11 +44,11 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        cm = mesh.entity_measure('edge', index=index)
+        em = mesh.entity_measure('edge', index=index)
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        return bcs, ws, cm
+        return bcs, ws, em
 
     @enable_cache
     def fetch_gnjphi(self, space: _FS):
@@ -61,9 +63,56 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, cm = self.fetch(space)
+        bcs, ws, em = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='edge', index=self.index)
+        gamma = self.gamma
+
+        gnjphi = self.fetch_gnjphi(space)
+        gn2jphi = self.fetch_ggnjphi(space)
+
+        # 一阶法向导数矩阵
+        P1 = bm.einsum('q, qfi, qfj->fij', ws, gnjphi, gnjphi)
+        P1 = P1*self.gamma
+
+        isBdEdge    = mesh.boundary_edge_flag() 
+        isInnerEdge = ~isBdEdge 
+
+        P2 = bm.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isInnerEdge])
+        P2T = bm.transpose(P2, axes=(0, 2, 1))
+
+        P = (P2 + P2T) + P1
         
+        
+        NC = mesh.number_of_cells()
+        ie2cd = space.dof.iedge2celldof
+        be2cd = space.dof.bedge2celldof
+        
+        I = bm.broadcast_to(ie2cd[:, :, None], shape=P.shape)
+        J = bm.broadcast_to(ie2cd[:, None, :], shape=P.shape)
+
+        gdof = space.dof.number_of_global_dofs()
+        P = csr_matrix((P.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
+
+        # 边界的积分
+        gnjphi  = -space.boubdary_edge_grad_normal_jump_basis(bcs)
+        gn2jphi = space.boubdary_edge_grad_normal_2_jump_basis(bcs)
+
+        P1 = bm.einsum('q, qfi, qfj->fij', ws, gnjphi, gnjphi)
+        P1 = P1*self.gamma
+
+        P2  = bm.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isBdEdge])
+        P2T = bm.transpose(P2, axes=(0, 2, 1))
+
+        PP = (P2+P2T) + P1
+        
+        I = bm.broadcast_to(be2cd[:, :, None], shape=PP.shape)
+        J = bm.broadcast_to(be2cd[:, None, :], shape=PP.shape)
+
+        gdof = space.dof.number_of_global_dofs()
+        P = P+csr_matrix((PP.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
+        
+        return P
+
 
     
     @assemblymethod('fast')

@@ -20,6 +20,7 @@ from .vector_mass_integrator import VectorMassIntegrator
 from .curlcurl_integrator import CurlCurlIntegrator
 from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
+from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 
 
 ### Cell Source
