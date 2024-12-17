@@ -328,6 +328,31 @@ def compute_strain_stress_at_quadpoints2(space, uh, mu, lam):
 
     return strain, stress, nstrain, nstress
 
+def compute_strain_stress_at_quadpoints3(space, uh, B_BBar, D):
+    cell2tdof = space.cell_to_dof()
+    cuh = uh[cell2tdof]  # (NC, TLDOF) 
+    strain5 = bm.einsum('cqil, cl -> cqi', B_BBar, cuh) # (NC, NQ, 6)
+    stress5 = bm.einsum('cqij, cqi -> cqj', D, strain5) # (NC, NQ, 6)
+
+    # 初始化节点累加器和计数器
+    mesh = space.mesh
+    NN = mesh.number_of_nodes()
+    nstrain5 = bm.zeros((NN, 6), dtype=bm.float64)
+    nstress5 = bm.zeros((NN, 6), dtype=bm.float64)
+
+    map = bm.array([0, 4, 6, 2, 1, 5, 7, 3], dtype=bm.int32)
+    strain5 = strain5[:, map, :] # (NC, 8, 6)
+    stress5 = stress5[:, map, :] # (NC, 8, 6)
+    nc = bm.zeros(NN, dtype=bm.int32)
+    bm.add_at(nc, cell, 1)
+    for i in range(6):
+        bm.add_at(nstrain5[:, i], cell.flatten(), strain5[:, :, i].flatten())
+        nstrain5[:, i] /= nc
+        bm.add_at(nstress5[:, i], cell.flatten(), stress5[:, :, i].flatten())
+        nstress5[:, i] /= nc
+    
+    return strain5, stress5, nstrain5, nstress5
+
 def compute_equivalent_strain(strain, nu):
     exx = strain[..., 0, 0]
     eyy = strain[..., 1, 1]
@@ -428,12 +453,6 @@ cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7],
                 dtype=bm.int32)
 mesh = HexahedronMesh(node, cell)
 
-# nx, ny, nz = 2, 2, 2 
-# mesh = HexahedronMesh.from_box(box=[0, 1, 0, 1, 0, 1], 
-#                             nx=nx, ny=ny, nz=nz, device=bm.get_device('cpu'))
-# mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], 
-#                             nx=nx, ny=ny, nz=ny, device=bm.get_device('cpu'))
-
 GD = mesh.geo_dimension()
 NN = mesh.number_of_nodes()
 NC = mesh.number_of_cells()
@@ -443,7 +462,7 @@ node = mesh.entity('node')
 cell = mesh.entity('cell')
 
 p = 1
-q = p+3
+q = p+1
 space = LagrangeFESpace(mesh, p=p, ctype='C')
 sgdof = space.number_of_global_dofs()
 print(f"sgdof: {sgdof}")
@@ -453,7 +472,7 @@ tgdof = tensor_space.number_of_global_dofs()
 print(f"tgdof: {tgdof}")
 pde = BoxDomainLinear3d()
 
-filename = "/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_linear_exact_fealpy_STIF2.mtx"
+filename = "/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_linear_exact_abaqus_fealpy_STIF2.mtx"
 matrices = read_mtx_file(filename)
 KE0_true = matrices[0].round(4)
 print(f"KE0_true_max: {bm.max(KE0_true)}")
@@ -479,6 +498,8 @@ linear_elastic_material = LinearElasticMaterial(name='E_nu',
 integrator_K_bbar = LinearElasticIntegrator(material=linear_elastic_material, 
                                             q=q, method='C3D8_BBar')
 KE_bbar_yz_xz_xy = integrator_K_bbar.c3d8_bbar_assembly(space=tensor_space)
+integrator_K_bbar.keep_data(True)
+_, _, D, B_BBar = integrator_K_bbar.fetch_c3d8_bbar_assembly(tensor_space)
 KE0_bbar_yz_xz_xy = KE_bbar_yz_xz_xy[0].round(4)
 print(f"KE0_bbar_yz_xz_xy_max: {bm.max(KE0_bbar_yz_xz_xy)}")
 print(f"KE0_bbar_yz_xz_xy_abs_min: {bm.min(bm.abs(KE0_bbar_yz_xz_xy))}")
@@ -488,7 +509,6 @@ print(f"KE_bbar_yz_xz_xy_max: {bm.max(KE_bbar_yz_xz_xy)}")
 print(f"KE_bbar_yz_xz_xy_abs_min: {bm.min(bm.abs(KE_bbar_yz_xz_xy))}")
 print(f"KE_bbar_yz_xz_xy_min: {bm.min(KE_bbar_yz_xz_xy)}")
 
-
 integrator_K_sri = LinearElasticIntegrator(material=linear_elastic_material,
                                            q=q, method='C3D8_SRI')
 KE_sri_yz_xz_xy = integrator_K_sri.c3d8_sri_assembly(space=tensor_space)
@@ -497,8 +517,8 @@ print(f"KE0_sri_yz_xz_xy_max: {bm.max(KE0_sri_yz_xz_xy)}")
 print(f"KE0_sri_yz_xz_xy_min: {bm.min(KE0_sri_yz_xz_xy)}")
 
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
-                                        q=q, method='voigt_tensor')
-KE_yz_xz_xy = integrator_K.voigt_tensor_assembly(space=tensor_space)
+                                        q=q, method='voigt')
+KE_yz_xz_xy = integrator_K.voigt_assembly(space=tensor_space)
 KE0_yz_xz_xy = KE_yz_xz_xy[0].round(4)
 print(f"KE0_yz_xz_xy_max: {bm.max(KE0_yz_xz_xy)}")
 print(f"KE0_yz_xz_xy_min: {bm.min(KE0_yz_xz_xy)}")
@@ -531,11 +551,13 @@ boundary_nodes_idx = bm.where(isBdNode)[0]
 boundary_nodes = node[boundary_nodes_idx]
 boundary_nodes_u = bm.concatenate([u(boundary_nodes), v(boundary_nodes), w(boundary_nodes)], axis=1)
 
-export_to_inp_by_u(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_linear_exact_ansys_fealpy.inp', 
-              nodes=node, elements=cell, 
-              boundary_nodes_idx=boundary_nodes_idx, boundary_nodes_u=boundary_nodes_u,
-              young_modulus=E, poisson_ratio=nu, density=7.85e-9, 
-              used_app='ansys', mesh_type='hex')
+export_to_inp_by_u(
+            filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_linear_exact_abaqus_fealpy.inp', 
+            nodes=node, elements=cell, 
+            boundary_nodes_idx=boundary_nodes_idx, boundary_nodes_u=boundary_nodes_u,
+            young_modulus=E, poisson_ratio=nu, density=7.85e-9, 
+            used_app='abaqus', mesh_type='hex'
+        )
 
 # 边界条件处理
 uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
@@ -591,10 +613,9 @@ strain3, stress3, nstrain3, nstress3 = compute_strain_stress_at_quadpoints1(spac
 strain4, stress4, nstrain4, nstress4 = compute_strain_stress_at_quadpoints2(space, 
                                                                         uh_show, mu, lam)
 
-uh_cell = bm.zeros((NC, tldof)) # (NC, tldof)
-cell2tdof = tensor_space.cell_to_dof()
-for c in range(NC):
-    uh_cell[c] = uh[cell2tdof[c]]
+# 计算方式五：使用 B-Bar 修正后的 B 计算
+strain5, stress5, nstrain5, nstress5 = compute_strain_stress_at_quadpoints3(tensor_space,
+                                                                        uh, B_BBar, D)
 
 # 单元积分点处的位移梯度
 q = 2
