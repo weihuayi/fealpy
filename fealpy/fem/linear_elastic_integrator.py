@@ -307,8 +307,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         B = self.material.strain_matrix(dof_priority=space.dof_priority, 
                                         gphi=gphi)
         
-        KK = bm.einsum('q, c, cqki, cqkl, cqlj, cq -> cij',
-                            ws, cm, B, D, B)
+        KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, D, B)
             
         return KK
 
@@ -646,8 +645,25 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @assemblymethod('C3D8_SRI')
     def c3d8_sri_assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
-        bcs1, ws1, gphi1, detJ1, bcs2, ws2, gphi2, detJ2 = \
-            self.fetch_c3d8_sri_assembly(scalar_space)
+        # bcs1, ws1, gphi1, detJ1, bcs2, ws2, gphi2, detJ2 = \
+        #     self.fetch_c3d8_sri_assembly(scalar_space)
+        
+        index = self.index
+        mesh = getattr(space, 'mesh', None)
+    
+        q1 = 1
+        qf1 = mesh.quadrature_formula(q1)
+        bcs1, ws1 = qf1.get_quadrature_points_and_weights()
+        gphi1 = scalar_space.grad_basis(bcs1, index=index, variable='x')
+        J1 = mesh.jacobi_matrix(bcs1)
+        detJ1 = bm.linalg.det(J1)
+
+        q2 = 2
+        qf2 = mesh.quadrature_formula(q2)
+        bcs2, ws2 = qf2.get_quadrature_points_and_weights()
+        gphi2 = scalar_space.grad_basis(bcs2, index=index, variable='x')
+        J2 = mesh.jacobi_matrix(bcs2)
+        detJ2 = bm.linalg.det(J2)
         
         D_q1 = self.material.elastic_matrix(bcs1)
         D0_q1 = D_q1[..., :3, :3] # (1, 1, 3, 3)

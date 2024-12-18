@@ -6,8 +6,8 @@ structural optimization. International Journal for Numerical Methods in Engineer
 """
 
 from typing import Tuple
-from scipy.sparse import diags
-from scipy.linalg import solve
+from numpy import diag as diags
+from numpy.linalg import solve
 
 from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
@@ -70,27 +70,27 @@ def solve_mma_subproblem(m: int,
     epsvecn = epsi * een
     epsvecm = epsi * eem
     x = 0.5 * (alfa + beta)
-    y = eem.copy()
+    y = bm.copy(eem)
     z = bm.array([[1.0]])
-    lam = eem.copy()
+    lam = bm.copy(eem)
     xsi = een / (x - alfa)
     xsi = bm.maximum(xsi, een)
     eta = een / (beta - x)
     eta = bm.maximum(eta, een)
     mu = bm.maximum(eem, 0.5*c)
     zet = bm.array([[1.0]])
-    s = eem.copy()
+    s = bm.copy(eem)
     itera = 0
 
     while epsi > epsimin:
-        epsvecn = epsi*een
-        epsvecm = epsi*eem
-        ux1 = upp-x
-        xl1 = x-low
-        ux2 = ux1*ux1
-        xl2 = xl1*xl1
-        uxinv1 = een/ux1
-        xlinv1 = een/xl1
+        epsvecn = epsi * een
+        epsvecm = epsi * eem
+        ux1 = upp - x
+        xl1 = x - low
+        ux2 = ux1 * ux1
+        xl2 = xl1 * xl1
+        uxinv1 = een / ux1
+        xlinv1 = een / xl1
 
         # 计算梯度和残差
         plam = p0 + bm.dot(P.T, lam)
@@ -123,13 +123,13 @@ def solve_mma_subproblem(m: int,
             ux1 = upp-x
             xl1 = x-low
             ux2 = ux1*ux1
-            xl2 = xl1*xl2
+            xl2 = xl1*xl1
             ux3 = ux1*ux2
             xl3 = xl1*xl2
-            uxinv1 = een/ux1
-            xlinv1 = een/xl1
-            uxinv2 = een/ux2
-            xlinv2 = een/xl2
+            uxinv1 = een / ux1
+            xlinv1 = een / xl1
+            uxinv2 = een / ux2
+            xlinv2 = een / xl2
             
             # 计算梯度矩阵和向量
             plam = p0 + bm.dot(P.T, lam)
@@ -142,7 +142,7 @@ def solve_mma_subproblem(m: int,
             dpsidx = plam/ux2 - qlam/xl2
             delx = dpsidx - epsvecn/(x-alfa) + epsvecn/(beta-x)
             dely = c + d*y - lam - epsvecm/y
-            delz = a0 - np.dot(a.T, lam) - epsi/z
+            delz = a0 - bm.dot(a.T, lam) - epsi/z
             dellam = gvec - a*z - y - b + epsvecm/lam
             
             # 计算 Hessian 对角线
@@ -156,17 +156,17 @@ def solve_mma_subproblem(m: int,
             
             # 求解线性系统
             if m < n:
-                blam = dellam + dely/diagy - bm.dot(GG, (delx/diagx))
+                blam = dellam + dely / diagy - bm.dot(GG, (delx / diagx))
                 bb = bm.concatenate((blam, delz), axis=0)
                 Alam = bm.asarray(diags(diaglamyi.flatten(), 0) + \
-                    (diags(diagxinv.flatten(), 0).dot(GG.T).T).dot(GG.T))
+                        (diags(diagxinv.flatten(), 0).dot(GG.T).T).dot(GG.T))
                 AAr1 = bm.concatenate((Alam, a), axis=1)
                 AAr2 = bm.concatenate((a, -zet/z), axis=0).T
                 AA = bm.concatenate((AAr1, AAr2), axis=0)
                 solut = solve(AA, bb)
                 dlam = solut[0:m]
                 dz = solut[m:m+1]
-                dx = -delx/diagx - bm.dot(GG.T, dlam)/diagx
+                dx = -delx / diagx - bm.dot(GG.T, dlam) / diagx
             else:
                 diaglamyiinv = eem/diaglamyi
                 dellamyi = dellam + dely/diagy
@@ -193,32 +193,31 @@ def solve_mma_subproblem(m: int,
             dmu = -mu + epsvecm/y - (mu*dy)/y
             dzet = -zet + epsi/z - zet*dz/z
             ds = -s + epsvecm/lam - (s*dlam)/lam
-            
-            # 计算步长
             xx = bm.concatenate((y, z, lam, xsi, eta, mu, zet, s), axis=0)
             dxx = bm.concatenate((dy, dz, dlam, dxsi, deta, dmu, dzet, ds), axis=0)
             
-            stepxx = -1.01*dxx/xx
+            # 步长确定
+            stepxx = -1.01 * dxx / xx
             stmxx = bm.max(stepxx)
-            stepalfa = -1.01*dx/(x-alfa)
+            stepalfa = -1.01 * dx / (x - alfa)
             stmalfa = bm.max(stepalfa)
-            stepbeta = 1.01*dx/(beta-x)
+            stepbeta = 1.01 * dx / (beta - x)
             stmbeta = bm.max(stepbeta)
             stmalbe = max(stmalfa, stmbeta)
             stmalbexx = max(stmalbe, stmxx)
             stminv = max(stmalbexx, 1.0)
-            steg = 1.0/stminv
+            steg = 1.0 / stminv
             
             # 保存旧值
-            xold = x.copy()
-            yold = y.copy()
-            zold = z.copy()
-            lamold = lam.copy()
-            xsiold = xsi.copy()
-            etaold = eta.copy()
-            muold = mu.copy()
-            zetold = zet.copy()
-            sold = s.copy()
+            xold = bm.copy(x)
+            yold = bm.copy(y)
+            zold = bm.copy(z)
+            lamold = bm.copy(lam)
+            xsiold = bm.copy(xsi)
+            etaold = bm.copy(eta)
+            muold = bm.copy(mu)
+            zetold = bm.copy(zet)
+            sold = bm.copy(s)
             
             # 线搜索
             itto = 0
@@ -234,14 +233,12 @@ def solve_mma_subproblem(m: int,
                 mu = muold + steg*dmu
                 zet = zetold + steg*dzet
                 s = sold + steg*ds
-                
-                # 重新计算残差
-                ux1 = upp-x
-                xl1 = x-low
-                ux2 = ux1*ux1
-                xl2 = xl1*xl1
-                uxinv1 = een/ux1
-                xlinv1 = een/xl1
+                ux1 = upp - x
+                xl1 = x - low
+                ux2 = ux1 * ux1
+                xl2 = xl1 * xl1
+                uxinv1 = een / ux1
+                xlinv1 = een / xl1
                 plam = p0 + bm.dot(P.T, lam)
                 qlam = q0 + bm.dot(Q.T, lam)
                 gvec = bm.dot(P, uxinv1) + bm.dot(Q, xlinv1)
@@ -252,10 +249,9 @@ def solve_mma_subproblem(m: int,
                 relam = gvec - a*z - y + s - b
                 rexsi = xsi*(x-alfa) - epsvecn
                 reeta = eta*(beta-x) - epsvecn
-                remu = mu*y - epsvecm
-                rezet = zet*z - epsi
-                res = lam*s - epsvecm
-                
+                remu = mu * y - epsvecm
+                rezet = zet * z - epsi
+                res = lam * s - epsvecm
                 residu1 = bm.concatenate((rex, rey, rez), axis=0)
                 residu2 = bm.concatenate((relam, rexsi, reeta, remu, rezet, res), axis=0)
                 residu = bm.concatenate((residu1, residu2), axis=0)
@@ -264,15 +260,19 @@ def solve_mma_subproblem(m: int,
             
             residunorm = resinew.copy()
             residumax = bm.max(bm.abs(residu))
-            steg = 2*steg
+            steg = 2 * steg
             
-        epsi = 0.1*epsi
+        epsi = 0.1 * epsi
     
     # 返回最优解
-    xmma = x.copy()
-    ymma = y.copy()
-    zmma = z.copy()
+    xmma = bm.copy(x)
+    ymma = bm.copy(y)
+    zmma = bm.copy(z)
     lamma = lam
     xsimma = xsi
     etamma = eta
     mumma = mu
+    zetmma = zet
+    smma = s
+
+    return xmma, ymma, zmma, lamma, xsimma, etamma, mumma, zetmma, smma
