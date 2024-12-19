@@ -34,16 +34,8 @@ class TestLagrangeQuadrangleMeshInterfaces:
         mesh = QuadrangleMesh.from_unit_sphere_surface()
         
         # 计算收敛阶
-        p = 1
-        lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=p, surface=surface)
-    
-        cm[i] = np.sum(lmesh.cell_area())
-        
-        x = bm.to_numpy(cm[i])
-        y = data["sphere_cm"]
-        em[i] = np.abs(x - y)  # absolute error
-        """
-        maxit = 1
+        p = 2
+        maxit = 4
         cm = np.zeros(maxit, dtype=np.float64)
         em = np.zeros(maxit, dtype=np.float64)
         for i in range(maxit):
@@ -60,7 +52,6 @@ class TestLagrangeQuadrangleMeshInterfaces:
             
         em_ratio = em[0:-1] / em[1:]
         print("unit_sphere:", em_ratio)
-        """
 
 if __name__ == "__main__":
     a = TestLagrangeQuadrangleMeshInterfaces()
