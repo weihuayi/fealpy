@@ -11,6 +11,15 @@ from .quadrangle_mesh import QuadrangleMesh
 class LagrangeQuadrangleMesh(TensorMesh):
     def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
             construct=False):
+        """
+        Parameters
+        ----------
+        node : TensorLike
+
+        Note
+        ----
+        1. node 中网格顶点必须排在前面
+        """
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
@@ -37,10 +46,27 @@ class LagrangeQuadrangleMesh(TensorMesh):
     def reference_cell_measure(self):
         return 1
     
-    def interpolation_points(self, p: int, index: Index=_S):
-        """Fetch all p-order interpolation points on the quadrangle mesh."""
-        #TODO
-        pass
+    def interpolation_points(self, p: int, index: Index = _S):
+        """
+        @brief Get all p-th order interpolation points on the quadrilateral mesh
+        """
+        node = self.linearmesh.entity('node')
+        if p == 1:
+            return node[index]
+        if p <= 0:
+            raise ValueError("p must be a integer larger than 0.")
+
+        GD = self.geo_dimension()
+
+        multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
+        w = multiIndex[1:-1, :] / p
+        ipoints0 = self.bc_to_point((w,)).reshape(-1, GD)
+        ipoints1 = bm.zeros((0, GD), dtype=self.ftype) 
+        if p >= 3:
+            ipoints1 = self.bc_to_point((w, w)).reshape(-1, GD) 
+
+        ipoints = bm.concatenate((node, ipoints0, ipoints1), axis=0)
+        return ipoints[index]
 
     @classmethod
     def from_quadrangle_mesh(cls, mesh, p: int, surface=None):
@@ -73,10 +99,14 @@ class LagrangeQuadrangleMesh(TensorMesh):
             raise ValueError(f"entity type: {etype} is wrong!")
 
     def bc_to_point(self, bc: TensorLike, index: Index=_S, etype='cell'):
+        """
+        @brief 把参考单元上的坐标映射到实际单元上
+        """
         node = self.node
-        TD = len(bc)
-        phi = self.shape_function(bc, p=p)
-        p = bm.einsum('cqn, cni -> cqi', phi, node[entity])
+        TD = len(bc) 
+        entity = self.entity(TD, index=index) # 
+        phi = self.shape_function(bc, p=self.p) # (NQ, NVC)
+        p = bm.einsum('qn, cni -> cqi', phi, node[entity])
         return p
 
     # ipoints
@@ -163,7 +193,8 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
         qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        G = self.first_fundamental_form(bcs)
+        J = self.jacobi_matrix(bcs, index=index)
+        G = self.first_fundamental_form(J)
         d = bm.sqrt(bm.linalg.det(G))
         a = bm.einsum('q, cq -> c', ws, d)
         return a
@@ -193,16 +224,16 @@ class LagrangeQuadrangleMesh(TensorMesh):
             n /= l
         return n
 
-    def jacobi_matrix(self, bc: TensorLike, index: Index=_S, return_grad=False):
+    def jacobi_matrix(self, bc: tuple, index: Index=_S, return_grad=False):
         """
         @berif 计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
         TD = len(bc)
-        print("000", bc)
+        print("BC", bc)
         entity = self.entity(TD, index)
-        gphi = self.grad_shape_function(bc)
+        gphi = self.grad_shape_function(bc, p = self.p)
         print("111", self.node[entity[index], :].shape)
         print("222", gphi.shape)
         J = bm.einsum('cim, qin -> cqmn',
@@ -213,18 +244,11 @@ class LagrangeQuadrangleMesh(TensorMesh):
             return J, gphi
 
     # fundamental form
-    def first_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]],
-            index: Index=_S, return_jacobi=False, return_grad=False):
+    def first_fundamental_form(self, J: TensorLike, index: Index=_S):
         """
         Compute the first fundamental form of a mesh surface at integration points.
         """
-        TD = len(bc)
-        J = self.jacobi_matrix(bc, index=index, 
-                return_grad=return_grad)
-
-        if return_grad:
-            J, gphi = J
-
+        TD = J.shape[-1]
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
         for i in range(TD):
@@ -232,14 +256,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             for j in range(i+1, TD):
                 G[..., i, j] = bm.sum(J[..., i]*J[..., j], axis=-1)
                 G[..., j, i] = G[..., i, j]
-        if (return_jacobi is False) & (return_grad is False):
-            return G
-        elif (return_jacobi is True) & (return_grad is False):
-            return G, J
-        elif (return_jacobi is False) & (return_grad is True):
-            return G, gphi
-        else:
-            return G, J, gphi
+        return G
 
     def second_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]],
             index: Index=_S, return_jacobi=False, return_grad=False):
@@ -298,7 +315,8 @@ class LagrangeQuadrangleMesh(TensorMesh):
         ps = self.bc_to_point(bcs)
 
         rm = self.reference_cell_measure()
-        G = self.first_fundamental_form(bcs)
+        J = self.jacobi_matrix(bcs)
+        G = self.first_fundamental_form(J)
         d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
 
         if callable(u):
