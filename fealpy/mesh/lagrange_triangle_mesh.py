@@ -140,10 +140,13 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return p
     
     # shape function
-    def shape_function(self, bc: TensorLike, p=None):
+    def shape_function(self, bc: TensorLike, p=None, variables='x'):
         p = self.p if p is None else p
         phi = bm.simplex_shape_function(bc, p=p)
-        return phi[None, :, :]
+        if variables == 'u':
+            return phi
+        elif variables == 'x':
+            return phi[None, :, :]
 
     def grad_shape_function(self, bc: TensorLike, p=None, 
                             index: Index=_S, variables='x'):
@@ -167,7 +170,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         if variables == 'u':
             return gphi[None, :, :, :] #(1, ..., ldof, TD)
         elif variables == 'x':
-            G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
+            J = self.jacobi_matrix(bc, index=index)
+            G = self.first_fundamental_form(J)
             G = bm.linalg.inv(G)
             gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
             return gphi
@@ -319,19 +323,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             return J, gphi
 
     # fundamental form
-    def first_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
-            index: Index=_S, return_jacobi=False, return_grad=False):
+    def first_fundamental_form(self, J: TensorLike, index: Index=_S):
         """
         Compute the first fundamental form of a mesh surface at integration points.
         """
-        TD = bc.shape[-1] - 1
-
-        J = self.jacobi_matrix(bc, index=index,
-                return_grad=return_grad)
-        
-        if return_grad:
-            J, gphi = J
-
+        TD = J.shape[-1]
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
         for i in range(TD):
@@ -339,14 +335,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             for j in range(i+1, TD):
                 G[..., i, j] = bm.sum(J[..., i]*J[..., j], axis=-1)
                 G[..., j, i] = G[..., i, j]
-        if (return_jacobi is False) & (return_grad is False):
-            return G
-        elif (return_jacobi is True) & (return_grad is False): 
-            return G, J
-        elif (return_jacobi is False) & (return_grad is True): 
-            return G, gphi 
-        else:
-            return G, J, gphi
+        return G
 
     def second_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
             index: Index=_S, return_jacobi=False, return_grad=False):
@@ -367,7 +356,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         ps = self.bc_to_point(bcs)
         
         rm = self.reference_cell_measure()
-        G = self.first_fundamental_form(bcs) 
+        J = self.jacobi_matrix(bcs)
+        G = self.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
 
         if callable(f):
@@ -405,7 +395,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         ps = self.bc_to_point(bcs)
 
         rm = self.reference_cell_measure()
-        G = self.first_fundamental_form(bcs) 
+        J = self.jacobi_matrix(bcs)
+        G = self.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
 
         if callable(u):
