@@ -33,8 +33,6 @@ class LagrangeQuadrangleMesh(TensorMesh):
         self.celldata = {}
         self.meshdata = {}
 
-        #self.cell_shape_function = self.shape_function
-        #self.cell_grad_shape_function = self.grad_shape_function
 
     def reference_cell_measure(self):
         return 1
@@ -80,20 +78,6 @@ class LagrangeQuadrangleMesh(TensorMesh):
         phi = self.shape_function(bc, p=p)
         p = bm.einsum('cqn, cni -> cqi', phi, node[entity])
         return p
-
-    # shape function
-    def shape_function(self, bc: TensorLike, p: int=1):
-        """
-        @berif 
-        bc 是一个长度为 TD 的 tuple 数组
-        bc[i] 是一个一维积分公式的重心坐标数组
-        假设 bc[0]==bc[1]== ... ==bc[TD-1]
-        """
-        return self.shape_function(bc, p=p)
-
-    def grad_shape_function(self, bc: TensorLike, p: int=1, 
-            index: Index=_S, variables='x'):
-        return self.grad_shape_function(bc, p=p, variables=variables)
 
     # ipoints
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
@@ -216,12 +200,13 @@ class LagrangeQuadrangleMesh(TensorMesh):
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
         TD = len(bc)
+        print("000", bc)
         entity = self.entity(TD, index)
         gphi = self.grad_shape_function(bc)
-        print('bc',bc.shape)
-        print('gphi', gphi.shape)
-        J = bm.einsum('cim, cqin -> cqmn',
-                self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
+        print("111", self.node[entity[index], :].shape)
+        print("222", gphi.shape)
+        J = bm.einsum('cim, qin -> cqmn',
+                self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,ldof,TD)
         if return_grad is False:
             return J #(NC,NQ,GD,TD)
         else:
