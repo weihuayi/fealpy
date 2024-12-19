@@ -53,13 +53,13 @@ def assemblymethod(call_name: Optional[str]=None):
     Example:
     ```
         class MyIntegrator(Integrator):
-            def assembly(self, space: _FS) -> Tensor:
+            def assembly(self, space: _FS, /, indices=None) -> Tensor:
                 # 'assembly' is the default assembly method,
                 # naturally registered to name 'assembly'.
                 return integral
 
             @assemblymethod('my')
-            def my_assembly(self, space: _FS) -> Tensor:
+            def my_assembly(self, space: _FS, /, indices=None) -> Tensor:
                 # code for getting local integral tensor
                 return integral
     ```
@@ -124,10 +124,10 @@ class Integrator(metaclass=IntegratorMeta):
     All integrators should implement methods named `assembly` and `to_global_dof`.
     See examples below:
     ```
-    def to_global_dof(space, /, indices):
+    def to_global_dof(space, /, indices=None):
         pass
 
-    def assembly(space, /, indices):
+    def assembly(space, /, indices=None):
         pass
     ```
     These two methods indicate two functions of an integrator: calculation of the integral,
@@ -185,6 +185,7 @@ class Integrator(metaclass=IntegratorMeta):
     def set_region(self, region: Optional[TensorLike], /):
         """Set the region of integration, given as indices of mesh entity."""
         self._region = region
+        self.clear()
         return self
 
     def get_region(self):
@@ -215,7 +216,7 @@ class Integrator(metaclass=IntegratorMeta):
     ### END: Region of Integration ###
 
     def const(self, space: _SpaceGroup, /):
-        value = self.assembly(space)
+        value = self(space)
         to_gdof = self.to_global_dof(space)
         return ConstIntegrator(value, to_gdof)
 
@@ -303,7 +304,6 @@ class ConstIntegrator(Integrator, Generic[_GT]):
 
     ConstIntegrator wrap a given TensorLike object as an Integrator type.
     The `to_gdof` is optional but must be provided if `to_global_dof` is needed.
-    Indices of entity is ignored if `enable_region` is False.
     """
     def __init__(self, value: TensorLike, to_gdof: Optional[_GT] = None):
         super().__init__('assembly', False, False)
