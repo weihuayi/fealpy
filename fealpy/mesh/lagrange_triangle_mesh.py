@@ -7,6 +7,7 @@ from .. import logger
 from .utils import simplex_gdof, simplex_ldof 
 from .mesh_base import HomogeneousMesh, estr2dim
 from .triangle_mesh import TriangleMesh
+#from fealpy.functionspace.dofs import LinearMeshCFEDof
 
 class LagrangeTriangleMesh(HomogeneousMesh):
     def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
@@ -32,7 +33,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             self.construct()
 
         self.meshtype = 'ltri'
-        self.linearmesh = None # 网格的顶点必须在球面上
+        self.linearmesh = None
 
         self.nodedata = {}
         self.edgedata = {}
@@ -52,7 +53,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         localEdge = bm.zeros((3, p+1), dtype=bm.int32)
         localEdge[2, :], = bm.where(multiIndex[:, 2] == 0)
         localEdge[1,:] = bm.flip(bm.where(multiIndex[:, 1] == 0)[0])
-        #localEdge[1, -1::-1], = bm.where(multiIndex[:, 1] == 0)
         localEdge[0, :],  = bm.where(multiIndex[:, 0] == 0)
 
         return localEdge
@@ -96,11 +96,13 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
     @classmethod
     def from_triangle_mesh(cls, mesh, p: int, surface=None):
-        bnode = mesh.entity('node')
+        init_node = mesh.entity('node')
+        #cls.dof = LinearMeshCFEDof(mesh, p=p)
+
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
         if surface is not None:
-            bnode[:], _ = surface.project(bnode) 
+            init_node[:], _ = surface.project(init_node) 
             node, _ = surface.project(node)
 
         lmesh = cls(node, cell, p=p, construct=True)
@@ -143,7 +145,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         phi = bm.simplex_shape_function(bc, p=p)
         return phi[None, :, :]
 
-    def grad_shape_function(self, bc: TensorLike, p=None, index: Index=_S, variables='x'):
+    def grad_shape_function(self, bc: TensorLike, p=None, 
+                            index: Index=_S, variables='x'):
         """
         @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
 
@@ -152,7 +155,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lambda_2 = eta
 
         """
-        p = self.p if p is None else p 
+        p = self.p  if p is None else p
         TD = bc.shape[-1] - 1
         if TD == 2:
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
@@ -298,16 +301,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             n /= l
         return n
 
-    def jacobi_matrix(self, bc: TensorLike, p=None, index: Index=_S, return_grad=False):
+    def jacobi_matrix(self, bc: TensorLike, index: Index=_S, return_grad=False):
         """
         @berif 计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
-
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index)
-        gphi = self.grad_shape_function(bc, p=p, variables='u')
+        gphi = self.grad_shape_function(bc, variables='u')
         J = bm.einsum(
                 'cin, cqim -> cqnm',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
