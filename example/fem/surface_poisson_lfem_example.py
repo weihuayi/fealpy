@@ -97,6 +97,7 @@ for i in range(maxit):
         data = A._values
         indices = A._indices
         return coo_array((data, indices), shape=A.shape)
+    print(coo(A).shape, C.reshape(-1, 1).shape, C.shape)
     A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
     A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
 

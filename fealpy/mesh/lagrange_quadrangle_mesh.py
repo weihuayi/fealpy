@@ -26,12 +26,15 @@ class LagrangeQuadrangleMesh(TensorMesh):
             self.construct()
 
         self.meshtype = 'lquad'
-        self.linearmesh = None # 网格的顶点必须在球面上
+        self.linearmesh = None
 
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
         self.meshdata = {}
+
+        #self.cell_shape_function = self.shape_function
+        #self.cell_grad_shape_function = self.grad_shape_function
 
     def reference_cell_measure(self):
         return 1
@@ -43,11 +46,11 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     @classmethod
     def from_quadrangle_mesh(cls, mesh, p: int, surface=None):
-        bnode = mesh.entity('node')
+        init_node = mesh.entity('node')
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
         if surface is not None:
-            bnode[:],_ = surface.project(bnode)
+            init_node[:],_ = surface.project(init_node)
             node,_ = surface.project(node)
 
         lmesh = cls(node, cell, p=p, construct=False)
@@ -79,43 +82,82 @@ class LagrangeQuadrangleMesh(TensorMesh):
         return p
 
     # shape function
-    def shape_function(self, bc: TensorLike, p=None):
+    def shape_function(self, bc: TensorLike, p: int=1):
         """
         @berif 
         bc 是一个长度为 TD 的 tuple 数组
         bc[i] 是一个一维积分公式的重心坐标数组
         假设 bc[0]==bc[1]== ... ==bc[TD-1]
         """
-        return self.linearmesh.cell_shape_function(bc, p)
+        return self.shape_function(bc, p=p)
 
-    def grad_shape_function(self, bc: TensorLike, p=None, 
+    def grad_shape_function(self, bc: TensorLike, p: int=1, 
             index: Index=_S, variables='x'):
-        return self.linearmesh.cell_grad_shape_function(bc, p, index, variables)
+        return self.grad_shape_function(bc, p=p, variables=variables)
 
     # ipoints
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
         """
-        @berif 每个ltri单元上插值点的个数
+        @berif 每个lquad单元上插值点的个数
         """
-        #TODO
-        pass
+        if isinstance(iptype, str):
+            iptype = estr2dim(self, iptype)
+        return tensor_ldof(p, iptype)
 
-    def number_of_global_ipoints(self, p:int):
+    def number_of_global_ipoints(self, p:int) -> int:
         """
-        @berif ltri网格上插值点总数
+        @berif lquad网格上插值点总数
         """
-        # TODO
-        pass
+        num = [self.entity(i).shape[0] for i in range(self.TD+1)]
+        return tensor_gdof(p, num)
 
     def cell_to_ipoint(self, p:int, index:Index=_S):
         """
-        @berif 获取单元与插值点的对应关系
+        @brief 获取单元上的双 p 次插值点    
         """
-        #TODO 复制粘贴 QuadrangleMesh 的代码并测试
-        pass
+        sp = self.p
+        cell = self.cell[:, [0, -sp-1, 1]]  # 取角点
+        
+        if p == 0:
+            return bm.arange(len(cell)).reshape((-1, 1))[index]
+        if p == 1:
+            return cell[index, [0, 3, 1, 2]]
+        
+        cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype, device=bm.get_device(cell))
+        c2p = cell2ipoint.reshape((NC, p + 1, p + 1))
+        e2p = self.edge_to_ipoint(p)
+
+        flag = edge2cell[:, 2] == 0
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], slice(None), 0), e2p[flag])
+
+        flag = edge2cell[:, 2] == 1
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], -1, slice(None)), e2p[flag])
+
+        flag = edge2cell[:, 2] == 2
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], slice(None), -1), bm.flip(e2p[flag], axis=-1))
+
+        flag = edge2cell[:, 2] == 3
+        c2p = bm.set_at(c2p, (edge2cell[flag, 0], 0, slice(None)), bm.flip(e2p[flag], axis=-1))
+
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        flag = iflag & (edge2cell[:, 3] == 0)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], slice(None), 0), bm.flip(e2p[flag], axis=-1))
+
+        flag = iflag & (edge2cell[:, 3] == 1)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], -1, slice(None)), bm.flip(e2p[flag], axis=-1))
+
+        flag = iflag & (edge2cell[:, 3] == 2)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], slice(None), -1), e2p[flag])
+
+        flag = iflag & (edge2cell[:, 3] == 3)
+        c2p = bm.set_at(c2p, (edge2cell[flag, 1], 0, slice(None)), e2p[flag])
+
+        c2p = bm.set_at(c2p, (slice(None), slice(1, -1), slice(1, -1)), NN + NE * (p - 1) +
+                        bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
+
+        return cell2ipoint[index]
 
     def face_to_ipoint(self, p: int, index: Index=_S):
-        #TODO test
         return self.edge_to_ipoint(p, index)
 
     def entity_measure(self, etype=2, index:Index=_S):
@@ -167,7 +209,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             n /= l
         return n
 
-    def jacobi_matrix(self, bc: TensorLike, p=None, index: Index=_S, return_grad=False):
+    def jacobi_matrix(self, bc: TensorLike, index: Index=_S, return_grad=False):
         """
         @berif 计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
 
@@ -175,9 +217,10 @@ class LagrangeQuadrangleMesh(TensorMesh):
         """
         TD = len(bc)
         entity = self.entity(TD, index)
-        gphi = self.grad_shape_function(bc, p=p, variables='u')
-        J = bm.einsum(
-                'cin, cqim -> cqnm',
+        gphi = self.grad_shape_function(bc)
+        print('bc',bc.shape)
+        print('gphi', gphi.shape)
+        J = bm.einsum('cim, cqin -> cqmn',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
         if return_grad is False:
             return J #(NC,NQ,GD,TD)
@@ -191,8 +234,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
         Compute the first fundamental form of a mesh surface at integration points.
         """
         TD = len(bc)
-
-        J = self.jacobi_matrix(bc, index=index,
+        J = self.jacobi_matrix(bc, index=index, 
                 return_grad=return_grad)
 
         if return_grad:
