@@ -12,14 +12,15 @@ class Cantilever3dData1:
                 ymin: float=0, ymax: float=20,
                 zmin: float=0, zmax: float=4):
         """
-        flip_direction = 'y'
-           1------- 5
+           3------- 7
          / |       /|
-        3 ------- 7 |
+        1 ------- 5 |
         |  |      | |
-        |  0------|-4
+        |  2------|-6
         | /       |/
-        2 ------- 6
+        0 ------- 4
+        位移边界条件: x 坐标为 0 的节点全部固定
+        载荷: x 坐标为 xmax, y 坐标为 ymin 的节点施加载荷
         """
         self.xmin, self.xmax = xmin, xmax
         self.ymin, self.ymax = ymin, ymax

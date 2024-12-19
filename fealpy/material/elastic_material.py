@@ -286,7 +286,6 @@ class LinearElasticMaterial(ElasticMaterial):
         for i in range(GD):
             for j in range(GD):
                 out = bm.set_at(out, (..., i, indices[:, j]), gphi[..., :, j])
-
         return out
     
     def _normal_strain_bbar(self, gphi: TensorLike,

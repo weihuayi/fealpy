@@ -26,6 +26,7 @@ class AssemblyMethod(Enum):
     """矩阵组装方法的枚举类"""
     STANDARD = auto()     # 标准组装方法
     VOIGT = auto()        # Voigt 格式组装
+    VOIGT_UNIFORM = auto  # Voigt 格式一致网格组装
     FAST_STRAIN = auto()  # 应变快速组装
     FAST_STRESS = auto()  # 应力快速组装
     FAST_3D = auto()      # 3D 快速组装
@@ -33,7 +34,7 @@ class AssemblyMethod(Enum):
 @dataclass
 class AssemblyConfig:
     """矩阵组装的配置类"""
-    method: AssemblyMethod = AssemblyMethod.VOIGT
+    method: AssemblyMethod = AssemblyMethod.VOIGT_UNIFORM
     quadrature_degree_increase: int = 3 
 
 class ElasticFEMSolver:
@@ -93,12 +94,7 @@ class ElasticFEMSolver:
     # 状态管理相关方法
     #---------------------------------------------------------------------------
     def update_density(self, density: TensorLike) -> None:
-        """更新密度并更新相关状态
-        
-        Parameters
-        ----------
-        density : 新的密度场
-        """
+        """更新密度并更新相关状态"""
         if density is None:
             raise ValueError("'density' cannot be None")
             
@@ -134,9 +130,10 @@ class ElasticFEMSolver:
             base_material = self.material_properties.get_base_material()
             integrator = LinearElasticIntegrator(
                                             material=base_material,
-                                            q=self.tensor_space.p + 3
+                                            q=self.tensor_space.p + 3,
+                                            method='voigt_uniform'
                                         )
-            self._base_local_stiffness_matrix = integrator.assembly(space=self.tensor_space)
+            self._base_local_stiffness_matrix = integrator.voigt_uniform_assembly(space=self.tensor_space)
         return self._base_local_stiffness_matrix
     
     def compute_local_stiffness_matrix(self) -> TensorLike:
@@ -151,6 +148,7 @@ class ElasticFEMSolver:
         method_map = {
             AssemblyMethod.STANDARD: integrator.assembly,
             AssemblyMethod.VOIGT: integrator.voigt_assembly,
+            AssemblyMethod.VOIGT_UNIFORM: integrator.voigt_uniform_assembly,
             AssemblyMethod.FAST_STRAIN: integrator.fast_assembly_strain,
             AssemblyMethod.FAST_STRESS: integrator.fast_assembly_stress,
             AssemblyMethod.FAST_3D: integrator.fast_assembly
@@ -178,6 +176,7 @@ class ElasticFEMSolver:
         method_map = {
             AssemblyMethod.STANDARD: 'assembly',
             AssemblyMethod.VOIGT: 'voigt',
+            AssemblyMethod.VOIGT_UNIFORM: 'voigt_uniform',
             AssemblyMethod.FAST_STRAIN: 'fast_strain',
             AssemblyMethod.FAST_STRESS: 'fast_stress',
             AssemblyMethod.FAST_3D: 'fast_3d'
@@ -188,11 +187,10 @@ class ElasticFEMSolver:
         # 创建积分器
         q = self.tensor_space.p + self.assembly_config.quadrature_degree_increase
         
-        integrator = LinearElasticIntegrator(
-            material=self._current_material,
-            q=q,
-            method=method
-        )
+        integrator = LinearElasticIntegrator(material=self._current_material,
+                                            q=q,
+                                            method=method
+                                        )
         
         return integrator
     
@@ -208,7 +206,6 @@ class ElasticFEMSolver:
             
         # 创建适当的积分器
         integrator = self._create_integrator()
-
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
         # t.send('Local Assembly')
@@ -295,18 +292,18 @@ class ElasticFEMSolver:
         if self._current_density is None:
             raise ValueError("Density not set. Call update_density first.")
         
-        # 创建计时器
-        t = timer("CG Solver Timing")
-        next(t)  # 启动计时器
+        # # 创建计时器
+        # t = timer("CG Solver Timing")
+        # next(t)  # 启动计时器
     
         K0 = self._assemble_global_stiffness_matrix()
-        t.send('Stiffness Matrix Assembly')
+        # t.send('Stiffness Matrix Assembly')
 
         F0 = self._assemble_global_force_vector()
-        t.send('Force Vector Assembly')
+        # t.send('Force Vector Assembly')
 
         K, F = self._apply_boundary_conditions(K0, F0)
-        t.send('Boundary Conditions')
+        # t.send('Boundary Conditions')
         
         uh = self.tensor_space.function()
 
@@ -315,10 +312,10 @@ class ElasticFEMSolver:
             # uh[:], info = cg(K, F[:], x0=x0, maxiter=maxiter, atol=atol, rtol=rtol)
             # TODO 目前 FEALPy 中的 cg 只能通过 logger 获取迭代步数，无法直接返回
             uh[:] = cg(K, F[:], x0=x0, maxiter=maxiter, atol=atol, rtol=rtol)
-            t.send('Solving Phase')  # 记录求解阶段时间
+            # t.send('Solving Phase')  # 记录求解阶段时间
 
             # 结束计时
-            t.send(None)
+            # t.send(None)
         except Exception as e:
             raise RuntimeError(f"CG solver failed: {str(e)}")
         

@@ -1,3 +1,6 @@
+"""
+外齿轮
+"""
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.sparse import COOTensor
@@ -490,11 +493,11 @@ F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 F_load_nodes = F[dof_indices] # (15*8, GD)
 
 fixed_node_index = bm.where(is_inner_node)[0]
-export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/inp/external_gear_analys.inp', 
+export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/inp/external_gear_abaqus.inp', 
               nodes=node, elements=cell, 
               fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
               young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
-              used_app='ansys', mesh_type='hex')
+              used_app='abaqus', mesh_type='hex')
 
 E = 206e3
 nu = 0.3
@@ -564,6 +567,7 @@ if tensor_space.dof_priority:
     uh_show = uh.reshape(GD, NN).T
 else:
     uh_show = uh.reshape(NN, GD)
+
 uh_x = uh_show[:, 0]
 uh_y = uh_show[:, 1]
 uh_z = uh_show[:, 2]
