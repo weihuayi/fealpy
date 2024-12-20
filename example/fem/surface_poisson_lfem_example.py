@@ -12,8 +12,8 @@ from fealpy.backend import backend_manager as bm
 
 from fealpy.pde.surface_poisson_model import SurfaceLevelSetPDEData
 from fealpy.geometry.implicit_surface import SphereSurface
-from fealpy.mesh.triangle_mesh import TriangleMesh
-from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
+from fealpy.mesh import TriangleMesh, QuadrangleMesh
+from fealpy.mesh import LagrangeTriangleMesh, LagrangeQuadrangleMesh
 from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
@@ -57,6 +57,13 @@ mdegree = args.mdegree
 mtype = args.mtype
 maxit = args.maxit
 
+if mtype == 'ltri':
+    LinearMesh = TriangleMesh
+    LagrangeMesh = LagrangeTriangleMesh
+elif mtype == 'lquad':
+    LinearMesh = QuadrangleMesh
+    LagrangeMesh = LagrangeQuadrangleMesh
+
 x, y, z = sp.symbols('x, y, z', real=True)
 F = x**2 + y**2 + z**2
 u = x * y
@@ -64,17 +71,21 @@ pde = SurfaceLevelSetPDEData(F, u)
 
 p = mdegree
 surface = SphereSurface()
-tmesh = TriangleMesh.from_unit_sphere_surface()
+
+lmesh = LinearMesh.from_unit_sphere_surface()
 
 
-errorType = ['$|| u - u_h||_{\Omega,0}$']
+errorType = ['$|| u - u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
     
-    mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p=mdegree, surface=surface)
+    if mtype == 'ltri':
+        mesh = LagrangeMesh.from_triangle_mesh(lmesh, p=mdegree, surface=surface)
+    elif mtype == 'lquad':
+        mesh = LagrangeMesh.from_quadrangle_mesh(lmesh, p=mdegree, surface=surface)
     #fname = f"sphere_test.vtu"
     #mesh.to_vtk(fname=fname)
     
@@ -88,6 +99,7 @@ for i in range(maxit):
     bfrom.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
     lfrom = LinearForm(space)
     lfrom.add_integrator(ScalarSourceIntegrator(pde.source, method='isopara'))
+    print("开始组装刚度矩阵和右端向量")
 
     A = bfrom.assembly(format='coo')
     F = lfrom.assembly()
@@ -97,6 +109,7 @@ for i in range(maxit):
         data = A._values
         indices = A._indices
         return coo_array((data, indices), shape=A.shape)
+    print(coo(A).shape, C.reshape(-1, 1).shape, C.shape)
     A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
     A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
 
@@ -110,7 +123,7 @@ for i in range(maxit):
     errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)
 
     if i < maxit-1:
-        tmesh.uniform_refine()
+        lmesh.uniform_refine()
 
 print("最终误差:", errorMatrix)
 print("order:", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
