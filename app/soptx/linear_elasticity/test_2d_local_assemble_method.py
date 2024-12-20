@@ -27,10 +27,12 @@ mesh_simplex = TriangleMesh.from_box(box=box, nx=nx, ny=ny)
 mesh_tensor = QuadrangleMesh.from_box(box=box, nx=nx, ny=ny)
 mesh_struct = UniformMesh2d(extent=extent, h=h, origin=origin)
 
-p = 4
+p = 1
 space_simplex = LagrangeFESpace(mesh_simplex, p=p, ctype='C')
+ldof1 = space_simplex.number_of_local_dofs()
 space_tensor = LagrangeFESpace(mesh_tensor, p=p, ctype='C')
 tensor_space_simplex = TensorFunctionSpace(space_simplex, shape=(-1, 2))
+tldof1 = tensor_space_simplex.number_of_local_dofs()
 tensor_space_tensor = TensorFunctionSpace(space_tensor, shape=(-1, 2))
 
 linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
@@ -49,22 +51,23 @@ integrator_fast_stress.keep_data()
 integrator_symbolic_stress.keep_data() 
 # integrator2.keep_result() # 保留积分结果
 
-# # 创建计时器
-# t = timer("2d Local Assembly Timing (Simplex)")
-# next(t)  # 启动计时器
+# 创建计时器
+t = timer("2d Local Assembly Timing (Simplex)")
+next(t)  # 启动计时器
+KE_symbolic_stress_simplex = integrator_symbolic_stress.symbolic_assembly_stress(space=tensor_space_simplex)
+t.send('Symbolic Assembly simplex')
+KE_symbolic_stress_simplex_cache = integrator_symbolic_stress.symbolic_assembly_stress(space=tensor_space_simplex)
+t.send('Symbolic Assembly simplex cache')
 
-# KE_standard_simplex = integrator_standard.assembly(space=tensor_space_simplex)
-# t.send('Standard Assembly simplex')
-# KE_standard_simplex_cache = integrator_standard.assembly(space=tensor_space_simplex)
-# t.send('Standard Assembly simplex cache')
-# KE_fast_stress_simplex = integrator_fast_stress.fast_assembly_stress(space=tensor_space_simplex)
-# t.send('Fast Assembly simplex')
-# KE_fast_stress_simplex_cache = integrator_fast_stress.fast_assembly_stress(space=tensor_space_simplex)
-# t.send('Fast Assembly simplex cache')
-# KE_symbolic_stress_simplex = integrator_symbolic_stress.symbolic_assembly_stress(space=tensor_space_simplex)
-# t.send('Symbolic Assembly simplex')
-# KE_symbolic_stress_simplex_cache = integrator_symbolic_stress.symbolic_assembly_stress(space=tensor_space_simplex)
-# t.send('Symbolic Assembly simplex cache')
+
+KE_standard_simplex = integrator_standard.assembly(space=tensor_space_simplex)
+t.send('Standard Assembly simplex')
+KE_standard_simplex_cache = integrator_standard.assembly(space=tensor_space_simplex)
+t.send('Standard Assembly simplex cache')
+KE_fast_stress_simplex = integrator_fast_stress.fast_assembly_stress(space=tensor_space_simplex)
+t.send('Fast Assembly simplex')
+KE_fast_stress_simplex_cache = integrator_fast_stress.fast_assembly_stress(space=tensor_space_simplex)
+t.send('Fast Assembly simplex cache')
 
 # t.send(None)
 

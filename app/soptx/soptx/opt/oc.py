@@ -28,18 +28,13 @@ class OptimizationHistory:
 
     def log_iteration(self, iter_idx: int, obj_val: float, volume: float, 
                      change: float, time: float, density: TensorLike):
-        """记录一次迭代的信息
-        
-        Parameters
-        ----------
-        density : 当前密度场
-        """
+        """记录一次迭代的信息"""
         self.densities.append(density.copy())
         
         print(f"Iteration: {iter_idx + 1}, "
-              f"Objective: {obj_val:.3f}, "
-              f"Volume: {volume:.12f}, "
-              f"Change: {change:.3f}, "
+              f"Objective: {obj_val:.4f}, "
+              f"Volume: {volume:.4f}, "
+              f"Change: {change:.4f}, "
               f"Time: {time:.3f} sec")
 
 class OCOptimizer(OptimizerBase):
