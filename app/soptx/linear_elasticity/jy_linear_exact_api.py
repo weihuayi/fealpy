@@ -617,99 +617,99 @@ strain4, stress4, nstrain4, nstress4 = compute_strain_stress_at_quadpoints2(spac
 strain5, stress5, nstrain5, nstress5 = compute_strain_stress_at_quadpoints3(tensor_space,
                                                                         uh, B_BBar, D)
 
-# 单元积分点处的位移梯度
-q = 2
-qf = mesh.quadrature_formula(q)
-bcs_quadrature, ws = qf.get_quadrature_points_and_weights()
-tgphi = tensor_space.grad_basis(bcs_quadrature)             # (NC, NQ, tldof, GD, GD)
-tgrad = bm.einsum('cqimn, ci -> cqmn', tgphi, uh_cell)      # (NC, NQ, GD, GD)
+# # 单元积分点处的位移梯度
+# q = 2
+# qf = mesh.quadrature_formula(q)
+# bcs_quadrature, ws = qf.get_quadrature_points_and_weights()
+# tgphi = tensor_space.grad_basis(bcs_quadrature)             # (NC, NQ, tldof, GD, GD)
+# tgrad = bm.einsum('cqimn, ci -> cqmn', tgphi, uh_cell)      # (NC, NQ, GD, GD)
 
-# 应变张量
-strain = (tgrad + bm.transpose(tgrad, (0, 1, 3, 2))) / 2    # (NC, NQ, GD, GD)
-strain_xx = strain[..., 0, 0] # (NC, NQ)
-strain_yy = strain[..., 1, 1] # (NC, NQ)
-strain_zz = strain[..., 2, 2] # (NC, NQ)
-strain_xy = strain[..., 0, 1] # (NC, NQ)
-strain_yz = strain[..., 1, 2] # (NC, NQ)
-strain_xz = strain[..., 0, 2] # (NC, NQ)
+# # 应变张量
+# strain = (tgrad + bm.transpose(tgrad, (0, 1, 3, 2))) / 2    # (NC, NQ, GD, GD)
+# strain_xx = strain[..., 0, 0] # (NC, NQ)
+# strain_yy = strain[..., 1, 1] # (NC, NQ)
+# strain_zz = strain[..., 2, 2] # (NC, NQ)
+# strain_xy = strain[..., 0, 1] # (NC, NQ)
+# strain_yz = strain[..., 1, 2] # (NC, NQ)
+# strain_xz = strain[..., 0, 2] # (NC, NQ)
 
-# 应力张量
-trace_e = bm.einsum("...ii", strain) # (NC, NQ)
-I = bm.eye(GD, dtype=bm.float64)
-stress = 2 * mu * strain + lam * trace_e[..., None, None] * I # (NC, NQ, GD, GD)
-stress_xx = stress[..., 0, 0] # (NC, 8)
-stress_yy = stress[..., 1, 1] # (NC, 8)
-stress_zz = stress[..., 2, 2] # (NC, 8)
-stress_xy = stress[..., 0, 1] # (NC, 8)
-stress_yz = stress[..., 1, 2] # (NC, 8)
-stress_xz = stress[..., 0, 2] # (NC, 8)
-
-
-mesh.nodedata['uh'] = uh_show[:]
-mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
-mesh.nodedata['strain_vertices'] = nstrain1
-mesh.nodedata['stress_vertices'] = nstress1
-mesh.nodedata['strian_centers'] = nstrain2
-mesh.nodedata['stress_centers'] = nstress2
-mesh.nodedata['strain_quadpoints'] = nstrain3
-mesh.nodedata['stress_quadpoints'] = nstress3
-mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_hex_linear_exact_fealpy.vtu')
+# # 应力张量
+# trace_e = bm.einsum("...ii", strain) # (NC, NQ)
+# I = bm.eye(GD, dtype=bm.float64)
+# stress = 2 * mu * strain + lam * trace_e[..., None, None] * I # (NC, NQ, GD, GD)
+# stress_xx = stress[..., 0, 0] # (NC, 8)
+# stress_yy = stress[..., 1, 1] # (NC, 8)
+# stress_zz = stress[..., 2, 2] # (NC, 8)
+# stress_xy = stress[..., 0, 1] # (NC, 8)
+# stress_yz = stress[..., 1, 2] # (NC, 8)
+# stress_xz = stress[..., 0, 2] # (NC, 8)
 
 
-# 验证收敛阶
-maxit = 4
-errorType = ['$|| u_{bd} - uh_{bd}$', '$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
-errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
-NDof = bm.zeros(maxit, dtype=bm.int32)
-for i in range(maxit):
-    space = LagrangeFESpace(mesh, p=p, ctype='C')
-    # tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
-    tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
+# mesh.nodedata['uh'] = uh_show[:]
+# mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
+# mesh.nodedata['strain_vertices'] = nstrain1
+# mesh.nodedata['stress_vertices'] = nstress1
+# mesh.nodedata['strian_centers'] = nstrain2
+# mesh.nodedata['stress_centers'] = nstress2
+# mesh.nodedata['strain_quadpoints'] = nstrain3
+# mesh.nodedata['stress_quadpoints'] = nstress3
+# mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_hex_linear_exact_fealpy.vtu')
 
-    NDof[i] = tensor_space.number_of_global_dofs()
 
-    linear_elastic_material = LinearElasticMaterial(name='E_nu', 
-                                                elastic_modulus=E, poisson_ratio=nu, 
-                                                hypo='3D', device=bm.get_device(mesh))
+# # 验证收敛阶
+# maxit = 4
+# errorType = ['$|| u_{bd} - uh_{bd}$', '$|| u  - u_h ||_{L2}$', '$|| u -  u_h||_{l2}$']
+# errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
+# NDof = bm.zeros(maxit, dtype=bm.int32)
+# for i in range(maxit):
+#     space = LagrangeFESpace(mesh, p=p, ctype='C')
+#     # tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
+#     tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
 
-    integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=q, method='voigt')
-    bform = BilinearForm(tensor_space)
-    bform.add_integrator(integrator_K)
-    K = bform.assembly(format='csr')
+#     NDof[i] = tensor_space.number_of_global_dofs()
 
-    integrator_F = VectorSourceIntegrator(source=pde.source, q=q)
-    lform = LinearForm(tensor_space)    
-    lform.add_integrator(integrator_F)
-    F = lform.assembly()
+#     linear_elastic_material = LinearElasticMaterial(name='E_nu', 
+#                                                 elastic_modulus=E, poisson_ratio=nu, 
+#                                                 hypo='3D', device=bm.get_device(mesh))
 
-    dbc = DirichletBC(space=tensor_space, 
-                    gd=pde.dirichlet, 
-                    threshold=None, 
-                    method='interp')
-    uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
-                    dtype=bm.float64, device=bm.get_device(mesh))
-    uh_bd, isDDof = tensor_space.boundary_interpolate(gd=pde.dirichlet, 
-                                                    uh=uh_bd, threshold=None, method='interp')
-    F = F - K.matmul(uh_bd)
-    F = bm.set_at(F, isDDof, uh_bd[isDDof])
+#     integrator_K = LinearElasticIntegrator(material=linear_elastic_material, q=q, method='voigt')
+#     bform = BilinearForm(tensor_space)
+#     bform.add_integrator(integrator_K)
+#     K = bform.assembly(format='csr')
 
-    K = dbc.apply_matrix(matrix=K, check=True)
+#     integrator_F = VectorSourceIntegrator(source=pde.source, q=q)
+#     lform = LinearForm(tensor_space)    
+#     lform.add_integrator(integrator_F)
+#     F = lform.assembly()
 
-    uh = tensor_space.function()
-    # uh[:] = cg(K, F, maxiter=1000, atol=1e-8, rtol=1e-8)
-    uh[:] = spsolve(K, F, solver="mumps")
+#     dbc = DirichletBC(space=tensor_space, 
+#                     gd=pde.dirichlet, 
+#                     threshold=None, 
+#                     method='interp')
+#     uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
+#                     dtype=bm.float64, device=bm.get_device(mesh))
+#     uh_bd, isDDof = tensor_space.boundary_interpolate(gd=pde.dirichlet, 
+#                                                     uh=uh_bd, threshold=None, method='interp')
+#     F = F - K.matmul(uh_bd)
+#     F = bm.set_at(F, isDDof, uh_bd[isDDof])
 
-    u_exact = tensor_space.interpolate(pde.solution)
-    errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh[:] - u_exact)**2 * (1 / NDof[i])))
-    errorMatrix[1, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
-    errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
+#     K = dbc.apply_matrix(matrix=K, check=True)
 
-    if i < maxit-1:
-        mesh.uniform_refine()
+#     uh = tensor_space.function()
+#     # uh[:] = cg(K, F, maxiter=1000, atol=1e-8, rtol=1e-8)
+#     uh[:] = spsolve(K, F, solver="mumps")
 
-print("errorMatrix:\n", errorType, "\n", errorMatrix)
-print("NDof:", NDof)
-print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
-print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))
-print("----------------------")
+#     u_exact = tensor_space.interpolate(pde.solution)
+#     errorMatrix[0, i] = bm.sqrt(bm.sum(bm.abs(uh[:] - u_exact)**2 * (1 / NDof[i])))
+#     errorMatrix[1, i] = mesh.error(u=uh, v=pde.solution, q=tensor_space.p+3, power=2)
+#     errorMatrix[2, i] = bm.sqrt(bm.sum(bm.abs(uh[isDDof] - u_exact[isDDof])**2 * (1 / NDof[i])))
+
+#     if i < maxit-1:
+#         mesh.uniform_refine()
+
+# print("errorMatrix:\n", errorType, "\n", errorMatrix)
+# print("NDof:", NDof)
+# print("order_l2:\n", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
+# print("order_L2:\n ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))
+# print("----------------------")
 

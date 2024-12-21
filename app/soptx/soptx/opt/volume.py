@@ -78,7 +78,9 @@ class VolumeConstraint(ConstraintBase):
             return gradient
             
          # 明确指定这是约束函数的梯度
-        return self.filter.filter_sensitivity(gradient, rho, 'constraint', filter_params)
+        filtered_gradient = self.filter.filter_sensitivity(gradient, rho, 'constraint', filter_params)
+        
+        return filtered_gradient
         
     def hess(self, rho: TensorLike, lambda_: Dict[str, Any]) -> TensorLike:
         """计算体积约束 Hessian 矩阵（未实现）

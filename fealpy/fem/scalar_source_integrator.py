@@ -60,7 +60,8 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         bcs, ws, phi, cm, index = self.fetch(space)
 
         rm = space.mesh.reference_cell_measure()
-        G = space.mesh.first_fundamental_form(bcs)
+        J = space.mesh.jacobi_matrix(bcs)
+        G = space.mesh.first_fundamental_form(J)
         d = bm.sqrt(bm.linalg.det(G))
 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)

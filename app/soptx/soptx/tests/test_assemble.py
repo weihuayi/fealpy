@@ -126,8 +126,8 @@ def create_base_components(config: TestConfig):
        tensor_space=tensor_space_C,
        pde=pde,
        assembly_config=assembly_config,
-       solver_type=config.solver_type,  # 添加默认求解器类型
-       solver_params=solver_params  # 添加求解器参数
+       solver_type=config.solver_type,  
+       solver_params=solver_params 
    )
     
     # Initialize density field

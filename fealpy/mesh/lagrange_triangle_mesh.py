@@ -7,6 +7,7 @@ from .. import logger
 from .utils import simplex_gdof, simplex_ldof 
 from .mesh_base import HomogeneousMesh, estr2dim
 from .triangle_mesh import TriangleMesh
+#from fealpy.functionspace.dofs import LinearMeshCFEDof
 
 class LagrangeTriangleMesh(HomogeneousMesh):
     def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
@@ -32,7 +33,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             self.construct()
 
         self.meshtype = 'ltri'
-        self.linearmesh = None # 网格的顶点必须在球面上
+        self.linearmesh = None
 
         self.nodedata = {}
         self.edgedata = {}
@@ -52,7 +53,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         localEdge = bm.zeros((3, p+1), dtype=bm.int32)
         localEdge[2, :], = bm.where(multiIndex[:, 2] == 0)
         localEdge[1,:] = bm.flip(bm.where(multiIndex[:, 1] == 0)[0])
-        #localEdge[1, -1::-1], = bm.where(multiIndex[:, 1] == 0)
         localEdge[0, :],  = bm.where(multiIndex[:, 0] == 0)
 
         return localEdge
@@ -96,11 +96,13 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
     @classmethod
     def from_triangle_mesh(cls, mesh, p: int, surface=None):
-        bnode = mesh.entity('node')
+        init_node = mesh.entity('node')
+        #cls.dof = LinearMeshCFEDof(mesh, p=p)
+
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
         if surface is not None:
-            bnode[:], _ = surface.project(bnode) 
+            init_node[:], _ = surface.project(init_node) 
             node, _ = surface.project(node)
 
         lmesh = cls(node, cell, p=p, construct=True)
@@ -138,12 +140,16 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return p
     
     # shape function
-    def shape_function(self, bc: TensorLike, p=None):
+    def shape_function(self, bc: TensorLike, p=None, variables='x'):
         p = self.p if p is None else p
         phi = bm.simplex_shape_function(bc, p=p)
-        return phi[None, :, :]
+        if variables == 'u':
+            return phi
+        elif variables == 'x':
+            return phi[None, :, :]
 
-    def grad_shape_function(self, bc: TensorLike, p=None, index: Index=_S, variables='x'):
+    def grad_shape_function(self, bc: TensorLike, p=None, 
+                            index: Index=_S, variables='x'):
         """
         @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
 
@@ -152,7 +158,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lambda_2 = eta
 
         """
-        p = self.p if p is None else p 
+        p = self.p  if p is None else p
         TD = bc.shape[-1] - 1
         if TD == 2:
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
@@ -164,7 +170,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         if variables == 'u':
             return gphi[None, :, :, :] #(1, ..., ldof, TD)
         elif variables == 'x':
-            G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
+            J = self.jacobi_matrix(bc, index=index)
+            G = self.first_fundamental_form(J)
             G = bm.linalg.inv(G)
             gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
             return gphi
@@ -298,16 +305,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             n /= l
         return n
 
-    def jacobi_matrix(self, bc: TensorLike, p=None, index: Index=_S, return_grad=False):
+    def jacobi_matrix(self, bc: TensorLike, index: Index=_S, return_grad=False):
         """
         @berif 计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
-
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index)
-        gphi = self.grad_shape_function(bc, p=p, variables='u')
+        gphi = self.grad_shape_function(bc, variables='u')
         J = bm.einsum(
                 'cin, cqim -> cqnm',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
@@ -317,19 +323,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             return J, gphi
 
     # fundamental form
-    def first_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
-            index: Index=_S, return_jacobi=False, return_grad=False):
+    def first_fundamental_form(self, J: TensorLike, index: Index=_S):
         """
         Compute the first fundamental form of a mesh surface at integration points.
         """
-        TD = bc.shape[-1] - 1
-
-        J = self.jacobi_matrix(bc, index=index,
-                return_grad=return_grad)
-        
-        if return_grad:
-            J, gphi = J
-
+        TD = J.shape[-1]
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
         for i in range(TD):
@@ -337,14 +335,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             for j in range(i+1, TD):
                 G[..., i, j] = bm.sum(J[..., i]*J[..., j], axis=-1)
                 G[..., j, i] = G[..., i, j]
-        if (return_jacobi is False) & (return_grad is False):
-            return G
-        elif (return_jacobi is True) & (return_grad is False): 
-            return G, J
-        elif (return_jacobi is False) & (return_grad is True): 
-            return G, gphi 
-        else:
-            return G, J, gphi
+        return G
 
     def second_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
             index: Index=_S, return_jacobi=False, return_grad=False):
@@ -365,7 +356,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         ps = self.bc_to_point(bcs)
         
         rm = self.reference_cell_measure()
-        G = self.first_fundamental_form(bcs) 
+        J = self.jacobi_matrix(bcs)
+        G = self.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
 
         if callable(f):
@@ -403,7 +395,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         ps = self.bc_to_point(bcs)
 
         rm = self.reference_cell_measure()
-        G = self.first_fundamental_form(bcs) 
+        J = self.jacobi_matrix(bcs)
+        G = self.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G)) # 第一基本形式开方
 
         if callable(u):
