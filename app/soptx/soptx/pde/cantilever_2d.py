@@ -8,9 +8,11 @@ from builtins import list
 
 class Cantilever2dData1:
     def __init__(self, 
-                xmin: float=0, xmax: float=160, 
-                ymin: float=0, ymax: float=100):
+                xmin: float, xmax: float, 
+                ymin: float, ymax: float):
         """
+        位移边界条件：梁的左边界固定
+        载荷：梁的右边界的下点施加垂直向下的力 F = 1
         flip_direction = True
         0 ------- 3 ------- 6 
         |    0    |    2    |

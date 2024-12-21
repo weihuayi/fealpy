@@ -78,12 +78,40 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             glambda_x = mesh.grad_lambda()       # (NC, LDOF, GD)
             J = None
             G = None
+            JG = None
         else:
             glambda_x = None
-            J = mesh.jacobi_matrix(bcs)          # (NC, NQ, GD, GD)
-            G = mesh.first_fundamental_form(J)   # (NC, NQ, GD, GD)
+            J = mesh.jacobi_matrix(bcs)                   # (NC, NQ, GD, GD)
+            G = mesh.first_fundamental_form(J)            # (NC, NQ, GD, GD)
+            G = bm.linalg.inv(G)                          # (NC, NQ, GD, GD)
+            JG = bm.einsum('cqkm, cqmn -> cqkn', J, G)    # (NC, NQ, GD, GD)
 
-        return cm, ws, gphi_lambda, glambda_x, J, G
+        return cm, ws, gphi_lambda, glambda_x, JG
+    
+    @enable_cache
+    def fetch_fast_assembly_uniform(self, space: _FS):
+        index = self.index
+        mesh = getattr(space, 'mesh', None)
+    
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+    
+        cm = mesh.entity_measure('cell', index=index)
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        gphi_lambda = space.grad_basis(bcs, index=index, variable='u')    # (NQ, LDOF, BC)
+
+        J = mesh.jacobi_matrix(bcs)[:, 0, ...]        # (NC, GD, GD)
+        G = mesh.first_fundamental_form(J)            # (NC, GD, GD)
+        G = bm.linalg.inv(G)                          # (NC, GD, GD)
+        JG = bm.einsum('ckm, cmn -> ckn', J, G)       # (NC, GD, GD)
+
+        M = bm.einsum('qim, qjn, q -> ijmn', gphi_lambda, gphi_lambda, ws)  # (LDOF, LDOF, BC, BC)
+
+        return cm, JG, M
     
     @enable_cache
     def fetch_symbolic_assembly(self, space: _TS) -> TensorLike:
@@ -96,11 +124,10 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
     
         cm = mesh.entity_measure('cell', index=index)
-        # (NC, LDOF, GD)
-        glambda_x = mesh.grad_lambda()
+        glambda_x = mesh.grad_lambda()  # (NC, LDOF, GD)
         
         symbolic_int = SymbolicIntegration(space)
-        M = bm.tensor(symbolic_int.gphi_gphi_matrix())
+        M = bm.tensor(symbolic_int.gphi_gphi_matrix()) # (LDOF1, LDOF1, GD+1, GD+1)
 
         return cm, mesh, glambda_x, bm.asarray(M, dtype=bm.float64)
     
@@ -168,27 +195,27 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             A_xx = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 0], gphi[..., 0], detJ)
             A_yy = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 1], gphi[..., 1], detJ)
             A_xy = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 0], gphi[..., 1], detJ)
+            A_yx = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 1], gphi[..., 0], detJ)
         else:
             A_xx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 0], cm)
             A_yy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 1], cm)
             A_xy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 1], cm)
-
-        
-        A_yx = A_xy.transpose((0, 2, 1))
+            A_yx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 1], cm)
 
         GD = mesh.geo_dimension()
         if GD == 3:
             if isinstance(mesh, TensorMesh):
                 A_xz = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 0], gphi[..., 2], detJ)
+                A_zx = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 2], gphi[..., 0], detJ)
                 A_yz = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 1], gphi[..., 2], detJ)
+                A_zy = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 2], gphi[..., 1], detJ)
                 A_zz = bm.einsum('q, cqi, cqj, cq -> cij', ws, gphi[..., 2], gphi[..., 2], detJ)
             else:
                 A_xz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 2], cm)
+                A_zx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 0], cm)
                 A_yz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 2], cm)
+                A_zy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 1], cm)
                 A_zz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 2], cm)
-                
-            A_zx = A_xz.transpose((0, 2, 1))
-            A_zy = A_yz.transpose((0, 2, 1))
 
         D = self.material.elastic_matrix()
         if D.shape[1] != 1:
@@ -299,7 +326,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return KK
     
     @assemblymethod('voigt_uniform')
-    def voigt_uniform_assembly(self, space: _TS) -> TensorLike:
+    def voigt_assembly_uniform(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         cm, bcs, ws, gphi, _ = self.fetch_assembly(scalar_space)
 
@@ -309,6 +336,63 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         
         KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, D, B)
             
+        return KK
+    
+    @assemblymethod('fast_stress_uniform')
+    def fast_assembly_stress_uniform(self, space: _TS) -> TensorLike:
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
+        cm, JG, M = self.fetch_fast_assembly_uniform(scalar_space)
+        
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        ldof = scalar_space.number_of_local_dofs()
+        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
+
+        D = self.material.elastic_matrix()
+        if D.shape[1] != 1:
+            raise ValueError("fast_assembly_stress currently only supports elastic matrices "
+                            "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
+        D00 = D[..., 0, 0]  # E / (1-\nu^2) * 1
+        D01 = D[..., 0, 1]  # E / (1-\nu^2) * \nu
+        D22 = D[..., 2, 2]  # E / (1-\nu^2) * (1-nu)/2
+
+        # A = bm.einsum('ijmn, cam, cbn, c -> cijab', M, JG, JG, cm)  # (NC, LDOF, LDOF, GD, GD)
+        # A_xx = A[..., 0, 0]
+        # A_yy = A[..., 1, 1]
+        # A_xy = A[..., 0, 1]
+        # A_yx = A[..., 1, 0]
+        A_xx = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 0], JG[..., 0], cm)  # (NC, LDOF, LDOF)
+        A_yy = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 1], JG[..., 1], cm)  # (NC, LDOF, LDOF)
+        A_xy = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 0], JG[..., 1], cm)  # (NC, LDOF, LDOF)
+        A_yx = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 1], JG[..., 0], cm)  # (NC, LDOF, LDOF)
+        
+        # 填充刚度矩阵
+        if space.dof_priority:
+            # Fill the diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), 
+                        D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), 
+                        D00 * A_yy + D22 * A_xx)
+
+            # Fill the off-diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), 
+                        D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), 
+                        D01 * A_yx + D22 * A_xy)
+        else:
+            # Fill the diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
+                        D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
+                        D00 * A_yy + D22 * A_xx)
+
+            # Fill the off-diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
+                        D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
+                        D01 * A_yx + D22 * A_xy)
+
         return KK
 
     @assemblymethod('fast_strain')
@@ -339,9 +423,9 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         D = self.material.elastic_matrix()
         if D.shape[0] != 1:
             raise ValueError("Elastic matrix D must have shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-        D00 = D[..., 0, 0, None]  # E / (1-\nu^2) * 1
-        D01 = D[..., 0, 1, None]  # E / (1-\nu^2) * \nu
-        D22 = D[..., 2, 2, None]  # E / (1-\nu^2) * (1-nu)/2
+        D00 = D[..., 0, 0, None]  # 2*\mu + \lambda
+        D01 = D[..., 0, 1, None]  # \lambda
+        D22 = D[..., 2, 2, None]  # \mu
         
         if space.dof_priority:
             # Fill the diagonal part
@@ -366,41 +450,40 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @assemblymethod('fast_stress')
     def fast_assembly_stress(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
-        mesh = scalar_space.mesh
-        cm, ws, gphi_lambda, glambda_x, J, G = self.fetch_fast_assembly(scalar_space)
+        mesh = getattr(scalar_space, 'mesh', None)
+        cm, ws, gphi_lambda, glambda_x, JG = self.fetch_fast_assembly(scalar_space)
         
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
         ldof = scalar_space.number_of_local_dofs()
-        tldof = space.number_of_local_dofs()
-        KK = bm.zeros((NC, tldof, tldof), dtype=bm.float64)
+        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
 
         D = self.material.elastic_matrix()
         if D.shape[1] != 1:
             raise ValueError("fast_assembly_stress currently only supports elastic matrices "
                             "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-        D00 = D[..., 0, 0, None]  # 2*\mu + \lambda
-        D01 = D[..., 0, 1, None]  # \lambda
-        D22 = D[..., 2, 2, None]  # \mu
+        D00 = D[..., 0, 0, None]  # E / (1-\nu^2) * 1
+        D01 = D[..., 0, 1, None]  # E / (1-\nu^2) * \nu
+        D22 = D[..., 2, 2, None]  # E / (1-\nu^2) * (1-nu)/2
 
-        M = bm.einsum('q, qik, qjl -> ijkl', ws, gphi_lambda, gphi_lambda) # (LDOF, LDOF, BC, BC)
-
-        if isinstance(mesh, SimplexMesh):       
+        if isinstance(mesh, SimplexMesh):
+            M = bm.einsum('q, qik, qjl -> ijkl', ws, gphi_lambda, gphi_lambda)  # (LDOF, LDOF, BC, BC)
             A_xx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 0], cm)
             A_yy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 1], cm)
             A_xy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 1], cm)
             A_yx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 0], cm)
         else:
-            G = bm.linalg.inv(G)
-            detJ = bm.linalg.det(J)
-            
-            JG = bm.einsum('cqij, cqjk -> cqik', J, G)        # (NC, NQ, GD, GD)
+            M = bm.einsum('qim, qjn, q -> ijmnq', gphi_lambda, gphi_lambda, ws)  # (LDOF, LDOF, GD, GD, NQ)
+            A_xx = bm.einsum('ijmnq, cqm, cqn, c -> cij', M, JG[...,0,:], JG[...,0,:], cm) # (NC, LDOF, LDOF)
+            A_yy = bm.einsum('ijmnq, cqm, cqn, c -> cij', M, JG[...,1,:], JG[...,1,:], cm) # (NC, LDOF, LDOF)
+            A_xy = bm.einsum('ijmnq, cqm, cqn, c -> cij', M, JG[...,0,:], JG[...,1,:], cm) # (NC, LDOF, LDOF)
+            A_yx = bm.einsum('ijmnq, cqm, cqn, c -> cij', M, JG[...,1,:], JG[...,0,:], cm) # (NC, LDOF, LDOF)
+            # A = bm.einsum('ijmnq, cqam, cqbn, c -> cijab', M, JG, JG, cm)    # (NC, ldof, ldof, GD, GD)
+            # A_xx = A[..., 0, 0]  # (NC, LDOF, LDOF)
+            # A_yy = A[..., 1, 1]  # (NC, LDOF, LDOF)
+            # A_xy = A[..., 0, 1]  # (NC, LDOF, LDOF)
+            # A_yx = A[..., 1, 0]  # (NC, LDOF, LDOF)
         
-            A_xx = bm.einsum('ijkl, cqkp, cqlp, cq -> cij', M, JG[..., 0:1, :], JG[..., 0:1, :], detJ)
-            A_yy = bm.einsum('ijkl, cqkp, cqlp, cq -> cij', M, JG[..., 1:2, :], JG[..., 1:2, :], detJ)
-            A_xy = bm.einsum('ijkl, cqkp, cqlp, cq -> cij', M, JG[..., 0:1, :], JG[..., 1:2, :], detJ)
-            A_yx = bm.einsum('ijkl, cqkp, cqlp, cq -> cij', M, JG[..., 1:2, :], JG[..., 0:1, :], detJ)
-
         # 填充刚度矩阵
         if space.dof_priority:
             # Fill the diagonal part
@@ -428,58 +511,6 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                         D01 * A_yx + D22 * A_xy)
 
         return KK
-
-    # @assemblymethod('fast_stress')
-    # def fast_assembly_stress(self, space: _TS) -> TensorLike:
-    #     scalar_space = space.scalar_space
-    #     ws, cm, mesh, gphi_lambda, glambda_x = self.fetch_fast_assembly(scalar_space)
-    
-    #     if not isinstance(mesh, SimplexMesh):
-    #         raise RuntimeError("The mesh should be an instance of SimplexMesh.")
-        
-    #     GD = mesh.geo_dimension()
-
-    #     # (LDOF, LDOF, BC, BC)
-    #     M = bm.einsum('q, qik, qjl->ijkl', ws, gphi_lambda, gphi_lambda)
-
-    #     # (NC, LDOF, LDOF)
-    #     A_xx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 0], cm)
-    #     A_yy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 1], cm)
-    #     A_xy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 1], cm)
-    #     A_yx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 0], cm)
-
-    #     NC = mesh.number_of_cells()
-    #     ldof = scalar_space.number_of_local_dofs()
-    #     tldof = space.number_of_local_dofs()
-    #     KK = bm.zeros((NC, tldof, tldof), dtype=bm.float64)
-
-    #     # TODO 只能处理 (NC, 1, 3, 3) 和 (1, 1, 3, 3) 的情况 
-    #     D = self.material.elastic_matrix()
-    #     if D.shape[1] != 1:
-    #         raise ValueError("fast_assembly_stress currently only supports elastic matrices "
-    #                         "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-    #     D00 = D[..., 0, 0, None]  # 2*\mu + \lambda
-    #     D01 = D[..., 0, 1, None]  # \lambda
-    #     D22 = D[..., 2, 2, None]  # \mu
-
-    #     if space.dof_priority:
-    #         # Fill the diagonal part
-    #         KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), D00 * A_xx + D22 * A_yy)
-    #         KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), D00 * A_yy + D22 * A_xx)
-
-    #         # Fill the off-diagonal part
-    #         KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), D01 * A_xy + D22 * A_yx)
-    #         KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), D01 * A_yx + D22 * A_xy)
-    #     else:
-    #         # Fill the diagonal part
-    #         KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D00 * A_xx + D22 * A_yy)
-    #         KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D00 * A_yy + D22 * A_xx)
-
-    #         # Fill the off-diagonal part
-    #         KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), D01 * A_xy + D22 * A_yx)
-    #         KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), D01 * A_yx + D22 * A_xy)
-
-    #     return KK
     
     @assemblymethod('symbolic_stress')
     def symbolic_assembly_stress(self, space: _TS) -> TensorLike:
