@@ -53,12 +53,22 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def fetch_gnjphi(self, space: _FS):
         bcs = self.fetch(space)[0]
-        return space.grad_normal_jump_basis(bcs, index=self.index)
+        return space.grad_normal_jump_basis(bcs)
 
     @enable_cache
     def fetch_ggnjphi(self, space: _FS):
         bcs = self.fetch(space)[0]
-        return space.grad_grad_normal_jump_basis(bcs, index=self.index)
+        return space.grad_grad_normal_jump_basis(bcs)
+    
+    @enable_cache
+    def fetch_bgnjphi(self, space: _FS):
+        bcs = self.fetch(space)[0]
+        return space.boubdary_edge_grad_normal_jump_basis(bcs)
+    
+    @enable_cache
+    def fetch_bggnjphi(self, space: _FS):
+        bcs = self.fetch(space)[0]
+        return space.boubdary_edge_grad_normal_2_jump_basis(bcs)
 
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
@@ -77,8 +87,9 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
         isBdEdge    = mesh.boundary_edge_flag() 
         isInnerEdge = ~isBdEdge 
 
+
         P2 = bm.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isInnerEdge])
-        P2T = bm.transpose(P2, axes=(0, 2, 1))
+        P2T = bm.permute_dims(P2, axes=(0, 2, 1))
 
         P = (P2 + P2T) + P1
         
@@ -94,14 +105,14 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
         P = csr_matrix((P.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
 
         # 边界的积分
-        gnjphi  = -space.boubdary_edge_grad_normal_jump_basis(bcs)
-        gn2jphi = space.boubdary_edge_grad_normal_2_jump_basis(bcs)
+        bgnjphi = -1 * self.fetch_bgnjphi(space)
+        bggnjphi = self.fetch_bggnjphi(space)
 
         P1 = bm.einsum('q, qfi, qfj->fij', ws, gnjphi, gnjphi)
         P1 = P1*self.gamma
 
         P2  = bm.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isBdEdge])
-        P2T = bm.transpose(P2, axes=(0, 2, 1))
+        P2T = bm.permute_dims(P2, axes=(0, 2, 1))
 
         PP = (P2+P2T) + P1
         

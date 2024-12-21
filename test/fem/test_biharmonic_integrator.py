@@ -3,7 +3,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import InteriorPenaltyFESpace2d
 
-from fealpy.fem import ScalarBiharmonicIntegrator, BilinearForm, LinearForm
+from fealpy.fem import ScalarBiharmonicIntegrator, BilinearForm, LinearForm, ScalarInteriorPenaltyIntegrator
 
 
 
@@ -15,4 +15,8 @@ ipspace = InteriorPenaltyFESpace2d(mesh, p=2)
 bi = ScalarBiharmonicIntegrator()
 assembly_cell_matrix = bi.assembly(space)
 print(assembly_cell_matrix)
+
+ip = ScalarInteriorPenaltyIntegrator()
+assembly_edge_matrix = ip.assembly(ipspace)
+print(assembly_edge_matrix)
 
