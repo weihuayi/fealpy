@@ -231,11 +231,8 @@ class LagrangeQuadrangleMesh(TensorMesh):
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
         TD = len(bc)
-        print("BC", bc)
         entity = self.entity(TD, index)
         gphi = self.grad_shape_function(bc, p = self.p)
-        print("111", self.node[entity[index], :].shape)
-        print("222", gphi.shape)
         J = bm.einsum('cim, qin -> cqmn',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,ldof,TD)
         if return_grad is False:
@@ -257,14 +254,6 @@ class LagrangeQuadrangleMesh(TensorMesh):
                 G[..., i, j] = bm.sum(J[..., i]*J[..., j], axis=-1)
                 G[..., j, i] = G[..., i, j]
         return G
-
-    def second_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]],
-            index: Index=_S, return_jacobi=False, return_grad=False):
-        """
-        Compute the second fundamental form of a mesh surface at integration points.
-        """
-        #TODO
-        pass
 
     # tools
     def integral(self, f, q=3, celltype=False) -> TensorLike:
