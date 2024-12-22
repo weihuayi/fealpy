@@ -59,6 +59,32 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return cm, bcs, ws, gphi, detJ
     
     @enable_cache
+    def fetch_voigt_assembly(self, space: _FS):
+        index = self.index
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
+    
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+    
+        cm = mesh.entity_measure('cell', index=index)
+        q = scalar_space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        gphi = scalar_space.grad_basis(bcs, index=index, variable='x')
+
+        J = mesh.jacobi_matrix(bcs)
+        detJ = bm.linalg.det(J)
+
+        D = self.material.elastic_matrix(bcs)
+        B = self.material.strain_matrix(dof_priority=space.dof_priority, 
+                                        gphi=gphi)
+            
+        return cm, ws, detJ, D, B
+
+    @enable_cache
     def fetch_fast_assembly(self, space: _FS):
         index = self.index
         mesh = getattr(space, 'mesh', None)
@@ -310,11 +336,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     def voigt_assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(space, 'mesh', None)
-        cm, bcs, ws, gphi, detJ = self.fetch_assembly(scalar_space)
-
-        D = self.material.elastic_matrix(bcs)
-        B = self.material.strain_matrix(dof_priority=space.dof_priority, 
-                                        gphi=gphi)
+        cm, ws, detJ, D, B = self.fetch_assembly(scalar_space)
         
         if isinstance(mesh, TensorMesh):
             KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
