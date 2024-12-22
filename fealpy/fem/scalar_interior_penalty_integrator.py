@@ -63,12 +63,12 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def fetch_bgnjphi(self, space: _FS):
         bcs = self.fetch(space)[0]
-        return space.boubdary_edge_grad_normal_jump_basis(bcs)
+        return space.boundary_edge_grad_normal_jump_basis(bcs)
     
     @enable_cache
     def fetch_bggnjphi(self, space: _FS):
         bcs = self.fetch(space)[0]
-        return space.boubdary_edge_grad_normal_2_jump_basis(bcs)
+        return space.boundary_edge_grad_grad_normal_jump_basis(bcs)
 
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
@@ -98,8 +98,8 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
         ie2cd = space.dof.iedge2celldof
         be2cd = space.dof.bedge2celldof
         
-        I = bm.broadcast_to(ie2cd[:, :, None], shape=P.shape)
-        J = bm.broadcast_to(ie2cd[:, None, :], shape=P.shape)
+        I = bm.broadcast_to(ie2cd[:, :, None], P.shape)
+        J = bm.broadcast_to(ie2cd[:, None, :], P.shape)
 
         gdof = space.dof.number_of_global_dofs()
         P = csr_matrix((P.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
@@ -108,16 +108,16 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
         bgnjphi = -1 * self.fetch_bgnjphi(space)
         bggnjphi = self.fetch_bggnjphi(space)
 
-        P1 = bm.einsum('q, qfi, qfj->fij', ws, gnjphi, gnjphi)
+        P1 = bm.einsum('q, qfi, qfj->fij', ws, bgnjphi, bgnjphi)
         P1 = P1*self.gamma
 
-        P2  = bm.einsum('q, qfi, qfj, f->fij', ws, gnjphi, gn2jphi, em[isBdEdge])
+        P2  = bm.einsum('q, qfi, qfj, f->fij', ws, bgnjphi, bggnjphi, em[isBdEdge])
         P2T = bm.permute_dims(P2, axes=(0, 2, 1))
 
         PP = (P2+P2T) + P1
-        
-        I = bm.broadcast_to(be2cd[:, :, None], shape=PP.shape)
-        J = bm.broadcast_to(be2cd[:, None, :], shape=PP.shape)
+                
+        I = bm.broadcast_to(be2cd[:, :, None], PP.shape)
+        J = bm.broadcast_to(be2cd[:, None, :], PP.shape)
 
         gdof = space.dof.number_of_global_dofs()
         P = P+csr_matrix((PP.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))

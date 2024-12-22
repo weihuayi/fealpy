@@ -11,7 +11,7 @@ class TestInteriorPenaltyDof2d:
         iedge2celldof = dof.inner_edge_to_cell_dof()
         bedge2celldof = dof.boundary_edge_to_cell_dof()
         print(iedge2celldof)
-        print(bedge2celldof)
+        print('bbbbe', bedge2celldof.shape)
 
     def test_boundary_edge_to_cell_dof(self):
         pass
@@ -35,5 +35,5 @@ class TestInteriorPenaltyFESpace2d:
 bm.set_backend('pytorch')
 dof = TestInteriorPenaltyDof2d()
 dof.test_ip_lfe_dof_2d()
-test_space = TestInteriorPenaltyFESpace2d()
-test_space.test_ip_lfe_space_2d()
+#test_space = TestInteriorPenaltyFESpace2d()
+#test_space.test_ip_lfe_space_2d()

@@ -70,6 +70,7 @@ class InteriorPenaltyDof2d(LinearMeshCFEDof):
 
 class InteriorPenaltyFESpace2d:
     def __init__(self, mesh, p=2, space=None, ctype='C'):
+        self.dof = InteriorPenaltyDof2d(mesh, p)
         if space is None or space == 'Lagrange':
             self.base_space = LagrangeFESpace(mesh, p, ctype=ctype)
         elif space == 'Bernstein':
@@ -77,8 +78,6 @@ class InteriorPenaltyFESpace2d:
         else:
             raise ValueError("Space must be either 'Lagrange' or 'Bernstein'")
 
-        # 其他初始化逻辑
-        self.dof = InteriorPenaltyDof2d(mesh, p)
 
     def __getattr__(self, name):
         # 当访问不存在的属性时，尝试从base_space获取

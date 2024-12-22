@@ -14,7 +14,7 @@ ipspace = InteriorPenaltyFESpace2d(mesh, p=2)
 
 bi = ScalarBiharmonicIntegrator()
 assembly_cell_matrix = bi.assembly(space)
-print(assembly_cell_matrix)
+#print(assembly_cell_matrix)
 
 ip = ScalarInteriorPenaltyIntegrator()
 assembly_edge_matrix = ip.assembly(ipspace)
