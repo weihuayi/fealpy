@@ -25,3 +25,5 @@ from .huzhang_fe_space_2d import HuZhangFESpace2D
 
 from .BrezziDouglasMariniFiniteElementSpace2d import BDMFiniteElementSpace2d
 from .BrezziDouglasMariniFiniteElementSpace3d import BDMFiniteElementSpace3d
+
+from .interior_penalty_fe_space_2d import InteriorPenaltyFESpace2d
