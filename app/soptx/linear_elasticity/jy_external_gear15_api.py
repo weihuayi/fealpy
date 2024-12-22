@@ -317,7 +317,6 @@ def compute_strain_stress_at_quadpoints3(space, uh, B_BBar, D):
     
     return strain5, stress5, nstrain5, nstress5
 
-
 def compute_equivalent_strain(strain, nu):
     exx = strain[..., 0, 0]
     eyy = strain[..., 1, 1]
@@ -414,7 +413,7 @@ cell = mesh.entity('cell')
 
 # 节点载荷
 load_values = 100 * bm.array([50.0, 60.0, 79.0, 78.0, 87.0, 95.0, 102.0, 109.0, 114.0,
-                        119.0, 123.0, 127.0, 129.0, 130.0, 131.0], dtype=bm.float64) # (15, )
+                        119.0, 123.0, 127.0, 129.0, 130.0, 131.0], dtype=bm.float64)   # (15, )
 
 n = 15
 helix_d = bm.linspace(external_gear.d, external_gear.effective_da, n)
@@ -451,15 +450,14 @@ bcs_list = [
     for u, v, w in zip(u, v, w)
 ]
 p = 1
+q = p+2
 space = LagrangeFESpace(mesh, p=p, ctype='C')
 scalar_gdof = space.number_of_global_dofs()
 print(f"gdof: {scalar_gdof}")
 cell2dof = space.cell_to_dof()
-
-q = p+2
-
-# tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
 tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
+
+# test = cell[29779]
 
 tgdof = tensor_space.number_of_global_dofs()
 print(f"tgdof: {tgdof}")
@@ -506,8 +504,21 @@ mu = E / (2.0 * (1.0 + nu))
 linear_elastic_material = LinearElasticMaterial(name='E_nu', 
                                                 elastic_modulus=E, poisson_ratio=nu, 
                                                 hypo='3D', device=bm.get_device(mesh))
+integrator_K0 = LinearElasticIntegrator(material=linear_elastic_material, 
+                                        q=q, method='voigt')
+KE = integrator_K0.voigt_assembly(tensor_space)
+KE0 = KE[0]
+KE29779 = KE[29779]
+np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/KE0.csv', KE0.round(4), delimiter=',', fmt='%s')
+np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/KE29779.csv', KE29779.round(4), delimiter=',', fmt='%s')
+
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
                                        q=q, method='C3D8_BBar')
+KE_bbar = integrator_K.c3d8_bbar_assembly(tensor_space)
+KE_bbar0 = KE_bbar[0]
+KE_bbar29779 = KE_bbar[29779]
+np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/KE_bbar0.csv', KE_bbar0.round(4), delimiter=',', fmt='%s')
+np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/KE_bbar29779.csv', KE_bbar29779.round(4), delimiter=',', fmt='%s')
 integrator_K.keep_data(True)
 _, _, D, B_BBar = integrator_K.fetch_c3d8_bbar_assembly(tensor_space)
 bform = BilinearForm(tensor_space)
