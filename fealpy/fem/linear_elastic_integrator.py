@@ -217,7 +217,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                 A_zy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 1], cm)
                 A_zz = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 2], gphi[..., 2], cm)
 
-        D = self.material.elastic_matrix()
+        D = self.material.elastic_matrix(bcs)
         if D.shape[1] != 1:
             raise ValueError("assembly currently only supports elastic matrices "
                             f"with shape (NC, 1, {2*GD}, {2*GD}) or (1, 1, {2*GD}, {2*GD}).")
@@ -320,7 +320,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
                             ws, detJ, B, D, B)
         else:
-            KK = bm.einsum('q, c, cqki, cqkl, cqlj, cq -> cij',
+            KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij',
                             ws, cm, B, D, B)
             
         return KK
