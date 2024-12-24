@@ -140,15 +140,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return p
     
     # shape function
-    def shape_function(self, bc: TensorLike, p=None, variables='x'):
-        p = self.p if p is None else p
+    def shape_function(self, bc: TensorLike, p: int=1, variables='x'):
+        p = self.p 
         phi = bm.simplex_shape_function(bc, p=p)
         if variables == 'u':
             return phi
         elif variables == 'x':
             return phi[None, :, :]
 
-    def grad_shape_function(self, bc: TensorLike, p=None, 
+    def grad_shape_function(self, bc: TensorLike, p: int=1, 
                             index: Index=_S, variables='x'):
         """
         @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
@@ -158,7 +158,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lambda_2 = eta
 
         """
-        p = self.p  if p is None else p
+        p = self.p
         TD = bc.shape[-1] - 1
         if TD == 2:
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
@@ -336,15 +336,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                 G[..., i, j] = bm.sum(J[..., i]*J[..., j], axis=-1)
                 G[..., j, i] = G[..., i, j]
         return G
-
-    def second_fundamental_form(self, bc: Union[TensorLike, Tuple[TensorLike]], 
-            index: Index=_S, return_jacobi=False, return_grad=False):
-        """
-        Compute the second fundamental form of a mesh surface at integration points.
-        """
-        TD = bc.shape[-1] - 1
-        pass
-    
+ 
     # tools
     def integral(self, f, q=3, celltype=False) -> TensorLike:
         """
