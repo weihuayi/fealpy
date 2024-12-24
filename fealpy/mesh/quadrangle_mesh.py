@@ -28,6 +28,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
         self.construct()
 
+        self.meshtype = 'quad'
         self.nodedata = {}
         self.edgedata = {}
         self.facedata = self.edgedata

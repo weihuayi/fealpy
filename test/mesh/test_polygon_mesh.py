@@ -160,6 +160,15 @@ class TestPolygonMeshInterfaces:
         np.testing.assert_array_equal(bm.to_numpy(pedge),meshdata["pmesh_edge"]),
         np.testing.assert_array_equal(bm.to_numpy(pedge2cell),meshdata["pmesh_edge2cell"])
 
+#    @pytest.mark.parametrize("backend", ["numpy","pytorch"])
+#    @pytest.mark.parametrize("data",from_box)
+#    def test_from_box(self,data,backend):  #未实现 from_box
+#        mesh = PolygonMesh.from_box([0,1,0,1],2,1)
+#        node = mesh.entity('node')
+#        cell = mesh.entity('cell')
+#        np.testing.assert_array_equal(bm.to_numpy(node),data['node'])
+#        #np.testing.assert_array_equal(bm.to_numpy(cell),data['cell'])
+ 
 if __name__ == "__main__":
     pytest.main(["./test_polygon_mesh.py", "-k", "test_init"])
     pytest.main(["./test_polygon_mesh.py", "-k", "test_entity"])

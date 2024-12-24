@@ -430,6 +430,24 @@ class PolygonMesh(Mesh, Plotable):
             return self.cell
 
     @classmethod
+    def from_triangle_mesh_by_dual(cls, mesh, bc=True):
+        """
+        @brief 生成三角形网格的对偶网格，目前默认用三角形的重心做为对偶网格的顶点
+
+        @param mesh
+        @param bc bool 如果为真，则对偶网格点为三角形单元重心; 否则为三角形单元外心
+        """
+        raise NotImplementedError
+
+
+    @classmethod
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+        """
+        @brief Generate a polygon mesh for a box domain
+        """
+        raise NotImplementedError
+
+    @classmethod
     def from_one_triangle(cls,meshtype='iso',*,device=None): 
         if meshtype == 'equ':
             node = bm.tensor([

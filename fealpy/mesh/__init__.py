@@ -7,6 +7,8 @@ from .triangle_mesh import TriangleMesh
 from .tetrahedron_mesh import TetrahedronMesh
 from .quadrangle_mesh import QuadrangleMesh
 from .hexahedron_mesh import HexahedronMesh
+from .polygon_mesh import PolygonMesh
+from .halfedge_mesh import HalfEdgeMesh2d
 
 from .uniform_mesh_2d import UniformMesh2d
 from .uniform_mesh_3d import UniformMesh3d
