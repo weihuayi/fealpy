@@ -33,12 +33,13 @@ class TestLagrangeQuadrangleMeshInterfaces:
         surface = SphereSurface() #以原点为球心，1 为半径的球
         mesh = QuadrangleMesh.from_unit_sphere_surface()
         
-        # 计算收敛阶 
+        # 计算收敛阶
+        p = 2
         maxit = 4
         cm = np.zeros(maxit, dtype=np.float64)
         em = np.zeros(maxit, dtype=np.float64)
         for i in range(maxit):
-            lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=3, surface=surface)
+            lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=p, surface=surface)
         
             cm[i] = np.sum(lmesh.cell_area())
             
@@ -54,6 +55,6 @@ class TestLagrangeQuadrangleMeshInterfaces:
 
 if __name__ == "__main__":
     a = TestLagrangeQuadrangleMeshInterfaces()
-    a.test_surface_mesh('numpy')
-    #a.test_cell_area(cell_area_data[0], 'numpy')
+    #a.test_surface_mesh('numpy')
+    a.test_cell_area(cell_area_data[0], 'numpy')
     #pytest.main(["./test_lagrange_triangle_mesh.py"])

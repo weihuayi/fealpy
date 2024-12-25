@@ -21,6 +21,7 @@ from .curlcurl_integrator import CurlCurlIntegrator
 from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
+from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -33,6 +34,8 @@ from .vector_source_integrator import VectorSourceIntegrator
 from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
 from .face_mass_integrator import BoundaryFaceMassIntegrator, InterFaceMassIntegrator
 from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegrator
+from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegratorP
+from .scalar_interior_penalty_integrator import ScalarInteriorPenaltyIntegrator
 
 ### Face Source
 from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator, ScalarRobinSourceIntegrator

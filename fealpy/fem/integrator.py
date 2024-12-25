@@ -1,11 +1,12 @@
 
-from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict
+from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Callable
 from typing import Generic
 import logging
 
 from .. import logger
 from ..typing import TensorLike, Index, CoefLike
 from ..backend import backend_manager as bm
+from ..mesh import Mesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import ftype_memory_size
 
@@ -24,6 +25,7 @@ __all__ = [
 Self = TypeVar('Self')
 _SpaceGroup = Union[_FS, Tuple[_FS, ...]]
 _OpIndex = Optional[Index]
+_Region = Union[Callable[[Mesh], TensorLike], TensorLike, None]
 
 
 class IntegratorMeta(type):
@@ -53,13 +55,13 @@ def assemblymethod(call_name: Optional[str]=None):
     Example:
     ```
         class MyIntegrator(Integrator):
-            def assembly(self, space: _FS) -> Tensor:
+            def assembly(self, space: _FS, /, indices=None) -> Tensor:
                 # 'assembly' is the default assembly method,
                 # naturally registered to name 'assembly'.
                 return integral
 
             @assemblymethod('my')
-            def my_assembly(self, space: _FS) -> Tensor:
+            def my_assembly(self, space: _FS, /, indices=None) -> Tensor:
                 # code for getting local integral tensor
                 return integral
     ```
@@ -110,14 +112,37 @@ def enable_cache(func: Self) -> Self:
 class Integrator(metaclass=IntegratorMeta):
     """The base class for integrators.
 
+    ## Introduction
+
     Integrators are designed to integral given functions in input spaces.
     Output of integrators are tensors on entities (0-axis), containing data
     of each local DoFs (1-axis). There may be extra dimensions.
 
-    All integrators should inplement the `assembly` and `to_global_dof` method.
+    Integrators have a concept called `region` to specify the region of integration,
+    given as indices of mesh entities.
+    Integrators are expected to output tensor fields on these mesh entities
+    (i.e. tensors sized the number of entity in the 0-dimension).
+
+    All integrators should implement methods named `assembly` and `to_global_dof`.
+    See examples below:
+    ```
+    def to_global_dof(space, /, indices=None):
+        pass
+
+    def assembly(space, /, indices=None):
+        pass
+    ```
     These two methods indicate two functions of an integrator: calculation of the integral,
     and getting relationship between local DoFs and global DoFs, repectively.
+    The `indices` argument is designed to select a subset of integrator's working region,
+    and the final indices of entities can be fetched by
+    ```
+    # inside the methods of integrators
+    index = self.entity_selection(indices)
+    ```
     Users can customize an integrator by implementing them in a subclass.
+
+    ## Features
 
     ### Multiple Assembly Methods
 
@@ -133,7 +158,8 @@ class Integrator(metaclass=IntegratorMeta):
     See `integrator.enable_cache` for details.
     """
     _assembly_name_map: Dict[str, str] = {}
-    _region: Optional[TensorLike] = None
+    _region: _Region = None
+    etype: str
 
     def __init__(self, method='assembly', keep_data=False, *args, **kwds) -> None:
         if method not in self._assembly_name_map:
@@ -159,40 +185,68 @@ class Integrator(metaclass=IntegratorMeta):
     ### END: Cache System ###
 
     ### START: Region of Integration ###
-    def set_region(self, region: Optional[TensorLike], /):
-        """Set the region of integration, given as indices of mesh entity."""
+    def set_region(self, region: _Region, /):
+        """Set the region of integration, given as indices of mesh entity,
+        or a callable that receives a mesh and returns the indices."""
         self._region = region
+        self.clear()
         return self
 
     def get_region(self):
-        """Get the region of integration, returned as indices of mesh entity."""
-        if self._region is None:
-            raise RuntimeError("Region of integration not specified. "
-                               "Use Integrator.set_region to set indices.")
+        """Get the region of integration, returned as indices of mesh entity,
+        or a callable that receives a mesh and returns the indices."""
         return self._region
 
-    def entity_selection(self, indices: _OpIndex = None) -> Index:
+    def entity_selection(self, indices: _OpIndex = None, *, mesh: Optional[Mesh] = None) -> Index:
+        """Make the selection of integral entities."""
         if self._region is None:
             if indices is None:
                 return slice(None, None, None)
             else:
                 return indices
         else:
-            if indices is None:
-                return self._region
+            if callable(self._region):
+                if mesh is None:
+                    raise RuntimeError("Mesh must be provided in entity_selection "
+                    "when region is given as a callable.")
+                full_region = self._region(mesh)
             else:
-                if bm.is_tensor(self._region):
-                    if self._region.dtype == bm.bool:
-                        return bm.nonzero(self._region)[0][indices]
-                    return self._region[indices]
+                full_region = self._region
+            if indices is None:
+                return full_region
+            else:
+                if bm.is_tensor(full_region):
+                    if full_region.dtype == bm.bool:
+                        return bm.nonzero(full_region)[0][indices]
+                    return full_region[indices]
                 else:
-                    raise TypeError(f"region of type '{self._region.__class__.__name__}' "
+                    raise TypeError(f"region of type '{full_region.__class__.__name__}' "
                                     "is not supported when indices is given.")
 
+    def size(self, mesh: Mesh, /) -> int:
+        if self._region is None:
+            if not hasattr(self, 'etype'):
+                raise RuntimeError("etype of Integrator should be specified to detect "
+                "the number of entities when region is `None`.")
+            else:
+                return mesh.count(self.etype)
+        else:
+            if callable(self._region):
+                full_region = self._region(mesh)
+            else:
+                full_region = self._region
+            if bm.is_tensor(full_region):
+                if full_region.dtype == bm.bool:
+                    return bm.sum(full_region, dtype=bm.int64)
+                else:
+                    return full_region.shape[0]
+            else:
+                raise TypeError(f"region of type '{full_region.__class__.__name__}' "
+                                "is not supported when indices is given.")
     ### END: Region of Integration ###
 
     def const(self, space: _SpaceGroup, /):
-        value = self.assembly(space)
+        value = self(space)
         to_gdof = self.to_global_dof(space)
         return ConstIntegrator(value, to_gdof)
 
@@ -256,17 +310,17 @@ class SrcInt(Integrator):
 class CellInt(Integrator):
     """### Cell Integrator
     Base class for integrators that integrate over mesh cells."""
-    pass
+    etype = 'cell'
 
 class FaceInt(Integrator):
     """### Face Integrator
     Base class for integrators that integrate over mesh faces."""
-    pass
+    etype = 'face'
 
 class EdgeInt(Integrator):
     """### Edge Integrator
     Base class for integrators that integrate over mesh edges."""
-    pass
+    etype = 'edge'
 
 
 ##################################################
@@ -280,7 +334,6 @@ class ConstIntegrator(Integrator, Generic[_GT]):
 
     ConstIntegrator wrap a given TensorLike object as an Integrator type.
     The `to_gdof` is optional but must be provided if `to_global_dof` is needed.
-    Indices of entity is ignored if `enable_region` is False.
     """
     def __init__(self, value: TensorLike, to_gdof: Optional[_GT] = None):
         super().__init__('assembly', False, False)

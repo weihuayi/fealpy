@@ -102,7 +102,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         
         p = self.p
-        phi = self.mesh.shape_function(bc, p=p)
+        phi = self.mesh.shape_function(bc, p=p, variables='x')
         return phi 
 
     @barycentric
@@ -135,7 +135,8 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         qf = self.quadrature_formula if q is None else self.mesh.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         rm = self.mesh.reference_cell_measure()
-        G = self.mesh.first_fundamental_form(bcs)
+        J = self.mesh.jacobi_matrix(bcs)
+        G = self.mesh.first_fundamental_form(J)
         d = bm.sqrt(bm.linalg.det(G))  #(NC, NQ)
         phi = self.basis(bcs)  #(NC, NQ, ldof)
         cc = bm.einsum('q, cqi, cq -> ci', ws*rm, phi, d)

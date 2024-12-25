@@ -126,12 +126,14 @@ class Form(Generic[_I], ABC):
 
         return self
 
-    def _assembly_group(self, group: str, /, *args, **kwds):
+    def _assembly_kernel(self, group: str, /, indices=None):
         integrator = self.integrators[group]
         etg = integrator.to_global_dof(self.space)
         if not isinstance(etg, (tuple, list)):
             etg = (etg, )
-        return integrator(self.space), etg
+        if indices is None:
+            return integrator(self.space), etg
+        return integrator(self.space, indices=indices), etg
 
     def assembly_local_iterative(self):
         """Assembly local matrix considering chunk size.

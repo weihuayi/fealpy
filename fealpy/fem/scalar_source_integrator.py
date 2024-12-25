@@ -13,23 +13,23 @@ from .integrator import LinearInt, SrcInt, CellInt, enable_cache, assemblymethod
 class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
     r"""The domain source integrator for function spaces based on homogeneous meshes."""
     def __init__(self, source: Optional[SourceLike]=None, q: int=None, *,
-                 index: Index=_S,
+                 region: Optional[TensorLike] = None,
                  batched: bool=False,
                  method: Literal['isopara', None] = None) -> None:
         super().__init__(method=method if method else 'assembly')
         self.source = source
         self.q = q
-        self.index = index
+        self.set_region(region)
         self.batched = batched
 
     @enable_cache
-    def to_global_dof(self, space: _FS) -> TensorLike:
-        return space.cell_to_dof()[self.index]
+    def to_global_dof(self, space: _FS, /, indices=None) -> TensorLike:
+        return space.cell_to_dof()[self.entity_selection(indices)]
 
     @enable_cache
-    def fetch(self, space: _FS):
+    def fetch(self, space: _FS, /, inidces=None):
         q = self.q
-        index = self.index
+        index = self.entity_selection(inidces)
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
@@ -45,10 +45,10 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
 
         return bcs, ws, phi, cm, index
 
-    def assembly(self, space: _FS) -> TensorLike:
+    def assembly(self, space: _FS, indices=None) -> TensorLike:
         f = self.source
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, phi, cm, index = self.fetch(space)
+        bcs, ws, phi, cm, index = self.fetch(space, indices)
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
   
         return linear_integral(phi, ws, cm, val, batched=self.batched)
@@ -60,7 +60,8 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         bcs, ws, phi, cm, index = self.fetch(space)
 
         rm = space.mesh.reference_cell_measure()
-        G = space.mesh.first_fundamental_form(bcs)
+        J = space.mesh.jacobi_matrix(bcs)
+        G = space.mesh.first_fundamental_form(J)
         d = bm.sqrt(bm.linalg.det(G))
 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)

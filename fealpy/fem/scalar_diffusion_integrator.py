@@ -113,11 +113,11 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
                linear_integral(gphi, ws, cm, coef_F, batched=self.batched)
 
     @assemblymethod('isopara')
-    def isopara_assembly(self, space: _FS) -> TensorLike:
+    def isopara_assembly(self, space: _FS, /, indices=None) -> TensorLike:
         """
         曲面等参有限元积分子组装
         """
-        index = self.index
+        index = self.entity_selection(indices)
         mesh = getattr(space, 'mesh', None)
 
         rm = mesh.reference_cell_measure()
@@ -126,7 +126,8 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        G = mesh.first_fundamental_form(bcs) 
+        J = mesh.jacobi_matrix(bcs, index=index)
+        G = mesh.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G))
         gphi = space.grad_basis(bcs, index=index, variable='x')
         A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d)

@@ -162,6 +162,9 @@ class MeshDS(metaclass=MeshMeta):
         cell2face[face2cell[:, 1], face2cell[:, 3]] = arange_tensor
         return cell2face[index]
 
+    def edge_to_cell(self, index: Index=_S) -> TensorLike:
+        return self.face_to_cell(index)
+
     def face_to_cell(self, index: Index=_S) -> TensorLike:
         if not hasattr(self, 'face2cell'):
             raise RuntimeError('Please call construct() first or make sure the face2cell'

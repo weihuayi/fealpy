@@ -38,6 +38,13 @@ def _dims_to_axes(func):
         return func(*args, dims=axes, **kwargs)
     return wrapper
 
+def _size_to_shape(func):
+    def wrapper(*args, shape=None, **kwargs):
+        if shape is None:
+            return func(*args, **kwargs)
+        return func(*args, size=shape, **kwargs)
+    return wrapper
+
 def _axis_keepdims_dispatch(func, **defaults):
     if len(defaults) > 0:
         def wrapper(*args, **kwargs):
@@ -160,6 +167,7 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
     ### Manipulation Functions ###
     # python array API standard v2023.12
+    broadcast_to = staticmethod(_size_to_shape(torch.broadcast_to))
     concat = staticmethod(_dim_to_axis(torch.concat))
     expand_dims = staticmethod(_dim_to_axis(torch.unsqueeze))
     @staticmethod
@@ -630,7 +638,7 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
     @classmethod
     def simplex_hess_shape_function(cls, bcs: Tensor, p: int, mi=None) -> Tensor:
-        fn = vmap(jacrev(jacfwd(
+        fn = vmap(jacfwd(jacfwd(
             partial(cls._simplex_shape_function_kernel, p=p, mi=mi)
         )))
         return fn(bcs)
@@ -708,8 +716,6 @@ function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
     array='tensor',
     bitwise_invert='bitwise_not',
-    power='pow',
-    transpose='permute',
     broadcast_arrays='broadcast_tensors',
     copy='clone',
     compile='compile'
