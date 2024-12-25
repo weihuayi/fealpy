@@ -115,8 +115,48 @@ class TestGearSystem:
         external_gear = data['external_gear']
 
         idx0, node0 = external_gear.get_profile_node_index(tooth_tag=0)
-        idx1, node1 = external_gear.get_profile_node_index(tooth_tag=(0, 2, 3))
-        idx2, node2 = external_gear.get_profile_node_index(tooth_tag=None)
+        # idx1, node1 = external_gear.get_profile_node_index(tooth_tag=(0, 2, 3))
+        # idx2, node2 = external_gear.get_profile_node_index(tooth_tag=None)
+        idx_right = idx0[0][0, ...]
+        idx_left = idx0[1][0, ...]
+        node_right = node0[0][0, ...]
+        node_left = node0[1][0, ...]
+
+        num_col = idx_right.shape[0]
+        num_row = idx_right.shape[1]
+        num_cell = (num_col-1) * (num_row-1)
+        num_node = num_col * num_row
+        # profile_mesh_node = np.concatenate([node_right.reshape(-1, 3), node_left.reshape(-1, 3)], axis=0)
+        # profile_mesh_cell = np.zeros((num_cell*2, 4), dtype=np.int32)
+        # temp_idx_right = np.arange(num_node).reshape(num_col, num_row)
+        # temp_idx_left = temp_idx_right + num_node
+        # profile_mesh_cell[0:num_cell, 0] = temp_idx_right[0:num_col-1, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[0:num_cell, 1] = temp_idx_right[1:num_col, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[0:num_cell, 2] = temp_idx_right[1:num_col, 1:num_row].reshape(-1)
+        # profile_mesh_cell[0:num_cell, 3] = temp_idx_right[0:num_col-1, 1:num_row].reshape(-1)
+        #
+        # profile_mesh_cell[num_cell:, 0] = temp_idx_left[0:num_col-1, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[num_cell:, 1] = temp_idx_left[1:num_col, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[num_cell:, 2] = temp_idx_left[1:num_col, 1:num_row].reshape(-1)
+        # profile_mesh_cell[num_cell:, 3] = temp_idx_left[0:num_col-1, 1:num_row].reshape(-1)
+
+        profile_mesh_node = node_left.reshape(-1, 3)
+        profile_mesh_cell = np.zeros((num_cell, 4), dtype=np.int32)
+        temp_idx_right = np.arange(num_node).reshape(num_col, num_row)
+        # temp_idx_left = temp_idx_right + num_node
+        profile_mesh_cell[0:num_cell, 0] = temp_idx_right[0:num_col-1, 0:num_row-1].reshape(-1)
+        profile_mesh_cell[0:num_cell, 1] = temp_idx_right[1:num_col, 0:num_row-1].reshape(-1)
+        profile_mesh_cell[0:num_cell, 2] = temp_idx_right[1:num_col, 1:num_row].reshape(-1)
+        profile_mesh_cell[0:num_cell, 3] = temp_idx_right[0:num_col-1, 1:num_row].reshape(-1)
+
+        profile_mesh = QuadrangleMesh(profile_mesh_node, profile_mesh_cell)
+        np.savetxt('/home/concha/openfinite3/app/gearx/data/profile_mesh_nodes.txt',
+                   np.column_stack((np.arange(profile_mesh.node.shape[0]), profile_mesh.node)),
+                   delimiter=',', fmt='%d,%.6f,%.6f,%.6f')
+        np.savetxt('/home/concha/openfinite3/app/gearx/data/profile_mesh_cells.txt',
+                   np.column_stack((np.arange(profile_mesh.cell.shape[0]), profile_mesh.cell)),
+                   delimiter=',', fmt='%d,%d,%d,%d,%d')
+        profile_mesh.to_vtk(fname="/home/concha/openfinite3/app/gearx/data/one_tooth_external_gear_quad_mesh_left.vtu")
 
         print(-1)
 
