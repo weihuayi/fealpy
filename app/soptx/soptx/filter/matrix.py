@@ -44,6 +44,7 @@ class FilterMatrix:
 
         for i in range(nx):
             for j in range(ny):
+                # 单元的编号顺序: y->x 
                 row = i * ny + j
                 kk1 = int(max(i - (ceil(rmin) - 1), 0))
                 kk2 = int(min(i + ceil(rmin), nx))
@@ -82,17 +83,19 @@ class FilterMatrix:
         for i in range(nx):
             for j in range(ny):
                 for k in range(nz):
-                    row = i * ny * nz + j * nz + k
+                    # 单元的编号顺序: z -> y -> x
+                    row = k + j * nz + i * ny * nz 
                     ii1 = max(i - (ceil_rmin - 1), 0)
-                    ii2 = min(i + ceil_rmin, nx)
+                    ii2 = min(i + (ceil_rmin - 1), nx - 1)
                     jj1 = max(j - (ceil_rmin - 1), 0)
-                    jj2 = min(j + ceil_rmin, ny)
+                    jj2 = min(j + (ceil_rmin - 1), ny - 1)
                     kk1 = max(k - (ceil_rmin - 1), 0)
-                    kk2 = min(k + ceil_rmin, nz)
-                    for ii in range(ii1, ii2):
-                        for jj in range(jj1, jj2):
-                            for kk in range(kk1, kk2):
-                                col = ii * ny * nz + jj * nz + kk
+                    kk2 = min(k + (ceil_rmin - 1), nz - 1)
+                    for ii in range(ii1, ii2 + 1):
+                        for jj in range(jj1, jj2 + 1):
+                            for kk in range(kk1, kk2 + 1):
+                                # 单元的编号顺序: z -> y -> x
+                                col = kk + jj * nz + ii * ny * nz 
                                 fac = rmin - sqrt((i - ii)**2 + (j - jj)**2 + (k - kk)**2)
                                 iH[cc] = row
                                 jH[cc] = col

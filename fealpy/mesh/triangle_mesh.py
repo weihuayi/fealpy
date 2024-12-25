@@ -92,6 +92,20 @@ class TriangleMesh(SimplexMesh, Plotable):
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         return quad
 
+    def update_bcs(self, bcs, toetype: Union[int, str]='cell'):
+        TD = bcs.shape[-1] - 1
+        if toetype == 'cell' or toetype == 2: 
+            if TD == 2:
+                return bcs
+            elif TD == 1: # edge up to cell
+                result = bm.stack([bm.insert(bcs, i, 0.0, axis=-1) for i in range(3)], axis=0)
+                return result
+            else:
+                raise ValueError("Unsupported topological dimension: {TD}")
+                    
+        else:
+            raise ValueError("The etype only support face, other etype is not implemented.")
+    
     # shape function
     def grad_lambda(self, index: Index=_S, TD:int=2) -> TensorLike:
         """
@@ -124,7 +138,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @berif 这里调用的是网格空间基函数的梯度
         """
-        TD = bc.shape[1] - 1
+        TD = bc.shape[-1] - 1
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index, TD=TD)
@@ -252,6 +266,9 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
+
+    def boundary_edge_flag(self):
+        return self.boundary_face_flag()
 
     def cell_to_face_sign(self):
         """
@@ -1171,7 +1188,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         @return TriangleMesh instance
         """
         if itype is None:
-            itype = bm.int32
+            itype = bm.int64
         if ftype is None:
             ftype = bm.float64
         

@@ -1,6 +1,8 @@
 from fealpy.backend import backend_manager as bm
 
 from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
+
 from typing import Tuple, Callable
 
 
@@ -10,14 +12,15 @@ class Cantilever3dData1:
                 ymin: float=0, ymax: float=20,
                 zmin: float=0, zmax: float=4):
         """
-        flip_direction = 'y'
-           1------- 5
+           3------- 7
          / |       /|
-        3 ------- 7 |
+        1 ------- 5 |
         |  |      | |
-        |  0------|-4
+        |  2------|-6
         | /       |/
-        2 ------- 6
+        0 ------- 4
+        位移边界条件: x 坐标为 0 的节点全部固定
+        载荷: x 坐标为 xmax, y 坐标为 ymin 的节点施加载荷
         """
         self.xmin, self.xmax = xmin, xmax
         self.ymin, self.ymax = ymin, ymax
@@ -32,6 +35,7 @@ class Cantilever3dData1:
 
         return box
     
+    @cartesian
     def force(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -48,10 +52,12 @@ class Cantilever3dData1:
 
         return val
     
+    @cartesian
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return bm.zeros(points.shape, dtype=points.dtype)
     
+    @cartesian
     def is_dirichlet_boundary_dof_x(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -61,6 +67,7 @@ class Cantilever3dData1:
         
         return coord
     
+    @cartesian
     def is_dirichlet_boundary_dof_y(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -70,6 +77,7 @@ class Cantilever3dData1:
         
         return coord
     
+    @cartesian
     def is_dirichlet_boundary_dof_z(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 

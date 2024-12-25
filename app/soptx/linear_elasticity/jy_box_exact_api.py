@@ -17,7 +17,6 @@ from app.gearx.utils import *
 
 def export_to_inp_abaqus(filename, nodes, elements, fixed_nodes, load_nodes, loads, young_modulus, poisson_ratio, density):
     """
-    齿轮专用的，相关信息导出为 Abaqus 的 inp 文件
     :param filename: 文件名
     :param nodes: 网格节点
     :param elements: 网格单元 (注: 网格节点从0开始编号, 导出时需要+1以符合Abaqus的编号规则)
@@ -264,13 +263,13 @@ dbc = DirichletBC(space=tensor_space,
                 gd=pde.dirichlet, 
                 threshold=None, 
                 method='interp')
-K = dbc.apply_matrix(matrix=K, check=True)
 uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
                 dtype=bm.float64, device=bm.get_device(mesh))
 uh_bd, isDDof = tensor_space.boundary_interpolate(gd=pde.dirichlet, 
                                                 uh=uh_bd, threshold=None, method='interp')
 F = F - K.matmul(uh_bd)
 F = bm.set_at(F, isDDof, uh_bd[isDDof])
+K = dbc.apply_matrix(matrix=K, check=True)
 
 # 求解
 uh = tensor_space.function()
@@ -319,13 +318,13 @@ for i in range(maxit):
                     gd=pde.dirichlet, 
                     threshold=None, 
                     method='interp')
-    K = dbc.apply_matrix(matrix=K, check=True)
     uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), 
                     dtype=bm.float64, device=bm.get_device(mesh))
     uh_bd, isDDof = tensor_space.boundary_interpolate(gd=pde.dirichlet, 
                                                     uh=uh_bd, threshold=None, method='interp')
     F = F - K.matmul(uh_bd)
     F = bm.set_at(F, isDDof, uh_bd[isDDof])
+    K = dbc.apply_matrix(matrix=K, check=True)
 
     uh = tensor_space.function()
     uh[:] = cg(K, F, maxiter=1000, atol=1e-8, rtol=1e-8)

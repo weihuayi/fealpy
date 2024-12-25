@@ -12,8 +12,8 @@ from fealpy.backend import backend_manager as bm
 
 from fealpy.pde.surface_poisson_model import SurfaceLevelSetPDEData
 from fealpy.geometry.implicit_surface import SphereSurface
-from fealpy.mesh.triangle_mesh import TriangleMesh
-from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
+from fealpy.mesh import TriangleMesh, QuadrangleMesh
+from fealpy.mesh import LagrangeTriangleMesh, LagrangeQuadrangleMesh
 from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
@@ -57,6 +57,13 @@ mdegree = args.mdegree
 mtype = args.mtype
 maxit = args.maxit
 
+if mtype == 'ltri':
+    LinearMesh = TriangleMesh
+    LagrangeMesh = LagrangeTriangleMesh
+elif mtype == 'lquad':
+    LinearMesh = QuadrangleMesh
+    LagrangeMesh = LagrangeQuadrangleMesh
+
 x, y, z = sp.symbols('x, y, z', real=True)
 F = x**2 + y**2 + z**2
 u = x * y
@@ -64,26 +71,27 @@ pde = SurfaceLevelSetPDEData(F, u)
 
 p = mdegree
 surface = SphereSurface()
-tmesh = TriangleMesh.from_unit_sphere_surface()
+
+lmesh = LinearMesh.from_unit_sphere_surface()
 
 
-errorType = ['$|| u - u_h||_{\Omega,0}$']
+errorType = ['$|| u - u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
 NDof = bm.zeros(maxit, dtype=bm.int32)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
     
-    mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh, p=mdegree, surface=surface)
-    #fname = f"sphere_test.vtu"
-    #mesh.to_vtk(fname=fname)
+    if mtype == 'ltri':
+        mesh = LagrangeMesh.from_triangle_mesh(lmesh, p=mdegree, surface=surface)
+    elif mtype == 'lquad':
+        mesh = LagrangeMesh.from_quadrangle_mesh(lmesh, p=mdegree, surface=surface)
     
     space = ParametricLagrangeFESpace(mesh, p=sdegree)
     NDof[i] = space.number_of_global_dofs()
 
     uI = space.interpolate(pde.solution)
 
-    #ipdb.set_trace()
     bfrom = BilinearForm(space)
     bfrom.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
     lfrom = LinearForm(space)
@@ -105,12 +113,11 @@ for i in range(maxit):
     uh = space.function()
     x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
     uh[:] = -x[:-1] 
-    #tmr.send(f'第{i}次求解器时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)
 
     if i < maxit-1:
-        tmesh.uniform_refine()
+        lmesh.uniform_refine()
 
 print("最终误差:", errorMatrix)
 print("order:", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))

@@ -38,6 +38,13 @@ def _dims_to_axes(func):
         return func(*args, dims=axes, **kwargs)
     return wrapper
 
+def _size_to_shape(func):
+    def wrapper(*args, shape=None, **kwargs):
+        if shape is None:
+            return func(*args, **kwargs)
+        return func(*args, size=shape, **kwargs)
+    return wrapper
+
 def _axis_keepdims_dispatch(func, **defaults):
     if len(defaults) > 0:
         def wrapper(*args, **kwargs):
@@ -160,6 +167,7 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
     ### Manipulation Functions ###
     # python array API standard v2023.12
+    broadcast_to = staticmethod(_size_to_shape(torch.broadcast_to))
     concat = staticmethod(_dim_to_axis(torch.concat))
     expand_dims = staticmethod(_dim_to_axis(torch.unsqueeze))
     @staticmethod
@@ -188,6 +196,91 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
         if dtype is not None:
             arrays = [a.to(dtype) for a in arrays]
         return torch.cat(arrays, dim=axis, out=out)
+
+    @staticmethod
+    def insert(x, obj, values, /, *, axis=None):
+        kwargs = {'dtype': x.dtype, 'device': x.device}
+        ndim = x.ndim
+        if axis is None:
+            if ndim != 1:
+                x = x.ravel()
+            ndim = x.ndim
+            axis = ndim - 1
+        else: # normalize axis
+            if axis < -ndim or axis > ndim:
+                raise IndexError(f"index {axis} is out of bounds for axis {axis} "
+                                f"with size {ndim}")
+            axis = axis if axis >=0 else axis + ndim
+
+        slobj = [slice(None), ] * ndim
+        N = x.shape[axis]
+        newshape = list(x.shape)
+
+        if isinstance(obj, slice):
+            # turn it into a range object
+            indices = torch.arange(*obj.indices(N), dtype=torch.int64, device=x.device)
+        else:
+            # need to copy obj, because indices will be changed in-place
+            indices = torch.tensor(obj, dtype=torch.int64, device=x.device)
+            if indices.dtype == bool:
+                indices = torch.as_tensor(indices, dtype=torch.int64, device=x.device)
+            elif indices.ndim > 1:
+                raise ValueError(
+                    "index array argument obj to insert must be one dimensional "
+                    "or scalar")
+        if indices.numel() == 1:
+            index = indices.item()
+            if index < -N or index > N:
+                raise IndexError(f"index {obj} is out of bounds for axis {axis} "
+                                f"with size {N}")
+            if (index < 0):
+                index += N
+
+            values = torch.tensor(values, **kwargs)
+            if values.ndim < ndim:
+                values = values.reshape((1,)*(ndim - values.ndim) + (-1, ))
+            if indices.ndim == 0:
+                # broadcasting is very different here, since a[:,0,:] = ... behaves
+                # very different from a[:,[0],:] = ...! This changes values so that
+                # it works likes the second case. (here a[:,0:1,:])
+                values = torch.moveaxis(values, 0, axis)
+            numnew = values.shape[axis]
+            newshape[axis] += numnew
+            new = torch.empty(newshape, **kwargs)
+            slobj[axis] = slice(None, index)
+            new[tuple(slobj)] = x[tuple(slobj)]
+            slobj[axis] = slice(index, index+numnew)
+            print(values.shape, new.shape, slobj)
+            new[tuple(slobj)] = values
+            slobj[axis] = slice(index+numnew, None)
+            slobj2 = [slice(None)] * ndim
+            slobj2[axis] = slice(index, None)
+            new[tuple(slobj)] = x[tuple(slobj2)]
+
+            return new
+
+        elif indices.numel() == 0 and not isinstance(obj, Tensor):
+            # Can safely cast the empty list to int64
+            indices = torch.as_tensor(indices, torch.int64)
+
+        indices[indices < 0] += N
+
+        numnew = len(indices)
+        order = indices.argsort(stable=True)   # stable sort
+        indices[order] += torch.arange(numnew, dtype=torch.int64, device=x.device)
+
+        newshape[axis] += numnew
+        old_mask = torch.ones(newshape[axis], dtype=torch.bool, device=x.device)
+        old_mask[indices] = False
+
+        new = torch.empty(newshape, **kwargs)
+        slobj2 = [slice(None)]*ndim
+        slobj[axis] = indices
+        slobj2[axis] = old_mask
+        new[tuple(slobj)] = values
+        new[tuple(slobj2)] = x
+
+        return new
 
     @staticmethod
     def split(x, indices_or_sections, /, *, axis=0):
@@ -545,7 +638,7 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
     @classmethod
     def simplex_hess_shape_function(cls, bcs: Tensor, p: int, mi=None) -> Tensor:
-        fn = vmap(jacrev(jacfwd(
+        fn = vmap(jacfwd(jacfwd(
             partial(cls._simplex_shape_function_kernel, p=p, mi=mi)
         )))
         return fn(bcs)
@@ -623,8 +716,6 @@ function_mapping = FUNCTION_MAPPING.copy()
 function_mapping.update(
     array='tensor',
     bitwise_invert='bitwise_not',
-    power='pow',
-    transpose='permute',
     broadcast_arrays='broadcast_tensors',
     copy='clone',
     compile='compile'

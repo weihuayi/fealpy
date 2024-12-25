@@ -1,15 +1,18 @@
 from fealpy.backend import backend_manager as bm
 
 from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
 
 from typing import Tuple, Callable
 from builtins import list
 
 class Cantilever2dData1:
     def __init__(self, 
-                xmin: float=0, xmax: float=160, 
-                ymin: float=0, ymax: float=100):
+                xmin: float, xmax: float, 
+                ymin: float, ymax: float):
         """
+        位移边界条件：梁的左边界固定
+        载荷：梁的右边界的下点施加垂直向下的力 F = 1
         flip_direction = True
         0 ------- 3 ------- 6 
         |    0    |    2    |
@@ -27,6 +30,7 @@ class Cantilever2dData1:
 
         return box
     
+    @cartesian
     def force(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -42,10 +46,12 @@ class Cantilever2dData1:
 
         return val
     
+    @cartesian
     def dirichlet(self, points: TensorLike) -> TensorLike:
 
         return bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
     
+    @cartesian
     def is_dirichlet_boundary_dof_x(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 
@@ -55,6 +61,7 @@ class Cantilever2dData1:
         
         return coord
     
+    @cartesian
     def is_dirichlet_boundary_dof_y(self, points: TensorLike) -> TensorLike:
         domain = self.domain()
 

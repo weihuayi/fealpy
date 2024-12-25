@@ -183,7 +183,8 @@ FUNCTION_MAPPING = _make_default_mapping(
     'tile',
     'unstack',
     # non-standard
-    'concatenate', 'swapaxes', 'split', 'transpose',
+    'concatenate', 'insert',
+    'swapaxes', 'split', 'transpose',
 
     ### Searching Functions ###
     # python array API standard v2023.12
