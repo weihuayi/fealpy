@@ -10,6 +10,7 @@
 doc/project
 *.html
 *.inp
+*.mtx
 *.mexa64
 
 meviewer
@@ -41,10 +42,12 @@ dist
 *.png
 *.fig
 *.vtk
+*.vts
 *.so
 *.swn
 *.swo
 *.vtu
+*.txt
 
 *.cpython-38.pyc
 .vscode
@@ -66,4 +69,5 @@ __pycache__
 tags
 .idea
 
+.DS_Store
 .DS_Store

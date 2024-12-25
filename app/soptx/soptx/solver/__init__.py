@@ -1,5 +1,10 @@
-# 导入需要公开的类
-from .fem_solver import FEMSolver
+from .elastic_fem_solver import (ElasticFEMSolver, 
+                                IterativeSolverResult, DirectSolverResult,
+                                AssemblyMethod)
 
-# 指定可导出的内容
-__all__ = ['FEMSolver']
+__all__ = [
+    'ElasticFEMSolver',
+    'IterativeSolverResult',
+    'DirectSolverResult',
+    'AssemblyMethod',
+]

@@ -393,6 +393,40 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         vec[edge2dof] = bm.einsum("eql, eq, e, q->el", phi, gval, em, ws)
 
         return vec
+    
+    def set_dirichlet_bc(self, gd, uh, threshold=None, q=None, method=None):
+        """
+        @brief 设置狄利克雷边界条件，使用边界上的 L2 投影
+        """
+        p = self.p
+        mesh = self.mesh
+        bspace = self.bspace
+        isbdFace = mesh.boundary_face_flag()
+        edge2dof = self.dof.edge_to_dof()[isbdFace]
+        fm = mesh.entity_measure('face')[isbdFace]
+        gdof = self.number_of_global_dofs()
+        n = mesh.edge_unit_normal()[isbdFace]
+        # Bernstein 空间的单位质量矩阵
+        qf = self.mesh.quadrature_formula(p+3, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bphi = bspace.basis(bcs)
+        M = bm.einsum("cql, cqm, q->lm", bphi, bphi, ws)
+        Minv = bm.linalg.inv(M)
+        Minv = Minv*fm[:,None,None]
+
+        points = mesh.bc_to_point(bcs)[isbdFace]
+        gDval = -gd(points, n) 
+        g = -bm.einsum('cql, cq,q->cl', bphi, gDval,ws)
+        
+        #uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
+        uh = bm.set_at(uh,(edge2dof),bm.einsum('cl, clm->cm', g, Minv))
+        # 边界自由度
+        isDDof = bm.zeros(gdof, dtype=bm.bool)
+        isDDof[edge2dof] = True
+        return uh,isDDof
+
+    boundary_interpolate = set_dirichlet_bc
+
 
 #     def set_neumann_bc(self, g):
 #         bcs, ws = self.integralalg.faceintegrator.get_quadrature_points_and_weights()

@@ -1,58 +1,55 @@
-from math import ceil, sqrt
 from typing import Tuple
+from math import ceil, sqrt
+
+from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
 from fealpy.sparse import COOTensor
-from fealpy.backend import backend_manager as bm
-from fealpy.mesh.uniform_mesh_2d import UniformMesh2d
-from fealpy.mesh.uniform_mesh_3d import UniformMesh3d
-from fealpy.mesh.mesh_base import Mesh
+from fealpy.mesh import UniformMesh2d, UniformMesh3d
 
-class FilterMatrixBuilder:
-    """滤波矩阵构建器"""
+class FilterMatrix:
+    """滤波矩阵计算工具类"""
     
     @staticmethod
-    def build(mesh: Mesh, rmin: float) -> Tuple[TensorLike, TensorLike]:
-        """构建滤波矩阵
-        
-        Args:
-            mesh: 网格对象
-            rmin: 过滤半径
-            
-        Returns:
-            Tuple[COOTensor, TensorLike]: 过滤矩阵和缩放向量
-            
-        Raises:
-            TypeError: 当网格类型不支持时
-            ValueError: 当参数无效时
+    def create_filter_matrix(mesh, filter_radius: float) -> Tuple[COOTensor, TensorLike]:
         """
-        if not isinstance(mesh, (UniformMesh2d, UniformMesh3d)):
-            raise TypeError("mesh must be an instance of UniformMesh2d or UniformMesh3d")
+        根据网格创建滤波矩阵
+        
+        Parameters
+        ----------
+        mesh : UniformMesh2d or UniformMesh3d
+            计算网格
+        radius : float
+            滤波半径
             
-        if rmin <= 0:
-            raise ValueError("Filter radius (rmin) must be positive")
-            
-        builder = FilterMatrixBuilder()
+        Returns
+        -------
+        H : 滤波矩阵
+        Hs : 滤波矩阵行和向量
+        """
         if isinstance(mesh, UniformMesh2d):
-            return builder._build_2d(mesh.nx, mesh.ny, rmin)
+            return FilterMatrix._compute_filter_2d(mesh.nx, mesh.ny, filter_radius)
+        elif isinstance(mesh, UniformMesh3d):
+            return FilterMatrix._compute_filter_3d(mesh.nx, mesh.ny, mesh.nz, filter_radius)
         else:
-            return builder._build_3d(mesh.nx, mesh.ny, mesh.nz, rmin)
+            raise TypeError("Mesh must be UniformMesh2d or UniformMesh3d")
     
-    def _build_2d(self, nx: int, ny: int, rmin: float) -> Tuple[TensorLike, TensorLike]:
-        """构建2D滤波矩阵"""
+    @staticmethod
+    def _compute_filter_2d(nx: int, ny: int, rmin: float) -> Tuple[COOTensor, TensorLike]:
+        """计算2D滤波矩阵"""
         nfilter = int(nx * ny * ((2 * (ceil(rmin) - 1) + 1) ** 2))
         iH = bm.zeros(nfilter, dtype=bm.int32)
         jH = bm.zeros(nfilter, dtype=bm.int32)
         sH = bm.ones(nfilter, dtype=bm.float64)
         cc = 0
-        
+
         for i in range(nx):
             for j in range(ny):
+                # 单元的编号顺序: y->x 
                 row = i * ny + j
                 kk1 = int(max(i - (ceil(rmin) - 1), 0))
                 kk2 = int(min(i + ceil(rmin), nx))
                 ll1 = int(max(j - (ceil(rmin) - 1), 0))
                 ll2 = int(min(j + ceil(rmin), ny))
-                
                 for k in range(kk1, kk2):
                     for l in range(ll1, ll2):
                         col = k * ny + l
@@ -62,48 +59,52 @@ class FilterMatrixBuilder:
                             jH[cc] = col
                             sH[cc] = fac
                             cc += 1
+
+        H = COOTensor(
+            indices=bm.astype(bm.stack((iH[:cc], jH[:cc]), axis=0), bm.int32),
+            values=sH[:cc],
+            spshape=(nx * ny, nx * ny)
+        )
+        Hs = H @ bm.ones(H.shape[1], dtype=bm.float64)
         
-        return self._create_matrix(iH[:cc], jH[:cc], sH[:cc], nx * ny)
-    
-    def _build_3d(self, nx: int, ny: int, nz: int, rmin: float) -> Tuple[TensorLike, TensorLike]:
-        """构建3D滤波矩阵"""
+        return H, Hs
+
+    @staticmethod
+    def _compute_filter_3d(nx: int, ny: int, nz: int, rmin: float) -> Tuple[TensorLike, TensorLike]:
+        """计算 3D 滤波矩阵"""
+
         ceil_rmin = int(ceil(rmin))
         nfilter = nx * ny * nz * ((2 * (ceil_rmin - 1) + 1) ** 3)
         iH = bm.zeros(nfilter, dtype=bm.int32)
         jH = bm.zeros(nfilter, dtype=bm.int32)
         sH = bm.zeros(nfilter, dtype=bm.float64)
         cc = 0
-        
+
         for i in range(nx):
             for j in range(ny):
                 for k in range(nz):
-                    row = i * ny * nz + j * nz + k
+                    # 单元的编号顺序: z -> y -> x
+                    row = k + j * nz + i * ny * nz 
                     ii1 = max(i - (ceil_rmin - 1), 0)
-                    ii2 = min(i + ceil_rmin, nx)
+                    ii2 = min(i + (ceil_rmin - 1), nx - 1)
                     jj1 = max(j - (ceil_rmin - 1), 0)
-                    jj2 = min(j + ceil_rmin, ny)
+                    jj2 = min(j + (ceil_rmin - 1), ny - 1)
                     kk1 = max(k - (ceil_rmin - 1), 0)
-                    kk2 = min(k + ceil_rmin, nz)
-                    
-                    for ii in range(ii1, ii2):
-                        for jj in range(jj1, jj2):
-                            for kk in range(kk1, kk2):
-                                col = ii * ny * nz + jj * nz + kk
+                    kk2 = min(k + (ceil_rmin - 1), nz - 1)
+                    for ii in range(ii1, ii2 + 1):
+                        for jj in range(jj1, jj2 + 1):
+                            for kk in range(kk1, kk2 + 1):
+                                # 单元的编号顺序: z -> y -> x
+                                col = kk + jj * nz + ii * ny * nz 
                                 fac = rmin - sqrt((i - ii)**2 + (j - jj)**2 + (k - kk)**2)
-                                if fac > 0:
-                                    iH[cc] = row
-                                    jH[cc] = col
-                                    sH[cc] = fac
-                                    cc += 1
-        
-        return self._create_matrix(iH[:cc], jH[:cc], sH[:cc], nx * ny * nz)
-    
-    def _create_matrix(self, iH: TensorLike, jH: TensorLike, sH: TensorLike, size: int) -> Tuple[TensorLike, TensorLike]:
-        """创建过滤矩阵和缩放向量"""
-        H = COOTensor(
-            indices=bm.astype(bm.stack((iH, jH), axis=0), bm.int32),
-            values=sH,
-            spshape=(size, size)
-        )
+                                iH[cc] = row
+                                jH[cc] = col
+                                sH[cc] = max(0.0, fac)
+                                cc += 1
+
+        H = COOTensor(indices=bm.astype(bm.stack((iH[:cc], jH[:cc]), axis=0), bm.int32), 
+                      values=sH[:cc], 
+                      spshape=(nx * ny * nz, nx * ny * nz))
         Hs = H @ bm.ones(H.shape[1], dtype=bm.float64)
+
         return H, Hs

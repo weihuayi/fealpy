@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional, Tuple
 
-from fealpy.fem.precomp_data import data
+from fealpy.old.fem.precomp_data import data
 
 
 class LinearElasticityOperatorIntegrator:

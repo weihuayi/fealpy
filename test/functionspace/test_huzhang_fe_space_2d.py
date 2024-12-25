@@ -11,10 +11,9 @@ from huzhang_fe_space_data_2d import *
 class TestHuZhangFiniteElementSpace2D:
 
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
-    @pytest.mark.parametrize("data", triangle_mesh_one_box)
-    def test_top(self, backend, data): 
+    def test_top(self, backend): 
         bm.set_backend(backend)
-        
+
         mesh = TriangleMesh.from_box([0,1,0,1],1,1)
         space = HuZhangFESpace2D(mesh, 1)
         ldofs = space.number_of_local_dofs()

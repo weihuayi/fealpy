@@ -5,7 +5,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh.polygon_mesh import PolygonMesh
 from fealpy.mesh.triangle_mesh import TriangleMesh
 
-from mesh.polygon_mesh_data import *
+from polygon_mesh_data import *
 
 
 class TestPolygonMeshInterfaces:

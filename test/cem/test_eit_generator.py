@@ -1,8 +1,7 @@
 
 from fealpy.cem.generator import EITDataGenerator
-from fealpy.mesh import TriangleMesh as TM
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh, UniformMesh2d
 
 
 EXT = 63
@@ -19,9 +18,8 @@ def current_density(p, *args):
     return bm.sin(1*angle)
 current_density.coordtype = 'cartesian'
 
-mesh = TM.interfacemesh_generator([-1, 1, -1, 1], nx=EXT, ny=EXT, phi=inclusion)
-mesh = TriangleMesh(bm.from_numpy(mesh.entity('node')),
-                    bm.from_numpy(mesh.entity('cell')))
+umesh = UniformMesh2d([0, EXT, 0, EXT], [2./EXT,]*2, [-1, -1])
+mesh = TriangleMesh.interfacemesh_generator(umesh, phi=inclusion)
 
 gen = EITDataGenerator(mesh, p=1)
 flag = gen.set_levelset([10., 1.], inclusion)

@@ -431,8 +431,8 @@ class HomogeneousMesh(Mesh):
                 v = v(ps)
         cm = self.entity_measure('cell')
         NC = self.number_of_cells()
-        if v.shape[-1] == NC:
-            v = bm.swapaxes(v, 0, -1)
+        #if v.shape[-1] == NC:
+        #    v = bm.swapaxes(v, 0, -1)
         #f = bm.power(bm.abs(u - v), power)
         f = bm.abs(u - v)**power
         if len(f.shape) == 1:
@@ -488,6 +488,7 @@ class SimplexMesh(HomogeneousMesh):
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         R = bm.simplex_grad_shape_function(bcs, p, mi) # (NQ, ldof, bc)
+        
         if variables == 'u':
             return R
         elif variables == 'x':
@@ -499,6 +500,20 @@ class SimplexMesh(HomogeneousMesh):
             raise ValueError("Variables type is expected to be 'u' or 'x', "
                              f"but got '{variables}'.")
     
+    def hess_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
+                            variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+        """
+        """
+        TD = bcs.shape[1] - 1
+        if mi is None:
+            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+        H = bm.simplex_hess_shape_function(bcs, p, mi)
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index, TD=TD) # (NC, NQ, ldof, dim) 
+            Hphi = bm.einsum('...inm, knj, kml  -> k...ijl', H, Dlambda, Dlambda)
+            return Hphi
+        elif variables == 'u':
+            return H
 
 class TensorMesh(HomogeneousMesh):
     # ipoints
@@ -595,13 +610,12 @@ class TensorMesh(HomogeneousMesh):
         elif TD == 2:
             gphi0 = bm.einsum('im, jn -> ijmn', dphi, phi).reshape(-1, ldof, 1)
             gphi1 = bm.einsum('im, jn -> ijmn', phi, dphi).reshape(-1, ldof, 1)
-            gphi = bm.concatenate((gphi0, gphi1), axis=-1)
+            gphi = bm.concatenate((gphi0, gphi1), axis=-1)              # (NQ, ldof, GD)
             if variables == 'x':
-                J = self.jacobi_matrix(bcs, index=index)
-                G = self.first_fundamental_form(J)
+                J = self.jacobi_matrix(bcs, index=index)                # (NC, NQ, GD, GD)
+                G = self.first_fundamental_form(J)                      # (NC, NQ, GD, GD)
                 G = bm.linalg.inv(G)
-                # gphi = bm.einsum('qikm, qimn, qln -> qilk', J, G, gphi)
-                gphi = bm.einsum('qikm, qimn, qln -> iqlk', J, G, gphi)
+                gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) # (NC, NQ, ldof, GD)
 
                 return gphi
             

@@ -92,6 +92,20 @@ class TriangleMesh(SimplexMesh, Plotable):
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         return quad
 
+    def update_bcs(self, bcs, toetype: Union[int, str]='cell'):
+        TD = bcs.shape[-1] - 1
+        if toetype == 'cell' or toetype == 2: 
+            if TD == 2:
+                return bcs
+            elif TD == 1: # edge up to cell
+                result = bm.stack([bm.insert(bcs, i, 0.0, axis=-1) for i in range(3)], axis=0)
+                return result
+            else:
+                raise ValueError("Unsupported topological dimension: {TD}")
+                    
+        else:
+            raise ValueError("The etype only support face, other etype is not implemented.")
+    
     # shape function
     def grad_lambda(self, index: Index=_S, TD:int=2) -> TensorLike:
         """
@@ -124,7 +138,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @berif 这里调用的是网格空间基函数的梯度
         """
-        TD = bc.shape[1] - 1
+        TD = bc.shape[-1] - 1
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index, TD=TD)
@@ -253,6 +267,9 @@ class TriangleMesh(SimplexMesh, Plotable):
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
 
+    def boundary_edge_flag(self):
+        return self.boundary_face_flag()
+
     def cell_to_face_sign(self):
         """
         """
@@ -286,8 +303,15 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
+        Uniform refine the triangle mesh n times.
 
+        Parameters:
+            n (int): times refine the triangle mesh.
+            surface (function): the surface function.
+            returnim (bool): return the interpolation  matrix or not.
         """
+        if returnim is True:
+            IM = []
 
         for i in range(n):
             NN = self.number_of_nodes()
@@ -300,12 +324,26 @@ class TriangleMesh(SimplexMesh, Plotable):
             edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype, device=self.device)
             newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
 
+            if returnim is True:
+                A = coo_matrix(
+                        (bm.ones(NN, dtype=self.ftype), (bm.arange(NN), bm.arange(NN))), 
+                        shape=(NN + NE, NN))
+                A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 0])), 
+                                shape=(NN + NE, NN))
+                A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 1])), 
+                                shape=(NN + NE, NN))
+
+                IM.append(A.tocsr())
+
             self.node = bm.concatenate((node, newNode), axis=0)
             p = bm.concatenate((cell, edge2newNode[cell2edge]), axis=1)
             self.cell = bm.concatenate(
                     (p[:,[0,5,4]], p[:,[5,1,3]], p[:,[4,3,2]], p[:,[3,4,5]]),
                     axis=0)
             self.construct()
+
+        if returnim is True:
+            return IM
 
     def is_crossed_cell(self, point, segment):
         """
@@ -579,6 +617,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         https://lyc102.github.io/ifem/afem/coarsen/
         """
+        from .utils import inverse_relation
 
         if isMarkedCell is None:
             return
@@ -590,17 +629,18 @@ class TriangleMesh(SimplexMesh, Plotable):
         node = self.entity('node')
 
         valence = bm.zeros(NN, dtype=self.itype, device=self.device)
-        bm.add_at(valence, cell, 1)
+        valence = bm.index_add(valence, cell, 1)
 
         valenceNew = bm.zeros(NN, dtype=self.itype, device=self.device)
-        bm.add_at(valenceNew, cell[isMarkedCell][:, 0], 1)
+        valenceNew = bm.index_add(valenceNew, cell[isMarkedCell][:, 0], 1)
 
         isIGoodNode = (valence == valenceNew) & (valence == 4)
         isBGoodNode = (valence == valenceNew) & (valence == 2)
 
-        node2cell = self.node_to_cell()
+        # node2cell = self.node_to_cell()
 
-        I, J = bm.nonzero(node2cell[isIGoodNode, :])
+        # I, J = bm.nonzero(node2cell[isIGoodNode, :])
+        _, J, _ = inverse_relation(cell, NN, isIGoodNode)
         nodeStar = J.reshape(-1, 4)
 
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
@@ -628,7 +668,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.set_at(cell , (t2, 2) , p1)
         cell = bm.set_at(cell , (t3, 0) , -1)
 
-        I, J = bm.nonzero(node2cell[isBGoodNode, :])
+        # I, J = bm.nonzero(node2cell[isBGoodNode, :])
+        _, J, _ = inverse_relation(cell, NN, isBGoodNode)
         nodeStar = J.reshape(-1, 2)
         idx = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 1], 1])
         nodeStar = bm.set_at(nodeStar , idx , nodeStar[idx, :][:, [0, 1]])
@@ -1147,7 +1188,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         @return TriangleMesh instance
         """
         if itype is None:
-            itype = bm.int32
+            itype = bm.int64
         if ftype is None:
             ftype = bm.float64
         

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from typing import Optional
 
 from fealpy.typing import TensorLike
@@ -64,7 +65,7 @@ class BasedPhaseFractureMaterial(LinearElasticMaterial):
 
         lam = self.lam
         mu = self.mu
-        trace_e = np.trace(strain, axis1=-2, axis2=-1)
+        trace_e = bm.einsum('...ii', strain)
         I = bm.eye(strain.shape[-1])
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
         
@@ -132,14 +133,6 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         D = D0 * gd[..., None, None]
         return D
     
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
-    
     def positive_stress_func(self, guh) -> TensorLike:
         """
         @brief Compute the stress tensor from the grad displacement tensor.
@@ -156,7 +149,7 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         mu = self.mu
         strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
         
-        trace_e = bm.vmap(bm.trace)(strain)
+        trace_e = bm.einsum('...ii', strain)
         
         I = bm.eye(GD)
         stress = lam * trace_e[..., None, None] * I + 2 * mu * strain
@@ -179,12 +172,6 @@ class IsotropicModel(BasedPhaseFractureMaterial):
         flat_stress = flatten_symmetric_matrices(stress)
         return flat_stress
     
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
-    
 class AnisotropicModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
         # 计算各向异性模型下的应力
@@ -206,14 +193,6 @@ class AnisotropicModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         pass
-
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
     
     def negative_stress_func(self, guh) -> TensorLike:
         """
@@ -227,12 +206,6 @@ class AnisotropicModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         pass
-
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
 
 class DeviatoricModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
@@ -256,14 +229,6 @@ class DeviatoricModel(BasedPhaseFractureMaterial):
         """
         pass
 
-    def positive_coef(self, bc) -> TensorLike:      
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
-
     def negative_stress_func(self, guh) -> TensorLike:
         """
         @brief Compute the stress tensor from the grad displacement tensor.
@@ -277,11 +242,6 @@ class DeviatoricModel(BasedPhaseFractureMaterial):
         """
         pass
         
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
 
 class SpectralModel(BasedPhaseFractureMaterial):
     def stress_value(self, bc) -> TensorLike:
@@ -304,13 +264,15 @@ class SpectralModel(BasedPhaseFractureMaterial):
 
         # 应变正负分解
         sp, sm = self.strain_pm_eig_decomposition(s)
-
-        _ts = np.trace(s, axis1=-2, axis2=-1)
-        ts = bm.array(_ts, dtype=bm.float64)
+        
+        #ts = bm.trace(s, axis1=-2, axis2=-1)
+        ts = bm.einsum('...ii', s)
 
         tp, tm = self.macaulay_operation(ts)
-        tsp = np.trace(sp**2, axis1=-2, axis2=-1)
-        tsm = np.trace(sm**2, axis1=-2, axis2=-1)
+        #tsp = bm.trace(sp**2, axis1=-2, axis2=-1)
+        #tsm = bm.trace(sm**2, axis1=-2, axis2=-1)
+        tsp = bm.einsum('...ii', sp**2)
+        tsm = bm.einsum('...ii', sm**2)
 
         phi_p = lam * tp ** 2 / 2.0 + mu * tsp
         phi_m = lam * tm ** 2 / 2.0 + mu * tsm
@@ -325,7 +287,18 @@ class SpectralModel(BasedPhaseFractureMaterial):
         
         @param[in] s strain，（NC, NQ, GD, GD）
         """
-        w, v = bm.linalg.eigh(s) # w 特征值, v 特征向量
+        '''
+        if bm.device_type(s) == 'cuda':
+            torch.cuda.empty_cache()
+            try:
+                w, v = bm.linalg.eigh(s)  # w 特征值, v 特征向量
+            except torch.cuda.OutOfMemoryError as e:
+                print("CUDA out of memory. Attempting to free cache.")
+                torch.cuda.empty_cache()
+        else:
+            w, v = bm.linalg.eigh(s) # w 特征值, v 特征向量
+        '''
+        w, v = bm.linalg.eigh(s)
         p, m = self.macaulay_operation(w)
 
         sp = bm.zeros_like(s)
@@ -361,6 +334,16 @@ class SpectralModel(BasedPhaseFractureMaterial):
         val[x < -1e-13] = 0
         return val
     
+    def linear_strain_value(self, bc):
+        """
+        Compute the linear strain tensor.
+        """
+        bc = bm.array([[1/3, 1/3, 1/3]], dtype=bm.float64)
+        uh = self.uh
+        guh = uh.grad_value(bc)
+        strain = 0.5 * (guh + bm.swapaxes(guh, -2, -1))
+        return strain
+    
     @ barycentric
     def maximum_historical_field(self, bc):
 
@@ -374,7 +357,7 @@ class SpectralModel(BasedPhaseFractureMaterial):
         if self.H is None:
             self.H = phip[:]
         else:
-            self.H = np.fmax(self.H, phip)
+            self.H = bm.maximum(self.H, phip)
         return self.H
     
     def positive_stress_func(self, guh) -> TensorLike:
@@ -389,14 +372,6 @@ class SpectralModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         pass
-
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
     
     def negative_stress_func(self, guh) -> TensorLike:
         """
@@ -409,13 +384,7 @@ class SpectralModel(BasedPhaseFractureMaterial):
         TensorLike
             The flattened stress tensor.
         """
-        pass  
-
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1     
+        pass     
 
 class HybridModel(BasedPhaseFractureMaterial):
     def __init__(self, material, energy_degradation_fun):
@@ -456,20 +425,6 @@ class HybridModel(BasedPhaseFractureMaterial):
             The flattened stress tensor.
         """
         return self._isotropic_model.positive_stress_func(guh)
-
-    def positive_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the positive energy coefficient.
-        """
-        d = self.d
-        gd = self._gd.degradation_function(d(bc))
-        return gd
-    
-    def negative_coef(self, bc) -> TensorLike:
-        """
-        @brief Compute the negative energy coefficient.
-        """
-        return 1
     
     def negative_stress_func(self, guh) -> TensorLike:
         """

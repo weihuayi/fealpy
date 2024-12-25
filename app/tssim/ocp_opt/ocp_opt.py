@@ -1,149 +1,169 @@
-#!/usr/bin/python3
-'''!    	
-	@Author: wpx
-	@File Name: ocp-opt.py
-	@Mail: wpx15673207315@gmail.com 
-	@Created Time: Thu 05 Sep 2024 04:50:58 PM CST
-	@bref 
-	@ref 
-'''  
 from fealpy.mesh import TriangleMesh
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.timeintegratoralg import UniformTimeLine
-
+from fealpy.old.timeintegratoralg import UniformTimeLine
+from fealpy.functionspace import TensorFunctionSpace
 from ocp_opt_pde import example_1
-from solver import ocp_opt_solver
+from solver_update import ocp_opt_solver
+from fealpy.fem import DirichletBC  
 
-from scipy.sparse import coo_array, bmat
 from functools import partial
 from fealpy import logger
+from fealpy.solver import spsolve
 logger.setLevel('ERROR') #积分子问题
 
 bm.set_backend("numpy")
 pde = example_1()
 n = 10
-q = 4
+q = 3
 T = 1
-nt = 30
-maxit = 3
+nt = 500
+maxit = 12
 
 mesh = TriangleMesh.from_box(pde.domain(), nx=n, ny=n)
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 yspace= LagrangeFESpace(mesh, p=1) 
-pspace= LagrangeFESpace(mesh, p=1) 
-solver = ocp_opt_solver(mesh, yspace, pspace, pde, timeline)
+space = LagrangeFESpace(mesh, p=1)
+pspace = TensorFunctionSpace(space, (2,-1)) 
+solver = ocp_opt_solver(mesh, yspace, pspace, pde, timeline, q=q)
 
-ygodf = yspace.number_of_global_dofs()
+ygdof = yspace.number_of_global_dofs()
 pgdof = pspace.number_of_global_dofs()
-yisbdof = yspace.is_boundary_dof()
-pisbdof = pspace.is_boundary_dof()
-isbdof = bm.concatenate([yisbdof, pisbdof, pisbdof], axis=0)
 
 ally = [None]*(nt+1)
-allpx1 = [None]*(nt+1)
-allpx2 = [None]*(nt+1)
+allp = [None]*(nt+1)
 allu = [None]*(nt+1)
+allz = [None]*(nt+1)
 
 y0 = yspace.function(yspace.interpolate(partial(pde.y_solution, time=0)))
 y0t = yspace.interpolate(partial(pde.y_t_solution, time=0)) 
-p0x1 = pspace.function(pspace.interpolate(partial(pde.px1_solution, time=0)))
-p0x2 = pspace.function(pspace.interpolate(partial(pde.px2_solution, time=0)))
+p0 = pspace.function(pspace.interpolate(partial(pde.p_solution, time=0))) 
+zn = yspace.function(yspace.interpolate(partial(pde.z_solution, time=T)))
+
+q2 = pspace.function()
+
 ally[0] = y0
-allpx1[0] = p0x1
-allpx2[0] = p0x2
+allp[0] = p0
+allz[-1] = zn
+allu[0] = yspace.function()
+
+A0 = solver.Forward_BForm_A0().assembly()
+b0_LForm = solver.Forward_LForm_b0()
+
+FA = solver.Forward_BForm_A().assembly()
+Forward_b_LForm = solver.Forward_LForm_b()
+
+An = solver.Forward_BForm_A0().assembly()
+bn_LForm = solver.Backward_LForm_bn()
+
+BA = solver.Forward_BForm_A().assembly()
+Backward_b_LForm = solver.Backward_LForm_b()
 
 for k in range(maxit):
-    A0 = solver.A0n()
-    b0 = solver.forward_b0(allu[1])
-    A0, b0 = solver.forward_boundary(A0, b0, isbdof, dt)
-    x0 = solver.mumps_solve(A0, b0)
-
     y1 = yspace.function()
-    p1x1 = pspace.function()
-    p1x2 = pspace.function()
-    y1[:] = x0[:ygodf]
-    p1x1[:] = x0[ygodf:-pgdof]
-    p1x2[:] = x0[-pgdof:]
+    p1 = pspace.function()
+    
+    ## 正向求解第0步
+    solver.Forward_0_update(allu[1])
+    Fb0 = b0_LForm.assembly()
+    BC = DirichletBC(space=(yspace,pspace), threshold=(None, None), 
+                     gd=(partial(pde.y_solution,time=dt), 
+                         partial(pde.p_solution,time=dt)),method='interp')
+    A0, b0 = BC.apply(A0, Fb0) 
+    x0 = spsolve(A0, b0, solver='mumps')
+
+    y1[:] = x0[:ygdof]
+    p1[:] = x0[-pgdof:] 
     ally[1] = y1
-    allpx1[1] = p1x1
-    allpx2[1] = p1x2
+    allp[1] = p1
+    
     timeline.advance()
 
-    AA = solver.A()
-    #正向求解
-    for i in range(nt-1):
-        t1 = timeline.next_time_level()
-        tnextindex = timeline.current_time_level_index()+1
-
+    # 正向求解
+    for i in bm.arange(1, nt):
+        t1 = timeline.current_time_level()
+        t1index = timeline.current_time_level_index()
+        
         y2 = yspace.function()
-        px1 = pspace.function()
-        px2 = pspace.function()
-        b = solver.forward_b(y0, y1, allu[tnextindex], t1)
-        A,b = solver.forward_boundary(AA, b, isbdof, t1)
+        p2 = pspace.function()
         
-        x = solver.mumps_solve(A, b)
-        y1[:] = y0
-        y2[:] = x[:ygodf]
-        px1[:] = x[ygodf:-pgdof]
-        px2[:] = x[-pgdof:]
-        ally[tnextindex] = y2
-        allpx1[tnextindex] = px1
-        allpx2[tnextindex] = px2
+        solver.Forward_update(ally[t1index-1], ally[t1index], allu[t1index+1], t1+dt)
+        Fb = Forward_b_LForm.assembly()
+        
+        BC = DirichletBC(space=(yspace,pspace), threshold=(None, None), 
+                         gd=(partial(pde.y_solution,time=t1+dt), 
+                             partial(pde.p_solution,time=t1+dt)),method='interp')
+        Forward_A, Forward_b = BC.apply(FA, Fb)
+        Forward_x = spsolve(Forward_A, Forward_b, solver='mumps')
+        
+        y2[:] = Forward_x[:ygdof]
+        p2[:] = Forward_x[-pgdof:]
+        ally[t1index+1] = y2
+        allp[t1index+1] = p2
         timeline.advance()
+    
+    ## 反向求解第0步
+    t1 = timeline.current_time_level()
+    t1index = timeline.current_time_level_index()
 
-
-    zn0 = yspace.function(yspace.interpolate(partial(pde.z_solution, time=T)))
-    zn0t = yspace.interpolate(partial(pde.z_t_solution, time=0)) 
     zn1 = yspace.function()
-    zn2 = yspace.function()
-    qx1 = pspace.function()
-    qx2 = pspace.function()
-    un0 = yspace.function()
-    un1 = yspace.function()
+    solver.Backward_n_update(ally[t1index-1], allp[t1index-1])
+    bn = bn_LForm.assembly() 
+     
+    BC = DirichletBC(space=(yspace,pspace), threshold=(None, None), 
+                     gd=(partial(pde.z_solution,time = T-dt), 
+                        partial(pde.q_solution,time = T-dt)),method='interp')   
+    An, bn = BC.apply(An, bn)
+    xn = spsolve(An, bn, solver='mumps')
+    zn1[:] = xn[:ygdof]
+    q2[:] = xn[-pgdof:]
+    allz[t1index-1] = zn1
 
-    un0[:] = solver.solve_u(zn0) #积分子
-    allu[tnextindex] = un0
-
-    An = solver.A0n()
-    bn = solver.backward_b0(ally[-1], allpx1[-1], allpx2[-1])     
-    An, bn = solver.backward_boundary(An, bn, isbdof, T-dt)
-    xn = solver.mumps_solve(An, bn)
-
-    zn1[:] = xn[:ygodf]
-    qx1[:] = xn[ygodf:-pgdof]
-    qx2[:] = xn[-pgdof:]
     timeline.backward()
+    
+    ## 反向求解 
+    for i in bm.arange(nt-1, 0, -1):    
+        t1 = timeline.current_time_level()
+        t1index = timeline.current_time_level_index()
+        zn2 = yspace.function() 
 
-    tnextindex = timeline.current_time_level_index()
-    un1[:] = solver.solve_u(zn1)
-    allu[tnextindex] = un1
-
-    # 反向求解
-    for i in range(nt-1):
-        t1 = timeline.prev_time_level()
-        tnextindex = timeline.current_time_level_index()-1
-        u = yspace.function()    
-
-        b = solver.backward_b(zn0, zn1, ally[tnextindex], allpx1[tnextindex], allpx2[tnextindex], t1)
-        A,b = solver.forward_boundary(AA, b, isbdof, t1)
+        ##求第i-1步的z,q
+        solver.Backward_update(allz[t1index+1], allz[t1index], ally[t1index-1], allp[t1index-1], t1-dt)  
+        Bb = Backward_b_LForm.assembly()
+        BC = DirichletBC(space=(yspace,pspace), threshold=(None, None), 
+                         gd=(partial(pde.z_solution,time = t1-dt), 
+                             partial(pde.q_solution,time = t1-dt)),method='interp') 
+        Backward_A, Backward_b = BC.apply(BA, Bb)
+        Backward_x = spsolve(Backward_A, Backward_b, solver='mumps')
         
-        x = solver.mumps_solve(A, b)
-        
-        zn1[:] = zn0
-        zn2[:] = x[:ygodf]
-        qx1[:] = x[ygodf:-pgdof]
-        qx2[:] = x[-pgdof:]
-        u[:] = solver.solve_u(zn2)
-        allu[tnextindex] = u
+        zn2[:] = Backward_x[:ygdof]
+        q2[:] = Backward_x[-pgdof:]
+        allz[t1index-1] = zn2 
         timeline.backward()
+    
+    z_bar = solver.solve_z_bar(allz)
+    un_pre = allu[0]
+    for i in range(nt+1):
+       ufunction = yspace.function()
+       ufunction[:] = bm.max((0,z_bar)) - allz[i]
+       allu[i] = ufunction
+    print(f"第{k}次的前后u差别",mesh.error(un_pre,allu[0]))
 
-
-ysolution = yspace.function(yspace.interpolate(partial(pde.y_solution, time=T))) 
-usolution = yspace.function(yspace.interpolate(partial(pde.u_solution, time=0))) 
-errory = mesh.error(ally[-1], ysolution)
-erroru = mesh.error(allu[0], usolution)
-print(errory)
-print(erroru)
+print(q2)
+ysolution = yspace.function(yspace.interpolate(partial(pde.y_solution, time=T-dt))) 
+psolution = pspace.function(pspace.interpolate(partial(pde.p_solution, time=T-dt))) 
+usolution = yspace.function(yspace.interpolate(partial(pde.u_solution, time=dt))) 
+zsolution = yspace.function(yspace.interpolate(partial(pde.z_solution, time=dt))) 
+qsolution = pspace.function(pspace.interpolate(partial(pde.q_solution, time=0))) 
+errory = mesh.error(ally[-2], ysolution)
+errorp = mesh.error(allp[-2], psolution)
+erroru = mesh.error(allu[1], usolution)
+errorz = mesh.error(allz[1], zsolution)
+errorq = mesh.error(q2, qsolution)
+print("y误差",errory)
+print("p误差",errorp)
+print("u误差",erroru)
+print("z误差",errorz)
+print("q误差",errorq)

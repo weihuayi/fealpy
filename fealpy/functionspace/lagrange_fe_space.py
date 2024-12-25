@@ -51,13 +51,13 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.dof.interpolation_points()
 
     def cell_to_dof(self, index: Index=_S) -> TensorLike:
-        return self.dof.cell_to_dof()[index]
+        return self.dof.cell_to_dof(index=index)
 
     def face_to_dof(self, index: Index=_S) -> TensorLike:
-        return self.dof.face_to_dof()[index]
+        return self.dof.face_to_dof(index=index)
 
     def edge_to_dof(self, index=_S):
-        return self.dof.edge_to_dof()[index]
+        return self.dof.edge_to_dof(index=index)
 
     def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
@@ -137,6 +137,47 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variables=variable)
 
     @barycentric
+    def cell_basis_on_edge(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
+        NLF = self.mesh.number_of_faces_of_cells()
+        NF = len(eindex)
+        NQ = bc.shape[0]
+        ldof = self.number_of_local_dofs('cell')
+        result = bm.zeros((NF,NQ,ldof),dtype=self.ftype) 
+        face2cell = self.mesh.face_to_cell(eindex) 
+        cbcs = self.mesh.update_bcs(bc, 'cell')
+
+        for i in range(NLF): 
+            phi = self.basis(cbcs[i])
+            tag = bm.where(face2cell[:,2]==i)
+            result[tag] = phi
+        return result
+        
+    @barycentric
+    def cell_grad_basis_on_edge(self, bc: TensorLike, eindex: TensorLike, 
+                                isleft = True) -> TensorLike:
+        TD = self.mesh.TD  ## 一定是单元的
+        NLF = self.mesh.number_of_faces_of_cells()
+        NF = len(eindex)
+        NQ = bc.shape[0]
+        ldof = self.number_of_local_dofs('cell')
+        result = bm.zeros((NF,NQ,ldof,TD),dtype=self.ftype) 
+        
+        cbcs = self.mesh.update_bcs(bc, 'cell')   
+        face2cell = self.mesh.face_to_cell(eindex)      
+        if isleft:
+            c_index  = face2cell[:,0]
+            e_local_index = face2cell[:,2]
+        else :
+            c_index  = face2cell[:,1]
+            e_local_index = face2cell[:,3]
+
+        for i in range(NLF):
+            gphi = self.grad_basis(cbcs[i], c_index)
+            tag = bm.where(e_local_index==i)
+            result[tag] = gphi[tag]
+        return result
+    
+    @barycentric
     def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike: 
         if isinstance(bc, tuple):
             TD = len(bc)
@@ -156,4 +197,4 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         gphi = self.grad_basis(bc, index=index)
         e2dof = self.dof.entity_to_dof(TD, index=index)
         val = bm.einsum('cilm, cl -> cim', gphi, uh[e2dof])
-        return val[...]
+        return val

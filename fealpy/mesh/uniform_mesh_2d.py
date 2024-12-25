@@ -507,6 +507,32 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         return self.edge_normal(index=index, unit=True, out=out)
     
+    def cell_location(self, points) -> TensorLike:
+        """
+        @brief 给定一组点，确定所有点所在的单元
+
+        """
+        hx = self.h[0]
+        hy = self.h[1]
+        v = bm.real(points - bm.array(self.origin, dtype=points.dtype))
+        n0 = v[..., 0] // hx
+        n1 = v[..., 1] // hy
+
+        return n0.astype('int64'), n1.astype('int64')
+    
+    def point_to_bc(self, points):
+
+        x = points[..., 0]
+        y = points[..., 1]
+
+        bc_x_ = bm.real((x - self.origin[0]) / self.h[0]) % 1
+        bc_y_ = bm.real((y - self.origin[1]) / self.h[1]) % 1
+        bc_x = bm.array([[bc_x_, 1 - bc_x_]], dtype=bm.float64)
+        bc_y = bm.array([[bc_y_, 1 - bc_y_]], dtype=bm.float64)
+        val = (bc_x, bc_y)
+
+        return val
+    
 
 #################################### 插值点 #############################################
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
@@ -755,7 +781,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     face_to_ipoint = edge_to_ipoint
     
-    
     # 形函数
     def jacobi_matrix(self, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
@@ -766,8 +791,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         node = self.entity('node')
         cell = self.entity('cell', index=index)
-        gphi = self.grad_shape_function(bcs, p=1, variables='u', index=index)
-        J = bm.einsum( 'cim, ...in -> ...cmn', node[cell[:]], gphi)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u')   # (NQ, ldof, GD)
+        #TODO 这里不能翻转网格，否则会导致 Jacobian 计算错误
+        node_cell_flip = node[cell[:]]                             # (NC, NCN, GD)
+        J = bm.einsum('cim, qin -> cqmn', node_cell_flip, gphi)    # (NC, NQ, GD, GD)
 
         return J
     
@@ -845,6 +872,78 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             self.face2cell = self.edge2cell
 
         self.clear() 
+
+    def to_vtk(self, filename, celldata=None, nodedata=None):
+        """
+        @brief: Converts the mesh data to a VTK structured grid format and writes to a VTS file
+        """
+        import vtk
+        from vtk.util.numpy_support import numpy_to_vtk
+
+        if celldata is None:
+            celldata = self.celldata
+
+        if nodedata is None:
+            nodedata = self.nodedata
+
+        # 网格参数
+        nx, ny = self.nx, self.ny
+        h = self.h
+        origin = self.origin
+
+        # 创建坐标点
+        x = bm.linspace(origin[0], origin[0] + nx * h[0], nx + 1)
+        y = bm.linspace(origin[1], origin[1] + ny * h[1], ny + 1)
+        z = bm.zeros(1)
+
+        # 按 y, x 顺序重新组织坐标数组（左上到右下）
+        xy_x, xy_y = bm.meshgrid(x, y, indexing='ij')
+        xy_z = bm.zeros_like(xy_x)
+
+        if self.flip_direction == 'y':
+            # 左上到右下
+            yx_x = xy_x[:, ::-1].flatten()
+            yx_y = xy_y[:, ::-1].flatten()
+            yx_z = xy_z[:, ::-1].flatten()
+        elif self.flip_direction == None:
+            # 默认：左下到右上
+            yx_x = xy_x.flatten()
+            yx_y = xy_y.flatten()
+            yx_z = xy_z.flatten()
+
+        # 创建 VTK 网格对象
+        rectGrid = vtk.vtkStructuredGrid()
+        rectGrid.SetDimensions(ny + 1, nx + 1, 1)
+
+        # 创建点
+        points = vtk.vtkPoints()
+        for i in range(len(yx_x)):
+            points.InsertNextPoint(yx_x[i], yx_y[i], yx_z[i])
+        rectGrid.SetPoints(points)
+
+        # 添加节点数据
+        if nodedata is not None:
+            for name, data in nodedata.items():
+                data_array = numpy_to_vtk(data, deep=True)
+                data_array.SetName(name)
+                rectGrid.GetPointData().AddArray(data_array)
+
+        # 添加单元格数据
+        if celldata is not None:
+            for name, data in celldata.items():
+                data_array = numpy_to_vtk(data, deep=True)
+                data_array.SetName(name)
+                rectGrid.GetCellData().AddArray(data_array)
+
+        # 写入 VTK 文件
+        print("Writting to vtk...")
+        writer = vtk.vtkXMLStructuredGridWriter()
+        writer.SetInputData(rectGrid)
+        writer.SetFileName(filename)
+        writer.Write()
+
+        return filename
+
 
     # 界面网格
     def is_cut_cell(self, phi: Callable, *, eps=1e-10) -> TensorLike:

@@ -77,7 +77,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
              origin: Tuple[float, float, float] = (0.0, 0.0, 0.0), 
              ipoints_ordering='zyx', 
              flip_direction=None, 
-             itype=None, ftype=None):
+             *, itype=None, ftype=None, device=None):
         """
         Initializes a 3D uniform structured mesh.
 
@@ -102,6 +102,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         if ftype is None:
             ftype = bm.float64
         super().__init__(TD=3, itype=itype, ftype=ftype)
+
+        self.device = device
 
         # Mesh properties
         self.extent = [int(e) for e in extent]
@@ -1252,8 +1254,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         node = self.entity('node')
         cell = self.entity('cell', index=index)
-        gphi = self.grad_shape_function(bcs, p=1, variables='u')
-        J = bm.einsum( 'cim, qin -> qcmn', node[cell[:]], gphi)
+        gphi = self.grad_shape_function(bcs, p=1, variables='u')   # (NQ, ldof, GD)
+        #TODO 这里不能翻转网格，否则会导致 Jacobian 计算错误
+        node_cell_flip = node[cell[:]]                             # (NC, NCN, GD)
+        J = bm.einsum( 'cim, qin -> cqmn', node_cell_flip, gphi)
 
         return J
     
@@ -1311,6 +1315,97 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             self.face2cell = self.face_to_cell()
 
         self.clear()
+
+    def to_vtk(self, filename, celldata=None, nodedata=None):
+        """
+        @brief: Converts the 3D mesh data to a VTK structured grid format and writes to a VTS file
+        """
+        import vtk
+        from vtk.util.numpy_support import numpy_to_vtk
+
+        if celldata is None:
+            celldata = self.celldata
+
+        if nodedata is None:
+            nodedata = self.nodedata
+
+        # 网格参数
+        nx, ny, nz = self.nx, self.ny, self.nz  
+        h = self.h  
+        origin = self.origin
+
+        # 创建三维坐标点
+        x = bm.linspace(origin[0], origin[0] + nx * h[0], nx + 1)
+        y = bm.linspace(origin[1], origin[1] + ny * h[1], ny + 1)
+        z = bm.linspace(origin[2], origin[2] + nz * h[2], nz + 1) 
+
+        # 创建三维网格点坐标
+        xyz_x, xyz_y, xyz_z = bm.meshgrid(x, y, z, indexing='ij')
+
+        if self.flip_direction == 'y':
+            # 左上到右下：在 y 方向翻转
+            xyz_x = xyz_x[:, ::-1, :]
+            xyz_y = xyz_y[:, ::-1, :]
+            xyz_z = xyz_z[:, ::-1, :]
+            
+            # 将坐标展平为一维数组
+            points_x = xyz_x.flatten()
+            points_y = xyz_y.flatten()
+            points_z = xyz_z.flatten()
+        elif self.flip_direction == None:
+            # 默认：左下到右上
+            points_x = xyz_x.flatten()
+            points_y = xyz_y.flatten()
+            points_z = xyz_z.flatten()
+
+        # 创建 VTK 网格对象
+        rectGrid = vtk.vtkStructuredGrid()
+        # 注意：VTK 中维度顺序为 (nz+1, ny+1, nx+1)
+        rectGrid.SetDimensions(nz + 1, ny + 1, nx + 1)
+
+        # 创建点
+        points = vtk.vtkPoints()
+        for i in range(len(points_x)):
+            points.InsertNextPoint(points_x[i], points_y[i], points_z[i])
+        rectGrid.SetPoints(points)
+
+        # 添加节点数据
+        if nodedata is not None:
+            for name, data in nodedata.items():
+                # 如果数据是元组，取第一个元素（当前密度值）
+                if isinstance(data, tuple):
+                    current_data = data[0]  # 获取当前密度值
+                else:
+                    current_data = data
+                
+                # 将数据展平
+                data_array = numpy_to_vtk(current_data.flatten(), deep=True)
+                data_array.SetName(name)
+                rectGrid.GetPointData().AddArray(data_array)
+
+        # 添加单元格数据
+        if celldata is not None:
+            for name, data in celldata.items():
+                # 如果数据是元组，取第一个元素（当前密度值）
+                if isinstance(data, tuple):
+                    current_data = data[0]  # 获取当前密度值
+                else:
+                    current_data = data
+                
+                # 将数据展平
+                data_array = numpy_to_vtk(current_data.flatten(), deep=True)
+                data_array.SetName(name)
+                rectGrid.GetCellData().AddArray(data_array)
+
+        # 写入 VTK 文件
+        print("Writing to vtk...")
+        writer = vtk.vtkXMLStructuredGridWriter()
+        writer.SetInputData(rectGrid)
+        writer.SetFileName(filename)
+        writer.Write()
+
+        return filename
+
 
 
 UniformMesh3d.set_ploter('3d')
