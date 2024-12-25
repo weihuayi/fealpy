@@ -342,6 +342,67 @@ class TestGearSystem:
         plt.show()
 
 
+    def test_get_part_internal_gear(self):
+        with open('../data/internal_gear_data.json', 'r') as file:
+            data = json.load(file)
+        m_n = data['mn']  # 法向模数
+        z = data['z']  # 齿数
+        alpha_n = data['alpha_n']  # 法向压力角
+        beta = data['beta']  # 螺旋角
+        x_n = data['xn']  # 法向变位系数
+        hac = data['hac']  # 齿顶高系数
+        cc = data['cc']  # 顶隙系数
+        rcc = data['rcc']  # 刀尖圆弧半径
+        jn = data['jn']  # 法向侧隙
+        n1 = data['n1']  # 渐开线分段数
+        n2 = data['n2']  # 过渡曲线分段数
+        n3 = data['n3']
+        na = data['na']
+        nf = data['nf']
+        nw = data['nw']
+        tooth_width = data['tooth_width']
+        outer_diam = data['outer_diam']  # 轮缘内径
+        z_cutter = data['z_cutter']
+        xn_cutter = data['xn_cutter']
+
+        internal_gear = InternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
+                                     xn_cutter, tooth_width)
+
+        hex_mesh = internal_gear.generate_hexahedron_mesh()
+        target_hex_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
+
+        n = 15
+        helix_d = np.linspace(internal_gear.d, internal_gear.d_a, n)
+        helix_width = np.linspace(0, internal_gear.tooth_width, n)
+        helix_node = internal_gear.cylindrical_to_cartesian(helix_d, helix_width)
+
+        target_cell_idx = np.zeros(n, np.int32)
+        face_normal = np.zeros((n, 3), np.float64)
+        parameters = np.zeros((n, 3), np.float64)
+        for i, t_node in enumerate(helix_node):
+            target_cell_idx[i], face_normal[i], parameters[i] = internal_gear.find_node_location_kd_tree(t_node)
+
+        # 法向量后处理
+        # 计算平均法向量
+        average_normal = np.mean(face_normal, axis=0)
+        average_normal /= np.linalg.norm(average_normal)
+
+        threshold = 0.1
+        for i in range(len(face_normal)):
+            deviation = np.linalg.norm(face_normal[i] - average_normal)
+            if deviation > threshold:
+                face_normal[i] = average_normal
+
+        # 寻找外圈上节点
+        node = target_hex_mesh.node
+        node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
+        is_outer_node = np.abs(node_r - internal_gear.outer_diam / 2) < 1e-11
+        outer_node_idx = np.where(np.abs(node_r - internal_gear.outer_diam / 2)<1e-11)[0]
+
+        with open('../data/part_internal_gear_data.pkl', 'wb') as f:
+            pickle.dump({'internal_gear': internal_gear, 'hex_mesh': target_hex_mesh, 'helix_node': helix_node,
+                         'target_cell_idx': target_cell_idx, 'parameters': parameters,
+                         'is_inner_node': is_outer_node, 'inner_node_idx': outer_node_idx}, f)
 
 
 
