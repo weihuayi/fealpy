@@ -4,16 +4,17 @@ jax.config.update("jax_enable_x64", True) # 启用 float64 支持
 import enum
 import jax.numpy as jnp
 import numpy as np
-from fealpy.jax.mesh.node_mesh import NodeMesh
-from fealpy.jax.sph import SPHSolver,TimeLine
-from fealpy.jax.sph import partition 
-from fealpy.jax.sph.jax_md.partition import Sparse
-from fealpy.jax.sph.kernel_function import QuinticKernel
+from fealpy.mesh.node_mesh import NodeMesh
+from fealpy.cfd.sph.particle_solver import SPHSolver,TimeLine
+from fealpy.cfd.sph import partition 
+from fealpy.cfd.sph.jax_md.partition import Sparse
+from fealpy.cfd.sph.particle_kernel_function import QuinticKernel
 from jax_md import space
 from jax import ops, vmap
 from jax import lax
 import matplotlib.pyplot as plt
 import warnings
+import time
 
 EPS = jnp.finfo(float).eps
 dx = 0.02
@@ -55,8 +56,9 @@ neighbor_fn = partition.neighbor_list(
 warnings.filterwarnings("ignore", category=FutureWarning)
 neighbors = neighbor_fn.allocate(mesh.nodedata["position"], num_particles=mesh.nodedata["position"].shape[0])
 
-for i in range(t_num+2):
-    
+start = time.time()
+for i in range(100):
+    print(i)
     mesh.nodedata['mv'] += 1.0*dt*mesh.nodedata["dmvdt"]
     mesh.nodedata['tv'] = mesh.nodedata['mv']
     #mesh.nodedata['tv'] = mesh.nodedata['mv'] + 0.5*dt*mesh.nodedata['dtvdt']
@@ -87,3 +89,6 @@ for i in range(t_num+2):
     #solver.write_h5(mesh.nodedata, fname)
     #fname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'
     #solver.write_vtk(mesh.nodedata, fname)
+
+end = time.time()
+print(end-start)
