@@ -6,7 +6,7 @@ from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
 from COA import COA
-from fealpy.opt import *
+#from fealpy.opt import *
 from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
 from fealpy.opt.crayfish_opt_alg import CrayfishOptAlg
 from meshing_type import MeshingType
