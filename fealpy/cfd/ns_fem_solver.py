@@ -16,7 +16,7 @@ from fealpy.fem import (ScalarConvectionIntegrator,
                         SourceIntegrator,
                         PressWorkIntegrator,
                         FluidBoundaryFrictionIntegrator,
-                        FluidBoundaryFrictionIntegratorP)
+                        ViscousWorkIntegrator)
 from fealpy.fem import (BoundaryFaceMassIntegrator,
                         BoundaryFaceSourceIntegrator)
 
@@ -94,8 +94,43 @@ class NSFEMSolver():
         q = self.q
         
         Bform = BilinearForm(uspace)
-        M = ScalarMassIntegrator(coef=R , q=q)
-        S = ScalarDiffusionIntegrator(coef=R , q=q)
-        F = FluidBoundaryFrictionIntegrator(coef=1, q=5, threshold=threshold)
+        M = ScalarMassIntegrator(coef=R/dt, q=q)
+        F = FluidBoundaryFrictionIntegrator(coef=-1, q=q, threshold=threshold)
+        VW = ViscousWorkIntegrator(coef=2, q=q)
+        Bform.add_integrator(VW)
         Bform.add_integrator(F)
+        Bform.add_integrator(M)
         return Bform
+    
+    def IPCS_LForm_0(self, pthreshold=None):
+        pspace = self.pspace
+        uspace = self.uspace
+        dt = self.dt
+        R = self.pde.R
+        q = self.q
+        
+        Lform = LinearForm(uspace)
+        self.ipcs_lform_SI = SourceIntegrator(q=q)
+        self.ipcs_lform_SI.keep_data()
+        self.ipcs_lform_BSI = BoundaryFaceSourceIntegrator(q=q, threshold=pthreshold)
+        self.ipcs_lform_BSI.keep_data()
+        return Lform
+
+    def update_ipcs_0(self, u0, p0):
+        dt = self.dt
+        R = self.pde.R
+
+        def coef(bcs, index):
+            result = 1/dt*u0(bcs, index)
+            result += np.einsum('...j, ....,ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
+            result += np.repeat(p0(bcs,index)[...,np.newaxis], 2, axis=-1)
+            return 
+
+        def B_coef(bcs, index):
+            result = np.einsum('..ij, ....j->...ij', p(bcs, index), self.mesh.edge_unit_normal(bcs, index))
+            return
+
+        self.ipcs_lform_SI.source = coef
+        self.ipcs_lform_BSI.source = B_coef
+    
+

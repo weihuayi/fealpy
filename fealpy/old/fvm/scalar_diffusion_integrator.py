@@ -39,8 +39,6 @@ class ScalarDiffusionIntegrator:
         val = -h/h*np.ones(I.shape)
         A += csr_matrix((val,(I, J)), shape=(NC, NC))
 
-
-
         b = np.zeros(NC)
         index = np.where(flag)[0]
         index1 = cell2edge[flag]
