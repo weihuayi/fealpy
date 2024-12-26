@@ -5,7 +5,10 @@ from typing import Union
 from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
-#from fealpy.iopt import COA
+from COA import COA
+from fealpy.opt import *
+from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
+from fealpy.opt.crayfish_opt_alg import CrayfishOptAlg
 from meshing_type import MeshingType
 from partition_type import PartitionType
 from dataclasses import dataclass
@@ -117,7 +120,7 @@ class Screen:
         self.eillposid_overlapmesh = []
         self.eillposid_nonoverlapmesh = []
 
-        #self.optimize()
+        self.optimize()
         #self.draw_frature_points()
         self.meshing()
         self.compute_uv()
@@ -152,8 +155,8 @@ class Screen:
                 ps2 = camsys.cameras[i].to_screen(ps1, on_ground=True)
                 ps0 = np.array(ps0)
                 error += np.sum((ps0 - ps2[:, :-1])**2)
-            if self.i%50==0:
-                print("Error: ", error)
+            # if self.i%50==0:
+            #     print("Error: ", error)
             return error
 
         # 6 个相机，每个相机的位置和欧拉角共 6 * 6 = 36 个参数
@@ -179,11 +182,24 @@ class Screen:
 
         opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
                       object_function, init_x.flatten())
-        bestfitness,best_position,_ = opt_alg.cal()
-        print(bestfitness)
+        
+        best_fitness,best_position,_ = opt_alg.cal()
+        
+        #ub = ub.flatten().reshape((1,dim))
+        #lb = lb.flatten().reshape((1, dim))
+        #a = init_x.flatten()[None, :]
+        #init_x = np.tile(a, (N, 1))
+        # init_x = lb + np.random.rand(N, dim) * (ub - lb)
+        #option = opt_alg_options(init_x, object_function, (ub, lb), N, MaxIters=500)
+        #optimizer = CrayfishOptAlg(option)
+
+
+        #best_position,bestfitness = optimizer.run()
+        print( best_fitness)
         print(best_position)
 
         camsys.set_parameters(best_position.reshape(6, -1))
+
 
     def get_implict_function(self):
         """
