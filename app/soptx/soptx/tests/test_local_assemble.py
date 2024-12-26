@@ -33,33 +33,41 @@ E = 1
 nu = 0.3
 linear_elastic_material = LinearElasticMaterial(name='E_nu', 
                                                 elastic_modulus=E, poisson_ratio=nu, 
-                                                hypo='3D', device=bm.get_device(mesh))
+                                                hypo='plane_stress', device=bm.get_device(mesh))
 integrator = LinearElasticIntegrator(material=linear_elastic_material, q=q)
 integrator.keep_data(True)
-integrator_fsu = LinearElasticIntegrator(material=linear_elastic_material, 
-                                        q=q, method='fast_stress_uniform')
-integrator_fsu.keep_data(True)
+integrator_vu = LinearElasticIntegrator(material=linear_elastic_material,
+                                        q=q, method='voigt_uniform')
+integrator_vu.keep_data(True)
 integrator_fs = LinearElasticIntegrator(material=linear_elastic_material,
                                         q=q, method='fast_stress')
 integrator_fs.keep_data(True)
+integrator_fsu = LinearElasticIntegrator(material=linear_elastic_material, 
+                                        q=q, method='fast_stress_uniform')
+integrator_fsu.keep_data(True)
 t.send('准备')
 
 KE = integrator.assembly(tensor_space)
 t.send('标准1')
 KE_cache = integrator.assembly(tensor_space)
 t.send('标准2')
-KE_fsu = integrator_fsu.fast_assembly_stress_uniform(tensor_space)
-t.send('一致快速组装1')
-KE_fsu_cache = integrator_fsu.fast_assembly_stress_uniform(tensor_space)
-t.send('一致快速组装2')
+KE_vu = integrator_vu.voigt_assembly_uniform(tensor_space)
+t.send('voigt一致网格1')
+KE_vu_cache = integrator_vu.voigt_assembly_uniform(tensor_space)
+t.send('voigt一致网格2')
 KE_fs = integrator_fs.fast_assembly_stress(tensor_space)
 t.send('快速组装1')
 KE_fs_cache = integrator_fs.fast_assembly_stress(tensor_space)
 t.send('快速组装2')
+KE_fsu = integrator_fsu.fast_assembly_stress_uniform(tensor_space)
+t.send('快速组装一致网格1')
+KE_fsu_cache = integrator_fsu.fast_assembly_stress_uniform(tensor_space)
+t.send('快速组装一致网格2')
 t.send(None)
-
-error1 = bm.sum(bm.abs(KE[0] - KE_fs[0]))
-error2 = bm.sum(bm.abs(KE[0] - KE_fsu[0]))
+error1 = bm.sum(bm.abs(KE[0] - KE_vu[0]))
+error2 = bm.sum(bm.abs(KE[0] - KE_fs[0]))
+error3 = bm.sum(bm.abs(KE[0] - KE_fsu[0]))
 print(f"error1: {error1}")
 print(f"error2: {error2}")
+print(f"error3: {error3}")
 print("----------------")
