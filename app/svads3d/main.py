@@ -26,7 +26,9 @@ if __name__ == '__main__':
     #ptype = PartitionType("nonoverlap", np.pi/6)
 
     feature_points = [data[name+"_feature_points"] for name in data['name']]
-    pictures = [Picture(data_path, picture, fp) for picture, fp in zip(data['pictures'], feature_points)]
+    pictures = [Picture(data_path, picture, fp, pic_folder) for picture, fp,
+                pic_folder in 
+                zip(data['pictures'], feature_points, data['pic_folder'])]
 
     cameras = [Camera(pic, data_path, chessboard_dir, loc, axes) 
                for pic, chessboard_dir, loc, axes in 
@@ -38,7 +40,8 @@ if __name__ == '__main__':
     plotter = OpenGLPlotter()
 
     screen.display(plotter)
-    plotter.run()
+    plotter.run_pic()
+    #plotter.run()
 
 
 

@@ -1,4 +1,5 @@
 from OpenGL.GL import *
+from OpenGL.GLU import *
 from PIL import Image
 import glfw
 from ctypes import c_void_p
@@ -10,6 +11,7 @@ import ipdb
 from gl_mesh import GLMesh
 from coordinate_axes import CoordinateAxes
 from kernel import calculate_rotation_matrix
+import os
 
 
 class OpenGLPlotter:
@@ -33,6 +35,10 @@ class OpenGLPlotter:
         self.bgColor = (0.1, 0.2, 0.3, 1.0)   # 深海军蓝色背景
 
         self.transform = np.identity(4, dtype=np.float32)
+
+        self.zNear = 0.1  # 近平面
+        self.zFar = 100.0  # 远平面
+
         
         self.window = glfw.create_window(width, height, title, None, None)
         if not self.window:
@@ -183,18 +189,21 @@ class OpenGLPlotter:
 
         self.projection[3, 2] = -1
 
-    def add_mesh(self, node, cell=None, texture_paths=[], flip='LR'):
+    def add_mesh(self, node, cell=None, texture_paths=[], flip='LR', 
+                 texture_folders = []):
         logger.info(f"Add GLMesh with {len(node)} nodes!")
         if len(texture_paths) < 2:
             self.meshes.append(GLMesh(node, 
                 cell=cell, 
                 texture_paths=texture_paths,
+                texture_folders=texture_folders,
                 texture_unit=self.texture_unit, flip=flip, 
                 shader_program=self.general_shader_program))
         else:
             self.meshes.append(GLMesh(node, 
                 cell=cell, 
                 texture_paths=texture_paths,
+                texture_folders=texture_folders,
                 texture_unit=self.texture_unit, flip=flip, 
                 shader_program=self.mix_shader_program))
         self.texture_unit += len(texture_paths)
@@ -246,7 +255,27 @@ class OpenGLPlotter:
         else:
             logger.error("Transform location is invalid.")
 
-    def run(self):
+    def save_screenshot(self, file_path):
+        """
+        @brief 保存屏幕截图
+        """
+        # 获取窗口的宽度和高度
+        width, height = glfw.get_framebuffer_size(self.window)
+
+        # 创建一个空的 numpy 数组来存储图像数据
+        data = glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE)
+
+        # 将数据转为 numpy 数组并调整颜色通道的顺序（OpenGL 默认是从下到上，PIL 默认从上到下）
+        img_data = np.frombuffer(data, dtype=np.uint8).reshape(height, width, 3)
+
+        # Flip the image vertically because OpenGL stores images bottom to top
+        img_data = np.flipud(img_data)
+
+        # 使用 PIL 保存图片
+        image = Image.fromarray(img_data)
+        image.save(file_path)
+
+    def run_pic(self):
         """
         @brief 
         """
@@ -263,9 +292,67 @@ class OpenGLPlotter:
             # 只显示背面
             glEnable(GL_CULL_FACE)
             glCullFace(GL_BACK)
+            #glCullFace(GL_FRONT)
 
             for mesh in self.meshes:
                 mesh.draw(self.mode)
+
+            # 关闭深度测试，确保坐标轴总是绘制在最前面
+            # glDisable(GL_DEPTH_TEST)
+
+            # 渲染坐标轴
+            # self.coordinate_axes.render(self.projection, view_for_axes, np.identity(4))
+
+            # 重新启用深度测试
+            # glEnable(GL_DEPTH_TEST)
+
+            glfw.swap_buffers(self.window)
+
+        glfw.terminate()
+
+
+    def run(self):
+        """
+        @brief 
+        """
+        allfolder = [] # 所有的纹理文件夹
+        for mesh in self.meshes:
+            allfolder = allfolder + mesh.texture_folders # 添加每个mesh的纹理文件夹
+        allfolder = list(set(allfolder)) # 去重
+
+        namemap = {allfolder[i]:i for i in range(len(allfolder))} # 文件夹名字到索引的映射
+
+        allimgs = [] # 所有的纹理图片数据
+        for folder in allfolder:
+            allimgs.append(self.meshes[0].get_folder_textures(folder)) # 获取每个文件夹的纹理图片数据
+
+        L = min([len(textures) for textures in allimgs]) # 所有纹理图片数据的最小长度
+        frame_count = 0
+        while not glfw.window_should_close(self.window):
+            glfw.poll_events()
+            
+            # 清除颜色缓冲区和深度缓冲区
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+            glClearColor(*self.bgColor)
+
+            self._bind_uinform(self.mix_shader_program)
+            self._bind_uinform(self.general_shader_program)
+
+            # 只显示背面
+            glEnable(GL_CULL_FACE)
+            glCullFace(GL_BACK)
+            #glCullFace(GL_FRONT)
+
+            #for mesh in self.meshes:
+            #    mesh.draw(self.mode)
+            for mesh in self.meshes:
+                meshimg = [allimgs[namemap[folder]][frame_count] for folder in mesh.texture_folders]
+                mesh.redraw(self.mode, meshimg)
+            frame_count = (frame_count + 1) % L
+
+            screenshot_path = f"screenshots/frame_{frame_count:04d}.png"  # 以帧编号命名
+            self.save_screenshot(screenshot_path)
+                
 
             # 关闭深度测试，确保坐标轴总是绘制在最前面
             # glDisable(GL_DEPTH_TEST)
@@ -387,6 +474,19 @@ class OpenGLPlotter:
             scale_factor = 1.0 / scale_factor
         # 更新变换矩阵
         self.transform[:3, :3] *= scale_factor
+
+        fovy = 45.0  # 视场角 (度)
+        width, height = glfw.get_framebuffer_size(window)
+        aspect = width / height  # 宽高比 
+
+        # 更新透视投影的近平面和远平面，避免裁剪
+        self.zNear = max(0.1, self.zNear * scale_factor)  # 防止 zNear 变为负数或零
+        self.zFar = self.zFar * scale_factor
+
+        # 更新投影矩阵
+        gluPerspective(fovy, aspect, self.zNear, self.zFar)
+
+
         logger.debug("Zooming: {}".format("In" if scale_factor > 1 else "Out"))
 
 
