@@ -5,7 +5,7 @@ from typing import Union
 from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
-from fealpy.iopt import COA
+#from fealpy.iopt import COA
 from meshing_type import MeshingType
 from partition_type import PartitionType
 from dataclasses import dataclass
@@ -22,7 +22,7 @@ class OverlapGroundMesh:
     @param uv1: 网格点在相机 1 的图像中的 uv 坐标
     @param w:   网格点上的图像在相机 0 中的权重
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam0 : int = None
     cam1 : int = None
     uv0  : np.ndarray = None
@@ -44,7 +44,7 @@ class OverlapEllipsoidMesh:
     @param uv1: 网格点在相机 1 的图像中的 uv 坐标
     @param w:   网格点上的图像在相机 0 中的权重
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam0 : int = None
     cam1 : int = None
     didx0: np.ndarray = None
@@ -63,7 +63,7 @@ class NonOverlapGroundMesh:
     @param cam: 相机
     @param uv: 网格点在相机的图像中的 uv 坐标
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam  : int = None
     uv   : np.ndarray = None
 
@@ -77,7 +77,7 @@ class NonOverlapEllipsoidMesh:
     @param dval: 狄利克雷边界条件的节点值
     @param uv: 网格点在相机的图像中的 uv 坐标
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam  : int = None
     didx : np.ndarray = None
     dval : np.ndarray = None
@@ -117,8 +117,8 @@ class Screen:
         self.eillposid_overlapmesh = []
         self.eillposid_nonoverlapmesh = []
 
-        self.optimize()
-        self.draw_frature_points()
+        #self.optimize()
+        #self.draw_frature_points()
         self.meshing()
         self.compute_uv()
 
@@ -653,7 +653,8 @@ class Screen:
         node = pmesh.mesh.entity('node')
         cell = pmesh.mesh.entity('cell')
         no = np.concatenate((node[cell].reshape(-1, 3), pmesh.uv[cell].reshape(-1, 2)), axis=-1, dtype=np.float32)
-        plotter.add_mesh(no, cell=None, texture_paths=[cam.picture.fname])
+        plotter.add_mesh(no, cell=None, texture_paths=[cam.picture.fname], 
+                         texture_folders=[cam.picture.pic_folder])
 
     def _display_overlap_mesh(self, plotter, mesh):
         cam0 = self.camera_system.cameras[mesh.cam0]
@@ -666,7 +667,9 @@ class Screen:
         has_inf = np.any(np.isinf(w))
 
         no = np.concatenate((node, uv0, uv1, w), axis=-1, dtype=np.float32)
-        plotter.add_mesh(no, cell=None, texture_paths=[cam0.picture.fname, cam1.picture.fname])
+        plotter.add_mesh(no, cell=None, 
+            texture_paths = [cam0.picture.fname, cam1.picture.fname], 
+            texture_folders = [cam0.picture.pic_folder, cam1.picture.pic_folder])
 
     def display(self, plotter):
         """
