@@ -86,20 +86,16 @@ for i in range(maxit):
         mesh = LagrangeMesh.from_triangle_mesh(lmesh, p=mdegree, surface=surface)
     elif mtype == 'lquad':
         mesh = LagrangeMesh.from_quadrangle_mesh(lmesh, p=mdegree, surface=surface)
-    #fname = f"sphere_test.vtu"
-    #mesh.to_vtk(fname=fname)
     
     space = ParametricLagrangeFESpace(mesh, p=sdegree)
     NDof[i] = space.number_of_global_dofs()
 
     uI = space.interpolate(pde.solution)
 
-    #ipdb.set_trace()
     bfrom = BilinearForm(space)
     bfrom.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
     lfrom = LinearForm(space)
     lfrom.add_integrator(ScalarSourceIntegrator(pde.source, method='isopara'))
-    print("开始组装刚度矩阵和右端向量")
 
     A = bfrom.assembly(format='coo')
     F = lfrom.assembly()
@@ -109,7 +105,6 @@ for i in range(maxit):
         data = A._values
         indices = A._indices
         return coo_array((data, indices), shape=A.shape)
-    print(coo(A).shape, C.reshape(-1, 1).shape, C.shape)
     A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
     A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
 
@@ -118,7 +113,6 @@ for i in range(maxit):
     uh = space.function()
     x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
     uh[:] = -x[:-1] 
-    #tmr.send(f'第{i}次求解器时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)
 
