@@ -142,13 +142,13 @@ class Form(Generic[_I], ABC):
             chunk_size = self.chunk_sizes[key]
             if chunk_size == 0:
                 logger.debug(f"(ASSEMBLY LOCAL FULL) {key}")
-                yield self._assembly_group(key)
+                yield self._assembly_kernel(key)
             else:
                 logger.debug(f"(ASSEMBLY LOCAL ITER) {key}, {chunk_size} for each chunk")
                 yield from IntegralIter.split(int_, chunk_size)(self.space)
 
 
-# An iteration util for the `_assembly_group` method.
+# An iteration util for the `_assembly_kernel` method.
 class IntegralIter():
     def __init__(self, integrator: Integrator, /, indices_or_segments: Union[Iterable[TensorLike], TensorLike]):
         self.integrator = integrator
