@@ -336,7 +336,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     def voigt_assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(space, 'mesh', None)
-        cm, ws, detJ, D, B = self.fetch_assembly(scalar_space)
+        cm, ws, detJ, D, B = self.fetch_voigt_assembly(space)
         
         if isinstance(mesh, TensorMesh):
             KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
