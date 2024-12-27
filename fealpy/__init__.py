@@ -1,6 +1,6 @@
 import logging
 
-__version__ = '3.0.3'
+__version__ = '3.0.4'
 
 logger = logging.getLogger('fealpy')
 logger.setLevel(logging.WARNING)
