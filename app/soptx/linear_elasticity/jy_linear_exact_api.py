@@ -466,7 +466,8 @@ q = p+1
 space = LagrangeFESpace(mesh, p=p, ctype='C')
 sgdof = space.number_of_global_dofs()
 print(f"sgdof: {sgdof}")
-tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
+# tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
+tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # dof_priority
 tldof = tensor_space.number_of_local_dofs()
 tgdof = tensor_space.number_of_global_dofs()
 print(f"tgdof: {tgdof}")
@@ -488,8 +489,6 @@ print(f"KE_true_min: {bm.min(KE_true)}")
 # 刚度矩阵
 E = 2.1e5
 nu = 0.3
-# E = 1e6
-# nu = 0.25
 lam = (E * nu) / ((1.0 + nu) * (1.0 - 2.0 * nu))
 mu = E / (2.0 * (1.0 + nu))
 linear_elastic_material = LinearElasticMaterial(name='E_nu', 
@@ -497,35 +496,10 @@ linear_elastic_material = LinearElasticMaterial(name='E_nu',
                                                 hypo='3D', device=bm.get_device(mesh))
 integrator_K_bbar = LinearElasticIntegrator(material=linear_elastic_material, 
                                             q=q, method='C3D8_BBar')
-KE_bbar_yz_xz_xy = integrator_K_bbar.c3d8_bbar_assembly(space=tensor_space)
-integrator_K_bbar.keep_data(True)
-_, _, D, B_BBar = integrator_K_bbar.fetch_c3d8_bbar_assembly(tensor_space)
-KE0_bbar_yz_xz_xy = KE_bbar_yz_xz_xy[0].round(4)
-print(f"KE0_bbar_yz_xz_xy_max: {bm.max(KE0_bbar_yz_xz_xy)}")
-print(f"KE0_bbar_yz_xz_xy_abs_min: {bm.min(bm.abs(KE0_bbar_yz_xz_xy))}")
-print(f"KE0_bbar_yz_xz_xy_min: {bm.min(KE0_bbar_yz_xz_xy)}")
-KE_bbar_yz_xz_xy = KE_bbar_yz_xz_xy.round(4)
-print(f"KE_bbar_yz_xz_xy_max: {bm.max(KE_bbar_yz_xz_xy)}")
-print(f"KE_bbar_yz_xz_xy_abs_min: {bm.min(bm.abs(KE_bbar_yz_xz_xy))}")
-print(f"KE_bbar_yz_xz_xy_min: {bm.min(KE_bbar_yz_xz_xy)}")
-
-integrator_K_sri = LinearElasticIntegrator(material=linear_elastic_material,
-                                           q=q, method='C3D8_SRI')
-KE_sri_yz_xz_xy = integrator_K_sri.c3d8_sri_assembly(space=tensor_space)
-KE0_sri_yz_xz_xy = KE_sri_yz_xz_xy[0].round(4)
-print(f"KE0_sri_yz_xz_xy_max: {bm.max(KE0_sri_yz_xz_xy)}")
-print(f"KE0_sri_yz_xz_xy_min: {bm.min(KE0_sri_yz_xz_xy)}")
-
-integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
-                                        q=q, method='voigt')
-KE_yz_xz_xy = integrator_K.voigt_assembly(space=tensor_space)
-KE0_yz_xz_xy = KE_yz_xz_xy[0].round(4)
-print(f"KE0_yz_xz_xy_max: {bm.max(KE0_yz_xz_xy)}")
-print(f"KE0_yz_xz_xy_min: {bm.min(KE0_yz_xz_xy)}")
-
-
+KE_bbar= integrator_K_bbar.c3d8_bbar_assembly(space=tensor_space)
+KE0_bbar = KE_bbar[0].round(4)
 bform = BilinearForm(tensor_space)
-bform.add_integrator(integrator_K_sri)
+bform.add_integrator(integrator_K_bbar)
 K = bform.assembly(format='csr')
 Kdense = K.to_dense()
 values = K.values()
@@ -552,11 +526,11 @@ boundary_nodes = node[boundary_nodes_idx]
 boundary_nodes_u = bm.concatenate([u(boundary_nodes), v(boundary_nodes), w(boundary_nodes)], axis=1)
 
 export_to_inp_by_u(
-            filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/box_linear_exact_abaqus_fealpy.inp', 
+            filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/inp/box_linear_exact_ansys.inp', 
             nodes=node, elements=cell, 
             boundary_nodes_idx=boundary_nodes_idx, boundary_nodes_u=boundary_nodes_u,
             young_modulus=E, poisson_ratio=nu, density=7.85e-9, 
-            used_app='abaqus', mesh_type='hex'
+            used_app='ansys', mesh_type='hex'
         )
 
 # 边界条件处理

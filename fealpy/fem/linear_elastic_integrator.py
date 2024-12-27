@@ -36,7 +36,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def fetch_assembly(self, space: _FS):
         index = self.index
-        mesh = getattr(space, 'mesh', None)
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
     
         if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The LinearElasticIntegrator only support spaces on"
@@ -44,10 +45,10 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
     
         cm = mesh.entity_measure('cell', index=index)
-        q = space.p+3 if self.q is None else self.q
+        q = scalar_space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi = space.grad_basis(bcs, index=index, variable='x')
+        gphi = scalar_space.grad_basis(bcs, index=index, variable='x')
 
         if isinstance(mesh, TensorMesh):
             J = mesh.jacobi_matrix(bcs)
@@ -57,7 +58,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             detJ = None
             
         return cm, bcs, ws, gphi, detJ
-    
+
     @enable_cache
     def fetch_voigt_assembly(self, space: _FS):
         index = self.index
@@ -75,14 +76,41 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = scalar_space.grad_basis(bcs, index=index, variable='x')
 
-        J = mesh.jacobi_matrix(bcs)
-        detJ = bm.linalg.det(J)
+        if isinstance(mesh, TensorMesh):
+            J = mesh.jacobi_matrix(bcs)
+            detJ = bm.linalg.det(J)
+        else:
+            J = None
+            detJ = None
 
         D = self.material.elastic_matrix(bcs)
         B = self.material.strain_matrix(dof_priority=space.dof_priority, 
                                         gphi=gphi)
             
         return cm, ws, detJ, D, B
+    
+    @enable_cache
+    def fetch_voigt_assembly_uniform(self, space: _FS):
+        index = self.index
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
+    
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+    
+        cm = mesh.entity_measure('cell', index=index)
+        q = scalar_space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        gphi = scalar_space.grad_basis(bcs, index=index, variable='x')
+
+        D = self.material.elastic_matrix(bcs)
+        B = self.material.strain_matrix(dof_priority=space.dof_priority, 
+                                        gphi=gphi)
+            
+        return cm, ws, D, B
 
     @enable_cache
     def fetch_fast_assembly(self, space: _FS):
@@ -169,7 +197,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
     
         cm = mesh.entity_measure('cell', index=index)
-        q = scalar_space.p+3 if self.q is None else self.q
+        q = scalar_space.p+1 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = scalar_space.grad_basis(bcs, index=index, variable='x')
@@ -185,35 +213,10 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             
         return ws, detJ, D, B
 
-    @enable_cache
-    def fetch_c3d8_sri_assembly(self, space: _FS):
-        index = self.index
-        mesh = getattr(space, 'mesh', None)
-        if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
-                               f"homogeneous meshes, but {type(mesh).__name__} is"
-                               "not a subclass of HomoMesh.")
-    
-        q1 = 1
-        qf1 = mesh.quadrature_formula(q1)
-        bcs1, ws1 = qf1.get_quadrature_points_and_weights()
-        gphi1 = space.grad_basis(bcs1, index=index, variable='x')
-        J1 = mesh.jacobi_matrix(bcs1)
-        detJ1 = bm.linalg.det(J1)
-
-        q2 = 2
-        qf2 = mesh.quadrature_formula(q2)
-        bcs2, ws2 = qf2.get_quadrature_points_and_weights()
-        gphi2 = space.grad_basis(bcs2, index=index, variable='x')
-        J2 = mesh.jacobi_matrix(bcs2)
-        detJ2 = bm.linalg.det(J2)
-
-        return bcs1, ws1, gphi1, detJ1, bcs2, ws2, gphi2, detJ2
-
     def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
-        cm, bcs, ws, gphi, detJ = self.fetch_assembly(scalar_space)
+        cm, bcs, ws, gphi, detJ = self.fetch_assembly(space)
 
         if isinstance(mesh, TensorMesh):
             J = mesh.jacobi_matrix(bcs)
@@ -334,7 +337,6 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     
     @assemblymethod('voigt')
     def voigt_assembly(self, space: _TS) -> TensorLike:
-        scalar_space = space.scalar_space
         mesh = getattr(space, 'mesh', None)
         cm, ws, detJ, D, B = self.fetch_voigt_assembly(space)
         
@@ -349,74 +351,12 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     
     @assemblymethod('voigt_uniform')
     def voigt_assembly_uniform(self, space: _TS) -> TensorLike:
-        scalar_space = space.scalar_space
-        cm, bcs, ws, gphi, _ = self.fetch_assembly(scalar_space)
-
-        D = self.material.elastic_matrix(bcs)
-        B = self.material.strain_matrix(dof_priority=space.dof_priority, 
-                                        gphi=gphi)
+        cm, ws, D, B = self.fetch_voigt_assembly_uniform(space)
         
         KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij', ws, cm, B, D, B)
             
         return KK
     
-    @assemblymethod('fast_stress_uniform')
-    def fast_assembly_stress_uniform(self, space: _TS) -> TensorLike:
-        scalar_space = space.scalar_space
-        mesh = getattr(scalar_space, 'mesh', None)
-        cm, JG, M = self.fetch_fast_assembly_uniform(scalar_space)
-        
-        GD = mesh.geo_dimension()
-        NC = mesh.number_of_cells()
-        ldof = scalar_space.number_of_local_dofs()
-        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
-
-        D = self.material.elastic_matrix()
-        if D.shape[1] != 1:
-            raise ValueError("fast_assembly_stress currently only supports elastic matrices "
-                            "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-        D00 = D[..., 0, 0]  # E / (1-\nu^2) * 1
-        D01 = D[..., 0, 1]  # E / (1-\nu^2) * \nu
-        D22 = D[..., 2, 2]  # E / (1-\nu^2) * (1-nu)/2
-
-        # A = bm.einsum('ijmn, cam, cbn, c -> cijab', M, JG, JG, cm)  # (NC, LDOF, LDOF, GD, GD)
-        # A_xx = A[..., 0, 0]
-        # A_yy = A[..., 1, 1]
-        # A_xy = A[..., 0, 1]
-        # A_yx = A[..., 1, 0]
-        A_xx = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 0], JG[..., 0], cm)  # (NC, LDOF, LDOF)
-        A_yy = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 1], JG[..., 1], cm)  # (NC, LDOF, LDOF)
-        A_xy = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 0], JG[..., 1], cm)  # (NC, LDOF, LDOF)
-        A_yx = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 1], JG[..., 0], cm)  # (NC, LDOF, LDOF)
-        
-        # 填充刚度矩阵
-        if space.dof_priority:
-            # Fill the diagonal part
-            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), 
-                        D00 * A_xx + D22 * A_yy)
-            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), 
-                        D00 * A_yy + D22 * A_xx)
-
-            # Fill the off-diagonal part
-            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), 
-                        D01 * A_xy + D22 * A_yx)
-            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), 
-                        D01 * A_yx + D22 * A_xy)
-        else:
-            # Fill the diagonal part
-            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
-                        D00 * A_xx + D22 * A_yy)
-            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
-                        D00 * A_yy + D22 * A_xx)
-
-            # Fill the off-diagonal part
-            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
-                        D01 * A_xy + D22 * A_yx)
-            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
-                        D01 * A_yx + D22 * A_xy)
-
-        return KK
-
     @assemblymethod('fast_strain')
     def fast_assembly_strain(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
@@ -505,6 +445,63 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             # A_yy = A[..., 1, 1]  # (NC, LDOF, LDOF)
             # A_xy = A[..., 0, 1]  # (NC, LDOF, LDOF)
             # A_yx = A[..., 1, 0]  # (NC, LDOF, LDOF)
+        
+        # 填充刚度矩阵
+        if space.dof_priority:
+            # Fill the diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), 
+                        D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), 
+                        D00 * A_yy + D22 * A_xx)
+
+            # Fill the off-diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), 
+                        D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), 
+                        D01 * A_yx + D22 * A_xy)
+        else:
+            # Fill the diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
+                        D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
+                        D00 * A_yy + D22 * A_xx)
+
+            # Fill the off-diagonal part
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
+                        D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
+                        D01 * A_yx + D22 * A_xy)
+
+        return KK
+    
+    @assemblymethod('fast_stress_uniform')
+    def fast_assembly_stress_uniform(self, space: _TS) -> TensorLike:
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
+        cm, JG, M = self.fetch_fast_assembly_uniform(scalar_space)
+        
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        ldof = scalar_space.number_of_local_dofs()
+        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
+
+        D = self.material.elastic_matrix()
+        if D.shape[1] != 1:
+            raise ValueError("fast_assembly_stress currently only supports elastic matrices "
+                            "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
+        D00 = D[..., 0, 0]  # E / (1-\nu^2) * 1
+        D01 = D[..., 0, 1]  # E / (1-\nu^2) * \nu
+        D22 = D[..., 2, 2]  # E / (1-\nu^2) * (1-nu)/2
+
+        # A = bm.einsum('ijmn, cam, cbn, c -> cijab', M, JG, JG, cm)  # (NC, LDOF, LDOF, GD, GD)
+        # A_xx = A[..., 0, 0]
+        # A_yy = A[..., 1, 1]
+        # A_xy = A[..., 0, 1]
+        # A_yx = A[..., 1, 0]
+        A_xx = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 0], JG[..., 0], cm)  # (NC, LDOF, LDOF)
+        A_yy = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 1], JG[..., 1], cm)  # (NC, LDOF, LDOF)
+        A_xy = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 0], JG[..., 1], cm)  # (NC, LDOF, LDOF)
+        A_yx = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 1], JG[..., 0], cm)  # (NC, LDOF, LDOF)
         
         # 填充刚度矩阵
         if space.dof_priority:
@@ -693,47 +690,4 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
                         ws, detJ, B, D, B)
 
-        return KK
-    
-    @assemblymethod('C3D8_SRI')
-    def c3d8_sri_assembly(self, space: _TS) -> TensorLike:
-        scalar_space = space.scalar_space
-        # bcs1, ws1, gphi1, detJ1, bcs2, ws2, gphi2, detJ2 = \
-        #     self.fetch_c3d8_sri_assembly(scalar_space)
-        
-        index = self.index
-        mesh = getattr(space, 'mesh', None)
-    
-        q1 = 1
-        qf1 = mesh.quadrature_formula(q1)
-        bcs1, ws1 = qf1.get_quadrature_points_and_weights()
-        gphi1 = scalar_space.grad_basis(bcs1, index=index, variable='x')
-        J1 = mesh.jacobi_matrix(bcs1)
-        detJ1 = bm.linalg.det(J1)
-
-        q2 = 2
-        qf2 = mesh.quadrature_formula(q2)
-        bcs2, ws2 = qf2.get_quadrature_points_and_weights()
-        gphi2 = scalar_space.grad_basis(bcs2, index=index, variable='x')
-        J2 = mesh.jacobi_matrix(bcs2)
-        detJ2 = bm.linalg.det(J2)
-        
-        D_q1 = self.material.elastic_matrix(bcs1)
-        D0_q1 = D_q1[..., :3, :3] # (1, 1, 3, 3)
-        B_q1 = self.material.strain_matrix(dof_priority=space.dof_priority, 
-                                        gphi=gphi1, 
-                                        correction='SRI')
-        B0_q1 = B_q1[..., :3, :]  # (NC, NQ, 3, TLDOF)
-
-        D_q2 = self.material.elastic_matrix(bcs2)
-        B_q2 = self.material.strain_matrix(dof_priority=space.dof_priority, 
-                                        gphi=gphi2, 
-                                        correction=None)
-
-        KK = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
-                        ws2, detJ2, B_q2, D_q2, B_q2)
-        KK0 = bm.einsum('q, cq, cqki, cqkl, cqlj -> cij',
-                        ws1, detJ1, B0_q1, D0_q1, B0_q1)
-        KK += KK0
-                        
         return KK
