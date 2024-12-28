@@ -74,6 +74,19 @@ class TensorFunctionSpace(FunctionSpace):
     def grad_basis(self, p: TensorLike, index: Index=_S, **kwargs) -> TensorLike:
         gphi = self.scalar_space.grad_basis(p, index, **kwargs)
         return generate_tensor_grad_basis(gphi, self.dof_shape, self.dof_priority)
+    
+     
+    @barycentric
+    def cell_basis_on_edge(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
+        result = self.scalar_space.cell_basis_on_edge(bc, eindex)
+        return generate_tensor_basis(result, self.dof_shape, self.dof_priority)
+    
+    @barycentric
+    def cell_grad_basis_on_edge(self, bc: TensorLike, eindex: TensorLike, 
+                                isleft = True) -> TensorLike:
+        result = self.scalar_space.cell_grad_basis_on_edge(bc, eindex, isleft) 
+        return generate_tensor_grad_basis(result, self.dof_shape, self.dof_priority)
+
 
     def cell_to_dof(self, index: Index=_S) -> TensorLike:
         """Get the cell to dof mapping.
