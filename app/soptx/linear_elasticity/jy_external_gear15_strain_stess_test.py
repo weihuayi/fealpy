@@ -17,8 +17,6 @@ from app.gearx.utils import *
 
 from fealpy.mesh import HexahedronMesh
 
-bm.set_backend('numpy')
-
 def compute_strain_stress_1(space, uh, mu, lam):
     """在积分点处计算应变和应力"""
     mesh = space.mesh
@@ -89,47 +87,42 @@ def compute_strain_stress_3(tensor_space, uh, B_BBar, D):
     
     return strain, stress
 
-def compute_equivalent_strain(strain, nu):
-    exx = strain[..., 0, 0]
-    eyy = strain[..., 1, 1]
-    ezz = strain[..., 2, 2]
-    gamma_xy = strain[..., 0, 1]
-    gamma_yz = strain[..., 1, 2]
-    gamma_xz = strain[..., 0, 2]
+def read_mtx_file(filename):
+    """
+    读取 mtx 文件并将数据转换为三维数组
+        
+    返回:
+    numpy.ndarray
+        形状为 (2, 24, 24) 的三维数组
+    """
+    result = bm.zeros((2, 24, 24))
     
-    d1 = exx - eyy
-    d2 = eyy - ezz
-    d3 = ezz - exx
+    # 读取文件
+    with open(filename, 'r') as file:
+        for line in file:
+            # 跳过空行
+            if not line.strip():
+                continue
+                
+            # 将每行分割成数组
+            parts = line.strip().split()
+            if len(parts) == 4:  # 确保行格式正确
+                # 解析数据
+                matrix_idx = int(parts[0])     # 矩阵索引 (0-NC-1)
+                i = int(parts[1]) - 1          # 行索引 (0-23)
+                j = int(parts[2]) - 1          # 列索引 (0-23)
+                value = float(parts[3])        # 值
+                
+                # 将值存入对应位置
+                if 0 <= matrix_idx < 2 and 0 <= i < 24 and 0 <= j < 24:
+                    result[matrix_idx, i, j] = value
     
-    equiv_strain = (d1**2 + d2**2 + d3**2 + 6.0 * (gamma_xy**2 + gamma_yz**2 + gamma_xz**2))
-    
-    # equiv_strain = bm.sqrt(equiv_strain / 2.0) / (1.0 + nu)
-    equiv_strain = bm.sqrt(equiv_strain / 2.0) / (1.0)
-    
-    return equiv_strain
+    return result
 
-def compute_equivalent_stress(stress, nu):
-    sxx = stress[..., 0, 0]
-    syy = stress[..., 1, 1]
-    szz = stress[..., 2, 2]
-    sxy = stress[..., 0, 1]
-    syz = stress[..., 1, 2]
-    sxz = stress[..., 0, 2]
-    
-    d1 = sxx - syy
-    d2 = syy - szz
-    d3 = szz - sxx
-    
-    equiv_stress = (d1**2 + d2**2 + d3**2 + 6.0 * (sxy**2 + syz**2 + sxz**2))
-
-    equiv_stress = bm.sqrt(equiv_stress / 2.0)
-    
-    return equiv_stress
+bm.set_backend('numpy')
 
 with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/external_gear_data_part.pkl', 'rb') as f:
     data = pickle.load(f)
-
-# # Ansys 位移结果
 
 external_gear = data['external_gear']
 hex_mesh = data['hex_mesh']
@@ -192,14 +185,17 @@ space = LagrangeFESpace(mesh, p=p, ctype='C')
 scalar_gdof = space.number_of_global_dofs()
 print(f"gdof: {scalar_gdof}")
 cell2dof = space.cell_to_dof()
-tensor_space = TensorFunctionSpace(space, shape=(3, -1)) # dof_priority
+tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
 
+
+cell2tdof = tensor_space.cell_to_dof()
+map = [ 0,  1,  2, 12, 13, 14,  9, 10, 11, 21, 22, 23,  3,  4,  5, 15, 16,
+       17,  6,  7,  8, 18, 19, 20]
 tgdof = tensor_space.number_of_global_dofs()
 print(f"tgdof: {tgdof}")
 tldof = tensor_space.number_of_local_dofs()
-cell2tdof = tensor_space.cell_to_dof()
 
-# 节点载荷的索引
+# 节点载荷的索引 (需要去重)
 load_node_indices0 = cell[target_cell_idx].flatten() # (15*8, )
 unique_nodes, first_indices = bm.unique(load_node_indices0, return_index=True)
 sort1_indices = bm.sort(first_indices)
@@ -209,6 +205,7 @@ if tensor_space.dof_priority:
     dof_indices = bm.stack([scalar_gdof * d + load_node_indices for d in range(GD)], axis=1)  # (15*8, GD)
 else:
     dof_indices = bm.stack([load_node_indices * GD + d for d in range(GD)], axis=1)  # (15*8, GD)
+
 
 phi_loads = []
 for bcs in bcs_list:
@@ -227,16 +224,24 @@ F = COOTensor(indices = bm.empty((1, 0), dtype=bm.int32, device=bm.get_device(sp
             spshape = (tgdof, ))
 indices = cell2tdof.reshape(1, -1)
 F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
+non_zero_indices = bm.nonzero(F)[0]
+non_zero_values = F[non_zero_indices]
+F_non_zero = bm.concatenate([non_zero_indices[:, None], non_zero_values[:, None]], axis=1)
+np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/F_without_dc.csv', 
+           F, delimiter=',', fmt='%s')
+np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/F_non_zero_without_dc.csv', 
+           F_non_zero, delimiter='', fmt=['%10d', '%20.6f'])
+
 
 # 从全局载荷向量中提取有载荷节点处的值
 F_load_nodes = F[dof_indices] # (15*8, GD)
 
 fixed_node_index = bm.where(is_inner_node)[0]
-export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/inp/external_gear_abaqus.inp', 
+export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/inp/external_gear_ansys.inp', 
               nodes=node, elements=cell, 
               fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
               young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
-              used_app='abaqus', mesh_type='hex')
+              used_app='ansys', mesh_type='hex')
 
 E = 206e3
 nu = 0.3
@@ -245,6 +250,8 @@ mu = E / (2.0 * (1.0 + nu))
 linear_elastic_material = LinearElasticMaterial(name='E_nu', 
                                                 elastic_modulus=E, poisson_ratio=nu, 
                                                 hypo='3D', device=bm.get_device(mesh))
+
+# B-Bar 修正的刚度矩阵
 integrator_K0 = LinearElasticIntegrator(material=linear_elastic_material, 
                                         q=q, method='voigt')
 integrator_K0.keep_data(True)
@@ -256,6 +263,7 @@ _, _, D, B_BBar = integrator_K.fetch_c3d8_bbar_assembly(tensor_space)
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
+
 
 # 处理 Dirichlet 边界条件
 scalar_is_bd_dof = bm.zeros(scalar_gdof, dtype=bm.bool)
@@ -276,7 +284,7 @@ uh = tensor_space.function()
 uh[:] = spsolve(K, F, solver="mumps")
 
 # 计算残差向量和范数
-residual = K.matmul(uh[:]) - F  # 使用 CSRTensor 的 matmul 方法
+residual = K.matmul(uh[:]) - F  
 residual_norm = bm.sqrt(bm.sum(residual * residual))
 print(f"Final residual norm: {residual_norm:.6e}")
 
@@ -284,114 +292,97 @@ if tensor_space.dof_priority:
     uh_show = uh.reshape(GD, NN).T
 else:
     uh_show = uh.reshape(NN, GD)
-cuh = uh_show[cell] # (NC, NCN, GD)
-map_cuh = [0, 1, 3, 2, 4, 5, 7, 6]
-print(f"cuh_0-{cuh[0].shape}, {cell[0]}\n {cuh[0]}")
-print(f"cuh_0_map-{cuh[0].shape}, {cell[0][map_cuh]}\n {cuh[0][map_cuh, :]}")
-# print(f"cuh_1-{cuh[1].shape}, {cell[1]}\n {cuh[1]}")
+
+uh_x = uh_show[:, 0]
+uh_y = uh_show[:, 1]
+uh_z = uh_show[:, 2]
 
 uh_magnitude = bm.linalg.norm(uh_show, axis=1)
 
 mesh.nodedata['uh'] = uh_show[:]
 mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
 
-cuh_0_ansys = bm.tensor([[0.0000,     0.0000,     0.000],
-                        [-6.4276e-4, -1.3507e-3, -4.7196e-4],
-                        [0.0000,     0.0000,     0.000],
-                        [-6.0845e-4, -1.3320e-3, -4.4468e-4],
-                        [0.0000,     0.0000,     0.000],
-                        [-5.0779e-4, -1.5781e-3, -2.2451e-4],
-                        [0.0000,     0.0000,     0.000],
-                        [-4.8505e-4, -1.5615e-3, -2.1318e-4]], dtype=bm.float64)
-print(f"cuh_0_ansys-{cuh_0_ansys.shape}, {[0, 24, 331, 364, 2178, 2202, 2509, 2542]}\n {cuh_0_ansys}")
-error_l2_cuh_0 = bm.linalg.norm(cuh[0][map_cuh, :] - cuh_0_ansys)
-print(f"error_l2_cuh_0: {error_l2_cuh_0:.8e}")
-error_l2_rel_cuh_0 = bm.linalg.norm(cuh[0][map_cuh, :] - cuh_0_ansys) / (bm.linalg.norm(cuh_0_ansys))
-print(f"error_l2_rel_cuh_0: {error_l2_rel_cuh_0:.8e}")
-error_max_cuh_0 = bm.max(bm.abs(cuh[0][map_cuh, :] - cuh_0_ansys))
-print(f"error_max_cuh_0: {error_max_cuh_0:.8e}")
-
-np.set_printoptions(precision=4, suppress=False)
-
 # NOTE 应变
-strain1, stress1 = compute_strain_stress_1(space, uh_show, mu, lam)
-map_es = [0, 4, 2, 6, 1, 5, 3, 7]
-print(f"strain1_0-{strain1[0].shape}, {cell2dof[0]}\n {strain1[0]}")
-print(f"strain1_0_map-{strain1[0].shape}, {cell2dof[0][map_es]}\n {strain1[0][map_es, :]}")
+# strain1, stress1 = compute_strain_stress_1(space, uh_show, mu, lam)
+# map_abaqus = [0, 4, 6, 2, 1, 5, 7, 3]
+# print(f"strain1_0-{strain1[0].shape}, {cell2dof[0]}\n {strain1[0]}")
+# print(f"strain1_0_map-{strain1[0].shape}, {cell2dof[0][map_abaqus]}\n {strain1[0][map_abaqus, :]}")
 
-strain2, stress2 = compute_strain_stress_2(tensor_space, uh, B, D)
+# strain2, stress2 = compute_strain_stress_2(tensor_space, uh, B, D)
+# error12 = bm.linalg.norm(strain1 - strain2)
+# print(f"error12: {error12:.12e}")
 
-strain3, stress3 = compute_strain_stress_3(tensor_space, uh, B_BBar, D)
-print(f"strain_BBar_0: {strain3.shape}, {cell2dof[0]}\n {strain3[0]}")
-print(f"strain_BBar_0_map: {strain3.shape}, {cell2dof[0][map_es]}\n {strain3[0][map_es, :]}")
+# NQ 轴: z-y-x
+strain3, stress3 = compute_strain_stress_3(tensor_space, uh, B_BBar, D) # (NC, NQ, 6)
+# print(f"strain_BBar_0: {strain3.shape}, {cell2dof[0]}\n {strain3[0]}")
+# qf = mesh.quadrature_formula(2)
+# bcs, wq = qf.get_quadrature_points_and_weights()
+# ps = mesh.bc_to_point(bcs)
+# print(f"ps_1:\n {ps[1]}")
+# print(f"strain_BBar_0_map: {strain3.shape}, {cell2dof[0][map_abaqus]}\n {strain3[0][map_abaqus, :]}")
+print(f"strain_BBar_1: {strain3.shape}, {cell2dof[1]}\n {strain3[1]}")
+# print(f"strain_BBar_1_map: {strain3.shape}, {cell2dof[1][map_abaqus]}\n {strain3[1][map_abaqus, :]}")
+# print(f"stess_BBar_0: {stress3.shape}, {cell2dof[0]}\n {stress3[0]}")
+# print(f"stess_BBar_0_map: {stress3.shape}, {cell2dof[0][map_abaqus]}\n {stress3[0][map_abaqus, :]}")
+# print(f"strain_BBar_1363: {strain3.shape}, {cell2dof[1363]}\n {strain3[1363]}")
+# print(f"strain_BBar_1363_map: {strain3.shape}, {cell2dof[1363][map_abaqus]}\n {strain3[1363][map_abaqus, :]}")
+# print(f"strain_BBar_1364: {strain3.shape}, {cell2dof[1364]}\n {strain3[1364]}")
+# print(f"strain_BBar_1364_map: {strain3.shape}, {cell2dof[1364][map_abaqus]}\n {strain3[1364][map_abaqus, :]}")
 
-error12 = bm.linalg.norm(strain1 - strain2)
-error13 = bm.linalg.norm(strain1 - strain3)
-print(f"error12: {error12:.12e}")
-print(f"error13: {error13:.12e}")
+# NQ 轴: z-y-x, LDOF 轴 z-y-x
+extrapolation_matrix = bm.tensor([
+            [-0.0490381057,  0.1830127019,  0.1830127019, -0.6830127019,  0.1830127019, -0.6830127019, -0.6830127019,  2.5490381057],
+            [ 0.1830127019, -0.0490381057, -0.6830127019,  0.1830127019, -0.6830127019,  0.1830127019,  2.5490381057, -0.6830127019],
+            [ 0.1830127019, -0.6830127019, -0.0490381057,  0.1830127019, -0.6830127019,  2.5490381057,  0.1830127019, -0.6830127019],
+            [-0.6830127019,  0.1830127019,  0.1830127019, -0.0490381057,  2.5490381057, -0.6830127019, -0.6830127019,  0.1830127019],
+            [ 0.1830127019, -0.6830127019, -0.6830127019,  2.5490381057, -0.0490381057,  0.1830127019,  0.1830127019, -0.6830127019],
+            [-0.6830127019,  0.1830127019,  2.5490381057, -0.6830127019,  0.1830127019, -0.0490381057, -0.6830127019,  0.1830127019],
+            [-0.6830127019,  2.5490381057,  0.1830127019, -0.6830127019,  0.1830127019, -0.6830127019, -0.0490381057,  0.1830127019],
+            [ 2.5490381057, -0.6830127019, -0.6830127019,  0.1830127019, -0.6830127019,  0.1830127019,  0.1830127019, -0.0490381057]
+            ], dtype=bm.float64) # (NQ, LDOF)
+strain3_extrapolation = bm.einsum('lq, cqj -> clj', extrapolation_matrix, strain3)
+# strain3_extrapolation = np.zeros((NC, 8, 6), dtype=np.float64)
+# for c in range(NC):
+#     for l in range(8):
+#         for j in range(6):
+#             # 初始化应变值
+#             strain_sum = 0.0
+#             for q in range(8):
+#                 strain_sum += extrapolation_matrix[l, q] * strain3[c, q, j]
+#             strain3_extrapolation[c, l, j] = strain_sum
+# ip2 = mesh.interpolation_points(p=1)
+# print(f"ip2_1:\n {node[cell2dof[1]]}")
+print(f"strain_extrapolation_BBar_0: {strain3_extrapolation.shape}, {cell2dof[0]}\n {strain3_extrapolation[0]}")
+# print(f"strain_extrapolation_BBar_0_map: {strain3_extrapolation.shape}, {cell2dof[0][map_abaqus]}\n {strain3_extrapolation[0][map_abaqus, :]}")
 
-# [xx, yy, zz, xy, yz, xz]
-strain_0_ansys = bm.tensor([
-                    [-6.4997e-4, 2.6777e-4, 4.0435e-5, -1.3961e-3, 4.7005e-5, -3.6421e-4],
-                    [-6.9321e-4, 3.2490e-4, 9.2012e-5, -1.3546e-3, 4.8227e-5, -3.6566e-4],
-                    [-6.3136e-4, 2.6192e-4, 3.8964e-5, -1.4010e-3, 4.5833e-5, -3.4739e-4],
-                    [-6.7491e-4, 3.1914e-4, 8.8178e-5, -1.3595e-3, 4.6737e-5, -3.5085e-4],
-                    [-5.6564e-4, 2.7827e-4, -4.3553e-7, -1.5713e-3, 5.8720e-5, -3.6197e-4],
-                    [-6.1220e-4, 3.3237e-4, 5.5974e-5, -1.5480e-3, 3.5611e-5, -3.6204e-4],
-                    [-5.5134e-4, 2.7262e-4, -1.8154e-5, -1.5761e-3, 5.8458e-5, -3.5106e-4],
-                    [-5.9813e-4, 3.2681e-4, 5.2232e-5, -1.5528e-3, 3.5012e-5, -3.5305e-4]
-                ], dtype=bm.float64)
-print(f"strain_0_ansys: {strain_0_ansys.shape}, {[0, 24, 331, 364, 2178, 2202, 2509, 2542]}\n {strain_0_ansys}")
+# print(f"strain_extrapolation_BBar_0_map1: {strain3_extrapolation.shape}, {cell2dof[0][map_abaqus][map_abaqus2]}\n {strain3_extrapolation[0][map_abaqus, :][map_abaqus2]}")
 
-# NOTE 应变误差
-error_l2_strain_0 = bm.linalg.norm(strain1[0][map_es, :] - strain_0_ansys)
-print(f"error_l2_strain_0: {error_l2_strain_0:.8e}")
-error_l2_rel_strain_0 = bm.linalg.norm(strain1[0][map_es, :] - strain_0_ansys) / bm.linalg.norm(strain_0_ansys)
-print(f"error_l2_rel_strain_0: {error_l2_rel_strain_0:.8e}")
-error_max_strain_0 = bm.max(bm.abs(strain1[0][map_es, :] - strain_0_ansys))
-print(f"error_max_strain_0: {error_max_strain_0:.8e}")
+print(f"strain_extrapolation_BBar_1: {strain3_extrapolation.shape}, {cell2dof[1]}\n {strain3_extrapolation[1]}")
+# print(f"strain_extrapolation_BBar_1_map: {strain3_extrapolation.shape}, {cell2dof[1][map_abaqus]}\n {strain3_extrapolation[1][map_abaqus, :]}")
+# print(f"strain_extrapolation_BBar_1_map1: {strain3_extrapolation.shape}, {cell2dof[1][map_abaqus][map_abaqus2]}\n {strain3_extrapolation[1][map_abaqus, :][map_abaqus2]}")
 
-error_l2_strain_0_BBar = bm.linalg.norm(strain3[0][map_es, :] - strain_0_ansys)
-print(f"error_l2_strain_0_BBar: {error_l2_strain_0_BBar:.8e}")
-error_l2_rel_strain_0_BBar = bm.linalg.norm(strain3[0][map_es, :] - strain_0_ansys) / bm.linalg.norm(strain_0_ansys)
-print(f"error_l2_rel_strain_0_BBar: {error_l2_rel_strain_0_BBar:.8e}")
-error_max_strain_0_BBar = bm.max(bm.abs(strain3[0][map_es, :] - strain_0_ansys)) 
-print(f"error_max_strain_0_BBar: {error_max_strain_0_BBar:.8e}")
+print(f"strain_extrapolation_BBar_1363: {strain3_extrapolation.shape}, {cell2dof[1363]}\n {strain3_extrapolation[1363]}")
+# print(f"strain_extrapolation_BBar_1363_map: {strain3_extrapolation.shape}, {cell2dof[1363][map_abaqus]}\n {strain3_extrapolation[1363][map_abaqus, :]}")
 
+print(f"strain_extrapolation_BBar_1364: {strain3_extrapolation.shape}, {cell2dof[1364]}\n {strain3_extrapolation[1364]}")
+# print(f"strain_extrapolation_BBar_1364_map: {strain3_extrapolation.shape}, {cell2dof[1364][map_abaqus]}\n {strain3_extrapolation[1364][map_abaqus, :]}")
 
-#NOTE 应力
-print(f"stress1_0: {stress1[0].shape}, {cell2dof[0]}\n {stress1[0]}")
-print(f"stress1_0_map: {stress1[0].shape}, {cell2dof[0][map_es]}\n {stress1[0][map_es, :]}")
-print(f"stress_BBar_0: {stress3.shape}, {cell2dof[0]}\n {stress3[0]}")
-print(f"stress_BBar_0_map: {stress3.shape}, {cell2dof[0][map_es]}\n {stress3[0][map_es, :]}")
-
-# [xx, yy, zz, xy, yz, xz]
-stress_0_ansys = bm.tensor([
-                        [-143.61,   1.8134, -34.210, -110.62,   3.7242, -28.857],
-                        [-142.68,  18.6460, -18.257, -107.33,   3.8211, -28.971],
-                        [-139.32,   2.2279, -33.102, -111.01,   3.6314, -27.524],
-                        [-138.75,  18.7700, -17.829, -107.71,   3.7030, -27.798],
-                        [-123.84,   9.8896, -34.274, -124.49,   4.6524, -28.679],
-                        [-123.61,  26.0630, -17.735, -122.65,   2.8215, -28.685],
-                        [-120.71,   9.8589, -33.628, -124.88,   4.6317, -27.814],
-                        [-120.82,  25.7490, -17.761, -123.03,   2.7740, -27.972]
-                    ], dtype=bm.float64)
-print(f"stress_0_ansys: {stress_0_ansys.shape}, {[0, 24, 331, 364, 2178, 2202, 2509, 2542]}\n {stress_0_ansys}")
-
-# NOTE 应力误差
-error_l2_stress_0 = bm.linalg.norm(stress1[0][map_es, :] - stress_0_ansys)
-print(f"error_l2_stress_0: {error_l2_stress_0:.8e}")
-error_l2_rel_stress_0 = bm.linalg.norm(stress1[0][map_es, :] - stress_0_ansys) / bm.linalg.norm(stress_0_ansys)
-print(f"error_l2_rel_stress_0: {error_l2_rel_stress_0:.8e}")
-error_max_stress_0 = bm.max(bm.abs(stress1[0][map_es, :] - stress_0_ansys))
-print(f"error_max_stress_0: {error_max_stress_0:.8e}")
-
-error_l2_stress_0_BBar = bm.linalg.norm(stress3[0][map_es, :] - stress_0_ansys)
-print(f"error_l2_stress_0_BBar: {error_l2_stress_0_BBar:.8e}")
-error_l2_rel_stress_0_BBar = bm.linalg.norm(stress3[0][map_es, :] - stress_0_ansys) / bm.linalg.norm(stress_0_ansys)
-print(f"error_l2_rel_stress_0_BBar: {error_l2_rel_stress_0_BBar:.8e}")
-error_max_stress_0_BBar = bm.max(bm.abs(stress3[0][map_es, :] - stress_0_ansys))
-print(f"error_max_stress_0_BBar: {error_max_stress_0_BBar:.8e}")
-
+# 计算节点应变和应力
+nstrain = bm.zeros((NN, 6), dtype=bm.float64)
+nstress = bm.zeros((NN, 6), dtype=bm.float64)
+nc = bm.zeros(NN, dtype=bm.int32)
+bm.add_at(nc, cell2dof, 1)
+# bm.add_at(nc, cell, 1)
+for i in range(6):
+    bm.add_at(nstrain[:, i], cell2dof.flatten(), strain3_extrapolation[..., i].flatten())
+    # bm.add_at(nstrain[:, i], cell.flatten(), strain3_extrapolation[..., i].flatten())
+    nstrain[:, i] /= nc
+    bm.add_at(nstress[:, i], cell2dof.flatten(), strain3_extrapolation[..., i].flatten())
+    # bm.add_at(nstress[:, i], cell.flatten(), strain3_extrapolation[..., i].flatten())
+    nstress[:, i] /= nc
+nstrain24 = nstrain[24]
+print(f"nstrain24: {nstrain24}")
+mesh.nodedata['nstrain'] = nstrain
+mesh.nodedata['nstress'] = nstress
 mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/vtu/external_gear_fealpy.vtu')
 print("-----------")

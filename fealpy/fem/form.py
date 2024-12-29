@@ -1,5 +1,8 @@
 
-from typing import Sequence, overload, Iterable, Dict, Tuple, Optional, Union, TypeVar, Generic
+from typing import (
+    Sequence, overload, Iterable, Dict, Tuple, Optional, Union, TypeVar, Generic,
+    Callable
+)
 
 from ..typing import TensorLike, Size, Index
 from ..backend import backend_manager as bm
@@ -10,13 +13,20 @@ from .. import logger
 from abc import ABC
 
 _I = TypeVar('_I', bound=Integrator)
+_IT = TypeVar('_IT')
 Self = TypeVar('Self')
+# NOTE: _Splitter is different from Index:
+# (1) TensorLike: Indices of entities, or boolean mask of entities.
+# (2) slice: Slice of entities.
+_SplitterInterface = Callable[[_FS, Integrator], Iterable[_IT]]
+_Splitter = Union[_SplitterInterface[TensorLike], _SplitterInterface[slice]]
 
 
 class Form(Generic[_I], ABC):
     _spaces: Tuple[_FS, ...]
     integrators: Dict[str, _I]
-    chunk_sizes: Dict[str, int]
+    # chunk_sizes: Dict[str, int]
+    splitters: Dict[str, _Splitter]
     batch_size: int
     sparse_shape: Tuple[int, ...]
 
@@ -33,7 +43,8 @@ class Form(Generic[_I], ABC):
             space = space[0]
         self._spaces = space
         self.integrators = {}
-        self.chunk_sizes = {}
+        self.splitters = {}
+        # self.chunk_sizes = {}
         self._cursor = 0
         self.batch_size = batch_size
 
@@ -43,7 +54,8 @@ class Form(Generic[_I], ABC):
     def copy(self):
         new_obj = self.__class__(self._spaces, batch_size=self.batch_size)
         new_obj.integrators.update(self.integrators)
-        new_obj.chunk_sizes.update(self.chunk_sizes)
+        # new_obj.chunk_sizes.update(self.chunk_sizes)
+        new_obj.splitters.update(self.splitters)
         new_obj._values_ravel_shape = self._values_ravel_shape
         new_obj.sparse_shape = tuple(reversed(self.sparse_shape))
         return new_obj
@@ -72,12 +84,12 @@ class Form(Generic[_I], ABC):
             return self._spaces
 
     @overload
-    def add_integrator(self: Self, I: _I, /, *, region: Optional[Index] = None, chunk_size: int = 0, group: str = ...) -> Self: ...
+    def add_integrator(self: Self, I: _I, /, *, region: Optional[Index] = None, splitter: Union[_Splitter, int, None] = None, group: str = ...) -> Self: ...
     @overload
-    def add_integrator(self: Self, I: Sequence[_I], /, *, region: Optional[Index] = None, chunk_size: int = 0, group: str = ...) -> Self: ...
+    def add_integrator(self: Self, I: Sequence[_I], /, *, region: Optional[Index] = None, splitter: Union[_Splitter, int, None] = None, group: str = ...) -> Self: ...
     @overload
-    def add_integrator(self: Self, *I: _I, region: Optional[Index] = None, chunk_size: int = 0, group: str = ...) -> Self: ...
-    def add_integrator(self, *I, region: Optional[Index] = None, chunk_size=0, group=None):
+    def add_integrator(self: Self, *I: _I, region: Optional[Index] = None, splitter: Union[_Splitter, int, None] = None, group: str = ...) -> Self: ...
+    def add_integrator(self, *I, region: Optional[Index] = None, splitter=None, group=None):
         """Add integrator(s) to the form.
 
         Parameters:
@@ -104,7 +116,10 @@ class Form(Generic[_I], ABC):
         else:
             I = GroupIntegrator(*I, region=region)
 
-        return self._add_integrator_impl(I, group, chunk_size)
+        if isinstance(splitter, int):
+            splitter = UniformSplitter(splitter)
+
+        return self._add_integrator_impl(I, group, splitter)
 
     @overload
     def __lshift__(self: Self, other: Integrator) -> Self: ...
@@ -114,41 +129,67 @@ class Form(Generic[_I], ABC):
         else:
             return NotImplemented
 
-    def _add_integrator_impl(self, I: _I, group: Optional[str] = None, chunk_size: int = 0):
+    def _add_integrator_impl(self, I: _I, group: Optional[str] = None, splitter: Optional[_Splitter] = None):
         group = f'_group_{self._cursor}' if group is None else group
         self._cursor += 1
-        self.chunk_sizes[group] = chunk_size
 
         if group in self.integrators:
             self.integrators[group] += I
+            if splitter is not None:
+                self.splitters[group] = splitter
         else:
             self.integrators[group] = I
+            self.splitters[group] = splitter
 
         return self
 
     def _assembly_kernel(self, group: str, /, indices=None):
         integrator = self.integrators[group]
-        etg = integrator.to_global_dof(self.space)
+        if indices is None:
+            value = integrator(self.space)
+            etg = integrator.to_global_dof(self.space)
+        else:
+            value = integrator(self.space, indices=indices)
+            etg = integrator.to_global_dof(self.space, indices=indices)
         if not isinstance(etg, (tuple, list)):
             etg = (etg, )
-        if indices is None:
-            return integrator(self.space), etg
-        return integrator(self.space, indices=indices), etg
+        return value, etg
 
     def assembly_local_iterative(self):
         """Assembly local matrix considering chunk size.
         Yields local matrix and to_global_dof tuple."""
         for key, int_ in self.integrators.items():
-            chunk_size = self.chunk_sizes[key]
-            if chunk_size == 0:
+            splitter = self.splitters[key]
+            if splitter is None:
                 logger.debug(f"(ASSEMBLY LOCAL FULL) {key}")
-                yield self._assembly_group(key)
+                yield self._assembly_kernel(key)
             else:
-                logger.debug(f"(ASSEMBLY LOCAL ITER) {key}, {chunk_size} for each chunk")
-                yield from IntegralIter.split(int_, chunk_size)(self.space)
+                logger.debug(f"(ASSEMBLY LOCAL ITER) {key}")
+                for indices in splitter(self.space, int_):
+                    yield self._assembly_kernel(key, indices)
 
 
-# An iteration util for the `_assembly_group` method.
+class UniformSplitter():
+    def __init__(self, chunk_size: int, /): # Arguments of split method
+        self.chunk_size = chunk_size
+
+    def __call__(self, space, integrator: Integrator): # Receives space and integrator
+        if isinstance(space, (list, tuple)):
+            space = space[0]
+        size = integrator.size(space.mesh)
+        start = 0
+
+        while start < size:
+            stop = start + self.chunk_size
+            if stop >= size:
+                stop = size
+            logger.debug(f"(FORM ITER) {stop}/{size}")
+            yield slice(start, stop, 1)
+            start = stop
+
+
+# NOTE: deprecated.
+# An iteration util for the `_assembly_kernel` method.
 class IntegralIter():
     def __init__(self, integrator: Integrator, /, indices_or_segments: Union[Iterable[TensorLike], TensorLike]):
         self.integrator = integrator

@@ -5,7 +5,10 @@ from typing import Union
 from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
-from fealpy.iopt import COA
+from COA import COA
+#from fealpy.opt import *
+from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
+from fealpy.opt.crayfish_opt_alg import CrayfishOptAlg
 from meshing_type import MeshingType
 from partition_type import PartitionType
 from dataclasses import dataclass
@@ -22,7 +25,7 @@ class OverlapGroundMesh:
     @param uv1: 网格点在相机 1 的图像中的 uv 坐标
     @param w:   网格点上的图像在相机 0 中的权重
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam0 : int = None
     cam1 : int = None
     uv0  : np.ndarray = None
@@ -44,7 +47,7 @@ class OverlapEllipsoidMesh:
     @param uv1: 网格点在相机 1 的图像中的 uv 坐标
     @param w:   网格点上的图像在相机 0 中的权重
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam0 : int = None
     cam1 : int = None
     didx0: np.ndarray = None
@@ -63,7 +66,7 @@ class NonOverlapGroundMesh:
     @param cam: 相机
     @param uv: 网格点在相机的图像中的 uv 坐标
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam  : int = None
     uv   : np.ndarray = None
 
@@ -77,7 +80,7 @@ class NonOverlapEllipsoidMesh:
     @param dval: 狄利克雷边界条件的节点值
     @param uv: 网格点在相机的图像中的 uv 坐标
     """
-    mesh : list[TriangleMesh] = None
+    mesh : list = None
     cam  : int = None
     didx : np.ndarray = None
     dval : np.ndarray = None
@@ -118,7 +121,7 @@ class Screen:
         self.eillposid_nonoverlapmesh = []
 
         self.optimize()
-        self.draw_frature_points()
+        #self.draw_frature_points()
         self.meshing()
         self.compute_uv()
 
@@ -152,8 +155,8 @@ class Screen:
                 ps2 = camsys.cameras[i].to_screen(ps1, on_ground=True)
                 ps0 = np.array(ps0)
                 error += np.sum((ps0 - ps2[:, :-1])**2)
-            if self.i%50==0:
-                print("Error: ", error)
+            # if self.i%50==0:
+            #     print("Error: ", error)
             return error
 
         # 6 个相机，每个相机的位置和欧拉角共 6 * 6 = 36 个参数
@@ -179,11 +182,24 @@ class Screen:
 
         opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
                       object_function, init_x.flatten())
-        bestfitness,best_position,_ = opt_alg.cal()
-        print(bestfitness)
+        
+        best_fitness,best_position,_ = opt_alg.cal()
+        
+        #ub = ub.flatten().reshape((1,dim))
+        #lb = lb.flatten().reshape((1, dim))
+        #a = init_x.flatten()[None, :]
+        #init_x = np.tile(a, (N, 1))
+        # init_x = lb + np.random.rand(N, dim) * (ub - lb)
+        #option = opt_alg_options(init_x, object_function, (ub, lb), N, MaxIters=500)
+        #optimizer = CrayfishOptAlg(option)
+
+
+        #best_position,bestfitness = optimizer.run()
+        print( best_fitness)
         print(best_position)
 
         camsys.set_parameters(best_position.reshape(6, -1))
+
 
     def get_implict_function(self):
         """
@@ -653,7 +669,8 @@ class Screen:
         node = pmesh.mesh.entity('node')
         cell = pmesh.mesh.entity('cell')
         no = np.concatenate((node[cell].reshape(-1, 3), pmesh.uv[cell].reshape(-1, 2)), axis=-1, dtype=np.float32)
-        plotter.add_mesh(no, cell=None, texture_paths=[cam.picture.fname])
+        plotter.add_mesh(no, cell=None, texture_paths=[cam.picture.fname], 
+                         texture_folders=[cam.picture.pic_folder])
 
     def _display_overlap_mesh(self, plotter, mesh):
         cam0 = self.camera_system.cameras[mesh.cam0]
@@ -666,7 +683,9 @@ class Screen:
         has_inf = np.any(np.isinf(w))
 
         no = np.concatenate((node, uv0, uv1, w), axis=-1, dtype=np.float32)
-        plotter.add_mesh(no, cell=None, texture_paths=[cam0.picture.fname, cam1.picture.fname])
+        plotter.add_mesh(no, cell=None, 
+            texture_paths = [cam0.picture.fname, cam1.picture.fname], 
+            texture_folders = [cam0.picture.pic_folder, cam1.picture.pic_folder])
 
     def display(self, plotter):
         """
