@@ -15,76 +15,14 @@ from app.soptx.linear_elasticity.JingYiGearProject.utils import export_to_inp
 
 import pickle
 
-def compute_strain_stress_1(space, uh, mu, lam):
-    """在积分点处计算应变和应力"""
-    mesh = space.mesh
-    cell = mesh.entity('cell')
-    cell2dof = space.cell_to_dof()
-    NC = mesh.number_of_cells()
 
-    # 计算积分点处的基函数梯度
-    qf2 = mesh.quadrature_formula(2)
-    bcs_q2, ws = qf2.get_quadrature_points_and_weights()
-    gphix_q2 = space.grad_basis(bcs_q2, variable='x')  # (NC, NQ, LDOF, GD)
-
-    cuh = uh[cell2dof]  # (NC, LDOF, GD)
-
-    # 计算应变
-    NQ = len(ws)  # 积分点个数
-    strain = bm.zeros((NC, NQ, 6), dtype=bm.float64)
-    
-    # 计算正应变和剪切应变
-    strain[:, :, 0:3] = bm.einsum('cid, cqid -> cqd', cuh, gphix_q2)  # (NC, NQ, 3)
-    for i in range(NQ):  
-        # strain[:, i, 3] = bm.sum(
-        #         cuh[:, :, 2]*gphix_q2[:, i, :, 1] + cuh[:, :, 1]*gphix_q2[:, i, :, 2], 
-        #         axis=-1) / 2.0  # (NC,)
-
-        # strain[:, i, 4] = bm.sum(
-        #         cuh[:, :, 2]*gphix_q2[:, i, :, 0] + cuh[:, :, 0]*gphix_q2[:, i, :, 2], 
-        #         axis=-1) / 2.0  # (NC,)
-
-        # strain[:, i, 5] = bm.sum(
-        #         cuh[:, :, 1]*gphix_q2[:, i, :, 0] + cuh[:, :, 0]*gphix_q2[:, i, :, 1], 
-        #         axis=-1) / 2.0  # (NC,)
-        strain[:, i, 3] = bm.sum(
-                cuh[..., 1]*gphix_q2[:, i, :, 0] + cuh[..., 0]*gphix_q2[:, i, :, 1], axis=-1)  # (NC,)
-        strain[:, i, 4] = bm.sum(
-                cuh[..., 2]*gphix_q2[:, i, :, 1] + cuh[..., 1]*gphix_q2[:, i, :, 2], axis=-1)  # (NC,)
-        strain[:, i, 5] = bm.sum(
-                cuh[..., 2]*gphix_q2[:, i, :, 0] + cuh[..., 0]*gphix_q2[:, i, :, 2], axis=-1)  # (NC,)
-
-    # 计算应力
-    val = 2*mu + lam
-    stress = bm.zeros((NC, NQ, 6), dtype=bm.float64)
-    stress[:, :, 0] = val * strain[:, :, 0] + lam * (strain[:, :, 1] + strain[:, :, 2])
-    stress[:, :, 1] = val * strain[:, :, 1] + lam * (strain[:, :, 2] + strain[:, :, 0])
-    stress[:, :, 2] = val * strain[:, :, 2] + lam * (strain[:, :, 0] + strain[:, :, 1])
-    # stress[:, :, 3] = 2*mu * strain[:, :, 3]
-    # stress[:, :, 4] = 2*mu * strain[:, :, 4]
-    # stress[:, :, 5] = 2*mu * strain[:, :, 5]
-    stress[:, :, 3] = mu * strain[:, :, 3]
-    stress[:, :, 4] = mu * strain[:, :, 4]
-    stress[:, :, 5] = mu * strain[:, :, 5]
-
-    return strain, stress
-
-def compute_strain_stress_2(tensor_space, uh, B, D):
-    cell2tdof = tensor_space.cell_to_dof()
-    cuh = uh[cell2tdof]  # (NC, TLDOF) 
-    strain = bm.einsum('cqil, cl -> cqi', B, cuh) # (NC, NQ, 6)
-    stress = bm.einsum('cqij, cqi -> cqj', D, strain) # (NC, NQ, 6)
-    
-    return strain, stress
-
-def compute_strain_stress_3(tensor_space, uh, B_BBar, D):
+def compute_strain_stress(tensor_space, uh, B_BBar, D):
     cell2tdof = tensor_space.cell_to_dof()
     cuh = uh[cell2tdof]  # (NC, TLDOF) 
     strain = bm.einsum('cqil, cl -> cqi', B_BBar, cuh) # (NC, NQ, 6)
-    stress = bm.einsum('cqij, cqi -> cqj', D, strain) # (NC, NQ, 6)
+    stress = bm.einsum('cqij, cqi -> cqj', D, strain)  # (NC, NQ, 6)
     
     return strain, stress
-
 
 bm.set_backend('numpy')
 
@@ -93,7 +31,6 @@ with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/J
 
 external_gear = data['external_gear']
 hex_mesh = data['hex_mesh']
-# helix_node = data['helix_node']
 is_inner_node = data['is_inner_node']
 
 hex_cell = hex_mesh.cell
@@ -122,7 +59,7 @@ face_normal = bm.zeros((n, 3), bm.float64)
 parameters = bm.zeros((n, 3), bm.float64)
 for i, t_node in enumerate(helix_node):
     target_cell_idx[i], face_normal[i], parameters[i] = external_gear.find_node_location_kd_tree(t_node)
-
+print(f"target_cell_idx: {target_cell_idx}")
 average_normal = bm.mean(face_normal, axis=0)
 average_normal /= bm.linalg.norm(average_normal)
 
@@ -156,8 +93,6 @@ print(f"gdof: {scalar_gdof}")
 cell2dof = space.cell_to_dof()
 tensor_space = TensorFunctionSpace(space, shape=(-1, 3)) # gd_priority
 cell2tdof = tensor_space.cell_to_dof()
-map = [ 0,  1,  2, 12, 13, 14,  9, 10, 11, 21, 22, 23,  3,  4,  5, 15, 16,
-       17,  6,  7,  8, 18, 19, 20]
 tgdof = tensor_space.number_of_global_dofs()
 print(f"tgdof: {tgdof}")
 tldof = tensor_space.number_of_local_dofs()
@@ -184,16 +119,18 @@ phi_loads_array = bm.concatenate(phi_loads, axis=1) # (1, 15, tldof, GD)
 FE_load = bm.einsum('pd, cpld -> pl', P, phi_loads_array) # (15, 24)
 
 FE = bm.zeros((NC, tldof), dtype=bm.float64)
-FE[target_cell_idx, :] = FE_load[:, :] # (NC, tldof)
+bm.add.at(FE, target_cell_idx, FE_load)  # (NC, tldof) 这会自动累加重复索引的值
+# FE[target_cell_idx, :] = FE_load[:, :] # (NC, tldof)
+# FE[target_cell_idx, :] = FE_load # (NC, tldof)
 
 F = COOTensor(indices = bm.empty((1, 0), dtype=bm.int32, device=bm.get_device(space)),
             values = bm.empty((0, ), dtype=bm.float64, device=bm.get_device(space)),
             spshape = (tgdof, ))
 indices = cell2tdof.reshape(1, -1)
 F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
-non_zero_indices = bm.nonzero(F)[0]
-non_zero_values = F[non_zero_indices]
-F_non_zero = bm.concatenate([non_zero_indices[:, None], non_zero_values[:, None]], axis=1)
+# non_zero_indices = bm.nonzero(F)[0]
+# non_zero_values = F[non_zero_indices]
+# F_non_zero = bm.concatenate([non_zero_indices[:, None], non_zero_values[:, None]], axis=1)
 # np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/F_without_dc.csv', 
 #            F, delimiter=',', fmt='%s')
 # np.savetxt('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/txt/F_non_zero_without_dc.csv', 
@@ -219,19 +156,15 @@ linear_elastic_material = LinearElasticMaterial(name='E_nu',
                                                 hypo='3D', device=bm.get_device(mesh))
 
 # B-Bar 修正的刚度矩阵
-# integrator_K0 = LinearElasticIntegrator(material=linear_elastic_material, 
-#                                         q=q, method='voigt')
-# integrator_K0.keep_data(True)
-# _, _, _, D, B = integrator_K0.fetch_voigt_assembly(tensor_space)
 integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
                                        q=q, method='C3D8_BBar')
 integrator_K.keep_data(True)
 _, _, D, B_BBar = integrator_K.fetch_c3d8_bbar_assembly(tensor_space)
-B_BBar0 = B_BBar[1000][3].round(6)
+# print(f"B_BBar:\n {B_BBar[0]}")
+# KE = integrator_K.c3d8_bbar_assembly(space=tensor_space)
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
-
 
 # 处理 Dirichlet 边界条件
 scalar_is_bd_dof = bm.zeros(scalar_gdof, dtype=bm.bool)
@@ -250,7 +183,8 @@ logger.setLevel('INFO')
 uh = tensor_space.function()
 # uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
 uh[:] = spsolve(K, F, solver="mumps")
-
+# print(f"uh10: {uh[:10]}")
+# print(f"uh-10: {uh[-10:]}")
 # 计算残差向量和范数
 residual = K.matmul(uh[:]) - F  
 residual_norm = bm.sqrt(bm.sum(residual * residual))
@@ -267,12 +201,17 @@ uh_z = uh_show[:, 2]
 
 uh_magnitude = bm.linalg.norm(uh_show, axis=1)
 
+# rel_l2_uh_magnitude = bm.linalg.norm(uh_magnitude - uh_array) / bm.linalg.norm(uh_array)
+# print(f"rel_l2_uh_magnitude: {rel_l2_uh_magnitude}")
+
 mesh.nodedata['uh'] = uh_show[:]
 mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
 
 # NOTE 计算单元积分点处的应变和应力
-strain3, stress3 = compute_strain_stress_3(tensor_space, uh, B_BBar, D) # (NC, NQ, 6)
-
+strain, stress = compute_strain_stress(tensor_space, uh, B_BBar, D) # (NC, NQ, 6)
+# print(f"stress0:\n, {stress[0]}")
+# print(f"stress5000:, {stress[5000]}")
+# print(f"stress10000:, {stress[10000]}")
 extrapolation_matrix = bm.tensor([
             [-0.0490381057,  0.1830127019,  0.1830127019, -0.6830127019,  0.1830127019, -0.6830127019, -0.6830127019,  2.5490381057],
             [ 0.1830127019, -0.0490381057, -0.6830127019,  0.1830127019, -0.6830127019,  0.1830127019,  2.5490381057, -0.6830127019],
@@ -287,23 +226,23 @@ extrapolation_matrix = bm.tensor([
 # 计算外插后的单元节点应变和应力
 cell2dof_map = [0, 4, 6, 2, 1, 5, 7, 3]
 extrapolation_map = [7, 3, 1, 5, 6, 2, 0, 4 ]
-strain3_extrapolation = bm.einsum('lq, cqj -> clj', extrapolation_matrix, strain3)
-stress3_extrapolation = bm.einsum('lq, cqj -> clj', extrapolation_matrix, stress3)
-
-# 计算节点应变和应力
-cell2dof_maps = cell2dof[:, cell2dof_map]
-strain3_extrapolation_maps = strain3_extrapolation[:, extrapolation_map, :]
-stress3_extrapolation_maps = stress3_extrapolation[:, extrapolation_map, :]
+strain_extrapolation = bm.einsum('lq, cqj -> clj', extrapolation_matrix, strain)
+stress_extrapolation = bm.einsum('lq, cqj -> clj', extrapolation_matrix, stress)
+strain_extrapolation_maps = strain_extrapolation[:, extrapolation_map, :]
+stress_extrapolation_maps = stress_extrapolation[:, extrapolation_map, :]
+# print(f"stress_extrapolation0:\n {stress_extrapolation[0]}")
+# print(f"stress_extrapolation_maps:\n {stress_extrapolation_maps[0]}")
 
 # 使用直接平均法计算节点应变和应力 
+cell2dof_maps = cell2dof[:, cell2dof_map]
 nstrain = bm.zeros((NN, 6), dtype=bm.float64)
 nstress = bm.zeros((NN, 6), dtype=bm.float64)
 nc = bm.zeros(NN, dtype=bm.int32)
 bm.add_at(nc, cell2dof_maps, 1)
 for i in range(6):
-    bm.add_at(nstrain[:, i], cell2dof_maps.flatten(), strain3_extrapolation_maps[:, :, i].flatten())
+    bm.add_at(nstrain[:, i], cell2dof_maps.flatten(), strain_extrapolation_maps[:, :, i].flatten())
     nstrain[:, i] /= nc
-    bm.add_at(nstress[:, i], cell2dof_maps.flatten(), stress3_extrapolation_maps[:, :, i].flatten())
+    bm.add_at(nstress[:, i], cell2dof_maps.flatten(), stress_extrapolation_maps[:, :, i].flatten())
     nstress[:, i] /= nc
 
 mesh.nodedata['nstrain'] = nstrain
@@ -313,13 +252,19 @@ mesh.nodedata['nstress'] = nstress
 # 计算 Mises 应力（Von Mises Stress）
 # ------------------------------------------------------------------------------
 # 计算单元节点处的 Mises 应力
-# 1. 获取外插后的单元节点处的应力分量
-sigma_xx_node = stress3_extrapolation[..., 0]
-sigma_yy_node = stress3_extrapolation[..., 1]
-sigma_zz_node = stress3_extrapolation[..., 2]
-tau_xy_node = stress3_extrapolation[..., 3]
-tau_xz_node = stress3_extrapolation[..., 4]
-tau_yz_node = stress3_extrapolation[..., 5]
+# 1. 获取外插后的单元节点处的应力分量 (已经按照新的顺序排列)
+# sigma_xx_node = stress_extrapolation[..., 0]
+# sigma_yy_node = stress_extrapolation[..., 1]
+# sigma_zz_node = stress_extrapolation[..., 2]
+# tau_xy_node = stress_extrapolation[..., 3]
+# tau_xz_node = stress_extrapolation[..., 4]
+# tau_yz_node = stress_extrapolation[..., 5]
+sigma_xx_node = stress_extrapolation_maps[..., 0]
+sigma_yy_node = stress_extrapolation_maps[..., 1]
+sigma_zz_node = stress_extrapolation_maps[..., 2]
+tau_xy_node = stress_extrapolation_maps[..., 3]
+tau_xz_node = stress_extrapolation_maps[..., 4]
+tau_yz_node = stress_extrapolation_maps[..., 5]
 # 2. 计算单元节点处的 Mises 应力
 mises_elem_node = bm.sqrt(0.5 * (
                     (sigma_xx_node - sigma_yy_node)**2 +
@@ -327,17 +272,24 @@ mises_elem_node = bm.sqrt(0.5 * (
                     (sigma_yy_node - sigma_zz_node)**2 +
                     6 * (tau_xy_node**2 + tau_xz_node**2 + tau_yz_node**2)
                 )) # (NC, NCN)
-mises_elem_node_map = [7, 3, 1, 5, 6, 2, 0, 4]
-print(f"mises_node_0: {cell2dof[0][cell2dof_map]}\n, {mises_elem_node[0][mises_elem_node_map]}")
-print(f"mises_node_1: {cell2dof[1][cell2dof_map]}\n, {mises_elem_node[1][mises_elem_node_map]}")
-print(f"mises_node_1363: {cell2dof[1363][cell2dof_map]}\n, {mises_elem_node[1363][mises_elem_node_map]}")
-print(f"mises_node_1364: {cell2dof[1364][cell2dof_map]}\n, {mises_elem_node[1364][mises_elem_node_map]}")
+print(f"mises_elem_node0: {mises_elem_node[0]}")
+print(f"mises_elem_node5000: {mises_elem_node[5000]}")
+print(f"mises_elem_node10000: {mises_elem_node[10000]}")
+# mises_elem_node_map = [7, 3, 1, 5, 6, 2, 0, 4]
 # 3. 平均分配到节点
 mises_node = bm.zeros(NN, dtype=bm.float64)
 nc = bm.zeros(NN, dtype=bm.int32)
 bm.add_at(nc, cell2dof_maps, 1)
-bm.add_at(mises_node, cell2dof_maps.flatten(), mises_elem_node[:, mises_elem_node_map].flatten())
+# bm.add_at(mises_node, cell2dof_maps.flatten(), mises_elem_node[:, mises_elem_node_map].flatten())
+bm.add_at(mises_node, cell2dof_maps.flatten(), mises_elem_node.flatten())
 mises_node /= nc
+
+# rel_le_mises = bm.linalg.norm(mises_node - s_mises_array) / bm.linalg.norm(s_mises_array)
+# print(f"rel_le_mises: {rel_le_mises}")
+# print(f"mises_node_0: {cell2dof[0][cell2dof_map]}\n, {mises_elem_node[0][mises_elem_node_map]}")
+# print(f"mises_node_1: {cell2dof[1][cell2dof_map]}\n, {mises_elem_node[1][mises_elem_node_map]}")
+# print(f"mises_node_1363: {cell2dof[1363][cell2dof_map]}\n, {mises_elem_node[1363][mises_elem_node_map]}")
+# print(f"mises_node_1364: {cell2dof[1364][cell2dof_map]}\n, {mises_elem_node[1364][mises_elem_node_map]}")
 
 # 将 Voigt 表示法的应变转换为对称的 3x3 应变张量
 # strain_tensors = bm.zeros((NN, 3, 3), dtype=bm.float64)
