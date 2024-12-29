@@ -7,7 +7,7 @@ from .. import logger
 from .utils import simplex_gdof, simplex_ldof 
 from .mesh_base import HomogeneousMesh, estr2dim
 from .triangle_mesh import TriangleMesh
-#from fealpy.functionspace.dofs import LinearMeshCFEDof
+
 
 class LagrangeTriangleMesh(HomogeneousMesh):
     def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
@@ -172,8 +172,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         elif variables == 'x':
             J = self.jacobi_matrix(bc, index=index)
             G = self.first_fundamental_form(J)
-            G = bm.linalg.inv(G)
-            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
+            d = bm.linalg.inv(G)
+            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, d, gphi) 
             return gphi
 
     # ipoints
