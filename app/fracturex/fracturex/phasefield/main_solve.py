@@ -226,7 +226,7 @@ class MainSolve:
         self.pfcm.update_disp(uh)
 
         ubform = BilinearForm(self.tspace)
-        ubform.add_integrator(LinearElasticIntegrator(self.pfcm, q=self.q))
+        ubform.add_integrator(LinearElasticIntegrator(self.pfcm, q=self.q, method='voigt'))
         A = ubform.assembly()
         R = -A @ uh[:]
         self._Rfu = bm.sum(-R[force_index])

@@ -32,7 +32,7 @@ class Solver():
         self.pde = pde
         self.dt = dt
         self.q = q
-    
+ 
     def CH_BForm(self):
         phispace = self.phispace
         dt = self.dt
@@ -54,7 +54,8 @@ class Solver():
         A10 = BilinearForm(phispace)
         A10.add_integrator(ScalarDiffusionIntegrator(coef=-epsilon, q=q))
         A10.add_integrator(ScalarMassIntegrator(coef=-s/epsilon, q=q))
-        A10.add_integrator(BoundaryFaceMassIntegrator(coef=-3/(2*dt*V_s), q=q, threshold=self.pde.is_wall_boundary))     
+        A10.add_integrator(BoundaryFaceMassIntegrator(coef=-3/(2*dt*V_s), 
+                                q=q, threshold=self.pde.is_slip_boundary)) 
 
         A11 = BilinearForm(phispace)
         A11.add_integrator(ScalarMassIntegrator(coef=1, q=q))
@@ -191,6 +192,7 @@ class Solver():
         lam = self.pde.lam
         epsilon = self.pde.epsilon
         normal = self.mesh.edge_unit_normal()
+        normal[..., 1] = 1
         tangent = self.mesh.edge_unit_tangent()
         tangent[..., 0] = 1
         
@@ -214,6 +216,7 @@ class Solver():
         
         def u_BF_SI_coef(bcs, index):
             L_phi = epsilon*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), normal[index,:])
+            print(phi_2.grad_value(bcs, index))
             L_phi -= 2*(bm.sqrt(bm.array(2))/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_2(bcs, index))
             L_phi +=   (bm.sqrt(bm.array(2))/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_1(bcs, index))
             

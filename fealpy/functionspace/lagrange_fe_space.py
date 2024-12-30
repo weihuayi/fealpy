@@ -198,3 +198,76 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         e2dof = self.dof.entity_to_dof(TD, index=index)
         val = bm.einsum('cilm, cl -> cim', gphi, uh[e2dof])
         return val
+    
+    def grad_recovery(self, uh: TensorLike, method: str='simple'):
+        """
+
+        Notes
+        -----
+
+        uh 是线性有限元函数，该程序把 uh 的梯度(分片常数）恢复到分片线性连续空间
+        中。
+
+        """
+        GD = self.GD
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        ldof = self.number_of_local_dofs()
+        p = self.p
+        bc = self.dof.multiIndex/p
+        guh = uh.grad_value(bc)
+        guh = guh.swapaxes(0, 1)
+        rguh = self.function(dim=GD)
+
+        if method == 'simple':
+            deg = bm.bincount(cell2dof.flat, minlength = gdof)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'area':
+            measure = self.mesh.entity_measure('cell')
+            ws = bm.einsum('i, j->ij', measure,bm.ones(ldof))
+            deg = bm.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = bm.einsum('ij..., i->ij...', guh, measure)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'distance':
+            ipoints = self.interpolation_points()
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            d = bm.sqrt(bm.sum(v**2, axis=-1))
+            deg = bm.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = bm.einsum('ij..., ij->ij...', guh, d)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'area_harmonic':
+            measure = 1/self.mesh.entity_measure('cell')
+            ws = bm.einsum('i, j->ij', measure,bm.ones(ldof))
+            deg = bm.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = bm.einsum('ij..., i->ij...', guh, measure)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'distance_harmonic':
+            ipoints = self.interpolation_points()
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            d = 1/bm.sqrt(bm.sum(v**2, axis=-1))
+            deg = bm.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = bm.einsum('ij..., ij->ij...',guh,d)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+        rguh /= deg.reshape(-1, 1)
+        return rguh

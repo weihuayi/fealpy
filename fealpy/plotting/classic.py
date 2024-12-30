@@ -290,9 +290,10 @@ class AddPlot2dPoly(MeshPloter[HomogeneousMesh]):
                 f.colorbar(mapper, shrink=kwargs['colorbarshrink'], ax=axes)
 
         node = bm.to_numpy(self.mesh.entity('node'))
-        cell = bm.to_numpy(self.mesh.entity('cell')) # A list containing indices of vertices.
+        cell, loc = self.mesh.entity('cell')
+        cell_list = [cell[loc[i]:loc[i+1]] for i in range(loc.shape[0]-1)]
 
-        return A.poly_(axes=axes, points=node, struct_seq=cell,
+        return A.poly_(axes=axes, points=node, struct_seq=cell_list,
                        edgecolor=kwargs['edgecolor'], cellcolor=cellcolor,
                        linewidths=kwargs['linewidths'], alpha=kwargs['alpha'])
 

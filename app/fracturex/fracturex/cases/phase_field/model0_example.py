@@ -102,6 +102,10 @@ parser.add_argument('--save_vtkfile',
         help='是否保存 vtk 文件, 默认为 False.')
 
 
+parser.add_argument('--atype', 
+        default=None, type=str,
+        help='矩阵组装的方法, 默认为 常规组装.')
+
 parser.add_argument('--gpu', 
         default=False, type=bool,
         help='是否使用 GPU, 默认为 False.')
@@ -117,6 +121,7 @@ refine_method = args.refine_method
 h = args.h
 save_vtkfile = args.save_vtkfile
 vtkname = args.vtkname +'_' + args.mesh_type + '_'
+atype = args.atype
 gpu = args.gpu
 
 tmr = timer()
@@ -143,8 +148,11 @@ ms.add_boundary_condition('force', 'Dirichlet', model.is_force_boundary, model.i
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 ms.add_boundary_condition('phase', 'Dirichlet', model.is_dirchlet_boundary, 0)
 
-if bm.backend_name == 'pytorch':
+if atype == 'auto':
     ms.auto_assembly_matrix()
+elif atype == 'fast':
+    ms.fast_assembly_matrix()
+    
 
 #ms.set_scipy_solver()
 ms.output_timer()

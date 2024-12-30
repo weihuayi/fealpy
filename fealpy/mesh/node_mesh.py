@@ -12,8 +12,8 @@ from jax_md import space, partition
 from jax import vmap, lax
 
 class NodeMesh(MeshDS):
-    def __init__(self, node: TensorLike, nodedata:Optional[Dict]=None) -> None: 
-        super().__init__(TD=0)
+    def __init__(self, node: TensorLike, nodedata: Optional[Dict] = None, itype: str = 'default_itype', ftype: str = 'default_ftype') -> None: 
+        super().__init__(TD=0, itype=itype, ftype=ftype)
         '''
         note : Currently using jax's own jax_md, vmap, lax, vstack , ravel,
                full, where, mgrid, column_stack, full_like, hstack.

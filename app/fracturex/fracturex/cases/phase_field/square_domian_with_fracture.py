@@ -124,6 +124,10 @@ parser.add_argument('--cupy',
         default=False, type=bool,
         help='是否使用cupy求解.')
 
+parser.add_argument('--atype',
+        default='None', type=str,
+        help='矩阵组装的方法, 默认为 常规组装.')
+
 args = parser.parse_args()
 p= args.degree
 maxit = args.maxit
@@ -138,6 +142,8 @@ vtkname = args.vtkname +'_' + args.mesh_type + '_'
 force_type = args.force_type
 gpu = args.gpu
 cupy = args.cupy
+atype = args.atype
+
 
 tmr = timer()
 next(tmr)
@@ -191,7 +197,7 @@ else:
 ms.add_boundary_condition('displacement', 'Dirichlet', model.is_dirchlet_boundary, 0)
 
 
-if bm.backend_name == 'pytorch':
+if atype == 'auto':
     ms.auto_assembly_matrix()
 if cupy:
     ms.set_cupy_solver()
