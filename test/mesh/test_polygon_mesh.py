@@ -168,12 +168,39 @@ class TestPolygonMeshInterfaces:
 #        cell = mesh.entity('cell')
 #        np.testing.assert_array_equal(bm.to_numpy(node),data['node'])
 #        #np.testing.assert_array_equal(bm.to_numpy(cell),data['cell'])
- 
+    @pytest.mark.parametrize("backend", ["numpy","pytorch"])
+    @pytest.mark.parametrize("data",rhombic)
+    def test_rhombic(self,data,backend):  #未实现 from_box
+        bm.set_backend(backend)
+        mesh = PolygonMesh.distorted_concave_rhombic_quadrilaterals_mesh(nx=4,ny=4)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        cell1 = np.split(cell[0],cell[1][1:-1])
+        np.testing.assert_allclose(bm.to_numpy(node),data['node'], atol=1e-7)
+        for arr1, arr2 in zip(cell1, data['cell']):
+            np.testing.assert_array_equal(bm.to_numpy(arr1), arr2)
+
+    @pytest.mark.parametrize("backend", ["numpy","pytorch"])
+    @pytest.mark.parametrize("data",nonconvex)
+    def test_nonconvex(self,data,backend):  #未实现 from_box
+        bm.set_backend(backend)
+        mesh = PolygonMesh.nonconvex_octagonal_mesh(nx=3,ny=3)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        cell1 = np.split(cell[0],cell[1][1:-1])
+        np.testing.assert_allclose(bm.to_numpy(node),data['node'], atol=1e-7)
+        for arr1, arr2 in zip(cell1, data['cell']):
+            np.testing.assert_array_equal(bm.to_numpy(arr1), arr2)
+
+
 if __name__ == "__main__":
     pytest.main(["./test_polygon_mesh.py", "-k", "test_init"])
     pytest.main(["./test_polygon_mesh.py", "-k", "test_entity"])
     pytest.main(["./test_polygon_mesh.py", "-k", "test_extend_data"])
     pytest.main(["./test_polygon_mesh.py", "-k", "test_geo_data"])
     pytest.main(["./test_polygon_mesh.py", "-k", "test_mesh_example"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_rhombic"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_nonconvex"])
+    a = TestPolygonMeshInterfaces()
     
     

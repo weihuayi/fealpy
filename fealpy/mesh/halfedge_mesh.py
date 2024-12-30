@@ -5,10 +5,11 @@ from .plot import Plotable
 from .mesh_base import Mesh
 from ..common import DynamicArray
 from scipy.sparse import csr_matrix, coo_matrix
+from scipy.spatial import cKDTree
 
 class HalfEdgeMesh2d(Mesh, Plotable):
     def __init__(self, node, halfedge, NC=None, NV=None, nodedof=None,
-                 initlevel=None):
+                 initlevel=True):
         """
 
         Parameters
@@ -78,6 +79,9 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         #    self.cell_shape_function = self._shape_function
         #    self.face_shape_function = self._shape_function
         #    self.edge_shape_function = self._shape_function
+    @property
+    def device(self):
+        return bm.get_device(self.halfedge)
 
     def reinit(self, NN=None, NC=None, NV=None):
         """
@@ -122,6 +126,27 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         flag = bm.arange(self.NHE)-halfedge[:, 4] >= 0
         self.hedge = bm.arange(self.NHE, dtype=self.itype)[flag]
 
+    def init_level_info(self):
+        """
+        @brief 初始化半边和单元的 level 
+        """
+        NN = self.number_of_nodes()
+        NHE = self.number_of_halfedges()
+        NC = self.number_of_cells() # 实际单元个数
+
+        self.halfedgedata['level'] = bm.zeros(NHE, dtype=self.itype)
+        self.celldata['level'] = bm.zeros(NC, dtype=self.itype)
+
+        # 如果单元的角度大于 170 度， 设对应的半边层数为 1
+        node = self.node
+        halfedge = self.halfedge
+        v0 = node[halfedge[halfedge[:, 2], 0]] - node[halfedge[:, 0]]
+        v1 = node[halfedge[halfedge[:, 3], 0]] - node[halfedge[:, 0]]
+        angle = bm.sum(v0*v1, axis=1)/bm.sqrt(bm.sum(v0**2, axis=1)*bm.sum(v1**2, axis=1))
+        self.halfedgedata['level'][(angle < -0.98)] = 1 
+
+
+
     def top_dimension(self):
         return 2
 
@@ -153,6 +178,178 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
     def number_of_faces_of_cells(self):
         return self.number_of_vertices_of_cells()
+
+    def entity(self, etype=2, index=_S):
+        if etype in {'cell', 2}:
+            return self.cell_to_node()[index]
+        elif etype in {'edge', 'face', 1}:
+            return self.edge_to_node()[index]
+        elif etype in {'halfedge'}:
+            return self.halfedge # DynamicArray
+        elif etype in {'node', 0}:
+            return self.node # DynamicArrray
+        else:
+            raise ValueError("`entitytype` is wrong!")
+
+
+    def convexity(self):
+        """
+        @brief 将网格中的非凸单元分解为凸单元
+        """
+        def angle(x, y):
+            x = x/(bm.linalg.norm(x, axis=1)).reshape(len(x), 1)
+            y = y/bm.linalg.norm(y, axis=1).reshape(len(y), 1)
+            x1 = bm.concatenate((bm.zeros((x.shape[0],1)), x), axis=1)
+            y1 = bm.concatenate([bm.zeros((y.shape[0],1)), y], axis=1)
+            theta = bm.sign(bm.cross(x1, y1)[:,0])*bm.arccos((x*y).sum(axis=1))
+            theta[theta<0]+=2*bm.pi
+            theta[theta==0]+=bm.pi
+            return theta
+
+        halfedge = self.halfedge
+        node = self.node
+
+        hedge = self.hedge
+        hcell = self.hcell
+
+        hlevel = self.halfedgedata['level']
+        clevel = self.celldata['level']
+        while True:
+            NC = self.number_of_cells()
+            NHE = self.number_of_halfedges()
+
+            end = halfedge[:, 0]
+            start = halfedge[halfedge[:, 3], 0]
+            vector = node[end] - node[start]#所有边的方向
+            vectornex = vector[halfedge[:, 2]]#所有边的下一个边的方向
+
+            angle0 = angle(vectornex, -vector)#所有边的反方向与下一个边的角度
+            badHEdge, = bm.where(angle0 > bm.pi)#夹角大于170度的半边
+            badCell, idx= bm.unique(halfedge[badHEdge, 1], return_index=True)#每个单元每次只处理中的一个
+            badHEdge = badHEdge[idx]#现在坏半边的单元都不同
+            badNode = halfedge[badHEdge, 0]
+            NE1 = len(badHEdge)
+
+            nex = halfedge[badHEdge, 2]
+            pre = halfedge[badHEdge, 3]
+            vectorBad = vector[badHEdge]#坏半边的方向
+            vectorBadnex = vector[nex]#坏半边的下一个半边的方向
+
+            anglenex = angle(vectorBadnex, -vectorBad)#坏边的夹角
+            anglecur = anglenex/2#当前方向与角平分线的夹角
+            angle_err_min = anglenex/2#与角平分线夹角的最小值
+            goodHEdge = bm.zeros(NE1, dtype=self.itype)#最小夹角的边
+            isNotOK = bm.ones(NE1, dtype = bm.bool)#每个单元的循环情况
+            nex = halfedge[nex, 2]#从下下一个边开始
+            while isNotOK.any():
+                vectornex = node[halfedge[nex, 0]] - node[badNode]
+                anglecur[isNotOK] = angle(vectorBadnex[isNotOK], vectornex[isNotOK])
+                angle_err = abs(anglecur - anglenex/2)
+                goodHEdge[angle_err<angle_err_min] = nex[angle_err<angle_err_min]#与角平分线夹角小于做小夹角的边做goodHEdge.
+                angle_err_min[angle_err<angle_err_min] = angle_err[angle_err<angle_err_min]#更新最小角
+                nex = halfedge[nex, 2]
+                isNotOK[nex==pre] = False#循环到坏边的上上一个边结束
+            #halfedgeNew = halfedge.increase_size(NE1*2)
+            halfedgeNew = bm.zeros((NE1*2, 5), dtype=self.itype)
+            halfedgeNew[:NE1, 0] = bm.copy(halfedge[goodHEdge, 0])
+            halfedgeNew[:NE1, 1] = bm.copy(halfedge[badHEdge, 1])
+            halfedgeNew[:NE1, 2] = bm.copy(halfedge[goodHEdge, 2])
+            halfedgeNew[:NE1, 3] = bm.copy(badHEdge)
+            halfedgeNew[:NE1, 4] = bm.arange(NHE+NE1, NHE+NE1*2)
+
+            halfedgeNew[NE1:, 0] = bm.copy(halfedge[badHEdge, 0])
+            halfedgeNew[NE1:, 1] = bm.arange(NC, NC+NE1)
+            halfedgeNew[NE1:, 2] = bm.copy(halfedge[badHEdge, 2])
+            halfedgeNew[NE1:, 3] = bm.copy(goodHEdge)
+            halfedgeNew[NE1:, 4] = bm.arange(NHE, NHE+NE1, dtype=self.itype)
+            self.halfedge = bm.concatenate([halfedge, halfedgeNew], axis=0)
+            halfedge = self.halfedge
+
+            halfedge[halfedge[goodHEdge, 2], 3] = bm.arange(NHE, NHE+NE1, dtype=self.itype)
+            halfedge[halfedge[badHEdge, 2], 3] = bm.arange(NHE+NE1, NHE+NE1*2, dtype=self.itype)
+            halfedge[badHEdge, 2] = bm.arange(NHE, NHE+NE1, dtype=self.itype)
+            halfedge[goodHEdge, 2] = bm.arange(NHE+NE1, NHE+NE1*2, dtype=self.itype)
+            isNotOK = bm.ones(NE1, dtype=bm.bool)
+            nex = halfedge[len(halfedge)-NE1:, 2]
+            while isNotOK.any():
+                halfedge[nex[isNotOK], 1] = bm.arange(NC, NC+NE1, dtype=self.itype)[isNotOK]
+                nex = halfedge[nex, 2]
+                flag = (nex==bm.arange(NHE+NE1, NHE+NE1*2)) & isNotOK
+                isNotOK[flag] = False
+
+            #单元层
+            #clevelNew = clevel.increase_size(NE1)
+            clevelNew = bm.zeros(NE1, dtype=self.itype)
+            clevelNew[:] = clevel[halfedge[badHEdge, 1]]
+            self.celldata['level'] = bm.concatenate([clevel, clevelNew], axis=0)
+            clevel = self.celldata['level']
+
+            #半边层
+            #hlevelNew = hlevel.increase_size(NE1*2)
+            hlevelNew = bm.zeros(NE1*2, dtype=self.itype)
+            hlevelNew[:NE1] = hlevel[goodHEdge]
+            hlevelNew[NE1:] = hlevel[badHEdge]
+            self.halfedgedata['level'] = bm.concatenate([hlevel, hlevelNew], axis=0)
+            hlevel = self.halfedgedata['level']
+
+            self.reinit()
+            if len(badHEdge)==0:
+                break
+
+    def find_point(self, points, start=None): 
+        raise NotImplementedError('The method find_point is not implemented!')
+
+########################### 三角形网格的接口 ####################################
+    def find_point_in_triangle_mesh(self, points, start=None):
+        raise NotImplementedError('The method find_point_in_triangle_mesh is not implemented!')
+ 
+
+    def interpolation_cell_data(self, mesh, datakey, itype="max"):
+        raise NotImplementedError('The method interpolation_cell_data is not implemented!')
+
+    def grad_shape_function(self, bc, p=1, index=_S, variables='x'):
+        """
+        @note 注意这里调用的实际上不是形状函数的梯度，而是网格空间基函数的梯度
+        """
+        if self.NV==3:
+            R = bm.simplex_grad_shape_function(bc, p)
+            if variables == 'x':
+                Dlambda = self.grad_lambda(index=index)
+                gphi = bm.einsum('...ij, kjm->...kim', R, Dlambda)
+                return gphi #(NQ, NC, ldof, GD)
+            elif variables == 'u':
+                return R #(NQ, ldof, TD+1)
+        else:
+            pass
+
+    def grad_lambda(self, index=_S):
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NC = self.number_of_cells() if index is _S else len(index)
+        #NC = self.number_of_cells() if index == bm.s_[:] else len(index)
+        import ipdb
+        ipdb.set_trace()
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
+        GD = self.geo_dimension()
+        nv = bm.linalg.cross(v1, v2)
+        Dlambda = bm.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
+            length = nv
+            W = bm.array([[0, 1], [-1, 0]])
+            Dlambda[:, 0] = v0@W/length[:, None]
+            Dlambda[:, 1] = v1@W/length[:, None]
+            Dlambda[:, 2] = v2@W/length[:, None]
+        elif GD == 3:
+            length = bm.linalg.norm(nv, axis=-1, keepdims=True)
+            n = nv/length
+            Dlambda[:, 0] = bm.linalg.cross(n, v0)/length
+            Dlambda[:, 1] = bm.cross(n, v1)/length
+            Dlambda[:, 2] = bm.cross(n, v2)/length
+        return Dlambda
+
+
 
     @classmethod
     def from_mesh(cls, mesh):
@@ -593,6 +790,17 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             i += 1
         return halfedge2cellnum
 
+    def halfedge_to_edge(self, index = _S):
+        halfedge = self.halfedge
+        hedge = self.hedge
+        NE = self.NE
+
+        halfedge2edge = bm.zeros(len(halfedge), dtype=self.itype)
+        halfedge2edge[hedge] = bm.arange(NE, dtype=self.itype)
+        halfedge2edge[halfedge[hedge, 4]] = bm.arange(NE, dtype=self.itype)
+        return halfedge2edge[index] 
+
+
     ######################## 与插值点有关的接口 ######################
     def number_of_global_ipoints(self, p: int) -> int:
         """
@@ -688,7 +896,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                     c2p[edge2cell[flag, 0][:, None], idx0] = e2p[flag]
 
                     flag = edge2cell[:, 2] == 1
-                    c2p[edge2cell[flag, 0][:, None], idx1[-1::-1]] = e2p[flag]
+                    c2p[edge2cell[flag, 0][:, None], bm.flip(idx1)] = e2p[flag]
 
                     flag = edge2cell[:, 2] == 2
                     c2p[edge2cell[flag, 0][:, None], idx2] = e2p[flag]
@@ -697,17 +905,18 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                     iflag = edge2cell[:, 0] != edge2cell[:, 1]
 
                     flag = iflag & (edge2cell[:, 3] == 0)
-                    c2p[edge2cell[flag, 1][:, None], idx0[-1::-1]] = e2p[flag]
+                    c2p[edge2cell[flag, 1][:, None], bm.flip(idx0)] = e2p[flag]
 
                     flag = iflag & (edge2cell[:, 3] == 1)
                     c2p[edge2cell[flag, 1][:, None], idx1] = e2p[flag]
 
                     flag = iflag & (edge2cell[:, 3] == 2)
-                    c2p[edge2cell[flag, 1][:, None], idx2[-1::-1]] = e2p[flag]
+                    c2p[edge2cell[flag, 1][:, None], bm.flip(idx2)] = e2p[flag]
 
                     cdof = (p-1)*(p-2)//2
                     flag = bm.sum(mi > 0, axis=1) == 3
-                    c2p[:, flag] = NN + NE*(p-1) + bm.arange(NC*cdof).reshape(NC, cdof)
+                    c2p[:, flag] = NN + NE*(p-1) + bm.arange(NC*cdof,
+                                                             dtype=self.itype).reshape(NC, cdof)
                     
                     self.cell2ipt = c2p
                     return c2p[index]
@@ -718,7 +927,7 @@ class HalfEdgeMesh2d(Mesh, Plotable):
                 ldof = self.number_of_local_ipoints(p, iptype='all')
 
                 location = bm.zeros(NC+1, dtype=self.itype)
-                location[1:] = bm.add.accumulate(ldof)
+                location[1:] = bm.cumsum(ldof, axis=0)
 
                 cell2ipoint = bm.zeros(location[-1], dtype=self.itype)
 
@@ -730,15 +939,81 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
                 isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
                 idx = (location[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + bm.arange(p)
-                cell2ipoint[idx] = edge2ipoint[isInEdge, p:0:-1]
+                cell2ipoint[idx] = bm.flip(edge2ipoint[isInEdge, 1:p+1], axis=1)
+               
 
                 NN = len(self.hnode)
                 NV = self.number_of_vertices_of_cells()
                 NE = self.number_of_edges()
                 cdof = self.number_of_local_ipoints(p, iptype='cell')
                 idx = (location[:-1] + NV*p).reshape(-1, 1) + bm.arange(cdof)
-                cell2ipoint[idx] = NN + NE*(p-1) + bm.arange(NC*cdof).reshape(NC, cdof)
-                return bm.hsplit(cell2ipoint, location[1:-1])[index]
+                cell2ipoint[idx] = NN + NE*(p-1) + bm.arange(NC*cdof,dtype=self.itype).reshape(NC, cdof)
+                return bm.split(cell2ipoint, location[1:-1], axis=0)[index]
+
+    def boundary_node_flag(self):
+        NN = self.NN
+        halfedge =  self.halfedge 
+        isBdHEdge = halfedge[:, 4]==bm.arange(self.NHE)
+        isBdNode = bm.zeros(NN, dtype=bm.bool)
+        isBdNode[halfedge[isBdHEdge, 0]] = True 
+        return isBdNode
+
+    def boundary_halfedge_flag(self):
+        return self.halfedge[:, 4]==bm.arange(self.NHE)
+
+
+    def nex_boundary_halfedge(self):
+        halfedge = self.halfedge
+        isBDHEdge = self.boundary_halfedge_flag()
+        bdHEdge = bm.where(isBDHEdge)[0]
+        nex = 100000*bm.ones(self.NHE, dtype=self.itype)
+        nex[bdHEdge] = halfedge[bdHEdge, 2]
+
+        isNotOK = bm.ones(bdHEdge.shape, dtype=bm.bool)
+        while bm.any(isNotOK):
+            nex[bdHEdge[isNotOK]] = halfedge[halfedge[nex[bdHEdge[isNotOK]], 4], 2]
+            isNotOK = ~isBDHEdge[nex[bdHEdge]]
+        return nex
+
+    def boundary_edge_flag(self):
+        halfedge =  self.halfedge
+        hedge = self.hedge
+        isBdEdge = hedge[:] == halfedge[hedge, 4] 
+        return isBdEdge 
+
+    boundary_face_flag = boundary_edge_flag
+
+    def boundary_cell_flag(self):
+        NC = self.NC
+        halfedge =  self.halfedge
+        isBdHEdge = halfedge[:, 4]==bm.arange(self.NHE)
+        isBDCell = bm.zeros(NC, dtype=bm.bool)
+        isBDCell[halfedge[isBdHEdge, 1]] = True 
+        return isBDCell
+
+    def boundary_node_index(self):
+        NN = self.NN
+        halfedge =  self.halfedge 
+        isBdHEdge = halfedge[:, 4]==bm.arange(self.NHE)
+        return halfedge[isBdHEdge, 0]
+
+    def boundary_edge_index(self):
+        isBdEdge = self.boundary_edge_flag()
+        idx, = bm.nonzero(isBdEdge)
+        return idx
+
+    def boundary_halfedge_index(self):
+        isBdHEdge = self.boundary_halfedge_flag()
+        idx, = bm.nonzero(isBdHEdge)
+        return idx
+
+    boundary_face_index = boundary_edge_index
+
+    def boundary_cell_index(self):
+        NN = self.NN
+        halfedge =  self.halfedge 
+        isBdHEdge = halfedge[:, 4]==bm.arange(self.NHE)
+        return halfedge[isBdHEdge, 1]
 
 
 
@@ -747,3 +1022,4 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
 
 
+HalfEdgeMesh2d.set_ploter('polygon2d')

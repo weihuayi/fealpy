@@ -3187,7 +3187,7 @@ class HalfEdgeMesh2dDataStructure():
 
     def edge_to_edge(self):
         edge2node = self.edge_to_node(return_sparse=True)
-        return edge2node@edge2node.transpose()
+        return edge2node@edge2node.tranpose()
 
     def edge_to_cell(self):
         """

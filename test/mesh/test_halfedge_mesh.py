@@ -247,16 +247,16 @@ class TestHalfEdgeMesh():
             tmesh = PolygonMesh(bm.array(node), cell)
         mesh = HalfEdgeMesh2d.from_mesh(tmesh)
         halfedge2cellnum = mesh.halfedge_to_cell_location_number()
+        halfedge2edge = mesh.halfedge_to_edge()
         np.testing.assert_array_equal(data['halfedge2cellnum'], halfedge2cellnum)
+        np.testing.assert_array_equal(data['halfedge2edge'], halfedge2edge)
  
     @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
     @pytest.mark.parametrize("data", ipoint)
     def test_ipoint(self, data, backend):
         bm.set_backend(backend)
         if data['mesh'] =='tri':
-            import ipdb
-            ipdb.set_trace()
-            tmesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2, ny=1,device='cpu')
+            tmesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2, ny=1)
         elif data['mesh'] == 'quad':
             tmesh = QuadrangleMesh.from_box([0, 1, 0, 1], nx=2, ny=1)
         elif data['mesh'] == 'poly':
@@ -278,28 +278,106 @@ class TestHalfEdgeMesh():
        [1.        , 1.        ]])
             cell = np.array([ 0,  2,  4, 10,  5,  2,  6, 11,  4,  1,  3,  0,  5,
                              12,  7,  2,  0, 3,  8, 13,  6,  1,  7, 14,  9,  3,
-                             1,  9, 15,  8], dtype=np.int32,device=None) 
+                             1,  9, 15,  8], dtype=np.int32) 
             cellLocation = np.array([ 0,  5,  9, 15, 21, 25, 30],
                                     dtype=np.int32)
             cell = (bm.array(cell), bm.array(cellLocation))
             tmesh = PolygonMesh(bm.array(node), cell)
         mesh = HalfEdgeMesh2d.from_mesh(tmesh)
         e2p = mesh.edge_to_ipoint(p=3)
-        import ipdb
-        ipdb.set_trace()
         c2p = mesh.cell_to_ipoint(p=3)
         for arr1,arr2 in zip(e2p, data['e2p']):
             np.testing.assert_array_equal(arr1, arr2)
         for arr1,arr2 in zip(c2p, data['c2p']):
             np.testing.assert_array_equal(arr1, arr2)
     
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", boundary)
+    def test_boundary(self, data, backend):
+        bm.set_backend(backend)
+        if data['mesh'] =='tri':
+            tmesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2, ny=1)
+        elif data['mesh'] == 'quad':
+            tmesh = QuadrangleMesh.from_box([0, 1, 0, 1], nx=2, ny=1)
+        elif data['mesh'] == 'poly':
+            node = np.array([[0.33333333, 0.33333333],
+       [0.83333333, 0.33333333],
+       [0.16666667, 0.66666667],
+       [0.66666667, 0.66666667],
+       [0.        , 0.5       ],
+       [0.25      , 0.        ],
+       [0.25      , 1.        ],
+       [0.75      , 0.        ],
+       [0.75      , 1.        ],
+       [1.        , 0.5       ],
+       [0.        , 0.        ],
+       [0.        , 1.        ],
+       [0.5       , 0.        ],
+       [0.5       , 1.        ],
+       [1.        , 0.        ],
+       [1.        , 1.        ]])
+            cell = np.array([ 0,  2,  4, 10,  5,  2,  6, 11,  4,  1,  3,  0,  5,
+                             12,  7,  2,  0, 3,  8, 13,  6,  1,  7, 14,  9,  3,
+                             1,  9, 15,  8], dtype=np.int32) 
+            cellLocation = np.array([ 0,  5,  9, 15, 21, 25, 30],
+                                    dtype=np.int32)
+            cell = (bm.array(cell), bm.array(cellLocation))
+            tmesh = PolygonMesh(bm.array(node), cell)
+        mesh = HalfEdgeMesh2d.from_mesh(tmesh)
+        nex = mesh.nex_boundary_halfedge()
+        isBdNode = mesh.boundary_node_flag()
+        isBdEdge = mesh.boundary_edge_flag()
+        isBdCell = mesh.boundary_cell_flag()
+        isBdHEdge = mesh.boundary_halfedge_flag()
+        np.testing.assert_array_equal(data['isBdNode'], isBdNode)
+        np.testing.assert_array_equal(data['isBdEdge'], isBdEdge)
+        np.testing.assert_array_equal(data['isBdCell'], isBdCell)
+        np.testing.assert_array_equal(data['isBdHalfedge'], isBdHEdge)
+
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", convexity)
+    def test_convexity(self, data, backend):
+        bm.set_backend(backend)
+        pmesh = PolygonMesh.distorted_concave_rhombic_quadrilaterals_mesh(nx=1,ny=2)
+        mesh = HalfEdgeMesh2d.from_mesh(pmesh)
+        mesh.convexity()
+        node = mesh.node
+        halfedge = mesh.halfedge
+        clevel = mesh.celldata['level']
+        hlevel = mesh.halfedgedata['level']
+        np.testing.assert_array_equal(data['halfedge'],halfedge)
+        np.testing.assert_allclose(data['node'],node, atol=1e-12)
+        np.testing.assert_array_equal(data['clevel'],clevel)
+        np.testing.assert_array_equal(data['hlevel'],hlevel)
+
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch"])
+    @pytest.mark.parametrize("data", grad_shape_function)
+    def test_grad_shape_function(self, data, backend):
+        bm.set_backend(backend)
+        mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2, ny=1)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        bc = mesh.multi_index_matrix(3,2)/3
+        grad_lambda = mesh.grad_lambda()
+        print(grad_lambda)
+        grad_shape = mesh.grad_shape_function(bc,p=2)
+        grad_shape = grad_shape.transpose(1,0,2)
+        np.testing.assert_allclose(data['grad_shape_x'], grad_shape, atol=1e-12)
+        grad_shape_u = mesh.grad_shape_function(bc,p=2,variables='u')
+        grad_shape_u = grad_shape_u.transpose(1,0,2)
+        np.testing.assert_allclose(data['grad_shape_u'], grad_shape_u, atol=1e-12)
+
+ 
 if __name__ == "__main__":
-    #pytest.main(["-v", "test_halfedge_mesh.py","-k","test_init"])
-    #pytest.main(["-v", "test_halfedge_mesh.py","-k","test_from_mesh"])
-    #pytest.main(["-v", "test_halfedge_mesh.py","-k","test_cell_to_node_edge_cell"])
-    #pytest.main(["-v", "test_halfedge_mesh.py","-k","test_edge_to_node_edge_cell"])
-    #pytest.main(["-v", "test_halfedge_mesh.py","-k","test_node_to_node_edge_cell"])
-    #pytest.main(["-v", "test_halfedge_mesh.py","-k","test_halfedge_to"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_init"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_from_mesh"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_cell_to_node_edge_cell"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_edge_to_node_edge_cell"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_node_to_node_edge_cell"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_halfedge_to"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_ipoint"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_boundary"])
+    pytest.main(["-v", "test_halfedge_mesh.py","-k","test_convexity"])
     a = TestHalfEdgeMesh() 
     #a.test_init(init_data[0], "numpy")
     #a.test_from_mesh(from_mesh[1], "numpy")
@@ -308,6 +386,8 @@ if __name__ == "__main__":
     #a.test_edge_to_node_edge_cell(edge_to_node_edge_cell[0], "pytorch")
     #a.test_node_to_node_edge_cell(edge_to_node_edge_cell[1], "pytorch")
     #a.test_halfedge_to(edge_to_node_edge_cell[2], "pytorch")
-    a.test_ipoint(ipoint[0], "pytorch")
+    #a.test_ipoint(ipoint[2], "numpy")
+    #a.test_convexity(convexity[0], "pytorch")
+    a.test_grad_shape_function(grad_shape_function[0], "pytorch")
 
 

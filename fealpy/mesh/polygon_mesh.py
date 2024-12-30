@@ -504,4 +504,109 @@ class PolygonMesh(Mesh, Plotable):
         cell = (mesh.entity('cell'),None)
         return cls(node, cell)
 
+    @classmethod
+    def distorted_concave_rhombic_quadrilaterals_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10, ratio=0.618):
+        """
+        @brief 虚单元网格，矩形内部包含一个菱形，两者共用左下和右上的节点
+
+        @param box 网格所占区域
+        @param nx 沿 x 轴方向剖分段数
+        @param ny 沿 y 轴方向剖分段数
+        @param ratio 矩形内部菱形的大小比例
+        """
+        from .quadrangle_mesh import QuadrangleMesh
+        from .uniform_mesh_2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+
+        mesh0 = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(box[0], box[2]))
+        node0 = mesh0.entity("node")
+        cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
+        mesh = QuadrangleMesh(node0, cell0)
+
+        edge = mesh.entity("edge")
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        ftype = node.dtype
+        itype = cell.dtype
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+
+        node_append1 = node[cell[:, 3]] * (1-ratio) + node[cell[:, 1]] * ratio
+        node_append2 = node[cell[:, 3]] * ratio + node[cell[:, 1]] * (1-ratio)
+        new_node = bm.concatenate((node, node_append1, node_append2),axis=0,
+                                  dtype=ftype)
+
+        cell = bm.tile(cell, (3, 1))
+        idx1 = bm.arange(NN, NN + NC, dtype=itype)
+        idx2 = bm.arange(NN + NC, NN + 2 * NC, dtype=itype)
+        cell[0:NC, 3] = idx1
+        cell[NC:2 * NC, 1] = idx1
+        cell[NC:2 * NC, 3] = idx2
+        cell[2 * NC:3 * NC, 1] = idx2
+        cellLocation = bm.arange(0, 4*(NC*3+1),4, dtype=itype)
+        cell = (cell.reshape(-1), cellLocation)
+
+        return cls(new_node, cell)
+
+    @classmethod
+    def nonconvex_octagonal_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10):
+        """
+        @brief 虚单元网格，矩形网格的每条内部边上加一个点后形成的八边形网格
+
+        @param box 网格所占区域
+        @param nx 沿 x 轴方向剖分段数
+        @param ny 沿 y 轴方向剖分段数
+        """
+        from .quadrangle_mesh import QuadrangleMesh
+        from .uniform_mesh_2d import UniformMesh2d
+
+        hx = (box[1] - box[0]) / nx
+        hy = (box[3] - box[2]) / ny
+        NN = (nx + 1) * (ny + 1)
+
+        mesh0 = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(box[0], box[2]))
+        node0 = mesh0.entity("node")
+        cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
+        mesh = QuadrangleMesh(node0, cell0)
+
+        edge = mesh.entity("edge")
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        ftype = node.dtype
+        itype = cell.dtype
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        cell2edge = mesh.cell_to_edge()
+        isbdedge = mesh.boundary_face_flag()
+        isbdcell = mesh.boundary_cell_flag()
+
+        nie = bm.sum(~isbdedge)
+        hx = 1 / nx
+        hy = 1 / ny
+        newnode = bm.zeros((NN + nie, 2), dtype=ftype)
+        newnode[:NN] = node
+        newnode[NN:] = 0.5 * node[edge[~isbdedge, 0]] + 0.5 * node[edge[~isbdedge, 1]]
+        newnode[NN: NN + (nx - 1) * ny] = newnode[NN: NN + (nx - 1) * ny] + bm.array([[0.2 * hx, 0.1 * hy]])
+        newnode[NN + (nx - 1) * ny:] = newnode[NN + (nx - 1) * ny:] + bm.array([[0.1 * hx, 0.2 * hy]])
+
+        edge2newnode = -bm.ones(NE, dtype=itype)
+        edge2newnode[~isbdedge] = bm.arange(NN, newnode.shape[0], dtype=itype)
+        newcell = bm.zeros((NC, 8), dtype=itype)
+        newcell[:, ::2] = cell
+        newcell[:, 1::2] = edge2newnode[cell2edge]
+
+        flag = newcell > -1
+        num = bm.zeros(NC + 1, dtype=itype)
+        num[1:] = bm.sum(flag, axis=-1)
+        newcell = newcell[flag]
+        cellLocation = bm.cumsum(num, axis=0)
+        cell = (newcell, cellLocation)
+        return cls(newnode, cell)
+
+
+
+
 PolygonMesh.set_ploter('polygon2d')
