@@ -62,6 +62,8 @@ class Gear(ABC):
         self.hex_mesh = None
         self.target_quad_mesh = None
         self.targer_hex_mesh = None
+        self.gear_type = 0
+        self.is_max_angle = False
         self._material = material
         self.rotation_direction = rotation_direction
         self.center = center
@@ -360,7 +362,7 @@ class Gear(ABC):
 
         return (tooth_profile_node_right, tooth_profile_node_left), (hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
 
-    def set_target_tooth(self, target_tooth_tag):
+    def set_target_tooth(self, target_tooth_tag, get_wheel=False):
         if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
             raise ValueError('The hex_mesh attribute is not set.')
         target_tooth_tag = sorted(set(target_tooth_tag))
@@ -379,9 +381,6 @@ class Gear(ABC):
 
         # 标记目标齿面相关节点
         is_target_node = np.zeros(total_hex_mesh.number_of_nodes(), dtype=bool)
-        # for cell in target_cell:
-        #     for node in cell:
-        #         is_target_node[node] = True
         is_target_node[target_cell] = True
         target_node_idx = np.where(is_target_node)[0]
         target_node = total_hex_mesh.node[target_node_idx]
@@ -390,12 +389,27 @@ class Gear(ABC):
         node_idx_map = np.zeros(total_hex_mesh.number_of_nodes(), dtype=int)
         node_idx_map[target_node_idx] = np.arange(len(target_node_idx))
         # 单元映射
-        # for i, cell in enumerate(target_cell):
-        #     for j, node in enumerate(cell):
-        #         target_cell[i, j] = node_idx_map[node]
         target_cell = node_idx_map[target_cell]
 
-        self.target_hex_mesh = HexahedronMesh(target_node, target_cell)
+        if not get_wheel:
+            self.target_hex_mesh = HexahedronMesh(target_node, target_cell)
+        else:
+            df = self.d_f
+            total_tooth_node_num = len(target_node)
+            one_tooth_node_num = total_tooth_node_num//tooth_num
+            if self.gear_type == 1:
+                if self.is_max_angle:
+                    pass
+                else:
+                    pass
+            elif self.gear_type == 2:
+                if self.is_max_angle:
+                    pass
+                else:
+                    pass
+            else:
+                raise ValueError('The gear type is not set.')
+
         return self.target_hex_mesh
 
     @property
@@ -453,6 +467,9 @@ class ExternalGear(Gear):
         # 刀具齿顶高与刀尖圆弧半径
         self.ha_cutter = (self.hac + self.cc) * self.m_n
         self.rc = self.m_n * self.rcc
+
+        # 标记外齿轮
+        self.gear_type = 1
 
     def get_involute_points(self, t):
         m_n = self.m_n
@@ -577,6 +594,7 @@ class ExternalGear(Gear):
             max_angle_flag = True
         else:
             max_angle_flag = False
+        self.is_max_angle = max_angle_flag
         # TODO: 改用齿根圆角是否超过最大圆角进行判断与分类
         # 两侧过渡曲线之间相连，齿槽底面为一条直线，宽度为 0
         if max_angle_flag:  # 构造关键点
@@ -1174,6 +1192,9 @@ class InternalGear(Gear):
         ]
         self.t = fsolve(func, [1, 0.75 * pi, 0.25 * self.m_n])
 
+        # 标记内齿轮
+        self.gear_type = 2
+
     @classmethod
     def ainv(cls, x):
         temp = 0
@@ -1257,6 +1278,7 @@ class InternalGear(Gear):
         df11 = 2 * (E + ra_cutter)
 
         if rc >= t[2]:
+            self.is_max_angle = True
             points = np.zeros((2 * (n1 + n2) + 1, 3))
             x0 = 0
             y0 = ra_cutter - rc

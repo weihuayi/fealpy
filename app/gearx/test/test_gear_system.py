@@ -110,6 +110,7 @@ class TestGearSystem:
         # quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
         # quad_mesh_from_cpp.to_vtk(fname='internal_quad_mesh_cpp.vtu')
 
+
     def test_get_profile_node(self):
         with open('../data/external_gear.pkl', 'rb') as f:
             data = pickle.load(f)
@@ -442,7 +443,19 @@ class TestGearSystem:
         with open('../data/part_internal_gear_data.pkl', 'wb') as f:
             pickle.dump({'internal_gear': internal_gear, 'hex_mesh': target_hex_mesh, 'helix_node': helix_node,
                          'target_cell_idx': target_cell_idx, 'parameters': parameters,
-                         'is_inner_node': is_outer_node, 'inner_node_idx': outer_node_idx}, f)
+                         'is_outer_node': is_outer_node, 'inner_node_idx': outer_node_idx}, f)
+
+    def test_get_part_external_gear(self):
+        with open('../data/external_gear_data_part.pkl', 'rb') as f:
+            data = pickle.load(f)
+        external_gear = data['external_gear']
+        hex_mesh = data['hex_mesh']
+        helix_node = data['helix_node']
+        target_cell_idx = data['target_cell_idx']
+        parameters = data['parameters']
+        is_inner_node = data['is_inner_node']
+        inner_node_idx = data['inner_node_idx']
+
 
 
 
