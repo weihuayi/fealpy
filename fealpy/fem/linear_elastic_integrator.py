@@ -115,7 +115,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def fetch_fast_assembly(self, space: _FS):
         index = self.index
-        mesh = getattr(space, 'mesh', None)
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
     
         if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The LinearElasticIntegrator only support spaces on"
@@ -123,10 +124,10 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
     
         cm = mesh.entity_measure('cell', index=index)
-        q = space.p+3 if self.q is None else self.q
+        q = scalar_space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi_lambda = space.grad_basis(bcs, index=index, variable='u')    # (NQ, LDOF, BC)
+        gphi_lambda = scalar_space.grad_basis(bcs, index=index, variable='u')    # (NQ, LDOF, BC)
 
         if isinstance(mesh, SimplexMesh):
             glambda_x = mesh.grad_lambda()       # (NC, LDOF, GD)
@@ -145,7 +146,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def fetch_fast_assembly_uniform(self, space: _FS):
         index = self.index
-        mesh = getattr(space, 'mesh', None)
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
     
         if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The LinearElasticIntegrator only support spaces on"
@@ -153,10 +155,10 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                                "not a subclass of HomoMesh.")
     
         cm = mesh.entity_measure('cell', index=index)
-        q = space.p+3 if self.q is None else self.q
+        q = scalar_space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gphi_lambda = space.grad_basis(bcs, index=index, variable='u')    # (NQ, LDOF, BC)
+        gphi_lambda = scalar_space.grad_basis(bcs, index=index, variable='u')    # (NQ, LDOF, BC)
 
         J = mesh.jacobi_matrix(bcs)[:, 0, ...]        # (NC, GD, GD)
         G = mesh.first_fundamental_form(J)            # (NC, GD, GD)
@@ -170,7 +172,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def fetch_symbolic_assembly(self, space: _TS) -> TensorLike:
         index = self.index
-        mesh = getattr(space, 'mesh', None)
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
     
         if not isinstance(mesh, HomogeneousMesh):
             raise RuntimeError("The LinearElasticIntegrator only support spaces on"
@@ -180,7 +183,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         cm = mesh.entity_measure('cell', index=index)
         glambda_x = mesh.grad_lambda()  # (NC, LDOF, GD)
         
-        symbolic_int = SymbolicIntegration(space)
+        symbolic_int = SymbolicIntegration(scalar_space)
         M = bm.tensor(symbolic_int.gphi_gphi_matrix()) # (LDOF1, LDOF1, GD+1, GD+1)
 
         return cm, mesh, glambda_x, bm.asarray(M, dtype=bm.float64)
@@ -360,7 +363,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @assemblymethod('fast_strain')
     def fast_assembly_strain(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
-        cm, ws, mesh, gphi_lambda, glambda_x = self.fetch_fast_assembly(scalar_space)
+        cm, ws, mesh, gphi_lambda, glambda_x = self.fetch_fast_assembly(space)
 
         if not isinstance(mesh, SimplexMesh):
             raise RuntimeError("The mesh should be an instance of SimplexMesh.")
@@ -413,7 +416,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     def fast_assembly_stress(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
-        cm, ws, gphi_lambda, glambda_x, JG = self.fetch_fast_assembly(scalar_space)
+        cm, ws, gphi_lambda, glambda_x, JG = self.fetch_fast_assembly(space)
         
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
@@ -478,7 +481,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     def fast_assembly_stress_uniform(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
-        cm, JG, M = self.fetch_fast_assembly_uniform(scalar_space)
+        cm, JG, M = self.fetch_fast_assembly_uniform(space)
         
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
@@ -534,7 +537,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     @assemblymethod('symbolic_stress')
     def symbolic_assembly_stress(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
-        cm, mesh, glambda_x, M = self.fetch_symbolic_assembly(scalar_space)
+        cm, mesh, glambda_x, M = self.fetch_symbolic_assembly(space)
 
         if not isinstance(mesh, SimplexMesh):
             raise RuntimeError("The mesh should be an instance of SimplexMesh.")
