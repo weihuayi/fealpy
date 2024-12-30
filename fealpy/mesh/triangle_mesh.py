@@ -93,6 +93,20 @@ class TriangleMesh(SimplexMesh, Plotable):
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
         return quad
 
+    def update_bcs(self, bcs, toetype: Union[int, str]='cell'):
+        TD = bcs.shape[-1] - 1
+        if toetype == 'cell' or toetype == 2: 
+            if TD == 2:
+                return bcs
+            elif TD == 1: # edge up to cell
+                result = bm.stack([bm.insert(bcs, i, 0.0, axis=-1) for i in range(3)], axis=0)
+                return result
+            else:
+                raise ValueError("Unsupported topological dimension: {TD}")
+                    
+        else:
+            raise ValueError("The etype only support face, other etype is not implemented.")
+    
     # shape function
     def grad_lambda(self, index: Index=_S, TD:int=2) -> TensorLike:
         """
@@ -125,7 +139,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @berif 这里调用的是网格空间基函数的梯度
         """
-        TD = bc.shape[1] - 1
+        TD = bc.shape[-1] - 1
         R = bm.simplex_grad_shape_function(bc, p)
         if variables == 'x':
             Dlambda = self.grad_lambda(index=index, TD=TD)
@@ -253,6 +267,9 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
+
+    def boundary_edge_flag(self):
+        return self.boundary_face_flag()
 
     def cell_to_face_sign(self):
         """
@@ -1172,7 +1189,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         @return TriangleMesh instance
         """
         if itype is None:
-            itype = bm.int32
+            itype = bm.int64
         if ftype is None:
             ftype = bm.float64
         
@@ -1239,6 +1256,53 @@ class TriangleMesh(SimplexMesh, Plotable):
         l = bm.sqrt(bm.sum(node ** 2, axis=1))
         n = node / l[..., None]
         node = node - d[..., None] * n
+        return cls(node, cell)
+
+    @classmethod
+    def from_unit_circle_gmesh(cls, h, *, itype=None, ftype=None, device=None):
+        """
+        Generate a triangular mesh for a unit circle by gmsh.
+
+        @param h Parameter controlling mesh density
+        @return TriangleMesh instance
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("UnitCircle")
+
+        # 创建单位圆
+        gmsh.model.occ.addDisk(0.0, 0.0, 0.0, 1, 1, 1)
+
+        # 同步几何模型
+        gmsh.model.occ.synchronize()
+
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = node_coords.reshape((-1, 3))[:, :2]
+
+        # 节点编号映射
+        nodetags_map = dict({j: i for i, j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        # 节点编号映射到单元
+        evid = bm.array([nodetags_map[j] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1], -1))
+
+        gmsh.finalize()
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
         return cls(node, cell)
 
     ## @ingroup MeshGenerators

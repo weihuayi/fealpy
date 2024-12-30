@@ -32,7 +32,18 @@ class Solver():
         self.pde = pde
         self.dt = dt
         self.q = q
+        self.is_bd = pde.is_stick_boundary
     
+    def CH_BForm_0(self):
+        phispace = self.phispace
+        dt = self.dt
+        L_d = self.pde.L_d
+        epsilon = self.pde.epsilon
+        s = self.pde.s
+        V_s = self.pde.V_s
+        q = self.q
+        return A
+
     def CH_BForm(self):
         phispace = self.phispace
         dt = self.dt
@@ -45,6 +56,7 @@ class Solver():
         A00 = BilinearForm(phispace)
         M = ScalarMassIntegrator(coef=3, q=q)
         self.phi_C = ScalarConvectionIntegrator(q=q)
+        self.phi_C.keep_data()
         A00.add_integrator(M)
         A00.add_integrator(self.phi_C)
 
@@ -54,7 +66,7 @@ class Solver():
         A10 = BilinearForm(phispace)
         A10.add_integrator(ScalarDiffusionIntegrator(coef=-epsilon, q=q))
         A10.add_integrator(ScalarMassIntegrator(coef=-s/epsilon, q=q))
-        A10.add_integrator(BoundaryFaceMassIntegrator(coef=-3/(2*dt*V_s), q=q, threshold=self.pde.is_wall_boundary))     
+        A10.add_integrator(BoundaryFaceMassIntegrator(coef=-3/(2*dt*V_s), q=q, threshold=self.is_bd))     
 
         A11 = BilinearForm(phispace)
         A11.add_integrator(ScalarMassIntegrator(coef=1, q=q))
@@ -72,7 +84,9 @@ class Solver():
 
         L1 = LinearForm(phispace)
         self.mu_SI = SourceIntegrator(q=q)
-        self.mu_BF_SI = BoundaryFaceSourceIntegrator(q=q, threshold=self.pde.is_wall_boundary)
+        self.mu_BF_SI = BoundaryFaceSourceIntegrator(q=q, threshold=self.is_bd)
+        self.mu_SI.keep_data()
+        self.mu_BF_SI.keep_data()
         L1.add_integrator(self.mu_SI)
         L1.add_integrator(self.mu_BF_SI)
 
@@ -84,6 +98,7 @@ class Solver():
         s = self.pde.s
         epsilon =self.pde.epsilon
         tangent = self.mesh.edge_unit_tangent()
+        tangent[..., 0] = 1
         V_s = self.pde.V_s
         theta_s = self.pde.theta_s
 
@@ -124,7 +139,7 @@ class Solver():
             result1 = result10 - result11
 
             result2 = -2*(bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2) * phi_1(bcs, index))
-            result2 += (bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2)*phi_0(bcs, index))
+            result2 +=   (bm.sqrt(bm.array(2))/6) * bm.pi * bm.cos(theta_s) * bm.cos((bm.pi/2) * phi_0(bcs, index))
             
             result = (1/V_s)*(result0 + result1) + result2
             return result
@@ -142,9 +157,10 @@ class Solver():
         A00 = BilinearForm(uspace)
         M = ScalarMassIntegrator(coef=3*R, q=q)
         self.u_C = ScalarConvectionIntegrator(q=q)
+        self.u_C.keep_data()
         D = ScalarDiffusionIntegrator(coef=2*dt, q=q)
         ## TODO:和老师确认一下这个边界积分子 
-        FM = TangentFaceMassIntegrator(coef=2*dt/L_s, q=q, threshold=self.pde.is_wall_boundary)
+        FM = TangentFaceMassIntegrator(coef=2*dt/L_s, q=q, threshold=self.is_bd)
         A00.add_integrator(M)
         A00.add_integrator(self.u_C)
         A00.add_integrator(D)
@@ -169,14 +185,10 @@ class Solver():
 
         L0 = LinearForm(uspace) 
         self.u_SI = SourceIntegrator(q=q)
-        self.u_BF_SI = BoundaryFaceSourceIntegrator(q=q, threshold=self.pde.is_wall_boundary)
-        
-        @cartesian
-        def uw_BF_SI_coef(p):
-            return (2*dt/L_s)*self.pde.u_w(p)
-        uw_BF_SI = BoundaryFaceSourceIntegrator(source=uw_BF_SI_coef, q=q, threshold=self.pde.is_wall_boundary)
-        
-        L0.add_integrator(uw_BF_SI)
+        self.u_BF_SI = BoundaryFaceSourceIntegrator(q=q, threshold=self.is_bd)
+        self.u_SI.keep_data()
+        self.u_BF_SI.keep_data()
+
         L0.add_integrator(self.u_SI)
         L0.add_integrator(self.u_BF_SI)
 
@@ -191,6 +203,7 @@ class Solver():
         epsilon = self.pde.epsilon
         normal = self.mesh.edge_unit_normal()
         tangent = self.mesh.edge_unit_tangent()
+        tangent[..., 0] = 1
         
         L_s = self.pde.L_s
         theta_s = self.pde.theta_s
@@ -216,8 +229,7 @@ class Solver():
             L_phi +=   (bm.sqrt(bm.array(2))/6)*bm.pi*bm.cos(theta_s)*bm.cos((bm.pi/2)*phi_1(bcs, index))
             
             result = 2*dt*lam*L_phi*bm.einsum('eld, ed -> el', phi_2.grad_value(bcs, index), tangent[index,:])
-            result = bm.repeat(result[..., bm.newaxis], 2, axis=-1)
-            
+            result = bm.repeat(result[..., bm.newaxis], 2, axis=-1) 
             return result
         self.u_BF_SI.source = u_BF_SI_coef
         self.u_BF_SI.clear()

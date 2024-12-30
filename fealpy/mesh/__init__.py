@@ -12,3 +12,6 @@ from .halfedge_mesh import HalfEdgeMesh2d
 
 from .uniform_mesh_2d import UniformMesh2d
 from .uniform_mesh_3d import UniformMesh3d
+
+from .lagrange_triangle_mesh import LagrangeTriangleMesh
+from .lagrange_quadrangle_mesh import LagrangeQuadrangleMesh

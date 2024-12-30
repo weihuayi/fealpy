@@ -98,7 +98,7 @@ for i in range(maxit):
     bform = BilinearForm(space)
     bform.add_integrator(ScalarDiffusionIntegrator(method='fast'))
     lform = LinearForm(space)
-    lform.add_integrator(ScalarSourceIntegrator(pde.source))
+    lform.add_integrator(ScalarSourceIntegrator(pde.source), splitter=32768)
 
     A = bform.assembly()
     F = lform.assembly()

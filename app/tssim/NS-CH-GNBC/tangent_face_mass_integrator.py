@@ -36,6 +36,7 @@ class TangentFaceMassIntegrator(LinearInt, OpInt, FaceInt):
                 bc = mesh.entity_barycenter('face', index=index)
                 index = index[threshold(bc)]
         return index
+
     
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -52,10 +53,10 @@ class TangentFaceMassIntegrator(LinearInt, OpInt, FaceInt):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        facemeasure = mesh.entity_measure('face', index=index)
+        facemeasure = mesh.entity_measure('edge', index=index)
         t = mesh.edge_unit_tangent()
         q = space.p+3 if self.q is None else self.q
-        qf = mesh.quadrature_formula(q, 'face')
+        qf = mesh.quadrature_formula(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = space.face_basis(bcs, index)
         return bcs, ws, phi, facemeasure, index, t
@@ -65,8 +66,8 @@ class TangentFaceMassIntegrator(LinearInt, OpInt, FaceInt):
         bcs, ws, phi, fm, index, t = self.fetch(space)
         mesh = space.mesh
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
+        t[...,0] = 1
         phit = bm.einsum('eqid, ed -> eqi', phi, t[index,...])
-        #phii = bm.einsum('eqid -> eqi', phi)
-        phii = phi[...,0]
+        phii = bm.einsum('eqid -> eqi', phi)
         result = bilinear_integral(phii, phit, ws, fm, val, batched=self.batched)
         return result

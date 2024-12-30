@@ -14,7 +14,7 @@ logger.setLevel('ERROR') #积分子问题
 
 bm.set_backend("numpy")
 pde = example_1()
-n = 160
+n = 10
 q = 3
 T = 1
 nt = 500

@@ -228,25 +228,25 @@ class ComplianceObjective(ObjectiveBase):
         dc : 目标函数对密度的梯度
         """
         
-        # 创建计时器
-        t = timer(f"Gradient Computation ({diff_mode} mode)")
-        next(t)
+        # # 创建计时器
+        # t = timer(f"Gradient Computation ({diff_mode} mode)")
+        # next(t)
 
         # 选择计算方法
         if diff_mode == "manual":
             dc = self._compute_gradient_manual(rho, u)
-            t.send('Manual gradient computed')
+            # t.send('Manual gradient computed')
         elif diff_mode == "auto":  
             dc = self._compute_gradient_auto(rho)
-            t.send('Automatic gradient computed')
+            # t.send('Automatic gradient computed')
 
         # 应用滤波（如果需要）
         if self.filter is not None:
             dc = self.filter.filter_sensitivity(dc, rho, 'objective', filter_params)
-            t.send("Sensitivity filter applied")
+            # t.send("Sensitivity filter applied")
 
         # 结束计时
-        t.send(None)
+        # t.send(None)
         
         return dc
         

@@ -101,6 +101,14 @@
             "camera_models/chessboard_4",
             "camera_models/chessboard_5",
             "camera_models/chessboard_6"],
+    "pic_folder": [
+        "pic_folder/0_images",
+        "pic_folder/1_images",
+        "pic_folder/2_images",
+        "pic_folder/3_images",
+        "pic_folder/4_images",
+        "pic_folder/5_images"],
+
   "center_height": 3,
   "mark_board": [
       [[240.946,702.130],[265.611,726.620],[326.989,605.794],[291.346,599.545],

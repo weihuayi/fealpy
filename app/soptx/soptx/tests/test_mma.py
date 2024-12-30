@@ -14,7 +14,7 @@ from soptx.material import (
     SIMPInterpolation
 )
 from soptx.pde import MBBBeam2dData1, Cantilever2dData1, Cantilever3dData1
-from soptx.solver import ElasticFEMSolver
+from soptx.solver import ElasticFEMSolver, AssemblyMethod, AssemblyConfig
 from soptx.opt import ComplianceObjective, VolumeConstraint
 from soptx.filter import Filter, FilterConfig
 from soptx.opt import MMAOptimizer
@@ -43,6 +43,11 @@ class TestConfig:
     tolerance: float = 0.01
     initial_lambda: float = 1e9
     bisection_tol: float = 1e-3
+
+    assembly_method: AssemblyMethod = AssemblyMethod.VOIGT_UNIFORM  # 矩阵组装方法
+    quadrature_degree_increase: int = 3  # 积分阶数增量
+    solver_type: Literal['cg', 'direct'] = 'cg'  # 求解器类型
+    solver_params: Optional[Dict[str, Any]] = None  # 求解器参数
     
 
 def create_base_components(config: TestConfig):
@@ -56,7 +61,7 @@ def create_base_components(config: TestConfig):
         origin = [0.0, 0.0, 0.0]
         mesh = UniformMesh3d(
                             extent=extent, h=h, origin=origin,
-                            ipoints_ordering='zyx', flip_direction='y',
+                            ipoints_ordering='zyx', flip_direction=None,
                             device='cpu'
                         )
         dimension = 3
@@ -66,7 +71,7 @@ def create_base_components(config: TestConfig):
         origin = [0.0, 0.0]
         mesh = UniformMesh2d(
                         extent=extent, h=h, origin=origin,
-                        ipoints_ordering='yx', flip_direction='y',
+                        ipoints_ordering='yx', flip_direction=None,
                         device='cpu'
                     )
         dimension = 2
@@ -107,15 +112,26 @@ def create_base_components(config: TestConfig):
                         ymin=0, ymax=config.ny*h[1],
                         zmin=0, zmax=config.nz*h[2]
                     )
+    assembly_config = AssemblyConfig(
+                        method=config.assembly_method,
+                        quadrature_degree_increase=config.quadrature_degree_increase
+                    )
     
-    # Create solver
+    # 设置默认的求解器参数
+    default_solver_params = {
+                            'cg': {'maxiter': 5000, 'atol': 1e-12, 'rtol': 1e-12},
+                            'direct': {'solver_type': 'mumps'}
+                        }
+    solver_params = config.solver_params or default_solver_params[config.solver_type]
+
     solver = ElasticFEMSolver(
-       material_properties=material_properties,
-       tensor_space=tensor_space_C,
-       pde=pde,
-       solver_type='cg',  # 添加默认求解器类型
-       solver_params={'maxiter': 5000, 'atol': 1e-12, 'rtol': 1e-12}  # 添加求解器参数
-   )
+                            material_properties=material_properties,
+                            tensor_space=tensor_space_C,
+                            pde=pde,
+                            assembly_config=assembly_config,
+                            solver_type=config.solver_type,  
+                            solver_params=solver_params 
+                        )
     
     # Initialize density field
     array = config.volume_fraction * bm.ones(mesh.number_of_cells(), dtype=bm.float64)
@@ -130,9 +146,9 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     
     # Create filter based on configuration
     filter_config = FilterConfig(
-                            filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
-                            filter_radius=config.filter_radius
-                        )
+                        filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
+                        filter_radius=config.filter_radius
+                    )
     filter_obj = Filter(filter_config)
     filter_obj.initialize(mesh)
     
@@ -150,16 +166,16 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     
     # Create optimizer
     optimizer = MMAOptimizer(
-        objective=objective,
-        constraint=constraint,
-        m=1,
-        n=mesh.number_of_cells(),
-        filter=filter_obj,
-        options={
-            'max_iterations': config.max_iterations,
-            'tolerance': config.tolerance
-        }
-    )
+                    objective=objective,
+                    constraint=constraint,
+                    m=1,
+                    n=mesh.number_of_cells(),
+                    filter=filter_obj,
+                    options={
+                        'max_iterations': config.max_iterations,
+                        'tolerance': config.tolerance
+                    }
+                )
     
     # Prepare optimization parameters
     opt_params = {}
@@ -167,7 +183,7 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
         opt_params['beta'] = config.projection_beta
     
     # Run optimization
-    rho_opt, history = optimizer.optimize(rho=rho[:], **opt_params)
+    rho_opt, history = optimizer.optimize(rho[:], **opt_params)
     
     return {
         'optimal_density': rho_opt,
@@ -198,7 +214,7 @@ if __name__ == "__main__":
 
     config3 = TestConfig(
         problem_type='cantilever_3d',
-        nx=6, ny=2, nz=4,
+        nx=60, ny=20, nz=4,
         volume_fraction=0.3,
         filter_radius=1.5,
         filter_type='density',

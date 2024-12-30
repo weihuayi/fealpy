@@ -6,10 +6,14 @@ from OpenGL.arrays import vbo
 
 from fealpy import logger
 import ipdb
+import time
+import os
 
 class GLMesh:
-    def __init__(self, node, cell=None, texture_paths=[], texture_unit=0,
-                 flip='LR', tag = 'single', shader_program = None):
+    def __init__(self, node, cell=None, texture_paths=[], 
+                 texture_folders=[],
+                 texture_unit=0,
+                 flip='LR0', tag = 'single', shader_program = None):
         """
         @brief 初始化网格类，根据节点的数据格式配置顶点属性，并加载纹理（如果提供）。
 
@@ -25,6 +29,7 @@ class GLMesh:
         self.node = node 
         self.cell = cell if cell is not None else None
         self.texture_paths = texture_paths
+        self.texture_folders = texture_folders
         self.texture_ids = None
         self.texture_unit = texture_unit # TODO 作用?
         self.shader_program = shader_program
@@ -95,29 +100,66 @@ class GLMesh:
 
         # Load texture if provided
         if len(self.texture_paths) > 0:
-            self.texture_ids = [self.load_texture(path) for path in self.texture_paths]
+            images = [self.get_image(path) for path in self.texture_paths]
+            self.texture_ids = [self.load_texture(image) for image in images]
         if len(self.texture_paths) > 1:
             print(self.texture_ids)
             print(self.texture_paths)
             #self.load_texture()
 
-    def load_texture(self, texture_path):
-        """
-        @brief 加载并配置网格的纹理。
+    def get_all_textures(self):
+        images_path = []
+        # self.texture_paths
+        # 是一个文件夹的列表，现在取出其中的每个文件夹中的图片的路径
+        for path in self.texture_folders:
+            images_path.append(sorted(os.listdir(path)))
 
-        纹理图片从指定的路径加载。加载后的纹理将绑定到纹理单元并配置相应的纹理参数。
-        """
-        # Load the image with Pillow
-        image = Image.open(texture_path)
+        NF = len(images_path)  # Number of folders
+        NP = len(images_path[0]) # Number of pictures
+        NP = 10
+        images = []
+        for i in range(NP):
+            image0 = []
+            for j in range(NF):
+                img = self.get_image(self.texture_folders[j] + '/' + images_path[j][i])
+                image0.append(img)
+            images.append(image0)
+        print("Read all images successfully!")
+        return images
+
+    def get_folder_textures(self, folder):
+        images_path = sorted(os.listdir(folder))
+
+        NP = len(images_path) # Number of pictures
+        NP = 500
+        images = []
+        for i in range(NP):
+            img = self.get_image(folder + '/' + images_path[i])
+            images.append(img)
+        print("Read all images successfully!")
+        return images
+
+    def get_image(self, image_path):
+        image = Image.open(image_path)
         if self.flip == 'TB':
             image = image.transpose(Image.FLIP_TOP_BOTTOM)  # Flip the image for OpenGL
         elif self.flip == 'LR':
             image = image.transpose(Image.FLIP_LEFT_RIGHT)  # Flip the image for OpenGL
         img_data = image.convert("RGBA").tobytes()  # Convert the image to RGBA format
+        return (img_data, image.width, image.height)
 
+    def load_texture(self, image_data, texture_id = None):
+        """
+        @brief 加载并配置网格的纹理。
+
+        纹理图片从指定的路径加载。加载后的纹理将绑定到纹理单元并配置相应的纹理参数。
+        """
         # Generate a texture ID and bind it
-        texture_id = glGenTextures(1)
+        if texture_id is None:
+            texture_id = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, texture_id)
+
+        img_data, width, height = image_data
 
         # Set texture parameters
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
@@ -126,7 +168,7 @@ class GLMesh:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
         # Load the image data into the texture object
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
 
         # Generate mipmaps
         glGenerateMipmap(GL_TEXTURE_2D)
@@ -223,5 +265,52 @@ class GLMesh:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
         if len(self.texture_paths) > 0:
             glBindTexture(GL_TEXTURE_2D, 0)
+
+
+    def redraw(self, mode, images):
+        """
+        @brief 使用提供的着色器程序绘制网格。
+
+        @param shader_program: 用于绘制网格的着色器程序ID。
+        @param mode: 显示模式控制
+
+        该方法绑定网格的VAO和纹理（如果有），并根据是否提供了单元格索引来执行绘制命令。
+        """
+        self.texture_ids = [self.load_texture(img, tid) for img, tid in zip(images, self.texture_ids)]
+
+        glBindVertexArray(self.vao)  # Bind the VAO for this mesh
+        glUseProgram(self.shader_program)
+
+        if mode == 3:
+            if self.texture_ids is not None and self.node.shape[1] in [5, 8]: 
+                self.draw_texture()
+            else:
+                self.draw_face()
+        elif mode == 2:
+            self.draw_edge() # 先画边，后画面
+            self.draw_face()
+        elif mode == 1:
+            self.draw_edge()
+        elif mode == 0:
+            self.draw_face()
+
+        glBindVertexArray(0)
+        if self.ebo is not None:
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+        if len(self.texture_paths) > 0:
+            glBindTexture(GL_TEXTURE_2D, 0)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
