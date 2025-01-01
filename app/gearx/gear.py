@@ -11,7 +11,8 @@ from fealpy.geometry.utils import *
 from app.gearx.utils import *
 
 class Gear(ABC):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material=None, rotation_direction=1, center=(0,0,0), name=None):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material=None,
+                 rotation_direction=1, center=(0, 0, 0), name=None):
         """
 
         @param m_n: 法向模数
@@ -64,6 +65,8 @@ class Gear(ABC):
         self.targer_hex_mesh = None
         self.gear_type = 0
         self.is_max_angle = False
+        self.single_node_num = 0
+        self.number_of_key_points = 0
         self._material = material
         self.rotation_direction = rotation_direction
         self.center = center
@@ -356,37 +359,62 @@ class Gear(ABC):
         tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 2]
         tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
 
-        for i in range(1, nw+1):
+        for i in range(1, nw + 1):
             tooth_profile_node_right[..., i, :] = tooth_profile_node_right[..., 0, :] + i * t_NN
             tooth_profile_node_left[..., i, :] = tooth_profile_node_left[..., 0, :] + i * t_NN
 
-        return (tooth_profile_node_right, tooth_profile_node_left), (hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
+        return (tooth_profile_node_right, tooth_profile_node_left), (
+        hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
 
     def set_target_tooth(self, target_tooth_tag, get_wheel=False):
         if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
             raise ValueError('The hex_mesh attribute is not set.')
-        target_tooth_tag = sorted(set(target_tooth_tag))
+        # 检查输出齿数是否合规
+        target_tooth_tag = np.array(sorted(set(target_tooth_tag)))
+        tooth_num = len(target_tooth_tag)
+        gap_index = -1
+        is_gap = False
+        z = self.z
+        for i in range(tooth_num):
+            diff = (target_tooth_tag[(i + 1) % tooth_num] - target_tooth_tag[i]) % z
+            if diff == 1:
+                continue
+            if (diff > 1) and (not is_gap):
+                is_gap = True
+                gap_index = i
+            else:
+                raise ValueError('The target tooth number is not continuous.')
         self.target_tooth_tag = target_tooth_tag
         total_quad_mesh = self.mesh
         total_hex_mesh = self.hex_mesh
 
-        tooth_num = len(target_tooth_tag)
+        if get_wheel:
+            total_node = total_quad_mesh.node
+            total_cell = total_quad_mesh.cell
+            total_number_of_nodes = total_quad_mesh.number_of_nodes()
+            total_number_of_cells = total_quad_mesh.number_of_cells()
+            cell_tooth_tag = total_quad_mesh.celldata["cell_tooth_tag"]
+        else:
+            total_node = total_hex_mesh.node
+            total_cell = total_hex_mesh.cell
+            total_number_of_nodes = total_hex_mesh.number_of_nodes()
+            total_number_of_cells = total_hex_mesh.number_of_cells()
+            cell_tooth_tag = total_hex_mesh.celldata["cell_tooth_tag"]
         # 获取目标齿相关单元
-        cell_tooth_tag = total_hex_mesh.celldata["cell_tooth_tag"]
-        is_target_cell = np.zeros(total_hex_mesh.number_of_cells(), dtype=bool)
+        is_target_cell = np.zeros(total_number_of_cells, dtype=bool)
         for tag in target_tooth_tag:
             is_target_cell |= (cell_tooth_tag == tag)
         target_cell_idx = np.where(is_target_cell)[0]
-        target_cell = total_hex_mesh.cell[target_cell_idx]
+        target_cell = total_cell[target_cell_idx]
 
         # 标记目标齿面相关节点
-        is_target_node = np.zeros(total_hex_mesh.number_of_nodes(), dtype=bool)
+        is_target_node = np.zeros(total_number_of_nodes, dtype=bool)
         is_target_node[target_cell] = True
         target_node_idx = np.where(is_target_node)[0]
-        target_node = total_hex_mesh.node[target_node_idx]
+        target_node = total_node[target_node_idx]
 
         # 构建节点映射
-        node_idx_map = np.zeros(total_hex_mesh.number_of_nodes(), dtype=int)
+        node_idx_map = np.zeros(total_number_of_nodes, dtype=int)
         node_idx_map[target_node_idx] = np.arange(len(target_node_idx))
         # 单元映射
         target_cell = node_idx_map[target_cell]
@@ -396,19 +424,209 @@ class Gear(ABC):
         else:
             df = self.d_f
             total_tooth_node_num = len(target_node)
-            one_tooth_node_num = total_tooth_node_num//tooth_num
+            single_node_num = self.single_node_num
+            number_of_key_points = self.number_of_key_points
             if self.gear_type == 1:
-                if self.is_max_angle:
-                    pass
+                na1 = int(self.na / 2)
+                na2 = self.na - na1
+                n3 = self.n3
+                start_num = gap_index % len(target_tooth_tag)
+                end_num = (gap_index + 1) % len(target_tooth_tag)
+                if (target_tooth_tag[0] == 0 and (target_tooth_tag[-1] != (z - 1))) or target_tooth_tag[0] != 0:
+                    node_start = target_node[-single_node_num]
+                    node_end = target_node[0]
+                    node_temp = target_node[1]
                 else:
-                    pass
+                    node_start = target_node[start_num * single_node_num + 3 + (n3 - 1) + (na1 - 1)]
+                    node_end = target_node[end_num * single_node_num + 3 + (n3 - 1) + (na1 - 1)]
+                    node_temp = target_node[end_num * single_node_num + 1 + 3 + (n3 - 1) + (na1 - 1)]
+                angle_start = np.arctan2(node_start[1], node_start[0]) % (2 * pi)
+                angle_end = np.arctan2(node_end[1], node_end[0]) % (2 * pi)
+                r_temp = np.sqrt(node_temp[0] ** 2 + node_temp[1] ** 2)
+
+                if angle_end < angle_start:
+                    angle_end += 2 * pi
+                phi = np.linspace(angle_start, angle_end, 2 * na2 * (self.z - tooth_num))[1:-1]
+                r1 = np.linspace(self.inner_diam / 2, r_temp, self.n3 + 1)
+                r2 = np.linspace(r_temp, df / 2, na1 + 1)
+                r = np.concatenate((r1, r2[1:]))
+
+                x = np.einsum('r,p->pr', r, np.cos(phi))[..., None]
+                y = np.einsum('r,p->pr', r, np.sin(phi))[..., None]
+                wheel_node = np.concatenate([x, y], axis=-1)
+                wheel_node = wheel_node.reshape(-1, 2)
+
+                gap_tooth_num = len(target_tooth_tag) - 1
+                wheel_node_idx = np.zeros((len(phi) + 2, len(r)), dtype=np.int64)
+                wheel_node_idx[1:-1, :] = np.arange(total_tooth_node_num,
+                                                    total_tooth_node_num + len(wheel_node)).reshape(-1, len(r))
+                wheel_node_idx[0, 0] = start_num * single_node_num + 3 + (n3 - 1) + (na1 - 1)
+                wheel_node_idx[0, 1:n3] = np.arange(
+                    start_num * single_node_num + number_of_key_points + (n3 - 1) + (na1 - 1),
+                    start_num * single_node_num + number_of_key_points + 2 * (n3 - 1) + (na1 - 1))[::-1]
+                wheel_node_idx[0, n3] = start_num * single_node_num + 4 + (n3 - 1) + (na1 - 1)
+                wheel_node_idx[0, n3 + 1:n3 + na1] = np.arange(
+                    start_num * single_node_num + number_of_key_points + 2 * (n3 - 1) + (na1 - 1),
+                    start_num * single_node_num + number_of_key_points + 2 * (n3 - 1) + 2 * (na1 - 1))[::-1]
+                wheel_node_idx[0, n3 + na1] = start_num * single_node_num + 5 + (n3 - 1) + (na1 - 1)
+                if target_tooth_tag[0] == 0 and (target_tooth_tag[-1] != (z - 1)):
+                    wheel_node_idx[-1, 0] = 0
+                    wheel_node_idx[-1, 1:n3] = np.arange(number_of_key_points, number_of_key_points + n3 - 1)
+                    wheel_node_idx[-1, n3] = 1
+                    wheel_node_idx[-1, n3 + 1:n3 + na1] = np.arange(number_of_key_points + (n3 - 1),
+                                                                    number_of_key_points + (n3 - 1) + (na1 - 1))
+                    wheel_node_idx[-1, n3 + na1] = 2
+                elif target_tooth_tag[0] != 0:
+                    wheel_node_idx[-1, 0] = 0
+                    wheel_node_idx[-1, 1:n3] = np.arange(3, 3 + n3 - 1)[::-1]
+                    wheel_node_idx[-1, n3] = 1
+                    wheel_node_idx[-1, n3 + 1:n3 + na1] = np.arange(3 + (n3 - 1), 3 + (n3 - 1) + (na1 - 1))[::-1]
+                    wheel_node_idx[-1, n3 + na1] = 2
+                else:
+                    wheel_node_idx[-1, 0] = end_num * single_node_num + 3 + (n3 - 1) + (na1 - 1)
+                    wheel_node_idx[-1, 1:n3] = np.arange(
+                        end_num * single_node_num  + 6 + (n3 - 1) + (na1 - 1),
+                        end_num * single_node_num  + 6 +  n3 - 1 + (n3 - 1) + (na1 - 1))[::-1]
+                    wheel_node_idx[-1, n3] = end_num * single_node_num + 1 + 3 + (n3 - 1) + (na1 - 1)
+                    wheel_node_idx[-1, n3 + 1:n3 + na1] = np.arange(
+                        end_num * single_node_num + 6 + (n3 - 1) + (n3 - 1) + (na1 - 1),
+                        end_num * single_node_num + 6 + (n3 - 1) + (na1 - 1) + (n3 - 1) + (
+                                    na1 - 1))[::-1]
+                    wheel_node_idx[-1, n3 + na1] = end_num * single_node_num + 2 + 3 + (n3 - 1) + (na1 - 1)
+
+                wheel_cell = np.zeros((len(phi) + 1, len(r) - 1, 4), dtype=np.int64)
+
+                wheel_cell[..., 0] = wheel_node_idx[:-1, :-1]
+                wheel_cell[..., 1] = wheel_node_idx[:-1, 1:]
+                wheel_cell[..., 2] = wheel_node_idx[1:, 1:]
+                wheel_cell[..., 3] = wheel_node_idx[1:, :-1]
+                wheel_cell = wheel_cell.reshape(-1, 4)
+
+                total_quad_node = np.concatenate([target_node, wheel_node], axis=0)
+                total_quad_cell = np.concatenate([target_cell, wheel_cell], axis=0)
             elif self.gear_type == 2:
-                if self.is_max_angle:
-                    pass
+                n1 = self.n1
+                n2 = self.n2
+                n3 = self.n3
+                na2 = self.na - int(self.na / 2)
+                start_num = gap_index % len(target_tooth_tag)
+                end_num = (gap_index + 1) % len(target_tooth_tag)
+                if (target_tooth_tag[0] == 0 and (target_tooth_tag[-1] != (z - 1))) or target_tooth_tag[0] != 0:
+                    node_start = target_node[-single_node_num]
+                    node_end = target_node[0]
+                    node_temp1 = target_node[1]
+                    node_temp2 = target_node[2]
                 else:
-                    pass
+                    node_start = target_node[start_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
+                    node_end = target_node[end_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
+                    node_temp1 = target_node[end_num * single_node_num + 1  + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
+                    node_temp2 = target_node[end_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
+                angle_start = np.arctan2(node_start[1], node_start[0]) % (2 * pi)
+                angle_end = np.arctan2(node_end[1], node_end[0]) % (2 * pi)
+                r_temp1 = np.sqrt(node_temp1[0] ** 2 + node_temp1[1] ** 2)
+                r_temp2 = np.sqrt(node_temp2[0] ** 2 + node_temp2[1] ** 2)
+
+                if angle_end < angle_start:
+                    angle_end += 2 * pi
+                phi = np.linspace(angle_start, angle_end, 2 * na2 * (self.z - tooth_num))[1:-1]
+                r1 = np.linspace(self.r_a, r_temp1, n1 + 1)
+                r2 = np.linspace(r_temp1, r_temp2, n2 + 1)
+                r3 = np.linspace(r_temp2, self.outer_diam/2, n3 + 1)
+                r = np.concatenate((r1, r2[1:], r3[1:]))
+
+                x = np.einsum('r,p->pr', r, np.cos(phi))[..., None]
+                y = np.einsum('r,p->pr', r, np.sin(phi))[..., None]
+                wheel_node = np.concatenate([x, y], axis=-1)
+                wheel_node = wheel_node.reshape(-1, 2)
+
+                wheel_node_idx = np.zeros((len(phi) + 2, len(r)), dtype=np.int64)
+                wheel_node_idx[1:-1, :] = np.arange(total_tooth_node_num,
+                                                    total_tooth_node_num + len(wheel_node)).reshape(-1, len(r))
+                wheel_node_idx[0, 0] = start_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                wheel_node_idx[0, 1:n1] = np.arange(
+                    start_num * single_node_num + number_of_key_points + (n1 - 1) + (n2 - 1) + (n3 - 1),
+                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + (n2 - 1) + (n3 - 1))[::-1]
+                wheel_node_idx[0, n1] = start_num * single_node_num + 1 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                wheel_node_idx[0, n1 + 1:n1 + n2] = np.arange(
+                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + (n2 - 1) + (n3 - 1),
+                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + 2 * (n2 - 1) + (n3 - 1))[::-1]
+                wheel_node_idx[0, n1 + n2] = start_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                wheel_node_idx[0, n1 + n2 + 1:n1 + n2 + n3] = np.arange(
+                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + 2 * (n2 - 1) + (n3 - 1),
+                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + 2 * (n2 - 1) + 2 * (n3 - 1))[::-1]
+                wheel_node_idx[0, n1 + n2 + n3] = start_num * single_node_num + 3 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                if target_tooth_tag[0] == 0 and (target_tooth_tag[-1] != (z - 1)):
+                    wheel_node_idx[-1, 0] = 0
+                    wheel_node_idx[-1, 1:n1] = np.arange(number_of_key_points, number_of_key_points + n1 - 1)
+                    wheel_node_idx[-1, n1] = 1
+                    wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(number_of_key_points + (n1 - 1),
+                                                                    number_of_key_points + (n1 - 1) + (n2 - 1))
+                    wheel_node_idx[-1, n1 + n2] = 2
+                    wheel_node_idx[-1, n1 + n2 + 1:n1 + n2 + n3] = np.arange(number_of_key_points + (n1 - 1) + (n2 - 1),
+                                                                   number_of_key_points + (n1 - 1) + (n2 - 1) + (n3 - 1))
+                    wheel_node_idx[-1, n1 + n2 + n3] = 3
+                elif target_tooth_tag[0] != 0:
+                    wheel_node_idx[-1, 0] = 0
+                    wheel_node_idx[-1, 1:n1] = np.arange(4, 4 + n1 - 1)[::-1]
+                    wheel_node_idx[-1, n1] = 1
+                    wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(4 + (n1 - 1), 4 + (n1 - 1) + (n2 - 1))[::-1]
+                    wheel_node_idx[-1, n1 + n2] = 2
+                    wheel_node_idx[-1, n1 + n2 + 1:n1 + n2 + n3] = np.arange(4 + (n1 - 1) + (n2 - 1), 4 + (n1 - 1) + (n2 - 1) + (n3-1))[::-1]
+                    wheel_node_idx[-1, n1 + n2 + n3] = 3
+                else:
+                    wheel_node_idx[-1, 0] = end_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                    wheel_node_idx[-1, 1:n1] = np.arange(
+                        end_num * single_node_num + 8 + (n1 - 1) + (n2 - 1) + (n3 - 1),
+                        end_num * single_node_num + 8 + 2*(n1 - 1) + (n2 - 1) + (n3 - 1))[::-1]
+                    wheel_node_idx[-1, n1] = end_num * single_node_num + 1 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                    wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(
+                        end_num * single_node_num + 8 + 2*(n1 - 1) + (n2 - 1) + (n3 - 1),
+                        end_num * single_node_num + 8 + 2*(n1 - 1) + 2*(n2 - 1) + (n3 - 1))[::-1]
+                    wheel_node_idx[-1, n1 + n2] = end_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                    wheel_node_idx[-1, n1 + n2 + 1:n1 + n2 + n3] = np.arange(
+                        end_num * single_node_num + 8 + 2*(n1 - 1) + 2*(n2 - 1) + (n3 - 1),
+                        end_num * single_node_num + 8 + 2 * (n1 - 1) + 2 * (n2 - 1) + 2*(n3 - 1))[::-1]
+                    wheel_node_idx[-1, n1 + n2 + n3] = end_num * single_node_num + 3 + 4 + (n1 - 1) + (n2 - 1) + (
+                                n3 - 1)
+
+                wheel_cell = np.zeros((len(phi) + 1, len(r) - 1, 4), dtype=np.int64)
+
+                wheel_cell[..., 0] = wheel_node_idx[:-1, :-1]
+                wheel_cell[..., 1] = wheel_node_idx[:-1, 1:]
+                wheel_cell[..., 2] = wheel_node_idx[1:, 1:]
+                wheel_cell[..., 3] = wheel_node_idx[1:, :-1]
+                wheel_cell = wheel_cell.reshape(-1, 4)
+
+                total_quad_node = np.concatenate([target_node, wheel_node], axis=0)
+                total_quad_cell = np.concatenate([target_cell, wheel_cell], axis=0)
             else:
                 raise ValueError('The gear type is not set.')
+            node = total_quad_node
+            cell = total_quad_cell
+            beta = self.beta
+            r = self.r
+            tooth_width = self.tooth_width
+            nw = self.nw
+            rotation_direction = self.rotation_direction
+            # 数据处理，将二维点转换为三维点
+            new_node = np.zeros((len(node), 3))
+            new_node[:, 0:2] = node
+            one_section_node_num = len(new_node)
+
+            # 创建齿轮整体网格
+            # 拉伸节点
+            volume_node = sweep_points(new_node, beta, r, tooth_width, nw, rotation_direction).reshape(-1, 3)
+            # 将端面四边形单元拉伸为六面体单元
+            volume_cell = np.zeros((nw, len(cell), 8), dtype=np.int64)
+            cell_domain_tag = np.zeros((nw, len(cell)))
+            cell_tooth_tag = np.zeros((nw, len(cell)))
+            # 填充单元的节点索引
+            for i in range(nw):
+                volume_cell[i, :, 0:4] = cell + i * one_section_node_num
+                volume_cell[i, :, 4:8] = cell + (i + 1) * one_section_node_num
+            volume_cell = volume_cell.reshape(-1, 8)
+
+            self.target_hex_mesh = HexahedronMesh(volume_node, volume_cell)
 
         return self.target_hex_mesh
 
@@ -423,8 +641,9 @@ class Gear(ABC):
 
 
 class ExternalGear(Gear):
-    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia, inner_diam, tooth_width,
-                 material=None, rotation_direction=1, center=(0,0,0), name=None):
+    def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia, inner_diam,
+                 tooth_width,
+                 material=None, rotation_direction=1, center=(0, 0, 0), name=None):
         """
 
         @param m_n: 法向模数
@@ -450,7 +669,8 @@ class ExternalGear(Gear):
         @param center: 齿轮中心坐标，默认为原点
         @param name: 齿轮名称
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material, rotation_direction, center, name)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material,
+                         rotation_direction, center, name)
         self.inner_diam = inner_diam
         self.chamfer_dia = chamfer_dia
         # 齿顶圆直径与半径
@@ -557,11 +777,12 @@ class ExternalGear(Gear):
         # t4 = 1.5 * np.pi
         def involutecross_rb(t):
             return self.get_transition_intersection_points(t) - self.r_b
+
         def involutecross_rf(t):
             return self.get_transition_intersection_points(t) - self.r_f
 
-        t3 = fsolve(involutecross_rb, 2*np.pi-alpha_t)[0]
-        t4 = fsolve(involutecross_rf, 1.5*np.pi)[0]
+        t3 = fsolve(involutecross_rb, 2 * np.pi - alpha_t)[0]
+        t4 = fsolve(involutecross_rf, 1.5 * np.pi)[0]
         width2 = t3 - t4
         t = np.linspace(t4, t3, n2 + 1)
         points[0:n2 + 1, 0:-1] = self.get_transition_points(t)
@@ -590,7 +811,7 @@ class ExternalGear(Gear):
         r_inner = self.inner_diam / 2
 
         one_tooth_angle = abs(delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector"))
-        if one_tooth_angle*z > 2*pi:
+        if one_tooth_angle * z > 2 * pi:
             max_angle_flag = True
         else:
             max_angle_flag = False
@@ -652,6 +873,7 @@ class ExternalGear(Gear):
             kp4 = np.array([r_kp11 * np.cos(angle_kp4), r_kp11 * np.sin(angle_kp4)])
             key_points = np.array(
                 [kp0, kp1, kp2, kp3, kp4, kp5, kp6, kp7, kp8, kp9, kp10, kp11, kp12, kp13, kp14, kp15, kp16, kp17])
+            self.number_of_key_points = len(key_points)
 
             # 构造半边数据结构所用分区边
             edge = np.array([[0, 1],
@@ -740,6 +962,7 @@ class ExternalGear(Gear):
 
             # 旋转构建剩余点与单元，并依次拼接
             single_node_num = len(tooth_node) - (n3 + na1 + 1)
+            self.single_node_num = single_node_num
             temp_node = np.concatenate(
                 [tooth_node[3:len(key_points)], tooth_node[len(key_points) + (n3 - 1) + (na1 - 1):]], axis=0)
             # 最后一个齿的节点，需要特殊处理
@@ -907,6 +1130,7 @@ class ExternalGear(Gear):
             key_points = np.array(
                 [kp0, kp1, kp2, kp3, kp4, kp5, kp6, kp7, kp8, kp9, kp10, kp11, kp12, kp13, kp14, kp15, kp16, kp17, kp18,
                  kp19, kp20, kp21, kp22, kp23])
+            self.number_of_key_points = len(key_points)
 
             # 构造半边数据结构所用分区边
             edge = np.array([[0, 1],
@@ -1019,9 +1243,10 @@ class ExternalGear(Gear):
             tooth_cell = quad_mesh.cell
             origin_cell = quad_mesh.cell
             cell_cell_num = len(origin_cell)
-            cell_tooth_tag = np.zeros(cell_cell_num*z, dtype=np.int_)
+            cell_tooth_tag = np.zeros(cell_cell_num * z, dtype=np.int_)
             # 旋转构建剩余点与单元，并依次拼接
             single_node_num = len(tooth_node) - (n3 + na1 + 1)
+            self.single_node_num = single_node_num
             temp_node = np.concatenate(
                 [tooth_node[3:len(key_points)], tooth_node[len(key_points) + (n3 - 1) + (na1 - 1):]], axis=0)
             # 最后一个齿的节点，需要特殊处理
@@ -1048,7 +1273,7 @@ class ExternalGear(Gear):
             rot_matrix = np.array([[np.cos(rot_phi[1]), -np.sin(rot_phi[1])], [np.sin(rot_phi[1]), np.cos(rot_phi[1])]])
             new_node = np.einsum('ij,jn->in', rot_matrix, temp_node.T).T
             new_cell = trans_matrix[origin_cell]
-            cell_tooth_tag[cell_cell_num:2*cell_cell_num] = 1
+            cell_tooth_tag[cell_cell_num:2 * cell_cell_num] = 1
             # 拼接
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
@@ -1074,7 +1299,7 @@ class ExternalGear(Gear):
                 trans_matrix[len(key_points) + (n3 - 1) + (na1 - 1):] += single_node_num
                 # 新单元映射与拼接
                 new_cell = trans_matrix[origin_cell]
-                cell_tooth_tag[i*cell_cell_num:(i+1)*cell_cell_num] = i
+                cell_tooth_tag[i * cell_cell_num:(i + 1) * cell_cell_num] = i
                 tooth_node = np.concatenate([tooth_node, new_node], axis=0)
                 tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
 
@@ -1104,7 +1329,7 @@ class ExternalGear(Gear):
             trans_matrix[len(key_points) + 2 * (n3 - 1) + 2 * (na1 - 1):] += single_node_num - (n3 - 1) - (na1 - 1) - 3
             # 新单元映射与拼接
             new_cell = trans_matrix[origin_cell]
-            cell_tooth_tag[(z-1) * cell_cell_num:] = z-1
+            cell_tooth_tag[(z - 1) * cell_cell_num:] = z - 1
             tooth_node = np.concatenate([tooth_node, new_node], axis=0)
             tooth_node = np.dot(tooth_node, np.array([[0, -1], [1, 0]]))
             tooth_cell = np.concatenate([tooth_cell, new_cell], axis=0)
@@ -1119,7 +1344,7 @@ class ExternalGear(Gear):
 
 class InternalGear(Gear):
     def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
-                 xn_cutter, tooth_width, material=None, rotation_direction=1, center=(0,0,0), name=None):
+                 xn_cutter, tooth_width, material=None, rotation_direction=1, center=(0, 0, 0), name=None):
         """
 
         @param m_n: 法向模数
@@ -1146,7 +1371,8 @@ class InternalGear(Gear):
         @param center: 齿轮中心坐标，默认为原点
         @param name: 齿轮名称
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material, rotation_direction, center, name)
+        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material,
+                         rotation_direction, center, name)
         self.outer_diam = outer_diam
         self.z_cutter = z_cutter
         self.xn_cutter = xn_cutter
@@ -1419,7 +1645,9 @@ class InternalGear(Gear):
             kp17 = np.array([0, r_kp2]).reshape(1, -1)
 
             key_points = np.concatenate(
-                [kp0, kp1, kp2, kp3, kp4, kp5, kp6, kp7, kp8, kp9, kp10, kp11, kp12, kp13, kp14, kp15, kp16, kp17, kp18], axis=0)
+                [kp0, kp1, kp2, kp3, kp4, kp5, kp6, kp7, kp8, kp9, kp10, kp11, kp12, kp13, kp14, kp15, kp16, kp17,
+                 kp18], axis=0)
+            self.number_of_key_points = len(key_points)
 
             # 构造 edge 与 line
             edge = np.array([[0, 1],
@@ -1458,8 +1686,8 @@ class InternalGear(Gear):
             delta_kp8_12 = np.linspace(angle_kp8, angle_kp12, na1 + 1)
             delta_kp13_10 = np.linspace(angle_kp13, angle_kp10, na1 + 1)
             delta_kp4_13 = np.linspace(angle_kp4, angle_kp13, na2 + 1)
-            delta_kp17_2 = np.linspace(pi/2, angle_kp0, na2 + 1).reshape(-1, 1)
-            delta_kp6_17 = np.linspace(angle_kp4, pi/2, na2 + 1).reshape(-1, 1)
+            delta_kp17_2 = np.linspace(pi / 2, angle_kp0, na2 + 1).reshape(-1, 1)
+            delta_kp6_17 = np.linspace(angle_kp4, pi / 2, na2 + 1).reshape(-1, 1)
             delta_kp3_15 = delta_kp17_2[::-1]
             delta_kp15_7 = delta_kp6_17[::-1]
             line = [
@@ -1509,6 +1737,7 @@ class InternalGear(Gear):
 
             # 生成完整内齿
             single_node_num = len(tooth_node) - (n1 + n2 + n3 + 1)
+            self.single_node_num = single_node_num
             single_cell_num = len(tooth_cell)
             temp_node = np.concatenate(
                 [tooth_node[4:len(key_points)], tooth_node[len(key_points) + (n1 + n2 + n3 - 3):]], axis=0)
@@ -1679,6 +1908,7 @@ class InternalGear(Gear):
                 [kp0, kp1, kp2, kp3, kp4, kp5, kp6, kp7, kp8, kp9, kp10, kp11, kp12, kp13, kp14, kp15, kp16, kp17, kp18,
                  kp19, kp20, kp21, kp22, kp23, kp24],
                 axis=0)
+            self.number_of_key_points = len(key_points)
             # 构造 edge 与 line
             edge = np.array([[0, 1],
                              [1, 2],
@@ -1793,6 +2023,7 @@ class InternalGear(Gear):
 
             # 生成完整内齿
             single_node_num = len(tooth_node) - (n1 + n2 + n3 + 1)
+            self.single_node_num = single_node_num
             single_cell_num = len(tooth_cell)
             temp_node = np.concatenate(
                 [tooth_node[4:len(key_points)], tooth_node[len(key_points) + (n1 + n2 + n3 - 3):]], axis=0)
@@ -1963,6 +2194,7 @@ if __name__ == '__main__':
     z_cutter = data['z_cutter']
     xn_cutter = data['xn_cutter']
 
-    internal_gear = InternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, outer_diam, z_cutter, xn_cutter)
+    internal_gear = InternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, outer_diam, z_cutter,
+                                 xn_cutter)
     q_mesh = internal_gear.generate_mesh()
     internal_gear.show_mesh()

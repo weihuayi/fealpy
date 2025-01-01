@@ -110,7 +110,6 @@ class TestGearSystem:
         # quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
         # quad_mesh_from_cpp.to_vtk(fname='internal_quad_mesh_cpp.vtu')
 
-
     def test_get_profile_node(self):
         with open('../data/external_gear.pkl', 'rb') as f:
             data = pickle.load(f)
@@ -411,6 +410,11 @@ class TestGearSystem:
 
         hex_mesh = internal_gear.generate_hexahedron_mesh()
         target_hex_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
+        # part_external_gear_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
+        # part_external_gear_mesh_wheel = internal_gear.set_target_tooth([0, 1, 2, 78, 79], get_wheel=True)
+        #
+        # part_external_gear_mesh.to_vtk(fname='../data/part_internal_gear_mesh.vtu')
+        # part_external_gear_mesh_wheel.to_vtk(fname='../data/part_internal_gear_hex_mesh_wheel.vtu')
 
         n = 15
         helix_d = np.linspace(internal_gear.d, internal_gear.d_a, n)
@@ -446,16 +450,35 @@ class TestGearSystem:
                          'is_outer_node': is_outer_node, 'inner_node_idx': outer_node_idx}, f)
 
     def test_get_part_external_gear(self):
-        with open('../data/external_gear_data_part.pkl', 'rb') as f:
-            data = pickle.load(f)
-        external_gear = data['external_gear']
-        hex_mesh = data['hex_mesh']
-        helix_node = data['helix_node']
-        target_cell_idx = data['target_cell_idx']
-        parameters = data['parameters']
-        is_inner_node = data['is_inner_node']
-        inner_node_idx = data['inner_node_idx']
+        with open('../data/external_gear_data.json', 'r') as file:
+            data = json.load(file)
+        m_n = data['mn']  # 法向模数
+        z = data['z']  # 齿数
+        alpha_n = data['alpha_n']  # 法向压力角
+        beta = data['beta']  # 螺旋角
+        x_n = data['xn']  # 法向变位系数
+        hac = data['hac']  # 齿顶高系数
+        cc = data['cc']  # 顶隙系数
+        rcc = data['rcc']  # 刀尖圆弧半径
+        jn = data['jn']  # 法向侧隙
+        n1 = data['n1']  # 渐开线分段数
+        n2 = data['n2']  # 过渡曲线分段数
+        n3 = data['n3']
+        na = data['na']
+        nf = data['nf']
+        nw = data['nw']
+        tooth_width = data['tooth_width']
+        inner_diam = data['inner_diam']  # 轮缘内径
+        chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
 
+        external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia,
+                                     inner_diam, tooth_width)
+        hex_mesh = external_gear.generate_hexahedron_mesh()
+        part_external_gear_mesh = external_gear.set_target_tooth([18, 0, 1, 2, 3, 4])
+        part_external_gear_mesh_wheel = external_gear.set_target_tooth([18, 0, 1, 2, 3, 4], get_wheel=True)
+
+        part_external_gear_mesh.to_vtk(fname='../data/part_external_gear_mesh.vtu')
+        part_external_gear_mesh_wheel.to_vtk(fname='../data/part_external_gear_hex_mesh_wheel.vtu')
 
 
 
