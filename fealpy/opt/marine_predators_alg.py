@@ -33,8 +33,16 @@ class MarinePredatorsAlg(Optimizer):
         P = 0.5
         FADs = 0.2
         x_new = bm.zeros((N, dim))
-        # curve = bm.zeros((1, MaxIT))
+        curve = bm.zeros((1, MaxIT))
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
+            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
+            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            
             CF = (1 - it / MaxIT) ** (2 * it / MaxIT)
             if it <= MaxIT / 3:
                 RB = bm.random.randn(N, dim)
@@ -63,5 +71,9 @@ class MarinePredatorsAlg(Optimizer):
             fit = self.fun(x)[:, None]
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            # curve[0, it] = gbest_f
-        return gbest, gbest_f
+            curve[0, it] = gbest_f
+        self.gbest = gbest
+        self.gbest_f = gbest_f
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]

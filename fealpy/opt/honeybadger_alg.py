@@ -26,7 +26,7 @@ class HoneybadgerAlg(Optimizer):
         option = self.options
         x = option["x0"]
         N =  option["NP"]
-        T = option["MaxIters"]
+        MaxIT = option["MaxIters"]
         fit = self.fun(x)[:, None]
         dim = option["ndim"]
         lb, ub = option["domain"]
@@ -36,8 +36,12 @@ class HoneybadgerAlg(Optimizer):
         C = 2
         eps = 2.2204e-16
         beta = 6
-        for t in range (0, T):
-            alpha = C * bm.exp(bm.array(-t/T))
+        curve = bm.zeros((1, MaxIT))
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
+        for it in range (0, MaxIT):
+            alpha = C * bm.exp(bm.array(-it / MaxIT))
             di = ((bm.linalg.norm(x - gbest +eps, axis=1)) ** 2)[:, None]
             S = ((bm.linalg.norm(x - bm.concatenate((x[1:], x[0:1])) + eps, 2, axis=1)) ** 2)[:, None]
             r2 = bm.random.rand(N, 1)
@@ -60,5 +64,9 @@ class HoneybadgerAlg(Optimizer):
             x, fit = bm.where(mask, x_new, x), bm.where(mask, fit_new, fit)
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            # print("HBA: The optimum at iteration", t + 1, "is", gbest_f) 
-        return gbest, gbest_f
+            curve[0, it] = gbest_f[0]
+        self.gbest = gbest
+        self.gbest_f = gbest_f[0]
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]
