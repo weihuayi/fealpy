@@ -90,9 +90,10 @@ class Optimizer():
         plt.title("exploration vs exploitation percentage")
         plt.show()  
 
-    def plot_curve(self):
-        plt.semilogy(self.curve)
+    def plot_curve(self, label):
+        plt.semilogy(self.curve, label=label)
         plt.xlabel('Iteration')
         plt.ylabel("Best fitness obtained so far")
         plt.title("Convergence curve")
+        plt.legend()
         plt.show()

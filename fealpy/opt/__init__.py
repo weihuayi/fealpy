@@ -37,6 +37,5 @@ from .sand_cat_swarm_opt import SandCatSwarmOpt
 from .jellyfish_search_opt import JellyfishSearchOpt
 from .artificial_rabbits_opt import ArtificialRabbitsOpt
 from .starfish_opt_alg import StarFishOptAlg
-from .kmean_opt_alg import KmeanOptAlg
 from .zebra_opt_alg import ZebraOptAlg
 from .seagull_opt_alg import SeagullOptAlg
