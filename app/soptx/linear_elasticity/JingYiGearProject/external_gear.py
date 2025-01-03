@@ -272,9 +272,9 @@ mises_elem_node = bm.sqrt(0.5 * (
                     (sigma_yy_node - sigma_zz_node)**2 +
                     6 * (tau_xy_node**2 + tau_xz_node**2 + tau_yz_node**2)
                 )) # (NC, NCN)
-print(f"mises_elem_node0: {mises_elem_node[0]}")
-print(f"mises_elem_node5000: {mises_elem_node[5000]}")
-print(f"mises_elem_node10000: {mises_elem_node[10000]}")
+# print(f"mises_elem_node0: {mises_elem_node[0]}")
+# print(f"mises_elem_node5000: {mises_elem_node[5000]}")
+# print(f"mises_elem_node10000: {mises_elem_node[10000]}")
 # mises_elem_node_map = [7, 3, 1, 5, 6, 2, 0, 4]
 # 3. 平均分配到节点
 mises_node = bm.zeros(NN, dtype=bm.float64)

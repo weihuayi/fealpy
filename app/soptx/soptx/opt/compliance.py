@@ -249,57 +249,6 @@ class ComplianceObjective(ObjectiveBase):
         # t.send(None)
         
         return dc
-        
-    # def jac(self,
-    #         rho: TensorLike,
-    #         u: Optional[TensorLike] = None,
-    #         filter_params: Optional[Dict[str, Any]] = None) -> TensorLike:
-    #     """计算目标函数梯度
-        
-    #     Parameters
-    #     ----------
-    #     rho : 密度场
-    #     u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
-    #     filter_params : 滤波器参数
-        
-    #     Returns
-    #     -------
-    #     dc : 目标函数对密度的梯度
-    #     """
-    #     # 创建计时器
-    #     t = timer("Grad Timing")
-    #     next(t)  # 启动计时器
-    #     # 获取位移场
-    #     dc_func = bm.vmap(bm.jacfwd(func=self.fun)) # 输入比输出少
-    #     dc_value = dc_func(rho)
-    #     t.send('auto grad')
-    #     print("dc_func:", dc_func)
-    #     print("dc_auto:", dc_value)
-    #     # dc = bm.jacrev(func=self.fun) # 输入比输出多
-
-    #     if u is None:
-    #         u = self._update_u(rho)
-            
-    #     # 获取单元柔度
-    #     ce = (self.get_element_compliance() 
-    #           if self._element_compliance is not None 
-    #           else self._compute_element_compliance(u))
-        
-    #     # 计算梯度
-    #     dE = self.material_properties.calculate_elastic_modulus_derivative(rho)
-    #     dc = -bm.einsum('c, c -> c', dE, ce)
-    #     print("dc_manual:", dc)
-    #     t.send('manual grad')
-
-    #     # 结束计时
-    #     t.send(None)
-        
-    #     # 应用滤波
-    #     if self.filter is None:
-    #         return dc
-        
-    #     # 明确指定这是目标函数的梯度    
-    #     return self.filter.filter_sensitivity(dc, rho, 'objective', filter_params)
     
     def hess(self, rho: TensorLike, lambda_: dict) -> TensorLike:
         """计算目标函数 Hessian 矩阵（未实现）"""
