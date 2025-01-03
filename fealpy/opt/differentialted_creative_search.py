@@ -30,7 +30,10 @@ class DifferentialtedCreativeSearch(Optimizer):
         gbest_index = bm.argmin(fit)
         gbest = x[gbest_index]
         gbest_f = fit[gbest_index]
-
+        curve = bm.zeros((1, MaxIT))
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
         # Parameters
         golden_ratio = 2 / (1 + bm.sqrt(bm.array(5)))
         ngS = int(bm.max(bm.array([6, bm.round(N * (golden_ratio / 3))])))
@@ -38,6 +41,11 @@ class DifferentialtedCreativeSearch(Optimizer):
         phi_qKR = 0.25 + 0.55 * ((0 + ((1 + bm.arange(0, N)) / N)) ** 0.5)[:, None] # Eq.(8)
         x_new = bm.zeros((N, dim))
         for it in range(MaxIT):
+            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
+            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            
             bestInd = 0
             lamda_t = 0.1 + (0.518 * ((1 - (it / MaxIT) ** 0.5))) # Eq.(13)
             index = bm.argsort(fit, axis=0)
@@ -80,5 +88,9 @@ class DifferentialtedCreativeSearch(Optimizer):
             x, fit = bm.where(mask, x_new, x), bm.where(mask, fit_new, fit) # Eq.(22)
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f) # Eq.(23)
-
-        return gbest, gbest_f
+            curve[0, it] = gbest_f[0]
+        self.gbest = gbest
+        self.gbest_f = gbest_f[0]
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]

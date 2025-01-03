@@ -27,7 +27,7 @@ class CrayfishOptAlg(Optimizer):
         option = self.options
         x = option["x0"]
         N =  option["NP"]
-        T = option["MaxIters"]
+        MaxIT = option["MaxIters"]
         dim = option["ndim"]
         lb, ub = option["domain"]
         
@@ -35,31 +35,40 @@ class CrayfishOptAlg(Optimizer):
         gbest_idx = bm.argmin(fit)
         gbest_f = fit[gbest_idx]
         gbest = x[gbest_idx] 
-       
-
+        fit_new = bm.zeros((N,))
+        curve = bm.zeros((1, MaxIT))
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
         global_position = gbest
         global_fitness = gbest_f
-        for t in range(0, T):
-            C = 2 - (t / T)
+        for it in range(0, MaxIT):
+            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
+            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            
+            C = 2 - (it / MaxIT)
             temp = bm.random.rand(1) * 15 + 20
             xf = (gbest + global_position) / 2
             p = 0.2 * (1 / (bm.sqrt(bm.array(2 * bm.pi) * 3))) * bm.exp(bm.array(- (temp - 25) ** 2 / (2 * 3 ** 2)))
             rand = bm.random.rand(N, 1)
             rr = bm.random.rand(4, N, dim)
-            # z = [random.randint(0, N - 1) for _ in range(N)]
-            z = bm.random.randint(0, N - 1, (N,))
+
+            z = bm.random.randint(0, N, (N,))
 
             gbest = gbest.reshape(1, dim)
 
             P = 3 * bm.random.rand(N) * fit / (gbest_f + 2.2204e-16)
           
-            x_new = ((temp > 30) * ((rand < 0.5) * (x + C * rr[0] * (xf -x)) + 
+            x_new = ((temp > 30) * ((rand < 0.5) * (x + C * bm.random.rand(N, dim) * (xf - x)) + 
                                     (rand > 0.5) * (x - x[z] + xf)) + 
-                     (temp <= 30) * ((P[:, None] > 2) * (x + bm.cos(2 * rr[1] * bm.pi) * gbest * p - bm.sin(2 * bm.pi * rr[2] * gbest * p)) + 
-                                     (P[:, None] <= 2) * ((x - gbest) * p + p * rr[3] * x)))
+                     (temp <= 30) * ((P[:, None] > 2) * (x + bm.cos(2 * bm.random.rand(N, dim) * bm.pi) * gbest * p - bm.sin(2 * bm.pi * bm.random.rand(N, dim) * gbest * p)) + 
+                                     (P[:, None] <= 2) * ((x - gbest) * p + p * bm.random.rand(N, dim) * x)))
             x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)          
             fit_new = self.fun(x_new)
-
+            # for i in range(N):
+            #     fit_new[i] = self.fun(x_new[i])
             mask = fit_new < fit
             x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
             newbest_id = bm.argmin(fit_new)
@@ -69,4 +78,9 @@ class CrayfishOptAlg(Optimizer):
                 gbest_f = fit[gbest_idx]
                 gbest = x[gbest_idx].reshape(1, dim)
             gbest = gbest.flatten()
-        return gbest, gbest_f
+            curve[0, it] = gbest_f
+        self.gbest = gbest
+        self.gbest_f = gbest_f
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]
