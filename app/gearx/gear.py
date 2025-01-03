@@ -783,6 +783,19 @@ class ExternalGear(Gear):
 
         t3 = fsolve(involutecross_rb, 2 * np.pi - alpha_t)[0]
         t4 = fsolve(involutecross_rf, 1.5 * np.pi)[0]
+        # 检验是否超过最大圆角
+        max_angle = pi/z+pi/2
+        temp_node = self.get_transition_points(t4)[0]
+        temp_angle = np.arctan2(temp_node[1], temp_node[0])%(2*pi)
+        if temp_angle > max_angle:
+            self.is_max_angle = True
+            def max_angle_param(t):
+                p = self.get_transition_points(t)[0]
+                return np.arctan2(p[1], p[0])%(2*pi) - max_angle
+            t4 = fsolve(max_angle_param, 1.5 * pi)[0]
+        else:
+            self.is_max_angle = False
+
         width2 = t3 - t4
         t = np.linspace(t4, t3, n2 + 1)
         points[0:n2 + 1, 0:-1] = self.get_transition_points(t)
@@ -811,14 +824,8 @@ class ExternalGear(Gear):
         r_inner = self.inner_diam / 2
 
         one_tooth_angle = abs(delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector"))
-        if one_tooth_angle * z > 2 * pi:
-            max_angle_flag = True
-        else:
-            max_angle_flag = False
-        self.is_max_angle = max_angle_flag
-        # TODO: 改用齿根圆角是否超过最大圆角进行判断与分类
         # 两侧过渡曲线之间相连，齿槽底面为一条直线，宽度为 0
-        if max_angle_flag:  # 构造关键点
+        if self.is_max_angle:  # 构造关键点
             kp2 = points[n1 + n2 + 1, :2]
             angle_kp2 = np.arctan2(kp2[1], kp2[0])
             delta_angle_kp2 = pi / 2 - angle_kp2

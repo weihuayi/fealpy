@@ -43,7 +43,7 @@ class TestGearSystem:
         quad_mesh = external_gear.generate_mesh()
         # quad_mesh.to_vtk(fname='../data/external_quad_mesh.vtu')
         hex_mesh = external_gear.generate_hexahedron_mesh()
-        # hex_mesh.to_vtk(fname='external_hex_mesh.vtu')
+        hex_mesh.to_vtk(fname='../data/test_param_external_hex_mesh.vtu')
         #
         # with open('external_gear.pkl', 'wb') as f:
         #     pickle.dump({'quad_mesh': quad_mesh, 'gear': external_gear, 'hex_mesh': hex_mesh}, f)
