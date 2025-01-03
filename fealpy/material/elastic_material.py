@@ -282,7 +282,6 @@ class LinearElasticMaterial(ElasticMaterial):
             if out.shape != new_shape:
                 raise ValueError(f'out.shape={out.shape} != {new_shape}')
 
-        # average_gphi = bm.einsum('cqid, cq, q -> cid', gphi, detJ, ws)  # (NC, LDOF, GD)
         average_gphi = bm.einsum('cqid, cq, q -> cid', gphi, detJ, ws) / (3 * cm[:, None, None])  # (NC, LDOF, GD)
         for i in range(GD):
             for j in range(GD):
