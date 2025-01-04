@@ -46,7 +46,7 @@ class ChannelFlow:
     @cartesian
     def is_u_boundary(self, p):
         tag_up = bm.abs(p[..., 1] - 1.0) < self.eps
-        tag_down = bm.abs(p[..., 1]) < self.eps
+        tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
         return tag_up | tag_down 
     
 
