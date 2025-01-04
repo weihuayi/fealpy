@@ -8,7 +8,8 @@
 	@ref 
 '''  
 from fealpy.backend import backend_manager as bm
-from fealpy.pde.navier_stokes_equation_2d import ChannelFlow
+from fealpy.pde.navier_stokes_equation_3d import ChannelFlow
+#from fealpy.pde.navier_stokes_equation_2d import ChannelFlow
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import TensorFunctionSpace 
@@ -22,14 +23,16 @@ nt = 500
 n = 16
 
 pde = ChannelFlow()
-mesh = pde.mesh(n)
+mesh = pde.mesh(0.1)
+#mesh = pde.mesh(n)
+GD = mesh.GD
 
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
 pspace = LagrangeFESpace(mesh, p=1)
 space = LagrangeFESpace(mesh, p=2)
-uspace = TensorFunctionSpace(space, (2,-1))
+uspace = TensorFunctionSpace(space, (GD,-1))
 
 solver = NSFEMSolver(pde, mesh, pspace, uspace, dt, q=5)
 
@@ -43,7 +46,7 @@ p0 = pspace.function()
 p1 = pspace.function()
 
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
-mesh.nodedata['u'] = u1.reshape(2,-1).T
+mesh.nodedata['u'] = u1.reshape(GD,-1).T
 mesh.nodedata['p'] = p1
 mesh.to_vtk(fname=fname)
 
@@ -57,7 +60,7 @@ BCp = DirichletBC(space=pspace,
         threshold=pde.is_p_boundary, 
         method='interp')
 
-BForm0 = solver.IPCS_BForm_0(threshold = None)
+BForm0 = solver.IPCS_BForm_0()
 LForm0 = solver.IPCS_LForm_0()
 AA0 = BForm0.assembly()   
 
@@ -74,7 +77,7 @@ for i in range(100):
     t = timeline.next_time_level()
     print(f"第{i+1}步")
     print("time=", t)
-     
+    
     solver.update_ipcs_0(u0, p0)
     b0 = LForm0.assembly()
     A0,b0 = BCu.apply(AA0,b0)

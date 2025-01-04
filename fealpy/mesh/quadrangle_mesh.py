@@ -103,7 +103,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-    def quadrature_formula(self, q, etype: Union[int, str] = 'cell'):
+    def quadrature_formula(self, q, etype: Union[int, str] = 'cell', qtype=None):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
