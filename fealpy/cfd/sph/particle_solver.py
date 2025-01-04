@@ -483,6 +483,63 @@ class SPHSolver:
             return state
         return forward
 
+    def forward_wrapper_ht(self, displacement, kernel, box_size, dx, c0, rho0, p_bg,dt):
+        def forward_ht(state, neighbors):
+            i_s, j_s = neighbors.idx
+            
+            # 使用 JAX 的 where 函数避免布尔转换错误
+            i_s0 = jnp.where(i_s == len(state["position"]), len(state["position"]) - 1, i_s)
+            j_s0 = jnp.where(j_s == len(state["position"]), len(state["position"]) - 1, j_s)
+
+            r_i_s, r_j_s = state["position"][i_s0], state["position"][j_s0]
+            dr_i_j = vmap(displacement)(r_i_s, r_j_s)
+            dist = space.distance(dr_i_j)
+            w_dist = vmap(kernel)(dist)
+
+            e_s = dr_i_j / (dist[:, None] + EPS)
+            grad_w_dist_norm = vmap(kernel.grad_value)(dist)
+            grad_w_dist = grad_w_dist_norm[:, None] * e_s
+
+            # 外加速度场
+            g_ext = self.external_acceleration(state["position"], box_size, dx=dx)
+
+            # 标记
+            wall_mask = jnp.where(jnp.isin(state["tag"], jnp.array([1, 3])), 1.0, 0.0)
+            fluid_mask = jnp.where(state["tag"] == 0, 1.0, 0.0)
+
+            # 密度处理
+            rho_summation = self.compute_rho(state["mass"], i_s, w_dist)
+            rho = jnp.where(fluid_mask, rho_summation, state["rho"])
+
+            # 计算压力和背景压力
+            p = self.tait_eos(rho, c0, rho0, X=p_bg)
+            pb = self.tait_eos(jnp.zeros_like(p), c0, rho0, X=p_bg)
+
+            # 边界处理
+            p, rho, mv, tv, T = self.enforce_wall_boundary(state, p, g_ext, i_s, j_s, w_dist, dr_i_j, with_temperature=True)
+            state["rho"] = rho
+            state["mv"] = mv
+            state["tv"] = tv
+
+            # 计算下一步的温度导数
+            T += dt * state["dTdt"]
+            state["T"] = T
+            state["dTdt"] = self.temperature_derivative(state, kernel, e_s, dr_i_j, dist, i_s, j_s, grad_w_dist_norm)
+
+            # 更新动量速度的加速度
+            state["dmvdt"] = self.compute_mv_acceleration(state, i_s, j_s, dr_i_j, dist, grad_w_dist_norm, p)
+            state["dmvdt"] += g_ext
+            state["p"] = p
+
+            # 更新运输速度的加速度
+            state["dtvdt"] = self.compute_tv_acceleration(state, i_s, j_s, dr_i_j, dist, grad_w_dist_norm, pb)
+
+            # 更新边界条件
+            state = self.boundary_conditions(state, box_size, dx=dx)
+
+            return state
+        return forward_ht
+
     def write_vtk(self, data_dict: Dict, path: str):
         """Store a .vtk file for ParaView."""
         data_pv = self.dict2pyvista(data_dict)
@@ -507,3 +564,19 @@ def TimeLine(model, shift_fn):
         return state, neighbors
 
     return advance
+
+def TimeLoop(model, shift_fn, tvf):
+    def advance_ht(dt, state, neighbors):
+        state["mv"] += 1.0 * dt * state["dmvdt"]
+        state["tv"] = state["mv"] + tvf * 0.5 * dt * state["dtvdt"]
+
+        state["position"] = shift_fn(state["position"], 1.0 * dt * state["tv"])
+
+        num_particles = (state["tag"] != -1).sum()
+        neighbors = neighbors.update(state["position"], num_particles=num_particles)
+
+        state = model(state, neighbors)
+        
+        return state, neighbors
+
+    return advance_ht

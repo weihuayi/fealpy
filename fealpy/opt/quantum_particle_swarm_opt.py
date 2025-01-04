@@ -27,7 +27,16 @@ class QuantumParticleSwarmOpt(Optimizer):
         gbest_index = bm.argmin(pbest_f)
         gbest = pbest[gbest_index]
         gbest_f = pbest_f[gbest_index]
+        curve = bm.zeros((1, MaxIT))
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
+            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(a, axis=0) - a)) / N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
+            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+
             alpha = bm.array(0.9 - (it + 1) / (2 * MaxIT)) # contraction-expansion coefficient
             mbest = bm.sum(pbest, axis=0) / N # average of all particle optimal position
             phi = bm.random.rand(N, dim)
@@ -42,8 +51,13 @@ class QuantumParticleSwarmOpt(Optimizer):
             pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
             gbest_idx = bm.argmin(pbest_f)
             (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
-            # print("QPSO: The optimum at iteration", it + 1, "is", gbest_f)
-        return gbest, gbest_f
+            curve[0, it] = gbest_f
+
+        self.gbest = gbest
+        self.gbest_f = gbest_f
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]
 
 
 """
@@ -111,4 +125,5 @@ class LevyQuantumParticleSwarmOpt(Optimizer):
                 gbest_idx = bm.argmin(pbest_f)
                 (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
 
-        return gbest, gbest_f
+        self.gbest = gbest
+        self.gbest_f = gbest_f
