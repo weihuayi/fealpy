@@ -1,31 +1,20 @@
-#!/usr/bin/python3
-'''!    	
-	@Author: wpx
-	@File Name: fluid_boundary_friction_integrator.py
-	@Mail: wpx15673207315@gmail.com 
-	@Created Time: Thu 05 Dec 2024 02:58:11 PM CST
-	@bref 
-	@ref 
-'''  
-from typing import Optional
 from fealpy.backend import backend_manager as bm
-from ..typing import TensorLike, SourceLike, Threshold
-from ..mesh import HomogeneousMesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
-from ..functional import bilinear_integral
-from .integrator import (
+
+from typing import Optional
+from fealpy.typing import TensorLike, SourceLike, Threshold
+from fealpy.mesh import HomogeneousMesh
+from fealpy.functionspace.space import FunctionSpace as _FS
+from fealpy.utils import process_coef_func
+from fealpy.functional import bilinear_integral
+
+from fealpy.fem.integrator import (
     LinearInt, OpInt, FaceInt,
     enable_cache,
     assemblymethod,
     CoefLike
 )
-'''
-@brief
-(coef \\nabla u \\cdot n, v)_{\\partial \\Omega}
-@param[in] mu 
-'''
-class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
+
+class TangentFaceMassIntegrator(LinearInt, OpInt, FaceInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
@@ -34,9 +23,10 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
         self.q = q
         self.threshold = threshold
         self.batched = batched
-   
-    def make_index(self, space: _FS) -> TensorLike:
+
+    def make_index(self, space: _FS):
         threshold = self.threshold
+
         if isinstance(threshold, TensorLike):
             index = threshold
         else:
@@ -47,13 +37,11 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
                 index = index[threshold(bc)]
         return index
 
+    
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
         index = self.make_index(space)
-        result1 = space.face_to_dof(index=index) 
-        tag = space.mesh.face2cell[index,0]
-        result2 = space.cell_to_dof()[tag]
-        return (result2, result2) 
+        return space.face_to_dof()[index]
     
     @enable_cache
     def fetch(self, space: _FS):
@@ -65,22 +53,21 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        facemeasure = mesh.entity_measure('face', index=index)
+        facemeasure = mesh.entity_measure('edge', index=index)
+        t = mesh.edge_unit_tangent()
         q = space.p+3 if self.q is None else self.q
-        qf = mesh.quadrature_formula(q, 'face')
+        qf = mesh.quadrature_formula(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        
-        phi = space.cell_basis_on_face(bcs, index)
-        gphi = space.cell_grad_basis_on_face(bcs, index)
-        n = mesh.face_unit_normal(index)
-        return bcs, ws, phi, gphi, facemeasure, index, n
-
+        phi = space.face_basis(bcs, index)
+        return bcs, ws, phi, facemeasure, index, t
+    
     def assembly(self, space: _FS):
         coef = self.coef
-        mesh = getattr(space, 'mesh', None)
-        bcs, ws, phi, gphi, fm, index, n = self.fetch(space)
+        bcs, ws, phi, fm, index, t = self.fetch(space)
+        mesh = space.mesh
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
-        gphin = bm.einsum('e...i, eql...ij->eql...j', n, gphi)
-        result =  bilinear_integral(phi, gphin, ws, fm, val, batched=self.batched)
+        t[...,0] = 1
+        phit = bm.einsum('eqid, ed -> eqi', phi, t[index,...])
+        phii = bm.einsum('eqid -> eqi', phi)
+        result = bilinear_integral(phii, phit, ws, fm, val, batched=self.batched)
         return result
-
