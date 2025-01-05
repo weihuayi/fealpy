@@ -1,11 +1,11 @@
 from fealpy.backend import backend_manager as bm
-from typing import Any, Union ,Optional
 from fealpy.typing import TensorLike
 from fealpy.mesh import TriangleMesh
 from fealpy.mesh import TetrahedronMesh
 from fealpy.mesh import IntervalMesh
-from fealpy.mesh import TriangleMesh as TM
-from fealpy.mesh import TetrahedronMesh as THM
+from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
+from fealpy.old.mesh import TriangleMesh as TM
+from fealpy.old.mesh import TetrahedronMesh as THM
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import (BilinearForm 
                         ,ScalarDiffusionIntegrator
@@ -17,10 +17,12 @@ from scipy.sparse.linalg import spsolve as spsolve1
 from scipy.integrate import solve_ivp
 from scipy.sparse import csr_matrix,spdiags,block_diag,bmat
 from sympy import *
+from typing import Any ,Union,Optional
+import pyamg
 
 
 class LogicMesh():
-    def __init__(self , mesh: Union[TriangleMesh,TetrahedronMesh],
+    def __init__(self , mesh: Union[TriangleMesh,TetrahedronMesh,LagrangeTriangleMesh],
                         Vertex_idx : TensorLike,
                         Bdinnernode_idx : TensorLike,
                         Arrisnode_idx : Optional[TensorLike] = None,
@@ -36,7 +38,6 @@ class LogicMesh():
         self.TD = mesh.top_dimension()
         self.node = mesh.entity('node')
         self.cell = mesh.entity('cell')
-        self.edge = mesh.entity('edge')
         
         self.BdNodeidx = mesh.boundary_node_index()
         self.BdFaceidx = mesh.boundary_face_index()
@@ -49,7 +50,8 @@ class LogicMesh():
         self.isconvex = self.is_convex()
         # 新网格下没有该方法
         if self.TD == 2:
-            self.node2edge = TM(self.node, self.cell).ds.node_to_edge()
+            self.node2edge = TM(bm.to_numpy(self.node), 
+                                bm.to_numpy(self.cell)).ds.node_to_edge()
             self.Bi_Lnode_normal = self.get_normal_information(self.logic_mesh)
             self.Bi_Pnode_normal = self.get_normal_information(self.mesh)
 
@@ -67,7 +69,7 @@ class LogicMesh():
     def get_logic_mesh(self) :
         if self.TD == 2:
             if self.is_convex():
-                logic_mesh = TriangleMesh(self.node.copy(),self.cell) # 更新
+                logic_mesh = TriangleMesh(bm.copy(self.node),self.cell) # 更新
             else:
                 logic_node = self.get_logic_node()
                 logic_cell = self.cell
@@ -77,7 +79,7 @@ class LogicMesh():
             if not self.is_convex():
                 raise ValueError('非凸多面体无法构建逻辑网格')
             else:
-                logic_mesh = TetrahedronMesh(self.node.copy(),self.cell)
+                logic_mesh = TetrahedronMesh(bm.copy(self.node),self.cell)
             return logic_mesh
         
     def is_convex(self):
@@ -100,8 +102,8 @@ class LogicMesh():
                 (
                     bm.ones(NVF*NF, dtype=bm.bool),
                     (
-                        face.flat,
-                        bm.repeat(range(NF), NVF)
+                        face.flatten(),
+                        bm.repeat(bm.arange(NF), NVF)
                     )
                 ), shape=(NN, NF))
         return node2face
@@ -114,7 +116,7 @@ class LogicMesh():
         BdFaceidx = self.BdFaceidx
         if self.TD == 3:
             Arrisnode_idx = self.Arrisnode_idx
-            node2face = self.node_to_face()
+            node2face = bm.tensor(self.node_to_face().todense())
             Ar_node2face = node2face[Arrisnode_idx][:,BdFaceidx]
             i0 , j0 = bm.nonzero(Ar_node2face)
             bdfun0 = mesh.face_unit_normal(index=BdFaceidx[j0])
@@ -130,11 +132,13 @@ class LogicMesh():
                 isaimnode = counts0 > mincount+i
                 Ar_node2normal_idx = bm.set_at(Ar_node2normal_idx,(isaimnode,mincount+i) , 
                                                 inverse0[index0[isaimnode]+mincount+i])
-            Ar_node2normal_idx = bm.apply_along_axis(lambda x: bm.unique(x[x>=0])
-                                                    ,axis=1,arr=Ar_node2normal_idx)
-            Ar_node2normal = normal0[Ar_node2normal_idx]
+            for i in range(Ar_node2normal_idx.shape[0]):
+                x = Ar_node2normal_idx[i]
+                unique_vals = bm.unique(x[x >= 0])
+                Ar_node2normal_idx[i, :len(unique_vals)] = unique_vals
+            Ar_node2normal = normal0[Ar_node2normal_idx[:,:2]]
         elif self.TD == 2:
-            node2face = self.node2edge
+            node2face = bm.tensor(self.node2edge.todense())
         
         Bi_node2face = node2face[Bdinnernode_idx][:,BdFaceidx]
         i1 , j1 = bm.nonzero(Bi_node2face)
@@ -221,7 +225,6 @@ class Harmap_MMPDE(LogicMesh):
     def __init__(self, 
                  mesh:Union[TriangleMesh,TetrahedronMesh] , 
                  uh:TensorLike,
-                 pde ,
                  beta :float ,
                  Vertex_idx : TensorLike,
                  Bdinnernode_idx : TensorLike,
@@ -231,13 +234,13 @@ class Harmap_MMPDE(LogicMesh):
                  mol_times = 1 , 
                  redistribute = True) -> None:
         """
-        mesh : 初始物理网格
-        uh : 物理网格上的解
-        pde : 微分方程基本信息
-        beta : 控制函数的参数
-        alpha : 移动步长控制参数
-        mol_times : 磨光次数
-        redistribute : 是否预处理边界节点
+        @param mesh: 初始物理网格
+        @param uh: 物理网格上的解
+        @param pde: 微分方程基本信息
+        @param beta: 控制函数的参数
+        @param alpha: 移动步长控制参数
+        @param mol_times: 磨光次数
+        @param redistribute: 是否预处理边界节点
         """
         super().__init__(mesh = mesh,
                          Vertex_idx = Vertex_idx,
@@ -245,7 +248,6 @@ class Harmap_MMPDE(LogicMesh):
                          Arrisnode_idx = Arrisnode_idx,
                          sort_BdNode_idx = sort_BdNode_idx)
         self.uh = uh
-        self.pde = pde
         self.beta = beta
         self.alpha = alpha
         self.mol_times = mol_times
@@ -261,14 +263,12 @@ class Harmap_MMPDE(LogicMesh):
         self.isBdNode = mesh.boundary_node_flag()
         self.redistribute = redistribute
 
-        self.W = bm.array([[0,1],[-1,0]],dtype=bm.int32)
-        self.localEdge = bm.array([[1,2],[2,0],[0,1]],dtype=bm.int32)
-
         self.star_measure,self.i,self.j = self.get_star_measure()
         self.G = self.get_control_function(self.beta , self.mol_times)
         self.A , self.b = self.get_linear_constraint()
         if redistribute and sort_BdNode_idx is None:
             raise ValueError('redistributing boundary , you must give the sort_BdNode')
+        self.tol = self.caculate_tol()
 
     def get_star_measure(self)->TensorLike:
         """
@@ -279,7 +279,7 @@ class Harmap_MMPDE(LogicMesh):
         bm.add_at(star_measure , i , self.cm[j])
         return star_measure,i,j
     
-    def get_control_function(self,beta:float,mol_times:int):
+    def get_control_function(self):
         """
         @brief 计算控制函数
         @param beta: float 控制函数的参数
@@ -291,12 +291,14 @@ class Harmap_MMPDE(LogicMesh):
         gphi = self.mesh.grad_lambda()
         guh_incell = bm.sum(self.uh[cell,None] * gphi,axis=1)
         max_norm_guh = bm.max(bm.linalg.norm(guh_incell,axis=1))
-        M_incell = bm.sqrt(1 +beta *bm.sum( guh_incell**2,axis=1)/max_norm_guh)
+        if max_norm_guh == 0:
+            max_norm_guh = 1
+        M_incell = bm.sqrt(1 +self.beta *bm.sum( guh_incell**2,axis=1)/max_norm_guh)
         M = bm.zeros(self.NN,dtype=bm.float64)
         bm.add_at(M , self.i , (cm *M_incell)[self.j])
         M /= self.star_measure
-        if mol_times > 0:
-            for k in range(mol_times):
+        if self.mol_times > 0:
+            for k in range(self.mol_times):
                 M = bm.zeros(self.NN,dtype=bm.float64)
                 bm.add_at(M , self.i , (cm *M_incell)[self.j])
                 M /= self.star_measure
@@ -330,97 +332,84 @@ class Harmap_MMPDE(LogicMesh):
         @brief 组装线性约束
         """
         logic_node = self.logic_node
-        NN = self.NN
-        BDNN = self.BDNN
         BdNodeidx = self.BdNodeidx
         Vertex_idx = self.Vertex_idx
         Bdinnernode_idx = self.Bdinnernode_idx
         Binnorm = self.Bi_Lnode_normal
         logic_Bdinnode = logic_node[Bdinnernode_idx]
         logic_Vertex = logic_node[Vertex_idx]
+        NN = self.NN
+        BDNN = self.BDNN
+        VNN = len(Vertex_idx)
+
+        b = bm.zeros(NN, dtype=bm.float64)
+        b_val0 = bm.sum(logic_Bdinnode * Binnorm, axis=1)
+        b[Bdinnernode_idx] = b_val0
+
+        A_diag = bm.zeros((self.TD , NN)  , dtype=bm.float64)
+        A_diag[:,Bdinnernode_idx] = Binnorm.T
+        A_diag[0,Vertex_idx] = 1
         if self.TD == 2:
-            b = bm.zeros(NN,dtype=bm.float64)
-            b_val0 = bm.sum(logic_Bdinnode*Binnorm,axis=1)
-            b_val1 = logic_Vertex[:,0]
-            b_val2 = logic_Vertex[:,1]
-            b = bm.set_at(b , Bdinnernode_idx , b_val0)
-            b = bm.set_at(b , Vertex_idx , b_val1)[BdNodeidx]
-            b = bm.concatenate([b,b_val2])
-  
-            A1_diag = bm.zeros(NN  , dtype=bm.float64)
-            A2_diag = bm.zeros(NN  , dtype=bm.float64)
-            A1_diag = bm.set_at(A1_diag , Bdinnernode_idx , Binnorm[:,0])
-            A2_diag = bm.set_at(A2_diag , Bdinnernode_idx , Binnorm[:,1])
-            A1_diag = bm.set_at(A1_diag , Vertex_idx , 1)[BdNodeidx]
-            A2_diag = bm.set_at(A2_diag , Vertex_idx , 0)[BdNodeidx]
-            A1 = spdiags(A1_diag,0,BDNN,BDNN , format='csr')
-            A2 = spdiags(A2_diag,0,BDNN,BDNN , format='csr')
-            VNN = len(Vertex_idx)
-            Vbd_constraint1 = csr_matrix((VNN, BDNN), dtype=bm.float64)
-            data = bm.ones(VNN,dtype=bm.float64)
-            Vbd_constraint2 = csr_matrix((data, (bm.arange(VNN), Vertex_idx)), shape=(VNN, NN))
-            A = bmat([[A1,A2],[Vbd_constraint1,Vbd_constraint2[:,BdNodeidx]]],format='csr')
+            b[Vertex_idx] = logic_Vertex[:, 0]
+            b = bm.concatenate([b[BdNodeidx],logic_Vertex[:,1]])
+            A_diag = A_diag[:,BdNodeidx]
+
+            A = bmat([[spdiags(A_diag[0], 0, BDNN, BDNN, format='csr'),
+                       spdiags(A_diag[1], 0, BDNN, BDNN, format='csr')],
+                      [csr_matrix((VNN, BDNN), dtype=bm.float64),
+                       csr_matrix((bm.ones(VNN, dtype=bm.float64),
+                                  (bm.arange(VNN), Vertex_idx)), 
+                        shape=(VNN, NN))[:, BdNodeidx]]], format='csr')
 
         elif self.TD == 3:
             Arrisnode_idx = self.Arrisnode_idx
             Arnnorm = self.Ar_Lnode_normal
             logic_Arnode = logic_node[Arrisnode_idx]
             ArNN = len(Arrisnode_idx)
-            VNN = len(Vertex_idx)
-
-            b = bm.zeros(NN,dtype=bm.float64)
-            b_val0 = bm.sum(logic_Bdinnode*Binnorm,axis=1)
             b_val1 = bm.sum(logic_Arnode*Arnnorm[:,0,:],axis=1)
             b_val2 = bm.sum(logic_Arnode*Arnnorm[:,1,:],axis=1)
-            b_val3 = logic_Vertex[:,0]
-            b_val4 = logic_Vertex[:,1]
-            b_val5 = logic_Vertex[:,2]
-            bm.add_at(b_val2 , slice(VNN) , b_val4) 
-            b = bm.set_at(b , Bdinnernode_idx , b_val0)
             b = bm.set_at(b , Arrisnode_idx , b_val1)
-            b = bm.set_at(b , Vertex_idx , b_val3)
-            b = bm.concatenate([b,b_val2,b_val5])
+            b = bm.set_at(b , Vertex_idx , logic_Vertex[:,0])[BdNodeidx]
+            b = bm.concatenate([b,b_val2,logic_Vertex[:,1],logic_Vertex[:,2]])       
 
-            index0 = NN * bm.arange(self.TD) + Bdinnernode_idx[:,None]
+            A_diag[:,Arrisnode_idx] = Arnnorm[:,0,:].T
+            A_diag = A_diag[:,BdNodeidx]
+            
             index1 = NN * bm.arange(self.TD) + Arrisnode_idx[:,None]
             index2 = NN * bm.arange(self.TD) + BdNodeidx[:,None]
-
-            A_diag = bm.zeros(self.TD * NN  , dtype=bm.float64)
-            A_diag = bm.set_at(A_diag , index0 , Binnorm)
-            A_diag = bm.set_at(A_diag , index1 , Arnnorm[:,0,:])
-            A_diag = bm.set_at(A_diag , Vertex_idx , 1)
-
-            A1 = spdiags(A_diag[:NN][BdNodeidx],0, BDNN ,BDNN , format='csr')
-            A2 = spdiags(A_diag[NN:2*NN][BdNodeidx],0, BDNN ,BDNN , format='csr')
-            A3 = spdiags(A_diag[2*NN:][BdNodeidx],0, BDNN ,BDNN , format='csr')
-
             rol_Ar = bm.repeat(bm.arange(ArNN)[None,:],3,axis=0).flat
-            rol_Ar = bm.concatenate([rol_Ar,bm.arange(VNN)])
-            cow_Ar = bm.concatenate([index1.T.flat,Vertex_idx+NN])
-            data_Ar = bm.concatenate([Arnnorm[:,1,:].T.flat,bm.ones(VNN,bm.float64)])
+            cow_Ar = index1.T.flat
+            data_Ar = Arnnorm[:,1,:].T.flat
             Ar_constraint = csr_matrix((data_Ar,(rol_Ar, cow_Ar)),shape=(ArNN,3*NN))
-            Vertex_constraint = csr_matrix((bm.ones(VNN,dtype=bm.float64),
+            Vertex_constraint1 = csr_matrix((bm.ones(VNN,dtype=bm.float64),
+                                (bm.arange(VNN),Vertex_idx + NN)),shape=(VNN,3*NN))
+            Vertex_constraint2 = csr_matrix((bm.ones(VNN,dtype=bm.float64),
                                 (bm.arange(VNN),Vertex_idx + 2 * NN)),shape=(VNN,3*NN))
 
-            Ar_constraint = Ar_constraint[:, (index2.T).flat]
-            Vertex_constraint = Vertex_constraint[:, (index2.T).flat]
-            A_part = bmat([[A1,A2,A3]],format='csr')
-            A = bmat([[A_part],[Ar_constraint],[Vertex_constraint]],format='csr')
+            A_part = bmat([[spdiags(A_diag[0], 0, BDNN, BDNN, format='csr'),
+                            spdiags(A_diag[1], 0, BDNN, BDNN, format='csr'),
+                            spdiags(A_diag[2], 0, BDNN, BDNN, format='csr')]], format='csr')
+            A = bmat([[A_part],
+                      [Ar_constraint[:, index2.T.flat]],
+                      [Vertex_constraint1[:, index2.T.flat]],
+                      [Vertex_constraint2[:, index2.T.flat]]], format='csr')
         return A,b
 
     def solve_move_LogicNode(self):
         """
         @brief 交替求解逻辑网格点
-        process_logic_node : 新逻辑网格点
-        move_vector_field : 逻辑网格点移动向量场
+        @param process_logic_node: 新逻辑网格点
+        @param move_vector_field: 逻辑网格点移动向量场
         """
-        from scipy.sparse.linalg import spsolve
         isBdNode = self.isBdNode
-        H = self.get_stiff_matrix(self.mesh , self.G)
-        H11 = H[~self.isBdNode][:, ~self.isBdNode]
-        H12 = H[~self.isBdNode][:, self.isBdNode]
-        H21 = H[self.isBdNode][:, ~self.isBdNode]
-        H22 = H[self.isBdNode][:, self.isBdNode]
+        TD = self.TD
+        BDNN = self.BDNN
+        INN = self.NN - BDNN
+        H = self.get_stiff_matrix(self.mesh,self.G)
+        H11 = H[~isBdNode][:, ~isBdNode]
+        H12 = H[~isBdNode][:, isBdNode]
+        H21 = H[isBdNode][:, ~isBdNode]
+        H22 = H[isBdNode][:, isBdNode]
 
         A,b= self.A,self.b
         # 获得一个初始逻辑网格点的拷贝
@@ -429,28 +418,23 @@ class Harmap_MMPDE(LogicMesh):
         if self.redistribute:
             process_logic_node = self.redistribute_boundary()
         # 移动逻辑网格点
-        f1 = -H12@process_logic_node[isBdNode,0]
-        f2 = -H12@process_logic_node[isBdNode,1]
+        F = -H12 @ process_logic_node[isBdNode, :]
+        move_innerlogic_node = bm.zeros((INN, TD), dtype=bm.float64)
+        ml = pyamg.ruge_stuben_solver(H11)
+        for i in range(TD):
+            move_innerlogic_node[:, i] = ml.solve(F[:, i],tol= 1e-8)
+        process_logic_node = bm.set_at(process_logic_node, ~isBdNode, move_innerlogic_node)
 
-        move_innerlogic_node_x = spsolve1(H11, f1 )
-        move_innerlogic_node_y = spsolve1(H11, f2 )
-        process_logic_node = bm.set_at(process_logic_node , ~isBdNode, 
-                                bm.stack([move_innerlogic_node_x,
-                                          move_innerlogic_node_y],axis=1))
-        
-        f1 = -H21@move_innerlogic_node_x
-        f2 = -H21@move_innerlogic_node_y
-        b0 = bm.concatenate((f1,f2,b),axis=0)
+        F = (-H21 @ move_innerlogic_node).T.flatten()
+        b0 = bm.concatenate((F,b),axis=0)
 
-        A1 = block_diag((H22, H22),format='csr')
+        A1 = block_diag([H22]*TD,format='csr')
         zero_matrix = csr_matrix((A.shape[0],A.shape[0]),dtype=bm.float64)
         A0 = bmat([[A1,A.T],[A,zero_matrix]],format='csr')
 
-        move_bdlogic_node = spsolve(A0,b0)[:2*H22.shape[0]]
-        process_logic_node = bm.set_at(process_logic_node , isBdNode,
-                                bm.stack((move_bdlogic_node[:H22.shape[0]],
-                                        move_bdlogic_node[H22.shape[0]:]),axis=1))
-        
+        move_bdlogic_node = spsolve1(A0,b0)[:TD*BDNN]
+        move_bdlogic_node = move_bdlogic_node.reshape((TD, BDNN)).T
+        process_logic_node = bm.set_at(process_logic_node , isBdNode, move_bdlogic_node)
         move_vector_field = init_logic_node - process_logic_node
         return process_logic_node,move_vector_field
 
@@ -463,7 +447,7 @@ class Harmap_MMPDE(LogicMesh):
         node = self.node
         cell = self.cell
         cm = self.cm
-
+        TD = self.TD
         A = (node[cell[:,1:]] - node[cell[:,0,None]]).transpose(0,2,1)
         B = (logic_node_move[cell[:,1:]] - logic_node_move[cell[:,0,None]]).transpose(0,2,1)
         grad_x_incell = (A@bm.linalg.inv(B)) * cm[:,None,None]
@@ -473,24 +457,57 @@ class Harmap_MMPDE(LogicMesh):
         grad_x /= self.star_measure[:,None,None]
 
         delta_x = (grad_x @ move_vertor_field[:,:,None]).reshape(-1,2)
-
-        Bin_tangent = self.Bi_Pnode_normal @ self.W
+        if TD == 3:
+            self.Bi_Pnode_normal = self.Bi_Lnode_normal
+            Ar_Pnode_normal = self.Ar_Lnode_normal
+            Arrisnode_idx = self.Arrisnode_idx
+            dot1 = bm.sum(Ar_Pnode_normal * delta_x[Arrisnode_idx,None],axis=-1)
+            delta_x[Arrisnode_idx] -= (dot1[:,0,None] * Ar_Pnode_normal[:,0,:] + 
+                                       dot1[:,1,None] * Ar_Pnode_normal[:,1,:])
+        
         Bdinnernode_idx = self.Bdinnernode_idx
-        dot = bm.sum(Bin_tangent * delta_x[Bdinnernode_idx],axis=1)
-        delta_x = bm.set_at(delta_x,Bdinnernode_idx,dot[:,None] * Bin_tangent)
-
+        dot = bm.sum(self.Bi_Pnode_normal * delta_x[Bdinnernode_idx],axis=1)
+        delta_x[Bdinnernode_idx] -= dot[:,None] * self.Bi_Pnode_normal
         # 物理网格点移动距离
         C = (delta_x[cell[:,1:]] - delta_x[cell[:,0,None]]).transpose(0,2,1)
-        a = C[:,0,0]*C[:,1,1] - C[:,0,1]*C[:,1,0]
-        b = A[:,0,0]*C[:,1,1] - A[:,0,1]*C[:,1,0] + C[:,0,0]*A[:,1,1] - C[:,0,1]*A[:,1,0]
-        c = A[:,0,0]*A[:,1,1] - A[:,0,1]*A[:,1,0]
-        discriminant = b**2 - 4*a*c
-        discriminant = bm.where(discriminant > 0, discriminant, 0)
-        x1 = (-b + bm.sqrt(discriminant))/(2*a)
-        x2 = (-b - bm.sqrt(discriminant))/(2*a)
-        positive_x1 = bm.where(x1 > 0, x1, bm.inf)
-        positive_x2 = bm.where(x2 > 0, x2, bm.inf)
-        eta = bm.min([bm.min(positive_x1),bm.min(positive_x2),1])
+        if TD == 2:
+            a = C[:,0,0]*C[:,1,1] - C[:,0,1]*C[:,1,0]
+            b = A[:,0,0]*C[:,1,1] - A[:,0,1]*C[:,1,0] + C[:,0,0]*A[:,1,1] - C[:,0,1]*A[:,1,0]
+            c = A[:,0,0]*A[:,1,1] - A[:,0,1]*A[:,1,0]
+            discriminant = b**2 - 4*a*c
+            discriminant = bm.where(discriminant > 0, discriminant, 0)
+            x = bm.concatenate([(-b + bm.sqrt(discriminant))/(2*a),
+                                (-b - bm.sqrt(discriminant))/(2*a)])
+        else:
+            # 三维情况，求解三次方程
+            a0,a1,a2 = C[:,1,1]*C[:,2,2] - C[:,1,2]*C[:,2,1],\
+                       C[:,1,2]*C[:,2,0] - C[:,1,0]*C[:,2,2],\
+                       C[:,1,0]*C[:,2,1] - C[:,1,1]*C[:,2,0]
+            b0,b1,b2 = A[:,1,1]*C[:,2,2] - A[:,1,2]*C[:,2,1] + C[:,1,1]*A[:,2,2] - C[:,1,2]*A[:,2,1],\
+                       A[:,1,0]*C[:,2,2] - A[:,1,2]*C[:,2,0] + C[:,1,0]*A[:,2,2] - C[:,1,2]*A[:,2,0],\
+                       A[:,1,0]*C[:,2,1] - A[:,1,1]*C[:,2,0] + C[:,1,0]*A[:,2,1] - C[:,1,1]*A[:,2,0]
+            c0,c1,c2 = A[:,1,1]*A[:,2,2] - A[:,1,2]*A[:,2,1],\
+                       A[:,1,0]*A[:,2,2] - A[:,1,2]*A[:,2,0],\
+                       A[:,1,0]*A[:,2,1] - A[:,1,1]*A[:,2,0]
+            a = C[:,0,0]*a0 - C[:,0,1]*a1 + C[:,0,2]*a2
+            b = A[:,0,0]*a0 - A[:,0,1]*a1 + A[:,0,2]*a2 + C[:,0,0]*b0 - C[:,0,1]*b1 + C[:,0,2]*b2
+            c = A[:,0,0]*b0 - A[:,0,1]*b1 + A[:,0,2]*b2 + C[:,0,0]*c0 - C[:,0,1]*c1 + C[:,0,2]*c2
+            d = A[:,0,0]*c0 - A[:,0,1]*c1 + A[:,0,2]*c2
+            # 使用卡尔达诺公式求解三次方程的实根
+            p = (3 * a * c - b**2) / (3 * a**2)
+            q = (2 * b**3 - 9 * a * b * c + 27 * a**2 * d) / (27 * a**3)
+            discriminant = (q / 2)**2 + (p / 3)**3
+            u = bm.where(discriminant >= 0, (-q / 2 + bm.sqrt(discriminant))**(1 / 3),
+                                            (-q / 2 + bm.sqrt(-discriminant) * 1j)**(1 / 3))
+            v = bm.where(discriminant >= 0, (-q / 2 - bm.sqrt(discriminant))**(1 / 3), 
+                                            (-q / 2 - bm.sqrt(-discriminant) * 1j)**(1 / 3))
+            move_dis = b / (3 * a)
+            x1 = u + v - move_dis
+            x2 = -(u + v) / 2 + (u - v) * bm.sqrt(3) * 1j / 2 - move_dis
+            x3 = -(u + v) / 2 - (u - v) * bm.sqrt(3) * 1j / 2 - move_dis
+            x = bm.concatenate([x1, x2, x3])
+        positive_x = bm.where(bm.logical_and(x.imag == 0, x.real > 0), x.real, bm.inf)
+        eta = bm.min([bm.min(positive_x),1])
         node = node + self.alpha * eta * delta_x
 
         return node
@@ -554,7 +571,6 @@ class Harmap_MMPDE(LogicMesh):
         @brief 将解插值到新网格上
         @param move_node: 移动后的物理节点
         """
-        from scipy.sparse.linalg import spsolve
         delta_x = self.node - move_node
         mesh0 = TriangleMesh(self.node,self.cell)
         space = LagrangeFESpace(mesh0, p=1)
@@ -571,8 +587,9 @@ class Harmap_MMPDE(LogicMesh):
         J = bm.broadcast_to(space.cell_to_dof()[:, None, :], shape=P.shape)
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
         P = csr_matrix((P.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
+        ml = pyamg.ruge_stuben_solver(M)
         def ODEs(t,y):
-            f = spsolve(M,P@y)
+            f = ml.solve(P@y , tol=1e-8)
             return f
         # 初值条件  
         uh0 = self.uh
@@ -582,20 +599,36 @@ class Harmap_MMPDE(LogicMesh):
         sol = solve_ivp(ODEs,tau_span,uh0,method='RK23').y[:,-1]
         return sol
     
-    def construct(self,new_mesh):
+    def construct(self,new_node):
         """
         @brief construct: 重构信息
-        @param new_mesh:新的网格
+        @param new_mesh:新的节点
         """
-        self.mesh = new_mesh
         # node 更新之前完成插值
-        self.uh = self.interpolate(new_mesh.entity('node'))
-        self.node = new_mesh.entity('node')
-        self.cm = new_mesh.entity_measure('cell')
+        self.uh = self.interpolate(new_node)
+        self.mesh.node = new_node
+        self.node = new_node
+        self.cm = self.mesh.entity_measure('cell')
         self.star_measure = self.get_star_measure()[0]
-        self.G = self.get_control_function(self.beta , self.mol_times)
+        self.G = self.get_control_function()
 
-
+    def caculate_tol(self):
+        """
+        @brief caculate_tol: 计算容许误差
+        """
+        logic_mesh = self.logic_mesh
+        logic_cm = logic_mesh.entity_measure('cell')
+        logic_em = logic_mesh.entity_measure('edge')
+        cell2edge = logic_mesh.cell_to_edge()
+        em_cell = logic_em[cell2edge]
+        if self.TD == 3:
+            mul = em_cell[:,:3]*em_cell[:,3:][:,::-1]
+            p = 0.5*bm.sum(mul,axis=1)
+            d = bm.min(bm.sqrt(p*(p-mul[:,0])*(p-mul[:,1])*(p-mul[:,2]))/(3*logic_cm))
+        else:
+            d = bm.min(bm.prod(em_cell,axis=1)/(2*logic_cm))
+        return d*0.1
+    
     def mesh_redistribution(self ,uh, tol = None , maxit = 1000):
         """
         @brief mesh_redistribution: 网格重构算法
@@ -603,22 +636,19 @@ class Harmap_MMPDE(LogicMesh):
         @param maxit 最大迭代次数
         """
         self.uh = uh
-         # 计算容许误差
-        em = self.logic_mesh.entity_measure('edge')
         if tol is None:
-            tol = bm.min(em)* 0.1
+            tol = self.tol
             print(f'容许误差为{tol}')
 
         for i in range(maxit):
             logic_node,vector_field = self.solve_move_LogicNode()
             L_infty_error = bm.max(bm.linalg.norm(self.logic_node - logic_node,axis=1))
             node = self.get_physical_node(vector_field,logic_node)
-            mesh0 = TriangleMesh(node,self.cell)
             print(f'第{i+1}次迭代的差值为{L_infty_error}')
-            self.construct(mesh0)
+            self.construct(node)
             if L_infty_error < tol:
                 print(f'迭代总次数:{i+1}次')
-                return mesh0 , self.uh
+                return self.mesh , self.uh
             elif i == maxit - 1:
                 print('超出最大迭代次数')
                 break
@@ -627,13 +657,31 @@ class Harmap_MMPDE(LogicMesh):
 
 
 class Mesh_Data_Harmap():
-    def __init__(self,mesh:Union[TriangleMesh,TetrahedronMesh],Vertex ) -> None:
-        self.mesh = mesh
+    def __init__(self,mesh:Union[TriangleMesh,
+                                 TetrahedronMesh,
+                                 LagrangeTriangleMesh],
+                     Vertex) -> None:
+        self.isinstance_mesh_type(mesh)
+        if self.mesh_type == "LagrangeTriangleMesh":
+            self.mesh = mesh.linearmesh
+        else:
+            self.mesh = mesh
         self.node = mesh.entity('node')
         self.isBdNode = mesh.boundary_node_flag()
         self.Vertex = Vertex
         self.isconvex = self.is_convex()
         
+    def isinstance_mesh_type(self,mesh):
+        if isinstance(mesh, TriangleMesh):
+            self.mesh_type = "TriangleMesh"
+        elif isinstance(mesh, TetrahedronMesh):
+            self.mesh_type = "TetrahedronMesh"
+        elif isinstance(mesh, LagrangeTriangleMesh):
+            self.mesh_type = "LagrangeTriangleMesh"
+            self.Lmesh = mesh
+        else:
+            raise TypeError("Unsupported mesh type")
+
     def is_convex(self):
         """
         判断边界是否是凸的
@@ -650,13 +698,12 @@ class Mesh_Data_Harmap():
         node = mesh.node
         edge = mesh.edge
         cell = mesh.cell
-        # 对边界边和点进行排序
-        mesh_0 = TM(node,cell)
-        node2edge = mesh_0.ds.node_to_face()
+        mesh_0 = TM(bm.to_numpy(node),bm.to_numpy(cell))
+        node2edge = mesh_0.ds.node_to_edge()
         bdnode2edge = node2edge[BdNodeidx][:,BdEdgeidx]
-        i,j = bm.nonzero(bdnode2edge)
+        i,j = bm.nonzero(bm.tensor(bdnode2edge.todense()))
         bdnode2edge = j.reshape(-1,2)
-        glob_bdnode2edge = bm.zeros_like(node,dtype=bm.int32)
+        glob_bdnode2edge = bm.zeros_like(node,dtype=bm.int64)
         glob_bdnode2edge = bm.set_at(glob_bdnode2edge,BdNodeidx,BdEdgeidx[bdnode2edge])
         
         sort_glob_bdedge_idx_list = []
@@ -684,11 +731,17 @@ class Mesh_Data_Harmap():
                     break
             sort_glob_bdnode_idx_list.append(next_node_idx)
             current_node_idx = next_node_idx
-        return bm.array(sort_glob_bdnode_idx_list,dtype=bm.int32),\
-                bm.array(sort_glob_bdedge_idx_list,dtype=bm.int32)
+        sort_glob_bdnode_idx = bm.array(sort_glob_bdnode_idx_list,dtype=bm.int32)
+        sort_glob_bdedge_idx = bm.array(sort_glob_bdedge_idx_list,dtype=bm.int32)
+        if self.mesh_type == "LagrangeTriangleMesh":
+            Lmesh = self.Lmesh
+            Ledge = Lmesh.edge
+            sort_glob_bdedge = Ledge[sort_glob_bdedge_idx]
+            sort_glob_bdnode_idx = sort_glob_bdedge[:,:2].flatten()
+
+        return sort_glob_bdnode_idx,sort_glob_bdedge_idx
     
     def get_normal_inform(self,sort_BdNode_idx = None) -> None:
-        from scipy.sparse import csr_matrix
         mesh = self.mesh
         BdNodeidx = mesh.boundary_node_index()
         if sort_BdNode_idx is not None:
@@ -698,8 +751,8 @@ class Mesh_Data_Harmap():
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         if TD == 2:
-            mesh = TM(node,cell)
-            node2face = mesh.ds.node_to_face()
+            mesh1 = TM(bm.to_numpy(node),bm.to_numpy(cell))
+            node2face = mesh1.ds.node_to_face()
         elif TD == 3:
             def node_to_face(mesh): # 作为三维网格的辅助函数
                 NN = mesh.number_of_nodes()
@@ -710,47 +763,53 @@ class Mesh_Data_Harmap():
                         (
                             bm.ones(NVF*NF, dtype=bm.bool),
                             (
-                                face.flat,
-                                bm.repeat(range(NF), NVF)
+                                face.flatten(),
+                                bm.repeat(bm.arange(NF), NVF)
                             )
                         ), shape=(NN, NF))
                 return node2face
             node2face = node_to_face(mesh)
         bd_node2face = node2face[BdNodeidx][:,BdFaceidx]
-        i , j = bm.nonzero(bd_node2face)
-
+        i , j = bm.nonzero(bm.tensor(bd_node2face.todense()))
         bdfun = mesh.face_unit_normal(index=BdFaceidx[j])
         normal,inverse = bm.unique(bdfun,return_inverse=True ,axis = 0)
-        
         _,index,counts = bm.unique(i,return_index=True,return_counts=True)
         cow = bm.max(counts)
         r = bm.min(counts)
 
-        node2face_normal = -bm.ones((BdNodeidx.shape[0],cow),dtype=bm.int32)
+        node2face_normal = -bm.ones((BdNodeidx.shape[0],cow),dtype=bm.int64)
         node2face_normal = bm.set_at(node2face_normal,(slice(None),slice(r)),inverse[index[:,None]+bm.arange(r)])
         for i in range(cow-r):
             isaimnode = counts > r+i
-            node2face_normal = bm.set_at(node2face_normal,(isaimnode,r+i) , 
+            node2face_normal = bm.set_at(node2face_normal,(isaimnode,r+i) ,
                                             inverse[index[isaimnode]+r+i])
-        node2face_normal = bm.apply_along_axis(lambda x: bm.set_at(
-                                                - bm.ones(TD , dtype = bm.int32)
-                                                , slice(len(bm.unique(x[x>=0])))
-                                                ,bm.unique(x[x>=0]))
-                                                ,axis=1, arr=node2face_normal)
-        return node2face_normal,normal
+        
+        for i in range(node2face_normal.shape[0]):
+            x = node2face_normal[i]
+            unique_vals = bm.unique(x[x >= 0])
+            result = -bm.ones(TD, dtype=bm.int32)
+            result[:len(unique_vals)] = unique_vals
+            node2face_normal[i,:TD] = result
+
+        return node2face_normal[:,:TD],normal
     
     def get_basic_infom(self):
         mesh = self.mesh
         node2face_normal,normal = self.get_normal_inform()
         BdNodeidx = mesh.boundary_node_index()
         Bdinnernode_idx = BdNodeidx[node2face_normal[:,1] < 0]
+        if self.mesh_type == "LagrangeTriangleMesh":
+            Lmesh = self.Lmesh
+            BdFaceidx = Lmesh.boundary_face_index()
+            LBdedge = Lmesh.edge[BdFaceidx]
+            Bdinnernode_idx = bm.concatenate([Bdinnernode_idx,LBdedge[:,1:-1].flatten()])
         is_convex = self.isconvex
+        Arrisnode_idx = None
         if is_convex:
             Vertex_idx = BdNodeidx[node2face_normal[:,-1] >= 0]
             if mesh.TD == 3:
                 Arrisnode_idx = BdNodeidx[(node2face_normal[:,1] >= 0) & (node2face_normal[:,-1] < 0)]
-                return Vertex_idx,Bdinnernode_idx,Arrisnode_idx
-            return Vertex_idx,Bdinnernode_idx
+            return Vertex_idx,Bdinnernode_idx,Arrisnode_idx
         else:
             if self.Vertex is None:
                 raise ValueError('The boundary is not convex, you must give the Vertex')

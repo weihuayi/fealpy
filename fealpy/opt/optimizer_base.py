@@ -1,5 +1,5 @@
 from typing import TypedDict, Callable, Tuple, Union, Optional
-
+import matplotlib.pyplot as plt
 from fealpy.backend import backend_manager as bm 
 from fealpy.typing import TensorLike, Index, _S
 from fealpy import logger
@@ -72,3 +72,28 @@ class Optimizer():
 
     def run(self):
         raise NotImplementedError
+    
+    def D_pl_pt(self, div):
+        D_pl = 100 * div / bm.max(self.Div)
+        D_pt = 100 * bm.abs(div - bm.max(self.Div)) / bm.max(self.Div)
+        return D_pl, D_pt 
+
+    def print_optimal_result(self):
+        print(f"Optimal solution: {self.gbest} \nFitness: {self.gbest_f}")
+
+    def plot_plpt_percen(self):
+        plt.plot(self.D_pl, label=(f'Exploration:{bm.round(bm.mean(self.D_pl), 2)}%'))
+        plt.plot(self.D_pt, label=(f'Exploitation:{bm.round(bm.mean(self.D_pt), 2)}%'))
+        plt.legend()
+        plt.xlabel('Iteration')
+        plt.ylabel('Percentage')
+        plt.title("exploration vs exploitation percentage")
+        plt.show()  
+
+    def plot_curve(self, label):
+        plt.semilogy(self.curve, label=label)
+        plt.xlabel('Iteration')
+        plt.ylabel("Best fitness obtained so far")
+        plt.title("Convergence curve")
+        plt.legend()
+        plt.show()

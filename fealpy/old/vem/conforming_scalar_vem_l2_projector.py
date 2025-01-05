@@ -1,7 +1,7 @@
 import numpy as np 
 from numpy.linalg import inv
 
-from fealpy.functionspace import ConformingScalarVESpace2d
+from ..functionspace import ConformingScalarVESpace2d
 
 class ConformingScalarVEML2Projector2d():
     def __init__(self, M, PI1):
