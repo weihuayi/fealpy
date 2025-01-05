@@ -1,17 +1,17 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-from fealpy.jax.mesh.node_mesh import NodeMesh
-from fealpy.jax.sph import SPHSolver
-from fealpy.jax.sph.solver import Tag
-from fealpy.jax.sph import partition 
-from fealpy.jax.sph.jax_md.partition import Sparse
-from fealpy.jax.sph.kernel_function import QuinticKernel
+from fealpy.mesh.node_mesh import NodeMesh
+from fealpy.cfd.sph.particle_solver import SPHSolver, Tag, TimeLine
+from fealpy.cfd.sph import partition 
+from fealpy.cfd.sph.jax_md.partition import Sparse
+from fealpy.cfd.sph.particle_kernel_function import QuinticKernel
 from jax_md import space
 from jax import vmap
+import time
 
 jax.config.update("jax_enable_x64", True) # 启用 float64 支持
-jax.config.update('jax_platform_name', 'cpu')
+#jax.config.update('jax_platform_name', 'cpu')
 
 EPS = jnp.finfo(float).eps
 dx = 0.02
@@ -61,7 +61,8 @@ neighbor_fn = partition.neighbor_list(
 num_particles = (mesh.nodedata["tag"] != -1).sum()
 neighbors = neighbor_fn.allocate(mesh.nodedata["position"], num_particles=num_particles)
 
-for i in range(t_num+2):
+start = time.time()
+for i in range(100):
     print("i:", i)
     mesh.nodedata["mv"] += 1.0*dt*mesh.nodedata["dmvdt"]
     mesh.nodedata["tv"] = mesh.nodedata["mv"] + tvf*0.5*dt*mesh.nodedata["dtvdt"]
@@ -124,5 +125,8 @@ for i in range(t_num+2):
     
     #fname = path + 'test_'+ str(i+1).zfill(10) + '.h5'
     #solver.write_h5(mesh.nodedata, fname)
-    fname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'
-    solver.write_vtk(mesh.nodedata, fname)
+    #fname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'
+    #solver.write_vtk(mesh.nodedata, fname)
+
+end = time.time()
+print(end - start)

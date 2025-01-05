@@ -10,25 +10,25 @@ from ..mesh.halfedge_mesh import HalfEdgeMesh2d
 from ..functionspace import ConformingScalarVESpace2d
 
 # 积分子
-from fealpy.vem import ScaledMonomialSpaceMassIntegrator2d
-from fealpy.vem import ConformingVEMDoFIntegrator2d
-from fealpy.vem import ConformingScalarVEMH1Projector2d
-from fealpy.vem import ConformingScalarVEML2Projector2d
-from fealpy.vem import ConformingScalarVEMLaplaceIntegrator2d
-from fealpy.vem import ConformingVEMScalarSourceIntegrator2d
-from fealpy.vem import PoissonCVEMEstimator
+from . import ScaledMonomialSpaceMassIntegrator2d
+from . import ConformingVEMDoFIntegrator2d
+from . import ConformingScalarVEMH1Projector2d
+from . import ConformingScalarVEML2Projector2d
+from . import ConformingScalarVEMLaplaceIntegrator2d
+from . import ConformingVEMScalarSourceIntegrator2d
+from . import PoissonCVEMEstimator
 
 # 双线性型
-from fealpy.vem import BilinearForm
+from . import BilinearForm
 
 # 线性型
-from fealpy.vem import LinearForm
+from . import LinearForm
 
 # 边界条件
 from ..boundarycondition import DirichletBC
 
 from ..mesh.adaptive_tools import mark
-from ..tools.show import showmultirate
+
 
 class PoissonACVEMSolver:
     def __init__(self, pde, mesh, p=1):
@@ -168,6 +168,7 @@ class PoissonACVEMSolver:
          '$||\\nabla u - \Pi \\nabla u_h||_{\Omega, 0}$',
          '$\eta $']
 
+        from ..tools.show import showmultirate
         showmultirate(plt, self.maxit-select_number, np.array(self.NDof), self.errorMatrix, errorType, propsize=20, lw=2, ms=4)
         print(self.errorMatrix)
         plt.show()

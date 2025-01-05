@@ -47,31 +47,55 @@ mesh.nodedata['u'] = u1.reshape(2,-1).T
 mesh.nodedata['p'] = p1
 mesh.to_vtk(fname=fname)
 
-BC = DirichletBC(space=uspace, 
+BCu = DirichletBC(space=uspace, 
         gd=pde.velocity, 
         threshold=pde.is_u_boundary, 
         method='interp')
 
-BForm0 = solver.IPCS_BForm_0(None)
-LForm0 = solver.IPCS_LForm_0()
-A0 = BForm0.assembly()   
+BCp = DirichletBC(space=pspace, 
+        gd=pde.pressure, 
+        threshold=pde.is_p_boundary, 
+        method='interp')
 
-for i in range(1):
+BForm0 = solver.IPCS_BForm_0(threshold = None)
+LForm0 = solver.IPCS_LForm_0()
+AA0 = BForm0.assembly()   
+
+Bform1 = solver.IPCS_BForm_1()
+Lform1 = solver.IPCS_LForm_1()
+AA1 = Bform1.assembly()
+
+Bform2 = solver.IPCS_BForm_2()
+Lform2 = solver.IPCS_LForm_2()
+AA2 = Bform2.assembly()
+
+print(bm.sum(bm.abs(AA2.toarray())))
+for i in range(100):
     t = timeline.next_time_level()
     print(f"第{i+1}步")
     print("time=", t)
-
+     
     solver.update_ipcs_0(u0, p0)
-    print(bm.sum(bm.abs(A0.to_dense())))
     b0 = LForm0.assembly()
-    A0,b0 = BC.apply(A0,b0)
-    print(bm.sum(bm.abs(b0)))
-
+    A0,b0 = BCu.apply(AA0,b0)
     us[:] = spsolve(A0, b0, 'mumps')
+
+    solver.update_ipcs_1(us, p0)
+    b1 = Lform1.assembly()
+    A1,b1 = BCp.apply(AA1, b1)
+    p1[:] = spsolve(A1, b1, 'mumps')
+
+    solver.update_ipcs_2(us, p0, p1)
+    b2 = Lform2.assembly()
+    u1[:] = spsolve(AA2, b2, 'mumps')
     
+    u0[:] = u1
+    p0[:] = p1
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['u'] = u1.reshape(2,-1).T
     mesh.nodedata['p'] = p1
     mesh.to_vtk(fname=fname)
-    
+    #print(mesh.error(pde.velocity, u1))
+    print(bm.max(u1))
+
     timeline.advance()

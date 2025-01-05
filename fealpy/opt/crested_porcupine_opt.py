@@ -37,8 +37,16 @@ class CrestedPorcupineOpt(Optimizer):
         alpha = 0.2
         Tf= 0.8
         NN = N
-
+        curve = bm.zeros((1, MaxIT))
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
+            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
+            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            
             N = int(bm.floor(bm.array(N_min + (NN - N_min) * (1 - (it % MaxIT // T) / (MaxIT // T))))) # Eq.(3)
             gamma = 2 * bm.random.rand(N, 1) * (1 - it / MaxIT) ** (it / MaxIT) # Eq.(9)
 
@@ -68,5 +76,9 @@ class CrestedPorcupineOpt(Optimizer):
             x[bm.arange(0, N)], fit[bm.arange(0, N)] = bm.where(mask, x_new, x[bm.arange(0, N)]), bm.where(mask, fit_new, fit[bm.arange(0, N)])
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            
-        return gbest, gbest_f[0]
+            curve[0, it] = gbest_f[0]
+        self.gbest = gbest
+        self.gbest_f = gbest_f[0]
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]
