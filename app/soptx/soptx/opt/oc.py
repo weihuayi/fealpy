@@ -72,19 +72,7 @@ class OCOptimizer(OptimizerBase):
                        dc: TensorLike,
                        dg: TensorLike,
                        lmid: float) -> TensorLike:
-        """使用 OC 准则更新密度
-        
-        Parameters
-        ----------
-        rho : 当前密度
-        dc : 目标函数梯度
-        dg : 约束函数梯度
-        lmid : 拉格朗日乘子
-        
-        Returns
-        -------
-        rho_new : 更新后的密度
-        """
+        """使用 OC 准则更新密度"""
         move = self.options.move_limit
         
         # OC update scheme
@@ -106,23 +94,19 @@ class OCOptimizer(OptimizerBase):
         
     def optimize(self, rho: TensorLike, **kwargs) -> TensorLike:
         """运行 OC 优化算法
-        
+
         Parameters
         ----------
-        rho : 初始密度场
-        **kwargs : 其他参数，例如：
-            - beta: Heaviside 投影参数
-        
-        Returns
-        -------
-        rho : 最优密度场
+        - rho : 初始密度场
+        - **kwargs : 其他参数，例如：
+            -- beta: Heaviside 投影参数
         """
-        # 获取参数
+        # 获取优化参数
         max_iters = self.options.max_iterations
         tol = self.options.tolerance
         bisection_tol = self.options.bisection_tol
 
-        # 准备 Heaviside 投影的参数(如果需要)
+        # 准备 Heaviside 投影的参数 (如果需要)
         filter_params = {'beta': kwargs.get('beta')} if 'beta' in kwargs else None
         
         # 获取物理密度(对于非 Heaviside 投影，就是设计密度本身)
@@ -138,11 +122,17 @@ class OCOptimizer(OptimizerBase):
             
             # 使用物理密度计算目标函数值和梯度
             obj_val = self.objective.fun(rho_phys)
-            obj_grad = self.objective.jac(rho_phys)
+            obj_grad = self.objective.jac(rho_phys)  # (NC, )
+            if self.filter is not None:
+                obj_grad = self.filter.filter_sensitivity(
+                                        obj_grad, rho_phys, 'objective', filter_params)
             
             # 使用物理密度计算约束值和梯度
             con_val = self.constraint.fun(rho_phys)
-            con_grad = self.constraint.jac(rho_phys)
+            con_grad = self.constraint.jac(rho_phys)  # (NC, )
+            if self.filter is not None:
+                con_grad = self.filter.filter_sensitivity(
+                                        con_grad, rho_phys, 'constraint', filter_params)
             
             # 二分法求解拉格朗日乘子
             l1, l2 = 0.0, self.options.initial_lambda

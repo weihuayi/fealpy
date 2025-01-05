@@ -109,23 +109,19 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     
     # Create filter based on configuration
     filter_config = FilterConfig(
-                        filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
-                        filter_radius=config.filter_radius
-                    )
+                    filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
+                    filter_radius=config.filter_radius)
     filter_obj = Filter(filter_config)
     filter_obj.initialize(mesh)
     
     # Create optimization components
     objective = ComplianceObjective(
-                            material_properties=material_properties,
-                            solver=solver,
-                            filter=filter_obj
-                        )
+                    material_properties=material_properties,
+                    solver=solver)
+
     constraint = VolumeConstraint(
-                        mesh=mesh,
-                        volume_fraction=config.volume_fraction,
-                        filter=filter_obj
-                    )
+                    mesh=mesh,
+                    volume_fraction=config.volume_fraction)
     
     # Create optimizer
     optimizer = OCOptimizer(
@@ -171,7 +167,6 @@ if __name__ == "__main__":
                     save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d',
                     mesh_type='uniform_mesh_2d',
                     assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM
-                    # assembly_method=AssemblyMethod.VOIGT_UNIFORM
                 )
     
     config2 = TestConfig(

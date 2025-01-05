@@ -24,12 +24,11 @@ class DirectSolverResult:
 
 class AssemblyMethod(Enum):
     """矩阵组装方法的枚举类"""
-    STANDARD = auto()     # 标准组装方法
-    VOIGT = auto()        # Voigt 格式组装
-    VOIGT_UNIFORM = auto  # Voigt 格式组装(一致网格)
-    FAST_STRAIN = auto()  # 应变快速组装
-    FAST_STRESS_UNIFORM = auto()  # 应力快速组装(一致网格)
-    FAST_3D = auto()      # 3D 快速组装
+    STANDARD = auto()             # 标准组装方法
+    VOIGT = auto()                # Voigt 格式组装
+    VOIGT_UNIFORM = auto          # Voigt 格式组装 (一致网格)
+    FAST_STRESS_UNIFORM = auto()  # 应力快速组装 (一致网格)
+    FAST_3D_UNIFORM = auto()      # 3D 快速组装 (一致网格)
 
 class ElasticFEMSolver:
     """专门用于求解线弹性问题的有限元求解器
@@ -145,9 +144,9 @@ class ElasticFEMSolver:
             AssemblyMethod.STANDARD: integrator.assembly,
             AssemblyMethod.VOIGT: integrator.voigt_assembly,
             AssemblyMethod.VOIGT_UNIFORM: integrator.voigt_assembly_uniform,
-            AssemblyMethod.FAST_STRAIN: integrator.fast_assembly_strain,
+            # AssemblyMethod.FAST_STRAIN: integrator.fast_assembly_strain,
             AssemblyMethod.FAST_STRESS_UNIFORM: integrator.fast_assembly_stress_uniform,
-            AssemblyMethod.FAST_3D: integrator.fast_assembly
+            AssemblyMethod.FAST_3D_UNIFORM: integrator.fast_assembly_uniform
         }
         
         try:
@@ -173,20 +172,19 @@ class ElasticFEMSolver:
             AssemblyMethod.STANDARD: 'assembly',
             AssemblyMethod.VOIGT: 'voigt',
             AssemblyMethod.VOIGT_UNIFORM: 'voigt_uniform',
-            AssemblyMethod.FAST_STRAIN: 'fast_strain',
+            # AssemblyMethod.FAST_STRAIN: 'fast_strain',
             AssemblyMethod.FAST_STRESS_UNIFORM: 'fast_stress_uniform',
-            AssemblyMethod.FAST_3D: 'fast_3d'
+            AssemblyMethod.FAST_3D_UNIFORM: 'fast_3d_uniform'
         }
         
         method = method_map[self.assembly_method]
         
         # 创建积分器
         q = self.tensor_space.p + 3
-        
         integrator = LinearElasticIntegrator(
-                            material=self._current_material, q=q,
-                            method=method
-                        )
+                        material=self._current_material, 
+                        q=q, method=method
+                    )
         
         return integrator
     

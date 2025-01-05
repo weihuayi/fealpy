@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from soptx.material import ElasticMaterialProperties
 from soptx.solver import ElasticFEMSolver
 from soptx.opt import ObjectiveBase
-from soptx.filter import Filter
 from soptx.utils import timer
 
 @dataclass
@@ -32,22 +31,19 @@ class ComplianceObjective(ObjectiveBase):
     
     def __init__(self,
                  material_properties: ElasticMaterialProperties,
-                 solver: ElasticFEMSolver,
-                 filter: Optional[Filter] = None):
+                 solver: ElasticFEMSolver):
         """
         Parameters
         ----------
         material_properties : 材料属性计算器
         solver : 有限元求解器
-        filter : 可选的滤波器
         """
         self.material_properties = material_properties
         self.solver = solver
-        self.filter = filter
 
         # 缓存状态
-        self._current_rho = None  # 当前密度场
-        self._current_u = None    # 当前位移场
+        self._current_rho = None          # 当前密度场
+        self._current_u = None            # 当前位移场
         self._element_compliance = None   # 单元柔顺度
         
     #---------------------------------------------------------------------------
@@ -185,13 +181,8 @@ class ComplianceObjective(ObjectiveBase):
         """计算总柔度值
         
         Parameters
-        ----------
-        rho : 密度场
-        u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
-        
-        Returns
-        -------
-        c : 总柔顺度值
+        - rho : 密度场
+        - u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
         """
         # 获取位移场
         if u is None:
@@ -209,25 +200,16 @@ class ComplianceObjective(ObjectiveBase):
     def jac(self,
             rho: TensorLike,
             u: Optional[TensorLike] = None,
-            filter_params: Optional[Dict[str, Any]] = None,
             diff_mode: Literal["auto", "manual"] = "manual") -> TensorLike:
         """计算目标函数梯度
         
         Parameters
-        ----------
-        rho : 密度场
-        u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
-        filter_params : 滤波器参数
-        diff_mode : 梯度计算方式
-        - "manual": 使用解析推导的梯度公式（默认）
-        - "auto": 使用自动微分技术
-
-        
-        Returns
-        -------
-        dc : 目标函数对密度的梯度
+        - rho : 密度场
+        - u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
+        - diff_mode : 梯度计算方式
+            - "manual": 使用解析推导的梯度公式（默认）
+            - "auto": 使用自动微分技术
         """
-        
         # # 创建计时器
         # t = timer(f"Gradient Computation ({diff_mode} mode)")
         # next(t)
@@ -239,11 +221,6 @@ class ComplianceObjective(ObjectiveBase):
         elif diff_mode == "auto":  
             dc = self._compute_gradient_auto(rho)
             # t.send('Automatic gradient computed')
-
-        # 应用滤波（如果需要）
-        if self.filter is not None:
-            dc = self.filter.filter_sensitivity(dc, rho, 'objective', filter_params)
-            # t.send("Sensitivity filter applied")
 
         # 结束计时
         # t.send(None)
