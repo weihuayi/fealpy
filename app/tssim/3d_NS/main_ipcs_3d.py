@@ -95,7 +95,7 @@ for i in range(100):
     u0[:] = u1
     p0[:] = p1
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
-    mesh.nodedata['u'] = u1.reshape(2,-1).T
+    mesh.nodedata['u'] = u1.reshape(GD,-1).T
     mesh.nodedata['p'] = p1
     mesh.to_vtk(fname=fname)
     #print(mesh.error(pde.velocity, u1))

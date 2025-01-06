@@ -44,6 +44,9 @@ class ChannelFlow:
 
     @cartesian
     def is_u_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
         tag = self.is_p_boundary(p)
         return ~tag
 
