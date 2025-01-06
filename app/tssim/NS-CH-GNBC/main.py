@@ -28,7 +28,8 @@ bm.set_backend('pytorch')
 #bm.set_default_device('cuda')
 
 output = './'
-h = 1/256
+#h = 1/256
+h = 1/10
 T = 2
 nt = int(T/(0.1*h))
 
@@ -47,19 +48,7 @@ pspace = LagrangeFESpace(mesh, p=0, ctype='D')
 space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 
-'''
-ipoint = space.interpolation_points()
-import matplotlib.pylab  as plt
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-#mesh.find_edge(axes,fontsize=20,showindex=True)
-mesh.find_node(axes,node=ipoint,fontsize=20,showindex=True)
-plt.show()
-'''
-
 solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=5)
-
 
 u0 = uspace.function()
 u1 = uspace.function()

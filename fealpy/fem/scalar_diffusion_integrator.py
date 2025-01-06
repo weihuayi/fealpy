@@ -1,4 +1,5 @@
 from typing import Optional, Literal
+from ..mesh.mesh_base import SimplexMesh
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
@@ -62,7 +63,6 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         index = self.entity_selection(indices)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         gphi = self.fetch_gphix(space, indices)
-
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
 
     @assemblymethod('fast')
@@ -72,13 +72,30 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         TODO: 加入 assert
         """
         mesh = space.mesh
-        _, ws = self.fetch_qf(space)
-        gphi = self.fetch_gphiu(space, indices)
-        M = bm.einsum('q, qik, qjl -> ijkl', ws, gphi, gphi)
-        cm = self.fetch_measure(space, indices)
-        glambda = mesh.grad_lambda(index=self.entity_selection(indices))
-        A = bm.einsum('ijkl, ckm, clm, c -> cij', M, glambda, glambda, cm)
-        return A
+        if isinstance(mesh, SimplexMesh):
+
+            _, ws = self.fetch_qf(space)
+            gphi = self.fetch_gphiu(space, indices)
+            M = bm.einsum('q, qik, qjl -> ijkl', ws, gphi, gphi)
+            cm = self.fetch_measure(space, indices)
+            glambda = mesh.grad_lambda(index=self.entity_selection(indices))
+            result = bm.einsum('ijkl, ckm, clm, c -> cij', M, glambda, glambda, cm)
+        else:
+            coef = self.coef
+            mesh = space.mesh    
+            index = self.entity_selection(indices)
+            cm = self.fetch_measure(space, indices)
+            bcs,ws = self.fetch_qf(space)
+            coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+            
+            gphiu = self.fetch_gphiu(space, indices)  
+            M = bm.einsum('qim, qjn, q -> qijmn', gphiu, gphiu, ws)
+            J = mesh.jacobi_matrix(bcs, index)
+            G = mesh.first_fundamental_form(J)
+            G = bm.linalg.inv(G)
+            JG = bm.einsum("cqkm, cqmn -> cqkn", J, G) 
+            result = bm.einsum('cqkn, qijmn, cqkm, c -> cij', JG, M, JG, cm) # (NC, NQ, ldof, GD)
+        return result
 
     @assemblymethod('nonlinear')
     def nonlinear_assembly(self, space: _FS, /, indices=None) -> TensorLike:

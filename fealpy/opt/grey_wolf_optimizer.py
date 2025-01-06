@@ -6,7 +6,7 @@ from .optimizer_base import Optimizer
 Grey Wolf Optimizer
 
 """
-class GreyWolfOptimizer(Optimizer):
+class GreyWolfOpt(Optimizer):
     def __init__(self, option) -> None:
         super().__init__(option)
 
@@ -37,8 +37,7 @@ class GreyWolfOptimizer(Optimizer):
         #空列表
         gbest_f = X_alpha_fit
         gbest = X_alpha
-        # Convergence_curve = []
-        # Convergence_curve.append(gbest_f)
+        self.curve = bm.zeros((1, MaxIT))
 
         for it in range(0, MaxIT):
             a = 2 - 2 * it / MaxIT
@@ -77,5 +76,6 @@ class GreyWolfOptimizer(Optimizer):
 
             gbest = X_alpha
             gbest_f = X_alpha_fit
-
-        return gbest, gbest_f
+            self.curve[0, it] = gbest_f
+        self.curve = self.curve.flatten()
+        self.gbest, self.gbest_f = gbest, gbest_f

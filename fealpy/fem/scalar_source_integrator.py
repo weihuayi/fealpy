@@ -24,7 +24,9 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
 
     @enable_cache
     def to_global_dof(self, space: _FS, /, indices=None) -> TensorLike:
-        return space.cell_to_dof()[self.entity_selection(indices)]
+        if indices is None:
+            return space.cell_to_dof()
+        return space.cell_to_dof(index=self.entity_selection(indices))
 
     @enable_cache
     def fetch(self, space: _FS, /, inidces=None):

@@ -25,14 +25,19 @@ class ButterflyOptAlg(Optimizer):
         gbest_index = bm.argmin(fit)
         gbest = x[gbest_index]
         gbest_f = fit[gbest_index]
-
+        curve = bm.zeros((1, MaxIT))
         # Parameters
         c = 0.01
         p = 0.8
         a = 0.1
-
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
-            
+            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
+            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
             f = c * (fit ** a) # Fragrance Eq.(1)
 
             rand = bm.random.rand(N, 1)
@@ -44,4 +49,10 @@ class ButterflyOptAlg(Optimizer):
             x, fit = bm.where(mask, x_new, x), bm.where(mask, fit_new, fit)
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-        return gbest, gbest_f
+            curve[0, it] = gbest_f
+        
+        self.gbest = gbest
+        self.gbest_f = gbest_f
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]

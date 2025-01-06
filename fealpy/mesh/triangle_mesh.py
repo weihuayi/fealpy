@@ -147,20 +147,6 @@ class TriangleMesh(SimplexMesh, Plotable):
         elif variables == 'u':
             return R  # (NQ, ldof, TD+1)
 
-    def hess_shape_function(self, bc, p=1, index: Index=_S, variables='x'):
-        """
-        """
-        TD = bc.shape[1] - 1
-        H = bm.simplex_hess_shape_function(bc, p)
-        if variables == 'x':
-            Dlambda = self.grad_lambda(index=index, TD=TD)
-            Hphi = bm.einsum('...ijk, kjm -> k...imk', H, Dlambda)
-            return Hphi
-        elif variables == 'u':
-            return H
-        
-    cell_hess_shape_function = hess_shape_function
-
     cell_grad_shape_function = grad_shape_function
 
     def grad_shape_function_on_edge(self, bc, cindex, lidx, p=1, direction=True):
@@ -1269,6 +1255,53 @@ class TriangleMesh(SimplexMesh, Plotable):
         l = bm.sqrt(bm.sum(node ** 2, axis=1))
         n = node / l[..., None]
         node = node - d[..., None] * n
+        return cls(node, cell)
+
+    @classmethod
+    def from_unit_circle_gmesh(cls, h, *, itype=None, ftype=None, device=None):
+        """
+        Generate a triangular mesh for a unit circle by gmsh.
+
+        @param h Parameter controlling mesh density
+        @return TriangleMesh instance
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("UnitCircle")
+
+        # 创建单位圆
+        gmsh.model.occ.addDisk(0.0, 0.0, 0.0, 1, 1, 1)
+
+        # 同步几何模型
+        gmsh.model.occ.synchronize()
+
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = node_coords.reshape((-1, 3))[:, :2]
+
+        # 节点编号映射
+        nodetags_map = dict({j: i for i, j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        # 节点编号映射到单元
+        evid = bm.array([nodetags_map[j] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1], -1))
+
+        gmsh.finalize()
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
         return cls(node, cell)
 
     ## @ingroup MeshGenerators

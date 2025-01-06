@@ -488,10 +488,11 @@ class SimplexMesh(HomogeneousMesh):
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
         R = bm.simplex_grad_shape_function(bcs, p, mi) # (NQ, ldof, bc)
+        
         if variables == 'u':
             return R
         elif variables == 'x':
-            Dlambda = self.grad_lambda(index=index)
+            Dlambda = self.grad_lambda(index=index, TD=TD)
             gphi = bm.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi
@@ -499,6 +500,20 @@ class SimplexMesh(HomogeneousMesh):
             raise ValueError("Variables type is expected to be 'u' or 'x', "
                              f"but got '{variables}'.")
     
+    def hess_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
+                            variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+        """
+        """
+        TD = bcs.shape[1] - 1
+        if mi is None:
+            mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
+        H = bm.simplex_hess_shape_function(bcs, p, mi)
+        if variables == 'x':
+            Dlambda = self.grad_lambda(index=index, TD=TD) # (NC, NQ, ldof, dim) 
+            Hphi = bm.einsum('...inm, knj, kml  -> k...ijl', H, Dlambda, Dlambda)
+            return Hphi
+        elif variables == 'u':
+            return H
 
 class TensorMesh(HomogeneousMesh):
     # ipoints

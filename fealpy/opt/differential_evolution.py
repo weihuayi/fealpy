@@ -52,4 +52,5 @@ class DifferentialEvolution(Optimizer):
             (gbest, gbest_f) = (x[gbest_index], fit[gbest_index]) if fit[gbest_index] < gbest_f else (gbest, gbest_f)
 
 
-        return gbest, gbest_f
+        self.gbest = gbest
+        self.gbest_f = gbest_f[0]

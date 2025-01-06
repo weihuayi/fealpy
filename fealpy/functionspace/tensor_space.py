@@ -74,6 +74,19 @@ class TensorFunctionSpace(FunctionSpace):
     def grad_basis(self, p: TensorLike, index: Index=_S, **kwargs) -> TensorLike:
         gphi = self.scalar_space.grad_basis(p, index, **kwargs)
         return generate_tensor_grad_basis(gphi, self.dof_shape, self.dof_priority)
+    
+     
+    @barycentric
+    def cell_basis_on_face(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
+        result = self.scalar_space.cell_basis_on_face(bc, eindex)
+        return generate_tensor_basis(result, self.dof_shape, self.dof_priority)
+    
+    @barycentric
+    def cell_grad_basis_on_face(self, bc: TensorLike, eindex: TensorLike, 
+                                isleft = True) -> TensorLike:
+        result = self.scalar_space.cell_grad_basis_on_face(bc, eindex, isleft) 
+        return generate_tensor_grad_basis(result, self.dof_shape, self.dof_priority)
+
 
     def cell_to_dof(self, index: Index=_S) -> TensorLike:
         """Get the cell to dof mapping.
@@ -405,3 +418,67 @@ class TensorFunctionSpace(FunctionSpace):
         e2dof = self.entity_to_dof(TD, index=index)
         val = bm.einsum('cqlmn..., cl... -> cqmn', gphi, uh[e2dof, ...])
         return val[...]
+
+    def grad_recovery(self, uh: TensorLike, method: str='simple'):
+        GD = self.mesh.GD
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        ldof = self.number_of_local_dofs()
+        p = self.p
+        bc = bm.multi_index_matrix(p,GD)/p
+        guh = uh.grad_value(bc)
+        guh = guh.swapaxes(0, 1)
+        rguh = self.function()
+
+        if method == 'simple':
+            deg = bm.bincount(cell2dof.flat, minlength = gdof)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'area':
+            measure = self.mesh.entity_measure('cell')
+            ws = bm.einsum('i, j->ij', measure,bm.ones(ldof))
+            deg = bm.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = bm.einsum('ij..., i->ij...', guh, measure)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'distance':
+            ipoints = self.interpolation_points()
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            d = bm.sqrt(bm.sum(v**2, axis=-1))
+            deg = bm.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = bm.einsum('ij..., ij->ij...', guh, d)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'area_harmonic':
+            measure = 1/self.mesh.entity_measure('cell')
+            ws = bm.einsum('i, j->ij', measure,bm.ones(ldof))
+            deg = bm.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = bm.einsum('ij..., i->ij...', guh, measure)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+
+        elif method == 'distance_harmonic':
+            ipoints = self.interpolation_points()
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            d = 1/bm.sqrt(bm.sum(v**2, axis=-1))
+            deg = bm.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = bm.einsum('ij..., ij->ij...',guh,d)
+            if GD > 1:
+                bm.add.at(rguh, (cell2dof, bm.s_[:]), guh)
+            else:
+                bm.add.at(rguh, cell2dof, guh)
+        rguh /= deg.reshape(-1, 1)
+        return rguh

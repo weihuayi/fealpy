@@ -12,25 +12,21 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 
 class CouetteFlow:
-    '''
-    @brief: CouetteFlow
-    '''
-
     def __init__(self, eps=1e-10, h=1/256):
         self.eps = eps
         
         ## init the parameter
         self.R = 5.0 ##dimensionless
         self.l_s = 0.0025 ##dimensionless slip length
-        self.L_s = self.l_s / 100
+        self.L_s = self.l_s
 
         self.epsilon = 0.004 ## the thickness of interface
         self.L_d = 0.0005 ##phenomenological mobility cofficient
         self.lam = 12.0 ##dimensionless
         self.V_s = 200.0 ##dimensionless 
         self.s = 2.5 ##stablilizing parameter
-        #self.theta_s = bm.array(bm.pi/2)
-        self.theta_s = bm.array(77.6/180 * bm.pi)
+        self.theta_s = bm.array(bm.pi/2)
+        #self.theta_s = bm.array(77.6/180 * bm.pi)
         self.h = h
 
     def mesh(self):
@@ -56,6 +52,11 @@ class CouetteFlow:
         return (bm.abs(p[..., 1] - 0.125) < self.eps) | \
                (bm.abs(p[..., 1] + 0.125) < self.eps)
     
+    @cartesian
+    def is_slip_boundary(self,p):
+        return self.is_wall_boundary(p)
+        #return bm.logical_not(self.is_wall_boundary(p)))
+
     @cartesian
     def init_phi(self,p):
         x = p[..., 0]

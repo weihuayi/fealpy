@@ -7,7 +7,7 @@ from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 
 from fealpy.fem import BilinearForm
-from fealpy.fem import VectorDiffusionIntegrator
+from fealpy.fem import ScalarDiffusionIntegrator
 
 @dataclass
 class HarmonicMapData:
@@ -32,16 +32,33 @@ def sphere_harmonic_map(data : HarmonicMapData):
     didx = data.didx
     dval = data.dval
 
+
     NN = mesh.number_of_nodes()
     GD = dval.shape[1]
     gdof = NN*GD 
+    cell = mesh.entity('cell')
 
-    space = LagrangeFESpace(mesh, p=1)
-    space.doforder = 'vdims'
+    # 标量刚度矩阵
+    glambda = mesh.grad_lambda()
+    cm = mesh.entity_measure('cell')
+    SK = np.einsum('cid, cjd, c->cij', glambda, glambda, cm)
 
-    bform = BilinearForm((space, )*GD)
-    bform.add_domain_integrator(VectorDiffusionIntegrator())
-    S = bform.assembly() # 刚度矩阵
+    I = np.broadcast_to(cell[:, :, None], SK.shape) 
+    J = np.broadcast_to(cell[:, None, :], SK.shape)
+    S0 = csr_matrix((SK.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+    # 扩展为向量刚度矩阵
+    if GD == 2:
+        S = bmat([[S0, None], [None, S0]], format='csr')
+    elif GD == 3:
+        S = bmat([[S0, None, None], [None, S0, None], [None, None, S0]],
+                   format='csr')
+
+    # 改变自由度顺序
+    idx = np.arange(gdof).reshape(-1, GD)
+    idx = idx.T.flatten()
+    P = csr_matrix((np.ones(gdof), (idx, np.arange(gdof))), shape=(gdof, gdof))
+    S = P@S@P.T
     SS = S.copy()
 
     # 1. 计算初值
@@ -115,6 +132,7 @@ def sphere_harmonic_map(data : HarmonicMapData):
 
 
     
+
 
 
 

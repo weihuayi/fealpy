@@ -103,7 +103,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
 
-    def quadrature_formula(self, q, etype: Union[int, str] = 'cell'):
+    def quadrature_formula(self, q, etype: Union[int, str] = 'cell', qtype=None):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
@@ -362,9 +362,9 @@ class QuadrangleMesh(TensorMesh, Plotable):
                 nonzeros = NN + 2 * NE + 4 * NC
                 num_new_node = NN + NE + NC
 
-                data = bm.zeros(nonzeros, dtype=bm.float64)
-                indices = bm.zeros(nonzeros, dtype=bm.int32)
-                indptr = bm.zeros(num_new_node + 1, dtype=bm.int32)
+                data = bm.zeros(nonzeros, dtype=self.ftype)
+                indices = bm.zeros(nonzeros, dtype=self.itype)
+                indptr = bm.zeros(num_new_node + 1, self.itype)
 
                 # 赋值
                 data[:NN] = 1
@@ -378,7 +378,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
                 indptr[:NN + 1] = bm.arange(NN + 1)
                 indptr[NN + 1:NN + NE + 1] = bm.arange(NN + 2, NN + 2 * NE + 1, step=2)
                 indptr[NN + NE + 1:] = bm.arange(NN + 2 * NE + 4, NN + 2 * NE + 4 * NC + 1, step=4)
-                A = csr_matrix((data, indices, indptr), dtype=bm.float64)
+                A = csr_matrix((data, indices, indptr), dtype=self.ftype)
                 IM.append(A)
 
             # Find the cutted edge
@@ -393,7 +393,7 @@ class QuadrangleMesh(TensorMesh, Plotable):
             ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
             cc = bm.arange(NN + NE, NN + NE + NC, device=bm.get_device(cell2edge)).reshape(-1, 1)
 
-            cell = bm.zeros((4 * NC, 4), dtype=bm.int64, device=bm.get_device(cell2edge))
+            cell = bm.zeros((4 * NC, 4), dtype=self.itype, device=bm.get_device(cell2edge))
 
             cell = bm.set_at(cell, (slice(0, None, 4), slice(None)),
                              bm.concatenate([cp[0], ep[0], cc, ep[3]], axis=1))

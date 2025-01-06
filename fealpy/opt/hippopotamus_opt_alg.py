@@ -42,8 +42,16 @@ class HippopotamusOptAlg(Optimizer):
         gbest_idx = bm.argmin(fit)
         gbest_f = fit[gbest_idx]
         gbest = x[gbest_idx].reshape(1, -1)
-        # Convergence_curve = bm.zeros([1, MaxIT])
+        curve = bm.zeros((1, MaxIT))
+        D_pl = bm.zeros((1, MaxIT))
+        D_pt = bm.zeros((1, MaxIT))
+        Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
+            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
+            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            
             T = bm.exp(bm.array(it / MaxIT)) # Eq.(5)
             i1 = bm.array(int(N / 2))
             I1 = bm.random.randint(1, 3, (i1, 1)) 
@@ -129,5 +137,9 @@ class HippopotamusOptAlg(Optimizer):
 
             gbest_idx = bm.argmin(fit)
             (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            # Convergence_curve[0, it] = bm.copy(gbest_f[0])
-        return gbest[0], gbest_f
+            curve[0, it] = gbest_f[0]
+        self.gbest = gbest
+        self.gbest_f = gbest_f[0]
+        self.curve = curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]

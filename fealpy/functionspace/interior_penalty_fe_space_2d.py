@@ -70,6 +70,7 @@ class InteriorPenaltyDof2d(LinearMeshCFEDof):
 
 class InteriorPenaltyFESpace2d:
     def __init__(self, mesh, p=2, space=None, ctype='C'):
+        self.dof = InteriorPenaltyDof2d(mesh, p)
         if space is None or space == 'Lagrange':
             self.base_space = LagrangeFESpace(mesh, p, ctype=ctype)
         elif space == 'Bernstein':
@@ -77,8 +78,6 @@ class InteriorPenaltyFESpace2d:
         else:
             raise ValueError("Space must be either 'Lagrange' or 'Bernstein'")
 
-        # 其他初始化逻辑
-        self.dof = InteriorPenaltyDof2d(mesh, p)
 
     def __getattr__(self, name):
         # 当访问不存在的属性时，尝试从base_space获取
@@ -156,7 +155,7 @@ class InteriorPenaltyFESpace2d:
             zero_indices = bm.where(self.dof.multiIndex[:, i] == 0)[0]
             dofidx1 = slice_operations[edof2rcdof[i]](zero_indices)
             #dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
-
+            
             gval = self.grad_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
             val  = bm.einsum('eqdi, ei->qed', gval, -en[edgeidx]) # (NQ, NIEi, cdof)
 
@@ -212,11 +211,14 @@ class InteriorPenaltyFESpace2d:
             zero_indices = bm.where(self.dof.multiIndex[:, i] == 0)[0]
             dofidx1 = slice_operations[edof2lcdof[i]](zero_indices)
             #dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2lcdof[i]]
-
-            print(bcsi, ie2c[edgeidx, 0])
-            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 0], variable='x')
-            val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
-                    en[edgeidx])/2.0# (NQ, NIEi, cdof)
+            
+            idx = ie2c[edgeidx, 0]
+            if len(idx) == 0:
+                val = bm.zeros((bcsi.shape[0], len(idx), cdof), dtype=self.mesh.ftype)
+            else:
+                hval = self.hess_basis(bcsi, index=idx, variable='x')
+                val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
+                        en[edgeidx])/2.0# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval0 = bm.set_at(rval0, indices, val[..., dofidx0])
@@ -232,10 +234,14 @@ class InteriorPenaltyFESpace2d:
             zero_indices = bm.where(self.dof.multiIndex[:, i] == 0)[0]
             dofidx1 = slice_operations[edof2rcdof[i]](zero_indices)
             #dofidx1 = bm.where(self.dof.multiIndex[:, i] == 0)[0][edof2rcdof[i]]
-
-            hval = self.hess_basis(bcsi, index=ie2c[edgeidx, 1], variable='x')
-            val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
-                    en[edgeidx])/2.0# (NQ, NIEi, cdof)
+            
+            idx = ie2c[edgeidx, 1]
+            if len(idx) == 0:
+                val = bm.zeros((bcsi.shape[0], len(idx), cdof), dtype=self.mesh.ftype)
+            else:
+                hval = self.hess_basis(bcsi, index=idx, variable='x')
+                val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx],
+                        en[edgeidx])/2.0# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval1 = bm.set_at(rval1, indices, val[..., dofidx0])
@@ -304,8 +310,13 @@ class InteriorPenaltyFESpace2d:
             bcsi    = bcss[i] 
             edgeidx = be2c[:, 2]==i
 
-            hval = self.hess_basis(bcsi, index=be2c[edgeidx, 0], variable='x')
-            val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
+            idx = be2c[edgeidx, 0]
+            if len(idx) == 0:
+                val = bm.zeros((bcsi.shape[0], len(idx), cdof), dtype=self.mesh.ftype)
+            else:
+
+                hval = self.hess_basis(bcsi, index=idx, variable='x')
+                val  = bm.einsum('eqdij, ei, ej->qed', hval, en[edgeidx], en[edgeidx])# (NQ, NIEi, cdof)
 
             indices = (Ellipsis, edgeidx, slice(None))
             rval = bm.set_at(rval, indices, val)
