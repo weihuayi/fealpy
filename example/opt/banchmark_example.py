@@ -18,14 +18,14 @@ lb, ub = iopt_data[num]['domain']
 NP = 100
 MaxIters = 1000
 dim = 30
-x0 = lb + bm.random.rand(NP, dim) * (ub - lb)
+x0 = initialize(NP, dim, ub, lb, way=2)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
-optimizer = ExponentialTrigonometricOptAlg(option)
-
-gbest, gbest_f = optimizer.run()
-print("The final result: ", gbest_f)
-print("The final solution: ", gbest)
-
+optimizer = StarFishOptAlg(option)
+optimizer.run()
+# optimizer.plot_curve()
+# optimizer.plot_plpt_percen()
+optimizer.print_optimal_result()
+# print("Function times:", optimizer.NF)
 end_time = time.perf_counter()
 running_time = end_time - start_time
-print("Running time :", running_time)
+# print("Running time :", running_time)
