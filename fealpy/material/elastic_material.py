@@ -313,15 +313,14 @@ class LinearElasticMaterial(ElasticMaterial):
                 raise ValueError(f'out.shape={out.shape} != {new_shape}')
         
 
-        average_gphi = bm.einsum('cqid, cq, q -> cid', gphi, detJ, ws)  # (NC, LDOF, GD)
+        average_gphi = bm.einsum('cqid, cq, q -> cid', gphi, detJ, ws)/cm[:, None, None]# (NC, LDOF, GD)
+
         for i in range(GD):
             for j in range(GD):
                 if i == j:
-                    corrected_phi = (2.0 / 3.0) * gphi[..., :, i] \
-                                    + (1.0 / (3.0 * cm[:, None, None]) ) * average_gphi[..., None,  :, i] # (NC, NQ, LDOF)
+                    corrected_phi = ( 2.0 / 3.0) * gphi[..., :, i] + (1.0 / 3.0) * average_gphi[..., None, :, i] # (NC, NQ, LDOF)
                 else:  
-                    corrected_phi = (-1.0 / 3.0) * gphi[..., :, j] \
-                                    + (1.0 / (3.0 * cm[:, None, None]) ) * average_gphi[..., None, :, j]  # (NC, NQ, LDOF)
+                    corrected_phi = (-1.0 / 3.0) * gphi[..., :, j] + (1.0 / 3.0) * average_gphi[..., None, :, j]  # (NC, NQ, LDOF)
 
                 out = bm.set_at(out, (..., i, indices[:, j]), corrected_phi)
 
