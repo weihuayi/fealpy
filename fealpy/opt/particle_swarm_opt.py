@@ -33,14 +33,14 @@ class ParticleSwarmOpt(Optimizer):
         w = 0.9
         v = bm.zeros((N, dim))
         vlb, ulb = 0.2 * lb, 0.2 * ub
-        self.curve = bm.zeros((1, MaxIT))
-        self.D_pl = bm.zeros((1, MaxIT))
-        self.D_pt = bm.zeros((1, MaxIT))
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
         self.Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
             self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(a, axis=0) - a))/N)
             # exploration percentage and exploitation percentage
-            self.D_pl[0, it], self.D_pt[0, it] = self.D_pl_pt(self.Div[0, it])
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
             
             w = 0.9 - 0.4 * (it / MaxIT)
             v = w * v + c1 * bm.random.rand(N, dim) * (pbest - a) + c2 * bm.random.rand(N, dim) * (self.gbest - a)
@@ -50,9 +50,5 @@ class ParticleSwarmOpt(Optimizer):
             fit = self.fun(a)
             mask = fit < pbest_f
             pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
-            gbest_idx = bm.argmin(pbest_f)
-            (self.gbest_f, self.gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < self.gbest_f else (self.gbest_f, self.gbest)
-            self.curve[0, it] = self.gbest_f
-        
-        self.D_pl = self.D_pl.flatten()
-        self.D_pt = self.D_pt.flatten()
+            self.update_gbest(pbest, pbest_f)
+            self.curve[it] = self.gbest_f

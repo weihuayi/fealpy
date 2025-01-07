@@ -30,14 +30,14 @@ class SparrowSearchAlg(Optimizer):
         dim = options["ndim"]
         lb, ub = options["domain"]
         gbest_index = bm.argmin(fit)
-        gbest = x[gbest_index]
-        gbest_f = fit[gbest_index]
+        self.gbest = x[gbest_index]
+        self.gbest_f = fit[gbest_index]
         best_f = fit[gbest_index]
         # x_new = bm.zeros((N, dim))
-        curve = bm.zeros((1, MaxIT))
-        D_pl = bm.zeros((1, MaxIT))
-        D_pt = bm.zeros((1, MaxIT))
-        Div = bm.zeros((1, MaxIT))
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
 
         index = bm.argsort(fit)
         x = x[index]
@@ -50,10 +50,9 @@ class SparrowSearchAlg(Optimizer):
         PDnumber = int(N * PD)
         SDnumber = int(N * SD) 
         for it in range(0, MaxIT):
-            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x)) / N)
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
             # exploration percentage and exploitation percentage
-            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
-            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
 
             if bm.random.rand(1) < ST:
                 x[0 : PDnumber] = x[0 : PDnumber] * bm.exp( -bm.arange(1, PDnumber + 1)[:, None] / (bm.random.rand(PDnumber, 1) * MaxIT))
@@ -76,13 +75,5 @@ class SparrowSearchAlg(Optimizer):
             index = bm.argsort(fit)
             x = x[index]
             fit = fit[index]
-            gbest_idx = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            
-            curve[0, it] = gbest_f
-
-        self.gbest = gbest
-        self.gbest_f = gbest_f
-        self.curve = curve[0]
-        self.D_pl = D_pl[0]
-        self.D_pt = D_pt[0]
+            self.update_gbest(x, fit)
+            self.curve[it] = self.gbest_f
