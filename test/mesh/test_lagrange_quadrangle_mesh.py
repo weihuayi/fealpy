@@ -55,6 +55,6 @@ class TestLagrangeQuadrangleMeshInterfaces:
 
 if __name__ == "__main__":
     a = TestLagrangeQuadrangleMeshInterfaces()
-    #a.test_surface_mesh('numpy')
-    a.test_cell_area(cell_area_data[0], 'numpy')
+    a.test_surface_mesh('numpy')
+    #a.test_cell_area(cell_area_data[0], 'numpy')
     #pytest.main(["./test_lagrange_triangle_mesh.py"])
