@@ -24,13 +24,13 @@ class HarmonySearchAlg(Optimizer):
         options = self.options
         x = options["x0"]
         N = options["NP"]
-        fit = self.fun(x)[:, None]
+        fit = self.fun(x)
         MaxIT = options["MaxIters"]
         dim = options["ndim"]
         lb, ub = options["domain"]
         gbest_index = bm.argmin(fit)
-        gbest = x[gbest_index]
-        gbest_f = fit[gbest_index]
+        self.gbest = x[gbest_index]
+        self.gbest_f = fit[gbest_index]
 
         # Parametes
         FW = 0.02 * (ub - lb)
@@ -39,21 +39,20 @@ class HarmonySearchAlg(Optimizer):
         PAR = 0.1
         FW_damp = 0.995
 
-        index = bm.argsort(fit, axis=0)
-        x = x[index[:, 0]]
-        fit = fit[index[:, 0]]
+        index = bm.argsort(fit)
+        x = x[index]
+        fit = fit[index]
 
 
-        curve = bm.zeros((1, MaxIT))
-        D_pl = bm.zeros((1, MaxIT))
-        D_pt = bm.zeros((1, MaxIT))
-        Div = bm.zeros((1, MaxIT))
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
 
         for it in range(0, MaxIT):
-            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x)) / N)
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
             # exploration percentage and exploitation percentage
-            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
-            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
             
             x_new = initialize(nNew, dim, lb, ub)
             mask = bm.random.rand(nNew, dim) <= HMCR
@@ -63,21 +62,14 @@ class HarmonySearchAlg(Optimizer):
             x_new = x_new + FW * bm.random.randn(nNew, dim) * (bm.random.rand(nNew, dim) <= PAR)
 
             x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
-            fit_new = self.fun(x_new)[:, None]
+            fit_new = self.fun(x_new)
 
             x = bm.concatenate((x, x_new), axis=0)
-            fit = bm.concatenate((fit, fit_new), axis=0)
+            fit = bm.concatenate((fit, fit_new))
 
-            index = bm.argsort(fit, axis=0)
-            x = x[index[0 : N, 0]]
-            fit = fit[index[0 : N, 0]]
-            gbest_idx = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
+            index = bm.argsort(fit)
+            x = x[index[0 : N]]
+            fit = fit[index[0 : N]]
+            self.update_gbest(x, fit)
             FW = FW * FW_damp
-            curve[0, it] = gbest_f
-
-        self.gbest = gbest.flatten()
-        self.gbest_f = gbest_f
-        self.curve = curve.flatten()
-        self.D_pl = D_pl[0]
-        self.D_pt = D_pt[0]
+            self.curve[it] = self.gbest_f

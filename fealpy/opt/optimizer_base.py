@@ -69,6 +69,9 @@ class Optimizer():
         self.__NF += self.options['NP'] 
         return self.options['objective'](x)
 
+    def update_gbest(self, x, f):
+        gbest_idx = bm.argmin(f)
+        (self.gbest_f, self.gbest) = (f[gbest_idx], x[gbest_idx]) if f[gbest_idx] < self.gbest_f else (self.gbest_f, self.gbest)
 
     def run(self):
         raise NotImplementedError

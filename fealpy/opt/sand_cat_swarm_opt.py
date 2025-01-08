@@ -21,7 +21,7 @@ class SandCatSwarmOpt(Optimizer):
         options = self.options
         x = options["x0"]
         N = options["NP"]
-        fit = self.fun(x)[:, None]
+        fit = self.fun(x)
         MaxIT = options["MaxIters"]
         dim = options["ndim"]
         lb, ub = options["domain"]
@@ -30,17 +30,14 @@ class SandCatSwarmOpt(Optimizer):
         self.gbest_f = fit[gbest_index]
 
 
-        self.curve = bm.zeros((1, MaxIT))
-        self.D_pl = bm.zeros((1, MaxIT))
-        self.D_pt = bm.zeros((1, MaxIT))
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
         self.Div = bm.zeros((1, MaxIT))
 
         for it in range(MaxIT):
             self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x)) / N)
-            # exploration percentage and exploitation percentage
-            self.D_pl[0, it], self.D_pt[0, it] = self.D_pl_pt(self.Div[0, it])
-            # D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
-            # D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
 
             rg = 2 - 2 * it / MaxIT # Eq.(1)
             R = 2 * rg * bm.random.rand(N, 1) - rg # Eq.(2)
@@ -51,14 +48,6 @@ class SandCatSwarmOpt(Optimizer):
                  (bm.abs(R) > 1) * (r * (self.gbest - bm.random.rand(N, dim) * x))) # Eq.(4)
             x = x + (lb - x) * (x < lb) + (ub - x) * (x > ub)
 
-            fit = self.fun(x)[:, None]
-            gbest_idx = bm.argmin(fit)
-            (self.gbest, self.gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < self.gbest_f else (self.gbest, self.gbest_f)
-
-            self.curve[0, it] = self.gbest_f
-
-        self.curve = self.curve.flatten()
-        # self.gbest = gbest.flatten()
-        # self.gbest_f = gbest_f.flatten()
-        self.D_pl = self.D_pl.flatten()
-        self.D_pt = self.D_pt.flatten()
+            fit = self.fun(x)
+            self.update_gbest(x, fit)
+            self.curve[it] = self.gbest_f
