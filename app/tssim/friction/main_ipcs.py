@@ -15,6 +15,7 @@ from fealpy.cfd import NSFEMSolver
 from fealpy.fem import DirichletBC
 from fealpy.solver import spsolve 
 from pde import ChannelFlow
+#from fealpy.pde.navier_stokes_equation_2d import ChannelFlow
 
 output = './'
 T = 1
@@ -70,7 +71,7 @@ Lform2 = solver.IPCS_LForm_2()
 AA2 = Bform2.assembly()
 
 print(bm.sum(bm.abs(AA2.toarray())))
-for i in range(1):
+for i in range(3):
     t = timeline.next_time_level()
     print(f"第{i+1}步")
     print("time=", t)
@@ -88,7 +89,10 @@ for i in range(1):
     solver.update_ipcs_2(us, p0, p1)
     b2 = Lform2.assembly()
     u1[:] = spsolve(AA2, b2, 'mumps')
-    print(uspace.grad_recovery(u1))
+    pp = pspace.grad_recovery(p1, method='simple')
+    bcs = bm.array([[1/3,1/3,1/3]])
+    uu = uspace.grad_recovery(u1)
+    ug = u1.grad_value(bcs)
 
 
     u0[:] = u1
@@ -96,8 +100,11 @@ for i in range(1):
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['u'] = u1.reshape(2,-1).T
     mesh.nodedata['p'] = p1
+    mesh.nodedata['pp'] = pp.reshape(2,-1).T
+    mesh.celldata['pg'] = p1.grad_value(bcs)[:,0,:]
+    mesh.nodedata['uu'] = uu[:,0,0]
+    mesh.celldata['ug'] = ug[:,:,0,0]
     mesh.to_vtk(fname=fname)
     #print(mesh.error(pde.velocity, u1))
-    print(bm.max(u1))
 
     timeline.advance()

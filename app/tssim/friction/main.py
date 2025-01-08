@@ -17,22 +17,23 @@ from fealpy.functionspace import TensorFunctionSpace
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.solver import spsolve, cg, gmres 
 from fealpy.fem import DirichletBC
-
-from pde import CouetteFlow
+import matplotlib.pyplot as plt
+from pde import slip_stick
 from solver import Solver
 
 from fealpy.utils import timer
 
-bm.set_backend('pytorch')
-#bm.set_backend('numpy')
+#bm.set_backend('pytorch')
+bm.set_backend('numpy')
 #bm.set_default_device('cuda')
 
 output = './'
-h = 1/256
-T = 2
+#h = 1/250
+h = 1/100
+T = 1
 nt = int(T/(0.1*h))
 
-pde = CouetteFlow(h=h)
+pde = slip_stick(h=h)
 mesh = pde.mesh()
 
 
@@ -47,12 +48,22 @@ pspace = LagrangeFESpace(mesh, p=1)
 space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 
-solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=5)
+'''
+ipoint = space.interpolation_points()
+import matplotlib.pylab  as plt
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+#mesh.find_edge(axes,fontsize=20,showindex=True)
+mesh.find_node(axes,node=ipoint,fontsize=20,showindex=True)
+plt.show()
+'''
 
+solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=5)
 u0 = uspace.function()
 u1 = uspace.function()
 u2 = uspace.function()
-phi0 = phispace.interpolate(pde.init_phi)
+phi0 = phispace.interpolate(pde.init_interface)
 phi1 = phispace.function()
 # TODO:第一步求解
 phi1[:] = phi0[:]
@@ -65,11 +76,13 @@ p2 = pspace.function()
 ugdof = uspace.number_of_global_dofs()
 pgdof = pspace.number_of_global_dofs()
 phigdof = phispace.number_of_global_dofs()
+sugdof = space.number_of_global_dofs()
 
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['phi'] = phi0
 mesh.nodedata['u'] = u0.reshape(2,-1).T
 #mesh.celldata['p'] = p1
+mesh.nodedata['p'] = p1
 mesh.nodedata['mu'] = mu1
 mesh.to_vtk(fname=fname)
 
@@ -78,21 +91,19 @@ CH_LForm = solver.CH_LForm()
 NS_BForm = solver.NS_BForm()
 NS_LForm = solver.NS_LForm()
 
-is_up = space.is_boundary_dof(pde.is_up_boundary)
-is_down = space.is_boundary_dof(pde.is_down_boundary)
-#NS_BC = DirichletBC(space=(uspace,pspace), \
-#        gd=(pde.u_w, pde.p_dirichlet), \
-#        threshold=(pde.is_wall_boundary, pde.is_p_dirichlet), method='interp')
+is_bd = uspace.is_boundary_dof((pde.is_ux_Dirichlet, pde.is_uy_Dirichlet), method='interp')
+is_bd = bm.concatenate((is_bd, bm.zeros(pgdof, dtype=bm.bool)))
 
-is_uy_bd = space.is_boundary_dof(pde.is_uy_Dirichlet)
-ux_gdof = space.number_of_global_dofs()
-is_bd = bm.concatenate((bm.zeros(ux_gdof, dtype=bool), is_uy_bd, bm.zeros(pgdof, dtype=bool)))
+uin_gd,_ = uspace.boundary_interpolate(pde.u_inflow_dirichlet, threshold=pde.is_left_boundary, method='interp')
+gd = bm.concatenate((uin_gd[:], bm.zeros(pgdof, dtype=bm.float64)))
+
 NS_BC = DirichletBC(space=(uspace,pspace), \
-        gd=bm.zeros(ugdof+pgdof, dtype=bm.float64), \
+        gd=gd, \
         threshold=is_bd, method='interp')
 
 time.send("初始化用时")
-for i in range(nt):
+
+for i in range(2):
     t = timeline.next_time_level()
     print(f"第{i+1}步")
     print("time=", t)
@@ -123,23 +134,46 @@ for i in range(nt):
     phi1[:] = phi2[:]
     mu1[:] = mu2[:]
     p1[:] = p2[:]
-    stress = solver.stress(u2)
+    
+    stress = uspace.grad_recovery(u1)
+    stress = 0.5*(stress + stress.swapaxes(-1,-2))
+    normal = mesh.edge_unit_normal()
+    tangent = mesh.edge_unit_tangent()
+    e2dof = uspace.edge_to_dof()
+    
+    iswalldof = uspace.scalar_space.is_boundary_dof(pde.is_up_boundary, method='interp')
+    u_tau = bm.abs(stress[iswalldof, 0,1])
+    print(u_tau)
+
+    inteface_phi = bm.where(bm.abs(phi1[:])<0.9)
+    interface_node = mesh.node[inteface_phi]
+    xx = bm.mean(interface_node[:,0])
+    #print(xx)
+    
+    ip = uspace.interpolation_points()[iswalldof]
+    tag = (ip[:,0]>xx) & (ip[:,0]<xx+5*h)
+    #print(ip[tag])
+    print(ip[:,0])
+    print(bm.sort(ip[:,0]))
+    print(bm.argsort(ip[:,0]))
+    plt.plot(bm.sort(ip[:,0]), u_tau[bm.argsort(ip[:,0])])
+    plt.show()
+    
+
+
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['phi'] = phi2
     mesh.nodedata['u'] = u2.reshape(2,-1).T
     #mesh.celldata['p'] = p2
-    mesh.celldata['tauxx'] = stress[..., 0,0]
-    mesh.celldata['tauxy'] = stress[..., 1,0]
-    mesh.celldata['tauyy'] = stress[..., 1,1]
+    mesh.nodedata['p'] = p2
     mesh.nodedata['mu'] = mu2
+    mesh.nodedata['stress0'] = stress[:,0,1]
+
+
+
     mesh.to_vtk(fname=fname)
     timeline.advance()
     time.send(f"第{i+1}次画图用时")
     uuu = u2.reshape(2,-1).T
-    print("上边界最大值",bm.max(uuu[is_up,0]))
-    print("上边界最小值",bm.min(uuu[is_up,0]))
-    print("下边界最大值",bm.max(uuu[is_down,0]))
-    print("下边界最小值",bm.min(uuu[is_down,0]))
 #next(time)
-
