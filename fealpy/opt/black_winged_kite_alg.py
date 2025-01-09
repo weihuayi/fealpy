@@ -27,13 +27,22 @@ class BlackwingedKiteAlg(Optimizer):
         dim = options["ndim"]
         lb, ub = options["domain"]
         gbest_index = bm.argmin(fit)
-        gbest = x[gbest_index]
-        gbest_f = fit[gbest_index]
+        self.gbest = x[gbest_index]
+        self.gbest_f = fit[gbest_index]
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
 
         # Parameters
         p = 0.9
 
         for it in range(0, MaxIT):
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x)) / N)
+            # exploration percentage and exploitation percentage
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
+            
+
             R = bm.random.rand(N, 1)
             
             # Attacking behavior
@@ -50,13 +59,12 @@ class BlackwingedKiteAlg(Optimizer):
             s = bm.random.randint(0, int(0.3 * N), (N,))
             fit_r = fit[s]
             cauchy_num = 1 / (bm.pi * ((bm.random.rand(N, dim) * bm.pi - bm.pi / 2) ** 2 + 1))
-            x_new = ((fit < fit_r) * (x + cauchy_num * (x - gbest)) + 
-                     (fit >= fit_r) * (x + cauchy_num * (gbest - m * x))) # Eq.(7)
+            x_new = ((fit < fit_r) * (x + cauchy_num * (x - self.gbest)) + 
+                     (fit >= fit_r) * (x + cauchy_num * (self.gbest - m * x))) # Eq.(7)
             x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
             fit_new = self.fun(x_new)[:, None]
             mask = fit_new < fit 
             x, fit = bm.where(mask, x_new, x), bm.where(mask, fit_new, fit)
             
-            gbest_idx = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-        return gbest, gbest_f
+            self.update_gbest(x, fit)
+            self.curve[it] = self.gbest_f

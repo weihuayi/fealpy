@@ -22,30 +22,34 @@ class RimeOptAlg(Optimizer):
         options = self.options
         x = options["x0"]
         N = options["NP"]
-        fit = self.fun(x)[:, None]
+        fit = self.fun(x)
         MaxIT = options["MaxIters"]
         dim = options["ndim"]
         lb, ub = options["domain"]
         gbest_index = bm.argmin(fit)
-        gbest = x[gbest_index]
-        gbest_f = fit[gbest_index]
+        self.gbest = x[gbest_index]
+        self.gbest_f = fit[gbest_index]
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
         w = 5
-        # curve = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
             RimeFactor = (bm.random.rand(N, 1) - 0.5) * 2 * bm.cos(bm.array(bm.pi * it / (MaxIT / 10))) * (1 - bm.round(bm.array(it * w / MaxIT)) / w) # Parameters of Eq.(3),(4),(5)
             E = (it / MaxIT) ** 0.5 # Eq.(6)
-            normalized_rime_rates = fit / bm.linalg.norm(fit) # Parameters of Eq.(7) 
+            normalized_rime_rates = fit / (bm.linalg.norm(fit) + 1e-10) # Parameters of Eq.(7) 
             r1 = bm.random.rand(N, 1)
-            x_new = ((r1 < E) * (gbest + RimeFactor * ((ub - lb) * bm.random.rand(N, 1) + lb)) + # Eq.(3)
+            x_new = ((r1 < E) * (self.gbest + RimeFactor * ((ub - lb) * bm.random.rand(N, 1) + lb)) + # Eq.(3)
                      (r1 >= E) * x)
             r2 = bm.random.rand(N, dim)
-            x_new = ((r2 < normalized_rime_rates) * (gbest)+ 
-                     (r2 >= normalized_rime_rates) * x_new)
+            x_new = ((r2 < normalized_rime_rates[:, None]) * (self.gbest)+ 
+                     (r2 >= normalized_rime_rates[:, None]) * x_new)
             x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
-            fit_new = self.fun(x_new)[:, None]
+            fit_new = self.fun(x_new)
             mask = fit_new < fit 
-            x, fit = bm.where(mask, x_new, x), bm.where(mask, fit_new, fit)
-            gbest_idx = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            # curve[0, it] = gbest_f
-        return gbest, gbest_f
+            x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
+            self.update_gbest(x, fit)
+            self.curve[it] = self.gbest_f

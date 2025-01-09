@@ -32,7 +32,7 @@ class CuckooQuantumParticleSwarmOpt(Optimizer):
         gbest_index = bm.argmin(pbest_f)
         gbest = pbest[gbest_index]
         gbest_f = pbest_f[gbest_index]
-
+        self.curve = bm.zeros((1, MaxIT))
         x = bm.random.rand(N, dim) * (ub - lb) + lb 
         fit_x = self.fun(x)[:, None]
         z = bm.random.rand(N, dim) * (ub - lb) + lb 
@@ -67,6 +67,7 @@ class CuckooQuantumParticleSwarmOpt(Optimizer):
             
             d_rand = bm.random.rand(N, 1)
             z_new = d_rand * x + (1 - d_rand) * a
+            z_new = z_new + (lb - z_new) * (z_new < lb) + (ub - z_new) * (z_new > ub)
             fit_new = self.fun(z_new)[:, None]
             mask = fit_new < fit_z
             z, fit_z = bm.where(mask, z_new, z), bm.where(mask, fit_new, fit_z)
@@ -95,5 +96,7 @@ class CuckooQuantumParticleSwarmOpt(Optimizer):
                         fit = self.fun(a)[:, None]
                         fit_x = self.fun(x)[:, None]
                         NS = 0
-
-        return gbest, gbest_f
+            self.curve[0, it] = gbest_f[0]
+        self.gbest =  gbest
+        self.gbest_f = gbest_f
+        self.curve = self.curve.flatten()
