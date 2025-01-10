@@ -77,14 +77,14 @@ class TensorFunctionSpace(FunctionSpace):
     
      
     @barycentric
-    def cell_basis_on_edge(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
-        result = self.scalar_space.cell_basis_on_edge(bc, eindex)
+    def cell_basis_on_face(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
+        result = self.scalar_space.cell_basis_on_face(bc, eindex)
         return generate_tensor_basis(result, self.dof_shape, self.dof_priority)
     
     @barycentric
-    def cell_grad_basis_on_edge(self, bc: TensorLike, eindex: TensorLike, 
+    def cell_grad_basis_on_face(self, bc: TensorLike, eindex: TensorLike, 
                                 isleft = True) -> TensorLike:
-        result = self.scalar_space.cell_grad_basis_on_edge(bc, eindex, isleft) 
+        result = self.scalar_space.cell_grad_basis_on_face(bc, eindex, isleft) 
         return generate_tensor_grad_basis(result, self.dof_shape, self.dof_priority)
 
 
@@ -418,3 +418,22 @@ class TensorFunctionSpace(FunctionSpace):
         e2dof = self.entity_to_dof(TD, index=index)
         val = bm.einsum('cqlmn..., cl... -> cqmn', gphi, uh[e2dof, ...])
         return val[...]
+
+    def grad_recovery(self, uh: TensorLike, method: str='simple'):
+        GD = self.mesh.GD
+        cell2dof = self.scalar_space.cell_to_dof()
+        gdof = self.scalar_space.number_of_global_dofs()
+        ldof = self.number_of_local_dofs()
+        p = self.p
+        bc = bm.multi_index_matrix(p,GD,dtype=self.ftype)/p
+        guh = uh.grad_value(bc)
+        NC = self.mesh.number_of_cells()
+        
+        rguh = bm.zeros((gdof, GD, GD), dtype=self.ftype)
+        
+        if method == 'simple':
+            deg = bm.bincount(cell2dof.flat, minlength = gdof)
+            bm.add.at(rguh, cell2dof, guh)
+        
+        rguh /= deg[:, None, None]
+        return rguh
