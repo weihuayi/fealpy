@@ -25,22 +25,21 @@ class QuantumParticleSwarmOpt(Optimizer):
         pbest = bm.copy(a)
         pbest_f = bm.copy(fit)
         gbest_index = bm.argmin(pbest_f)
-        gbest = pbest[gbest_index]
-        gbest_f = pbest_f[gbest_index]
-        curve = bm.zeros((1, MaxIT))
-        D_pl = bm.zeros((1, MaxIT))
-        D_pt = bm.zeros((1, MaxIT))
-        Div = bm.zeros((1, MaxIT))
+        self.gbest = pbest[gbest_index]
+        self.gbest_f = pbest_f[gbest_index]
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
-            Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(a, axis=0) - a)) / N)
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(a, axis=0) - a)) / N)
             # exploration percentage and exploitation percentage
-            D_pl[0, it] = 100 * Div[0, it] / bm.max(Div)
-            D_pt[0, it] = 100 * bm.abs(Div[0, it] - bm.max(Div)) / bm.max(Div)
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
 
             alpha = bm.array(0.9 - (it + 1) / (2 * MaxIT)) # contraction-expansion coefficient
             mbest = bm.sum(pbest, axis=0) / N # average of all particle optimal position
             phi = bm.random.rand(N, dim)
-            p = phi * pbest + (1 - phi) * gbest # local attractor
+            p = phi * pbest + (1 - phi) * self.gbest # local attractor
             u = bm.random.rand(N, dim)
             rand = bm.random.rand(N, 1)
             # update
@@ -49,15 +48,9 @@ class QuantumParticleSwarmOpt(Optimizer):
             fit = self.fun(a)
             mask = fit < pbest_f
             pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
-            gbest_idx = bm.argmin(pbest_f)
-            (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
-            curve[0, it] = gbest_f
+            self.update_gbest(pbest, pbest_f)
+            self.curve[it] = self.gbest_f
 
-        self.gbest = gbest
-        self.gbest_f = gbest_f
-        self.curve = curve[0]
-        self.D_pl = D_pl[0]
-        self.D_pt = D_pt[0]
 
 
 """
@@ -89,19 +82,25 @@ class LevyQuantumParticleSwarmOpt(Optimizer):
         pbest = bm.copy(x)
         pbest_f = bm.copy(fit)
         gbest_index = bm.argmin(pbest_f)
-        gbest = pbest[gbest_index]
-        gbest_f = pbest_f[gbest_index]
-
+        self.gbest = pbest[gbest_index]
+        self.gbest_f = pbest_f[gbest_index]
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
+        self.curve = bm.zeros((MaxIT,))
         # parameters
         sigma = 0.001
         delta = 0.1
 
         for it in range(0, MaxIT):
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
             # Nonlinear structure of contraction-expansion coefficient
             alpha = bm.array(0.5 + (1 - 0.5) * (1 - it / MaxIT) ** 2)
             mbest = bm.sum(pbest, axis=0) / N
             phi = bm.random.rand(N, dim)
-            p = phi * pbest + (1 - phi) * gbest
+            p = phi * pbest + (1 - phi) * self.gbest
             u = bm.random.rand(N, dim)
             rand = bm.random.rand(N, 1)
             s = levy(N, dim, 1.5) * 0.05
@@ -111,9 +110,7 @@ class LevyQuantumParticleSwarmOpt(Optimizer):
             fit = self.fun(x)
             mask = fit < pbest_f
             pbest, pbest_f = bm.where(mask[:, None], x, pbest), bm.where(fit < pbest_f, fit, pbest_f)
-            gbest_idx = bm.argmin(pbest_f)
-            (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
-            
+            self.update_gbest(pbest, pbest_f)
             # Premature prevention mechanism
             Diversity = bm.sum(x - mbest) / (N * (ub - lb)) # Population diversity
             if Diversity < sigma:
@@ -122,8 +119,5 @@ class LevyQuantumParticleSwarmOpt(Optimizer):
                 fit[rand_individual] = self.fun(x[rand_individual])
                 mask = fit < pbest_f
                 pbest, pbest_f = bm.where(mask[:, None], x, pbest), bm.where(fit < pbest_f, fit, pbest_f)
-                gbest_idx = bm.argmin(pbest_f)
-                (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
-
-        self.gbest = gbest
-        self.gbest_f = gbest_f
+                self.update_gbest(pbest, pbest_f)
+            self.curve[it] = self.gbest_f
