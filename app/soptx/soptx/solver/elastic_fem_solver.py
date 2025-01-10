@@ -122,13 +122,12 @@ class ElasticFEMSolver:
         if self._base_local_stiffness_matrix is None:
             base_material = self.material_properties.get_base_material()
             integrator = LinearElasticIntegrator(
-                                            material=base_material,
-                                            q=self.tensor_space.p + 3,
-                                            method='voigt_uniform'
-                                        )
+                                material=base_material,
+                                q=self.tensor_space.p + 1,
+                                method='voigt_uniform'
+                            )
             self._base_local_stiffness_matrix = integrator.voigt_assembly_uniform(
-                                                    space=self.tensor_space
-                                                )
+                                                            space=self.tensor_space)
         return self._base_local_stiffness_matrix
     
     def compute_local_stiffness_matrix(self) -> TensorLike:
@@ -144,7 +143,6 @@ class ElasticFEMSolver:
             AssemblyMethod.STANDARD: integrator.assembly,
             AssemblyMethod.VOIGT: integrator.voigt_assembly,
             AssemblyMethod.VOIGT_UNIFORM: integrator.voigt_assembly_uniform,
-            # AssemblyMethod.FAST_STRAIN: integrator.fast_assembly_strain,
             AssemblyMethod.FAST_STRESS_UNIFORM: integrator.fast_assembly_stress_uniform,
             AssemblyMethod.FAST_3D_UNIFORM: integrator.fast_assembly_uniform
         }

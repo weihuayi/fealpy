@@ -12,7 +12,8 @@ from soptx.filter import Filter
 class OCOptions:
     """OC 算法的配置选项"""
     max_iterations: int = 100     # 最大迭代次数
-    move_limit: float = 0.2       # 每次迭代的最大移动限制
+    move_limit: float = 0.2       # 正向移动限制 m
+    damping_coef: float = 0.5     # 阻尼系数 η
     tolerance: float = 0.01       # 收敛容差
     initial_lambda: float = 1e9   # 初始 lambda 值
     bisection_tol: float = 1e-3   # 二分法收敛容差
@@ -38,10 +39,7 @@ class OptimizationHistory:
               f"Time: {time:.3f} sec")
 
 class OCOptimizer(OptimizerBase):
-    """Optimality Criteria (OC) 优化器
-    
-    用于求解拓扑优化问题的 OC 方法实现
-    """
+    """Optimality Criteria (OC) 优化器"""
     
     def __init__(self,
                  objective: ObjectiveBase,
@@ -73,18 +71,22 @@ class OCOptimizer(OptimizerBase):
                        dg: TensorLike,
                        lmid: float) -> TensorLike:
         """使用 OC 准则更新密度"""
-        move = self.options.move_limit
+        m = self.options.move_limit
+        eta = self.options.damping_coef
         
+        B_e = -dc / (dg * lmid)
+        B_e_damped = bm.power(B_e, eta)
+
         # OC update scheme
         rho_new = bm.maximum(
             bm.tensor(0.0, dtype=rho.dtype), 
             bm.maximum(
-                rho - move, 
+                rho - m, 
                 bm.minimum(
                     bm.tensor(1.0, dtype=rho.dtype), 
                     bm.minimum(
-                        rho + move, 
-                        rho * bm.sqrt(-dc / dg / lmid)
+                        rho + m, 
+                        rho * B_e_damped
                     )
                 )
             )

@@ -8,23 +8,27 @@ from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
 
 from soptx.opt import ObjectiveBase, ConstraintBase, OptimizerBase
-from .utils import solve_mma_subproblem
 from soptx.filter import Filter
+from soptx.opt.utils import solve_mma_subproblem
 
 @dataclass
 class MMAOptions:
     """MMA 算法的配置选项"""
-    # 问题规模参数
-    m: int                          # 约束函数的数量
-    n: int                          # 设计变量的数量
     # 算法控制参数
     max_iterations: int = 100       # 最大迭代次数
-    tolerance: float = 0.001         # 收敛容差
+    tolerance: float = 0.001        # 收敛容差
+
+    # 问题规模参数
+    m: int = 1                         # 约束函数的数量
+    n: Optional[int] = None            # 设计变量的数量
+
     # MMA 子问题参数
-    a0: float = 1.0                 # a_0*z 项的常数系数 a_0
-    a: Optional[TensorLike] = None  # a_i*z 项的线性系数 a_i
-    c: Optional[TensorLike] = None  # c_i*y_i 项的线性系数 c_i
-    d: Optional[TensorLike] = None  # 0.5*d_i*(y_i)**2 项的二次项系数 d_i
+    xmin: Optional[TensorLike] = None  # 设计变量的下界
+    xmax: Optional[TensorLike] = None  # 设计变量的上界
+    a0: float = 1.0                    # a_0*z 项的常数系数 a_0
+    a: Optional[TensorLike] = None     # a_i*z 项的线性系数 a_i
+    c: Optional[TensorLike] = None     # c_i*y_i 项的线性系数 c_i
+    d: Optional[TensorLike] = None     # 0.5*d_i*(y_i)**2 项的二次项系数 d_i
 
 @dataclass
 class OptimizationHistory:
@@ -65,35 +69,35 @@ class MMAOptimizer(OptimizerBase):
     def __init__(self,
                 objective: ObjectiveBase,
                 constraint: ConstraintBase,
-                m: int,
-                n: int,
                 filter: Optional[Filter] = None,
-                options: Optional[Dict[str, Any]] = None):
+                options: Dict[str, Any] = None):
         """初始化 MMA 优化器 """
         self.objective = objective
         self.constraint = constraint
         self.filter = filter
 
-        # 设置默认参数
-        self.options = MMAOptions(m=m, n=n)
-        
-        # 更新用户提供的参数
-        if options is not None:
-            for key, value in options.items():
-                if hasattr(self.options, key):
-                    setattr(self.options, key, value)
+        # 使用用户提供的参数初始化选项
+        self.options = MMAOptions(**(options or {}))
+
+        # 设置问题规模参数的默认值
+        if self.options.m is None:
+            self.options.m = 1  # 默认一个约束
+        if self.options.n is None:
+            self.options.n = constraint.mesh.number_of_cells()  # 默认使用网格单元数
         
         # 初始化未设置的 MMA 参数
+        m = self.options.m
+        n = self.options.n
+        if self.options.xmin is None:
+            self.options.xmin = bm.zeros((n, 1))
+        if self.options.xmax is None:
+            self.options.xmax = bm.ones((n, 1))
         if self.options.a is None:
             self.options.a = bm.zeros((m, 1))
         if self.options.c is None:
             self.options.c = 1e4 * bm.ones((m, 1))
         if self.options.d is None:
             self.options.d = bm.zeros((m, 1))
-
-        # 初始化 xmin 和 xmax
-        self.xmin = bm.zeros((n, 1))  # 下界
-        self.xmax = bm.ones((n, 1))   # 上界
                     
         # MMA 内部状态
         self._epoch = 0
@@ -107,12 +111,11 @@ class MMAOptimizer(OptimizerBase):
                           xold1: TensorLike,
                           xold2: TensorLike) -> Tuple[TensorLike, TensorLike]:
         """更新渐近线位置"""
-        asyinit = self._ASYMP_INIT
-        asyincr = self._ASYMP_INCR
-        asydecr = self._ASYMP_DECR
+        asyinit = self._ASYMP_INIT # 0.5
+        asyincr = self._ASYMP_INCR # 1.2
+        asydecr = self._ASYMP_DECR # 0.7
 
         xmami = xmax - xmin
-
         if self._epoch <= 2:
             self._low = xval - asyinit * xmami
             self._upp = xval + asyinit * xmami
@@ -148,58 +151,56 @@ class MMAOptimizer(OptimizerBase):
                         xold1: TensorLike,
                         xold2: TensorLike) -> TensorLike:
         """求解 MMA 子问题"""
+        xmin = self.options.xmin
+        xmax = self.options.xmax
         m = self.options.m    # 使用配置的约束数量
         n = self.options.n    # 使用配置的设计变量数量
+
         a0 = self.options.a0
         a = self.options.a
         c = self.options.c
         d = self.options.d
 
-        move = self._MOVE_LIMIT
-        albefa = self._ALBEFA
-        raa0 = self._RAA0
+        move = self._MOVE_LIMIT # 0.2
+        albefa = self._ALBEFA   # 0.1
+        raa0 = self._RAA0       # 1e-5   
         epsimin = self._EPSILON_MIN
-
-        xmin = self.xmin
-        xmax = self.xmax
 
         eeen = bm.ones((n, 1), dtype=bm.float64)
         eeem = bm.ones((m, 1), dtype=bm.float64)
         
         # 更新渐近线
-        low, upp = self._update_asymptotes(xval, xmin, xmax, xold1, xold2)
+        low, upp = self._update_asymptotes(xval, xmin, xmax, xold1, xold2) # (NC, 1), (NC, 1)
         
-        # 计算边界 alpha, beta
+        # 计算变量边界 alpha, beta
         xxx1 = low + albefa * (xval - low)
         xxx2 = xval - move * (xmax - xmin)
         xxx = bm.maximum(xxx1, xxx2)
-        alpha = bm.maximum(xmin, xxx)
+        alpha = bm.maximum(xmin, xxx)      # (NC, 1) 
         xxx1 = upp - albefa * (upp - xval)
         xxx2 = xval + move * (xmax - xmin)
         xxx = bm.minimum(xxx1, xxx2)
-        beta = bm.minimum(xmax, xxx)
+        beta = bm.minimum(xmax, xxx)       # (NC, 1)
 
-        # 计算 p0, q0, P, Q 和 b
+        # 计算 p0, q0 构建目标函数的近似
         xmami = xmax - xmin
         xmami_eps = raa0 * eeen
         xmami = bm.maximum(xmami, xmami_eps)
         xmami_inv = eeen / xmami
-        # 定义当前设计点
         ux1 = upp - xval
         xl1 = xval - low
         ux2 = ux1 * ux1
         xl2 = xl1 * xl1
         uxinv = eeen / ux1
         xlinv = eeen / xl1
-        # 构建 p0, q0
         p0 = bm.maximum(df0dx, 0)   
         q0 = bm.maximum(-df0dx, 0) 
         pq0 = 0.001 * (p0 + q0) + raa0 * xmami_inv
         p0 = p0 + pq0
         q0 = q0 + pq0
-        p0 = p0 * ux2
-        q0 = q0 * xl2
-        # 构建 P, Q
+        p0 = p0 * ux2 # (NC, 1)
+        q0 = q0 * xl2 # (NC, 1)
+        # 构建 P, Q 和 b 构建约束函数的近似
         P = bm.zeros((m, n), dtype=bm.float64)
         Q = bm.zeros((m, n), dtype=bm.float64)
         P = bm.maximum(dfdx, 0)
@@ -207,10 +208,12 @@ class MMAOptimizer(OptimizerBase):
         PQ = 0.001 * (P + Q) + raa0 * bm.dot(eeem, xmami_inv.T)
         P = P + PQ
         Q = Q + PQ
-        from numpy import diag as diags
-        P = (diags(ux2.flatten(), 0) @ P.T).T
-        Q = (diags(xl2.flatten(), 0) @ Q.T).T
-        b = bm.dot(P, uxinv) + bm.dot(Q, xlinv) - fval
+        P = (bm.linalg.diags(ux2.flatten(), 0) @ P.T).T # (1, NC)
+        Q = (bm.linalg.diags(xl2.flatten(), 0) @ Q.T).T # (1, NC)
+        # from numpy import diag as diags
+        # P = (diags(ux2.flatten(), 0) @ P.T).T
+        # Q = (diags(xl2.flatten(), 0) @ Q.T).T
+        b = bm.dot(P, uxinv) + bm.dot(Q, xlinv) - fval  # (1, 1)
         
         # 求解子问题
         xmma, ymma, zmma, lam, xsi, eta, mu, zet, s = solve_mma_subproblem(
@@ -253,19 +256,27 @@ class MMAOptimizer(OptimizerBase):
             # 计算目标函数值和梯度
             obj_val = self.objective.fun(rho_phys)
             obj_grad = self.objective.jac(rho_phys)
+            if self.filter is not None:
+                obj_grad = self.filter.filter_sensitivity(
+                                        obj_grad, rho_phys, 'objective', filter_params)
             
             # 计算约束值和约束值梯度
             con_val = self.constraint.fun(rho_phys)
-            con_grad = self.constraint.jac(rho_phys)
+            con_grad = self.constraint.jac(rho_phys) # (NC, )
+            if self.filter is not None:
+                con_grad = self.filter.filter_sensitivity(
+                                        con_grad, rho_phys, 'constraint', filter_params)
             
-            # 求解 MMA 子问题
+            # MMA 方法
             volfrac = self.constraint.volume_fraction
-            dfdx = con_grad[:, None].T / (volfrac * con_grad.shape[0])
-            rho_new, low, upp = self._solve_subproblem(rho[:, None], 
-                                                    con_val, obj_grad[:, None], 
-                                                    dfdx, 
-                                                    low, upp,
-                                                    xold1[:, None], xold2[..., None])
+            # 体积约束对设计变量的标准化梯度
+            dfdx = con_grad[:, None].T / (volfrac * con_grad.shape[0]) # (1, NC)
+            rho_new, low, upp = self._solve_subproblem(
+                                        rho[:, None], fval=con_val, 
+                                        df0dx=obj_grad[:, None], dfdx=dfdx, 
+                                        low=low, upp=upp,
+                                        xold1=xold1[:, None], xold2=xold2[..., None]
+                                    )
             
             # 更新物理密度
             if self.filter is not None:

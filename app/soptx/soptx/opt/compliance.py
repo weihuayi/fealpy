@@ -75,15 +75,13 @@ class ComplianceObjective(ObjectiveBase):
         return self._current_u
 
     def _compute_element_compliance(self, u: TensorLike) -> TensorLike:
-        """计算单元柔顺度
+        """计算单元柔顺度向量
         
         Parameters
-        ----------
-        u : 位移场
+        - u : 位移场
         
         Returns
-        -------
-        ce : 单元柔顺度向量
+        - ce : 单元柔顺度向量
         """
         ke0 = self.solver.get_base_local_stiffness_matrix()
         cell2dof = self.solver.tensor_space.cell_to_dof()
