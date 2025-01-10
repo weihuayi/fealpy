@@ -104,9 +104,11 @@ class HippopotamusOptAlg(Optimizer):
 
             # Eq.(12)
             X_P3 = ((fit[i1:] > F_HL)[:, None] * 
-                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / distance2Leader) + 
+                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - 
+                    (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / distance2Leader) + 
                     (fit[i1:] <= F_HL)[:, None] * 
-                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / (bm.random.rand(i1, dim) + 2 * distance2Leader)))
+                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - 
+                    (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / (bm.random.rand(i1, dim) + 2 * distance2Leader)))
             X_P3 = X_P3 + (lb - X_P3) * (X_P3 < lb) + (ub - X_P3) * (X_P3 > ub)
             F_P3 = self.fun(X_P3)
 
