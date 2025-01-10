@@ -681,6 +681,8 @@ class ExternalGear(Gear):
         hf = self.m_n * (self.hac + self.cc - self.x_n)
         self.d_f = self.d - 2 * hf
         self.r_f = self.d_f / 2
+        if self. d_f < self.inner_diam:
+            raise ValueError('The root circle diameter is less than the inner diameter.')
         # 有效齿顶圆
         self.effective_da = self.d_a - self.chamfer_dia
         self.effective_ra = self.effective_da / 2
@@ -765,8 +767,8 @@ class ExternalGear(Gear):
         def involutecross_rb_i(t):
             return self.get_tip_intersection_points(t) - self.r_b
 
-        # t_temp = (mn * x - (ha_cutter - rc + rc * sin(alpha_t))) / cos(alpha_t)
-        t1 = fsolve(involutecross_rb_i, mn)[0]
+        t1 = (mn * x - (ha_cutter - rc + rc * sin(alpha_t))) / cos(alpha_t)
+        # t1 = fsolve(involutecross_rb_i, mn)[0]
 
         def involutecross(t2):
             return self.get_tip_intersection_points(t2) - (0.5 * effective_da)
@@ -781,7 +783,8 @@ class ExternalGear(Gear):
         def involutecross_rf(t):
             return self.get_transition_intersection_points(t) - self.r_f
 
-        t3 = fsolve(involutecross_rb, 2 * np.pi - alpha_t)[0]
+        # t3 = fsolve(involutecross_rb, 2 * np.pi - alpha_t)[0]
+        t3 = 2 * np.pi - alpha_t
         t4 = fsolve(involutecross_rf, 1.5 * np.pi)[0]
         # 检验是否超过最大圆角
         max_angle = pi/z+pi/2
@@ -821,6 +824,11 @@ class ExternalGear(Gear):
         z = self.z
         # 获取齿廓与过渡曲线点列
         points = self.get_profile_points()
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(10, 10))
+        plt.plot(points[:51, 0], points[:51, 1], 'o-', label='Profile Points')
+        plt.axis('equal')
+        plt.show()
         r_inner = self.inner_diam / 2
 
         one_tooth_angle = abs(delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector"))
@@ -953,10 +961,77 @@ class ExternalGear(Gear):
                 np.linspace(key_points[edge[25, 0]], key_points[edge[25, 1]], na2 + 1),
                 np.linspace(key_points[edge[26, 0]], key_points[edge[26, 1]], na1 + 1)
             ]
+            import matplotlib.pyplot as plt
+            # 验证 line
+            fig, ax = plt.subplots()
+            for l in line:
+                ax.plot(l[:, 0], l[:, 1])
+            # l = line[9]
+            # ax.plot(l[:, 0], l[:, 1])
+            plt.axis('equal')
+            plt.axis('off')
+            plt.show()
 
             # 构建子区域半边数据结构
-            boundary_edge = np.array([0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 3, 2, 12, 13])
-            half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            # boundary_edge = np.array([0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 3, 2, 12, 13])
+            # half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            half_edge = np.array(
+                [[1, 0, 45, 26, 1],
+                 [0, -1, 27, 3, 0],
+                 [2, 2, 8, 35, 3],
+                 [1, -1, 1, 9, 2],
+                 [3, 3, 24, 43, 5],
+                 [4, -1, 7, 25, 4],
+                 [4, 5, 38, 22, 7],
+                 [5, -1, 23, 5, 6],
+                 [6, 2, 53, 2, 9],
+                 [2, -1, 3, 11, 8],
+                 [7, 6, 12, 52, 11],
+                 [6, -1, 9, 13, 10],
+                 [15, 6, 37, 10, 13],
+                 [7, -1, 11, 15, 12],
+                 [13, 8, 33, 36, 15],
+                 [15, -1, 13, 17, 14],
+                 [17, 9, 41, 32, 17],
+                 [13, -1, 15, 19, 16],
+                 [9, 7, 20, 40, 19],
+                 [17, -1, 17, 21, 18],
+                 [8, 7, 46, 18, 21],
+                 [9, -1, 19, 23, 20],
+                 [5, 5, 6, 47, 23],
+                 [8, -1, 21, 7, 22],
+                 [10, 3, 28, 4, 25],
+                 [3, -1, 5, 27, 24],
+                 [0, 0, 0, 29, 27],
+                 [10, -1, 25, 1, 26],
+                 [11, 3, 43, 24, 29],
+                 [10, 0, 26, 45, 28],
+                 [12, 4, 49, 42, 31],
+                 [11, 1, 44, 51, 30],
+                 [13, 9, 16, 48, 33],
+                 [12, 8, 50, 14, 32],
+                 [14, 1, 51, 44, 35],
+                 [1, 2, 2, 53, 34],
+                 [15, 8, 14, 50, 37],
+                 [14, 6, 52, 12, 36],
+                 [16, 5, 47, 6, 39],
+                 [4, 4, 42, 49, 38],
+                 [17, 7, 18, 46, 41],
+                 [16, 9, 48, 16, 40],
+                 [11, 4, 30, 39, 43],
+                 [4, 3, 4, 28, 42],
+                 [1, 1, 34, 31, 45],
+                 [11, 0, 29, 0, 44],
+                 [16, 7, 40, 20, 47],
+                 [8, 5, 22, 38, 46],
+                 [12, 9, 32, 41, 49],
+                 [16, 4, 39, 30, 48],
+                 [14, 8, 36, 33, 51],
+                 [12, 1, 31, 34, 50],
+                 [6, 6, 10, 37, 53],
+                 [14, 2, 35, 8, 52]]
+            )
+
 
             # 单齿网格及其节点与单元
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points, line)
@@ -1240,8 +1315,84 @@ class ExternalGear(Gear):
             ]
 
             # 构建子区域半边数据结构
-            boundary_edge = np.array([0, 1, 27, 4, 5, 6, 7, 8, 9, 10, 11, 28, 3, 2, 29, 12, 13, 30])
-            half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            # boundary_edge = np.array([0, 1, 27, 4, 5, 6, 7, 8, 9, 10, 11, 28, 3, 2, 29, 12, 13, 30])
+            # half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            half_edge = np.array(
+                [[1, 0, 73, 60, 1],
+                 [0, -1, 61, 3, 0],
+                 [2, 1, 54, 72, 3],
+                 [1, -1, 1, 55, 2],
+                 [3, 2, 58, 71, 5],
+                 [4, -1, 7, 59, 4],
+                 [4, 3, 70, 56, 7],
+                 [5, -1, 57, 5, 6],
+                 [6, 4, 53, 64, 9],
+                 [20, -1, 55, 11, 8],
+                 [7, 5, 12, 52, 11],
+                 [6, -1, 9, 13, 10],
+                 [15, 5, 37, 10, 13],
+                 [7, -1, 11, 15, 12],
+                 [13, 12, 33, 36, 15],
+                 [15, -1, 13, 17, 14],
+                 [17, 13, 41, 32, 17],
+                 [13, -1, 15, 19, 16],
+                 [9, 6, 20, 40, 19],
+                 [17, -1, 17, 21, 18],
+                 [8, 6, 46, 18, 21],
+                 [9, -1, 19, 23, 20],
+                 [23, 7, 69, 47, 23],
+                 [8, -1, 21, 57, 22],
+                 [10, 8, 28, 67, 25],
+                 [21, -1, 59, 27, 24],
+                 [18, 9, 62, 29, 27],
+                 [10, -1, 25, 61, 26],
+                 [11, 8, 43, 24, 29],
+                 [10, 9, 26, 45, 28],
+                 [12, 11, 49, 42, 31],
+                 [11, 10, 44, 51, 30],
+                 [13, 13, 16, 48, 33],
+                 [12, 12, 50, 14, 32],
+                 [14, 10, 51, 44, 35],
+                 [19, 4, 64, 53, 34],
+                 [15, 12, 14, 50, 37],
+                 [14, 5, 52, 12, 36],
+                 [16, 7, 47, 69, 39],
+                 [22, 11, 42, 49, 38],
+                 [17, 6, 18, 46, 41],
+                 [16, 13, 48, 16, 40],
+                 [11, 11, 30, 39, 43],
+                 [22, 8, 67, 28, 42],
+                 [19, 10, 34, 31, 45],
+                 [11, 9, 29, 62, 44],
+                 [16, 6, 40, 20, 47],
+                 [8, 7, 22, 38, 46],
+                 [12, 13, 32, 41, 49],
+                 [16, 11, 39, 30, 48],
+                 [14, 12, 36, 33, 51],
+                 [12, 10, 31, 34, 50],
+                 [6, 5, 10, 37, 53],
+                 [14, 4, 35, 8, 52],
+                 [20, 1, 65, 2, 55],
+                 [2, -1, 3, 9, 54],
+                 [5, 3, 6, 68, 57],
+                 [23, -1, 23, 7, 56],
+                 [21, 2, 66, 4, 59],
+                 [3, -1, 5, 25, 58],
+                 [0, 0, 0, 63, 61],
+                 [18, -1, 27, 1, 60],
+                 [19, 9, 45, 26, 63],
+                 [18, 0, 60, 73, 62],
+                 [20, 4, 8, 35, 65],
+                 [19, 1, 72, 54, 64],
+                 [22, 2, 71, 58, 67],
+                 [21, 8, 24, 43, 66],
+                 [23, 3, 56, 70, 69],
+                 [22, 7, 38, 22, 68],
+                 [22, 3, 68, 6, 71],
+                 [4, 2, 4, 66, 70],
+                 [1, 1, 2, 65, 73],
+                 [19, 0, 63, 0, 72]]
+            )
 
             # 单齿网格及其节点与单元
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points, line)
@@ -1391,6 +1542,8 @@ class InternalGear(Gear):
         hf = self.m_n * (self.hac + self.cc + self.x_n)
         self.d_f = self.d + 2 * hf
         self.r_f = self.d_f / 2
+        if self.d_f > self.outer_diam:
+            raise ValueError("The root circle diameter of the gear is greater than the outer diameter of the gear.")
         # 刀具分度圆直径与半径
         self.d_cutter = self.m_t * self.z_cutter
         self.r_cutter = self.d_cutter / 2
@@ -1609,13 +1762,15 @@ class InternalGear(Gear):
             # 构建关键点
             angle_kp0 = pi / 2 - 2 * pi / z / 2
             angle_kp4 = pi / 2 + 2 * pi / z / 2
-            t1 = (self.r - ra) / (self.r_f - ra)
+            # t1 = (self.r - ra) / (self.r_f - ra)
+            t1 = 0.618
             t2 = (self.r_f - ra) / (outer_diam / 2 - ra) * 1.236
 
             kp0 = ra * np.array([cos(angle_kp0), sin(angle_kp0)]).reshape(1, -1)
             kp3 = outer_diam / 2 * np.array([cos(angle_kp0), sin(angle_kp0)]).reshape(1, -1)
-            kp1 = (1 - t1) * kp0 + t1 * kp3
+            # kp1 = (1 - t1) * kp0 + t1 * kp3
             kp2 = (1 - t2) * kp0 + t2 * kp3
+            kp1 = (1 - t1) * kp0 + t1 * kp2
 
             kp4 = np.zeros_like(kp0)
             kp4[:, 0] = -kp0[:, 0]
@@ -1728,8 +1883,66 @@ class InternalGear(Gear):
                 r_kp2 * np.concatenate([cos(delta_kp17_2), sin(delta_kp17_2)], axis=1)
             ]
 
-            boundary_edge = np.array([0, 1, 2, 6, 7, 5, 4, 3, 8, 9, 10, 11, 12, 13, 14, 15])
-            half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            # boundary_edge = np.array([0, 1, 2, 6, 7, 5, 4, 3, 8, 9, 10, 11, 12, 13, 14, 15])
+            # half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            half_edge = np.array(
+                [[1, 0, 51, 30, 1],
+                 [0, -1, 31, 3, 0],
+                 [2, 1, 55, 50, 3],
+                 [1, -1, 1, 5, 2],
+                 [3, 2, 12, 54, 5],
+                 [2, -1, 3, 13, 4],
+                 [4, 3, 16, 45, 7],
+                 [5, -1, 9, 17, 6],
+                 [5, 4, 44, 53, 9],
+                 [6, -1, 11, 7, 8],
+                 [6, 5, 52, 14, 11],
+                 [7, -1, 15, 9, 10],
+                 [15, 2, 43, 4, 13],
+                 [3, -1, 5, 15, 12],
+                 [7, 5, 10, 42, 15],
+                 [15, -1, 13, 11, 14],
+                 [13, 3, 36, 6, 17],
+                 [4, -1, 7, 19, 16],
+                 [10, 8, 20, 37, 19],
+                 [13, -1, 17, 21, 18],
+                 [11, 8, 47, 18, 21],
+                 [10, -1, 19, 23, 20],
+                 [14, 9, 40, 46, 23],
+                 [11, -1, 21, 25, 22],
+                 [9, 7, 48, 41, 25],
+                 [14, -1, 23, 27, 24],
+                 [8, 6, 28, 49, 27],
+                 [9, -1, 25, 29, 26],
+                 [12, 6, 32, 26, 29],
+                 [8, -1, 27, 31, 28],
+                 [0, 0, 0, 33, 31],
+                 [12, -1, 29, 1, 30],
+                 [18, 6, 49, 28, 33],
+                 [12, 0, 30, 51, 32],
+                 [17, 7, 41, 48, 35],
+                 [18, 1, 50, 55, 34],
+                 [16, 3, 45, 16, 37],
+                 [13, 8, 18, 47, 36],
+                 [17, 4, 53, 44, 39],
+                 [16, 9, 46, 40, 38],
+                 [17, 9, 39, 22, 41],
+                 [14, 7, 24, 34, 40],
+                 [15, 5, 14, 52, 43],
+                 [17, 2, 54, 12, 42],
+                 [16, 4, 38, 8, 45],
+                 [5, 3, 6, 36, 44],
+                 [11, 9, 22, 39, 47],
+                 [16, 8, 37, 20, 46],
+                 [18, 7, 34, 24, 49],
+                 [9, 6, 26, 32, 48],
+                 [1, 1, 2, 35, 51],
+                 [18, 0, 33, 0, 50],
+                 [17, 5, 42, 10, 53],
+                 [6, 4, 8, 38, 52],
+                 [2, 2, 4, 43, 55],
+                 [17, 1, 35, 2, 54]]
+            )
 
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points, line)
             cell_domain_tag = quad_mesh.celldata['cell_domain_tag']
@@ -1858,16 +2071,23 @@ class InternalGear(Gear):
             t_mesh.celldata['cell_tooth_tag'] = cell_tooth_tag
         else:
             points = self.get_profile_points()
+            import matplotlib.pyplot as plt
+            plt.figure(figsize=(10, 10))
+            plt.plot(points[:31, 0], points[:31, 1], 'o-', label='Profile Points')
+            plt.axis('equal')
+            plt.show()
             # 构建关键点
             angle_kp0 = pi / 2 - 2 * pi / z / 2
             angle_kp4 = pi / 2 + 2 * pi / z / 2
             t1 = (self.r - ra) / (self.r_f - ra)
+            t1 = 0.618
             t2 = (self.r_f - ra) / (outer_diam / 2 - ra) * 1.236
 
             kp0 = ra * np.array([cos(angle_kp0), sin(angle_kp0)]).reshape(1, -1)
             kp3 = outer_diam / 2 * np.array([cos(angle_kp0), sin(angle_kp0)]).reshape(1, -1)
-            kp1 = (1 - t1) * kp0 + t1 * kp3
+            # kp1 = (1 - t1) * kp0 + t1 * kp3
             kp2 = (1 - t2) * kp0 + t2 * kp3
+            kp1 = (1 - t1) * kp0 + t1 * kp2
 
             kp4 = np.zeros_like(kp0)
             kp4[:, 0] = -kp0[:, 0]
@@ -2013,9 +2233,97 @@ class InternalGear(Gear):
                 r_kp2 * np.concatenate([cos(delta_kp23_17), sin(delta_kp23_17)], axis=1),
                 r_kp2 * np.concatenate([cos(delta_kp17_20), sin(delta_kp17_20)], axis=1)
             ]
+            import matplotlib.pyplot as plt
+            # 验证 line
+            fig, ax = plt.subplots()
+            for l in line:
+                ax.plot(l[:, 0], l[:, 1])
+            # l = line[9]
+            # ax.plot(l[:, 0], l[:, 1])
+            plt.axis('equal')
+            plt.axis('off')
+            plt.show()
 
-            boundary_edge = np.array([0, 1, 2, 6, 30, 31, 7, 5, 4, 3, 8, 9, 10, 11, 28, 29, 12, 13, 14, 15])
-            half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            # boundary_edge = np.array([0, 1, 2, 6, 30, 31, 7, 5, 4, 3, 8, 9, 10, 11, 28, 29, 12, 13, 14, 15])
+            # half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
+            half_edge = np.array(
+                [[1, 0, 51, 30, 1],
+                 [0, -1, 31, 3, 0],
+                 [2, 1, 55, 50, 3],
+                 [1, -1, 1, 5, 2],
+                 [3, 2, 12, 54, 5],
+                 [2, -1, 3, 13, 4],
+                 [4, 3, 16, 45, 7],
+                 [5, -1, 9, 17, 6],
+                 [5, 4, 44, 53, 9],
+                 [6, -1, 11, 7, 8],
+                 [6, 5, 52, 14, 11],
+                 [7, -1, 15, 9, 10],
+                 [21, 2, 67, 4, 13],
+                 [3, -1, 5, 61, 12],
+                 [7, 5, 10, 70, 15],
+                 [24, -1, 63, 11, 14],
+                 [13, 3, 36, 6, 17],
+                 [4, -1, 7, 19, 16],
+                 [10, 8, 20, 37, 19],
+                 [13, -1, 17, 21, 18],
+                 [11, 8, 47, 18, 21],
+                 [10, -1, 19, 23, 20],
+                 [22, 9, 68, 46, 23],
+                 [11, -1, 21, 57, 22],
+                 [9, 7, 48, 65, 25],
+                 [19, -1, 59, 27, 24],
+                 [8, 6, 28, 49, 27],
+                 [9, -1, 25, 29, 26],
+                 [12, 6, 32, 26, 29],
+                 [8, -1, 27, 31, 28],
+                 [0, 0, 0, 33, 31],
+                 [12, -1, 29, 1, 30],
+                 [18, 6, 49, 28, 33],
+                 [12, 0, 30, 51, 32],
+                 [20, 7, 65, 48, 35],
+                 [18, 1, 50, 55, 34],
+                 [16, 3, 45, 16, 37],
+                 [13, 8, 18, 47, 36],
+                 [23, 4, 53, 44, 39],
+                 [16, 9, 46, 68, 38],
+                 [17, 11, 73, 56, 41],
+                 [14, 10, 58, 75, 40],
+                 [15, 12, 62, 72, 43],
+                 [17, 13, 74, 60, 42],
+                 [16, 4, 38, 8, 45],
+                 [5, 3, 6, 36, 44],
+                 [11, 9, 22, 39, 47],
+                 [16, 8, 37, 20, 46],
+                 [18, 7, 34, 24, 49],
+                 [9, 6, 26, 32, 48],
+                 [1, 1, 2, 35, 51],
+                 [18, 0, 33, 0, 50],
+                 [23, 5, 70, 10, 53],
+                 [6, 4, 8, 38, 52],
+                 [2, 2, 4, 67, 55],
+                 [20, 1, 35, 2, 54],
+                 [14, 11, 40, 69, 57],
+                 [22, -1, 23, 59, 56],
+                 [19, 10, 64, 41, 59],
+                 [14, -1, 57, 25, 58],
+                 [15, 13, 43, 66, 61],
+                 [21, -1, 13, 63, 60],
+                 [24, 12, 71, 42, 63],
+                 [15, -1, 61, 15, 62],
+                 [20, 10, 75, 58, 65],
+                 [19, 7, 24, 34, 64],
+                 [21, 13, 60, 74, 67],
+                 [20, 2, 54, 12, 66],
+                 [23, 9, 39, 22, 69],
+                 [22, 11, 56, 73, 68],
+                 [24, 5, 14, 52, 71],
+                 [23, 12, 72, 62, 70],
+                 [17, 12, 42, 71, 73],
+                 [23, 11, 69, 40, 72],
+                 [20, 13, 66, 43, 75],
+                 [17, 10, 41, 64, 74]]
+            )
 
             quad_mesh = QuadrangleMesh.sub_domain_mesh_generator(half_edge, key_points, line)
             cell_domain_tag = quad_mesh.celldata['cell_domain_tag']
