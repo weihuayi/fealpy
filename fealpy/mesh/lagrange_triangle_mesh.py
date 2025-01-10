@@ -7,11 +7,11 @@ from .. import logger
 from .utils import simplex_gdof, simplex_ldof 
 from .mesh_base import HomogeneousMesh, estr2dim
 from .triangle_mesh import TriangleMesh
-#from fealpy.functionspace.dofs import LinearMeshCFEDof
+
 
 class LagrangeTriangleMesh(HomogeneousMesh):
-    def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
-            construct=False):
+    def __init__(self, node: TensorLike, cell: TensorLike, p=1, curve=None, 
+            surface=None, construct=False):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
@@ -95,9 +95,29 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return bm.concatenate(ipoint_list, axis=0)[index]  # (gdof, GD)
 
     @classmethod
+    def from_curve_triangle_mesh(cls, mesh, p: int, curve=None):
+        init_node = mesh.entity('node')
+
+        node = mesh.interpolation_points(p)
+        cell = mesh.cell_to_ipoint(p)
+        if curve is not None:
+            boundary_edge = mesh.boundary_edge_flag()
+            e2p = mesh.edge_to_ipoint(p)[boundary_edge].flatten()
+
+            init_node[:], _ = curve.project(init_node) 
+            node[e2p], _ = curve.project(node[e2p])
+
+        lmesh = cls(node, cell, p=p, construct=True)
+        lmesh.linearmesh = mesh
+
+        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
+        lmesh.cell2edge = mesh.cell_to_edge()
+        lmesh.edge  = mesh.edge_to_ipoint(p)
+        return lmesh
+
+    @classmethod
     def from_triangle_mesh(cls, mesh, p: int, surface=None):
         init_node = mesh.entity('node')
-        #cls.dof = LinearMeshCFEDof(mesh, p=p)
 
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
@@ -172,8 +192,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         elif variables == 'x':
             J = self.jacobi_matrix(bc, index=index)
             G = self.first_fundamental_form(J)
-            G = bm.linalg.inv(G)
-            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) 
+            d = bm.linalg.inv(G)
+            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, d, gphi) 
             return gphi
 
     # ipoints
@@ -454,7 +474,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         if GD == 2:
             node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
 
-        #cell = self.entity(etype)[index]
         cell = self.entity(etype, index)
         cellType = self.vtk_cell_type(etype)
         idx = vtk_cell_index(self.p, cellType)

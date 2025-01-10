@@ -199,10 +199,16 @@ print(f"tgdof: {tgdof}")
 tldof = tensor_space.number_of_local_dofs()
 cell2tdof = tensor_space.cell_to_dof()
 
-load_node_indices = cell[target_cell_idx].flatten() # (15*8, )
-# 带有载荷的节点对应的全局自由度编号
-dof_indices = bm.stack([scalar_gdof * d + 
-                        load_node_indices for d in range(GD)], axis=1)  # (15*8, GD)
+# 节点载荷的索引
+load_node_indices0 = cell[target_cell_idx].flatten() # (15*8, )
+unique_nodes, first_indices = bm.unique(load_node_indices0, return_index=True)
+sort1_indices = bm.sort(first_indices)
+load_node_indices = load_node_indices0[sort1_indices] # (15*8, )
+# 带有载荷的节点对应的全局自由度编号（跟顺序有关）
+if tensor_space.dof_priority:
+    dof_indices = bm.stack([scalar_gdof * d + load_node_indices for d in range(GD)], axis=1)  # (15*8, GD)
+else:
+    dof_indices = bm.stack([load_node_indices * GD + d for d in range(GD)], axis=1)  # (15*8, GD)
 
 phi_loads = []
 for bcs in bcs_list:
@@ -261,16 +267,7 @@ dbc = DirichletBC(space=tensor_space,
                     gd=bm.zeros(tgdof), 
                     threshold=tensor_is_bd_dof, 
                     method='interp')
-uh_bd = bm.zeros(tensor_space.number_of_global_dofs(), dtype=bm.float64, device=bm.get_device(mesh))
-uh_bd, isDDof = tensor_space.boundary_interpolate(gd=bm.zeros(tgdof), 
-                                                uh=uh_bd, 
-                                                threshold=tensor_is_bd_dof, 
-                                                method='interp')
-# 处理载荷
-F = F - K.matmul(uh_bd)
-F = bm.set_at(F, isDDof, uh_bd[isDDof])
-# 处理刚度
-K = dbc.apply_matrix(matrix=K, check=True)
+K, F = dbc.apply(K, F)
 
 from fealpy import logger
 logger.setLevel('INFO')
@@ -307,29 +304,26 @@ cuh_0_ansys = bm.tensor([[0.0000,     0.0000,     0.000],
                         [0.0000,     0.0000,     0.000],
                         [-4.8505e-4, -1.5615e-3, -2.1318e-4]], dtype=bm.float64)
 print(f"cuh_0_ansys-{cuh_0_ansys.shape}, {[0, 24, 331, 364, 2178, 2202, 2509, 2542]}\n {cuh_0_ansys}")
-abs_error_cuh_0 = bm.linalg.norm(cuh[0][map_cuh, :] - cuh_0_ansys)
-print(f"abs_error_cuh_0: {abs_error_cuh_0:.8e}")
-rel_error_cuh_0 = bm.linalg.norm(cuh[0][map_cuh, :] - cuh_0_ansys) \
-                / (bm.linalg.norm(cuh_0_ansys))
-# rel_error_cuh_0 = bm.linalg.norm(cuh[0][map_cuh, :] - cuh_0_ansys) \
-#                 / (bm.linalg.norm(cuh_0_ansys) + bm.linalg.norm(cuh[0][map_cuh, :]))
-print(f"rel_error_cuh_0: {rel_error_cuh_0:.8e}")
+error_l2_cuh_0 = bm.linalg.norm(cuh[0][map_cuh, :] - cuh_0_ansys)
+print(f"error_l2_cuh_0: {error_l2_cuh_0:.8e}")
+error_l2_rel_cuh_0 = bm.linalg.norm(cuh[0][map_cuh, :] - cuh_0_ansys) / (bm.linalg.norm(cuh_0_ansys))
+print(f"error_l2_rel_cuh_0: {error_l2_rel_cuh_0:.8e}")
+error_max_cuh_0 = bm.max(bm.abs(cuh[0][map_cuh, :] - cuh_0_ansys))
+print(f"error_max_cuh_0: {error_max_cuh_0:.8e}")
 
-np.set_printoptions(precision=4, suppress=False)  
+np.set_printoptions(precision=4, suppress=False)
+
+# NOTE 应变
 strain1, stress1 = compute_strain_stress_1(space, uh_show, mu, lam)
 map_es = [0, 4, 2, 6, 1, 5, 3, 7]
 print(f"strain1_0-{strain1[0].shape}, {cell2dof[0]}\n {strain1[0]}")
 print(f"strain1_0_map-{strain1[0].shape}, {cell2dof[0][map_es]}\n {strain1[0][map_es, :]}")
 
-
 strain2, stress2 = compute_strain_stress_2(tensor_space, uh, B, D)
-# print(f"strain2_0: {strain2[0].shape}\n {strain2[0]}")
-# print(f"stress2_0: {stress2[0].shape}\n {stress2[0]}")
 
 strain3, stress3 = compute_strain_stress_3(tensor_space, uh, B_BBar, D)
 print(f"strain_BBar_0: {strain3.shape}, {cell2dof[0]}\n {strain3[0]}")
 print(f"strain_BBar_0_map: {strain3.shape}, {cell2dof[0][map_es]}\n {strain3[0][map_es, :]}")
-
 
 error12 = bm.linalg.norm(strain1 - strain2)
 error13 = bm.linalg.norm(strain1 - strain3)
@@ -349,20 +343,21 @@ strain_0_ansys = bm.tensor([
                 ], dtype=bm.float64)
 print(f"strain_0_ansys: {strain_0_ansys.shape}, {[0, 24, 331, 364, 2178, 2202, 2509, 2542]}\n {strain_0_ansys}")
 
-abs_error_strain_0 = bm.linalg.norm(strain1[0][map_es, :] - strain_0_ansys)
-print(f"abs_error_strain_0: {abs_error_strain_0:.8e}")
-rel_error_strain_0 = bm.linalg.norm(strain1[0][map_es, :] - strain_0_ansys) \
-                / (bm.linalg.norm(strain_0_ansys))
-# rel_error_strain_0 = bm.linalg.norm(strain1[0][map_es, :] - strain_0_ansys) \
-#                 / (bm.linalg.norm(strain_0_ansys) + bm.linalg.norm(strain1[0][map_es, :]))
-print(f"rel_error_strain_0: {rel_error_strain_0:.8e}")
-abs_error_strain_0_BBar = bm.linalg.norm(strain3[0][map_es, :] - strain_0_ansys)
-print(f"abs_error_strain_0_BBar: {abs_error_strain_0_BBar:.8e}")
-rel_error_strain_0_BBar = bm.linalg.norm(strain3[0][map_es, :] - strain_0_ansys) \
-                / (bm.linalg.norm(strain_0_ansys))
-# rel_error_strain_0_BBar = bm.linalg.norm(strain3[0][map_es, :] - strain_0_ansys) \
-#                 / (bm.linalg.norm(strain_0_ansys) + bm.linalg.norm(strain3[0][map_es, :]))
-print(f"rel_error_strain_0_BBar: {rel_error_strain_0_BBar:.8e}")
+# NOTE 应变误差
+error_l2_strain_0 = bm.linalg.norm(strain1[0][map_es, :] - strain_0_ansys)
+print(f"error_l2_strain_0: {error_l2_strain_0:.8e}")
+error_l2_rel_strain_0 = bm.linalg.norm(strain1[0][map_es, :] - strain_0_ansys) / bm.linalg.norm(strain_0_ansys)
+print(f"error_l2_rel_strain_0: {error_l2_rel_strain_0:.8e}")
+error_max_strain_0 = bm.max(bm.abs(strain1[0][map_es, :] - strain_0_ansys))
+print(f"error_max_strain_0: {error_max_strain_0:.8e}")
+
+error_l2_strain_0_BBar = bm.linalg.norm(strain3[0][map_es, :] - strain_0_ansys)
+print(f"error_l2_strain_0_BBar: {error_l2_strain_0_BBar:.8e}")
+error_l2_rel_strain_0_BBar = bm.linalg.norm(strain3[0][map_es, :] - strain_0_ansys) / bm.linalg.norm(strain_0_ansys)
+print(f"error_l2_rel_strain_0_BBar: {error_l2_rel_strain_0_BBar:.8e}")
+error_max_strain_0_BBar = bm.max(bm.abs(strain3[0][map_es, :] - strain_0_ansys)) 
+print(f"error_max_strain_0_BBar: {error_max_strain_0_BBar:.8e}")
+
 
 #NOTE 应力
 print(f"stress1_0: {stress1[0].shape}, {cell2dof[0]}\n {stress1[0]}")
@@ -383,20 +378,20 @@ stress_0_ansys = bm.tensor([
                     ], dtype=bm.float64)
 print(f"stress_0_ansys: {stress_0_ansys.shape}, {[0, 24, 331, 364, 2178, 2202, 2509, 2542]}\n {stress_0_ansys}")
 
-abs_error_stress_0 = bm.linalg.norm(stress1[0][map_es, :] - stress_0_ansys)
-print(f"abs_error_stress_0: {abs_error_stress_0:.8e}")
-rel_error_stress_0 = bm.linalg.norm(stress1[0][map_es, :] - stress_0_ansys) \
-                / (bm.linalg.norm(stress_0_ansys))
-# rel_error_stress_0 = bm.linalg.norm(stress1[0][map_es, :] - stress_0_ansys) \
-#                 / (bm.linalg.norm(stress_0_ansys) + bm.linalg.norm(stress1[0][map_es, :]))
-print(f"rel_error_stress_0: {rel_error_stress_0:.8e}")
-abs_error_stress_0_BBar = bm.linalg.norm(stress3[0][map_es, :] - stress_0_ansys)
-print(f"abs_error_stress_0_BBar: {abs_error_stress_0_BBar:.8e}")
-rel_error_stress_0_BBar = bm.linalg.norm(stress3[0][map_es, :] - stress_0_ansys) \
-                / (bm.linalg.norm(stress_0_ansys))
-# rel_error_stress_0_BBar = bm.linalg.norm(stress3[0][map_es, :] - stress_0_ansys) \
-#                 / (bm.linalg.norm(stress_0_ansys) + bm.linalg.norm(stress3[0][map_es, :]))
-print(f"rel_error_stress_0_BBar: {rel_error_stress_0_BBar:.8e}")
+# NOTE 应力误差
+error_l2_stress_0 = bm.linalg.norm(stress1[0][map_es, :] - stress_0_ansys)
+print(f"error_l2_stress_0: {error_l2_stress_0:.8e}")
+error_l2_rel_stress_0 = bm.linalg.norm(stress1[0][map_es, :] - stress_0_ansys) / bm.linalg.norm(stress_0_ansys)
+print(f"error_l2_rel_stress_0: {error_l2_rel_stress_0:.8e}")
+error_max_stress_0 = bm.max(bm.abs(stress1[0][map_es, :] - stress_0_ansys))
+print(f"error_max_stress_0: {error_max_stress_0:.8e}")
+
+error_l2_stress_0_BBar = bm.linalg.norm(stress3[0][map_es, :] - stress_0_ansys)
+print(f"error_l2_stress_0_BBar: {error_l2_stress_0_BBar:.8e}")
+error_l2_rel_stress_0_BBar = bm.linalg.norm(stress3[0][map_es, :] - stress_0_ansys) / bm.linalg.norm(stress_0_ansys)
+print(f"error_l2_rel_stress_0_BBar: {error_l2_rel_stress_0_BBar:.8e}")
+error_max_stress_0_BBar = bm.max(bm.abs(stress3[0][map_es, :] - stress_0_ansys))
+print(f"error_max_stress_0_BBar: {error_max_stress_0_BBar:.8e}")
 
 mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/vtu/external_gear_fealpy.vtu')
 print("-----------")

@@ -6,7 +6,7 @@ from .optimizer_base import Optimizer
 Grey Wolf Optimizer
 
 """
-class GreyWolfOptimizer(Optimizer):
+class GreyWolfOpt(Optimizer):
     def __init__(self, option) -> None:
         super().__init__(option)
 
@@ -35,28 +35,23 @@ class GreyWolfOptimizer(Optimizer):
         X_delta = X[X_fit_sort[2]]
 
         #空列表
-        gbest_f = X_alpha_fit
-        gbest = X_alpha
-        # Convergence_curve = []
-        # Convergence_curve.append(gbest_f)
+        self.gbest_f = X_alpha_fit
+        self.gbest = X_alpha
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
 
         for it in range(0, MaxIT):
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(X, axis=0) - X)) / N)
+            # exploration percentage and exploitation percentage
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
+            
             a = 2 - 2 * it / MaxIT
 
-            A = 2 * a * bm.random.rand(N, dim) - a
-            C = 2 * bm.random.rand(N, dim)
-            D_alpha = bm.abs(C * X_alpha - X)
-            X1 = X_alpha - A * D_alpha
-
-            A = 2 * a * bm.random.rand(N, dim) - a
-            C = 2 * bm.random.rand(N, dim)
-            D_beta = bm.abs(C * X_beta - X)
-            X2 = X_beta - A * D_beta
-            
-            A = 2 * a * bm.random.rand(N, dim) - a
-            C = 2 * bm.random.rand(N, dim)
-            D_delta = bm.abs(C * X_delta - X)
-            X3 = X_delta - A * D_delta
+            X1 = X_alpha - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_alpha - X)
+            X2 = X_beta - - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_beta - X)
+            X3 = X_delta - - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_delta - X)
 
             X = (X1 + X2 + X3) / 3
             X = X + (lb - X) * (X < lb) + (ub - X) * (X > ub)
@@ -75,7 +70,7 @@ class GreyWolfOptimizer(Optimizer):
             if X_beta_fit < fit_sort[2] < X_delta_fit:
                 X_delta, X_delta_fit = X_sort[2], fit_sort[2]
 
-            gbest = X_alpha
-            gbest_f = X_alpha_fit
-
-        return gbest, gbest_f
+            self.gbest = X_alpha
+            self.gbest_f = X_alpha_fit
+            self.curve[it] = self.gbest_f
+        

@@ -6,7 +6,7 @@ from scipy import ndimage
 from scipy.ndimage import label
 import matplotlib.pyplot as plt
 
-class PSOProblem:
+class PathPlanningProblem:
     def __init__(self, MAP, dataS, dataE):
         self.MAP = MAP
         self.dataS = dataS
@@ -167,9 +167,11 @@ class PSO:
             v = v + (self.vlb - v) * (v < self.vlb) + (self.vub - v) * (v > self.vub)
             x = x + v
             x = x + (self.lb - x) * (x < self.lb) + (self.ub - x) * (x > self.ub)
-            for i in range(0, self.N):
-                fit[i,0] = self.fobj(x[i, :])
-                pbest_f[i, 0], pbest[i, :], self.gbest_f, self.gbest = self.updatePGbest(fit[i,0], x[i,:], pbest_f[i, 0], pbest[i, :])  
+            fit = self.fobj(x)
+            mask = fit < pbest_f
+            pbest, pbest_f = bm.where(mask[:, None], x, pbest), bm.where(mask, fit, pbest_f)
+            gbest_idx = bm.argmin(pbest_f)
+            (self.gbest_f, self.gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < self.gbest_f else (self.gbest_f, self.gbest)
 
 class QPSO(PSO):
     def cal(self):

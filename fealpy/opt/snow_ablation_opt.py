@@ -57,8 +57,15 @@ class SnowAblationOpt(Optimizer):
         Na = bm.array(int(N / 2))
         Nb = bm.array(int(N / 2))
 
+        D_pl = bm.zeros((1, Max_iter))
+        D_pt = bm.zeros((1, Max_iter))
+        Div = bm.zeros((1, Max_iter))
         # 更新迭代
         for t in range(Max_iter):
+            Div[0, t] = bm.sum(bm.sum(bm.abs(bm.mean(X, axis=0) - X))/N)
+            # exploration percentage and exploitation percentage
+            D_pl[0, t] = 100 * Div[0, t] / bm.max(Div)
+            D_pt[0, t] = 100 * bm.abs(Div[0, t] - bm.max(Div)) / bm.max(Div)
             RB = bm.random.randn(N, dim)
             T = bm.exp(bm.array(-t / Max_iter))
             
@@ -74,7 +81,7 @@ class SnowAblationOpt(Optimizer):
 
             # 随机分配索引号
             index1 = bm.unique(bm.random.randint(0, N - 1, (Na,)))
-            index2 = bm.array(list(set(index).difference(index1)))
+            index2 = bm.array(list(set(index.tolist()).difference(index1.tolist())))
 
             r1 = bm.random.rand(len(index1), 1)
             k1 = bm.random.randint(0, 3, (len(index1),))
@@ -106,7 +113,11 @@ class SnowAblationOpt(Optimizer):
             Elite_pool[2] = third_best
             Elite_pool[3] = half_best_mean
             Convergence_curve[0, t] = bm.copy(Best_score)
-        return Best_pos, Best_score
+        self.gbest = Best_pos
+        self.gbest_f = Best_score
+        self.curve = Convergence_curve[0]
+        self.D_pl = D_pl[0]
+        self.D_pt = D_pt[0]
 
 
      

@@ -137,7 +137,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variables=variable)
 
     @barycentric
-    def cell_basis_on_edge(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
+    def cell_basis_on_face(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
         NLF = self.mesh.number_of_faces_of_cells()
         NF = len(eindex)
         NQ = bc.shape[0]
@@ -153,7 +153,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return result
         
     @barycentric
-    def cell_grad_basis_on_edge(self, bc: TensorLike, eindex: TensorLike, 
+    def cell_grad_basis_on_face(self, bc: TensorLike, eindex: TensorLike, 
                                 isleft = True) -> TensorLike:
         TD = self.mesh.TD  ## 一定是单元的
         NLF = self.mesh.number_of_faces_of_cells()
@@ -198,3 +198,68 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         e2dof = self.dof.entity_to_dof(TD, index=index)
         val = bm.einsum('cilm, cl -> cim', gphi, uh[e2dof])
         return val
+    
+    @barycentric
+    def grad_recovery(self, uh: TensorLike, method: str='simple'):
+        """
+
+        Notes
+        -----
+
+        uh 是线性有限元函数，该程序把 uh 的梯度(分片常数）恢复到分片线性连续空间
+        中。
+
+        """
+        from .tensor_space import TensorFunctionSpace
+        from .utils import to_tensor_dof
+        GD = self.mesh.GD
+        Tspace = TensorFunctionSpace(self, (GD, -1))
+        cell2dof = Tspace.cell_to_dof()  
+        p = self.p
+        bc = self.dof.multiIndex/p
+
+        gdof = Tspace.number_of_global_dofs()
+        ldof = Tspace.number_of_local_dofs()
+        
+        guh = uh.grad_value(bc)
+        NC = guh.shape[0]
+        guh = bm.swapaxes(guh, -1, -2).reshape(NC, -1) 
+        rguh = Tspace.function()
+
+        if method == 'simple':
+            deg = bm.bincount(cell2dof.flat, minlength = gdof)
+
+        elif method == 'area':
+            measure = self.mesh.entity_measure('cell')
+            ws = bm.einsum('i, j->ij', measure,bm.ones(ldof))
+            deg = bm.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = bm.einsum('ij..., i->ij...', guh, measure)
+            bm.add.at(rguh[:], cell2dof, guh)
+
+        elif method == 'distance':
+            ipoints = self.interpolation_points()
+            ipoints = bm.concatenate([ipoints]*GD,axis=0)
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            d = bm.sqrt(bm.sum(v**2, axis=-1))
+            deg = bm.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = bm.einsum('ij..., ij->ij...', guh, d)
+
+        elif method == 'area_harmonic':
+            measure = 1/self.mesh.entity_measure('cell')
+            ws = bm.einsum('i, j->ij', measure,bm.ones(ldof))
+            deg = bm.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = bm.einsum('ij..., i->ij...', guh, measure)
+
+        elif method == 'distance_harmonic':
+            ipoints = self.interpolation_points()
+            ipoints = bm.concatenate([ipoints]*GD,axis=0)
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, bm.newaxis, :] - ipoints[cell2dof, :]
+            d = 1/bm.sqrt(bm.sum(v**2, axis=-1))
+            deg = bm.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = bm.einsum('ij..., ij->ij...',guh,d)
+        
+        bm.index_add(rguh[:], cell2dof, guh)
+        rguh /= deg
+        return rguh

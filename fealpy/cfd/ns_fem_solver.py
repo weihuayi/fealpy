@@ -16,18 +16,20 @@ from fealpy.fem import (ScalarConvectionIntegrator,
                         SourceIntegrator,
                         PressWorkIntegrator,
                         FluidBoundaryFrictionIntegrator,
-                        FluidBoundaryFrictionIntegratorP)
+                        ViscousWorkIntegrator,
+                        GradSourceIntegrator)
 from fealpy.fem import (BoundaryFaceMassIntegrator,
                         BoundaryFaceSourceIntegrator)
 
 class NSFEMSolver():
-    def __init__(self, pde, mesh, pspace, uspace, dt, q=5):        
+    def __init__(self, pde, mesh, pspace, uspace, dt, q=5, keep_data=True):        
         self.pde = pde
         self.mesh = mesh
         self.pspace = pspace
         self.uspace = uspace
         self.dt = dt
         self.q = q
+        self.keep_data = keep_data
 
     def Ossen_BForm(self):
         pspace = self.pspace
@@ -39,7 +41,7 @@ class NSFEMSolver():
         A00 = BilinearForm(uspace)
         M = ScalarMassIntegrator(coef=R , q=q)
         self.u_C = ScalarConvectionIntegrator(q=q)
-        self.u_C.keep_data()
+        self.u_C.keep_data(self.keep_data)
         D = ScalarDiffusionIntegrator(coef=dt, q=q)
         A00.add_integrator(M)
         A00.add_integrator(self.u_C)
@@ -63,7 +65,7 @@ class NSFEMSolver():
 
         L0 = LinearForm(uspace) 
         self.u_SI = SourceIntegrator(q=q)
-        self.u_SI.keep_data()
+        self.u_SI.keep_data(self.Keep_data)
         L0.add_integrator(self.u_SI)
         L1 = LinearForm(pspace)
 
@@ -86,16 +88,138 @@ class NSFEMSolver():
         self.u_SI.source = u_SI_coef
         self.u_SI.clear()
     
-    def IPCS_BForm_0(self, threshold):
-        pspace = self.pspace
+    def IPCS_BForm_0(self, threshold=None):
         uspace = self.uspace
         dt = self.dt
         R = self.pde.R
         q = self.q
         
         Bform = BilinearForm(uspace)
-        M = ScalarMassIntegrator(coef=R , q=q)
-        S = ScalarDiffusionIntegrator(coef=R , q=q)
-        F = FluidBoundaryFrictionIntegrator(coef=1, q=5, threshold=threshold)
+        M = ScalarMassIntegrator(coef=R/dt, q=q)
+        F = FluidBoundaryFrictionIntegrator(coef=-1, q=q, threshold=threshold)
+        VW = ViscousWorkIntegrator(coef=2, q=q)
+        Bform.add_integrator(VW)
         Bform.add_integrator(F)
+        Bform.add_integrator(M)
         return Bform
+    
+    def IPCS_LForm_0(self, pthreshold=None):
+        uspace = self.uspace
+        dt = self.dt
+        R = self.pde.R
+        q = self.q
+        
+        Lform = LinearForm(uspace)
+        
+        self.ipcs0_lform_SI = SourceIntegrator(q=q)
+        self.ipcs0_lform_SI.keep_data(self.keep_data)
+        Lform.add_integrator(self.ipcs0_lform_SI)
+        
+        self.ipcs0_lform_GSI = GradSourceIntegrator(q=q)
+        self.ipcs0_lform_GSI.keep_data(self.keep_data)
+        Lform.add_integrator(self.ipcs0_lform_GSI)
+
+        self.ipcs0_lform_BSI = BoundaryFaceSourceIntegrator(q=q, threshold=pthreshold)
+        self.ipcs0_lform_BSI.keep_data(self.keep_data)
+        Lform.add_integrator(self.ipcs0_lform_BSI)
+        return Lform
+   
+    def update_ipcs_0(self, u0, p0):
+        dt = self.dt
+        R = self.pde.R
+        gd = self.mesh.geo_dimension()
+        
+        def coef(bcs, index):
+            result = R/dt*u0(bcs, index)
+            result -= R * bm.einsum('...j, ...ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
+            return result
+        
+        def G_coef(bcs, index):
+            I = bm.eye(gd)
+            result = bm.repeat(p0(bcs,index)[...,bm.newaxis], gd, axis=-1)
+            result = bm.expand_dims(result, axis=-1) * I
+            return result
+
+        def B_coef(bcs, index):
+            result = -bm.einsum('...i, ...j->...ij', p0(bcs, index), self.mesh.face_unit_normal(index=index))
+            result += bm.einsum('eqij, ej->...i', u0.grad_value(bcs, index), self.mesh.face_unit_normal(index=index))
+            return result
+
+        self.ipcs0_lform_SI.source = coef
+        self.ipcs0_lform_BSI.source = B_coef
+        self.ipcs0_lform_GSI.source = G_coef
+
+
+    def IPCS_BForm_1(self):
+        pspace = self.pspace
+        uspace = self.uspace
+        dt = self.dt
+        R = self.pde.R
+        q = self.q
+
+        Bform = BilinearForm(pspace)
+        D = ScalarDiffusionIntegrator(coef=1, q=q)
+        Bform.add_integrator(D)
+        return Bform 
+    
+    def IPCS_LForm_1(self):
+        pspace = self.pspace
+        dt = self.dt
+        q = self.q
+
+        Lform = LinearForm(pspace)
+        self.ipcs1_lform_SI = SourceIntegrator(q=q)
+        self.ipcs1_lform_SI.keep_data(self.keep_data)
+        self.ipcs1_lform_GSI = GradSourceIntegrator(q=q)
+        self.ipcs1_lform_GSI.keep_data(self.keep_data)
+        Lform.add_integrator(self.ipcs1_lform_SI) 
+        Lform.add_integrator(self.ipcs1_lform_GSI)
+        return Lform
+
+    def update_ipcs_1(self, us, p0):
+        dt = self.dt
+        R = self.pde.R
+
+        def grad_coef(bcs, index=None):
+            result = p0.grad_value(bcs, index)
+            return result
+        
+        def coef(bcs, index=None):
+            result = -1/dt*bm.trace(us.grad_value(bcs, index), axis1=-2, axis2=-1)
+            return result
+
+        self.ipcs1_lform_GSI.source = grad_coef
+        self.ipcs1_lform_SI.source = coef
+
+    def IPCS_BForm_2(self):
+        uspace = self.uspace
+        R = self.pde.R
+        q = self.q
+
+        Bform = BilinearForm(uspace)
+        M = ScalarMassIntegrator(coef=R, q=q)
+        Bform.add_integrator(M)
+        return Bform
+
+    def IPCS_LForm_2(self):
+        uspace = self.uspace
+        dt = self.dt
+        R = self.pde.R
+        q = self.q
+
+        Lform = LinearForm(uspace)
+        self.ipcs2_lform_SI = SourceIntegrator(q=q)
+        self.ipcs2_lform_SI.keep_data(self.keep_data)
+        Lform.add_integrator(self.ipcs2_lform_SI)
+        return Lform
+
+    def update_ipcs_2(self, us, p0, p1):
+        dt = self.dt
+        R = self.pde.R
+
+        def coef(bcs, index):
+            result = R*us(bcs, index)
+            result -= dt*(p1.grad_value(bcs, index) - p0.grad_value(bcs, index))
+            return result
+
+        self.ipcs2_lform_SI.source = coef
