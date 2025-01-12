@@ -6,23 +6,18 @@ structural optimization. International Journal for Numerical Methods in Engineer
 """
 
 from typing import Tuple
-from numpy import diag as diags
 from numpy.linalg import solve
 
 from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
+from fealpy.solver import cg, spsolve
 
-def solve_mma_subproblem(m: int, 
-                        n: int, 
+def solve_mma_subproblem(m: int, n: int, 
                         epsimin: float,
-                        low: TensorLike,
-                        upp: TensorLike,
-                        alfa: TensorLike,
-                        beta: TensorLike,
-                        p0: TensorLike,
-                        q0: TensorLike,
-                        P: TensorLike,
-                        Q: TensorLike,
+                        low: TensorLike, upp: TensorLike,
+                        alfa: TensorLike, beta: TensorLike,
+                        p0: TensorLike, q0: TensorLike,
+                        P: TensorLike, Q: TensorLike,
                         a0: float,
                         a: TensorLike = None,
                         b: TensorLike = None,
@@ -30,38 +25,37 @@ def solve_mma_subproblem(m: int,
                         d: TensorLike = None) -> Tuple[TensorLike, ...]:
     """求解 MMA 子问题
     
-    使用原始-对偶内点法求解由 MMA 算法产生的凸近似子问题.
+    使用 primal-dual Newton method 求解由 MMA 算法产生的凸近似子问题.
     
     Parameters
     ----------
-    m : 约束数量
-    n : 设计变量数量
+    m : 约束数量, 约束函数 f_i(x) 的个数
+    n : 设计变量数量, 变量 x_j 的个数
     epsimin : 最小收敛容差
     low : 下渐近线
     upp : 上渐近线
     alfa : 变量下界
     beta : 变量上界
-    p0 : 目标函数的正梯度项
-    q0 : 目标函数的负梯度项
-    P : 约束函数的正梯度项
-    Q : 约束函数的负梯度项
-    a0 : 弹性权重
-    a : 约束线性项系数
+    p0 (n, 1): 目标函数的正梯度项
+    q0 (n, 1): 目标函数的负梯度项
+    P (m, n): 约束函数的正梯度项
+    Q (m, n): 约束函数的负梯度项
+    a0 (float): 目标函数的线性项 a_0*z 的系数
+    a (m, 1): 约束的线性项 a_i*z 的系数
     b : 约束常数项
-    c : 约束二次项系数
-    d : 约束二次项系数
+    c (m, 1): 约束的二次项 c_iy_i 的系数
+    d (m, 1): 约束的二次项 0.5*d_i*y_i^2 的系数
     
     Returns
-    -------
-    xmma : 最优设计变量
-    ymma : 对偶变量
-    zmma : 松弛变量
-    lam : 拉格朗日乘子
-    xsi : 对偶变量
-    eta : 对偶变量
-    mu : 对偶变量
-    zet : 对偶变量
-    s : 松弛变量
+    - xmma (n, 1): 自然变量
+    - ymma: 人工变量 
+    - zmma: 人工变量
+    - lam (m, 1): m 个约束的拉格朗日乘子 lambda
+    - xsi (n, 1): n 个约束 alpha_j-x_j 的拉格朗日乘子 xi
+    - eta : n 个约束 x_j-beta_j 的拉格朗日乘子 eta
+    - mu : m 个约束 -y_i <= 0 的拉格朗日乘子 mu
+    - zet : 1 个约束 -z <= 0 的拉格朗日乘子 zeta
+    - s : m 个约束的松弛变量 s
     """
 
     een = bm.ones((n, 1))
@@ -72,6 +66,7 @@ def solve_mma_subproblem(m: int,
     x = 0.5 * (alfa + beta)
     y = bm.copy(eem)
     z = bm.array([[1.0]])
+    # 定义约束的拉格朗日乘子和松弛变量
     lam = bm.copy(eem)
     xsi = een / (x - alfa)
     xsi = bm.maximum(xsi, een)
@@ -80,6 +75,7 @@ def solve_mma_subproblem(m: int,
     mu = bm.maximum(eem, 0.5*c)
     zet = bm.array([[1.0]])
     s = bm.copy(eem)
+
     itera = 0
 
     while epsi > epsimin:
@@ -120,26 +116,29 @@ def solve_mma_subproblem(m: int,
             itera = itera + 1
             
             # 计算中间变量
-            ux1 = upp-x
-            xl1 = x-low
-            ux2 = ux1*ux1
-            xl2 = xl1*xl1
-            ux3 = ux1*ux2
-            xl3 = xl1*xl2
+            ux1 = upp - x
+            xl1 = x - low
+            ux2 = ux1 * ux1
+            xl2 = xl1 * xl1
+            ux3 = ux1 * ux2
+            xl3 = xl1 * xl2
             uxinv1 = een / ux1
             xlinv1 = een / xl1
-            uxinv2 = een / ux2
-            xlinv2 = een / xl2
+            uxinv2 = een / ux2 # (n, 1)
+            xlinv2 = een / xl2 # (n, 1)
             
             # 计算梯度矩阵和向量
             plam = p0 + bm.dot(P.T, lam)
             qlam = q0 + bm.dot(Q.T, lam)
             gvec = bm.dot(P, uxinv1) + bm.dot(Q, xlinv1)
-            GG = (diags(uxinv2.flatten(), 0).dot(P.T)).T - \
-                 (diags(xlinv2.flatten(), 0).dot(Q.T)).T
+            # TODO 使用 einsum 替代对角矩阵乘法
+            GG = bm.einsum('j, ij -> ij', uxinv2.flatten(), P) - \
+                 bm.einsum('j, ij -> ij', xlinv2.flatten(), Q)  # (m, n) 
+            # GG = (diags(uxinv2.flatten(), 0).dot(P.T)).T - \
+            #      (diags(xlinv2.flatten(), 0).dot(Q.T)).T # (m, n)
             
-            # 计算残差
-            dpsidx = plam/ux2 - qlam/xl2
+            # 计算残差 delta_x, delta_y, delta_z, delta_lambda
+            dpsidx = plam / ux2 - qlam / xl2
             delx = dpsidx - epsvecn/(x-alfa) + epsvecn/(beta-x)
             dely = c + d*y - lam - epsvecm/y
             delz = a0 - bm.dot(a.T, lam) - epsi/z
@@ -148,18 +147,22 @@ def solve_mma_subproblem(m: int,
             # 计算 Hessian 对角线
             diagx = plam/ux3 + qlam/xl3
             diagx = 2*diagx + xsi/(x-alfa) + eta/(beta-x)
-            diagxinv = een/diagx
-            diagy = d + mu/y
+            diagxinv = een / diagx
+            diagy = d + mu / y
             diagyinv = eem/diagy
-            diaglam = s/lam
+            diaglam = s / lam
             diaglamyi = diaglam + diagyinv
             
             # 求解线性系统
             if m < n:
                 blam = dellam + dely / diagy - bm.dot(GG, (delx / diagx))
                 bb = bm.concatenate((blam, delz), axis=0)
-                Alam = bm.asarray(diags(diaglamyi.flatten(), 0) + \
-                        (diags(diagxinv.flatten(), 0).dot(GG.T).T).dot(GG.T))
+                # TODO 使用 einsum 替代对角矩阵乘法
+                D_lamyi = diaglamyi * bm.eye(1)  
+                GD_xG = bm.einsum('ik, k, jk -> ij', GG, diagxinv.flatten(), GG)  
+                Alam = D_lamyi + GD_xG
+                # Alam = bm.asarray(diags(diaglamyi.flatten(), 0) + \
+                #         (diags(diagxinv.flatten(), 0).dot(GG.T).T).dot(GG.T))
                 AAr1 = bm.concatenate((Alam, a), axis=1)
                 AAr2 = bm.concatenate((a, -zet/z), axis=0).T
                 AA = bm.concatenate((AAr1, AAr2), axis=0)
@@ -168,10 +171,14 @@ def solve_mma_subproblem(m: int,
                 dz = solut[m:m+1]
                 dx = -delx / diagx - bm.dot(GG.T, dlam) / diagx
             else:
-                diaglamyiinv = eem/diaglamyi
+                diaglamyiinv = eem / diaglamyi
                 dellamyi = dellam + dely/diagy
-                Axx = bm.asarray(diags(diagx.flatten(), 0) + \
-                    (diags(diaglamyiinv.flatten(), 0).dot(GG).T).dot(GG))
+                # TODO 使用 einsum 替代对角矩阵乘法
+                D_x = diagx * bm.eye(1)
+                GD_lamyiG = bm.einsum('ik, k, jk -> ij', GG, diaglamyiinv.flatten(), GG)
+                Axx = D_x + GD_lamyiG
+                # Axx = bm.asarray(diags(diagx.flatten(), 0) + \
+                #     (diags(diaglamyiinv.flatten(), 0).dot(GG).T).dot(GG))
                 azz = zet/z + bm.dot(a.T, (a/diaglamyi))
                 axz = bm.dot(-GG.T, (a/diaglamyi))
                 bx = delx + bm.dot(GG.T, (dellamyi/diaglamyi))
@@ -183,16 +190,15 @@ def solve_mma_subproblem(m: int,
                 solut = solve(AA, bb)
                 dx = solut[0:n]
                 dz = solut[n:n+1]
-                dlam = bm.dot(GG, dx)/diaglamyi - dz*(a/diaglamyi) + \
-                       dellamyi/diaglamyi
+                dlam = bm.dot(GG, dx)/diaglamyi - dz*(a/diaglamyi) + dellamyi/diaglamyi
                 
             # 计算其他变量的更新
             dy = -dely/diagy + dlam/diagy
             dxsi = -xsi + epsvecn/(x-alfa) - (xsi*dx)/(x-alfa)
             deta = -eta + epsvecn/(beta-x) + (eta*dx)/(beta-x)
             dmu = -mu + epsvecm/y - (mu*dy)/y
-            dzet = -zet + epsi/z - zet*dz/z
-            ds = -s + epsvecm/lam - (s*dlam)/lam
+            dzet = -zet + epsi / z - zet * dz / z
+            ds = -s + epsvecm / lam - (s * dlam) / lam
             xx = bm.concatenate((y, z, lam, xsi, eta, mu, zet, s), axis=0)
             dxx = bm.concatenate((dy, dz, dlam, dxsi, deta, dmu, dzet, ds), axis=0)
             

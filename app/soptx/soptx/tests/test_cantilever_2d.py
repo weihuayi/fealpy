@@ -155,16 +155,14 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
         optimizer = MMAOptimizer(
                         objective=objective,
                         constraint=constraint,
-                        m=1,   # 约束个数
-                        n=NC,  # 设计变量个数
                         filter=filter_obj,
                         options={
                             'max_iterations': config.max_iterations,
                             'tolerance': config.tolerance,
                             'm': 1,
                             'n': NC,
-                            'xmin:': bm.zeros(NC, dtype=bm.float64),
-                            'xmax': bm.ones(NC, dtype=bm.float64),
+                            'xmin': bm.zeros(NC, dtype=bm.float64).reshape(-1, 1),
+                            'xmax': bm.ones(NC, dtype=bm.float64).reshape(-1, 1),
                         }
                     )
     else:
@@ -205,9 +203,9 @@ if __name__ == "__main__":
     
     # 使用 MMA 优化器的配置
     config2 = TestConfig(
-        nx=160, ny=100,
+        nx=16, ny=10,
         volume_fraction=0.4,
-        filter_radius=6.0,
+        filter_radius=0.6,
         filter_type='density',
         max_iterations=100,
         save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d_mma',
