@@ -49,7 +49,7 @@ class ExponentialTrigonometricOptAlg(Optimizer):
             
             d1 = 0.1 * bm.exp(bm.array(-0.01 * (it + 1))) * bm.cos(bm.array(0.5 * MaxIT * (1 - it / MaxIT))) # Eq.(10)
             d2 = -0.1 * bm.exp(bm.array(-0.01 * (it + 1))) * bm.cos(bm.array(0.5 * MaxIT * (1 - it / MaxIT))) # Eq.(11)
-            CM = (bm.sqrt(bm.array(it / MaxIT)) ** bm.tan(d1 / (d2 + 1e-8))) * bm.random.rand(N, 1) * 0.01 # Eq.(18)
+            CM = (bm.sqrt(bm.array((it + 1) / MaxIT)) ** bm.tan(d1 / (d2 + 1e-8))) * bm.random.rand(N, 1) * 0.01 # Eq.(18)
             if it == CEi:
                 j = bm.random.randint(0, dim, (1,))
                 r1 = bm.random.rand(1, 1)
@@ -78,6 +78,7 @@ class ExponentialTrigonometricOptAlg(Optimizer):
                 # The second phase(
                 x = ((CM > 1) * (x + bm.exp(bm.tan(bm.abs(d1 / (d2 + 1e-8)) * bm.abs(bm.random.rand(N, dim) * alpha_2 * self.gbest - x)))) + # Eq.(16)
                      (CM <= 1) * (x + 3 * (bm.abs(bm.random.rand(N, dim) * alpha_2 * self.gbest - x)) * (1 - 2 * (q1 > 0.5)))) # Eq.(12)
+            CEi = CEi_temp
             x = x + (LB - x) * (x < LB) + (UB - x) * (x > UB)
             fit = self.fun(x)
             self.update_gbest(x, fit)
