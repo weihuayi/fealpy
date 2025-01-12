@@ -50,8 +50,8 @@ class GreyWolfOpt(Optimizer):
             a = 2 - 2 * it / MaxIT
 
             X1 = X_alpha - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_alpha - X)
-            X2 = X_beta - - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_beta - X)
-            X3 = X_delta - - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_delta - X)
+            X2 = X_beta - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_beta - X)
+            X3 = X_delta - (2 * a * bm.random.rand(N, dim) - a) * bm.abs(2 * bm.random.rand(N, dim) * X_delta - X)
 
             X = (X1 + X2 + X3) / 3
             X = X + (lb - X) * (X < lb) + (ub - X) * (X > ub)

@@ -18,7 +18,7 @@ class RimeOptAlg(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
+    def run(self, w=5):
         options = self.options
         x = options["x0"]
         N = options["NP"]
@@ -33,7 +33,6 @@ class RimeOptAlg(Optimizer):
         self.D_pl = bm.zeros((MaxIT,))
         self.D_pt = bm.zeros((MaxIT,))
         self.Div = bm.zeros((1, MaxIT))
-        w = 5
         for it in range(0, MaxIT):
             self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
             # exploration percentage and exploitation percentage
