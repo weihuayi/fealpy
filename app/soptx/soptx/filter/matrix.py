@@ -36,6 +36,7 @@ class FilterMatrix:
     @staticmethod
     def _compute_filter_2d(nx: int, ny: int, rmin: float) -> Tuple[COOTensor, TensorLike]:
         """计算2D滤波矩阵"""
+        
         nfilter = int(nx * ny * ((2 * (ceil(rmin) - 1) + 1) ** 2))
         iH = bm.zeros(nfilter, dtype=bm.int32)
         jH = bm.zeros(nfilter, dtype=bm.int32)

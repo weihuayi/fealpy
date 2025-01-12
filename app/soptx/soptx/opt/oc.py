@@ -12,7 +12,8 @@ from soptx.filter import Filter
 class OCOptions:
     """OC 算法的配置选项"""
     max_iterations: int = 100     # 最大迭代次数
-    move_limit: float = 0.2       # 每次迭代的最大移动限制
+    move_limit: float = 0.2       # 正向移动限制 m
+    damping_coef: float = 0.5     # 阻尼系数 η
     tolerance: float = 0.01       # 收敛容差
     initial_lambda: float = 1e9   # 初始 lambda 值
     bisection_tol: float = 1e-3   # 二分法收敛容差
@@ -38,10 +39,7 @@ class OptimizationHistory:
               f"Time: {time:.3f} sec")
 
 class OCOptimizer(OptimizerBase):
-    """Optimality Criteria (OC) 优化器
-    
-    用于求解拓扑优化问题的 OC 方法实现
-    """
+    """Optimality Criteria (OC) 优化器"""
     
     def __init__(self,
                  objective: ObjectiveBase,
@@ -72,31 +70,23 @@ class OCOptimizer(OptimizerBase):
                        dc: TensorLike,
                        dg: TensorLike,
                        lmid: float) -> TensorLike:
-        """使用 OC 准则更新密度
+        """使用 OC 准则更新密度"""
+        m = self.options.move_limit
+        eta = self.options.damping_coef
         
-        Parameters
-        ----------
-        rho : 当前密度
-        dc : 目标函数梯度
-        dg : 约束函数梯度
-        lmid : 拉格朗日乘子
-        
-        Returns
-        -------
-        rho_new : 更新后的密度
-        """
-        move = self.options.move_limit
-        
+        B_e = -dc / (dg * lmid)
+        B_e_damped = bm.power(B_e, eta)
+
         # OC update scheme
         rho_new = bm.maximum(
             bm.tensor(0.0, dtype=rho.dtype), 
             bm.maximum(
-                rho - move, 
+                rho - m, 
                 bm.minimum(
                     bm.tensor(1.0, dtype=rho.dtype), 
                     bm.minimum(
-                        rho + move, 
-                        rho * bm.sqrt(-dc / dg / lmid)
+                        rho + m, 
+                        rho * B_e_damped
                     )
                 )
             )
@@ -106,23 +96,19 @@ class OCOptimizer(OptimizerBase):
         
     def optimize(self, rho: TensorLike, **kwargs) -> TensorLike:
         """运行 OC 优化算法
-        
+
         Parameters
         ----------
-        rho : 初始密度场
-        **kwargs : 其他参数，例如：
-            - beta: Heaviside 投影参数
-        
-        Returns
-        -------
-        rho : 最优密度场
+        - rho : 初始密度场
+        - **kwargs : 其他参数，例如：
+            -- beta: Heaviside 投影参数
         """
-        # 获取参数
+        # 获取优化参数
         max_iters = self.options.max_iterations
         tol = self.options.tolerance
         bisection_tol = self.options.bisection_tol
 
-        # 准备 Heaviside 投影的参数(如果需要)
+        # 准备 Heaviside 投影的参数 (如果需要)
         filter_params = {'beta': kwargs.get('beta')} if 'beta' in kwargs else None
         
         # 获取物理密度(对于非 Heaviside 投影，就是设计密度本身)
@@ -138,11 +124,17 @@ class OCOptimizer(OptimizerBase):
             
             # 使用物理密度计算目标函数值和梯度
             obj_val = self.objective.fun(rho_phys)
-            obj_grad = self.objective.jac(rho_phys)
+            obj_grad = self.objective.jac(rho_phys)  # (NC, )
+            if self.filter is not None:
+                obj_grad = self.filter.filter_sensitivity(
+                                        obj_grad, rho_phys, 'objective', filter_params)
             
             # 使用物理密度计算约束值和梯度
             con_val = self.constraint.fun(rho_phys)
-            con_grad = self.constraint.jac(rho_phys)
+            con_grad = self.constraint.jac(rho_phys)  # (NC, )
+            if self.filter is not None:
+                con_grad = self.filter.filter_sensitivity(
+                                        con_grad, rho_phys, 'constraint', filter_params)
             
             # 二分法求解拉格朗日乘子
             l1, l2 = 0.0, self.options.initial_lambda
