@@ -9,7 +9,7 @@ class GeneticAlgorithm(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
+    def run(self, pc=0.7, pm=0.01):
         options = self.options
         x = options["x0"]
         N = options["NP"]
@@ -20,9 +20,6 @@ class GeneticAlgorithm(Optimizer):
         gbest_index = bm.argmin(fit)
         self.gbest = x[gbest_index]
         self.gbest_f = fit[gbest_index]
-
-        pc = 0.7
-        pm = 0.01
 
         index = bm.argsort(fit)
         x = x[index]
