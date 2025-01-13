@@ -824,11 +824,6 @@ class ExternalGear(Gear):
         z = self.z
         # 获取齿廓与过渡曲线点列
         points = self.get_profile_points()
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(10, 10))
-        plt.plot(points[:51, 0], points[:51, 1], 'o-', label='Profile Points')
-        plt.axis('equal')
-        plt.show()
         r_inner = self.inner_diam / 2
 
         one_tooth_angle = abs(delta_angle_calculator(points[0, :2], points[n1 + n2 + 1, :2], input_type="vector"))

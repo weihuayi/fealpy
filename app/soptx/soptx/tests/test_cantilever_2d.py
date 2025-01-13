@@ -163,6 +163,7 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
                             'n': NC,
                             'xmin': bm.zeros(NC, dtype=bm.float64).reshape(-1, 1),
                             'xmax': bm.ones(NC, dtype=bm.float64).reshape(-1, 1),
+                            'c': 1e4 * bm.ones(1, dtype=bm.float64),
                         }
                     )
     else:

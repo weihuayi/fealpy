@@ -12,9 +12,9 @@ from fealpy.fem.dirichlet_bc import DirichletBC
 from fealpy.solver import cg, spsolve
 
 from app.soptx.linear_elasticity.JingYiGearProject.utils import export_to_inp
-
+from app.gearx.gear import ExternalGear, InternalGear
 import pickle
-
+import json
 
 def compute_strain_stress(tensor_space, uh, B_BBar, D):
     cell2tdof = tensor_space.cell_to_dof()
@@ -26,15 +26,38 @@ def compute_strain_stress(tensor_space, uh, B_BBar, D):
 
 bm.set_backend('numpy')
 
-with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/pkl/external_gear.pkl', 'rb') as f:
-    data = pickle.load(f)
+with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/json/external_gear_data.json', 'r') \
+        as file:data = json.load(file)
+m_n = data['mn']  # 法向模数
+z = data['z']  # 齿数
+alpha_n = data['alpha_n']  # 法向压力角
+beta = data['beta']  # 螺旋角
+x_n = data['xn']  # 法向变位系数
+hac = data['hac']  # 齿顶高系数
+cc = data['cc']  # 顶隙系数
+rcc = data['rcc']  # 刀尖圆弧半径
+jn = data['jn']  # 法向侧隙
+n1 = data['n1']  # 渐开线分段数
+n2 = data['n2']  # 过渡曲线分段数
+n3 = data['n3']
+na = data['na']
+nf = data['nf']
+nw = data['nw']
+tooth_width = data['tooth_width']
+inner_diam = data['inner_diam']  # 轮缘内径
+chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
 
-external_gear = data['external_gear']
-hex_mesh = data['hex_mesh']
-is_inner_node = data['is_inner_node']
+external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia,
+                                inner_diam, tooth_width)
+hex_mesh = external_gear.generate_hexahedron_mesh()
+target_hex_mesh = external_gear.set_target_tooth([0, 1, 18])
 
-hex_cell = hex_mesh.cell
-hex_node = hex_mesh.node
+hex_cell = target_hex_mesh.cell
+hex_node = target_hex_mesh.node
+# 寻找内圈上节点
+node_r = bm.sqrt(hex_node[:, 0] ** 2 + hex_node[:, 1] ** 2)
+is_inner_node = bm.abs(node_r - external_gear.inner_diam / 2) < 1e-11
+inner_node_idx = bm.where(bm.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
 mesh = HexahedronMesh(hex_node, hex_cell)
 
 GD = mesh.geo_dimension()   
@@ -49,6 +72,7 @@ cell = mesh.entity('cell')
 load_values = 100 * bm.array([50.0, 60.0, 79.0, 78.0, 87.0, 95.0, 102.0, 109.0, 114.0,
                         119.0, 123.0, 127.0, 129.0, 130.0, 131.0], dtype=bm.float64)   # (15, )
 
+# 接触线
 n = 15
 helix_d = bm.linspace(external_gear.d, external_gear.effective_da, n)
 helix_width = bm.linspace(0, external_gear.tooth_width, n)
@@ -141,7 +165,7 @@ F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 F_load_nodes = F[dof_indices] # (15*8, GD)
 
 fixed_node_index = bm.where(is_inner_node)[0]
-export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/external_gear_abaqus.inp', 
+export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/external_gear_helix_abaqus.inp', 
               nodes=node, elements=cell, 
               fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
               young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
@@ -201,17 +225,11 @@ uh_z = uh_show[:, 2]
 
 uh_magnitude = bm.linalg.norm(uh_show, axis=1)
 
-# rel_l2_uh_magnitude = bm.linalg.norm(uh_magnitude - uh_array) / bm.linalg.norm(uh_array)
-# print(f"rel_l2_uh_magnitude: {rel_l2_uh_magnitude}")
-
 mesh.nodedata['uh'] = uh_show[:]
 mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
 
 # NOTE 计算单元积分点处的应变和应力
 strain, stress = compute_strain_stress(tensor_space, uh, B_BBar, D) # (NC, NQ, 6)
-# print(f"stress0:\n, {stress[0]}")
-# print(f"stress5000:, {stress[5000]}")
-# print(f"stress10000:, {stress[10000]}")
 extrapolation_matrix = bm.tensor([
             [-0.0490381057,  0.1830127019,  0.1830127019, -0.6830127019,  0.1830127019, -0.6830127019, -0.6830127019,  2.5490381057],
             [ 0.1830127019, -0.0490381057, -0.6830127019,  0.1830127019, -0.6830127019,  0.1830127019,  2.5490381057, -0.6830127019],
@@ -230,8 +248,6 @@ strain_extrapolation = bm.einsum('lq, cqj -> clj', extrapolation_matrix, strain)
 stress_extrapolation = bm.einsum('lq, cqj -> clj', extrapolation_matrix, stress)
 strain_extrapolation_maps = strain_extrapolation[:, extrapolation_map, :]
 stress_extrapolation_maps = stress_extrapolation[:, extrapolation_map, :]
-# print(f"stress_extrapolation0:\n {stress_extrapolation[0]}")
-# print(f"stress_extrapolation_maps:\n {stress_extrapolation_maps[0]}")
 
 # 使用直接平均法计算节点应变和应力 
 cell2dof_maps = cell2dof[:, cell2dof_map]
@@ -378,5 +394,5 @@ mesh.nodedata['mises'] = mises_node
 # mesh.nodedata['max_principal_stresses'] = max_principal_stresses
 # mesh.nodedata['max_abs_principal_strains'] = max_abs_principal_strains
 # mesh.nodedata['max_abs_principal_stresses'] = max_abs_principal_stresses
-mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/external_gear_fealpy.vtu')
+mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/external_gear_helix_fealpy.vtu')
 print("-----------")

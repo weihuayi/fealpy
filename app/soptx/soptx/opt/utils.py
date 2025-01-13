@@ -58,15 +58,12 @@ def solve_mma_subproblem(m: int, n: int,
     - s : m 个约束的松弛变量 s
     """
 
+    # 变量初始化
     een = bm.ones((n, 1))
     eem = bm.ones((m, 1))
-    epsi = 1
-    epsvecn = epsi * een
-    epsvecm = epsi * eem
     x = 0.5 * (alfa + beta)
     y = bm.copy(eem)
     z = bm.array([[1.0]])
-    # 定义约束的拉格朗日乘子和松弛变量
     lam = bm.copy(eem)
     xsi = een / (x - alfa)
     xsi = bm.maximum(xsi, een)
@@ -76,8 +73,10 @@ def solve_mma_subproblem(m: int, n: int,
     zet = bm.array([[1.0]])
     s = bm.copy(eem)
 
+    epsi = 1    
+    epsvecn = epsi * een
+    epsvecm = epsi * eem
     itera = 0
-
     while epsi > epsimin:
         epsvecn = epsi * een
         epsvecm = epsi * eem
