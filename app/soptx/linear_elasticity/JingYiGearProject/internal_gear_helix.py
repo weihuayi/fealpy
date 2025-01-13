@@ -9,13 +9,12 @@ from fealpy.material.elastic_material import LinearElasticMaterial
 from fealpy.fem.bilinear_form import BilinearForm
 from fealpy.fem.dirichlet_bc import DirichletBC
 from fealpy.solver import cg, spsolve
+from fealpy.mesh import HexahedronMesh
 
+from soptx.utils import timer
 from app.soptx.linear_elasticity.JingYiGearProject.utils import export_to_inp
 
 import pickle
-
-from fealpy.mesh import HexahedronMesh
-
 
 def compute_strain_stress(tensor_space, uh, B_BBar, D):
     cell2tdof = tensor_space.cell_to_dof()
@@ -143,13 +142,15 @@ F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 F_load_nodes = F[dof_indices] # (15*8, GD)
 
 fixed_node_index = bm.where(is_outer_node)[0]
-# print(f"fixed_node_index: {fixed_node_index}")
 export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/internal_gear_abaqus.inp', 
               nodes=node, elements=cell, 
               fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
               young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
               used_app='abaqus', mesh_type='hex')
 
+# 创建计时器
+t = timer(f"Timing_{i}")
+next(t)  # 启动计时器
 E = 206e3
 nu = 0.3
 lam = (E * nu) / ((1.0 + nu) * (1.0 - 2.0 * nu))
@@ -180,14 +181,14 @@ dbc = DirichletBC(space=tensor_space,
                     threshold=tensor_is_bd_dof, 
                     method='interp')
 K, F = dbc.apply(K, F)
-
+t.send('准备时间')
 from fealpy import logger
 logger.setLevel('INFO')
 uh = tensor_space.function()
 # uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
 uh[:] = spsolve(K, F, solver="mumps")
-print(f"uh10:, {uh[:10]}")
-print(f"uh[-10:]:, {uh[-10:]}")
+t.send('求解时间')
+t.send(None)
 
 # 计算残差向量和范数
 residual = K.matmul(uh[:]) - F  

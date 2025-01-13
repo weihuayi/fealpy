@@ -134,7 +134,7 @@ dbc = DirichletBC(space=tensor_space,
                     method='interp')
 # 齿面上所有节点的位移结果
 uh_profiles = bm.zeros((NPN, GD), dtype=bm.float64) # (NPN, GD)
-for i in range(10):
+for i in range(3):
     # 创建计时器
     t = timer(f"Timing_{i}")
     next(t)  # 启动计时器
@@ -152,6 +152,7 @@ for i in range(10):
     from fealpy import logger
     logger.setLevel('INFO')
     uh = tensor_space.function()
+    # uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
     uh[:] = spsolve(K, F, solver="mumps")
     t.send('求解时间')
     # 获取齿面上节点的位移
@@ -172,7 +173,7 @@ for i in range(10):
         uh_magnitude = bm.linalg.norm(uh_show, axis=1)
         mesh.nodedata['uh'] = uh_show[:]
         mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
-        mesh.to_vtk('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/external_gear_profile_fealpy.vtu')
+        mesh.to_vtk(f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/external_gear_profile_fealpy_{i}.vtu')
 
         # 单个节点载荷的索引
         load_node_indices = node_indices[i].reshape(-1) # (1, )

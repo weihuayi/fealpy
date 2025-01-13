@@ -11,9 +11,9 @@ from fealpy.fem.bilinear_form import BilinearForm
 from fealpy.fem.dirichlet_bc import DirichletBC
 from fealpy.solver import cg, spsolve
 
+from soptx.utils import timer
 from app.soptx.linear_elasticity.JingYiGearProject.utils import export_to_inp
 from app.gearx.gear import ExternalGear, InternalGear
-import pickle
 import json
 
 def compute_strain_stress(tensor_space, uh, B_BBar, D):
@@ -163,7 +163,6 @@ F = F.add(COOTensor(indices, FE.reshape(-1), (tgdof, ))).to_dense() # (tgdof, )
 
 # 从全局载荷向量中提取有载荷节点处的值
 F_load_nodes = F[dof_indices] # (15*8, GD)
-
 fixed_node_index = bm.where(is_inner_node)[0]
 export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/external_gear_helix_abaqus.inp', 
               nodes=node, elements=cell, 
@@ -171,6 +170,9 @@ export_to_inp(filename='/home/heliang/FEALPy_Development/fealpy/app/soptx/linear
               young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
               used_app='abaqus', mesh_type='hex')
 
+# 创建计时器
+t = timer(f"Timing_{i}")
+next(t)  # 启动计时器
 E = 206e3
 nu = 0.3
 lam = (E * nu) / ((1.0 + nu) * (1.0 - 2.0 * nu))
@@ -184,8 +186,6 @@ integrator_K = LinearElasticIntegrator(material=linear_elastic_material,
                                        q=q, method='C3D8_BBar')
 integrator_K.keep_data(True)
 _, _, D, B_BBar = integrator_K.fetch_c3d8_bbar_assembly(tensor_space)
-# print(f"B_BBar:\n {B_BBar[0]}")
-# KE = integrator_K.c3d8_bbar_assembly(space=tensor_space)
 bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
@@ -201,14 +201,16 @@ dbc = DirichletBC(space=tensor_space,
                     threshold=tensor_is_bd_dof, 
                     method='interp')
 K, F = dbc.apply(K, F)
+t.send('准备时间')
 
 from fealpy import logger
 logger.setLevel('INFO')
 uh = tensor_space.function()
 # uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
 uh[:] = spsolve(K, F, solver="mumps")
-# print(f"uh10: {uh[:10]}")
-# print(f"uh-10: {uh[-10:]}")
+t.send('求解时间')
+t.send(None)
+
 # 计算残差向量和范数
 residual = K.matmul(uh[:]) - F  
 residual_norm = bm.sqrt(bm.sum(residual * residual))
