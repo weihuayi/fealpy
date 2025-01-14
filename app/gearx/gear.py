@@ -62,7 +62,7 @@ class Gear(ABC):
         self.mesh = None
         self.hex_mesh = None
         self.target_quad_mesh = None
-        self.targer_hex_mesh = None
+        self.target_hex_mesh = None
         self.gear_type = 0
         self.is_max_angle = False
         self.single_node_num = 0
@@ -313,8 +313,14 @@ class Gear(ABC):
         :param tooth_tag: 目标齿编号，默认为 None，即所有齿
         :return: 齿廓节点索引及坐标
         """
-        if not hasattr(self, 'hex_mesh'):
-            raise ValueError('The hex_mesh attribute is not set.')
+        if not hasattr(self, 'target_hex_mesh'):
+            if not hasattr(self, 'hex_mesh'):
+                raise ValueError('The hex_mesh attribute is not set.')
+            quad_mesh = self.mesh
+            hex_mesh = self.hex_mesh
+        else:
+            quad_mesh = self.target_quad_mesh
+            hex_mesh = self.target_hex_mesh
         # tooth_tag 输入类型检测，只能是整数或整数列表，并将其转换为列表
         if tooth_tag is not None:
             if isinstance(tooth_tag, int):
@@ -323,48 +329,100 @@ class Gear(ABC):
                 tooth_tag = list(tooth_tag)
             else:
                 raise TypeError('The tooth_tag must be an integer or a list of integers.')
-        quad_mesh = self.mesh
-        hex_mesh = self.hex_mesh
+        # 构建齿面参考法向
+        rotation = self.rotation_direction*self.beta
+        tooth_tangnet = np.array([0, np.sin(rotation), np.cos(rotation)])
+        tooth_normal_right = np.array([0, np.cos(rotation), -np.sin(rotation)])
+        tooth_normal_left = np.array([0, -np.cos(rotation), np.sin(rotation)])
+
+
         t_NN = quad_mesh.number_of_nodes()
+        t_NC = quad_mesh.number_of_cells()
         n1 = self.n1
         nw = self.nw
         hex_node = hex_mesh.node
 
         is_bd_cell = quad_mesh.boundary_cell_flag()
-        domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 6
-        domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 5
+        if self.gear_type == 1:
+            if self.is_max_angle:
+                domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 7
+                domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 6
+            else:
+                domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 6
+                domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 5
+        elif self.gear_type == 2:
+                domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 6
+                domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 8
+        else:
+            raise ValueError('The gear type is not set.')
+
         if tooth_tag is None:
             folder = self.z
-            cell_flag_left = is_bd_cell & domain_flag_left
             cell_flag_right = is_bd_cell & domain_flag_right
+            cell_flag_left = is_bd_cell & domain_flag_left
         else:
             folder = len(tooth_tag)
             tooth_flag = np.isin(quad_mesh.celldata["cell_tooth_tag"], tooth_tag)
 
-            cell_flag_left = is_bd_cell & domain_flag_left & tooth_flag
             cell_flag_right = is_bd_cell & domain_flag_right & tooth_flag
-
-        # 右侧齿面
-        # TODO: 考虑是否给单元局部起始节点编号加检测，即不一定从 0 和 2 开始
-        cell_idx_right = np.where(cell_flag_right)[0].reshape(folder, -1)[..., 0:n1]
-        tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
-        tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
-        tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 0]
-        tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
+            cell_flag_left = is_bd_cell & domain_flag_left & tooth_flag
 
         # 左侧齿面
-        cell_idx_left = np.flip(np.flip(np.where(cell_flag_left)[0]).reshape(folder, -1)[..., 0:n1], axis=0)
-        tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
-        tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
-        tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 2]
-        tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
+        # TODO: 考虑是否给单元局部起始节点编号加检测，即不一定从 0 和 2 开始
+        if self.gear_type == 1:
+            cell_idx_left = np.where(cell_flag_left)[0].reshape(folder, -1)[..., 0:n1]
+            tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
+            tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 0]
+            tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
+        elif self.gear_type == 2:
+            cell_idx_left = np.flip(np.flip(np.where(cell_flag_left)[0])[..., 0:n1].reshape(folder, -1), axis=0)
+            tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
+            tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 2]
+            tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
+        # 左侧齿面节点所在单元记录
+        left_cell_idx = np.zeros_like(tooth_profile_node_left)
+        left_cell_idx[..., 0, 0:n1] = cell_idx_left[..., :]
+        left_cell_idx[..., 0, -1] = cell_idx_left[..., -1]
+
+        # 右侧齿面
+        if self.gear_type == 1:
+            cell_idx_right = np.flip(np.flip(np.where(cell_flag_right)[0]).reshape(folder, -1)[..., 0:n1], axis=0)
+            tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
+            tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 2]
+            tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
+        elif self.gear_type == 2:
+            cell_idx_right = np.where(cell_flag_right)[0].reshape(folder, -1)[..., 0:n1]
+            tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
+            tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 0]
+            tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
+
+        # 右侧齿面节点所在单元记录
+        right_cell_idx = np.zeros_like(tooth_profile_node_right)
+        right_cell_idx[..., 0, 0:n1] = cell_idx_right[..., :]
+        right_cell_idx[..., 0, -1] = cell_idx_right[..., -1]
 
         for i in range(1, nw + 1):
-            tooth_profile_node_right[..., i, :] = tooth_profile_node_right[..., 0, :] + i * t_NN
             tooth_profile_node_left[..., i, :] = tooth_profile_node_left[..., 0, :] + i * t_NN
+            tooth_profile_node_right[..., i, :] = tooth_profile_node_right[..., 0, :] + i * t_NN
+        for i in range(1, nw):
+            left_cell_idx[..., i, :] = left_cell_idx[..., 0, :] + i * t_NC
+            right_cell_idx[..., i, :] = right_cell_idx[..., 0, :] + i * t_NC
+        left_cell_idx[..., -1, :] = left_cell_idx[..., 0, :] + (nw-1) * t_NC
+        right_cell_idx[..., -1, :] = right_cell_idx[..., 0, :] + (nw-1) * t_NC
+
+        # 计算齿廓节点内法向
+        cell = hex_mesh.cell
+        right_profile_node_face_normal = -get_face_normal_with_reference(hex_node[cell[right_cell_idx.reshape(-1)]], tooth_normal_right)
+        left_profile_node_face_normal = -get_face_normal_with_reference(hex_node[cell[left_cell_idx.reshape(-1)]], tooth_normal_left)
+        right_profile_node_face_normal = right_profile_node_face_normal.reshape(folder, nw + 1, n1 + 1, 3)
+        left_profile_node_face_normal = left_profile_node_face_normal.reshape(folder, nw + 1, n1 + 1, 3)
 
         return (tooth_profile_node_right, tooth_profile_node_left), (
-        hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
+        hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left]), (right_profile_node_face_normal, left_profile_node_face_normal)
 
     def set_target_tooth(self, target_tooth_tag, get_wheel=False):
         if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
@@ -388,39 +446,62 @@ class Gear(ABC):
         total_quad_mesh = self.mesh
         total_hex_mesh = self.hex_mesh
 
-        if get_wheel:
-            total_node = total_quad_mesh.node
-            total_cell = total_quad_mesh.cell
-            total_number_of_nodes = total_quad_mesh.number_of_nodes()
-            total_number_of_cells = total_quad_mesh.number_of_cells()
-            cell_tooth_tag = total_quad_mesh.celldata["cell_tooth_tag"]
-        else:
-            total_node = total_hex_mesh.node
-            total_cell = total_hex_mesh.cell
-            total_number_of_nodes = total_hex_mesh.number_of_nodes()
-            total_number_of_cells = total_hex_mesh.number_of_cells()
-            cell_tooth_tag = total_hex_mesh.celldata["cell_tooth_tag"]
+        # 构建目标齿端面网格
+        total_node = total_quad_mesh.node
+        total_cell = total_quad_mesh.cell
+        total_number_of_nodes = total_quad_mesh.number_of_nodes()
+        total_number_of_cells = total_quad_mesh.number_of_cells()
+        cell_tooth_tag = total_quad_mesh.celldata["cell_tooth_tag"]
+        cell_domain_tag = total_quad_mesh.celldata["cell_domain_tag"]
         # 获取目标齿相关单元
         is_target_cell = np.zeros(total_number_of_cells, dtype=bool)
         for tag in target_tooth_tag:
             is_target_cell |= (cell_tooth_tag == tag)
         target_cell_idx = np.where(is_target_cell)[0]
         target_cell = total_cell[target_cell_idx]
-
         # 标记目标齿面相关节点
         is_target_node = np.zeros(total_number_of_nodes, dtype=bool)
         is_target_node[target_cell] = True
         target_node_idx = np.where(is_target_node)[0]
         target_node = total_node[target_node_idx]
-
         # 构建节点映射
         node_idx_map = np.zeros(total_number_of_nodes, dtype=int)
         node_idx_map[target_node_idx] = np.arange(len(target_node_idx))
         # 单元映射
         target_cell = node_idx_map[target_cell]
+        self.target_quad_mesh = QuadrangleMesh(target_node, target_cell)
+        target_cell_domain_tag = cell_domain_tag.reshape(self.z, -1)[target_tooth_tag]
+        target_cell_tooth_tag = cell_tooth_tag.reshape(self.z, -1)[target_tooth_tag]
+        self.target_quad_mesh.celldata["cell_domain_tag"] = target_cell_domain_tag.reshape(-1)
+        self.target_quad_mesh.celldata["cell_tooth_tag"] = target_cell_tooth_tag.reshape(-1)
 
         if not get_wheel:
-            self.target_hex_mesh = HexahedronMesh(target_node, target_cell)
+            node = target_node
+            cell = target_cell
+            beta = self.beta
+            r = self.r
+            tooth_width = self.tooth_width
+            nw = self.nw
+            rotation_direction = self.rotation_direction
+            # 数据处理，将二维点转换为三维点
+            new_node = np.zeros((len(node), 3))
+            new_node[:, 0:2] = node
+            one_section_node_num = len(new_node)
+
+            # 创建齿轮整体网格
+            # 拉伸节点
+            volume_node = sweep_points(new_node, beta, r, tooth_width, nw, rotation_direction).reshape(-1, 3)
+            # 将端面四边形单元拉伸为六面体单元
+            volume_cell = np.zeros((nw, len(cell), 8), dtype=np.int64)
+            cell_domain_tag = np.zeros((nw, len(cell)))
+            cell_tooth_tag = np.zeros((nw, len(cell)))
+            # 填充单元的节点索引
+            for i in range(nw):
+                volume_cell[i, :, 0:4] = cell + i * one_section_node_num
+                volume_cell[i, :, 4:8] = cell + (i + 1) * one_section_node_num
+            volume_cell = volume_cell.reshape(-1, 8)
+
+            self.target_hex_mesh = HexahedronMesh(volume_node, volume_cell)
         else:
             df = self.d_f
             total_tooth_node_num = len(target_node)
@@ -956,16 +1037,6 @@ class ExternalGear(Gear):
                 np.linspace(key_points[edge[25, 0]], key_points[edge[25, 1]], na2 + 1),
                 np.linspace(key_points[edge[26, 0]], key_points[edge[26, 1]], na1 + 1)
             ]
-            import matplotlib.pyplot as plt
-            # 验证 line
-            fig, ax = plt.subplots()
-            for l in line:
-                ax.plot(l[:, 0], l[:, 1])
-            # l = line[9]
-            # ax.plot(l[:, 0], l[:, 1])
-            plt.axis('equal')
-            plt.axis('off')
-            plt.show()
 
             # 构建子区域半边数据结构
             # boundary_edge = np.array([0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 3, 2, 12, 13])
@@ -2066,11 +2137,6 @@ class InternalGear(Gear):
             t_mesh.celldata['cell_tooth_tag'] = cell_tooth_tag
         else:
             points = self.get_profile_points()
-            import matplotlib.pyplot as plt
-            plt.figure(figsize=(10, 10))
-            plt.plot(points[:31, 0], points[:31, 1], 'o-', label='Profile Points')
-            plt.axis('equal')
-            plt.show()
             # 构建关键点
             angle_kp0 = pi / 2 - 2 * pi / z / 2
             angle_kp4 = pi / 2 + 2 * pi / z / 2
@@ -2228,16 +2294,6 @@ class InternalGear(Gear):
                 r_kp2 * np.concatenate([cos(delta_kp23_17), sin(delta_kp23_17)], axis=1),
                 r_kp2 * np.concatenate([cos(delta_kp17_20), sin(delta_kp17_20)], axis=1)
             ]
-            import matplotlib.pyplot as plt
-            # 验证 line
-            fig, ax = plt.subplots()
-            for l in line:
-                ax.plot(l[:, 0], l[:, 1])
-            # l = line[9]
-            # ax.plot(l[:, 0], l[:, 1])
-            plt.axis('equal')
-            plt.axis('off')
-            plt.show()
 
             # boundary_edge = np.array([0, 1, 2, 6, 30, 31, 7, 5, 4, 3, 8, 9, 10, 11, 28, 29, 12, 13, 14, 15])
             # half_edge = subdomain_divider(line, key_points, edge, boundary_edge)
