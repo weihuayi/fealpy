@@ -511,8 +511,9 @@ class TestGearSystem:
         print(f"node: {node}")
 
         # 齿面上的节点索引和坐标
-        node_indices_tuple, noe_coord_tuple = external_gear.get_profile_node_index(tooth_tag=0)
+        node_indices_tuple, noe_coord_tuple, profile_node_normal = external_gear.get_profile_node_index(tooth_tag=0)
 
+        print(-1)
 
 
 
