@@ -15,11 +15,11 @@ from soptx.opt.utils import solve_mma_subproblem
 class MMAOptions:
     """MMA 算法的配置选项"""
     # 算法控制参数
-    max_iterations: int = 100       # 最大迭代次数
+    max_iterations: int = 200       # 最大迭代次数
     tolerance: float = 0.001        # 收敛容差
 
     # 问题规模参数
-    m: int = 1                         # 约束函数的数量
+    m: int = 1                         # 约束函数的数量, 默认 1 个约束
     n: Optional[int] = None            # 设计变量的数量
 
     # MMA 子问题参数
@@ -62,7 +62,7 @@ class MMAOptimizer(OptimizerBase):
     _ASYMP_INCR = 1.2      # 渐近线矩阵减小的因子
     _ASYMP_DECR = 0.7      # 渐近线矩阵增加的因子
     _MOVE_LIMIT = 0.2      # 移动限制
-    _ALBEFA = 0.1          # 计算边界 alpha 和 beta 的因子
+    _ALBEFA = 0.1          # 计算边界 alfa 和 beta 的因子
     _RAA0 = 1e-5           # 函数近似精度的参数
     _EPSILON_MIN = 1e-7    # 最小容差
     
@@ -80,8 +80,6 @@ class MMAOptimizer(OptimizerBase):
         self.options = MMAOptions(**(options or {}))
 
         # 设置问题规模参数的默认值
-        if self.options.m is None:
-            self.options.m = 1  # 默认一个约束
         if self.options.n is None:
             self.options.n = constraint.mesh.number_of_cells()  # 默认使用网格单元数
         
@@ -150,9 +148,19 @@ class MMAOptimizer(OptimizerBase):
                         upp: TensorLike,
                         xold1: TensorLike,
                         xold2: TensorLike) -> TensorLike:
-        """求解 MMA 子问题"""
-        xmin = self.options.xmin
-        xmax = self.options.xmax
+        """求解 MMA 子问题
+        
+        Paramters
+        - df0dx (n, 1): 目标函数的梯度
+        - dfdx (m, n): 约束函数的梯度
+
+        Returns
+        - xmma (n, 1): 当前 MMA 子问题中变量 x_j 的最优值.
+        - low (n, 1): 当前 MMA 子问题中计算和使用的下渐近线.
+        - upp (n, 1): 当前 MMA 子问题中计算和使用的上渐近线.
+        """
+        xmin = self.options.xmin # (n, )
+        xmax = self.options.xmax # (n, )
         m = self.options.m    # 使用配置的约束数量
         n = self.options.n    # 使用配置的设计变量数量
 
@@ -166,27 +174,27 @@ class MMAOptimizer(OptimizerBase):
         raa0 = self._RAA0       # 1e-5   
         epsimin = self._EPSILON_MIN
 
-        eeen = bm.ones((n, 1), dtype=bm.float64)
-        eeem = bm.ones((m, 1), dtype=bm.float64)
+        eeen = bm.ones((n, 1), dtype=bm.float64) # (n, 1)
+        eeem = bm.ones((m, 1), dtype=bm.float64) # (m, 1)
         
         # 更新渐近线
-        low, upp = self._update_asymptotes(xval, xmin, xmax, xold1, xold2) # (NC, 1), (NC, 1)
+        low, upp = self._update_asymptotes(xval, xmin, xmax, xold1, xold2) # (n, 1), (n, 1)
         
-        # 计算变量边界 alpha, beta
+        # 计算变量边界 alfa, beta
         xxx1 = low + albefa * (xval - low)
         xxx2 = xval - move * (xmax - xmin)
         xxx = bm.maximum(xxx1, xxx2)
-        alpha = bm.maximum(xmin, xxx)      # (NC, 1) 
+        alfa = bm.maximum(xmin, xxx)       # (n, 1) 
         xxx1 = upp - albefa * (upp - xval)
         xxx2 = xval + move * (xmax - xmin)
         xxx = bm.minimum(xxx1, xxx2)
-        beta = bm.minimum(xmax, xxx)       # (NC, 1)
+        beta = bm.minimum(xmax, xxx)       # (n, 1)
 
         # 计算 p0, q0 构建目标函数的近似
-        xmami = xmax - xmin
+        xmami = xmax - xmin # (n, 1)
         xmami_eps = raa0 * eeen
         xmami = bm.maximum(xmami, xmami_eps)
-        xmami_inv = eeen / xmami
+        xmami_inv = eeen / xmami # (n, 1)
         ux1 = upp - xval
         xl1 = xval - low
         ux2 = ux1 * ux1
@@ -198,8 +206,8 @@ class MMAOptimizer(OptimizerBase):
         pq0 = 0.001 * (p0 + q0) + raa0 * xmami_inv
         p0 = p0 + pq0
         q0 = q0 + pq0
-        p0 = p0 * ux2 # (NC, 1)
-        q0 = q0 * xl2 # (NC, 1)
+        p0 = p0 * ux2 # (n, 1)
+        q0 = q0 * xl2 # (n, 1)
         # 构建 P, Q 和 b 构建约束函数的近似
         P = bm.zeros((m, n), dtype=bm.float64)
         Q = bm.zeros((m, n), dtype=bm.float64)
@@ -208,8 +216,9 @@ class MMAOptimizer(OptimizerBase):
         PQ = 0.001 * (P + Q) + raa0 * bm.dot(eeem, xmami_inv.T)
         P = P + PQ
         Q = Q + PQ
-        P = (bm.linalg.diags(ux2.flatten(), 0) @ P.T).T # (1, NC)
-        Q = (bm.linalg.diags(xl2.flatten(), 0) @ Q.T).T # (1, NC)
+        # TODO 使用 einsum 替代对角矩阵乘法
+        P = bm.einsum('j, ij -> ij', ux2.flatten(), P)
+        Q = bm.einsum('j, ij -> ij', xl2.flatten(), Q)
         # from numpy import diag as diags
         # P = (diags(ux2.flatten(), 0) @ P.T).T
         # Q = (diags(xl2.flatten(), 0) @ Q.T).T
@@ -217,10 +226,13 @@ class MMAOptimizer(OptimizerBase):
         
         # 求解子问题
         xmma, ymma, zmma, lam, xsi, eta, mu, zet, s = solve_mma_subproblem(
-                                                            m, n, epsimin, low, upp, alpha, beta,
-                                                            p0, q0, P, Q,
-                                                            a0, a, b, c, d
-                                                        )
+                                                        m=m, n=n, 
+                                                        epsimin=epsimin, 
+                                                        low=low, upp=upp, 
+                                                        alfa=alfa, beta=beta,
+                                                        p0=p0, q0=q0, P=P, Q=Q,
+                                                        a0=a0, a=a, b=b, c=c, d=d
+                                                    )
         
         return xmma.reshape(-1), low, upp
         
@@ -255,7 +267,7 @@ class MMAOptimizer(OptimizerBase):
             
             # 计算目标函数值和梯度
             obj_val = self.objective.fun(rho_phys)
-            obj_grad = self.objective.jac(rho_phys)
+            obj_grad = self.objective.jac(rho_phys) # (NC, )
             if self.filter is not None:
                 obj_grad = self.filter.filter_sensitivity(
                                         obj_grad, rho_phys, 'objective', filter_params)
@@ -270,7 +282,7 @@ class MMAOptimizer(OptimizerBase):
             # MMA 方法
             volfrac = self.constraint.volume_fraction
             # 体积约束对设计变量的标准化梯度
-            dfdx = con_grad[:, None].T / (volfrac * con_grad.shape[0]) # (1, NC)
+            dfdx = con_grad[:, None].T / (volfrac * con_grad.shape[0]) # (m, n)
             rho_new, low, upp = self._solve_subproblem(
                                         rho[:, None], fval=con_val, 
                                         df0dx=obj_grad[:, None], dfdx=dfdx, 
