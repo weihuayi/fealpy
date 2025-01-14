@@ -343,8 +343,19 @@ class Gear(ABC):
         hex_node = hex_mesh.node
 
         is_bd_cell = quad_mesh.boundary_cell_flag()
-        domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 6
-        domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 5
+        if self.gear_type == 1:
+            if self.is_max_angle:
+                domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 7
+                domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 6
+            else:
+                domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 6
+                domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 5
+        elif self.gear_type == 2:
+                domain_flag_right = quad_mesh.celldata["cell_domain_tag"] == 6
+                domain_flag_left = quad_mesh.celldata["cell_domain_tag"] == 8
+        else:
+            raise ValueError('The gear type is not set.')
+
         if tooth_tag is None:
             folder = self.z
             cell_flag_right = is_bd_cell & domain_flag_right
@@ -358,22 +369,37 @@ class Gear(ABC):
 
         # 左侧齿面
         # TODO: 考虑是否给单元局部起始节点编号加检测，即不一定从 0 和 2 开始
-        cell_idx_left = np.where(cell_flag_left)[0].reshape(folder, -1)[..., 0:n1]
-        tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
-        tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
-        tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 0]
-        tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
+        if self.gear_type == 1:
+            cell_idx_left = np.where(cell_flag_left)[0].reshape(folder, -1)[..., 0:n1]
+            tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
+            tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 0]
+            tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
+        elif self.gear_type == 2:
+            cell_idx_left = np.flip(np.flip(np.where(cell_flag_left)[0])[..., 0:n1].reshape(folder, -1), axis=0)
+            tooth_profile_cell_left = quad_mesh.cell[cell_idx_left]
+            tooth_profile_node_left = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_left[..., 0, 0:n1] = tooth_profile_cell_left[..., :, 2]
+            tooth_profile_node_left[..., 0, -1] = tooth_profile_cell_left[..., -1, 1]
         # 左侧齿面节点所在单元记录
         left_cell_idx = np.zeros_like(tooth_profile_node_left)
         left_cell_idx[..., 0, 0:n1] = cell_idx_left[..., :]
         left_cell_idx[..., 0, -1] = cell_idx_left[..., -1]
 
         # 右侧齿面
-        cell_idx_right = np.flip(np.flip(np.where(cell_flag_right)[0]).reshape(folder, -1)[..., 0:n1], axis=0)
-        tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
-        tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
-        tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 2]
-        tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
+        if self.gear_type == 1:
+            cell_idx_right = np.flip(np.flip(np.where(cell_flag_right)[0]).reshape(folder, -1)[..., 0:n1], axis=0)
+            tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
+            tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 2]
+            tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
+        elif self.gear_type == 2:
+            cell_idx_right = np.where(cell_flag_right)[0].reshape(folder, -1)[..., 0:n1]
+            tooth_profile_cell_right = quad_mesh.cell[cell_idx_right]
+            tooth_profile_node_right = np.zeros((folder, nw + 1, n1 + 1), dtype=np.int32)
+            tooth_profile_node_right[..., 0, 0:n1] = tooth_profile_cell_right[..., :, 0]
+            tooth_profile_node_right[..., 0, -1] = tooth_profile_cell_right[..., -1, 1]
+
         # 右侧齿面节点所在单元记录
         right_cell_idx = np.zeros_like(tooth_profile_node_right)
         right_cell_idx[..., 0, 0:n1] = cell_idx_right[..., :]
