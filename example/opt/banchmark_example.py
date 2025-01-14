@@ -20,7 +20,7 @@ MaxIters = 1000
 dim = 30
 x0 = initialize(NP, dim, ub, lb, way=2)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
-optimizer = ArtificialRabbitsOpt(option)
+optimizer = ParticleSwarmOpt(option)
 optimizer.run()
 optimizer.plot_curve("WhaleOptAlg")
 optimizer.plot_plpt_percen()
