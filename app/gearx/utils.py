@@ -717,3 +717,31 @@ def face_normal_bilinear(cell_nodes, u, v, w, error=1e-3, is_normalize=True):
         return normal
     else:
         return np.cross(Pu, Pv)
+
+# 给定参考法向计算某点的法向
+def get_face_normal_with_reference(cell, reference_normal, error=1e-3, is_normalize=True):
+    '''
+    给定一组六面体单元，以及一个参考法向，计算该单元的六个面的法向，并返回与参考法向最接近的法向
+    :param cell: 计算单元
+    :param reference_normal: 参考法向
+    :param error: 误差限制
+    :param is_normalize: 是否归一化
+    '''
+    NC = cell.shape[0]
+    face_normal = np.zeros((NC, 3))
+    parameters = np.array([
+        [0.5, 0.5, 0],
+        [0.5, 0, 0.5],
+        [0, 0.5, 0.5],
+        [0.5, 0.5, 1],
+        [0.5, 1, 0.5],
+        [1, 0.5, 0.5]
+    ])
+    for i in range(NC):
+        for j in range(6):
+            temp_normal = face_normal_bilinear(cell[i], parameters[j, 0], parameters[j, 1], parameters[j, 2], error, is_normalize)
+            vec_err = np.sqrt(np.sum((temp_normal.reshape(-1) - reference_normal)**2))
+            if vec_err < error:
+                face_normal[i] = temp_normal
+                break
+    return face_normal

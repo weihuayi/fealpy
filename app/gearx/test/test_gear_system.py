@@ -35,6 +35,14 @@ class TestGearSystem:
         nw = data['nw']
         tooth_width = data['tooth_width']
         inner_diam = data['inner_diam']  # 轮缘内径
+        # m_n = 2.25
+        # z = 64
+        # alpha_n = 17.5
+        # beta = 30
+        # x_n = 0.4
+        # hac = 1
+        # cc = 1.4
+        # inner_diam = 10
         chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
 
         external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia,
@@ -43,7 +51,7 @@ class TestGearSystem:
         quad_mesh = external_gear.generate_mesh()
         # quad_mesh.to_vtk(fname='../data/external_quad_mesh.vtu')
         hex_mesh = external_gear.generate_hexahedron_mesh()
-        hex_mesh.to_vtk(fname='../data/test_param_external_hex_mesh.vtu')
+        # hex_mesh.to_vtk(fname='../data/test_param_external_hex_mesh.vtu')
         #
         # with open('external_gear.pkl', 'wb') as f:
         #     pickle.dump({'quad_mesh': quad_mesh, 'gear': external_gear, 'hex_mesh': hex_mesh}, f)
@@ -54,8 +62,8 @@ class TestGearSystem:
         # quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
         # quad_mesh_from_cpp.to_vtk(fname='external_quad_mesh_cpp.vtu')
 
-        # with open('../data/external_gear.pkl', 'wb') as f:
-        #     pickle.dump({'external_gear': external_gear, 'hex_mesh': hex_mesh, 'quad_mesh': quad_mesh}, f)
+        with open('../data/external_gear_new.pkl', 'wb') as f:
+            pickle.dump({'external_gear': external_gear, 'hex_mesh': hex_mesh, 'quad_mesh': quad_mesh}, f)
 
     def test_internal_gear(self):
         with open('../data/internal_gear_data.json', 'r') as file:
@@ -83,6 +91,9 @@ class TestGearSystem:
         internal_gear = InternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
                                      xn_cutter, tooth_width)
 
+        hex_mesh = internal_gear.generate_hexahedron_mesh()
+        hex_mesh.to_vtk(fname='../data/test_param_internal_hex_mesh.vtu')
+
         t = np.array([0.1, 0.2, 25])
         p1 = internal_gear.get_involute_points(t)
         p1_dis = internal_gear.get_tip_intersection_points(t)
@@ -98,7 +109,7 @@ class TestGearSystem:
 
         # p = internal_gear.get_profile_points()
 
-        quad_mesh = internal_gear.generate_mesh()
+        # quad_mesh = internal_gear.generate_mesh()
         # quad_mesh.to_vtk(fname='../data/internal_quad_mesh.vtu')
         # r = internal_gear.r
         # # hex_mesh = generate_hexahedral_mesh(quad_mesh, internal_gear.beta, r, tooth_width, nw)
@@ -479,6 +490,47 @@ class TestGearSystem:
 
         part_external_gear_mesh.to_vtk(fname='../data/part_external_gear_mesh.vtu')
         part_external_gear_mesh_wheel.to_vtk(fname='../data/part_external_gear_hex_mesh_wheel.vtu')
+
+    def test_get_profile_face_normal(self):
+        with open('../data/external_gear_new.pkl', 'rb') as f:
+            data = pickle.load(f)
+        external_gear = data['external_gear']
+        hex_mesh = data['hex_mesh']
+        quad_mesh = data['quad_mesh']
+
+        mesh = external_gear.set_target_tooth([0, 1, 18])
+
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        print(f"NC: {NC}")
+        NN = mesh.number_of_nodes()
+        print(f"NN: {NN}")
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        print(f"cell: {cell}")
+        print(f"node: {node}")
+
+        # 齿面上的节点索引和坐标
+        node_indices_tuple, noe_coord_tuple = external_gear.get_profile_node_index(tooth_tag=0)
+        node_indices_right = node_indices_tuple[0].reshape(-1, 1)
+        node_indices_left = node_indices_tuple[1].reshape(-1, 1)
+        node_indices = np.concatenate([node_indices_right, node_indices_left], axis=0)  # (NPN, 1)
+        node_coord_right = noe_coord_tuple[0].reshape(-1, 3)
+        node_coord_left = noe_coord_tuple[1].reshape(-1, 3)
+        node_coord = np.concatenate([node_coord_right, node_coord_left], axis=0)  # (NPN, GD)
+        # 齿面上的节点数
+        NPN = node_indices.shape[0]
+        # TODO 齿面上节点的内法线方向
+        face_normal = np.zeros((NPN, 3), np.float64)
+        for i, t_node in enumerate(node_coord):
+            t1, face_normal[i], t2 = external_gear.find_node_location_kd_tree(t_node)
+        average_normal = np.mean(face_normal, axis=0)
+        average_normal /= np.linalg.norm(average_normal)
+        threshold = 0.1
+        for i in range(len(face_normal)):
+            deviation = np.linalg.norm(face_normal[i] - average_normal)
+            if deviation > threshold:
+                face_normal[i] = average_normal
 
 
 
