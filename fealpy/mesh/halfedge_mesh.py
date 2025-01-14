@@ -181,7 +181,8 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
     def entity(self, etype=2, index=_S):
         if etype in {'cell', 2}:
-            return self.cell_to_node()[index]
+            #return self.cell_to_node()[index]
+            return self.halfedge
         elif etype in {'edge', 'face', 1}:
             return self.edge_to_node()[index]
         elif etype in {'halfedge'}:

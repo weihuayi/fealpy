@@ -99,7 +99,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         c2id = bm.arange(NN*ndof + NE*eidof,
                 NN*ndof+NE*eidof+NC*cidof,dtype=self.itype, device=self.device).reshape(NC, cidof)
         return c2id
-    def cell_to_dof(self):
+    def cell_to_dof(self, index=_S):
         p = self.p
         m = self.m
         mesh = self.mesh
@@ -132,7 +132,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     N+n0:N+n0+n1],axis=1)
                 n0 += n1
                 n1 += 1
-        return c2d
+        return c2d[index]
     def is_boundary_dof(self, threshold, method="interp"): #TODO:这个threshold 没有实现
         p = self.p
         m = self.m
