@@ -2,7 +2,6 @@ import pickle
 import json
 import numpy as np
 import pandas as pd
-from jax.experimental.array_api import reshape
 from numpy import tan, arctan, sin, cos, pi, arctan2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -499,6 +498,7 @@ class TestGearSystem:
         quad_mesh = data['quad_mesh']
 
         mesh = external_gear.set_target_tooth([0, 1, 18])
+        # mesh.to_vtk(fname='../data/face_normal_target_hex_mesh.vtu')
 
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
@@ -512,25 +512,6 @@ class TestGearSystem:
 
         # 齿面上的节点索引和坐标
         node_indices_tuple, noe_coord_tuple = external_gear.get_profile_node_index(tooth_tag=0)
-        node_indices_right = node_indices_tuple[0].reshape(-1, 1)
-        node_indices_left = node_indices_tuple[1].reshape(-1, 1)
-        node_indices = np.concatenate([node_indices_right, node_indices_left], axis=0)  # (NPN, 1)
-        node_coord_right = noe_coord_tuple[0].reshape(-1, 3)
-        node_coord_left = noe_coord_tuple[1].reshape(-1, 3)
-        node_coord = np.concatenate([node_coord_right, node_coord_left], axis=0)  # (NPN, GD)
-        # 齿面上的节点数
-        NPN = node_indices.shape[0]
-        # TODO 齿面上节点的内法线方向
-        face_normal = np.zeros((NPN, 3), np.float64)
-        for i, t_node in enumerate(node_coord):
-            t1, face_normal[i], t2 = external_gear.find_node_location_kd_tree(t_node)
-        average_normal = np.mean(face_normal, axis=0)
-        average_normal /= np.linalg.norm(average_normal)
-        threshold = 0.1
-        for i in range(len(face_normal)):
-            deviation = np.linalg.norm(face_normal[i] - average_normal)
-            if deviation > threshold:
-                face_normal[i] = average_normal
 
 
 

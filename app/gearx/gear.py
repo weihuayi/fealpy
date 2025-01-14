@@ -313,8 +313,14 @@ class Gear(ABC):
         :param tooth_tag: 目标齿编号，默认为 None，即所有齿
         :return: 齿廓节点索引及坐标
         """
-        if not hasattr(self, 'hex_mesh'):
-            raise ValueError('The hex_mesh attribute is not set.')
+        if not hasattr(self, 'target_hex_mesh'):
+            if not hasattr(self, 'hex_mesh'):
+                raise ValueError('The hex_mesh attribute is not set.')
+            quad_mesh = self.mesh
+            hex_mesh = self.hex_mesh
+        else:
+            quad_mesh = self.target_quad_mesh
+            hex_mesh = self.target_hex_mesh
         # tooth_tag 输入类型检测，只能是整数或整数列表，并将其转换为列表
         if tooth_tag is not None:
             if isinstance(tooth_tag, int):
@@ -329,8 +335,7 @@ class Gear(ABC):
         tooth_normal_right = np.array([0, np.cos(rotation), -np.sin(rotation)])
         tooth_normal_left = np.array([0, -np.cos(rotation), np.sin(rotation)])
 
-        quad_mesh = self.target_quad_mesh
-        hex_mesh = self.target_hex_mesh
+
         t_NN = quad_mesh.number_of_nodes()
         t_NC = quad_mesh.number_of_cells()
         n1 = self.n1
@@ -385,11 +390,13 @@ class Gear(ABC):
 
         # 计算齿廓节点内法向
         cell = hex_mesh.cell
-        right_profile_node_face_normal = get_face_normal_with_reference(hex_mesh[right_cell_idx], tooth_normal_right)
-        left_profile_node_face_normal = get_face_normal_with_reference(hex_mesh[left_cell_idx], tooth_normal_left)
+        right_profile_node_face_normal = -get_face_normal_with_reference(hex_node[cell[right_cell_idx.reshape(-1)]], tooth_normal_right)
+        left_profile_node_face_normal = -get_face_normal_with_reference(hex_node[cell[left_cell_idx.reshape(-1)]], tooth_normal_left)
+        right_profile_node_face_normal = right_profile_node_face_normal.reshape(folder, nw + 1, n1 + 1, 3)
+        left_profile_node_face_normal = left_profile_node_face_normal.reshape(folder, nw + 1, n1 + 1, 3)
 
         return (tooth_profile_node_right, tooth_profile_node_left), (
-        hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left])
+        hex_node[tooth_profile_node_right], hex_node[tooth_profile_node_left]), (right_profile_node_face_normal, left_profile_node_face_normal)
 
     def set_target_tooth(self, target_tooth_tag, get_wheel=False):
         if not hasattr(self, 'hex_mesh') or self.hex_mesh is None:
