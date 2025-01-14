@@ -18,7 +18,7 @@ from .integrator import (
 
 class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
-    def __init__(self, m: int=2,coef: Optional[CoefLike]=None, q:
+    def __init__(self, m: int=1,coef: Optional[CoefLike]=None, q:
             Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
@@ -50,7 +50,10 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        gmphi = space.grad_m_basis(bcs, m=m)
+        if self.m==0:
+            gmphi = space.basis(bcs)
+        else:
+            gmphi = space.grad_m_basis(bcs, m=m)
         return bcs, ws, gmphi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:
@@ -58,14 +61,18 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         device = bm.get_device(mesh.cell)
-        GD = mesh.geo_dimension()
-        idx = bm.array(mesh.multi_index_matrix(m, GD-1))
-        idx_cpu = bm.to_numpy(idx)
-        num = factorial(m)/bm.prod(bm.array(factorial(idx_cpu), device=device), axis=1)
         bcs, ws, gmphi, cm, index = self.fetch(space)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell',
                                  index=index)
-        M = bm.einsum('cqlg,cqmg,g,q,c->clm',gmphi,gmphi,num,ws,cm)
+        if self.m==0:
+            M = bm.einsum('cql,cqm,q,c->clm',gmphi,gmphi,ws,cm)
+        else:
+            GD = mesh.geo_dimension()
+            idx = bm.array(mesh.multi_index_matrix(m, GD-1))
+            idx_cpu = bm.to_numpy(idx)
+            num = factorial(m)/bm.prod(bm.array(factorial(idx_cpu), device=device), axis=1)
+
+            M = bm.einsum('cqlg,cqmg,g,q,c->clm',gmphi,gmphi,num,ws,cm)
         return M
     #return bilinear_integral(gmphi1, gmphi, ws, cm, coef,
     #                             batched=self.batched)
