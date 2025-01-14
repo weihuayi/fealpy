@@ -16,10 +16,10 @@ class ChannelFlow:
         self.eps = eps
         self.rho = rho
         self.mu = mu
+        self.R = 1
     
-    def mesh(self, n=16):
-        box = [0, 1, 0, 1, 0, 1]
-        mesh = TetrahedronMesh.from_cylinder_gmsh(0.5, 3, 0.1)
+    def mesh(self, lc):
+        mesh = TetrahedronMesh.from_cylinder_gmsh(0.5, 3, lc)
         return mesh
     
     @cartesian
@@ -27,28 +27,27 @@ class ChannelFlow:
         x = p[...,0]
         y = p[...,1]
         z = p[...,2]
-        value = np.zeros(p.shape)
-        value[...,0] = 4*y*(1-y)
+        value = bm.zeros(p.shape)
         return value
     
     @cartesian
     def pressure(self, p):
-        x = p[..., 0]
-        val = 8*(1-x) 
+        z = p[..., 2]
+        val = 8*(3-z) 
         return val
     
     @cartesian
     def is_p_boundary(self, p):
-        tag_left = np.abs(p[..., 0]) < self.eps
-        tag_right = np.abs(p[..., 0] - 1.0) < self.eps
+        tag_left = bm.abs(p[..., 2]) < self.eps
+        tag_right = bm.abs(p[..., 2] - 3.0) < self.eps
         return tag_left | tag_right
 
     @cartesian
-    def is_wall_boundary(self, p):
-        tag_up = np.abs(p[..., 2] - 1.0) < self.eps
-        tag_down = np.abs(p[..., 2]) < self.eps
-        tag_front = np.abs(p[..., 1] - 1) < self.eps
-        tag_back = np.abs(p[..., 1]) < self.eps
-        return tag_up | tag_down | tag_front | tag_back
+    def is_u_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        tag = self.is_p_boundary(p)
+        return ~tag
 
 

@@ -140,7 +140,7 @@ class Filter:
 
                 return modified_gradient
             else:
-                # 约束函数梯度不做修改
+                # 约束函数的梯度不做修改
                 return gradient
                 
         elif self.config.filter_type == FilterType.DENSITY:

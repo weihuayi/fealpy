@@ -190,6 +190,9 @@ FUNCTION_MAPPING = _make_default_mapping(
     # python array API standard v2023.12
     'argmax', 'argmin', 'nonzero', 'searchsorted', 'where',
 
+    # non-standard
+    'bincount', 'isin',
+
     ### Set Functions ###
     # python array API standard v2023.12
     'unique_all', 'unique_counts', 'unique_inverse', 'unique_values',

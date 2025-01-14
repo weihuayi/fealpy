@@ -35,15 +35,22 @@ class HippopotamusOptAlg(Optimizer):
         options = self.options
         x = options["x0"]
         N = options["NP"]
-        fit = self.fun(x)[:, None]
+        fit = self.fun(x)
         MaxIT = options["MaxIters"]
         dim = options["ndim"]
         lb, ub = options["domain"]
         gbest_idx = bm.argmin(fit)
-        gbest_f = fit[gbest_idx]
-        gbest = x[gbest_idx].reshape(1, -1)
-        # Convergence_curve = bm.zeros([1, MaxIT])
+        self.gbest_f = fit[gbest_idx]
+        self.gbest = x[gbest_idx].reshape(1, -1)
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
         for it in range(0, MaxIT):
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
+            # exploration percentage and exploitation percentage
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
+            
             T = bm.exp(bm.array(it / MaxIT)) # Eq.(5)
             i1 = bm.array(int(N / 2))
             I1 = bm.random.randint(1, 3, (i1, 1)) 
@@ -66,46 +73,48 @@ class HippopotamusOptAlg(Optimizer):
                 RandGroup = bm.unique(bm.random.randint(0, N - 1, (RandGroupNumber[i],)))
                 MeanGroup[i] = x[RandGroup].mean(axis=0)
 
-            X_P1 = x[: i1] + bm.random.rand(i1 ,1) * (gbest - I1 * x[: i1]) # Eq.(3)
+            X_P1 = x[: i1] + bm.random.rand(i1 ,1) * (self.gbest - I1 * x[: i1]) # Eq.(3)
             X_P1 = X_P1 + (lb - X_P1) * (X_P1 < lb) + (ub - X_P1) * (X_P1 > ub)
-            F_P1 = self.fun(X_P1)[:, None]
+            F_P1 = self.fun(X_P1)
 
             # Eq.(8)
             mask = F_P1 < fit[: i1]
-            x[: i1], fit[: i1] = bm.where(mask, X_P1, x[: i1]), bm.where(mask, F_P1, fit[: i1])
+            x[: i1], fit[: i1] = bm.where(mask[:, None], X_P1, x[: i1]), bm.where(mask, F_P1, fit[: i1])
 
             if T > 0.6:
-                X_P2 = x[: i1] + A * (gbest - I2 * MeanGroup) # Eq.(6)
+                X_P2 = x[: i1] + A * (self.gbest - I2 * MeanGroup) # Eq.(6)
             else:
                 r2 = bm.random.rand(i1, 1)
                 # Eq.(7)
                 X_P2 = ((r2 > 0.5) * 
-                        (x[: i1] + B * (MeanGroup - gbest)) + 
+                        (x[: i1] + B * (MeanGroup - self.gbest)) + 
                         (r2 <= 0.5) * 
                         (lb + bm.random.rand(i1, 1) * (ub - lb)))
             X_P2 = X_P2 + (lb - X_P2) * (X_P2 < lb) + (ub - X_P2) * (X_P2 > ub)
-            F_P2 = self.fun(X_P2)[:, None]   
+            F_P2 = self.fun(X_P2)  
             
             # Eq.(9)
             mask = F_P2 < fit[: i1]
-            x[: i1], fit[: i1] = bm.where(mask, X_P2, x[: i1]), bm.where(mask, F_P2, fit[: i1])
+            x[: i1], fit[: i1] = bm.where(mask[:, None], X_P2, x[: i1]), bm.where(mask, F_P2, fit[: i1])
 
             predator = lb + bm.random.rand(i1, dim) * (ub - lb) # Eq.(10)
-            F_HL = self.fun(predator)[:, None]
+            F_HL = self.fun(predator)
             distance2Leader = abs(predator - x[i1:]) # Eq.(11)
             RL = 0.05 * levy(i1, dim, 1.5) # Eq.(13)
 
             # Eq.(12)
-            X_P3 = ((fit[i1:] > F_HL) * 
-                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / distance2Leader) + 
-                    (fit[i1:] <= F_HL) * 
-                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / (bm.random.rand(i1, dim) + 2 * distance2Leader)))
+            X_P3 = ((fit[i1:] > F_HL)[:, None] * 
+                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - 
+                    (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / distance2Leader) + 
+                    (fit[i1:] <= F_HL)[:, None] * 
+                    (RL * predator + (bm.random.rand(i1, 1) * 2 + 2) / ((bm.random.rand(i1, 1) * 0.5 + 1 ) - 
+                    (bm.random.rand(i1, 1) + 2) * bm.cos(2 * bm.pi * (bm.random.rand(i1, 1) * 2 - 1))) / (bm.random.rand(i1, dim) + 2 * distance2Leader)))
             X_P3 = X_P3 + (lb - X_P3) * (X_P3 < lb) + (ub - X_P3) * (X_P3 > ub)
-            F_P3 = self.fun(X_P3)[:, None]
+            F_P3 = self.fun(X_P3)
 
             # Eq.(15)
             mask = F_P3 < fit[: i1]
-            x[: i1] , fit[: i1] = bm.where(mask, X_P3, x[: i1]), bm.where(mask, F_P3, fit[: i1])
+            x[: i1] , fit[: i1] = bm.where(mask[:, None], X_P3, x[: i1]), bm.where(mask, F_P3, fit[: i1])
 
             # Eq.(16)
             l_local = lb / (it + 1)
@@ -121,13 +130,11 @@ class HippopotamusOptAlg(Optimizer):
 
             X_P4 = x + bm.random.rand(N, 1) * (l_local + D * (h_local - l_local)) # Eq.(17)
             X_P4 = X_P4 + (lb - X_P4) * (X_P4 < lb) + (ub - X_P4) * (X_P4 > ub)
-            F_P4 = self.fun(X_P4)[:, None]
+            F_P4 = self.fun(X_P4)
 
             # Eq.(19)
             mask = F_P4 < fit
-            x , fit = bm.where(mask, X_P4, x), bm.where(mask, F_P4, fit)
+            x , fit = bm.where(mask[:, None], X_P4, x), bm.where(mask, F_P4, fit)
 
-            gbest_idx = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            # Convergence_curve[0, it] = bm.copy(gbest_f[0])
-        return gbest[0], gbest_f
+            self.update_gbest(x, fit)
+            self.curve[it] = self.gbest_f

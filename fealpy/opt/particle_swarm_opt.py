@@ -15,7 +15,7 @@ class ParticleSwarmOpt(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
+    def run(self, c1=2, c2=2, w_max=0.9, w_min=0.4):
         options = self.options
         a = options["x0"]
         N = options["NP"]
@@ -26,25 +26,26 @@ class ParticleSwarmOpt(Optimizer):
         pbest = bm.copy(a)
         pbest_f = bm.copy(fit)
         gbest_index = bm.argmin(pbest_f)
-        gbest = pbest[gbest_index]
-        gbest_f = pbest_f[gbest_index]
-        c1 = 2
-        c2 = 2
-        w = 0.9
+        self.gbest = pbest[gbest_index]
+        self.gbest_f = pbest_f[gbest_index]
+        self.curve = bm.zeros((MaxIT,))
+        self.D_pl = bm.zeros((MaxIT,))
+        self.D_pt = bm.zeros((MaxIT,))
+        self.Div = bm.zeros((1, MaxIT))
         v = bm.zeros((N, dim))
         vlb, ulb = 0.2 * lb, 0.2 * ub
         for it in range(0, MaxIT):
-            w = 0.9 - 0.4 * (it / MaxIT)
-            r1 = bm.random.rand(N, 1)
-            r2 = bm.random.rand(N, 1)
-            v = w * v + c1 * r1 * (pbest - a) + c2 * r2 * (gbest - a)
+            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(a, axis=0) - a))/N)
+            # exploration percentage and exploitation percentage
+            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
+            
+            w = w_max - w_min * (it / MaxIT)
+            v = w * v + c1 * bm.random.rand(N, dim) * (pbest - a) + c2 * bm.random.rand(N, dim) * (self.gbest - a)
             v = v + (vlb - v) * (v < vlb) + (ulb - v) * (v > ulb)
             a = a + v
             a = a + (lb - a) * (a < lb) + (ub - a) * (a > ub)
             fit = self.fun(a)
             mask = fit < pbest_f
             pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
-            gbest_idx = bm.argmin(pbest_f)
-            (gbest_f, gbest) = (pbest_f[gbest_idx], pbest[gbest_idx]) if pbest_f[gbest_idx] < gbest_f else (gbest_f, gbest)
-            # print("PSO: The optimum at iteration", it + 1, "is", gbest_f)
-        return gbest, gbest_f
+            self.update_gbest(pbest, pbest_f)
+            self.curve[it] = self.gbest_f

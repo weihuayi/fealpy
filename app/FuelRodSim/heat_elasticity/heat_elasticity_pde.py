@@ -3,7 +3,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.typing import TensorLike
 
-class Parabolic2dData: 
+class Parabolic2dData(): 
     def __init__(self,u, x, y, t, D=[0, 1, 0, 1], T=[0, 1]):
         self._domain = D 
         self._duration = T 
@@ -44,7 +44,7 @@ class Parabolic2dData:
     def dirichlet(self, p, t):
         return self.solution(p, t)
 
-class Parabolic3dData:
+class Parabolic3dData():
     def __init__(self,u, x, y, z, t, D=[0, 1, 0, 1, 0, 1], T=[0, 1]):
         self._domain = D 
         self._duration = T 
@@ -83,8 +83,6 @@ class Parabolic3dData:
         
         return self.solution(p, t)
     
-# TODO 基于符号计算来写PDE
-
     
 # 平面应变问题
 class BoxDomainPolyData2D():
