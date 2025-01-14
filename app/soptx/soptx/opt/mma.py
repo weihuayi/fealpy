@@ -15,7 +15,7 @@ from soptx.opt.utils import solve_mma_subproblem
 class MMAOptions:
     """MMA 算法的配置选项"""
     # 算法控制参数
-    max_iterations: int = 100       # 最大迭代次数
+    max_iterations: int = 200       # 最大迭代次数
     tolerance: float = 0.001        # 收敛容差
 
     # 问题规模参数
@@ -267,7 +267,7 @@ class MMAOptimizer(OptimizerBase):
             
             # 计算目标函数值和梯度
             obj_val = self.objective.fun(rho_phys)
-            obj_grad = self.objective.jac(rho_phys)
+            obj_grad = self.objective.jac(rho_phys) # (NC, )
             if self.filter is not None:
                 obj_grad = self.filter.filter_sensitivity(
                                         obj_grad, rho_phys, 'objective', filter_params)

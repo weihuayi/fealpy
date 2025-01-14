@@ -42,7 +42,7 @@ def solve_mma_subproblem(m: int, n: int,
     Q (m, n): 约束函数的负梯度项
     a0 (float): 目标函数的线性项 a_0*z 的系数
     a (m, 1): 约束的线性项 a_i*z 的系数
-    b : 约束常数项
+    b (m, 1): 
     c (m, 1): 约束的二次项 c_iy_i 的系数
     d (m, 1): 约束的二次项 0.5*d_i*y_i^2 的系数
     
@@ -73,13 +73,14 @@ def solve_mma_subproblem(m: int, n: int,
     zet = bm.array([[1.0]])
     s = bm.copy(eem)
 
-    epsi = 1    
-    epsvecn = epsi * een
-    epsvecm = epsi * eem
+    epsi = 1 # 松弛参数, 每次外循环迭代中逐步减小   
+    epsvecn = epsi * een # (m, 1)
+    epsvecm = epsi * eem # (n, 1)
+    # 外循环迭代: 逐步减小松弛参数 epsi
     itera = 0
     while epsi > epsimin:
-        epsvecn = epsi * een
-        epsvecm = epsi * eem
+        epsvecn = epsi * een # (m, 1)
+        epsvecm = epsi * eem # (n, 1)
         ux1 = upp - x
         xl1 = x - low
         ux2 = ux1 * ux1
@@ -87,34 +88,34 @@ def solve_mma_subproblem(m: int, n: int,
         uxinv1 = een / ux1
         xlinv1 = een / xl1
 
-        # 计算梯度和残差
         plam = p0 + bm.dot(P.T, lam)
         qlam = q0 + bm.dot(Q.T, lam)
         gvec = bm.dot(P, uxinv1) + bm.dot(Q, xlinv1)
-        dpsidx = plam/ux2 - qlam/xl2
-        rex = dpsidx - xsi + eta
-        rey = c + d*y - mu - lam
-        rez = a0 - zet - bm.dot(a.T, lam)
-        relam = gvec - a*z - y + s - b
-        rexsi = xsi*(x-alfa) - epsvecn
-        reeta = eta*(beta-x) - epsvecn
-        remu = mu*y - epsvecm
-        rezet = zet*z - epsi
-        res = lam*s - epsvecm
-        
-        residu1 = bm.concatenate((rex, rey, rez), axis=0)
-        residu2 = bm.concatenate((relam, rexsi, reeta, remu, rezet, res), axis=0)
+        dpsidx = plam / ux2 - qlam / xl2
+
+        # 1. 计算 KKT 残差
+        rex = dpsidx - xsi + eta           # (n, 1)
+        rey = c + d*y - mu - lam           # (m, 1) 
+        rez = a0 - zet - bm.dot(a.T, lam)  # (m, 1)
+        relam = gvec - a*z - y + s - b     # (m, 1)
+        rexsi = xsi * (x - alfa) - epsvecn # (n, 1)
+        reeta = eta * (beta - x) - epsvecn # (n, 1)
+        remu = mu * y - epsvecm            # (m, 1)
+        rezet = zet * z - epsi             # (1, 1)
+        res = lam * s - epsvecm            # (m, 1)
+    
+        residu1 = bm.concatenate((rex, rey, rez), axis=0)   # (n+m+m, 1)
+        residu2 = bm.concatenate((relam, rexsi, reeta, remu, rezet, res), axis=0) # (m+n+n+m+1+m, 1)
         residu = bm.concatenate((residu1, residu2), axis=0)
         residunorm = bm.sqrt((bm.dot(residu.T, residu)).item())
         residumax = bm.max(bm.abs(residu))
         
         ittt = 0
-        # 内循环迭代求解 KKT 系统
-        while (residumax > 0.9*epsi) and (ittt < 200):
+        # 内循环迭代: 在固定的 epsi 下求解 KKT 系统
+        while (residumax > 0.9 * epsi) and (ittt < 200):
             ittt = ittt + 1
             itera = itera + 1
             
-            # 计算中间变量
             ux1 = upp - x
             xl1 = x - low
             ux2 = ux1 * ux1
@@ -126,50 +127,52 @@ def solve_mma_subproblem(m: int, n: int,
             uxinv2 = een / ux2 # (n, 1)
             xlinv2 = een / xl2 # (n, 1)
             
-            # 计算梯度矩阵和向量
             plam = p0 + bm.dot(P.T, lam)
             qlam = q0 + bm.dot(Q.T, lam)
             gvec = bm.dot(P, uxinv1) + bm.dot(Q, xlinv1)
+
             # TODO 使用 einsum 替代对角矩阵乘法
             GG = bm.einsum('j, ij -> ij', uxinv2.flatten(), P) - \
                  bm.einsum('j, ij -> ij', xlinv2.flatten(), Q)  # (m, n) 
             # GG = (diags(uxinv2.flatten(), 0).dot(P.T)).T - \
             #      (diags(xlinv2.flatten(), 0).dot(Q.T)).T # (m, n)
             
-            # 计算残差 delta_x, delta_y, delta_z, delta_lambda
+            # 2. 计算 Newton 方向的一阶残差 delta_x, delta_y, delta_z, delta_lambda
             dpsidx = plam / ux2 - qlam / xl2
-            delx = dpsidx - epsvecn/(x-alfa) + epsvecn/(beta-x)
-            dely = c + d*y - lam - epsvecm/y
-            delz = a0 - bm.dot(a.T, lam) - epsi/z
-            dellam = gvec - a*z - y - b + epsvecm/lam
+            delx = dpsidx - epsvecn / (x - alfa) + epsvecn / (beta - x) # (n, 1)
+            dely = c + d * y - lam - epsvecm / y                        # (m, 1)
+            delz = a0 - bm.dot(a.T, lam) - epsi / z                     # (1, 1)
+            dellam = gvec - a * z - y - b + epsvecm / lam               # (m, 1)
             
-            # 计算 Hessian 对角线
-            diagx = plam/ux3 + qlam/xl3
-            diagx = 2*diagx + xsi/(x-alfa) + eta/(beta-x)
+            # 3. 计算 Hessian 的对角线
+            diagx = plam / ux3 + qlam / xl3
+            diagx = 2 * diagx + xsi / (x - alfa) + eta / (beta - x) # (n, 1)
             diagxinv = een / diagx
-            diagy = d + mu / y
+            diagy = d + mu / y                                      # (m, 1)
             diagyinv = eem/diagy
-            diaglam = s / lam
+            diaglam = s / lam                                       # (m, 1)
             diaglamyi = diaglam + diagyinv
             
-            # 求解线性系统
+            # 4. 求解 KKT 线性系统
             if m < n:
-                blam = dellam + dely / diagy - bm.dot(GG, (delx / diagx))
-                bb = bm.concatenate((blam, delz), axis=0)
+                # 选择 (\Delta\lambda, \Delta z) 系统
+                blam = dellam + dely / diagy - bm.dot(GG, (delx / diagx)) # (m, 1)
+                bb = bm.concatenate((blam, delz), axis=0)                 # (m+1, 1)
                 # TODO 使用 einsum 替代对角矩阵乘法
                 D_lamyi = diaglamyi * bm.eye(1)  
                 GD_xG = bm.einsum('ik, k, jk -> ij', GG, diagxinv.flatten(), GG)  
-                Alam = D_lamyi + GD_xG
+                Alam = D_lamyi + GD_xG  # (m, 1)
                 # Alam = bm.asarray(diags(diaglamyi.flatten(), 0) + \
                 #         (diags(diagxinv.flatten(), 0).dot(GG.T).T).dot(GG.T))
-                AAr1 = bm.concatenate((Alam, a), axis=1)
-                AAr2 = bm.concatenate((a, -zet/z), axis=0).T
-                AA = bm.concatenate((AAr1, AAr2), axis=0)
+                AAr1 = bm.concatenate((Alam, a), axis=1)     # (m, m+1)
+                AAr2 = bm.concatenate((a, -zet/z), axis=0).T # (1, m+1)
+                AA = bm.concatenate((AAr1, AAr2), axis=0)    # (m+1, m+1)
                 solut = solve(AA, bb)
                 dlam = solut[0:m]
-                dz = solut[m:m+1]
-                dx = -delx / diagx - bm.dot(GG.T, dlam) / diagx
+                dz = solut[m:m+1]                                # (m, 1)
+                dx = -delx / diagx - bm.dot(GG.T, dlam) / diagx  # (m, 1)
             else:
+                # 选择 (\Delta x, \Delta z) 系统
                 diaglamyiinv = eem / diaglamyi
                 dellamyi = dellam + dely/diagy
                 # TODO 使用 einsum 替代对角矩阵乘法
@@ -184,22 +187,22 @@ def solve_mma_subproblem(m: int, n: int,
                 bz = delz - bm.dot(a.T, (dellamyi/diaglamyi))
                 AAr1 = bm.concatenate((Axx, axz), axis=1)
                 AAr2 = bm.concatenate((axz.T, azz), axis=1)
-                AA = bm.concatenate((AAr1, AAr2), axis=0)
+                AA = bm.concatenate((AAr1, AAr2), axis=0) # (n+1, n+1)
                 bb = bm.concatenate((-bx, -bz), axis=0)
                 solut = solve(AA, bb)
                 dx = solut[0:n]
-                dz = solut[n:n+1]
-                dlam = bm.dot(GG, dx)/diaglamyi - dz*(a/diaglamyi) + dellamyi/diaglamyi
+                dz = solut[n:n+1]                                                               # (m, 1)
+                dlam = bm.dot(GG, dx) / diaglamyi - dz * (a / diaglamyi) + dellamyi / diaglamyi # (m, 1)
                 
             # 计算其他变量的更新
-            dy = -dely/diagy + dlam/diagy
-            dxsi = -xsi + epsvecn/(x-alfa) - (xsi*dx)/(x-alfa)
-            deta = -eta + epsvecn/(beta-x) + (eta*dx)/(beta-x)
-            dmu = -mu + epsvecm/y - (mu*dy)/y
-            dzet = -zet + epsi / z - zet * dz / z
-            ds = -s + epsvecm / lam - (s * dlam) / lam
-            xx = bm.concatenate((y, z, lam, xsi, eta, mu, zet, s), axis=0)
-            dxx = bm.concatenate((dy, dz, dlam, dxsi, deta, dmu, dzet, ds), axis=0)
+            dy = -dely / diagy + dlam / diagy                  # (m, 1)
+            dxsi = -xsi + epsvecn/(x-alfa) - (xsi*dx)/(x-alfa) # (n, 1)
+            deta = -eta + epsvecn/(beta-x) + (eta*dx)/(beta-x) # (n, 1)
+            dmu = -mu + epsvecm / y - (mu * dy) / y            # (m, 1)
+            dzet = -zet + epsi / z - zet * dz / z              # (1, 1)
+            ds = -s + epsvecm / lam - (s * dlam) / lam         # (m, 1)
+            xx = bm.concatenate((y, z, lam, xsi, eta, mu, zet, s), axis=0)          # (m+n+n+m+1+m, 1)
+            dxx = bm.concatenate((dy, dz, dlam, dxsi, deta, dmu, dzet, ds), axis=0) # (m+n+n+m+1+m, 1)
             
             # 步长确定
             stepxx = -1.01 * dxx / xx
@@ -213,7 +216,7 @@ def solve_mma_subproblem(m: int, n: int,
             stminv = max(stmalbexx, 1.0)
             steg = 1.0 / stminv
             
-            # 保存旧值
+            # 更新变量
             xold = bm.copy(x)
             yold = bm.copy(y)
             zold = bm.copy(z)
@@ -226,7 +229,7 @@ def solve_mma_subproblem(m: int, n: int,
             
             # 线搜索
             itto = 0
-            resinew = 2*residunorm
+            resinew = 2 * residunorm
             while (resinew > residunorm) and (itto < 50):
                 itto = itto + 1
                 x = xold + steg*dx
@@ -244,16 +247,18 @@ def solve_mma_subproblem(m: int, n: int,
                 xl2 = xl1 * xl1
                 uxinv1 = een / ux1
                 xlinv1 = een / xl1
+
                 plam = p0 + bm.dot(P.T, lam)
                 qlam = q0 + bm.dot(Q.T, lam)
                 gvec = bm.dot(P, uxinv1) + bm.dot(Q, xlinv1)
                 dpsidx = plam/ux2 - qlam/xl2
+
                 rex = dpsidx - xsi + eta
                 rey = c + d*y - mu - lam
                 rez = a0 - zet - bm.dot(a.T, lam)
                 relam = gvec - a*z - y + s - b
-                rexsi = xsi*(x-alfa) - epsvecn
-                reeta = eta*(beta-x) - epsvecn
+                rexsi = xsi * (x - alfa) - epsvecn
+                reeta = eta * (beta - x) - epsvecn
                 remu = mu * y - epsvecm
                 rezet = zet * z - epsi
                 res = lam * s - epsvecm
@@ -261,8 +266,9 @@ def solve_mma_subproblem(m: int, n: int,
                 residu2 = bm.concatenate((relam, rexsi, reeta, remu, rezet, res), axis=0)
                 residu = bm.concatenate((residu1, residu2), axis=0)
                 resinew = bm.sqrt(bm.dot(residu.T, residu))
+
                 steg = steg / 2
-            
+
             residunorm = resinew.copy()
             residumax = bm.max(bm.abs(residu))
             steg = 2 * steg
