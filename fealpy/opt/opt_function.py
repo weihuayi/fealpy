@@ -135,8 +135,6 @@ def PathPlanning(MAP, dataS, dataE, method):
         option = opt_alg_options(xo, fobj, (lb, ub), N, MaxIters=MaxIT)
         optimizer = method(option)
         optimizer.run()
-        # test1 = PSO(N, dim, ub, lb, MaxIT, fobj)
-        # test1.cal()
         
         result = textMAP.calresult(optimizer.gbest)
         

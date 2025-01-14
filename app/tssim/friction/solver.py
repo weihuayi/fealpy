@@ -240,8 +240,74 @@ class Solver():
         phi[tag0] = 1
         phi[tag1] = -1
         return phi[:]
-    
+    ''' 
     def stress(self, u):
         bcs = bm.array([[1/3, 1/3, 1/3]], dtype=bm.float64)
         stress = u.grad_value(bcs)
         return stress
+    '''
+
+    def plot_change_on_y(self, fun, y, space=None):
+        import matplotlib.pyplot as plt
+        if space is None:
+            space = fun.space
+        mesh = self.mesh
+        ip = space.interpolation_points()
+        tag = ip[..., 1] == y
+        x = ip[tag, 0]
+        plt.plot(bm.sort(x), fun[tag][bm.argsort(x)])
+        plt.show()
+    
+    def interface_on_boundary(self, phi):
+        inteface_phi = bm.abs(phi[:])<0.9
+        space = phi.space
+        ip = space.interpolation_points()
+
+        up = space.is_boundary_dof(self.pde.is_up_boundary, method='interp')
+        down = space.is_boundary_dof(self.pde.is_down_boundary, method='interp')
+        up_tag = up & inteface_phi
+        down_tag = down & inteface_phi
+        up_node = bm.mean(ip[up_tag], axis=0)
+        down_node = bm.mean(ip[down_tag], axis=0)
+        return up_node, down_node
+    
+    def slip_dof(self, up_node, down_node, h):
+        @cartesian
+        def up_dof(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            tag0 = bm.abs((p[..., 1] - up_node[1])) < 1e-10
+            tag1 = (p[..., 0] > up_node[0]) & (p[..., 0] < up_node[0] + h)  
+            return tag0 & tag1
+        
+        @cartesian
+        def down_dof(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            tag0 = bm.abs((p[..., 1] - down_node[1])) < 1e-10
+            tag1 = (p[..., 0] > down_node[0]) & (p[..., 0] < down_node[0] + h)  
+            return tag0 & tag1
+        updof = self.uspace.scalar_space.is_boundary_dof(up_dof, method='interp')
+        downdof = self.uspace.scalar_space.is_boundary_dof(down_dof, method='interp')
+        
+        return updof, downdof 
+
+    def stress(self, uh):
+        GD = self.mesh.GD
+        sspace = self.uspace.scalar_space
+        cell2dof = sspace.cell_to_dof()
+        gdof = sspace.number_of_global_dofs()
+        ldof = sspace.number_of_local_dofs()
+        p = sspace.p
+        bc = bm.multi_index_matrix(p,GD,dtype=sspace.ftype)/p
+        guh = uh.grad_value(bc)
+        NC = self.mesh.number_of_cells()
+        
+        rguh = bm.zeros((gdof, GD, GD), dtype=sspace.ftype)
+        
+        deg = bm.bincount(cell2dof.flatten(), minlength = gdof)
+        bm.index_add(rguh, cell2dof, guh)
+        
+        rguh /= deg[:, None, None]
+        result = 0.5*(rguh + rguh.swapaxes(-1,-2))
+        return result

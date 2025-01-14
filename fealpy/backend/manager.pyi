@@ -278,6 +278,7 @@ class BackendManager():
 
     # non-standard
     def bincount(self, x: _DT, /, *, weights=None, minlength=0) -> _DT: ...
+    def isin(self, element: _DT, test_elements: _DT, /, *, assume_unique=False, invert=False) -> _DT: ...
 
     ### Set Functions ###
     # python array API standard v2023.12

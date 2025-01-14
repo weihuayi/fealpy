@@ -13,7 +13,7 @@ class CuckooSearchOpt(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
+    def run(self, alpha=0.01, Pa=0.25):
         options = self.options
         x = options["x0"]
         N = options["NP"]
@@ -29,10 +29,6 @@ class CuckooSearchOpt(Optimizer):
         self.D_pt = bm.zeros((MaxIT,))
         self.Div = bm.zeros((1, MaxIT))
 
-        # Parameters
-        alpha = 0.01
-        Pa = 0.25
-
         for it in range(0, MaxIT):
             self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x)) / N)
             # exploration percentage and exploitation percentage
@@ -46,7 +42,7 @@ class CuckooSearchOpt(Optimizer):
             x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit) 
             
             # Nest
-            x_new = x + bm.random.rand(N, 1) * bm.where((bm.random.rand(N, dim) - Pa) < 0, 0, 1) * (x[bm.random.randint(0, N, (N,))] - x[bm.random.randint(0, N, (N,))])
+            x_new = x + bm.random.rand(N, dim) * bm.where((bm.random.rand(N, dim) - Pa) < 0, 0, 1) * (x[bm.random.randint(0, N, (N,))] - x[bm.random.randint(0, N, (N,))])
             x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
             fit_new = self.fun(x_new)
             mask = fit_new < fit 

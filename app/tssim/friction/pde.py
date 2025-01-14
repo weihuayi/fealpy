@@ -67,7 +67,7 @@ class slip_stick:
     def init_interface(self,p):
         x = p[..., 0]
         y = p[..., 1]   
-        tagfluid0 = x-0.05<self.eps
+        tagfluid0 = x-0.04<self.eps
         tagfluid1 = bm.logical_not(tagfluid0)
         phi = bm.zeros_like(x)
         phi[tagfluid0] = 1.0

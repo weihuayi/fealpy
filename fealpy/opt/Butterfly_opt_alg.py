@@ -14,7 +14,7 @@ class ButterflyOptAlg(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
+    def run(self, a=0.1, c=0.01, p=0.8):
         options = self.options
         x = options["x0"]
         N = options["NP"]
@@ -29,10 +29,6 @@ class ButterflyOptAlg(Optimizer):
         self.D_pl = bm.zeros((MaxIT,))
         self.D_pt = bm.zeros((MaxIT,))
         self.Div = bm.zeros((1, MaxIT))
-        # Parameters
-        c = 0.01
-        p = 0.8
-        a = 0.1
         for it in range(0, MaxIT):
             self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x)) / N)
             # exploration percentage and exploitation percentage

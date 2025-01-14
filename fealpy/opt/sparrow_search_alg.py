@@ -21,7 +21,7 @@ class SparrowSearchAlg(Optimizer):
     def __init__(self, option) -> None:
         super().__init__(option)
 
-    def run(self):
+    def run(self, ST=0.6, PD=0.7, SD=0.2):
         options = self.options
         x = options["x0"]
         N = options["NP"]
@@ -42,10 +42,6 @@ class SparrowSearchAlg(Optimizer):
         index = bm.argsort(fit)
         x = x[index]
         fit = fit[index]
-        #Paremeters
-        ST = 0.6
-        PD = 0.7
-        SD = 0.2
         
         PDnumber = int(N * PD)
         SDnumber = int(N * SD) 
