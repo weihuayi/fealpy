@@ -9,7 +9,7 @@
 '''  
 
 import os
-os.system(f'rm *.vtu')
+#os.system(f'rm *.vtu')
 
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace
@@ -17,7 +17,6 @@ from fealpy.functionspace import TensorFunctionSpace
 from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.solver import spsolve, cg, gmres 
 from fealpy.fem import DirichletBC
-import matplotlib.pyplot as plt
 from pde import slip_stick
 from solver import Solver
 
@@ -28,10 +27,11 @@ bm.set_backend('numpy')
 #bm.set_default_device('cuda')
 
 output = './'
-#h = 1/250
-h = 1/100
+h = 1/250
+#h = 1/100
 T = 1
 nt = int(T/(0.1*h))
+hh = 3*h
 
 pde = slip_stick(h=h)
 mesh = pde.mesh()
@@ -39,8 +39,6 @@ mesh = pde.mesh()
 
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
-time = timer()
-next(time)
 
 phispace = LagrangeFESpace(mesh, p=1)
 #pspace = LagrangeFESpace(mesh, p=0, ctype='D')
@@ -48,24 +46,13 @@ pspace = LagrangeFESpace(mesh, p=1)
 space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 
-'''
-ipoint = space.interpolation_points()
-import matplotlib.pylab  as plt
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-#mesh.find_edge(axes,fontsize=20,showindex=True)
-mesh.find_node(axes,node=ipoint,fontsize=20,showindex=True)
-plt.show()
-'''
-
 solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q=5)
 u0 = uspace.function()
 u1 = uspace.function()
 u2 = uspace.function()
 phi0 = phispace.interpolate(pde.init_interface)
 phi1 = phispace.function()
-# TODO:第一步求解
+
 phi1[:] = phi0[:]
 phi2 = phispace.function()
 mu1 = phispace.function()
@@ -101,9 +88,17 @@ NS_BC = DirichletBC(space=(uspace,pspace), \
         gd=gd, \
         threshold=is_bd, method='interp')
 
-time.send("初始化用时")
 
-for i in range(2):
+bdface_index = mesh.boundary_face_index()
+bdface_bc = mesh.entity_barycenter('face', index=bdface_index)
+stick_index = bdface_index[pde.is_wall_boundary(bdface_bc)]
+new_slip_set = set()
+allslip_set = set()
+e2dof = space.edge_to_dof()
+slip_threshold = 1.05
+
+control = True
+for i in range(nt):
     t = timeline.next_time_level()
     print(f"第{i+1}步")
     print("time=", t)
@@ -111,9 +106,7 @@ for i in range(2):
     solver.CH_update(u0, u1, phi0, phi1)
     CH_A = CH_BForm.assembly()
     CH_b = CH_LForm.assembly()
-    time.send(f"第{i+1}次CH组装用时")
     CH_x = spsolve(CH_A, CH_b, 'mumps')
-    time.send(f"第{i+1}次CH求解用时")
     
     phi2[:] = CH_x[:phigdof]
     mu2[:] = CH_x[phigdof:] 
@@ -122,9 +115,7 @@ for i in range(2):
     NS_A = NS_BForm.assembly()
     NS_b = NS_LForm.assembly()
     NS_A,NS_b = NS_BC.apply(NS_A,NS_b)
-    time.send(f"第{i+1}次NS组装用时") 
     NS_x = spsolve(NS_A, NS_b, 'mumps') 
-    time.send(f"第{i+1}次NS求解用时")
     u2[:] = NS_x[:ugdof]
     p2[:] = NS_x[ugdof:]
     
@@ -135,32 +126,63 @@ for i in range(2):
     mu1[:] = mu2[:]
     p1[:] = p2[:]
     
-    stress = uspace.grad_recovery(u1)
-    stress = 0.5*(stress + stress.swapaxes(-1,-2))
-    normal = mesh.edge_unit_normal()
-    tangent = mesh.edge_unit_tangent()
-    e2dof = uspace.edge_to_dof()
+    stress = solver.stress(u1)
     
-    iswalldof = uspace.scalar_space.is_boundary_dof(pde.is_up_boundary, method='interp')
-    u_tau = bm.abs(stress[iswalldof, 0,1])
-    print(u_tau)
+    up_node, down_node = solver.interface_on_boundary(phi1)
+    up_dof, down_dof = solver.slip_dof(up_node, down_node, hh)
+    value = bm.mean(bm.abs(stress[up_dof,0,1]))
+    print("值:",value)
+    if (i>50) & (value > 30) & control:
+        print("开始slip")
+        from fealpy.decorator import barycentric,cartesian
+        @cartesian
+        def is_slip_index(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            tag_up= bm.abs(y-0.15)<1e-10
+            tag1 = (x > up_node[0]) & (x < up_node[0] + hh)  
+            tag_down= bm.abs(y-0)<1e-10
+            tag2 = (x > down_node[0]) & (x < down_node[0] + hh)
+            tag_up = tag_up & tag1
+            tag_down = tag_down & tag2
+            return tag_up | tag_down
+        
+        
+        slip_index = bdface_index[is_slip_index(bdface_bc)]
+        new_slip_set = new_slip_set | set(slip_index) 
+        allslip_set = allslip_set | set(slip_index)
 
-    inteface_phi = bm.where(bm.abs(phi1[:])<0.9)
-    interface_node = mesh.node[inteface_phi]
-    xx = bm.mean(interface_node[:,0])
-    #print(xx)
+
+        stick_index = bm.array(list(set(stick_index) - set(slip_index)), dtype=bm.int32)
+
+        solver.is_bd = stick_index
+        CH_BForm = solver.CH_BForm()
+        CH_LForm = solver.CH_LForm()
+        NS_BForm = solver.NS_BForm()
+        NS_LForm = solver.NS_LForm()
     
-    ip = uspace.interpolation_points()[iswalldof]
-    tag = (ip[:,0]>xx) & (ip[:,0]<xx+5*h)
-    #print(ip[tag])
-    print(ip[:,0])
-    print(bm.sort(ip[:,0]))
-    print(bm.argsort(ip[:,0]))
-    plt.plot(bm.sort(ip[:,0]), u_tau[bm.argsort(ip[:,0])])
-    plt.show()
-    
+    new_slip_index = bm.array(list(new_slip_set), dtype=bm.int32)
+    slip_value = bm.mean(bm.abs(stress[e2dof[new_slip_index],0,1]))
+    print("滑移的值",slip_value)
+    if slip_value < 1.42:
+        control = False
+        print("control is False")
+        if slip_value < slip_threshold:
+            control = True
+            new_slip_set = set()
+            print("control is True")
 
 
+        
+        
+    #solver.plot_change_on_y(bm.abs(stress[:,0,1]), y=0.15, space=space)
+    #cc = bm.argmax(stress[:,0,1])
+    #ip = uspace.interpolation_points()
+
+    print("上边界",up_node)
+    print("下边界",down_node)
+    #print(ip[bm.where(up_dof)])
+    #print(ip[bm.where(down_dof)])
 
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['phi'] = phi2
@@ -170,10 +192,7 @@ for i in range(2):
     mesh.nodedata['mu'] = mu2
     mesh.nodedata['stress0'] = stress[:,0,1]
 
-
-
     mesh.to_vtk(fname=fname)
     timeline.advance()
-    time.send(f"第{i+1}次画图用时")
     uuu = u2.reshape(2,-1).T
 #next(time)
