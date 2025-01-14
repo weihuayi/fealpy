@@ -14,40 +14,29 @@ class QuantumParticleSwarmOpt(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
-        options = self.options
-        a = options["x0"]
-        N = options["NP"]
-        fit = self.fun(a)
-        MaxIT = options["MaxIters"]
-        dim = options["ndim"]
-        lb, ub = options["domain"]
-        pbest = bm.copy(a)
+    def run(self, alpha_max=0.9, alpha_min=0.4):
+        fit = self.fun(self.x)
+        pbest = bm.copy(self.x)
         pbest_f = bm.copy(fit)
         gbest_index = bm.argmin(pbest_f)
         self.gbest = pbest[gbest_index]
         self.gbest_f = pbest_f[gbest_index]
-        self.curve = bm.zeros((MaxIT,))
-        self.D_pl = bm.zeros((MaxIT,))
-        self.D_pt = bm.zeros((MaxIT,))
-        self.Div = bm.zeros((1, MaxIT))
-        for it in range(0, MaxIT):
-            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(a, axis=0) - a)) / N)
+        for it in range(0, self.MaxIT):
             # exploration percentage and exploitation percentage
-            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
+            self.D_pl_pt(it)
 
-            alpha = bm.array(0.9 - (it + 1) / (2 * MaxIT)) # contraction-expansion coefficient
-            mbest = bm.sum(pbest, axis=0) / N # average of all particle optimal position
-            phi = bm.random.rand(N, dim)
+            alpha = bm.array(alpha_max - (alpha_max - alpha_min) * (it + 1) / self.MaxIT) # contraction-expansion coefficient
+            mbest = bm.sum(pbest, axis=0) / self.N # average of all particle optimal position
+            phi = bm.random.rand(self.N, self.dim)
             p = phi * pbest + (1 - phi) * self.gbest # local attractor
-            u = bm.random.rand(N, dim)
-            rand = bm.random.rand(N, 1)
+            u = bm.random.rand(self.N, self.dim)
+            rand = bm.random.rand(self.N, 1)
             # update
-            a = p + alpha * bm.abs(mbest - a) * bm.log(1 / u) * (1 - 2 * (rand >= 0.5))
-            a = a + (lb - a) * (a < lb) + (ub - a) * (a > ub)
-            fit = self.fun(a)
+            self.x = p + alpha * bm.abs(mbest - self.x) * bm.log(1 / u) * (1 - 2 * (rand >= 0.5))
+            self.x = self.x + (self.lb - self.x) * (self.x < self.lb) + (self.ub - self.x) * (self.x > self.ub)
+            fit = self.fun(self.x)
             mask = fit < pbest_f
-            pbest, pbest_f = bm.where(mask[:, None], a, pbest), bm.where(fit < pbest_f, fit, pbest_f)
+            pbest, pbest_f = bm.where(mask[:, None], self.x, pbest), bm.where(fit < pbest_f, fit, pbest_f)
             self.update_gbest(pbest, pbest_f)
             self.curve[it] = self.gbest_f
 
