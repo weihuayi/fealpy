@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
-from .femdof import multi_index_matrix2d, multi_index_matrix1d
-from .lagrange_fe_space import LagrangeFESpace
+#from .femdof import multi_index_matrix2d, multi_index_matrix1d
+#from .lagrange_fe_space import LagrangeFESpace
 
 from typing import Optional, TypeVar, Union, Generic, Callable
 from ..typing import TensorLike, Index, _S, Threshold
@@ -163,7 +163,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return self.dof.cell_to_dof(p=p)
 
     @cartesian
-    def edge_basis(self, point, index=bm.s_[:], p=None):
+    def edge_basis(self, point, index=_S, p=None):
         p = self.p if p is None else p
         if p == 0:
             shape = len(point.shape)*(1, )
@@ -200,7 +200,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             return phi
 
     @cartesian
-    def basis(self, point, index=bm.s_[:], p=None):
+    def basis(self, point, index=_S, p=None):
         """
         Compute the basis values at point
 
@@ -237,7 +237,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return phi
 
     @cartesian
-    def grad_basis(self, point, index=bm.s_[:], p=None, scaled=True):
+    def grad_basis(self, point, index=_S, p=None, scaled=True):
         """
 
         p >= 0
@@ -271,7 +271,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             return gphi
 
     @cartesian
-    def laplace_basis(self, point, index=bm.s_[:], p=None, scaled=True):
+    def laplace_basis(self, point, index=_S, p=None, scaled=True):
         p = self.p if p is None else p
 
         area = self.cellmeasure
@@ -290,7 +290,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             return lphi
 
     @cartesian
-    def hessian_basis(self, point, index=bm.s_[:], p=None, scaled=True):
+    def hessian_basis(self, point, index=_S, p=None, scaled=True):
         """
         Compute the value of the hessian of the basis at a set of 'point'
 
@@ -323,7 +323,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         else:
             return hphi
 
-    def grad_m_basis(self, m, point, index=bm.s_[:], p=None, scaled=True):
+    def grad_m_basis(self, m, point, index=_S, p=None, scaled=True):
         """!
         @brief m=3时导数排列顺序: [xxx, xxy, xyx, xyy, yxx, yxy, yyx, yyy]
         """
@@ -340,9 +340,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             gmphi[..., i] = bm.einsum('cli, ...cl->...ci', M, phi)
         return gmphi
 
-    def partial_matrix(self, p=None, index=bm.s_[:]):
+    def partial_matrix(self, p=None, index=_S):
         p = p or self.p
-        mindex = multi_index_matrix2d(p)
+        #mindex = multi_index_matrix2d(p)
+        mindex = bm.multi_index_matrix(p, 2) # TODO
         N = len(mindex)
         cellarea = self.mesh.entity_measure("cell")
         NC = self.mesh.number_of_cells()
@@ -369,7 +370,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return P
 
     @cartesian
-    def value(self, uh, point, index=bm.s_[:]):
+    def value(self, uh, point, index=_S):
         phi = self.basis(point, index=index)
         cell2dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
@@ -378,7 +379,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return bm.einsum(s1, phi, uh[cell2dof])
 
     @cartesian
-    def grad_value(self, uh, point, index=bm.s_[:]):
+    def grad_value(self, uh, point, index=_S):
         gphi = self.grad_basis(point, index=index)
         cell2dof = self.dof.cell2dof
         if (type(index) is bm.ndarray) and (index.dtype.name == 'bool'):
@@ -396,19 +397,19 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             return bm.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
 
     @cartesian
-    def laplace_value(self, uh, point, index=bm.s_[:]):
+    def laplace_value(self, uh, point, index=_S):
         lphi = self.laplace_basis(point, index=index)
         cell2dof = self.dof.cell2dof
         return bm.einsum('...ij, ij->...i', lphi, uh[cell2dof[index]])
 
     @cartesian
-    def hessian_value(self, uh, point, index=bm.s_[:]):
+    def hessian_value(self, uh, point, index=_S):
         hphi = self.hessian_basis(point, index=index) #(NQ, NC, ldof, 2, 2)
         cell2dof = self.dof.cell2dof
         return bm.einsum('...clij, cl->...cij', hphi, uh[cell2dof[index]])
 
     @cartesian
-    def grad_3_value(self, uh, point, index=bm.s_[:]):
+    def grad_3_value(self, uh, point, index=_S):
         #TODO
         gmphi = self.grad_m_basis(3, point, index=index) #(NQ, NC, ldof, 8)
         cell2dof = self.dof.cell2dof
@@ -607,7 +608,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M
 
-    def penalty_matrix(self, p=None, index=bm.s_[:]):
+    def penalty_matrix(self, p=None, index=_S):
         """
         Notes
         -----
@@ -645,7 +646,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return A
 
 
-    def flux_matrix(self, p=None, index=bm.s_[:]):
+    def flux_matrix(self, p=None, index=_S):
         '''
         Notes:
         ------
@@ -688,7 +689,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
-    def normal_grad_penalty_matrix(self, p=None, index=bm.s_[:]):
+    def normal_grad_penalty_matrix(self, p=None, index=_S):
         """
         Notes
         -----
@@ -726,7 +727,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
-    def edge_normal_source_vector(self, g, p = None, index=bm.s_[:]):
+    def edge_normal_source_vector(self, g, p = None, index=_S):
 
         """
         Notes
@@ -767,7 +768,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         bm.add.at(F, cell2dof[edge2cell[isInEdge, 1]], A[isInEdge, ldof:])
         return F
 
-    def edge_source_vector(self, g, p = None, index=bm.s_[:], hpower=-1):
+    def edge_source_vector(self, g, p = None, index=_S, hpower=-1):
 
         """
         Notes
@@ -1100,40 +1101,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             td[:, 4] = c[HB[:, 1], 4]*h**2
             td[:, 5] = c[HB[:, 1], 5]*h**2
 
-        bm.add.at(d, (HB[:, 0], bm.s_[:]), td)
+        bm.add.at(d, (HB[:, 0], _S), td)
         d /= num.reshape(-1, 1)
         return sh1
 
-    @cartesian
-    def to_cspace_function(self, uh):
-        """
-        Notes
-        -----
-        把分片的 p 次多项式空间的函数  uh， 恢复到分片连续的函数空间。这里假定网
-        格是三角形网格。
-
-        TODO
-        ----
-        1. 实现多个函数同时恢复的情形
-        """
-
-        # number of function in uh
-
-        p = self.p
-        mesh  = self.mesh
-        bcs = multi_index_matrix2d(p)
-        ps = mesh.bc_to_point(bcs)
-        val = self.value(uh, ps) # （NQ, NC, ...)
-
-        space = LagrangeFiniteElementSpace(mesh, p=p)
-        gdof = space.number_of_global_dofs()
-        cell2dof = space.cell_to_dof()
-        deg = bm.zeros(gdof, dtype=space.itype)
-        bm.add.at(deg, cell2dof, 1)
-        ruh = space.function()
-        bm.add.at(ruh, cell2dof, val.T)
-        ruh /= deg
-        return ruh
     def error(self, u, uh):
         """!
         @brief 求 H1 误差

@@ -1,11 +1,11 @@
 import numpy as np
-from ..functionspace import ConformingVirtualElementSpace2d
+from ..functionspace import ConformingScalarVESpace2d
 from fealpy.quadrature import GaussLobattoQuadrature
 
 
 class ConformingVEMDoFIntegrator2d:
 
-    def assembly_cell_matrix(self, space: ConformingVirtualElementSpace2d, M):
+    def assembly_cell_matrix(self, space: ConformingScalarVESpace2d, M):
         """
 
         @param sapce 

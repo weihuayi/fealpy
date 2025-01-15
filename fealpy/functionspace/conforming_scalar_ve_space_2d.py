@@ -1,5 +1,4 @@
 
-from .femdof import multi_index_matrix2d, multi_index_matrix1d
 from .lagrange_fe_space import LagrangeFESpace
 
 from typing import Optional, TypeVar, Union, Generic, Callable
@@ -38,7 +37,7 @@ class CSVEDof2d():
         isBdDof[edge2dof[idx]] = True
         return isBdDof
 
-    def edge_to_dof(self, index=bm.s_[:]):
+    def edge_to_dof(self, index=_S):
         return self.mesh.edge_to_ipoint(self.p, index=index)
 
     face_to_dof = edge_to_dof
@@ -52,7 +51,7 @@ class CSVEDof2d():
     def number_of_local_dofs(self, doftype='all'):
         return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)
 
-    def interpolation_points(self, index=bm.s_[:]):
+    def interpolation_points(self, index=_S):
         return self.mesh.interpolation_points(self.p, scale=0.3)
 
 
@@ -79,10 +78,10 @@ class ConformingScalarVESpace2d():
     def number_of_local_dofs(self, doftype='all'):
         return self.dof.number_of_local_dofs(doftype=doftype)
 
-    def cell_to_dof(self, index=bm.s_[:]):
+    def cell_to_dof(self, index=_S):
         return self.dof.cell2dof[index]
 
-    def interpolation_points(self, index=bm.s_[:]):
+    def interpolation_points(self, index=_S):
         return self.dof.interpolation_points()
 
     def array(self, dim=None, dtype=bm.float64):

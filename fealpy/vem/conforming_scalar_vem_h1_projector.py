@@ -5,7 +5,6 @@ from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 
 from ..functionspace import ConformingScalarVESpace2d
-from ..functionspace import NonConformingScalarVESpace2d
 
 class ConformingScalarVEMH1Projector2d():
     def __init__(self, D):

@@ -1,7 +1,7 @@
 import ipdb
 import numpy as np
 from ..quadrature import GaussLegendreQuadrature
-from ..functionspace import ScaledMonomialSpace2d, ScaledMonomialSpace3d
+from ..functionspace import ScaledMonomialSpace2d
 
 
 class ScaledMonomialSpaceMassIntegrator2d:
@@ -97,16 +97,3 @@ class ScaledMonomialSpaceMassIntegrator2d:
     def assembly_cell_matrix_numba(self, space: ScaledMonomialSpace2d, index=np.s_[:]):
         pass
 
-class ScaledMonomialSpaceMassIntegrator3d:
-    def __init__(self, q=3):
-        self.q = 3
-
-    def assembly_cell_matrix(self, space: ScaledMonomialSpace3d):
-        """
-        """
-        pass
-
-    def assembly_cell_matrix_numba(self, space):
-        """
-        """
-        pass

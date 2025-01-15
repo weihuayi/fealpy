@@ -3,7 +3,6 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from ..functionspace import ConformingScalarVESpace2d
-from ..functionspace import NonConformingScalarVESpace2d
 
 class ConformingScalarVEMMassIntegrator2d():
     def __init__(self, PI0, H, c=None):

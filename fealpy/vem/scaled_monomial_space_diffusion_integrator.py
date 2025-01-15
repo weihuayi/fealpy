@@ -1,6 +1,6 @@
 import numpy as np
 from ..quadrature import GaussLegendreQuadrature
-from ..functionspace import ScaledMonomialSpace2d, ScaledMonomialSpace3d
+from ..functionspace import ScaledMonomialSpace2d
 
 class ScaledMonomialSpaceDiffusionIntegrator2d:
     def __init__(self, q=3):
@@ -35,9 +35,3 @@ class ScaledMonomialSpaceDiffusionIntegrator2d:
 
         return G
 
-class ScaledMonomialSpaceDiffusionIntegrator3d:
-    def __init__(self, q=3):
-        self.q = q
-
-    def assembly_cell_matrix(self, space: ScaledMonomialSpace2d, M=None):
-        pass
