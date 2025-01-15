@@ -39,6 +39,7 @@ if __name__ == '__main__':
 
     plotter = OpenGLPlotter()
 
+    print("Displaying the screen...")
     screen.display(plotter)
     plotter.run_pic()
     #plotter.run()
