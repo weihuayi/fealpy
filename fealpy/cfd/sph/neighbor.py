@@ -4,6 +4,10 @@ from scipy.spatial import cKDTree
 class Neighbor:
     def __init__(self, mesh):
         self.mesh = mesh 
+    
+    def segmensum(self, ):
+        pass
+
 
     def find_neighbors(state, h):
         tree = cKDTree(state["position"])

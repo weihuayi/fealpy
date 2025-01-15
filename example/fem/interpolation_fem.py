@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--degree',
-        default=9, type=int,
+        default=11, type=int,
         help='光滑有限元空间的次数, 默认为 11 次.')
 
 parser.add_argument('--m',
@@ -26,7 +26,7 @@ parser.add_argument('--n',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=2, type=int,
+        default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--backend',
@@ -61,7 +61,8 @@ z = sp.symbols('z')
 #u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x)*sp.sin(sp.pi*z))**2
 #u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x)*sp.sin(sp.pi*z))
 #u = sp.sin(5*x)*sp.sin(5*y)*sp.sin(5*z)
-u = sp.sin(7*x)*sp.sin(7*y)*sp.sin(7*z)
+#u = sp.sin(7*x)*sp.sin(7*y)*sp.sin(7*z)
+u = sp.sin(6*x)*sp.sin(6*y)*sp.sin(6*z)
 #u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x)*sp.sin(sp.pi*z))**2
 flist = get_flist(u)
 NDof = bm.zeros(maxit, dtype=bm.float64)
