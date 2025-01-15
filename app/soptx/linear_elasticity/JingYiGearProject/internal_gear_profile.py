@@ -1,8 +1,7 @@
 """
-外齿轮 1 个载荷点的算例 (左右齿面)
+内齿轮 1 个载荷点的算例 (左右齿面)
 """
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import HexahedronMesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.sparse import COOTensor
 from fealpy.fem.linear_elastic_integrator import LinearElasticIntegrator
@@ -10,17 +9,17 @@ from fealpy.material.elastic_material import LinearElasticMaterial
 from fealpy.fem.bilinear_form import BilinearForm
 from fealpy.fem.dirichlet_bc import DirichletBC
 from fealpy.solver import cg, spsolve
+from fealpy.mesh import HexahedronMesh
 
 from soptx.utils import timer
-
 from app.soptx.linear_elasticity.JingYiGearProject.utils import export_to_inp
-from app.gearx.gear import ExternalGear
+from app.gearx.gear import InternalGear
 import json
 
 bm.set_backend('numpy')
 
 with open(
-'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/json/external_gear_data.json', 'r') \
+'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/json/internal_gear_data.json', 'r') \
     as file:data = json.load(file)
 m_n = data['mn']  # 法向模数
 z = data['z']  # 齿数
@@ -38,20 +37,21 @@ na = data['na']
 nf = data['nf']
 nw = data['nw']
 tooth_width = data['tooth_width']
-inner_diam = data['inner_diam']  # 轮缘内径
-chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
+outer_diam = data['outer_diam']  # 轮缘内径
+z_cutter = data['z_cutter']
+xn_cutter = data['xn_cutter']
 
-external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia,
-                                inner_diam, tooth_width)
-hex_mesh = external_gear.generate_hexahedron_mesh()
-target_hex_mesh = external_gear.set_target_tooth([0, 1, 18])
+internal_gear = InternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
+                                xn_cutter, tooth_width)
+hex_mesh = internal_gear.generate_hexahedron_mesh()
+target_hex_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
 
 hex_cell = target_hex_mesh.cell
 hex_node = target_hex_mesh.node
-# 寻找内圈上节点
+# 寻找外圈上节点
 node_r = bm.sqrt(hex_node[:, 0] ** 2 + hex_node[:, 1] ** 2)
-is_inner_node = bm.abs(node_r - external_gear.inner_diam / 2) < 1e-11
-inner_node_idx = bm.where(bm.abs(node_r - external_gear.inner_diam / 2)<1e-11)[0]
+is_outer_node = bm.abs(node_r - internal_gear.outer_diam / 2) < 1e-11
+outer_node_idx = bm.where(bm.abs(node_r - internal_gear.outer_diam / 2)<1e-11)[0]
 mesh = HexahedronMesh(hex_node, hex_cell)
 
 GD = mesh.geo_dimension()   
@@ -93,7 +93,7 @@ bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
 
 # 齿面上的节点索引, 坐标和内法线方向
-node_indices_tuple, node_coord_tuple, profile_node_normal_tuple = external_gear.get_profile_node_index(tooth_tag=0)
+node_indices_tuple, node_coord_tuple, profile_node_normal_tuple = internal_gear.get_profile_node_index(tooth_tag=0)
 node_indices_left = node_indices_tuple[0].reshape(-1, 1)
 node_indices_right = node_indices_tuple[1].reshape(-1, 1)
 node_indices = bm.concatenate([node_indices_left, node_indices_right], axis=0) # (NPN, 1)
@@ -115,10 +115,10 @@ if tensor_space.dof_priority:
 else:
     dof_indices = bm.stack([node_indices.reshape(-1) * GD + d for d in range(GD)], axis=1)    # (NPN, GD)
 # inp 文件中需要的固定节点索引
-fixed_node_index = bm.where(is_inner_node)[0]
+fixed_node_index = bm.where(is_outer_node)[0]
 # Dirichlet 边界条件
 scalar_is_bd_dof = bm.zeros(sgdof, dtype=bm.bool)
-scalar_is_bd_dof[:NN] = is_inner_node
+scalar_is_bd_dof[:NN] = is_outer_node
 tensor_is_bd_dof = tensor_space.is_boundary_dof(
                                 threshold=(scalar_is_bd_dof, scalar_is_bd_dof, scalar_is_bd_dof), 
                                 method='interp')
@@ -167,13 +167,13 @@ for i in range(NPN):
         uh_magnitude = bm.linalg.norm(uh_show, axis=1)
         mesh.nodedata['uh'] = uh_show[:]
         mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
-        mesh.to_vtk(f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/external_gear_profile_fealpy_{i}.vtu')
+        mesh.to_vtk(f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/internal_gear_profile_fealpy_{i}.vtu')
 
         # 单个节点载荷的索引
         load_node_indices = node_indices[i].reshape(-1) # (1, )
         # 从全局载荷向量中提取单个载荷节点处的值
         F_load_nodes = F[dof_indices[i, :].reshape(1, -1)] # (1, GD)
-        export_to_inp(filename=f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/external_gear_profile_abaqus_{i}.inp', 
+        export_to_inp(filename=f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/internal_gear_profile_abaqus_{i}.inp', 
                     nodes=node, elements=cell, 
                     fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
                     young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
