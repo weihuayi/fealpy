@@ -1,11 +1,11 @@
-"""2D 悬臂梁"""
+"""3D 悬臂梁"""
 
 from dataclasses import dataclass
 from typing import Literal, Optional, Union, Dict, Any
 from pathlib import Path
 
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import UniformMesh2d, TriangleMesh
+from fealpy.mesh import UniformMesh3d, TetrahedronMesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 from soptx.material import (
@@ -13,7 +13,7 @@ from soptx.material import (
     ElasticMaterialProperties,
     SIMPInterpolation
 )
-from soptx.pde import Cantilever2dData1
+from soptx.pde import Cantilever3dData1
 from soptx.solver import (ElasticFEMSolver, AssemblyMethod)
 from soptx.filter import (Filter, FilterConfig)
 from soptx.opt import ComplianceObjective, VolumeConstraint
@@ -27,6 +27,7 @@ class TestConfig:
     # Required parameters (no default values)
     nx: int
     ny: int
+    nz: int
     volume_fraction: float
     filter_radius: float
     filter_type: Literal['sensitivity', 'density', 'heaviside']
@@ -44,7 +45,7 @@ class TestConfig:
 
     # 新增优化器类型参数
     optimizer_type: Literal['oc', 'mma'] = 'oc'  # 默认使用 OC 方法
-    max_iterations: int = 100
+    max_iterations: int = 200
     tolerance: float = 0.01
     
     # OC 优化器的参数
@@ -53,30 +54,25 @@ class TestConfig:
     initial_lambda: float = 1e9
     bisection_tol: float = 1e-3
 
-    # MMA 优化器的参数
-    asymp_init: float = 0.5
-    asymp_incr: float = 1.2
-    asymp_decr: float = 0.7
-
-
 def create_base_components(config: TestConfig):
     """Create basic components needed for topology optimization based on configuration."""
-    extent = [0, config.nx, 0, config.ny]
-    h = [1.0, 1.0]
-    if config.mesh_type == 'uniform_mesh_2d':
-        origin = [0.0, 0.0]
-        mesh = UniformMesh2d(
+    extent = [0, config.nx, 0, config.ny, 0, config.nz]
+    h = [1.0, 1.0, 1.0]
+    if config.mesh_type == 'uniform_mesh_3d':
+        origin = [0.0, 0.0, 0.0]
+        mesh = UniformMesh3d(
                     extent=extent, h=h, origin=origin,
-                    ipoints_ordering='yx', flip_direction=None,
+                    ipoints_ordering='zyx', flip_direction=None,
                     device='cpu'
                 )
-    elif config.mesh_type == "triangle_mesh":
-        mesh = TriangleMesh.from_box(box=[0, config.nx*h[0], 0, config.ny*h[1]], 
-                                    nx=config.nx, ny=config.ny, device='cpu')
+    elif config.mesh_type == "tetrahedron_mesh":
+        mesh = TetrahedronMesh.from_box(
+                    box=[0, config.nx*h[0], 0, config.ny*h[1], 0, config.nz*h[2]], 
+                    nx=config.nx, ny=config.ny, nz=config.nz, device='cpu')
     
     p = 1
     space_C = LagrangeFESpace(mesh=mesh, p=p, ctype='C')
-    tensor_space_C = TensorFunctionSpace(space_C, (-1, 2))
+    tensor_space_C = TensorFunctionSpace(space_C, (-1, 3))
     print(f"gdof:", {tensor_space_C.number_of_global_dofs()})
     space_D = LagrangeFESpace(mesh=mesh, p=p-1, ctype='D')
     
@@ -85,7 +81,7 @@ def create_base_components(config: TestConfig):
                             elastic_modulus=config.elastic_modulus,
                             minimal_modulus=config.minimal_modulus,
                             poisson_ratio=config.poisson_ratio,
-                            plane_assumption="plane_stress"
+                            plane_assumption="3D"
                         )
     interpolation_model = SIMPInterpolation(penalty_factor=config.penalty_factor)
     material_properties = ElasticMaterialProperties(
@@ -93,9 +89,10 @@ def create_base_components(config: TestConfig):
                                 interpolation_model=interpolation_model
                             )
     
-    pde = Cantilever2dData1(
+    pde = Cantilever3dData1(
                 xmin=0, xmax=extent[1] * h[0],
-                ymin=0, ymax=extent[3] * h[1]
+                ymin=0, ymax=extent[3] * h[1],
+                zmin=0, zmax=extent[5] * h[2]
             )
     
     solver = ElasticFEMSolver(
@@ -192,30 +189,39 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     }
 
 if __name__ == "__main__":
+    base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
+
     # 使用 OC 优化器的配置
+    filter_type = 'density'
+    optimizer_type = 'oc'
     config1 = TestConfig(
-        nx=160, ny=100,
-        volume_fraction=0.4,
-        filter_radius=6.0,
-        filter_type='sensitivity',
-        max_iterations=100,
-        save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d_oc',
-        mesh_type='uniform_mesh_2d',
-        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type='oc'  # 指定使用 OC 优化器
+        nx=60, ny=20, nz=4,
+        volume_fraction=0.3,
+        filter_radius=1.5,
+        filter_type=filter_type,       # 指定使用密度滤波器
+        save_dir=f'{base_dir}/cantilever_3d_{filter_type}_{optimizer_type}',
+        mesh_type='uniform_mesh_3d',
+        assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
+
     )
     
     # 使用 MMA 优化器的配置
+    filter_type = 'density'
+    optimizer_type = 'mma'
     config2 = TestConfig(
-        nx=160, ny=100,
-        volume_fraction=0.4,
-        filter_radius=6.0,
-        filter_type='density',
-        max_iterations=100,
-        save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d_mma',
-        mesh_type='uniform_mesh_2d',
-        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type='mma'  # 指定使用 MMA 优化器
+        nx=60, ny=20, nz=4,
+        volume_fraction=0.3,
+        filter_radius=1.5,
+        filter_type=filter_type,       # 指定使用密度滤波器
+        save_dir=f'{base_dir}/cantilever_3d_{filter_type}_{optimizer_type}',
+        mesh_type='uniform_mesh_3d',
+        assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
     )
 
     result = run_optimization_test(config2)

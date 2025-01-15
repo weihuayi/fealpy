@@ -25,7 +25,7 @@ path = "./"
 
 #初始化
 mesh = NodeMesh.from_tgv_domain(box_size, dx)
-solver = SPHSolver(mesh)
+solver = SPHSolver(mesh) #segmentsum vmap 
 kernel = QuinticKernel(h=h, dim=2)
 displacement, shift = space.periodic(side=box_size)
 

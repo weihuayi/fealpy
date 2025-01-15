@@ -26,7 +26,7 @@ from .marine_predators_alg import MarinePredatorsAlg
 from .rime_opt_alg import RimeOptAlg
 from .moss_growth_opt import MossGrowthOpt
 from .crow_drinking_water_alg import CrowDrinkingWaterAlg
-from .geneticalgorithm import GeneticAlgorithm
+from .geneticalgorithm import GeneticAlg
 from .whale_opt_alg import WhaleOptAlg, ImprovedWhaleOptAlg
 from .squirrel_search_alg import SquirrelSearchAlg, DifferentialSquirrelSearchAlg
 from .levy_quantum_butterfly_opt_alg import LevyQuantumButterflyOptAlg
