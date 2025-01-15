@@ -120,7 +120,7 @@ class Screen:
         self.eillposid_overlapmesh = []
         self.eillposid_nonoverlapmesh = []
 
-        self.optimize()
+        #self.optimize()
         #self.draw_frature_points()
         self.meshing()
         self.compute_uv()

@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     mtype = MeshingType.TRIANGLE
     ptype = PartitionType("overlap2", np.pi/4-np.pi/10, np.pi/4+np.pi/10, np.pi/2, 0.1)
-    ptype = PartitionType("nonoverlap", np.pi/6)
+    #ptype = PartitionType("nonoverlap", np.pi/6)
 
     feature_points = [data[name+"_feature_points"] for name in data['name']]
     pictures = [Picture(data_path, picture, fp, pic_folder) for picture, fp,
@@ -39,6 +39,7 @@ if __name__ == '__main__':
 
     plotter = OpenGLPlotter()
 
+    print("Displaying the screen...")
     screen.display(plotter)
     plotter.run_pic()
     #plotter.run()
