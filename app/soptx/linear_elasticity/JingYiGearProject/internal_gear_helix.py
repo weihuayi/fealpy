@@ -1,5 +1,5 @@
 """
-外齿轮 15 个载荷点的算例
+内齿轮 15 个载荷点的算例
 """
 from fealpy.backend import backend_manager as bm
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace

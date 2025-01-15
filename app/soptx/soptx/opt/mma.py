@@ -120,9 +120,9 @@ class MMAOptimizer(OptimizerBase):
         else:
             factor = bm.ones((xval.shape[0], 1))
             xxx = (xval - xold1) * (xold1 - xold2)
-            factor[xxx > 0] = asyincr
-            factor[xxx < 0] = asydecr
-            factor[xxx == 0] = 1.0
+            epsilon = 1e-12
+            factor[xxx > epsilon] = asyincr
+            factor[xxx < -epsilon] = asydecr
             
             self._low = xval - factor * (xold1 - self._low)
             self._upp = xval + factor * (self._upp - xold1)
@@ -136,7 +136,7 @@ class MMAOptimizer(OptimizerBase):
             self._low = bm.minimum(self._low, lowmax)
             self._upp = bm.minimum(self._upp, uppmax)
             self._upp = bm.maximum(self._upp, uppmin)
-            
+
         return self._low, self._upp
         
     def _solve_subproblem(self, 
@@ -151,6 +151,7 @@ class MMAOptimizer(OptimizerBase):
         """求解 MMA 子问题
         
         Paramters
+        - xval (n, 1): 当前设计变量
         - df0dx (n, 1): 目标函数的梯度
         - dfdx (m, n): 约束函数的梯度
 
@@ -282,14 +283,15 @@ class MMAOptimizer(OptimizerBase):
             # MMA 方法
             volfrac = self.constraint.volume_fraction
             # 体积约束对设计变量的标准化梯度
+            fval = bm.sum(rho_phys[:]) / (volfrac * obj_grad.shape[0]) - 1
             dfdx = con_grad[:, None].T / (volfrac * con_grad.shape[0]) # (m, n)
             rho_new, low, upp = self._solve_subproblem(
-                                        rho[:, None], fval=con_val, 
+                                        xval=rho[:, None], fval=fval, 
                                         df0dx=obj_grad[:, None], dfdx=dfdx, 
                                         low=low, upp=upp,
                                         xold1=xold1[:, None], xold2=xold2[..., None]
                                     )
-            
+
             # 更新物理密度
             if self.filter is not None:
                 rho_phys = self.filter.filter_density(rho_new, filter_params)
