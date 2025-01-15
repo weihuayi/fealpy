@@ -27,8 +27,8 @@ class FunctionSpace():
     def number_of_local_dofs(self, doftype='cell') -> int: raise NotImplementedError
 
     # relationships
-    def cell_to_dof(self) -> TensorLike: raise NotImplementedError
-    def face_to_dof(self) -> TensorLike: raise NotImplementedError
+    def cell_to_dof(self, index: Index=_S) -> TensorLike: raise NotImplementedError
+    def face_to_dof(self, index: Index=_S) -> TensorLike: raise NotImplementedError
 
     # interpolation
     def interpolate(self, source: Union[Callable[..., TensorLike], TensorLike, Number],

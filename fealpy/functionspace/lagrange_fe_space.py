@@ -137,7 +137,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variables=variable)
 
     @barycentric
-    def cell_basis_on_edge(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
+    def cell_basis_on_face(self, bc: TensorLike, eindex: TensorLike) -> TensorLike:
         NLF = self.mesh.number_of_faces_of_cells()
         NF = len(eindex)
         NQ = bc.shape[0]
@@ -153,7 +153,7 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return result
         
     @barycentric
-    def cell_grad_basis_on_edge(self, bc: TensorLike, eindex: TensorLike, 
+    def cell_grad_basis_on_face(self, bc: TensorLike, eindex: TensorLike, 
                                 isleft = True) -> TensorLike:
         TD = self.mesh.TD  ## 一定是单元的
         NLF = self.mesh.number_of_faces_of_cells()
@@ -198,3 +198,4 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         e2dof = self.dof.entity_to_dof(TD, index=index)
         val = bm.einsum('cilm, cl -> cim', gphi, uh[e2dof])
         return val
+    

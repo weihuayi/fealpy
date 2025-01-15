@@ -144,20 +144,26 @@ class Screen:
             @brief The object function to be optimized.
             @param x The parameters to be optimized.
             """
-            self.i+=1
-            x = x.reshape(6, -1)
-            camsys.set_parameters(x)
+            N, dim  = x.shape
+            error_list = np.zeros((N,))
 
-            error = 0
-            for i in range(6):
-                ps0 = camsys.cameras[i].feature_points["ground"]
-                ps1 = camsys.cameras[i].feature_points["camera_sphere"]
-                ps2 = camsys.cameras[i].to_screen(ps1, on_ground=True)
-                ps0 = np.array(ps0)
-                error += np.sum((ps0 - ps2[:, :-1])**2)
-            # if self.i%50==0:
-            #     print("Error: ", error)
-            return error
+            for j in range(N):
+
+                x2 = x[j,:].reshape(6, -1)
+
+                camsys.set_parameters(x2)
+                error = 0
+                for i in range(6):
+                    ps0 = camsys.cameras[i].feature_points["ground"]
+                    ps1 = camsys.cameras[i].feature_points["camera_sphere"]
+                    ps2 = camsys.cameras[i].to_screen(ps1, on_ground=True)
+                    ps0 = np.array(ps0)
+                    error += np.sum((ps0 - ps2[:, :-1])**2)
+                error_list[j] = error 
+
+    
+
+            return error_list.flatten()
 
         # 6 个相机，每个相机的位置和欧拉角共 6 * 6 = 36 个参数
         init_x = np.zeros((6, 10), dtype=np.float_)
@@ -165,7 +171,7 @@ class Screen:
             init_x[i, :3] = camsys.cameras[i].location
             init_x[i, 3:6] = camsys.cameras[i].eular_angle
             init_x[i, 6:] = np.array([1.0, 0.000001, 0.000001, 0.000001])
-        print("init error : ", object_function(init_x))
+        print("init error : ", object_function(init_x.flatten().reshape(1,60)))
 
         #参数设置
         N = 100
@@ -180,22 +186,22 @@ class Screen:
         lb[:, 6]  -= 0.1
         Max_iter = 50
 
-        opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
-                      object_function, init_x.flatten())
+        #opt_alg = COA(N, dim, ub.flatten(), lb.flatten(), Max_iter,
+        #              object_function, init_x.flatten())
         
-        best_fitness,best_position,_ = opt_alg.cal()
+        #best_fitness,best_position,_ = opt_alg.cal()
         
-        #ub = ub.flatten().reshape((1,dim))
-        #lb = lb.flatten().reshape((1, dim))
-        #a = init_x.flatten()[None, :]
-        #init_x = np.tile(a, (N, 1))
+        ub = ub.flatten().reshape((1,dim))
+        lb = lb.flatten().reshape((1, dim))
+        a = init_x.flatten()[None, :]
+        init_x = np.tile(a, (N, 1))
         # init_x = lb + np.random.rand(N, dim) * (ub - lb)
-        #option = opt_alg_options(init_x, object_function, (ub, lb), N, MaxIters=500)
-        #optimizer = CrayfishOptAlg(option)
+        option = opt_alg_options(init_x, object_function, (lb, ub), N, MaxIters=50)
+        optimizer = CrayfishOptAlg(option)
 
 
-        #best_position,bestfitness = optimizer.run()
-        print( best_fitness)
+        best_position,bestfitness = optimizer.run()
+        print( bestfitness)
         print(best_position)
 
         camsys.set_parameters(best_position.reshape(6, -1))

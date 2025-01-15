@@ -197,12 +197,26 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             return bm.zeros(1, dtype=self.ftype)
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
+    
+    def grad_lambda(self, index: Index=_S, TD:int=3) -> TensorLike:
+        node = self.entity('node')
+        entity = self.entity(TD, index=index) 
+        if TD == 1:
+            return bm.interval_grad_lambda(entity, node)
+        elif TD == 2:
+            return bm.triangle_grad_lambda_3d(entity, node)
+        elif TD == 3:
+            localFace = self.localFace
+            return bm.tetrahedron_grad_lambda_3d(entity, node, localFace)
+        else:
+            raise ValueError("Unsupported topological dimension: {TD}")
 
+    '''
     def grad_lambda(self, index=_S):
         localFace = self.localFace
         node = self.node
         cell = self.cell
-        NC = self.number_of_cells() if index == _S else len(index)
+        NC = self.number_of_cells() if bm.all(index == _S) else len(index)
         Dlambda = bm.zeros((NC, 4, 3), device=self.device, dtype=self.ftype)
         volume = self.entity_measure('cell', index=index)
         for i in range(4):
@@ -230,6 +244,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         Dlambda[:, 1] = bm.cross(n, v1) / length
         Dlambda[:, 2] = bm.cross(n, v2) / length
         return Dlambda
+    '''
 
     def boundary_edge_flag(self):
         """
@@ -452,6 +467,19 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         return nv/length.reshape(-1, 1)
 
 
+    def update_bcs(self, bcs, toetype: Union[int, str]='cell'):
+        TD = bcs.shape[-1] - 1
+        if toetype == 'cell' or toetype == 3: 
+            if TD == 3:
+                return bcs
+            elif TD == 2: # edge up to cell
+                result = bm.stack([bm.insert(bcs, i, 0.0, axis=-1) for i in range(4)], axis=0)
+                return result
+            else:
+                raise ValueError("Unsupported topological dimension: {TD}")
+                    
+        else:
+            raise ValueError("The etype only support face, other etype is not implemented.")
 
 
 

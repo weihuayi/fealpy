@@ -17,7 +17,7 @@ from fealpy.fem import DirichletBC
 from fealpy.solver import spsolve 
 
 output = './'
-T = 10
+T = 1
 nt = 500
 n = 16
 
@@ -31,62 +31,71 @@ pspace = LagrangeFESpace(mesh, p=1)
 space = LagrangeFESpace(mesh, p=2)
 uspace = TensorFunctionSpace(space, (2,-1))
 
-solver = NSFEMSolver(pde, mesh, pspace, space, dt, q=5)
+solver = NSFEMSolver(pde, mesh, pspace, uspace, dt, q=5)
 
 ugdof = uspace.number_of_global_dofs()
 pgdof = pspace.number_of_global_dofs()
 
+u0 = uspace.function()
+us = uspace.function()
 u1 = uspace.function()
+p0 = pspace.function()
 p1 = pspace.function()
-'''
-ipoint = space.interpolation_points()
-import matplotlib.pylab  as plt
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-#mesh.find_edge(axes,fontsize=20,showindex=True)
-mesh.find_node(axes,node=ipoint,fontsize=20,showindex=True)
-plt.show()
-'''
+
 fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
 mesh.nodedata['u'] = u1.reshape(2,-1).T
 mesh.nodedata['p'] = p1
 mesh.to_vtk(fname=fname)
-'''
-BC = DirichletBC(space=uspace, 
+
+BCu = DirichletBC(space=uspace, 
         gd=pde.velocity, 
         threshold=pde.is_u_boundary, 
         method='interp')
-'''
-BForm = solver.IPCS_BForm_0(None)
-A = BForm.assembly()   
-print(A.to_dense())
-#A = BC.apply_matrix(A)
-print(bm.sum(bm.abs(A.to_dense())))
 
+BCp = DirichletBC(space=pspace, 
+        gd=pde.pressure, 
+        threshold=pde.is_p_boundary, 
+        method='interp')
 
+BForm0 = solver.IPCS_BForm_0(threshold = None)
+LForm0 = solver.IPCS_LForm_0()
+AA0 = BForm0.assembly()   
 
-exit()
-LForm = solver.Ossen_LForm()
+Bform1 = solver.IPCS_BForm_1()
+Lform1 = solver.IPCS_LForm_1()
+AA1 = Bform1.assembly()
 
+Bform2 = solver.IPCS_BForm_2()
+Lform2 = solver.IPCS_LForm_2()
+AA2 = Bform2.assembly()
 
-for i in range(10):
+print(bm.sum(bm.abs(AA2.toarray())))
+for i in range(100):
     t = timeline.next_time_level()
     print(f"第{i+1}步")
     print("time=", t)
+     
+    solver.update_ipcs_0(u0, p0)
+    b0 = LForm0.assembly()
+    A0,b0 = BCu.apply(AA0,b0)
+    us[:] = spsolve(A0, b0, 'mumps')
 
-    solver.NS_update(u1)
-    A = BForm.assembly()
-    b = LForm.assembly()
-    A,b = BC.apply(A,b)
+    solver.update_ipcs_1(us, p0)
+    b1 = Lform1.assembly()
+    A1,b1 = BCp.apply(AA1, b1)
+    p1[:] = spsolve(A1, b1, 'mumps')
 
-    x = spsolve(A, b, 'mumps')
-    u1[:] = x[:ugdof]
-    p1[:] = x[ugdof:]
+    solver.update_ipcs_2(us, p0, p1)
+    b2 = Lform2.assembly()
+    u1[:] = spsolve(AA2, b2, 'mumps')
     
+    u0[:] = u1
+    p0[:] = p1
     fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
     mesh.nodedata['u'] = u1.reshape(2,-1).T
     mesh.nodedata['p'] = p1
     mesh.to_vtk(fname=fname)
-    
+    #print(mesh.error(pde.velocity, u1))
+    print(bm.max(u1))
+
     timeline.advance()

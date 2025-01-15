@@ -39,8 +39,7 @@ class CellSourceIntegrator(LinearInt, SrcInt, CellInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.basis(bcs, index=index)
-        
+        phi = space.basis(bcs, index=index) 
         return bcs, ws, phi, cm, index
 
     def assembly(self, space: _FS) -> TensorLike:

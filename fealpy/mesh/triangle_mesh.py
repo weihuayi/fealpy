@@ -34,6 +34,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             (2, 0, 1)], **kwargs)
 
         self.construct()
+        self.meshtype = 'tri'
 
         self.nodedata = {}
         self.edgedata = {}
@@ -1257,6 +1258,53 @@ class TriangleMesh(SimplexMesh, Plotable):
         node = node - d[..., None] * n
         return cls(node, cell)
 
+    @classmethod
+    def from_unit_circle_gmesh(cls, h, *, itype=None, ftype=None, device=None):
+        """
+        Generate a triangular mesh for a unit circle by gmsh.
+
+        @param h Parameter controlling mesh density
+        @return TriangleMesh instance
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("UnitCircle")
+
+        # 创建单位圆
+        gmsh.model.occ.addDisk(0.0, 0.0, 0.0, 1, 1, 1)
+
+        # 同步几何模型
+        gmsh.model.occ.synchronize()
+
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = node_coords.reshape((-1, 3))[:, :2]
+
+        # 节点编号映射
+        nodetags_map = dict({j: i for i, j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        # 节点编号映射到单元
+        evid = bm.array([nodetags_map[j] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1], -1))
+
+        gmsh.finalize()
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+        return cls(node, cell)
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_ellipsoid(cls, radius=[9, 3, 1], refine=0, *, itype=None, ftype=None, device=None):
@@ -1466,3 +1514,5 @@ class TriangleMesh(SimplexMesh, Plotable):
         return cls(node, cell)
 
 TriangleMesh.set_ploter('2d')
+
+
