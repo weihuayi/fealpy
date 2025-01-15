@@ -99,7 +99,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         c2id = bm.arange(NN*ndof + NE*eidof,
                 NN*ndof+NE*eidof+NC*cidof,dtype=self.itype, device=self.device).reshape(NC, cidof)
         return c2id
-    def cell_to_dof(self):
+    def cell_to_dof(self, index=_S):
         p = self.p
         m = self.m
         mesh = self.mesh
@@ -132,7 +132,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     N+n0:N+n0+n1],axis=1)
                 n0 += n1
                 n1 += 1
-        return c2d
+        return c2d[index]
     def is_boundary_dof(self, threshold, method="interp"): #TODO:这个threshold 没有实现
         p = self.p
         m = self.m
@@ -210,6 +210,11 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     #coeff[:, i, j] = sign*comb(bm.sum(beta),r)*bm.prod(bm.array(comb(dalpha, dbeta),**ikwargs),
                     #                                                   axis=0)*factorial(r)
 
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i],coeff[i+1], atol=1e-15)
+        #    print(i)
+
 
         # 局部自由度 边
         glambda = mesh.grad_lambda()
@@ -234,6 +239,17 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     j = dof2num[j]
                     coeff[:, i, j] = comb(beta_sum_cpu,
                                           int(dalpha))*(factorial(int(dalpha)))**2*val[:, None]
+        
+        ## 测试每个单元顶点的系数矩阵是一样的,与单元无关
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i,:18,:18],coeff[i+1,:18,:18], atol=1e-15)
+        #    print(i)
+        #print(coeff[:, :18, :18])
+        import numpy as np
+        np.savetxt('c.csv', coeff[0], delimiter=',')
+        
+
         #for i in range(NC):
         
         #    coeff[i] = solve_triangular(coeff[i], bm.eye(ldof), lower=True)
