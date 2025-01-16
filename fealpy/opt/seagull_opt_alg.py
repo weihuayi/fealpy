@@ -18,36 +18,21 @@ class SeagullOptAlg(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
-        options = self.options
-        x = options["x0"]
-        N = options["NP"]
-        fit = self.fun(x)
-        MaxIT = options["MaxIters"]
-        dim = options["ndim"]
-        lb, ub = options["domain"]
+    def run(self, Fc=2, u=1, v=1):
+        fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
-        self.gbest = x[gbest_index]
+        self.gbest = self.x[gbest_index]
         self.gbest_f = fit[gbest_index]
-        self.curve = bm.zeros((MaxIT,))
-        self.D_pl = bm.zeros((MaxIT,))
-        self.D_pt = bm.zeros((MaxIT,))
-        self.Div = bm.zeros((1, MaxIT))
-        # Parameters
-        Fc = 2
-        u = 1
-        v = 1
-        for it in range(0, MaxIT):
-            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
-            # exploration percentage and exploitation percentage
-            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
 
-            x = (bm.abs((Fc - (it * Fc / MaxIT)) * x + 2 * ((Fc - (it * Fc / MaxIT)) ** 2) * bm.random.rand(N, 1) * (self.gbest - x)) * 
-                 u * bm.exp(v * bm.random.rand(N, 1) * 2 * bm.pi) * bm.cos(bm.random.rand(N, 1) * 2 * bm.pi) * 
-                 u * bm.exp(v * bm.random.rand(N, 1) * 2 * bm.pi) * bm.sin(bm.random.rand(N, 1) * 2 * bm.pi) * 
-                 u * bm.exp(v * bm.random.rand(N, 1) * 2 * bm.pi) * bm.random.rand(N, 1) * 2 * bm.pi + 
-                 self.gbest) # Eq.(14)
-            x = x + (lb - x) * (x < lb) + (ub - x) * (x > ub)
-            fit = self.fun(x)
-            self.update_gbest(x, fit)
+        for it in range(0, self.MaxIT):
+            self.D_pl_pt(it)
+
+            self.x = (bm.abs((Fc - (it * Fc / self.MaxIT)) * self.x + 2 * ((Fc - (it * Fc / self.MaxIT)) ** 2) * bm.random.rand(self.N, 1) * (self.gbest - self.x)) * 
+                      u * bm.exp(v * bm.random.rand(self.N, 1) * 2 * bm.pi) * bm.cos(bm.random.rand(self.N, 1) * 2 * bm.pi) * 
+                      u * bm.exp(v * bm.random.rand(self.N, 1) * 2 * bm.pi) * bm.sin(bm.random.rand(self.N, 1) * 2 * bm.pi) * 
+                      u * bm.exp(v * bm.random.rand(self.N, 1) * 2 * bm.pi) * bm.random.rand(self.N, 1) * 2 * bm.pi + 
+                      self.gbest) # Eq.(14)
+            self.x = self.x + (self.lb - self.x) * (self.x < self.lb) + (self.ub - self.x) * (self.x > self.ub)
+            fit = self.fun(self.x)
+            self.update_gbest(self.x, fit)
             self.curve[it] = self.gbest_f

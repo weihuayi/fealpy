@@ -27,3 +27,14 @@ from .BrezziDouglasMariniFiniteElementSpace2d import BDMFiniteElementSpace2d
 from .BrezziDouglasMariniFiniteElementSpace3d import BDMFiniteElementSpace3d
 
 from .interior_penalty_fe_space_2d import InteriorPenaltyFESpace2d
+
+## VESpace
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
+from .conforming_scalar_ve_space_2d import ConformingScalarVESpace2d
+from .non_conforming_scalar_ve_space_2d import NonConformingScalarVESpace2d
+
+
+
+
+
+

@@ -678,9 +678,9 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         if D.shape[1] != 1:
             raise ValueError("fast_assembly_stress currently only supports elastic matrices "
                             "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-        D00 = D[..., 0, 0]  # E / (1-\nu^2) * 1
-        D01 = D[..., 0, 1]  # E / (1-\nu^2) * \nu
-        D22 = D[..., 2, 2]  # E / (1-\nu^2) * (1-nu)/2
+        D00 = D[..., 0, 0, None]  # E / (1-\nu^2) * 1
+        D01 = D[..., 0, 1, None]  # E / (1-\nu^2) * \nu
+        D22 = D[..., 2, 2, None]  # E / (1-\nu^2) * (1-nu)/2
 
         A_xx = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 0], JG[..., 0], cm)  # (NC, LDOF, LDOF)
         A_yy = bm.einsum('ijmn, cm, cn, c -> cij', M, JG[..., 1], JG[..., 1], cm)  # (NC, LDOF, LDOF)
