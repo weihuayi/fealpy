@@ -8,6 +8,10 @@
 	@ref 
 '''  
 from fealpy.backend import backend_manager as bm
+from fealpy.mesh.node_mesh import NodeMesh
+from fealpy.cfd.sph.particle_solver_new import SPHSolver
+from fealpy.cfd.sph.particle_kernel_function import QuinticKernel
+from jax_md import space #?
 
 bm.set_backend('numpy')
 
@@ -27,8 +31,10 @@ dim = 2 #维数
 box_size = bm.array([1.0,1.0]) #模拟区域
 path = "./"
 
-
 mesh = NodeMesh.from_tgv_domain(box_size, dx)
 solver = SPHSolver(mesh)
 kernel = QuinticKernel(h=h, dim=2)
 displacement, shift = space.periodic(side=box_size)
+
+for i in range(1):
+    print(i)
