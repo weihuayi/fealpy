@@ -13,7 +13,7 @@ from soptx.material import (
     ElasticMaterialProperties,
     SIMPInterpolation
 )
-from soptx.pde import Cantilever2dData1
+from soptx.pde import MBBBeam2dData1
 from soptx.solver import (ElasticFEMSolver, AssemblyMethod)
 from soptx.filter import (Filter, FilterConfig)
 from soptx.opt import ComplianceObjective, VolumeConstraint
@@ -93,7 +93,7 @@ def create_base_components(config: TestConfig):
                                 interpolation_model=interpolation_model
                             )
     
-    pde = Cantilever2dData1(
+    pde = MBBBeam2dData1(
                 xmin=0, xmax=extent[1] * h[0],
                 ymin=0, ymax=extent[3] * h[1]
             )
@@ -194,18 +194,17 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
 if __name__ == "__main__":
     base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
 
-    # 使用 OC 优化器的配置
+    filter_type = 'sensitivity'
+    optimizer_type = 'oc'
     '''
     参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
     '''
-    filter_type = 'sensitivity'
-    optimizer_type = 'oc'
     config1 = TestConfig(
-        nx=160, ny=100,
-        volume_fraction=0.4,
-        filter_radius=6.0,
+        nx=60, ny=20,
+        volume_fraction=0.5,
+        filter_radius=2.4,
         filter_type=filter_type,       # 指定使用灵敏度滤波器
-        save_dir=f'{base_dir}/cantilever_2d_{filter_type}_{optimizer_type}',
+        save_dir=f'{base_dir}/mbb_beam_2d_{filter_type}_{optimizer_type}',
         mesh_type='uniform_mesh_2d',
         assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
         optimizer_type=optimizer_type,  # 指定使用 OC 优化器
@@ -213,15 +212,17 @@ if __name__ == "__main__":
         tolerance=0.01
     )
     
-    # 使用 MMA 优化器的配置
-    filter_type = 'sensitivity'
-    optimizer_type = 'mma'
+    filter_type = 'density'
+    optimizer_type = 'oc'
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
     config2 = TestConfig(
-        nx=160, ny=100,
-        volume_fraction=0.4,
-        filter_radius=6.0,
-        filter_type=filter_type,       # 指定使用灵敏度滤波器
-        save_dir=f'{base_dir}/cantilever_2d_{filter_type}_{optimizer_type}',
+        nx=60, ny=20,
+        volume_fraction=0.5,
+        filter_radius=2.4,
+        filter_type=filter_type,       # 指定使用密度滤波器
+        save_dir=f'{base_dir}/mbb_beam_2d_{filter_type}_{optimizer_type}',
         mesh_type='uniform_mesh_2d',
         assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
         optimizer_type=optimizer_type,  # 指定使用 OC 优化器

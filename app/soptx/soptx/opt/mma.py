@@ -282,8 +282,8 @@ class MMAOptimizer(OptimizerBase):
             
             # MMA 方法
             volfrac = self.constraint.volume_fraction
-            # 体积约束对设计变量的标准化梯度
             fval = bm.sum(rho_phys[:]) / (volfrac * obj_grad.shape[0]) - 1
+            # 体积约束对设计变量的标准化梯度
             dfdx = con_grad[:, None].T / (volfrac * con_grad.shape[0]) # (m, n)
             rho_new, low, upp = self._solve_subproblem(
                                         xval=rho[:, None], fval=fval, 
