@@ -18,43 +18,31 @@ class ArtificialRabbitsOpt(Optimizer):
         super().__init__(option)
         
     def run(self):
-        options = self.options
-        x = options["x0"]
-        N = options["NP"]
-        fit = self.fun(x)
-        MaxIT = options["MaxIters"]
-        dim = options["ndim"]
-        lb, ub = options["domain"]
+        fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
-        self.gbest = x[gbest_index]
+        self.gbest = self.x[gbest_index]
         self.gbest_f = fit[gbest_index]
-        self.curve = bm.zeros((MaxIT,))
-        self.D_pl = bm.zeros((MaxIT,))
-        self.D_pt = bm.zeros((MaxIT,))
-        self.Div = bm.zeros((1, MaxIT))
-        for it in range(MaxIT):
-            self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x)) / N)
-            # exploration percentage and exploitation percentage
-            self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
+        for it in range(self.MaxIT):
+            self.D_pl_pt(it)
 
-            A = 4 * (1 - it / MaxIT) * bm.log(1 / bm.random.rand(1))
-            R = (bm.exp(bm.array(1)) - bm.exp(bm.array(((it - 1) / MaxIT) ** 2))) * bm.sin(2 * bm.pi * bm.random.rand(N, 1)) * bm.random.randint(0, 2, (N, dim))
+            A = 4 * (1 - it / self.MaxIT) * bm.log(1 / bm.random.rand(1))
+            R = (bm.exp(bm.array(1)) - bm.exp(bm.array(((it - 1) / self.MaxIT) ** 2))) * bm.sin(2 * bm.pi * bm.random.rand(self.N, 1)) * bm.random.randint(0, 2, (self.N, self.dim))
 
-            rand_index = bm.random.randint(0, N, (N,))
+            rand_index = bm.random.randint(0, self.N, (self.N,))
 
-            r4 = bm.random.rand(N, 1)
-            H = (MaxIT - it + 1) * r4 / MaxIT
-            k = bm.random.randint(0, dim, (N,))
-            g = bm.zeros((N, dim))
-            g[bm.arange(N), k] = 1
-            b = x + H * g * x
+            r4 = bm.random.rand(self.N, 1)
+            H = (self.MaxIT - it + 1) * r4 / self.MaxIT
+            k = bm.random.randint(0, self.dim, (self.N,))
+            g = bm.zeros((self.N, self.dim))
+            g[bm.arange(self.N), k] = 1
+            b = self.x + H * g * self.x
             if A > 1:
-                x_new = x[rand_index] + R * (x - x[rand_index]) + bm.round(0.5 * (0.05 + bm.random.rand(N, dim))) * bm.random.randn(N, dim)
+                x_new = self.x[rand_index] + R * (self.x - self.x[rand_index]) + bm.round(0.5 * (0.05 + bm.random.rand(self.N, self.dim))) * bm.random.randn(self.N, self.dim)
             else:
-                x_new = x + R * (r4 * b - x)
-            x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
+                x_new = self.x + R * (r4 * b - self.x)
+            x_new = x_new + (self.lb - x_new) * (x_new < self.lb) + (self.ub - x_new) * (x_new > self.ub)
             fit_new = self.fun(x_new)
             mask = fit_new < fit 
-            x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
-            self.update_gbest(x, fit)
+            self.x, fit = bm.where(mask[:, None], x_new, self.x), bm.where(mask, fit_new, fit)
+            self.update_gbest(self.x, fit)
             self.curve[it] = self.gbest_f
