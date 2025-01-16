@@ -81,7 +81,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
                 p = self.p
                 bcs = self.mesh.multi_index_matrix(p, TD)/p
                 uI = u(bcs)
-        return uI
+        return self.function(uI)
     
     @barycentric
     def edge_basis(self, bc: TensorLike):

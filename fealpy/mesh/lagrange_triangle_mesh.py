@@ -209,11 +209,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         """
         @berif ltri网格上插值点总数
         """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
+        NN = self.linearmesh.number_of_nodes()
+        NE = self.linearmesh.number_of_edges()
+        NC = self.linearmesh.number_of_cells()
         num = (NN, NE, NC)
-        return simplex_gdof(p, num)
+        return simplex_gdof(p, num) 
 
     def cell_to_ipoint(self, p:int, index:Index=_S):
         """
@@ -269,6 +269,20 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         val = NN + NE*(p-1) + bm.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         c2p = bm.set_at(c2p, (..., flag), val)
         return c2p[index]
+
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        """Get the relationship between edges and integration points."""
+        NN = self.linearmesh.number_of_nodes()
+        NE = self.number_of_edges()
+        edges = self.edge[index]
+        # kwargs = {'dtype': edges.dtype}
+        kwargs = bm.context(edges)
+        indices = bm.arange(NE, **kwargs)[index]
+        return bm.concatenate([
+            edges[:, 0].reshape(-1, 1),
+            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
+            edges[:, -1].reshape(-1, 1),
+        ], axis=-1)
 
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
