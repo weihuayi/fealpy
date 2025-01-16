@@ -37,7 +37,7 @@ if __name__ == '__main__':
     feature_points = [data[name+"_feature_points"] for name in data['name']]
     pictures = [Picture(data_path, picture, fp, pic_folder) for picture, fp,
                 pic_folder in 
-                zip(data['pictures'], feature_points, data['pic_folder'])]
+                zip(data['test_pictures'], feature_points, data['pic_folder'])]
 
     cameras = [Camera(pic, data_path, chessboard_dir, loc, axes) 
                for pic, chessboard_dir, loc, axes in 
