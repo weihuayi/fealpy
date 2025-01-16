@@ -32,6 +32,7 @@ class CurlCurlIntegrator(LinearInt, OpInt, CellInt):
 
     def assembly(self, space, index: Index = _S, 
                              cellmeasure=None, out=None):
+        coef = self.coef
         mesh = space.mesh
         NC = mesh.number_of_cells()
         GD = space.mesh.geo_dimension()
@@ -44,10 +45,13 @@ class CurlCurlIntegrator(LinearInt, OpInt, CellInt):
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         cphi = space.curl_basis(bcs) #(NQ, NC, ldof)
-        if GD==2:
-            cphi = cphi[..., None]
-        A = self.coef*bm.einsum("cqli, cqdi, c, q->cld", cphi, cphi, cm, ws)
-        if out is None:
-            return A
-        else:
-            out += A
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        return bilinear_integral(cphi, cphi, ws, cm, val)
+        
+        # if GD==2:
+        #     cphi = cphi[..., None]
+        # A = self.coef*bm.einsum("cqli, cqdi, c, q->cld", cphi, cphi, cm, ws)
+        # if out is None:
+        #     return A
+        # else:
+        #     out += A
