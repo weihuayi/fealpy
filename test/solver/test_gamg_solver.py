@@ -13,7 +13,16 @@ class TestGAMGSolverInterfaces:
         solver = GAMGSolver(**data) 
         assert solver is not None
         assert solver.maxit == data['maxit']
+
+
         
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_vcycle(self, backend):
+        bm.set_backend(backend)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch', 'jax'])
+    def test_wcycle(self, backend):
+        bm.set_backend(backend)
 
 
 if __name__ == "__main__":
