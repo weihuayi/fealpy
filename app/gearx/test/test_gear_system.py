@@ -35,7 +35,7 @@ class TestGearSystem:
         tooth_width = data['tooth_width']
         inner_diam = data['inner_diam']  # 轮缘内径
         # m_n = 2.25
-        z = 18
+        # z = 18
         # alpha_n = 17.5
         # beta = 30
         # x_n = 0.4
@@ -424,44 +424,11 @@ class TestGearSystem:
 
         hex_mesh = internal_gear.generate_hexahedron_mesh()
         target_hex_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
-        # part_external_gear_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
-        # part_external_gear_mesh_wheel = internal_gear.set_target_tooth([0, 1, 2, 78, 79], get_wheel=True)
-        #
-        # part_external_gear_mesh.to_vtk(fname='../data/part_internal_gear_mesh.vtu')
-        # part_external_gear_mesh_wheel.to_vtk(fname='../data/part_internal_gear_hex_mesh_wheel.vtu')
+        part_internal_gear_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
+        part_internal_gear_mesh_wheel = internal_gear.set_target_tooth([0, 1, 2, 78, 79], get_wheel=True)
 
-        n = 15
-        helix_d = np.linspace(internal_gear.d, internal_gear.d_a, n)
-        helix_width = np.linspace(0, internal_gear.tooth_width, n)
-        helix_node = internal_gear.cylindrical_to_cartesian(helix_d, helix_width)
-
-        target_cell_idx = np.zeros(n, np.int32)
-        face_normal = np.zeros((n, 3), np.float64)
-        parameters = np.zeros((n, 3), np.float64)
-        for i, t_node in enumerate(helix_node):
-            target_cell_idx[i], face_normal[i], parameters[i] = internal_gear.find_node_location_kd_tree(t_node)
-
-        # 法向量后处理
-        # 计算平均法向量
-        average_normal = np.mean(face_normal, axis=0)
-        average_normal /= np.linalg.norm(average_normal)
-
-        threshold = 0.1
-        for i in range(len(face_normal)):
-            deviation = np.linalg.norm(face_normal[i] - average_normal)
-            if deviation > threshold:
-                face_normal[i] = average_normal
-
-        # 寻找外圈上节点
-        node = target_hex_mesh.node
-        node_r = np.sqrt(node[:, 0] ** 2 + node[:, 1] ** 2)
-        is_outer_node = np.abs(node_r - internal_gear.outer_diam / 2) < 1e-11
-        outer_node_idx = np.where(np.abs(node_r - internal_gear.outer_diam / 2)<1e-11)[0]
-
-        with open('../data/part_internal_gear_data.pkl', 'wb') as f:
-            pickle.dump({'internal_gear': internal_gear, 'hex_mesh': target_hex_mesh, 'helix_node': helix_node,
-                         'target_cell_idx': target_cell_idx, 'parameters': parameters,
-                         'is_outer_node': is_outer_node, 'inner_node_idx': outer_node_idx}, f)
+        part_internal_gear_mesh.to_vtk(fname='../data/part_internal_gear_mesh.vtu')
+        part_internal_gear_mesh_wheel.to_vtk(fname='../data/part_internal_gear_hex_mesh_wheel_new.vtu')
 
     def test_get_part_external_gear(self):
         with open('../data/external_gear_data.json', 'r') as file:
@@ -501,8 +468,8 @@ class TestGearSystem:
         hex_mesh = data['hex_mesh']
         quad_mesh = data['quad_mesh']
 
-        mesh = external_gear.set_target_tooth([0, 1, 17])
-        external_gear.target_quad_mesh.to_vtk(fname='../data/face_normal_target_quad_mesh.vtu')
+        mesh = external_gear.set_target_tooth([0, 1, 18])
+        # external_gear.target_quad_mesh.to_vtk(fname='../data/face_normal_target_quad_mesh.vtu')
 
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
@@ -527,7 +494,7 @@ class TestGearSystem:
         quad_mesh = data['quad_mesh']
 
         mesh = internal_gear.set_target_tooth([78, 79, 0, 1, 2])
-        internal_gear.target_quad_mesh.to_vtk(fname='../data/face_normal_target_quad_mesh_internal.vtu')
+        # internal_gear.target_quad_mesh.to_vtk(fname='../data/face_normal_target_quad_mesh_internal.vtu')
 
         # 齿面上的节点索引和坐标
         node_indices_tuple, noe_coord_tuple, profile_node_normal = internal_gear.get_profile_node_index(tooth_tag=0)

@@ -1,5 +1,5 @@
 """
-外齿轮 15 个载荷点的算例
+外齿轮 1 个载荷点的算例 (左右齿面)
 """
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import HexahedronMesh
@@ -14,21 +14,14 @@ from fealpy.solver import cg, spsolve
 from soptx.utils import timer
 
 from app.soptx.linear_elasticity.JingYiGearProject.utils import export_to_inp
-from app.gearx.gear import ExternalGear, InternalGear
+from app.gearx.gear import ExternalGear
 import json
-
-def compute_strain_stress(tensor_space, uh, B_BBar, D):
-    cell2tdof = tensor_space.cell_to_dof()
-    cuh = uh[cell2tdof]  # (NC, TLDOF) 
-    strain = bm.einsum('cqil, cl -> cqi', B_BBar, cuh) # (NC, NQ, 6)
-    stress = bm.einsum('cqij, cqi -> cqj', D, strain)  # (NC, NQ, 6)
-    
-    return strain, stress
 
 bm.set_backend('numpy')
 
-with open('/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/json/external_gear_data.json', 'r') \
-        as file:data = json.load(file)
+with open(
+'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/json/external_gear_data.json', 'r') \
+    as file:data = json.load(file)
 m_n = data['mn']  # 法向模数
 z = data['z']  # 齿数
 alpha_n = data['alpha_n']  # 法向压力角
@@ -99,22 +92,23 @@ bform = BilinearForm(tensor_space)
 bform.add_integrator(integrator_K)
 K = bform.assembly(format='csr')
 
-# 齿面上的节点索引和坐标
-node_indices_tuple, noe_coord_tuple = external_gear.get_profile_node_index(tooth_tag=0)
+# 齿面上的节点索引, 坐标和内法线方向
+node_indices_tuple, node_coord_tuple, profile_node_normal_tuple = external_gear.get_profile_node_index(tooth_tag=0)
 node_indices_left = node_indices_tuple[0].reshape(-1, 1)
 node_indices_right = node_indices_tuple[1].reshape(-1, 1)
 node_indices = bm.concatenate([node_indices_left, node_indices_right], axis=0) # (NPN, 1)
-node_coord_left = noe_coord_tuple[0].reshape(-1, 3)
-node_coord_right = noe_coord_tuple[1].reshape(-1, 3)
+node_coord_left = node_coord_tuple[0].reshape(-1, 3)
+node_coord_right = node_coord_tuple[1].reshape(-1, 3)
 node_coord = bm.concatenate([node_coord_left, node_coord_right], axis=0)       # (NPN, GD)
+profile_node_normal_left = profile_node_normal_tuple[0].reshape(-1, 3)
+profile_node_normal_right = profile_node_normal_tuple[1].reshape(-1, 3)
+profile_node_normal = bm.concatenate([profile_node_normal_left, profile_node_normal_right], axis=0) # (NPN, GD)
 # 齿面上的节点数
 NPN = node_indices.shape[0]
-# TODO 齿面上节点的内法线方向 
-face_normal = bm.ones((NPN, 3), bm.float64)
 # 节点载荷值
 load_values = 1000
 # 所有节点的内法线载荷向量
-P = load_values * face_normal  # (NPN, 3)
+P = load_values * profile_node_normal  # (NPN, GD)
 # 齿面上节点对应的全局自由度编号（跟顺序有关）
 if tensor_space.dof_priority:
     dof_indices = bm.stack([sgdof * d + node_indices.reshape(-1) for d in range(GD)], axis=1) # (NPN, GD)
@@ -134,7 +128,7 @@ dbc = DirichletBC(space=tensor_space,
                     method='interp')
 # 齿面上所有节点的位移结果
 uh_profiles = bm.zeros((NPN, GD), dtype=bm.float64) # (NPN, GD)
-for i in range(3):
+for i in range(NPN):
     # 创建计时器
     t = timer(f"Timing_{i}")
     next(t)  # 启动计时器
@@ -153,10 +147,10 @@ for i in range(3):
     logger.setLevel('INFO')
     uh = tensor_space.function()
     # uh[:] = cg(K, F, maxiter=10000, atol=1e-8, rtol=1e-8)
-    uh[:] = spsolve(K, F, solver="mumps")
+    uh[:] = spsolve(K, F, solver="mumps") # (tgdof, )
     t.send('求解时间')
     # 获取齿面上节点的位移
-    uh_profile = uh[dof_indices[i, :]]
+    uh_profile = uh[dof_indices[i, :]]    # (GD, )
     uh_profiles[i, :] = uh_profile
     # 计算残差向量和范数
     residual = K.matmul(uh[:]) - F  
@@ -185,5 +179,5 @@ for i in range(3):
                     young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
                     used_app='abaqus', mesh_type='hex')
 # 计算齿面上节点的内法线方向位移
-uh_normal = bm.sum(uh_profiles * face_normal, axis=1) # (NPN, )
+uh_normal = bm.sum(uh_profiles * profile_node_normal, axis=1) # (NPN, )
 print("-----------")
