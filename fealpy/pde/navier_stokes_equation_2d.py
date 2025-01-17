@@ -49,11 +49,6 @@ class ChannelFlow:
         tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
         return tag_up | tag_down 
     
-
-
-
-
-
 class FlowPastCylinder:
     '''
     @brief 圆柱绕流
