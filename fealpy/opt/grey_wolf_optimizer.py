@@ -12,13 +12,7 @@ class GreyWolfOpt(Optimizer):
 
 
     def run(self):
-        # options = self.options
-        # X = options["x0"]
-        # N = options["NP"]
         fit = self.fun(self.x)
-        # MaxIT = options["MaxIters"]
-        # dim = options["ndim"]
-        # lb, ub = options["domain"]
 
         X_fit_sort = bm.argsort(fit, axis=0)
 
@@ -37,16 +31,9 @@ class GreyWolfOpt(Optimizer):
         #空列表
         self.gbest_f = X_alpha_fit
         self.gbest = X_alpha
-        # self.curve = bm.zeros((MaxIT,))
-        # self.D_pl = bm.zeros((MaxIT,))
-        # self.D_pt = bm.zeros((MaxIT,))
-        # self.Div = bm.zeros((1, MaxIT))
 
         for it in range(0, self.MaxIT):
             self.D_pl_pt(it)
-            # self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(X, axis=0) - X)) / N)
-            # # exploration percentage and exploitation percentage
-            # self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
             
             a = 2 - 2 * it / self.MaxIT
 
