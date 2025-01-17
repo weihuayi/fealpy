@@ -192,6 +192,9 @@ if __name__ == "__main__":
     base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
 
     # 使用 OC 优化器的配置
+    '''
+    参数来源论文: An efficient 3D topology optimization code written in Matlab
+    '''
     filter_type = 'density'
     optimizer_type = 'oc'
     config1 = TestConfig(
@@ -209,6 +212,9 @@ if __name__ == "__main__":
     )
     
     # 使用 MMA 优化器的配置
+    '''
+    参数来源论文: An efficient 3D topology optimization code written in Matlab
+    '''
     filter_type = 'density'
     optimizer_type = 'mma'
     config2 = TestConfig(
