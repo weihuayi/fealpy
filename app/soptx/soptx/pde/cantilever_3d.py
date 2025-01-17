@@ -7,6 +7,9 @@ from typing import Tuple, Callable
 
 
 class Cantilever3dData1:
+    '''
+    模型来源论文: An efficient 3D topology optimization code written in Matlab
+    '''
     def __init__(self,
                 xmin: float=0, xmax: float=60, 
                 ymin: float=0, ymax: float=20,

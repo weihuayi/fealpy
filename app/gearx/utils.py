@@ -722,7 +722,7 @@ def face_normal_bilinear(cell_nodes, u, v, w, error=1e-3, is_normalize=True):
 def get_face_normal_with_reference(cell_node, reference_normal, error=1e-3, is_normalize=True):
     '''
     给定一组六面体单元，以及一个参考法向，计算该单元的六个面的法向，并返回与参考法向最接近的法向
-    :param cell: 计算单元节点坐标
+    :param cell_node: 计算单元节点坐标
     :param reference_normal: 参考法向
     :param error: 误差限制
     :param is_normalize: 是否归一化
