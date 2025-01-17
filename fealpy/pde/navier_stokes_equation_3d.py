@@ -19,7 +19,7 @@ class ChannelFlow:
         self.R = 1
     
     def mesh(self, lc):
-        mesh = TetrahedronMesh.from_cylinder_gmsh(0.5, 3, lc)
+        mesh = TetrahedronMesh.from_cylinder_gmsh(0.5, 1, lc)
         return mesh
     
     @cartesian
@@ -28,12 +28,13 @@ class ChannelFlow:
         y = p[...,1]
         z = p[...,2]
         value = bm.zeros(p.shape)
+        value[...,0] = 4*(0.25-y**2-x**2)
         return value
     
     @cartesian
     def pressure(self, p):
         z = p[..., 2]
-        val = 8*(3-z) 
+        val = 8*(1-z) 
         return val
     
     @cartesian
