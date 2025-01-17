@@ -13,7 +13,8 @@ from fealpy.solver import cg
 pde=Parabolic2dData('exp(-2*pi**2*t)*sin(pi*x)*sin(pi*y)','x','y','t')
 nx = 20
 ny = 20
-mesh = TriangleMesh.from_box([0, 1, 0, 1], nx,ny)
+#mesh = TriangleMesh.from_box([0, 1, 0, 1], nx,ny)
+mesh =TriangleMesh.from_unit_circle_gmesh(0.05)
 node = mesh.node
 isBdNode = mesh.boundary_node_flag()
 p0 = pde.init_solution(node) #准备一个初值
@@ -63,4 +64,3 @@ for n in range(nt):
     mesh.nodedata['temp'] = p.flatten()
     name = os.path.join(output, f'{filename}_{n:010}.vtu')
     mesh.to_vtk(fname=name)
-

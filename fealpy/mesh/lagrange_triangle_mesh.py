@@ -10,8 +10,8 @@ from .triangle_mesh import TriangleMesh
 
 
 class LagrangeTriangleMesh(HomogeneousMesh):
-    def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
-            construct=False):
+    def __init__(self, node: TensorLike, cell: TensorLike, p=1, curve=None, 
+            surface=None, construct=False):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
@@ -95,9 +95,29 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return bm.concatenate(ipoint_list, axis=0)[index]  # (gdof, GD)
 
     @classmethod
+    def from_curve_triangle_mesh(cls, mesh, p: int, curve=None):
+        init_node = mesh.entity('node')
+
+        node = mesh.interpolation_points(p)
+        cell = mesh.cell_to_ipoint(p)
+        if curve is not None:
+            boundary_edge = mesh.boundary_edge_flag()
+            e2p = mesh.edge_to_ipoint(p)[boundary_edge].flatten()
+
+            init_node[:], _ = curve.project(init_node) 
+            node[e2p], _ = curve.project(node[e2p])
+
+        lmesh = cls(node, cell, p=p, construct=True)
+        lmesh.linearmesh = mesh
+
+        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
+        lmesh.cell2edge = mesh.cell_to_edge()
+        lmesh.edge  = mesh.edge_to_ipoint(p)
+        return lmesh
+
+    @classmethod
     def from_triangle_mesh(cls, mesh, p: int, surface=None):
         init_node = mesh.entity('node')
-        #cls.dof = LinearMeshCFEDof(mesh, p=p)
 
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
@@ -140,15 +160,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return p
     
     # shape function
-    def shape_function(self, bc: TensorLike, p: int=1, variables='x'):
-        p = self.p 
+    def shape_function(self, bc: TensorLike, p: int=None, variables='x'):
+        p = self.p if p is None else p 
         phi = bm.simplex_shape_function(bc, p=p)
         if variables == 'u':
             return phi
         elif variables == 'x':
             return phi[None, :, :]
 
-    def grad_shape_function(self, bc: TensorLike, p: int=1, 
+    def grad_shape_function(self, bc: TensorLike, p: int=None, 
                             index: Index=_S, variables='x'):
         """
         @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
@@ -158,7 +178,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lambda_2 = eta
 
         """
-        p = self.p
+        p = self.p if p is None else p 
         TD = bc.shape[-1] - 1
         if TD == 2:
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
@@ -189,11 +209,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         """
         @berif ltri网格上插值点总数
         """
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
+        NN = self.linearmesh.number_of_nodes()
+        NE = self.linearmesh.number_of_edges()
+        NC = self.linearmesh.number_of_cells()
         num = (NN, NE, NC)
-        return simplex_gdof(p, num)
+        return simplex_gdof(p, num) 
 
     def cell_to_ipoint(self, p:int, index:Index=_S):
         """
@@ -249,6 +269,20 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         val = NN + NE*(p-1) + bm.arange(NC*cdof, **kwargs).reshape(NC, cdof)
         c2p = bm.set_at(c2p, (..., flag), val)
         return c2p[index]
+
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        """Get the relationship between edges and integration points."""
+        NN = self.linearmesh.number_of_nodes()
+        NE = self.number_of_edges()
+        edges = self.edge[index]
+        # kwargs = {'dtype': edges.dtype}
+        kwargs = bm.context(edges)
+        indices = bm.arange(NE, **kwargs)[index]
+        return bm.concatenate([
+            edges[:, 0].reshape(-1, 1),
+            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
+            edges[:, -1].reshape(-1, 1),
+        ], axis=-1)
 
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
@@ -454,7 +488,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         if GD == 2:
             node = bm.concatenate((node, bm.zeros((node.shape[0], 1), dtype=bm.float64)), axis=1)
 
-        #cell = self.entity(etype)[index]
         cell = self.entity(etype, index)
         cellType = self.vtk_cell_type(etype)
         idx = vtk_cell_index(self.p, cellType)

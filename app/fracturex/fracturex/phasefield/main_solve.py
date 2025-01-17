@@ -273,20 +273,19 @@ class MainSolve:
         @barycentric
         def mass_coef2(bc, index):
             gg_gd = self.EDFunc.grad_grad_degradation_function(d(bc))
-            return gg_gd * self.pfcm.maximum_historical_field(bc)
+            self.H = self.pfcm.maximum_historical_field(bc)
+            return gg_gd * self.H
         
         @barycentric
         def source_coef(bc, index):
             gc_gd = self.EDFunc.grad_degradation_function_constant_coef()
-            return -1 * gc_gd * self.pfcm.maximum_historical_field(bc)
+            return -1 * gc_gd * self.H
 
         tmr = self.tmr
         tmr.send('phase_start')
 
         dbform = BilinearForm(self.space)
-        dbform.add_integrator(ScalarDiffusionIntegrator(coef=diff_coef, q=self.q))
-        dbform.add_integrator(ScalarMassIntegrator(coef=mass_coef1, q=self.q))
-        dbform.add_integrator(ScalarMassIntegrator(coef=mass_coef2, q=self.q))
+        dbform.add_integrator(ScalarDiffusionIntegrator(coef=diff_coef, q=self.q), ScalarMassIntegrator(coef=mass_coef1, q=self.q), ScalarMassIntegrator(coef=mass_coef2, q=self.q))
         A = dbform.assembly()
         tmr.send('phase_matrix_assemble')
 
@@ -337,10 +336,9 @@ class MainSolve:
         postive_coef.kernel_func = self.pfcm.positive_stress_func
 
         ubform = NonlinearForm(self.tspace)
-        ubform.add_integrator(NonlinearElasticIntegrator(coef=postive_coef, material=self.pfcm, q=self.q))
 
         if self.model_type == 'HybridModel' or self.model_type == 'IsotropicModel':
-            pass
+            ubform.add_integrator(NonlinearElasticIntegrator(coef=postive_coef, material=self.pfcm, q=self.q))
         else:
             @barycentric
             def negative_coef(bc, **kwargs):
@@ -349,7 +347,7 @@ class MainSolve:
             negative_coef.uh = uh
             negative_coef.kernel_func = self.pfcm.negative_stress_func
 
-            ubform.add_integrator(NonlinearElasticIntegrator(coef=negative_coef, material=self.pfcm, q=self.q))
+            ubform.add_integrator(NonlinearElasticIntegrator(coef=postive_coef, material=self.pfcm, q=self.q), NonlinearElasticIntegrator(coef=negative_coef, material=self.pfcm, q=self.q))
             
         A, R = ubform.assembly()
 
@@ -408,7 +406,8 @@ class MainSolve:
                 
         @barycentric
         def mass_coef2(bc, **kwargs):
-            return self.pfcm.maximum_historical_field(bc)
+            self.H = self.pfcm.maximum_historical_field(bc)
+            return self.H
         
         @barycentric
         def mass_kernel_func2(u):
@@ -436,9 +435,9 @@ class MainSolve:
 
         # using automatic differentiation to assemble the phase field system        
         dform = NonlinearForm(self.space)
-        dform.add_integrator(ScalarNonlinearDiffusionIntegrator(diffusion_coef, q=self.q)) 
-        dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef1, q=self.q))
-        dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef2, q=self.q))
+        dform.add_integrator(ScalarNonlinearDiffusionIntegrator(diffusion_coef, q=self.q), ScalarNonlinearMassIntegrator(mass_coef1, q=self.q), ScalarNonlinearMassIntegrator(mass_coef2, q=self.q)) 
+        #dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef1, q=self.q))
+        #dform.add_integrator(ScalarNonlinearMassIntegrator(mass_coef2, q=self.q))
         #dform.add_integrator(ScalarSourceIntegrator(source_coef, q=self.q))
 
         A, R = dform.assembly()

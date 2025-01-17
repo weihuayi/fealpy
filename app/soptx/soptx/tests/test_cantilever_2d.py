@@ -1,4 +1,4 @@
-"""2D """
+"""2D 悬臂梁"""
 
 from dataclasses import dataclass
 from typing import Literal, Optional, Union, Dict, Any
@@ -14,23 +14,23 @@ from soptx.material import (
     SIMPInterpolation
 )
 from soptx.pde import Cantilever2dData1
-from soptx.solver import (ElasticFEMSolver, 
-                          AssemblyMethod)
+from soptx.solver import (ElasticFEMSolver, AssemblyMethod)
+from soptx.filter import (Filter, FilterConfig)
 from soptx.opt import ComplianceObjective, VolumeConstraint
-from soptx.filter import Filter, FilterConfig
+
 from soptx.opt import OCOptimizer, save_optimization_history
+from soptx.opt import MMAOptimizer
 
 @dataclass
 class TestConfig:
     """Configuration for topology optimization test cases."""
     # Required parameters (no default values)
-    problem_type: Literal['cantilever_2d']
     nx: int
     ny: int
     volume_fraction: float
     filter_radius: float
     filter_type: Literal['sensitivity', 'density', 'heaviside']
-    max_iterations: int
+
     save_dir: Union[str, Path]
     mesh_type: Literal['uniform_mesh_2d', 'triangle_mesh']
     assembly_method: AssemblyMethod
@@ -41,10 +41,22 @@ class TestConfig:
     minimal_modulus: float = 1e-9
     penalty_factor: float = 3.0
     projection_beta: Optional[float] = None  # Only for Heaviside projection
-    move_limit: float = 0.2
+
+    # 新增优化器类型参数
+    optimizer_type: Literal['oc', 'mma'] = 'oc'  # 默认使用 OC 方法
+    max_iterations: int = 100
     tolerance: float = 0.01
+    
+    # OC 优化器的参数
+    move_limit: float = 0.2
+    damping_coef: float = 0.5
     initial_lambda: float = 1e9
     bisection_tol: float = 1e-3
+
+    # MMA 优化器的参数
+    asymp_init: float = 0.5
+    asymp_incr: float = 1.2
+    asymp_decr: float = 0.7
 
 
 def create_base_components(config: TestConfig):
@@ -106,41 +118,60 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     """Run topology optimization test with given configuration."""
     # Create base components
     mesh, space_D, material_properties, solver, rho = create_base_components(config)
+    NC = mesh.number_of_cells()
     
     # Create filter based on configuration
     filter_config = FilterConfig(
-                        filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
-                        filter_radius=config.filter_radius
-                    )
+                    filter_type={'sensitivity': 0, 'density': 1, 'heaviside': 2}[config.filter_type],
+                    filter_radius=config.filter_radius)
     filter_obj = Filter(filter_config)
     filter_obj.initialize(mesh)
     
     # Create optimization components
     objective = ComplianceObjective(
-                            material_properties=material_properties,
-                            solver=solver,
-                            filter=filter_obj
-                        )
+                    material_properties=material_properties,
+                    solver=solver)
+
     constraint = VolumeConstraint(
-                        mesh=mesh,
-                        volume_fraction=config.volume_fraction,
-                        filter=filter_obj
+                    mesh=mesh,
+                    volume_fraction=config.volume_fraction)
+    
+    # 根据配置创建优化器
+    if config.optimizer_type == 'oc':
+        optimizer = OCOptimizer(
+                        objective=objective,
+                        constraint=constraint,
+                        filter=filter_obj,
+                        options={
+                            'max_iterations': config.max_iterations,
+                            'move_limit': config.move_limit,
+                            'damping': config.damping_coef,
+                            'tolerance': config.tolerance,
+                            'initial_lambda': config.initial_lambda,
+                            'bisection_tol': config.bisection_tol
+                        }
                     )
-    
-    # Create optimizer
-    optimizer = OCOptimizer(
-                    objective=objective,
-                    constraint=constraint,
-                    filter=filter_obj,
-                    options={
-                        'max_iterations': config.max_iterations,
-                        'move_limit': config.move_limit,
-                        'tolerance': config.tolerance,
-                        'initial_lambda': config.initial_lambda,
-                        'bisection_tol': config.bisection_tol
-                    }
-                )
-    
+    elif config.optimizer_type == 'mma':
+        optimizer = MMAOptimizer(
+                        objective=objective,
+                        constraint=constraint,
+                        filter=filter_obj,
+                        options={
+                            'max_iterations': config.max_iterations,
+                            'tolerance': config.tolerance,
+                            'm': 1,
+                            'n': NC,
+                            'xmin': bm.zeros(NC, dtype=bm.float64).reshape(-1, 1),
+                            'xmax': bm.ones(NC, dtype=bm.float64).reshape(-1, 1),
+                            "a0": 1,
+                            "a": bm.zeros(1, dtype=bm.float64).reshape(-1, 1),
+                            'c': 1e4 * bm.ones(1, dtype=bm.float64).reshape(-1, 1),
+                            'd': bm.zeros(1, dtype=bm.float64).reshape(-1,),
+                        }
+                    )
+    else:
+        raise ValueError(f"Unsupported optimizer type: {config.optimizer_type}")
+
     # Prepare optimization parameters
     opt_params = {}
     if config.filter_type == 'heaviside' and config.projection_beta is not None:
@@ -161,30 +192,42 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     }
 
 if __name__ == "__main__":
-    config1 = TestConfig(
-                    problem_type='cantilever_2d',
-                    nx=160, ny=100,
-                    volume_fraction=0.4,
-                    filter_radius=6.0,
-                    filter_type='sensitivity',
-                    max_iterations=100,
-                    save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d',
-                    mesh_type='uniform_mesh_2d',
-                    assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM
-                    # assembly_method=AssemblyMethod.VOIGT_UNIFORM
-                )
-    
-    config2 = TestConfig(
-                    problem_type='cantilever_2d',
-                    nx=160, ny=100,
-                    volume_fraction=0.4,
-                    filter_radius=6.0,
-                    filter_type='sensitivity',
-                    max_iterations=5,
-                    save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d',
-                    mesh_type='triangle_mesh',
-                    assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM
-                )
+    base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
 
-    result = run_optimization_test(config1)
+    # 使用 OC 优化器的配置
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
+    filter_type = 'sensitivity'
+    optimizer_type = 'oc'
+    config1 = TestConfig(
+        nx=160, ny=100,
+        volume_fraction=0.4,
+        filter_radius=6.0,
+        filter_type=filter_type,       # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/cantilever_2d_{filter_type}_{optimizer_type}',
+        mesh_type='uniform_mesh_2d',
+        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
+    )
+    
+    # 使用 MMA 优化器的配置
+    filter_type = 'sensitivity'
+    optimizer_type = 'mma'
+    config2 = TestConfig(
+        nx=160, ny=100,
+        volume_fraction=0.4,
+        filter_radius=6.0,
+        filter_type=filter_type,       # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/cantilever_2d_{filter_type}_{optimizer_type}',
+        mesh_type='uniform_mesh_2d',
+        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
+    )
+
+    result = run_optimization_test(config2)
     

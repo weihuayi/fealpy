@@ -21,44 +21,34 @@ class HoneybadgerAlg(Optimizer):
 
 
     
-    def run(self):
+    def run(self, C=2, beta=6):
+        fit = self.fun(self.x)
 
-        option = self.options
-        x = option["x0"]
-        N =  option["NP"]
-        T = option["MaxIters"]
-        fit = self.fun(x)[:, None]
-        dim = option["ndim"]
-        lb, ub = option["domain"]
         gbest_idx = bm.argmin(fit)
-        gbest_f = fit[gbest_idx]
-        gbest = x[gbest_idx] 
-        C = 2
+        self.gbest_f = fit[gbest_idx]
+        self.gbest = self.x[gbest_idx] 
+
         eps = 2.2204e-16
-        beta = 6
-        for t in range (0, T):
-            alpha = C * bm.exp(bm.array(-t/T))
-            di = ((bm.linalg.norm(x - gbest +eps, axis=1)) ** 2)[:, None]
-            S = ((bm.linalg.norm(x - bm.concatenate((x[1:], x[0:1])) + eps, 2, axis=1)) ** 2)[:, None]
-            r2 = bm.random.rand(N, 1)
+
+        for it in range (0, self.MaxIT):
+            self.D_pl_pt(it)
+
+            alpha = C * bm.exp(bm.array(-it / self.MaxIT))
+            di = ((bm.linalg.norm(self.x - self.gbest +eps, axis=1)) ** 2)[:, None]
+            S = ((bm.linalg.norm(self.x - bm.concatenate((self.x[1:], self.x[0:1])) + eps, 2, axis=1)) ** 2)[:, None]
+            r2 = bm.random.rand(self.N, 1)
             I = r2 * S / (4 * bm.pi * di)
-            F = bm.where(bm.random.rand(N, 1) < 0.5, bm.array(1), bm.array(-1))
-            r3 = bm.random.rand(N, dim)
-            r4 = bm.random.rand(N, dim)
-            r5 = bm.random.rand(N, dim)
-            r7 = bm.random.rand(N, dim) 
-            r = bm.random.rand(N, 1)
-            di = gbest - x
-            x_new = (
-                      (r < 0.5) * 
-                      (gbest + F * beta * I * gbest + F * r3 * alpha * di * bm.abs(bm.cos(2 * bm.pi * r4) * (1 - bm.cos(2 * bm.pi * r5)))) + 
-                      (r >= 0.5) * 
-                      (gbest + F * r7 * alpha * di))
-            x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
-            fit_new = self.fun(x_new)[:, None]
+            F = bm.where(bm.random.rand(self.N, 1) < 0.5, bm.array(1), bm.array(-1))
+            r = bm.random.rand(self.N, 1)
+            di = self.gbest - self.x
+            x_new = ((r < 0.5) * 
+                    (self.gbest + F * beta * I * self.gbest + F * bm.random.rand(self.N, self.dim) * alpha * di * bm.abs(bm.cos(2 * bm.pi * bm.random.rand(self.N, self.dim)) * (1 - bm.cos(2 * bm.pi * bm.random.rand(self.N, self.dim))))) + 
+                    (r >= 0.5) * 
+                    (self.gbest + F * bm.random.rand(self.N, self.dim)  * alpha * di))
+                      
+            x_new = x_new + (self.lb - x_new) * (x_new < self.lb) + (self.ub - x_new) * (x_new > self.ub)
+            fit_new = self.fun(x_new)
             mask = fit_new < fit 
-            x, fit = bm.where(mask, x_new, x), bm.where(mask, fit_new, fit)
-            gbest_idx = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_idx], fit[gbest_idx]) if fit[gbest_idx] < gbest_f else (gbest, gbest_f)
-            # print("HBA: The optimum at iteration", t + 1, "is", gbest_f) 
-        return gbest, gbest_f
+            self.x, fit = bm.where(mask[:,None], x_new, self.x), bm.where(mask, fit_new, fit)
+            self.update_gbest(self.x, fit)
+            self.curve[it] = self.gbest_f

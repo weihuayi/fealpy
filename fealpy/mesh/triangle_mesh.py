@@ -34,6 +34,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             (2, 0, 1)], **kwargs)
 
         self.construct()
+        self.meshtype = 'tri'
 
         self.nodedata = {}
         self.edgedata = {}
@@ -1513,3 +1514,5 @@ class TriangleMesh(SimplexMesh, Plotable):
         return cls(node, cell)
 
 TriangleMesh.set_ploter('2d')
+
+

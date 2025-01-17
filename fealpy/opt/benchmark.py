@@ -182,9 +182,7 @@ def F25(x):
     """
     n = x.shape[-1]
     y1 = bm.sum(x ** 2, axis =-1) / 4000
-    y2 = 1
-    for i in range(n):
-        y2 *= bm.cos(x[:,i] / bm.sqrt(bm.array(i + 1)))
+    y2 = bm.prod(bm.cos(x / bm.sqrt(bm.arange(1, n+1))), axis=-1)
     return 1 + y1 - y2
 
 def F26(x):
@@ -193,7 +191,7 @@ def F26(x):
     """
     y1 = bm.sum(x ** 2, axis= -1)
     y2 = bm.sum(bm.cos(2 * bm.pi * x), axis=-1 )
-    n = len(x)
+    n = x.shape[-1]
     return -20 * bm.exp(-0.2 * bm.sqrt(y1 / n)) - bm.exp(y2 / n) + 20 + bm.exp(bm.array(1))
 
 iopt_benchmark_data = [

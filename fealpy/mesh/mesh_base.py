@@ -492,7 +492,7 @@ class SimplexMesh(HomogeneousMesh):
         if variables == 'u':
             return R
         elif variables == 'x':
-            Dlambda = self.grad_lambda(index=index)
+            Dlambda = self.grad_lambda(index=index, TD=TD)
             gphi = bm.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi

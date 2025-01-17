@@ -32,8 +32,7 @@ class Picture():
         """
         self.pic_folder = data_path+pic_folder if pic_folder is not None else None 
         self.data_path = data_path
-        self.fname = data_path+"camera_inputs/"+fname
-        #self.fname = data_path+fname
+        self.fname = data_path+fname
         # 读取图像
         image = cv2.imread(self.fname, cv2.IMREAD_GRAYSCALE)
         if image is None:

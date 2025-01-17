@@ -1,5 +1,5 @@
 from typing import TypedDict, Callable, Tuple, Union, Optional
-
+import matplotlib.pyplot as plt
 from fealpy.backend import backend_manager as bm 
 from fealpy.typing import TensorLike, Index, _S
 from fealpy import logger
@@ -46,6 +46,15 @@ class Optimizer():
         self.options = options 
         self.debug: bool = False
         self.__NF: int = 0
+        self.x = options["x0"]
+        self.N = options["NP"]
+        self.MaxIT = options["MaxIters"]
+        self.dim = options["ndim"]
+        self.lb, self.ub = options["domain"]
+        self.curve = bm.zeros((self.MaxIT,))
+        self.D_pl = bm.zeros((self.MaxIT,))
+        self.D_pt = bm.zeros((self.MaxIT,))
+        self.Div = bm.zeros((1, self.MaxIT))
 
     @property
     def NF(self) -> int:
@@ -69,6 +78,34 @@ class Optimizer():
         self.__NF += self.options['NP'] 
         return self.options['objective'](x)
 
+    def update_gbest(self, x, f):
+        gbest_idx = bm.argmin(f)
+        (self.gbest_f, self.gbest) = (f[gbest_idx], bm.copy(x[gbest_idx])) if f[gbest_idx] < self.gbest_f else (self.gbest_f, self.gbest)
 
     def run(self):
         raise NotImplementedError
+    
+    def D_pl_pt(self, it):
+        self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(self.x, axis=0) - self.x)) / self.N)
+        self.D_pl[it] = 100 * self.Div[0, it] / bm.max(self.Div)
+        self.D_pt[it] = 100 * bm.abs(self.Div[0, it] - bm.max(self.Div)) / bm.max(self.Div)
+
+    def print_optimal_result(self):
+        print(f"Optimal solution: {self.gbest} \nFitness: {self.gbest_f}")
+
+    def plot_plpt_percen(self):
+        plt.plot(self.D_pl, label=(f'Exploration:{bm.round(bm.mean(self.D_pl), 2)}%'))
+        plt.plot(self.D_pt, label=(f'Exploitation:{bm.round(bm.mean(self.D_pt), 2)}%'))
+        plt.legend()
+        plt.xlabel('Iteration')
+        plt.ylabel('Percentage')
+        plt.title("exploration vs exploitation percentage")
+        plt.show()  
+
+    def plot_curve(self, label="label"):
+        plt.semilogy(self.curve, label=label)
+        plt.xlabel('Iteration')
+        plt.ylabel("Best fitness obtained so far")
+        plt.title("Convergence curve")
+        plt.legend()
+        plt.show()

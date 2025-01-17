@@ -14,42 +14,30 @@ class DifferentialEvolution(Optimizer):
         super().__init__(option)
 
 
-    def run(self):
-        options = self.options
-        x = options["x0"]
-        N = options["NP"]
-        fit = self.fun(x)[:, None]
-        MaxIT = options["MaxIters"]
-        dim = options["ndim"]
-        lb, ub = options["domain"]
+    def run(self, F=0.2, CR=0.5):
+        fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
-        gbest = x[gbest_index]
-        gbest_f = fit[gbest_index]
+        self.gbest = self.x[gbest_index]
+        self.gbest_f = fit[gbest_index]
 
-        # Parameters
-        F = 0.2
-        CR = 0.5
-
-        for it in range(0, MaxIT):
+        for it in range(0, self.MaxIT):
+            self.D_pl_pt(it)
 
             # Mutation
-            v = x[bm.random.randint(0, N, (N,))] + F * (x[bm.random.randint(0, N, (N,))] - x[bm.random.randint(0, N, (N,))])
+            v = self.x[bm.random.randint(0, self.N, (self.N,))] + F * (self.x[bm.random.randint(0, self.N, (self.N,))] - self.x[bm.random.randint(0, self.N, (self.N,))])
             
             # Crossover
-            mask = bm.random.rand(N, dim) < CR
-            x_new = bm.where(mask, v, x)
+            mask = bm.random.rand(self.N, self.dim) < CR
+            x_new = bm.where(mask, v, self.x)
 
             # Boundary
-            x_new = x_new + (lb - x_new) * (x_new < lb) + (ub - x_new) * (x_new > ub)
+            x_new = x_new + (self.lb - x_new) * (x_new < self.lb) + (self.ub - x_new) * (x_new > self.ub)
 
             # Evaluation
-            fit_new = self.fun(x_new)[:, None]
+            fit_new = self.fun(x_new)
 
             # Selection
             mask = fit_new < fit
-            x, fit = bm.where(mask, x_new, x), bm.where(mask, fit_new, fit)
-            gbest_index = bm.argmin(fit)
-            (gbest, gbest_f) = (x[gbest_index], fit[gbest_index]) if fit[gbest_index] < gbest_f else (gbest, gbest_f)
-
-
-        return gbest, gbest_f
+            self.x, fit = bm.where(mask[:, None], x_new, self.x), bm.where(mask, fit_new, fit)
+            self.update_gbest(self.x, fit)
+            self.curve[it] = self.gbest_f

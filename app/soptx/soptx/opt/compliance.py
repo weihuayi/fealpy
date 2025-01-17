@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from soptx.material import ElasticMaterialProperties
 from soptx.solver import ElasticFEMSolver
 from soptx.opt import ObjectiveBase
-from soptx.filter import Filter
 from soptx.utils import timer
 
 @dataclass
@@ -32,22 +31,19 @@ class ComplianceObjective(ObjectiveBase):
     
     def __init__(self,
                  material_properties: ElasticMaterialProperties,
-                 solver: ElasticFEMSolver,
-                 filter: Optional[Filter] = None):
+                 solver: ElasticFEMSolver):
         """
         Parameters
         ----------
         material_properties : 材料属性计算器
         solver : 有限元求解器
-        filter : 可选的滤波器
         """
         self.material_properties = material_properties
         self.solver = solver
-        self.filter = filter
 
         # 缓存状态
-        self._current_rho = None  # 当前密度场
-        self._current_u = None    # 当前位移场
+        self._current_rho = None          # 当前密度场
+        self._current_u = None            # 当前位移场
         self._element_compliance = None   # 单元柔顺度
         
     #---------------------------------------------------------------------------
@@ -79,15 +75,13 @@ class ComplianceObjective(ObjectiveBase):
         return self._current_u
 
     def _compute_element_compliance(self, u: TensorLike) -> TensorLike:
-        """计算单元柔顺度
+        """计算单元柔顺度向量
         
         Parameters
-        ----------
-        u : 位移场
+        - u : 位移场
         
         Returns
-        -------
-        ce : 单元柔顺度向量
+        - ce : 单元柔顺度向量
         """
         ke0 = self.solver.get_base_local_stiffness_matrix()
         cell2dof = self.solver.tensor_space.cell_to_dof()
@@ -185,13 +179,8 @@ class ComplianceObjective(ObjectiveBase):
         """计算总柔度值
         
         Parameters
-        ----------
-        rho : 密度场
-        u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
-        
-        Returns
-        -------
-        c : 总柔顺度值
+        - rho : 密度场
+        - u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
         """
         # 获取位移场
         if u is None:
@@ -209,25 +198,16 @@ class ComplianceObjective(ObjectiveBase):
     def jac(self,
             rho: TensorLike,
             u: Optional[TensorLike] = None,
-            filter_params: Optional[Dict[str, Any]] = None,
             diff_mode: Literal["auto", "manual"] = "manual") -> TensorLike:
         """计算目标函数梯度
         
         Parameters
-        ----------
-        rho : 密度场
-        u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
-        filter_params : 滤波器参数
-        diff_mode : 梯度计算方式
-        - "manual": 使用解析推导的梯度公式（默认）
-        - "auto": 使用自动微分技术
-
-        
-        Returns
-        -------
-        dc : 目标函数对密度的梯度
+        - rho : 密度场
+        - u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
+        - diff_mode : 梯度计算方式
+            - "manual": 使用解析推导的梯度公式（默认）
+            - "auto": 使用自动微分技术
         """
-        
         # # 创建计时器
         # t = timer(f"Gradient Computation ({diff_mode} mode)")
         # next(t)
@@ -240,66 +220,10 @@ class ComplianceObjective(ObjectiveBase):
             dc = self._compute_gradient_auto(rho)
             # t.send('Automatic gradient computed')
 
-        # 应用滤波（如果需要）
-        if self.filter is not None:
-            dc = self.filter.filter_sensitivity(dc, rho, 'objective', filter_params)
-            # t.send("Sensitivity filter applied")
-
         # 结束计时
         # t.send(None)
         
         return dc
-        
-    # def jac(self,
-    #         rho: TensorLike,
-    #         u: Optional[TensorLike] = None,
-    #         filter_params: Optional[Dict[str, Any]] = None) -> TensorLike:
-    #     """计算目标函数梯度
-        
-    #     Parameters
-    #     ----------
-    #     rho : 密度场
-    #     u : 可选的位移场，如果为 None 则自动计算或使用缓存的位移场
-    #     filter_params : 滤波器参数
-        
-    #     Returns
-    #     -------
-    #     dc : 目标函数对密度的梯度
-    #     """
-    #     # 创建计时器
-    #     t = timer("Grad Timing")
-    #     next(t)  # 启动计时器
-    #     # 获取位移场
-    #     dc_func = bm.vmap(bm.jacfwd(func=self.fun)) # 输入比输出少
-    #     dc_value = dc_func(rho)
-    #     t.send('auto grad')
-    #     print("dc_func:", dc_func)
-    #     print("dc_auto:", dc_value)
-    #     # dc = bm.jacrev(func=self.fun) # 输入比输出多
-
-    #     if u is None:
-    #         u = self._update_u(rho)
-            
-    #     # 获取单元柔度
-    #     ce = (self.get_element_compliance() 
-    #           if self._element_compliance is not None 
-    #           else self._compute_element_compliance(u))
-        
-    #     # 计算梯度
-    #     dE = self.material_properties.calculate_elastic_modulus_derivative(rho)
-    #     dc = -bm.einsum('c, c -> c', dE, ce)
-    #     print("dc_manual:", dc)
-    #     t.send('manual grad')
-
-    #     # 结束计时
-    #     t.send(None)
-        
-    #     # 应用滤波
-    #     if self.filter is None:
-    #         return dc
-        
-    #     # 明确指定这是目标函数的梯度    
-    #     return self.filter.filter_sensitivity(dc, rho, 'objective', filter_params)
     
     def hess(self, rho: TensorLike, lambda_: dict) -> TensorLike:
         """计算目标函数 Hessian 矩阵（未实现）"""

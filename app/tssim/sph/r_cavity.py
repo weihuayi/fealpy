@@ -1,12 +1,11 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-from fealpy.jax.mesh.node_mesh import NodeMesh
-from fealpy.jax.sph import SPHSolver
-from fealpy.jax.sph.solver import Tag
-from fealpy.jax.sph import partition 
-from fealpy.jax.sph.jax_md.partition import Sparse
-from fealpy.jax.sph.kernel_function import QuinticKernel
+from fealpy.mesh.node_mesh import NodeMesh
+from fealpy.cfd.sph.particle_solver import SPHSolver, Tag, TimeLine
+from fealpy.cfd.sph import partition 
+from fealpy.cfd.sph.jax_md.partition import Sparse
+from fealpy.cfd.sph.particle_kernel_function import QuinticKernel
 from jax_md import space
 from jax import vmap
 import matplotlib.pyplot as plt
@@ -72,7 +71,7 @@ f_particles = (mesh.nodedata["tag"] == 0).sum()
 f_neighbors = neighbor_fn.allocate(mesh.nodedata["position"][mesh.nodedata["tag"]==0], num_particles=f_particles)
 
 state_history = []
-for i in range(10000): 
+for i in range(100): 
     print("i",i)
     state_history.append(mesh.nodedata.copy())
 

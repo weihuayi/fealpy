@@ -19,11 +19,21 @@ _F = Union[Callable[..., TensorLike], TensorLike, Number]
 
 
 class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh: _MT, p, q=None, spacetype='C'):
+    def __init__(self, mesh: _MT, p, q=None, ctype='C'):
         self.mesh = mesh
         self.p = p
+        
+        assert ctype in {'C', 'D'}
+        self.ctype = ctype # 空间连续性类型
+
+        if ctype == 'C':
+            self.dof = LinearMeshCFEDof(mesh.linearmesh, p)
+        elif ctype == 'D':
+            self.dof = LinearMeshDFEDof(mesh.linearmesh, p)
+        else:
+            raise ValueError(f"Unknown type: {ctype}")
+
         self.cellmeasure = mesh.cell_area()
-        self.dof = LinearMeshCFEDof(mesh.linearmesh, p)
         self.multi_index_matrix = mesh.multi_index_matrix
 
         self.device = mesh.device
@@ -81,7 +91,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
                 p = self.p
                 bcs = self.mesh.multi_index_matrix(p, TD)/p
                 uI = u(bcs)
-        return uI
+        return self.function(uI)
     
     @barycentric
     def edge_basis(self, bc: TensorLike):
