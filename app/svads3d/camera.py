@@ -21,6 +21,7 @@ class Camera():
         @param location: 相机的空间位置（世界坐标）。
         @param eular_angle: 相机的欧拉角。
         """
+        print("相机初始化...")
         self.picture = picture
         self.picture.camera = self
         self.data_path = data_path
@@ -30,9 +31,9 @@ class Camera():
         self.eular_angle = eular_angle
         self.axes = self.get_rot_matrix(eular_angle[0], eular_angle[1], eular_angle[2])
 
+        print("计算内参矩阵...")
         self.DIM, self.K, self.D = self.get_K_and_D((4, 6), data_path + chessboard_dir)
-        print("K: ", self.K)
-        print("D: ", self.D)
+        print("计算内参矩阵完成。")
 
         self.theta2rho = lambda theta: theta 
         self.picture.rho2theta = lambda rho: fsolve(lambda theta: self.theta2rho(theta)-rho, 0)[0]
@@ -41,6 +42,7 @@ class Camera():
         self.feature_points['camera_sphere'] = self.picture_to_self(picture.feature_point['image'])
         self.feature_points['ground'] = picture.feature_point['ground']
         self.camera_system = None
+        print("相机初始化完成。")
 
     def set_screen_frature_points(self, feature_point):
         """

@@ -327,7 +327,7 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         eldof = self.dof.number_of_local_dofs("edge")
         ldof = 3*eldof + fldof
         gdof = self.dof.number_of_global_dofs()
-        glambda = mesh.grad_face_lambda()
+        glambda = mesh.grad_lambda(TD =2)
         ledge = bm.array([[1, 2],
                          [2, 0],
                          [0, 1]],device=self.device)
@@ -550,6 +550,27 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         A = bm.to_numpy(A).reshape(-1)
         B = csr_matrix((A, (I, J)), shape=(gdof, gdof))
         return B
+    
+    def face_mass_matrix(self, c = 1, index=_S):
+        """
+        @brief (n \times u, n \times v)_{Gamma_{robin}}
+        @param c 系数, 现在只考虑了 c 是常数的情况
+        """
+        p = self.p
+        mesh = self.mesh
+        qf = mesh.quadrature_formula(p+2,"face")
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        face2dof = self.dof.face_to_dof()[index]
+        fm = self.mesh.entity_measure("face", index=index)
+        fphi = self.face_basis(bcs, index=index)
+
+        EMc = bm.einsum('fqlg, fqmg, q, f->flm', fphi, fphi, ws, fm)
+
+        gdof = self.dof.number_of_global_dofs()
+        I = bm.broadcast_to(face2dof[:,:, None], EMc.shape)
+        J = bm.broadcast_to(face2dof[:, None, :], EMc.shape)
+        EM = c*csr_matrix((EMc.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return EM
 
     def source_vector(self, f):
         mesh = self.mesh
