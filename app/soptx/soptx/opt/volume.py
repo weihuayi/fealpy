@@ -38,15 +38,10 @@ class VolumeConstraint(ConstraintBase):
         -------
         gneq : 约束函数值：(当前体积分数 - 目标体积分数) * 单元数量
         """
-        cell_measure = self._mesh.entity_measure('cell')
         NC = self._mesh.number_of_cells()
-        
-        # 计算实际体积分数
-        volfrac_true = (bm.einsum('c, c -> ', cell_measure, rho) / bm.sum(cell_measure))
-
-        gneq = (volfrac_true - self.volume_fraction) * NC
-        # gneq = bm.sum(rho[:]) - self.volume_fraction * NC
-                                 
+        cell_measure = self._mesh.entity_measure('cell')
+        gneq = bm.einsum('c, c -> ', cell_measure, rho) / (self.volume_fraction * NC) - 1 # float
+         
         return gneq
         
     def jac(self,

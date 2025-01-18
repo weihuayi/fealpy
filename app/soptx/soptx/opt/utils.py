@@ -42,7 +42,7 @@ def solve_mma_subproblem(m: int, n: int,
     Q (m, n): 约束函数的负梯度项
     a0 (float): 目标函数的线性项 a_0*z 的系数
     a (m, 1): 约束的线性项 a_i*z 的系数
-    b (m, 1): 
+    b (m, 1): -r_i
     c (m, 1): 约束的二次项 c_iy_i 的系数
     d (m, 1): 约束的二次项 0.5*d_i*y_i^2 的系数
     
@@ -138,7 +138,7 @@ def solve_mma_subproblem(m: int, n: int,
             #      (diags(xlinv2.flatten(), 0).dot(Q.T)).T # (m, n)
             
             # 2. 计算 Newton 方向的一阶残差 delta_x, delta_y, delta_z, delta_lambda
-            dpsidx = plam / ux2 - qlam / xl2
+            dpsidx = plam / ux2 - qlam / xl2                            # (n, 1)
             delx = dpsidx - epsvecn / (x - alfa) + epsvecn / (beta - x) # (n, 1)
             dely = c + d * y - lam - epsvecm / y                        # (m, 1)
             delz = a0 - bm.dot(a.T, lam) - epsi / z                     # (1, 1)
@@ -194,7 +194,7 @@ def solve_mma_subproblem(m: int, n: int,
                 dz = solut[n:n+1]                                                               # (m, 1)
                 dlam = bm.dot(GG, dx) / diaglamyi - dz * (a / diaglamyi) + dellamyi / diaglamyi # (m, 1)
                 
-            # 计算其他变量的更新
+            # 5.计算 Newton 方向 \Delta w
             dy = -dely / diagy + dlam / diagy                  # (m, 1)
             dxsi = -xsi + epsvecn/(x-alfa) - (xsi*dx)/(x-alfa) # (n, 1)
             deta = -eta + epsvecn/(beta-x) + (eta*dx)/(beta-x) # (n, 1)
@@ -204,7 +204,7 @@ def solve_mma_subproblem(m: int, n: int,
             xx = bm.concatenate((y, z, lam, xsi, eta, mu, zet, s), axis=0)          # (m+n+n+m+1+m, 1)
             dxx = bm.concatenate((dy, dz, dlam, dxsi, deta, dmu, dzet, ds), axis=0) # (m+n+n+m+1+m, 1)
             
-            # 步长确定
+            # 6. 确定线搜索步长
             stepxx = -1.01 * dxx / xx
             stmxx = bm.max(stepxx)
             stepalfa = -1.01 * dx / (x - alfa)
@@ -216,7 +216,6 @@ def solve_mma_subproblem(m: int, n: int,
             stminv = max(stmalbexx, 1.0)
             steg = 1.0 / stminv
             
-            # 更新变量
             xold = bm.copy(x)
             yold = bm.copy(y)
             zold = bm.copy(z)
@@ -227,11 +226,12 @@ def solve_mma_subproblem(m: int, n: int,
             zetold = bm.copy(zet)
             sold = bm.copy(s)
             
-            # 线搜索
+            # 7. 线搜索更新变量
             itto = 0
             resinew = 2 * residunorm
             while (resinew > residunorm) and (itto < 50):
                 itto = itto + 1
+ 
                 x = xold + steg*dx
                 y = yold + steg*dy
                 z = zold + steg*dz

@@ -103,7 +103,7 @@ class GAMGSolver():
                 print("P.shape = ", self.P[l].shape) 
                 print("R.shape = ", self.R[l].shape) 
 
-    @timer
+    # @timer
     def solve(self, b):
         """
         @brief 用多重网格方法求解 Ax = b
