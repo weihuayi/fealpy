@@ -192,30 +192,41 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     }
 
 if __name__ == "__main__":
+    base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
+
     # 使用 OC 优化器的配置
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
+    filter_type = 'sensitivity'
+    optimizer_type = 'oc'
     config1 = TestConfig(
         nx=160, ny=100,
         volume_fraction=0.4,
         filter_radius=6.0,
-        filter_type='sensitivity',
-        max_iterations=100,
-        save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d_oc',
+        filter_type=filter_type,       # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/cantilever_2d_{filter_type}_{optimizer_type}',
         mesh_type='uniform_mesh_2d',
         assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type='oc'  # 指定使用 OC 优化器
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
     )
     
     # 使用 MMA 优化器的配置
+    filter_type = 'sensitivity'
+    optimizer_type = 'mma'
     config2 = TestConfig(
         nx=160, ny=100,
         volume_fraction=0.4,
         filter_radius=6.0,
-        filter_type='density',
-        max_iterations=100,
-        save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_2d_mma',
+        filter_type=filter_type,       # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/cantilever_2d_{filter_type}_{optimizer_type}',
         mesh_type='uniform_mesh_2d',
         assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type='mma'  # 指定使用 MMA 优化器
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
     )
 
     result = run_optimization_test(config2)
