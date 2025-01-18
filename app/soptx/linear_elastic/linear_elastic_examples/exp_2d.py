@@ -103,14 +103,13 @@ def create_mesh(mesh_type, nx, ny, h, origin=[0.0, 0.0]):
         return UniformMesh2d(extent=extent, h=h, origin=origin,
                            ipoints_ordering='yx', flip_direction=None, device='cpu')
     elif mesh_type == 'triangle':
-        box = [0, nx*h, 0, ny*h]  
+        box = [0, nx*h[0], 0, ny*h[1]]  
         mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         return mesh
     elif mesh_type == 'quadrangle':
-        box = [0, nx*h, 0, ny*h]  
+        box = [0, nx*h[0], 0, ny*h[1]]  
         mesh = QuadrangleMesh.from_box(box, nx=nx, ny=ny)
         return mesh
-
     else:
         raise ValueError(f"Unsupported mesh type: {mesh_type}")
     
@@ -126,7 +125,7 @@ def main():
                         help='Degree of the Lagrange finite element space, default is 1.')
     parser.add_argument('--solver',
                         choices=['cg', 'spsolve'],
-                        default='cg', type=str,
+                        default='spsolve', type=str,
                         help='Specify the solver type for solving the linear system, default is "mumps".')
     parser.add_argument('--nx', 
                         default=10, type=int, 
@@ -136,7 +135,7 @@ def main():
                         help='Initial number of grid cells in the y direction, default is 10.')
     parser.add_argument('--mesh-type',
                             choices=['uniform', 'triangle', 'quadrangle'],
-                            default='uniform', type=str,
+                            default='triangle', type=str,
                             help='Type of mesh to use for computation.')
     args = parser.parse_args()
 
@@ -197,7 +196,6 @@ def main():
         
         uh = tensor_space.function()
 
-        # uh[:] = spsolve(K, F, solver='mumps')
         if args.solver == 'cg':
             uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
         elif args.solver == 'spsolve':
