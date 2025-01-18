@@ -158,7 +158,7 @@ for i in range(NPN):
     print(f"Final residual norm: {residual_norm:.6e}")
     t.send('后处理时间')
     t.send(None)
-    if i == 0:
+    if i == 1:
         # 保存单个节点的位移结果
         if tensor_space.dof_priority:
             uh_show = uh.reshape(GD, NN).T
@@ -167,17 +167,18 @@ for i in range(NPN):
         uh_magnitude = bm.linalg.norm(uh_show, axis=1)
         mesh.nodedata['uh'] = uh_show[:]
         mesh.nodedata['uh_magnitude'] = uh_magnitude[:]
-        mesh.to_vtk(f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/internal_gear_profile_fealpy_{i}.vtu')
+        mesh.to_vtk(f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/vtu/internal_gear_prof_fealpy_{i}.vtu')
 
         # 单个节点载荷的索引
         load_node_indices = node_indices[i].reshape(-1) # (1, )
         # 从全局载荷向量中提取单个载荷节点处的值
         F_load_nodes = F[dof_indices[i, :].reshape(1, -1)] # (1, GD)
-        export_to_inp(filename=f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/internal_gear_profile_abaqus_{i}.inp', 
+        export_to_inp(filename=f'/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elasticity/JingYiGearProject/inp/internal_gear_prof_abaqus_{i}.inp', 
                     nodes=node, elements=cell, 
                     fixed_nodes=fixed_node_index, load_nodes=load_node_indices, loads=F_load_nodes, 
                     young_modulus=206e3, poisson_ratio=0.3, density=7.85e-9, 
                     used_app='abaqus', mesh_type='hex')
+        print('------------------------')
 # 计算齿面上节点的内法线方向位移
 uh_normal = bm.sum(uh_profiles * profile_node_normal, axis=1) # (NPN, )
 print("-----------")
