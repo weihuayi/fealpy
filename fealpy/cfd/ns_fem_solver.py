@@ -65,7 +65,7 @@ class NSFEMSolver():
 
         L0 = LinearForm(uspace) 
         self.u_SI = SourceIntegrator(q=q)
-        self.u_SI.keep_data(self.Keep_data)
+        self.u_SI.keep_data(self.keep_data)
         L0.add_integrator(self.u_SI)
         L1 = LinearForm(pspace)
 
@@ -87,7 +87,75 @@ class NSFEMSolver():
             return result
         self.u_SI.source = u_SI_coef
         self.u_SI.clear()
-    
+     
+    def Newton_BForm(self, threshold=None):
+        pspace = self.pspace
+        uspace = self.uspace
+        dt = self.dt
+        R = self.pde.R
+        q = self.q
+
+        A00 = BilinearForm(uspace)
+        M = ScalarMassIntegrator(coef=R , q=q)
+        self.newton_C = ScalarConvectionIntegrator(q=q)
+        self.newton_C.keep_data(self.keep_data)
+        self.newton_M = ScalarMassIntegrator(q=q)##
+        self.newton_M.keep_data(self.keep_data)
+        D = ScalarDiffusionIntegrator(coef=dt, q=q)
+        A00.add_integrator(M)
+        A00.add_integrator(self.newton_C)
+        A00.add_integrator(self.newton_M)
+        A00.add_integrator(D)
+
+        A01 = BilinearForm((pspace, uspace))
+        A01.add_integrator(PressWorkIntegrator(coef=-dt, q=q))
+
+        A10 = BilinearForm((pspace, uspace))
+        A10.add_integrator(PressWorkIntegrator(coef=1, q=q))
+
+        A = BlockForm([[A00, A01], [A10.T, None]]) 
+        return A
+
+
+    def Newton_LForm(self, pthreshold=None):
+
+        pspace = self.pspace
+        uspace = self.uspace
+        dt = self.dt
+        R = self.pde.R
+        q = self.q
+
+        L0 = LinearForm(uspace)
+        self.newton_lform_SI = SourceIntegrator(q=q)
+        self.newton_lform_SI.keep_data(self.keep_data)
+        L0.add_integrator(self.newton_lform_SI) 
+        L1 = LinearForm(pspace)
+        L = LinearBlockForm([L0, L1])
+        return L
+
+    def Newton_update(self, u0, p0):
+        dt = self.dt
+        R = self.pde.R
+        gd = self.mesh.geo_dimension()
+        ## BilinearForm
+        def u_C_coef(bcs, index):
+            return R*dt*u0(bcs, index)
+        self.newton_C.coef = u_C_coef
+
+        self.newton_C.clear()
+        def u_M_coef(bcs,index):
+            return R*dt*u0.grad_value(bcs, index)
+        self.newton_M.coef=u_M_coef
+
+
+        ##linearform
+        def coef(bcs, index):
+            result = R*u0(bcs, index)
+            result += R*dt*bm.einsum('...j, ...ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
+            return result
+        self.newton_lform_SI.source = coef
+       
+
     def IPCS_BForm_0(self, threshold=None):
         uspace = self.uspace
         dt = self.dt
