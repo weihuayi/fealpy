@@ -109,20 +109,12 @@ class Filter:
         应用滤波器修改灵敏度
         
         Parameters
-        ----------
-        gradient : TensorLike
-            原始梯度
-        design_vars : TensorLike
-            设计变量
-        gradient_type : Literal['objective', 'constraint']
-            梯度类型，用于区分目标函数梯度和约束函数梯度
-        filter_params : Optional[dict]
-            过滤器参数
+        - gradient : 原始梯度
+        - design_vars : 设计变量
+        - gradient_type : 梯度类型, 用于区分目标函数梯度和约束函数梯度
+        - filter_params : 滤波器参数
             
         Returns
-        -------
-        TensorLike
-            过滤后的梯度
         """
         cell_measure = self._mesh.entity_measure('cell')
 
