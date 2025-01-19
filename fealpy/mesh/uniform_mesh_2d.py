@@ -871,7 +871,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             self.cell2edge = self.cell_to_edge()
             self.face2cell = self.edge2cell
 
-        self.clear() 
+        self.clear()
+
 
     def to_vtk(self, filename, celldata=None, nodedata=None):
         """
@@ -924,8 +925,16 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         # 添加节点数据
         if nodedata is not None:
             for name, data in nodedata.items():
-                data_array = numpy_to_vtk(data, deep=True)
-                data_array.SetName(name)
+                if len(data.shape) > 1 and data.shape[1] > 1:
+                    # 向量场数据
+                    n_components = data.shape[1]
+                    data_array = numpy_to_vtk(data, deep=True)
+                    data_array.SetName(name)
+                    data_array.SetNumberOfComponents(n_components)
+                else:
+                    # 标量场数据
+                    data_array = numpy_to_vtk(data.ravel(), deep=True)
+                    data_array.SetName(name)
                 rectGrid.GetPointData().AddArray(data_array)
 
         # 添加单元格数据
