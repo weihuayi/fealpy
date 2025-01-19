@@ -595,25 +595,26 @@ class Gear(ABC):
                 if (target_tooth_tag[0] == 0 and (target_tooth_tag[-1] != (z - 1))) or target_tooth_tag[0] != 0:
                     node_start = target_node[-single_node_num]
                     node_end = target_node[0]
-                    node_temp1 = target_node[1]
+                    # node_temp1 = target_node[1]
                     node_temp2 = target_node[2]
                 else:
                     node_start = target_node[start_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
                     node_end = target_node[end_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
-                    node_temp1 = target_node[end_num * single_node_num + 1  + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
+                    # node_temp1 = target_node[end_num * single_node_num + 1 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
                     node_temp2 = target_node[end_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)]
                 angle_start = np.arctan2(node_start[1], node_start[0]) % (2 * pi)
                 angle_end = np.arctan2(node_end[1], node_end[0]) % (2 * pi)
-                r_temp1 = np.sqrt(node_temp1[0] ** 2 + node_temp1[1] ** 2)
+                # r_temp1 = np.sqrt(node_temp1[0] ** 2 + node_temp1[1] ** 2)
                 r_temp2 = np.sqrt(node_temp2[0] ** 2 + node_temp2[1] ** 2)
 
                 if angle_end < angle_start:
                     angle_end += 2 * pi
                 phi = np.linspace(angle_start, angle_end, 2 * na2 * (self.z - tooth_num))[1:-1]
-                r1 = np.linspace(self.r_a, r_temp1, n1 + 1)
-                r2 = np.linspace(r_temp1, r_temp2, n2 + 1)
-                r3 = np.linspace(r_temp2, self.outer_diam/2, n3 + 1)
-                r = np.concatenate((r1, r2[1:], r3[1:]))
+                # r1 = np.linspace(self.r_a, r_temp1, n1 + 1)
+                # r2 = np.linspace(r_temp1, r_temp2, n2 + 1)
+                # r3 = np.linspace(r_temp2, self.outer_diam/2, n3 + 1)
+                r = np.linspace(r_temp2, self.outer_diam/2, n3 + 1)
+                # r = np.concatenate((r1, r2[1:], r3[1:]))
 
                 x = np.einsum('r,p->pr', r, np.cos(phi))[..., None]
                 y = np.einsum('r,p->pr', r, np.sin(phi))[..., None]
@@ -623,52 +624,52 @@ class Gear(ABC):
                 wheel_node_idx = np.zeros((len(phi) + 2, len(r)), dtype=np.int64)
                 wheel_node_idx[1:-1, :] = np.arange(total_tooth_node_num,
                                                     total_tooth_node_num + len(wheel_node)).reshape(-1, len(r))
-                wheel_node_idx[0, 0] = start_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
-                wheel_node_idx[0, 1:n1] = np.arange(
-                    start_num * single_node_num + number_of_key_points + (n1 - 1) + (n2 - 1) + (n3 - 1),
-                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + (n2 - 1) + (n3 - 1))[::-1]
-                wheel_node_idx[0, n1] = start_num * single_node_num + 1 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
-                wheel_node_idx[0, n1 + 1:n1 + n2] = np.arange(
-                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + (n2 - 1) + (n3 - 1),
-                    start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + 2 * (n2 - 1) + (n3 - 1))[::-1]
-                wheel_node_idx[0, n1 + n2] = start_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
-                wheel_node_idx[0, n1 + n2 + 1:n1 + n2 + n3] = np.arange(
+                # wheel_node_idx[0, 0] = start_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                # wheel_node_idx[0, 1:n1] = np.arange(
+                #     start_num * single_node_num + number_of_key_points + (n1 - 1) + (n2 - 1) + (n3 - 1),
+                #     start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + (n2 - 1) + (n3 - 1))[::-1]
+                # wheel_node_idx[0, n1] = start_num * single_node_num + 1 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                # wheel_node_idx[0, n1 + 1:n1 + n2] = np.arange(
+                #     start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + (n2 - 1) + (n3 - 1),
+                #     start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + 2 * (n2 - 1) + (n3 - 1))[::-1]
+                #
+                wheel_node_idx[0, 0] = start_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                wheel_node_idx[0, 1:n3] = np.arange(
                     start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + 2 * (n2 - 1) + (n3 - 1),
                     start_num * single_node_num + number_of_key_points + 2 * (n1 - 1) + 2 * (n2 - 1) + 2 * (n3 - 1))[::-1]
-                wheel_node_idx[0, n1 + n2 + n3] = start_num * single_node_num + 3 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                wheel_node_idx[0, n3] = start_num * single_node_num + 3 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
                 if target_tooth_tag[0] == 0 and (target_tooth_tag[-1] != (z - 1)):
-                    wheel_node_idx[-1, 0] = 0
-                    wheel_node_idx[-1, 1:n1] = np.arange(number_of_key_points, number_of_key_points + n1 - 1)
-                    wheel_node_idx[-1, n1] = 1
-                    wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(number_of_key_points + (n1 - 1),
-                                                                    number_of_key_points + (n1 - 1) + (n2 - 1))
-                    wheel_node_idx[-1, n1 + n2] = 2
-                    wheel_node_idx[-1, n1 + n2 + 1:n1 + n2 + n3] = np.arange(number_of_key_points + (n1 - 1) + (n2 - 1),
+                    # wheel_node_idx[-1, 0] = 0
+                    # wheel_node_idx[-1, 1:n1] = np.arange(number_of_key_points, number_of_key_points + n1 - 1)
+                    # wheel_node_idx[-1, n1] = 1
+                    # wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(number_of_key_points + (n1 - 1),
+                    #                                                 number_of_key_points + (n1 - 1) + (n2 - 1))
+                    wheel_node_idx[-1, 0] = 2
+                    wheel_node_idx[-1, 1:n3] = np.arange(number_of_key_points + (n1 - 1) + (n2 - 1),
                                                                    number_of_key_points + (n1 - 1) + (n2 - 1) + (n3 - 1))
-                    wheel_node_idx[-1, n1 + n2 + n3] = 3
+                    wheel_node_idx[-1, n3] = 3
                 elif target_tooth_tag[0] != 0:
-                    wheel_node_idx[-1, 0] = 0
-                    wheel_node_idx[-1, 1:n1] = np.arange(4, 4 + n1 - 1)[::-1]
-                    wheel_node_idx[-1, n1] = 1
-                    wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(4 + (n1 - 1), 4 + (n1 - 1) + (n2 - 1))[::-1]
-                    wheel_node_idx[-1, n1 + n2] = 2
-                    wheel_node_idx[-1, n1 + n2 + 1:n1 + n2 + n3] = np.arange(4 + (n1 - 1) + (n2 - 1), 4 + (n1 - 1) + (n2 - 1) + (n3-1))[::-1]
-                    wheel_node_idx[-1, n1 + n2 + n3] = 3
+                    # wheel_node_idx[-1, 0] = 0
+                    # wheel_node_idx[-1, 1:n1] = np.arange(4, 4 + n1 - 1)[::-1]
+                    # wheel_node_idx[-1, n1] = 1
+                    # wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(4 + (n1 - 1), 4 + (n1 - 1) + (n2 - 1))[::-1]
+                    wheel_node_idx[-1, 0] = 2
+                    wheel_node_idx[-1, 1:n3] = np.arange(4 + (n1 - 1) + (n2 - 1), 4 + (n1 - 1) + (n2 - 1) + (n3-1))[::-1]
+                    wheel_node_idx[-1, n3] = 3
                 else:
-                    wheel_node_idx[-1, 0] = end_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
-                    wheel_node_idx[-1, 1:n1] = np.arange(
-                        end_num * single_node_num + 8 + (n1 - 1) + (n2 - 1) + (n3 - 1),
-                        end_num * single_node_num + 8 + 2*(n1 - 1) + (n2 - 1) + (n3 - 1))[::-1]
-                    wheel_node_idx[-1, n1] = end_num * single_node_num + 1 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
-                    wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(
-                        end_num * single_node_num + 8 + 2*(n1 - 1) + (n2 - 1) + (n3 - 1),
-                        end_num * single_node_num + 8 + 2*(n1 - 1) + 2*(n2 - 1) + (n3 - 1))[::-1]
-                    wheel_node_idx[-1, n1 + n2] = end_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
-                    wheel_node_idx[-1, n1 + n2 + 1:n1 + n2 + n3] = np.arange(
+                    # wheel_node_idx[-1, 0] = end_num * single_node_num + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                    # wheel_node_idx[-1, 1:n1] = np.arange(
+                    #     end_num * single_node_num + 8 + (n1 - 1) + (n2 - 1) + (n3 - 1),
+                    #     end_num * single_node_num + 8 + 2*(n1 - 1) + (n2 - 1) + (n3 - 1))[::-1]
+                    # wheel_node_idx[-1, n1] = end_num * single_node_num + 1 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                    # wheel_node_idx[-1, n1 + 1:n1 + n2] = np.arange(
+                    #     end_num * single_node_num + 8 + 2*(n1 - 1) + (n2 - 1) + (n3 - 1),
+                    #     end_num * single_node_num + 8 + 2*(n1 - 1) + 2*(n2 - 1) + (n3 - 1))[::-1]
+                    wheel_node_idx[-1, 0] = end_num * single_node_num + 2 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
+                    wheel_node_idx[-1, 1:n3] = np.arange(
                         end_num * single_node_num + 8 + 2*(n1 - 1) + 2*(n2 - 1) + (n3 - 1),
                         end_num * single_node_num + 8 + 2 * (n1 - 1) + 2 * (n2 - 1) + 2*(n3 - 1))[::-1]
-                    wheel_node_idx[-1, n1 + n2 + n3] = end_num * single_node_num + 3 + 4 + (n1 - 1) + (n2 - 1) + (
-                                n3 - 1)
+                    wheel_node_idx[-1, n3] = end_num * single_node_num + 3 + 4 + (n1 - 1) + (n2 - 1) + (n3 - 1)
 
                 wheel_cell = np.zeros((len(phi) + 1, len(r) - 1, 4), dtype=np.int64)
 

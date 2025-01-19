@@ -95,6 +95,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return bm.concatenate(ipoint_list, axis=0)[index]  # (gdof, GD)
 
     @classmethod
+    def from_box(cls, box, p: int, nx=2, ny=2):
+        mesh = TriangleMesh.from_box(box, nx, ny)
+        return cls.from_triangle_mesh(mesh, p)
+
+    @classmethod
     def from_curve_triangle_mesh(cls, mesh, p: int, curve=None):
         init_node = mesh.entity('node')
 
@@ -160,15 +165,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return p
     
     # shape function
-    def shape_function(self, bc: TensorLike, p: int=1, variables='x'):
-        p = self.p 
+    def shape_function(self, bc: TensorLike, p: int=None, variables='x'):
+        p = self.p if p is None else p 
         phi = bm.simplex_shape_function(bc, p=p)
         if variables == 'u':
             return phi
         elif variables == 'x':
             return phi[None, :, :]
 
-    def grad_shape_function(self, bc: TensorLike, p: int=1, 
+    def grad_shape_function(self, bc: TensorLike, p: int=None, 
                             index: Index=_S, variables='x'):
         """
         @berif 计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
@@ -178,7 +183,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lambda_2 = eta
 
         """
-        p = self.p
+        p = self.p if p is None else p 
         TD = bc.shape[-1] - 1
         if TD == 2:
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)

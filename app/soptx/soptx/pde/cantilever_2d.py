@@ -7,6 +7,9 @@ from typing import Tuple, Callable
 from builtins import list
 
 class Cantilever2dData1:
+    '''
+    模型来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
     def __init__(self, 
                 xmin: float, xmax: float, 
                 ymin: float, ymax: float):
