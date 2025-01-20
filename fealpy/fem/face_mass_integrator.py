@@ -42,7 +42,7 @@ class _FaceMassIntegrator(LinearInt, OpInt, FaceInt):
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.face_basis(bcs)
+        phi = space.face_basis(bcs,index=index)
         return bcs, ws, phi, facemeasure, index
     
     def assembly(self, space: _FS):
