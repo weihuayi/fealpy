@@ -1378,9 +1378,23 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                 else:
                     current_data = data
                 
-                # 将数据展平
-                data_array = numpy_to_vtk(current_data.flatten(), deep=True)
-                data_array.SetName(name)
+                # 检查是否为向量场数据
+                if len(current_data.shape) > 1 and current_data.shape[-1] > 1:
+                    # 向量场数据
+                    n_components = current_data.shape[-1]  # 获取向量维度
+                    if len(current_data.shape) == 4:  # 3D网格的向量场
+                        # 重塑数据为2D数组：(n_points, n_components)
+                        reshaped_data = current_data.reshape(-1, n_components)
+                    else:
+                        reshaped_data = current_data
+                    
+                    data_array = numpy_to_vtk(reshaped_data, deep=True)
+                    data_array.SetName(name)
+                    data_array.SetNumberOfComponents(n_components)
+                else:
+                    # 标量场数据
+                    data_array = numpy_to_vtk(current_data.flatten(), deep=True)
+                    data_array.SetName(name)
                 rectGrid.GetPointData().AddArray(data_array)
 
         # 添加单元格数据

@@ -191,24 +191,36 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
 if __name__ == "__main__":
     base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
 
-    # 使用 OC 优化器的配置
     '''
     参数来源论文: An efficient 3D topology optimization code written in Matlab
     '''
-    filter_type = 'density'
+    # 使用 OC 优化器的配置
     optimizer_type = 'oc'
-    config1 = TestConfig(
+    filter_type = 'density'
+    config_oc_dens = TestConfig(
         nx=60, ny=20, nz=4,
         volume_fraction=0.3,
         filter_radius=1.5,
         filter_type=filter_type,       # 指定使用密度滤波器
-        save_dir=f'{base_dir}/cantilever_3d_{filter_type}_{optimizer_type}',
+        save_dir=f'{base_dir}/cantilever_3d_{optimizer_type}_{filter_type}',
         mesh_type='uniform_mesh_3d',
         assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
         optimizer_type=optimizer_type,  # 指定使用 OC 优化器
         max_iterations=200,
         tolerance=0.01
-
+    )
+    filter_type = 'sensitivity'
+    config_oc_sens = TestConfig(
+        nx=60, ny=20, nz=4,
+        volume_fraction=0.3,
+        filter_radius=1.5,
+        filter_type=filter_type,       # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/cantilever_3d_{optimizer_type}_{filter_type}',
+        mesh_type='uniform_mesh_3d',
+        assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
     )
     
     # 使用 MMA 优化器的配置
@@ -221,7 +233,7 @@ if __name__ == "__main__":
         nx=60, ny=20, nz=4,
         volume_fraction=0.3,
         filter_radius=1.5,
-        filter_type=filter_type,       # 指定使用密度滤波器
+        filter_type=filter_type,        # 指定使用密度滤波器
         save_dir=f'{base_dir}/cantilever_3d_{filter_type}_{optimizer_type}',
         mesh_type='uniform_mesh_3d',
         assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
@@ -230,5 +242,5 @@ if __name__ == "__main__":
         tolerance=0.01
     )
 
-    result = run_optimization_test(config2)
+    result = run_optimization_test(config_oc_sens)
     
