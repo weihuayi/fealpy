@@ -14,7 +14,7 @@ cell = mesh.entity('cell')
 print("node.shape = ", node.shape)
 print("cell.shape = ", cell.shape)
 
-mesh.vtkview()
+mesh.vtkview(etype='edge')
 
 #fig = plt.figure()
 #axes = fig.add_subplot(111, projection='3d')
