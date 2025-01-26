@@ -59,7 +59,8 @@ def Bernouli(pop_size, dim, lammda=0.4):
         condition,
         prev_col / (1 - lammda), 
         (prev_col - 1 + lammda) / lammda
-    )   
+    )
+    return rand   
 
 def Sine(pop_size, dim, alpha=1, beta=1):
     rand = bm.random.rand(pop_size, dim)
@@ -75,6 +76,36 @@ def Circle(pop_size, dim, a=0.5, b=0.6):
 
 
 def initialize(pop_size, dim, ub, lb, method=None):
+    """
+    Initialize a population with various method maps.
+
+    Parameters:
+    -----------
+    pop_size : int
+        Number of individuals in the population.
+    dim : int
+        Number of dimensions for each individual.
+    ub : list
+        Upper bounds for each dimension. Must be a list of length `dim`.
+    lb : list
+        Lower bounds for each dimension. Must be a list of length `dim`.
+    method : callable, optional, default=None
+        A function defining the chaotic map to generate the population.
+        If None, a random distribution is used for initialization.
+
+    Returns:
+    --------
+    pop : Tensor
+        Initialized population of shape (pop_size, dim).
+    """
+
+    if isinstance(ub, (list, tuple)) and isinstance(lb, (list, tuple)):
+        if len(ub) != dim or len(lb) != dim:
+            raise ValueError(f"Lengths of 'ub' and 'lb' must match 'dim'. "
+                             f"Received: len(ub)={len(ub)}, len(lb)={len(lb)}, dim={dim}")
+    elif not isinstance(ub, (float, int)) or not isinstance(lb, (float, int)):
+        raise TypeError("Both 'ub' and 'lb' must be either scalars or lists/tuples of length 'dim'.")
+    
 
     pop = bm.zeros([pop_size, dim])
     if method == None:
@@ -95,5 +126,5 @@ def initialize(pop_size, dim, ub, lb, method=None):
 if __name__ == "__main__":
     lb = [-1.5, -0.5]
     ub = [1.5, 2.5]
-    x0 = initialize(5, 2, 1, 2, method=Cubic)
-    print(x0)
+    x0 = initialize(5, 2, ub, lb, method=Cubic)
+    print(initialize.__doc__)
