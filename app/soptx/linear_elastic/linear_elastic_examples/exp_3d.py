@@ -4,7 +4,7 @@ from fealpy.typing import TensorLike
 
 from fealpy.decorator import cartesian
 
-from fealpy.mesh import UniformMesh2d, TriangleMesh, QuadrangleMesh
+from fealpy.mesh import HexahedronMesh, UniformMesh3d
 
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
@@ -17,98 +17,55 @@ from fealpy.fem.linear_form import LinearForm
 from fealpy.fem.dirichlet_bc import DirichletBC
 
 from fealpy.decorator import cartesian
+
 from fealpy.solver import cg, spsolve
 
 from app.soptx.soptx.utils.timer import timer
 
 import argparse
 
-class BoxDomainData2d:
-    """
-    @brief Dirichlet 边界条件的线弹性问题模型
-    @note 本模型假设在二维方形区域 [0,1] x [0,1] 内的线性弹性问题
-    """
-    def __init__(self, E=1.0, nu=0.3):
-        """
-        @brief 构造函数
-        @param[in] E 弹性模量，默认值为 1.0
-        @param[in] nu 泊松比，默认值为 0.3
-        """
-        self.E = E 
-        self.nu = nu
-
-        self.lam = self.nu * self.E / ((1 + self.nu) * (1 - 2*self.nu))
-        self.mu = self.E / (2 * (1+self.nu))
-
+class BoxDomainUnPolyloaded3d():
+    def __init__(self):
+        pass
+        
     def domain(self):
-        return [0, 1, 0, 1]
-
+        return [0, 1, 0, 1, 0, 1]
+    
     @cartesian
-    def source(self, p):
-        """
-        @brief 模型的源项值 f
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        val = bm.zeros(p.shape, dtype=bm.float64)
-        val[..., 0] = 35/13*y - 35/13*y**2 + 10/13*x - 10/13*x**2
-        val[..., 1] = -25/26*(-1+2*y) * (-1+2*x)
-
+    def solution(self, points: TensorLike):
+        x = points[..., 0]
+        y = points[..., 1]
+        z = points[..., 2]
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=bm.get_device(points))
+        val[..., 0] = 2*x**3 - 3*x*y**2 - 3*x*z**2
+        val[..., 1] = 2*y**3 - 3*y*x**2 - 3*y*z**2
+        val[..., 2] = 2*z**3 - 3*z*y**2 - 3*z*x**2
+        
         return val
 
     @cartesian
-    def solution(self, p):
-        """
-        @brief 模型真解
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        val = bm.zeros(p.shape, dtype=bm.float64)
-        val[..., 0] = x*(1-x)*y*(1-y)
-        val[..., 1] = 0
-
+    def source(self, points: TensorLike):
+        val = bm.zeros(points.shape, 
+                       dtype=points.dtype, device=bm.get_device(points))
+        
         return val
+    
+    def dirichlet(self, points: TensorLike) -> TensorLike:
 
-    @cartesian
-    def dirichlet(self, p):
-        """
-        @brief Dirichlet 边界条件
-        """
-        return self.solution(p)
+        return self.solution(points)
 
-    @cartesian
-    def is_dirichlet_boundary(self, p):
-        """
-        @brief 判断给定点是否在 Dirichlet 边界上
-        @param[in] p 一个表示空间点坐标的数组
-        @return 如果在 Dirichlet 边界上，返回 True，否则返回 False
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        flag1 = bm.abs(x) < 1e-13
-        flag2 = bm.abs(x - 1) < 1e-13
-        flagx = bm.logical_or(flag1, flag2)
-        flag3 = bm.abs(y) < 1e-13
-        flag4 = bm.abs(y - 1) < 1e-13
-        flagy = bm.logical_or(flag3, flag4)
-        flag = bm.logical_or(flagx, flagy)
-
-        return flag
-
-def create_mesh(mesh_type, nx, ny, h, origin=[0.0, 0.0]):
+def create_mesh(mesh_type, nx, ny, nz, h, origin=[0.0, 0.0, 0.0]):
     """根据参数创建不同类型的网格"""
-    extent = [0, nx, 0, ny]
+    extent = [0, nx, 0, ny, 0, nz]
     
     if mesh_type == 'uniform':
-        return UniformMesh2d(extent=extent, h=h, origin=origin,
-                           ipoints_ordering='yx', flip_direction=None, device='cpu')
-    elif mesh_type == 'triangle':
-        box = [0, nx*h[0], 0, ny*h[1]]  
-        mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
-        return mesh
-    elif mesh_type == 'quadrangle':
-        box = [0, nx*h[0], 0, ny*h[1]]  
-        mesh = QuadrangleMesh.from_box(box, nx=nx, ny=ny)
+        return UniformMesh3d(extent=extent, h=h, origin=origin,
+                           ipoints_ordering='zyx', flip_direction=None, 
+                           device='cpu')
+    elif mesh_type == 'hexahedron':
+        box = [0, nx*h[0], 0, ny*h[1], 0, nz*h[2]]  
+        mesh = HexahedronMesh.from_box(box, nx=nx, ny=ny, nz=nz)
         return mesh
     else:
         raise ValueError(f"Unsupported mesh type: {mesh_type}")
@@ -126,31 +83,35 @@ def main():
     parser.add_argument('--solver',
                         choices=['cg', 'spsolve'],
                         default='spsolve', type=str,
-                        help='Specify the solver type for solving the linear system, default is "mumps".')
+                        help='Specify the solver type for solving the linear system, default is "cg".')
     parser.add_argument('--nx', 
-                        default=10, type=int, 
-                        help='Initial number of grid cells in the x direction, default is 10.')
+                        default=4, type=int, 
+                        help='Initial number of grid cells in the x direction, default is 2.')
     parser.add_argument('--ny',
-                        default=10, type=int,
-                        help='Initial number of grid cells in the y direction, default is 10.')
+                        default=4, type=int,
+                        help='Initial number of grid cells in the y direction, default is 2.')
+    parser.add_argument('--nz',
+                        default=4, type=int,
+                        help='Initial number of grid cells in the z direction, default is 2.')
     parser.add_argument('--mesh-type',
-                            choices=['uniform', 'triangle', 'quadrangle'],
-                            default='uniform', type=str,
-                            help='Type of mesh to use for computation.')
+                                choices=['uniform', 'hexahedron'],
+                                default='hexahedron', type=str,
+                                help='Type of mesh to use for computation.')
     args = parser.parse_args()
 
-    pde = BoxDomainData2d()
+    pde = BoxDomainPolyloaded3d()
     args = parser.parse_args()
 
     bm.set_backend(args.backend)
 
-    h = [1.0, 1.0]
-    mesh = create_mesh(args.mesh_type, args.nx, args.ny, h)
+    h = [1.0, 1.0, 1.0]
+    mesh = create_mesh(args.mesh_type, args.nx, args.ny, args.nz, h)
+    
     GD = mesh.geo_dimension()
 
     p = args.degree
 
-    tmr = timer(f"Solver with {args.mesh_type} and {args.solver}")
+    tmr = timer("FEM Solver")
     next(tmr)
 
     maxit = 4
@@ -159,23 +120,23 @@ def main():
     NDof = bm.zeros(maxit, dtype=bm.int32)
     for i in range(maxit):
         space = LagrangeFESpace(mesh, p=p, ctype='C')
-        tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+        tensor_space = TensorFunctionSpace(space, shape=(-1, 3))
         NDof[i] = tensor_space.number_of_global_dofs()
 
-        linear_elastic_material = LinearElasticMaterial(name='E1nu03', 
-                                                    elastic_modulus=1, poisson_ratio=0.3, 
-                                                    hypo='plane_strain', device=bm.get_device(mesh))
+        linear_elastic_material = LinearElasticMaterial(name='lam1_mu1', 
+                                                    lame_lambda=1, shear_modulus=1, 
+                                                    hypo='3D', device=bm.get_device(mesh))
         tmr.send('material')
 
         integrator_K = LinearElasticIntegrator(material=linear_elastic_material, 
-                                            q=tensor_space.p+1, method=None)
+                                               q=tensor_space.p+1, method=None)
         bform = BilinearForm(tensor_space)
         bform.add_integrator(integrator_K)
         K = bform.assembly(format='csr')
-        tmr.send('stiffness assembly')
+        # tmr.send('stiffness assembly')
 
         integrator_F = VectorSourceIntegrator(source=pde.source, 
-                                            q=tensor_space.p+1)
+                                              q=tensor_space.p+1)
         lform = LinearForm(tensor_space)    
         lform.add_integrator(integrator_F)
         F = lform.assembly()
@@ -196,7 +157,6 @@ def main():
         tmr.send('boundary')
         
         uh = tensor_space.function()
-
         if args.solver == 'cg':
             uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
         elif args.solver == 'spsolve':
@@ -210,12 +170,12 @@ def main():
             uh_show = uh.reshape(NN, GD)
         mesh.nodedata['uh'] = uh_show[:]
         
-        if isinstance(mesh, UniformMesh2d):
+        if isinstance(mesh, UniformMesh3d):
             mesh.to_vtk(
-            '/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elastic/linear_elastic_examples/results/exp_2d_uh.vts')
+            '/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elastic/linear_elastic_examples/results/exp_3d_uh.vts')
         else:
             mesh.to_vtk(
-            '/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elastic/linear_elastic_examples/results/exp_2d_uh.vtk')
+            '/home/heliang/FEALPy_Development/fealpy/app/soptx/linear_elastic/linear_elastic_examples/results/exp_3d_uh.vtu')
         tmr.send('solve({})'.format(args.solver))
         
         tmr.send(None)

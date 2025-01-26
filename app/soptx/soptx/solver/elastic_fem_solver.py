@@ -317,8 +317,6 @@ class ElasticFEMSolver:
         uh = self.tensor_space.function()
         try:
             uh[:] = spsolve(K, F[:], solver=solver_type)
-            # t.send('Solving Phase')  # 记录求解阶段时间
-
             # t.send(None)
         except Exception as e:
             raise RuntimeError(f"Direct solver failed: {str(e)}")
