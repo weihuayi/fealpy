@@ -18,7 +18,7 @@ lb, ub = iopt_data[num]['domain']
 NP = 130
 MaxIters = 1000
 dim = 30
-x0 = initialize(NP, dim, ub, lb, way=2)
+x0 = initialize(NP, dim, ub, lb, method=Logistic)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
 optimizer = ParticleSwarmOpt(option)
 optimizer.run()
