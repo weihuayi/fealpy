@@ -38,4 +38,6 @@ from .artificial_rabbits_opt import ArtificialRabbitsOpt
 from .starfish_opt_alg import StarFishOptAlg
 from .zebra_opt_alg import ZebraOptAlg
 from .seagull_opt_alg import SeagullOptAlg
+from .sine_cosine_alg import SineCosineAlg
+from .teaching_learning_based_opt import TeachingLearningBasedAlg
 from .chaos import *

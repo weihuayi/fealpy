@@ -16,7 +16,9 @@ class TestIOptInterfaces:
         lb, ub = data['domain']
         x0 = initialize(NP, data['ndim'], ub, lb)
         option = opt_alg_options(x0, data['objective'], data['domain'], NP)
-        optimizer = MossGrowthOpt(option)
+        optimizer = TeachingLearningBasedAlg(option)
+        # optimizer = SineCosineAlg(option)
+        # optimizer = MossGrowthOpt(option)
         # optimizer = RimeOptAlg(option)
         # optimizer = MarinePredatorsAlg(option)
         # optimizer = HoneybadgerAlg(option)
@@ -35,7 +37,7 @@ class TestIOptInterfaces:
         # optimizer = DifferentialEvolution(option)
         # optimizer = DifferentialtedCreativeSearch(option)
         # optimizer = CuckooQuantumParticleSwarmOpt(option)
-        gbest, gbest_f = optimizer.run()
+        optimizer.run()
 
 if __name__ == "__main__":
     pytest.main(["./test_iopt_alg.py", "-k", "test_opt_alg"])
