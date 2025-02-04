@@ -206,7 +206,7 @@ if __name__ == "__main__":
         volume_fraction=0.4,
         filter_radius=6.0,
         filter_type=filter_type1,        # 指定使用灵敏度滤波器
-        save_dir=f'{base_dir}/cantilever_2d_{filter_type1}_{optimizer_type1}',
+        save_dir=f'{base_dir}/cantilever_2d_{optimizer_type1}_{filter_type1}',
         mesh_type='uniform_mesh_2d',
         assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
         optimizer_type=optimizer_type1,  # 指定使用 OC 优化器
@@ -233,5 +233,5 @@ if __name__ == "__main__":
         tolerance=0.01
     )
 
-    result = run_optimization_test(config2)
+    result = run_optimization_test(config1)
     

@@ -31,12 +31,10 @@ class VolumeConstraint(ConstraintBase):
         """计算体积约束函数值
         
         Parameters
-        ----------
-        rho : 密度场
+        - rho : 密度场
             
         Returns
-        -------
-        gneq : 约束函数值：(当前体积分数 - 目标体积分数) * 单元数量
+        - gneq : 约束函数值：(当前体积分数 - 目标体积分数) * 单元数量
         """
         NC = self._mesh.number_of_cells()
         cell_measure = self._mesh.entity_measure('cell')
