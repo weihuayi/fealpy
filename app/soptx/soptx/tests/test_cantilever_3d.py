@@ -223,10 +223,10 @@ if __name__ == "__main__":
         tolerance=0.01
     )
     
-    # 使用 MMA 优化器的配置
     '''
     参数来源论文: An efficient 3D topology optimization code written in Matlab
     '''
+    # 使用 MMA 优化器的配置
     filter_type = 'density'
     optimizer_type = 'mma'
     config2 = TestConfig(

@@ -169,17 +169,12 @@ class Filter:
         对密度进行滤波
 
         Parameters
-        ----------
-        density : TensorLike
-            原始密度场
-        filter_params : Optional[dict]
-            过滤器参数，对于 Heaviside 滤波需要:
+        - density : 原始密度场
+        - filter_params : 过滤器参数, 对于 Heaviside 滤波需要:
             - beta: 投影参数
 
         Returns
-        -------
-        TensorLike
-            过滤后的物理密度场
+        - 过滤后的物理密度场
         """
         # 获取单元度量
         cell_measure = self._mesh.entity_measure('cell')

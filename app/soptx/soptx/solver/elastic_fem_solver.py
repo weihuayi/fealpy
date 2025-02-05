@@ -49,15 +49,14 @@ class ElasticFEMSolver:
                 solver_params: Optional[dict] = None):
         """
         Parameters
-        ----------
-        material_properties : 材料属性计算器
-        tensor_space : 张量函数空间
-        pde : 包含荷载和边界条件的PDE模型
-        assembly_method : 矩阵组装方法
-        solver_type : 求解器类型, 'cg' 或 'direct' 
-        solver_params : 求解器参数
-            cg: maxiter, atol, rtol
-            direct: solver_type
+        - material_properties : 材料属性计算器
+        - tensor_space : 张量函数空间
+        - pde : 包含荷载和边界条件的PDE模型
+        - assembly_method : 矩阵组装方法
+        - solver_type : 求解器类型, 'cg' 或 'direct' 
+        - solver_params : 求解器参数
+            - cg: maxiter, atol, rtol
+            - direct: solver_type
         """
         self.material_properties = material_properties
         self.tensor_space = tensor_space
@@ -170,7 +169,6 @@ class ElasticFEMSolver:
             AssemblyMethod.STANDARD: 'assembly',
             AssemblyMethod.VOIGT: 'voigt',
             AssemblyMethod.VOIGT_UNIFORM: 'voigt_uniform',
-            # AssemblyMethod.FAST_STRAIN: 'fast_strain',
             AssemblyMethod.FAST_STRESS_UNIFORM: 'fast_stress_uniform',
             AssemblyMethod.FAST_3D_UNIFORM: 'fast_3d_uniform'
         }
