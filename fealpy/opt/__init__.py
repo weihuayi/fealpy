@@ -40,4 +40,6 @@ from .zebra_opt_alg import ZebraOptAlg
 from .seagull_opt_alg import SeagullOptAlg
 from .sine_cosine_alg import SineCosineAlg
 from .teaching_learning_based_opt import TeachingLearningBasedAlg
+from .plant_rhizome_growth_based_opt import PlantRhizomeGrowthBasedOpt
 from .chaos import *
+from .invasive_weed_opt import InvasiveWeedOpt
