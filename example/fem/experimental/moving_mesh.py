@@ -32,8 +32,7 @@ args = parser.parse_args()
 bm.set_backend(args.backend)
 
 from fealpy.pde.poisson_2d import LShapeRSinData
-from fealpy.fem import PoissonLFEMSolver
-from fealpy.csm import LinearElasticityLFEMSolver
+from fealpy.fem import PoissonLFEMSolver, LinearElasticityLFEMSolver
 from fealpy.material.elastic_material import LinearElasticMaterial
 
 
@@ -50,6 +49,8 @@ domain = pde.domain()
 
 mesh = pde.init_mesh(n=n, meshtype='tri') 
 cell = mesh.entity('cell')
+node = mesh.entity('node')
+
 kargs = bm.context(cell)
 cornerIdx = bm.array([0, 1, 3, 4, 5, 7], **kargs)
 mesh.meshdata['cornerIdx'] = cornerIdx
@@ -62,11 +63,11 @@ h = bm.sqrt(mesh.entity_measure('cell'))
 error = mesh.error(pde.gradient, uh.grad_value, celltype=True)
 tmr.send(f'误差计算时间')
 
-kargs = bm.conext(node)
+kargs = bm.context(node)
 bc = bm.array([[1/3, 1/3, 1/3]], **kargs)
 m0 = -bm.log(error/h)
 for i in range(10):
-    m1 = space.project(m0)
+    m1 = s0.space.project(m0)
     m0 = m1(bc)
     print(m0.shape)
 tmr.send(f'投影时间')
@@ -78,8 +79,8 @@ def force(bcs, index):
 
 material = LinearElasticMaterial('movingmesh', elastic_modulus=1,
                                  poisson_ratio=0.3)
-vspace = TensorFunctionSpace(s0.space, (-1, 2))
-s1 = LinearElasticityLFEMSolver(vspace, material, force)
+GD = mesh.geo_dimension()
+s1 = LinearElasticityLFEMSolver(s0.space, GD, material, force)
 s1.set_corner_disp_zero()
 s1.set_normal_disp_zero(domain)
 du = s1.solve()
@@ -89,10 +90,6 @@ fig = plt.figure()
 axes = fig.add_subplot(111, projection='3d')
 plot = axes.plot_trisurf(node[:, 0], node[:, 1], m1, triangles=cell, cmap='rainbow')
 fig.colorbar(plot, ax=axes)
-
-fig = plt.figure()
-axes = fig.add_subplot(111)
-axes.quiver(node[:, 0], node[:, 1], b[0::2], b[1::2])
 
 
 fig = plt.figure()

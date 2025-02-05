@@ -17,19 +17,20 @@ class PoissonLFEMSolver:
         self.timer = timer
         self.logger = logger
 
+        self.pde = pde
         self.space= LagrangeFESpace(mesh, p=p)
         self.uh = self.space.function() # 建立一个有限元函数
-        bform = BilinearForm(space)
+        bform = BilinearForm(self.space)
         bform.add_integrator(ScalarDiffusionIntegrator(method='fast'))
-        lform = LinearForm(space)
-        lform.add_integrator(ScalarSourceIntegrator(pde.source))
+        lform = LinearForm(self.space)
+        lform.add_integrator(ScalarSourceIntegrator(self.pde.source))
         A = bform.assembly()
         b = lform.assembly()
         if self.timer is not None:
             self.timer.send(f"组装 Poisson 方程离散系统")
 
         gdof = self.space.number_of_global_dofs()
-        self.A, self.b = DirichletBC(space, gd=pde.solution).apply(A, b)
+        self.A, self.b = DirichletBC(self.space, gd=pde.solution).apply(A, b)
         if self.timer is not None:
             self.timer.send(f"处理 Poisson 方程 D 边界条件")
 
