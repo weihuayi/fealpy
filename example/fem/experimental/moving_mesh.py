@@ -31,15 +31,17 @@ parser.add_argument('--backend',
 args = parser.parse_args()
 bm.set_backend(args.backend)
 
-from fealpy.pde.poisson_2d import CosCosData, LShapeRSinData
+from fealpy.pde.poisson_2d import LShapeRSinData
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator, LinearElasticIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator, VectorSourceIntegrator
 from fealpy.fem import DirichletBC
-from fealpy.sparse import csr_matrix, CSRTensor
 from fealpy.material.elastic_material import LinearElasticMaterial
 from fealpy.solver import cg
+
+from scipy.sparse import csr_matrix, bmat
+from scipy.sparse.linalg import spsolve
 
 
 p = args.degree
@@ -49,7 +51,7 @@ tmr = timer()
 next(tmr)
 
 pde = LShapeRSinData() 
-mesh = pde.init_mesh(n=3, meshtype='tri') 
+mesh = pde.init_mesh(n=5, meshtype='tri') 
 node = mesh.entity('node')
 tmr.send('网格生成时间')
 
@@ -60,7 +62,7 @@ tmr.send('有限元空间生成时间')
 bform = BilinearForm(space)
 bform.add_integrator(ScalarDiffusionIntegrator(method='fast'))
 lform = LinearForm(space)
-lform.add_integrator(ScalarSourceIntegrator(pde.source), splitter=32768)
+lform.add_integrator(ScalarSourceIntegrator(pde.source))
 A = bform.assembly()
 F = lform.assembly()
 tmr.send(f'矩组装时间')
@@ -78,7 +80,7 @@ tmr.send(f'误差计算时间')
 
 bc = bm.array([[1/3, 1/3, 1/3]], dtype=uh.dtype, device=uh.device)
 m0 = -bm.log(error/h)
-for i in range(3):
+for i in range(10):
     m1 = space.project(m0)
     m0 = m1(bc)
     print(m0.shape)
@@ -97,7 +99,8 @@ next(tmr)
 def force(bcs, index):
     return -m1.grad_value(bcs, index)
 
-material = LinearElasticMaterial('movingmesh', elastic_modulus=1.0, poisson_ratio=0.25)
+material = LinearElasticMaterial('movingmesh', elastic_modulus=1,
+                                 poisson_ratio=0.3)
 tspace = TensorFunctionSpace(space, (-1, 2))
 bform = BilinearForm(tspace)
 bform.add_integrator(LinearElasticIntegrator(material))
@@ -105,25 +108,49 @@ A = bform.assembly()
 lform = LinearForm(tspace)
 lform.add_integrator(VectorSourceIntegrator(force))
 b = lform.assembly()
+B = b.reshape(-1, 2)
+B[[843, 845, 235, 237, 1201, 1211], :] = 0.0
 
 tmr.send(f'组装线性弹性方程时间')
 
 cornerIndex = bm.array([0, 1, 3, 4, 5, 7], dtype=mesh.itype, device=b.device)
 isCornerDof = bm.zeros(A.shape[0], dtype=bm.bool, device=b.device) 
-isCornerDof[2*cornerIndex] = True
-isCornerDof[2*cornerIndex + 1] = True
+isCornerDof = bm.set_at(isCornerDof, 2*cornerIndex, True)
+isCornerDof = bm.set_at(isCornerDof, 2*cornerIndex + 1, True)
 
 bc = DirichletBC(tspace, gd=0.0, threshold=isCornerDof)
 A, b = bc.apply(A, b)
 
+    
 
 tmr.send(f"角点 D 氏边界处理时间")
 
 bdNodeIdx = mesh.boundary_node_index()
-isBdDof = bm.zeros(A.shape[0], dtype=bm.bool, device=b.device)
-isBdDof[2*bdNodeIdx] = True
-isBdDof[2*bdNodeIdx + 1] = True
-isBdDof[isCornerDof] = False
+isBdNode = bm.zeros(NN, dtype=bm.bool, device=b.device)
+isBdNode = bm.set_at(isBdNode, bdNodeIdx, True)
+isBdNode = bm.set_at(isBdNode, cornerIndex, False)
+
+bdNodeIdex, = bm.where(isBdNode)
+
+gdof = A.shape[0]  
+
+domain = pde.domain()
+bdNode = node[isBdNode]
+nd = bdNode.shape[0] # 非角点边界节点数
+n = domain.grad_signed_dist_function(bdNode) # 非角点边界节点的法向量
+val = n.reshape(-1) # 非角点边界节点的法向量
+I = bm.repeat(range(nd), 2).reshape(-1)
+J = bm.stack([2*bdNodeIdex, 2*bdNodeIdex+1], axis=1).reshape(-1)
+G = csr_matrix((val, (I, J)), shape=(nd, gdof))
+A = A.to_scipy()
+
+A = bmat([[A, G.T], [G, None]], format='csr')
+print(A.shape)
+F = bm.concatenate([b, bm.zeros(nd, dtype=b.dtype, device=b.device)], axis=0)
+
+du = spsolve(A, F)
+du = du[:-nd].reshape(-1, 2)
+print(du.shape)
 
 tmr.send(f"边界内部条件处理时间")
 
@@ -132,25 +159,29 @@ tmr.send(f"边界内部条件处理时间")
 tmr.send(f"求解线性弹性方程时间")
 
 
-
-fig = plt.figure()
-#axes = fig.add_subplot(111, projection='3d')
-axes = fig.add_subplot(111)
-mesh.add_plot(axes, cellcolor= error)
-isBdNode = mesh.boundary_node_flag()
-mesh.find_node(axes, index=isBdNode, showindex=True)
-
-fig = plt.figure()
 cell = mesh.entity('cell')
 node = mesh.entity('node')
+
+fig = plt.figure()
 axes = fig.add_subplot(111, projection='3d')
 plot = axes.plot_trisurf(node[:, 0], node[:, 1], m1, triangles=cell, cmap='rainbow')
 fig.colorbar(plot, ax=axes)
 
 fig = plt.figure()
-f = b.reshape(-1, 2)
-v0 = f[:, 0]
-v1 = f[:, 1]
 axes = fig.add_subplot(111)
-axes.quiver(node[:, 0], node[:, 1], v0, v1)
+axes.quiver(node[:, 0], node[:, 1], b[0::2], b[1::2])
+
+
+fig = plt.figure()
+axes = fig.add_subplot(111)
+axes.quiver(node[:, 0], node[:, 1], du[:, 0], du[:, 1])
+
+fig = plt.figure()
+axes = fig.add_subplot(121)
+mesh.add_plot(axes)
+mesh.find_node(axes, index=isBdNode, showindex=True)
+axes = fig.add_subplot(122)
+node += du
+mesh.add_plot(axes)
+mesh.find_node(axes, index=isBdNode, showindex=True)
 plt.show()

@@ -1,4 +1,5 @@
 
+from ..backend import backend_manager as bm
 from .sizing_function import huniform
 from .signed_distance_function import dmin, dcircle, drectangle, ddiff
 from .geoalg import project
@@ -14,7 +15,7 @@ class LShapeDomain(Domain):
             self.fh = fh
 
         self.box = [-1.0, 1.0, -1.0, 1.0] 
-        self.fh = fh
+    
         vertices = bm.array([
             (-1.0, -1.0),
             ( 0.0, -1.0),
@@ -45,6 +46,21 @@ class LShapeDomain(Domain):
 
     def signed_dist_function(self, p):
         return self(p) 
+
+    def grad_signed_dist_function(self, p, deps=1e-12):
+        """
+        """
+        d = self(p)
+        kargs = bm.context(p)
+        depsx = bm.array([deps, 0], **kargs)
+        depsy = bm.array([0, deps], **kargs)
+        
+        dgradx = (self(p + depsx) - d)/deps
+        dgrady = (self(p + depsy) - d)/deps
+
+        n = bm.stack([dgradx, dgrady], axis=1)
+        return n
+
 
     def sizing_function(self, p):
         return self.fh(p, self)
