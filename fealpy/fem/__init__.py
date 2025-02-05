@@ -50,3 +50,7 @@ from .recovery_alg import RecoveryAlg
 
 ### Other
 from .nonlinear_wrapper import NonlinearWrapperInt
+
+
+### solver
+from .poisson_lfem_solver import PoissonLFEMSolver

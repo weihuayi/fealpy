@@ -6,4 +6,4 @@ from .afem_phase_field_crack_hybrid_mix_model import AFEMPhaseFieldCrackHybridMi
 from .ipfem_phase_field_crack_hybrid_mix_model import IPFEMPhaseFieldCrackHybridMixModel
 
 
-from .linear_elasticity_solver import LinearElasticitySolver
+from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver

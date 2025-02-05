@@ -5,9 +5,12 @@ from ..fem import LinearForm, VectorSourceIntegrator
 
 
 
-class LinearElasticitySolver:
+class LinearElasticityLFEMSolver:
+    """
+    采用 Lagrange 有限元求解线弹性方程
+    """
 
-    def __init__(vspace, material, force):
+    def __init__(self, vspace, material, force):
         """
         生成线弹性离散系统
         """
