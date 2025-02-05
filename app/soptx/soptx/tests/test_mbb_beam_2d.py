@@ -214,6 +214,9 @@ if __name__ == "__main__":
         tolerance=0.01
     )
 
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
     nx, ny = 150, 50
     NC = nx * ny
     config2 = TestConfig(
@@ -229,6 +232,9 @@ if __name__ == "__main__":
         tolerance=0.01
     )
 
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
     nx, ny = 300, 100
     NC = nx * ny
     config3 = TestConfig(
@@ -244,6 +250,9 @@ if __name__ == "__main__":
         tolerance=0.01
     )
 
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
     filter_type2 = 'density'
     optimizer_type2 = 'oc'
     config4 = TestConfig(
