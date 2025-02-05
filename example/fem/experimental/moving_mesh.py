@@ -108,8 +108,6 @@ A = bform.assembly()
 lform = LinearForm(tspace)
 lform.add_integrator(VectorSourceIntegrator(force))
 b = lform.assembly()
-B = b.reshape(-1, 2)
-B[[843, 845, 235, 237, 1201, 1211], :] = 0.0
 
 tmr.send(f'组装线性弹性方程时间')
 
@@ -179,9 +177,9 @@ axes.quiver(node[:, 0], node[:, 1], du[:, 0], du[:, 1])
 fig = plt.figure()
 axes = fig.add_subplot(121)
 mesh.add_plot(axes)
-mesh.find_node(axes, index=isBdNode, showindex=True)
+#mesh.find_node(axes, index=isBdNode, showindex=True)
 axes = fig.add_subplot(122)
 node += du
 mesh.add_plot(axes)
-mesh.find_node(axes, index=isBdNode, showindex=True)
+#mesh.find_node(axes, index=isBdNode, showindex=True)
 plt.show()
