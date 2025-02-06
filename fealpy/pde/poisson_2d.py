@@ -1,6 +1,6 @@
 
-from ..backend import backend_manager as bm
-from ..decorator import cartesian, barycentric
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import cartesian, barycentric
 
 class CosCosData:
     """
@@ -135,11 +135,13 @@ class LShapeRSinData:
     def __init__(self):
         pass
 
+    def domain(self, hmin=0.1, hmax=0.1, fh=None):
+        from fealpy.geometry.domain_2d import LShapeDomain 
+        return  LShapeDomain(hmin=hmin, hmax=hmax, fh=fh)
+
     def init_mesh(self, n=4, meshtype='tri'):
         from fealpy.mesh import TriangleMesh 
         from fealpy.mesh import QuadrangleMesh 
-        #from fealpy.mesh import Quadtree 
-        #from fealpy.mesh import Tritree 
         node = bm.array([
             (-1, -1),
             (0, -1),
@@ -168,35 +170,6 @@ class LShapeRSinData:
             mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype == 'quadtree':
-            cell = bm.array([
-                (0, 1, 3, 2),
-                (2, 3, 6, 5),
-                (3, 4, 7, 6)], dtype=bm.int32)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'tritree':
-            cell = bm.array([
-                (1, 3, 0),
-                (2, 0, 3),
-                (3, 6, 2),
-                (5, 2, 6),
-                (4, 7, 3),
-                (6, 3, 7)], dtype=bm.int32)
-            mesh = TriangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            node = mesh.entity('node')
-            cell = mesh.entity('cell')
-            mesh = Tritree(node, cell)
-            return mesh
-        else:
-            raise ValueError("I don't know the meshtype %s".format(meshtype))
-
-    def domain(self):
-        points = [[0, 0], [1, 0], [1, 1], [-1, 1], [-1, -1], [0, -1]]
-        facets = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
-        return points, facets
 
     @cartesian
     def solution(self, p):

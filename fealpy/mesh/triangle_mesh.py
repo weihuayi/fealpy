@@ -6,13 +6,8 @@ from .. import logger
 from .utils import simplex_gdof, simplex_ldof
 from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
-
-from fealpy.sparse.coo_tensor import COOTensor
-from fealpy.sparse.csr_tensor import CSRTensor
-
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
-from scipy.sparse import spdiags, eye, tril, triu, bmat
-
+from fealpy.sparse import csr_matrix
+from fealpy.sparse import CSRTensor,COOTensor
 class TriangleMesh(SimplexMesh, Plotable):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
@@ -309,11 +304,11 @@ class TriangleMesh(SimplexMesh, Plotable):
         Parameters:
             n (int): times refine the triangle mesh.
             surface (function): the surface function.
-            returnim (bool): return the interpolation  matrix or not.
+            returnirm (bool): return the interpolation,restriction  matrix or not.
         """
         if returnim is True:
             IM = []
-
+            
         for i in range(n):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
@@ -322,20 +317,26 @@ class TriangleMesh(SimplexMesh, Plotable):
             edge = self.entity('edge')
             cell = self.entity('cell')
             cell2edge = self.cell_to_edge()
-            edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype, device=self.device)
+
+            kargs = bm.context(cell)
+            edge2newNode = bm.arange(NN, NN + NE, **kargs)
             newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
-
+            
             if returnim is True:
-                A = coo_matrix(
-                        (bm.ones(NN, dtype=self.ftype), (bm.arange(NN), bm.arange(NN))), 
-                        shape=(NN + NE, NN))
-                A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 0])), 
-                                shape=(NN + NE, NN))
-                A += coo_matrix((0.5 * bm.ones(NE, dtype=self.ftype), (bm.arange(NN, NN + NE), edge[:, 1])), 
-                                shape=(NN + NE, NN))
+                shape = (NN + NE, NN)
+                kargs = bm.context(node)
+                values = bm.ones(NN+2*NE, **kargs) 
+                values = bm.set_at(values, bm.arange(NN, NN+2*NE), 0.5)
 
-                IM.append(A.tocsr())
+                kargs = bm.context(cell)
+                i0 = bm.arange(NN, **kargs) 
+                I = bm.concatenate((i0, edge2newNode, edge2newNode))
+                J = bm.concatenate((i0, edge[:, 0], edge[:, 1]))   
 
+                P = csr_matrix((values, (I, J)), shape)
+
+                IM.append(P)
+            
             self.node = bm.concatenate((node, newNode), axis=0)
             p = bm.concatenate((cell, edge2newNode[cell2edge]), axis=1)
             self.cell = bm.concatenate(
@@ -344,6 +345,7 @@ class TriangleMesh(SimplexMesh, Plotable):
             self.construct()
 
         if returnim is True:
+            IM.reverse()
             return IM
 
     def is_crossed_cell(self, point, segment):

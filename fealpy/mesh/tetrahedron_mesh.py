@@ -4,8 +4,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .mesh_base import SimplexMesh
 from .plot import Plotable
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
-from scipy.sparse import spdiags, eye, tril, triu, bmat
+from fealpy.sparse import coo_matrix,csr_matrix
 
 class TetrahedronMesh(SimplexMesh, Plotable): 
     def __init__(self, node, cell):
@@ -483,7 +482,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
 
 
-    def uniform_refine(self, n=1, returnim=False):
+    def uniform_refine(self, n=1, returnim=False,returnrm=False):
         """
         Perform uniform refinement on the tetrahedral mesh.
 

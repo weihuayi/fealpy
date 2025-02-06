@@ -10,4 +10,4 @@ class Domain:
     hmin: float = 0.1
     hmax: float = field(default=None)
     GD: int = field(default=2)
-    fh: Callable[..., bm.ndarray] = huniform
+    fh: Callable[..., Any] = huniform
