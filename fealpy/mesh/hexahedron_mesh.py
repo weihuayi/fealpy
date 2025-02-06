@@ -6,7 +6,8 @@ from .mesh_base import TensorMesh
 from ..typing import TensorLike, Index, _S
 from .plot import Plotable
 
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+# from fealpy.sparse import coo_matrix,csr_matrix
+from fealpy.sparse import CSRTensor,COOTensor
 
 class HexahedronMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
@@ -235,17 +236,18 @@ class HexahedronMesh(TensorMesh, Plotable):
 
         return cell2ipoint[index]
 
-    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
+    def uniform_refine(self, n=1, surface=None, interface=None, returnirm=False):
         """
         @brief Uniform refine the hexahedron mesh n times.
 
         Parameters:
             n (int): times refine the hexahedron mesh.
             surface (function): the surface function.
-            returnim (bool): return the interpolation matrix or not.
+            returnim (bool): return the interpolation/restrction matrix or not.
         """
-        if returnim is True:
+        if returnirm is True:
             IM = []
+            RM = []
         for i in range(n):
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -275,29 +277,40 @@ class HexahedronMesh(TensorMesh, Plotable):
             edge2node = self.edge_to_node()
             face2node = self.face_to_node()
             cell2node = self.cell_to_node()
-            if returnim is True:
-                new_node_num = NN+NE+NF+NC
-                nonzeros = NN+2*NE+4*NF+8*NC
-                data = bm.zeros(nonzeros,dtype=bm.float64)
-                data[:NN] = 1
-                data[NN:NN+2*NE] = 1/2
-                data[NN+2*NE:NN+2*NE+4*NE] = 1/4
-                data[NN+2*NE+4*NF:] = 1/8
 
-                indices = bm.zeros(nonzeros,dtype=bm.int32)
-                indices[:NN] = bm.arange(NN)
-                indices[NN:NN+2*NE] = edge2node.flatten()
-                indices[NN+2*NE:NN+2*NE+4*NF] = face2node.flatten()
-                indices[NN+2*NE+4*NF:] = cell2node.flatten()
+            new_node_num = NN+NE+NF+NC
+            nonzeros = NN+2*NE+4*NF+8*NC
+            sparse_shape = bm.tensor([new_node_num,NN])
+            data = bm.zeros(nonzeros,dtype=bm.float64)
+            data[:NN] = 1
+            data[NN:NN+2*NE] = 1/2
+            data[NN+2*NE:NN+2*NE+4*NE] = 1/4
+            data[NN+2*NE+4*NF:] = 1/8
 
-                indptr = bm.zeros(new_node_num+1,dtype=bm.int32)
-                indptr[:NN+1] = bm.arange(NN+1)
-                indptr[NN+1:NN+NE+1]=bm.arange(NN+2,NN+2*NE+1,step=2)
-                indptr[NN+NE+1:NN+NE+NF+1] = bm.arange(NN+2*NE+4,NN+2*NE+4*NF+1,step=4)
-                indptr[NN+NE+NF+1:] = bm.arange(NN+2*NE+4*NF+8,nonzeros+1,step=8)
+            indices = bm.zeros(nonzeros,dtype=bm.int32)
+            indices[:NN] = bm.arange(NN)
+            indices[NN:NN+2*NE] = edge2node.flatten()
+            indices[NN+2*NE:NN+2*NE+4*NF] = face2node.flatten()
+            indices[NN+2*NE+4*NF:] = cell2node.flatten()
 
-                A = csr_matrix((data,indices,indptr),dtype=bm.float64)
-                IM.append(A)
+            indptr = bm.zeros(new_node_num+1,dtype=bm.int32)
+            indptr[:NN+1] = bm.arange(NN+1)
+            indptr[NN+1:NN+NE+1]=bm.arange(NN+2,NN+2*NE+1,step=2)
+            indptr[NN+NE+1:NN+NE+NF+1] = bm.arange(NN+2*NE+4,NN+2*NE+4*NF+1,step=4)
+            indptr[NN+NE+NF+1:] = bm.arange(NN+2*NE+4*NF+8,nonzeros+1,step=8)
+
+            P = CSRTensor(indptr,indices,data,sparse_shape)
+            P = P.tocoo()
+            IM.append(P)
+            
+            col_indices = IM._indices[1, :]
+            column_sums = bm.zeros(IM.shape[1], dtype=IM._values.dtype)
+            bm.add.at(column_sums, col_indices, IM._values)
+            normalized_values = IM._values / column_sums[col_indices]
+            R = CSRTensor(indptr,indices,normalized_values,sparse_shape)
+            R = R.tocoo()
+            R = R.T
+            RM.append(R)
 
             cell[0::8, 0] = c2n[:, 0]
             cell[0::8, 1] = c2e[:, 0]
@@ -375,9 +388,8 @@ class HexahedronMesh(TensorMesh, Plotable):
             self.cell = cell
             self.construct()
 
-        if returnim is True:
-            return IM
-
+        if returnirm is True:
+            return IM,RM
 
     @classmethod
     def from_one_hexahedron(cls, twist=False):
