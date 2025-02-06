@@ -6,7 +6,7 @@ from .. import logger
 from .utils import simplex_gdof, simplex_ldof
 from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
-# from fealpy.sparse import csr_matrix,coo_matrix
+from fealpy.sparse import csr_matrix
 from fealpy.sparse import CSRTensor,COOTensor
 class TriangleMesh(SimplexMesh, Plotable):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
@@ -297,7 +297,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         length = bm.sqrt(bm.square(v).sum(axis=1))
         return v/length.reshape(-1, 1)
 
-    def uniform_refine(self, n=1, surface=None, interface=None, returnirm=False):
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
         Uniform refine the triangle mesh n times.
 
@@ -306,9 +306,8 @@ class TriangleMesh(SimplexMesh, Plotable):
             surface (function): the surface function.
             returnirm (bool): return the interpolation,restriction  matrix or not.
         """
-        if returnirm is True:
+        if returnim is True:
             IM = []
-            RM = []
             
         for i in range(n):
             NN = self.number_of_nodes()
@@ -318,37 +317,26 @@ class TriangleMesh(SimplexMesh, Plotable):
             edge = self.entity('edge')
             cell = self.entity('cell')
             cell2edge = self.cell_to_edge()
-            edge2newNode = bm.arange(NN, NN + NE, dtype=self.itype, device=self.device)
+
+            kargs = bm.context(cell)
+            edge2newNode = bm.arange(NN, NN + NE, **kargs)
             newNode = (node[edge[:, 0], :] + node[edge[:, 1], :]) / 2.0
             
-            l = NN + NE
-            sparse_shape = bm.tensor([l,NN])
-            data = bm.zeros(NN+2*NE,dtype=bm.float64)
-            indices = bm.zeros(NN+2*NE,dtype=bm.int32)
-            indptr = bm.zeros(l+1,dtype=bm.int32)
+            if returnim is True:
+                shape = (NN + NE, NN)
+                kargs = bm.context(node)
+                values = bm.ones(NN+2*NE, **kargs) 
+                values = bm.set_at(values, bm.arange(NN, NN+2*NE), 0.5)
 
-            data[:NN] = 1
-            data[NN:] = 0.5
+                kargs = bm.context(cell)
+                i0 = bm.arange(NN, **kargs) 
+                I = bm.concatenate((i0, edge2newNode, edge2newNode))
+                J = bm.concatenate((i0, edge[:, 0], edge[:, 1]))   
 
-            indices[:NN] = bm.arange(NN) 
-            indices[NN:] = self.entity('edge').flatten()
+                P = csr_matrix((values, (I, J)), shape)
 
-            indptr[:NN+1] = bm.arange(NN+1)
-            indptr[NN+1:]=bm.arange(NN+2,NN+2*NE+1,step=2)
-
-            P = CSRTensor(indptr,indices,data,sparse_shape)
-            P = P.tocoo()
-            IM.append(P)
+                IM.append(P)
             
-            col_indices = P._indices[1, :]
-            column_sums = bm.zeros(P.shape[1], dtype=P._values.dtype)
-            bm.add.at(column_sums, col_indices, P._values)
-            normalized_values = P._values / column_sums[col_indices]
-            R = CSRTensor(indptr,indices,normalized_values,sparse_shape)
-            R = R.tocoo()
-            R = R.T
-            RM.append(R)
-
             self.node = bm.concatenate((node, newNode), axis=0)
             p = bm.concatenate((cell, edge2newNode[cell2edge]), axis=1)
             self.cell = bm.concatenate(
@@ -356,8 +344,9 @@ class TriangleMesh(SimplexMesh, Plotable):
                     axis=0)
             self.construct()
 
-        if returnirm is True:
-            return IM ,RM       
+        if returnim is True:
+            IM.reverse()
+            return IM
 
     def is_crossed_cell(self, point, segment):
         """

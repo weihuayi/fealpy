@@ -9,7 +9,8 @@ from ..solver import cg
 
 
 class PoissonLFEMSolver:
-
+    """
+    """
     def __init__(self, pde, mesh, p, timer=None, logger=None):
         """
         """
@@ -43,5 +44,23 @@ class PoissonLFEMSolver:
             self.timer.send(f"求解 Poisson 方程线性系统")
 
         return self.uh
+
+
+    def gamg_solve(self, P):
+        """
+        """
+        from ..solver import GAMGSolver
+        solver = GAMGSolver() 
+
+        solver.A = [self.A]
+        solver.P = P
+        solver.R = []
+        for m in P:
+            s = m.sum(axis=1)
+            # m.T/s[None, :]
+            solver.R.append(m.T.div(s))
+            print(m.shape)
+            print(solver.R[-1].shape)
+
 
 

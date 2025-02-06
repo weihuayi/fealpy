@@ -76,16 +76,13 @@ class CSRTensor(SparseTensor):
 
     @property
     def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        nonzero_row = bm.zeros(len(self._values),dtype=bm.int64)
-        nonzero_col = bm.zeros(len(self._values),dtype=bm.int64)
-
-        for i in range(1, self._crow.shape[0]):
-                start = self._crow[i - 1]
-                end = self._crow[i]
-                nonzero_row[start:end] = bm.zeros(end - start) + i-1
-                nonzero_col[start:end] = self._col[start:end]
-
-        return nonzero_row, nonzero_col
+        """
+        """
+        count = self._crow[1:] - self._crow[:-1]
+        nrow = self._crow.shape[0] - 1
+        kargs = bm.context(self._crow)
+        row = bm.repeat(bm.arange(nrow, **kargs), count)
+        return row, self._col
 
     def crow(self) -> TensorLike:
         """Return the row location of non-zero elements."""
@@ -150,10 +147,13 @@ class CSRTensor(SparseTensor):
         return dense_tensor.reshape(self.shape)
 
     def tocoo(self, *, copy=False):
+        """
+        """
         from .coo_tensor import COOTensor
         count = self._crow[1:] - self._crow[:-1]
         nrow = self._crow.shape[0] - 1
-        row = bm.repeat(bm.arange(nrow, device=bm.get_device(count)), count)
+        kargs = bm.context(self._crow)
+        row = bm.repeat(bm.arange(nrow, **kargs), count)
         indices = bm.stack([row, self._col], axis=0)
         new_values = bm.copy(self._values) if copy else self._values
         return COOTensor(indices, new_values, self.sparse_shape)
@@ -210,7 +210,10 @@ class CSRTensor(SparseTensor):
 
     @property
     def T(self):
-        raise NotImplementedError
+        """
+        """
+        A = self.tocoo()
+        return A.T.tocsr()
 
     def partial(self, index: Union[TensorLike, slice]):
         crow = self.crow()
@@ -236,6 +239,17 @@ class CSRTensor(SparseTensor):
     def triu(self, k: int = 0) -> 'CSRTensor':
         tril_loc = (self.col() - k) >= self.row()
         return self.partial(tril_loc)
+
+    def sum(self, axis=0):
+        """
+        """
+        kargs = bm.context(self._values)
+        if axis == 0: # the sum of row
+            return self@bm.ones(self._spshape[1], **kargs)
+        elif axis == 1: # the sum of column
+            r = bm.zeros(self._spshape[1], **kargs)
+            r = bm.index_add(r, self._col, self._values)
+            return r
 
     ### 6. Arithmetic Operations ###
     def neg(self) -> 'CSRTensor':
@@ -361,7 +375,12 @@ class CSRTensor(SparseTensor):
                 raise ValueError("Cannot divide CSRTensor without value")
 
         if isinstance(other, TensorLike):
-            check_shape_match(self.shape, other.shape)
+            if len(other.shape) == 1: #TODO: deal with case self.shape[0] == self.shape[1]
+                if other.shape[0] == self.shape[0]:
+                    other = bm.broadcast_to(other[:, None], self.shape)
+                elif other.shape[0] == self.shape[1]:
+                    other = bm.broadcast_to(other[None, :], self.shape)
+            check_shape_match(other.shape, self.shape)
             new_values = bm.copy(other[self.nonzero_slice])
   
             bm.divide(self._values, new_values, out=new_values)

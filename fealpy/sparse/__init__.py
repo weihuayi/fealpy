@@ -1,6 +1,7 @@
 
 from typing import overload, Optional, Tuple
 
+from ..backend import backend_manager as bm
 from ..backend import TensorLike as _DT
 from ..backend import Size
 from .sparse_tensor import SparseTensor
@@ -77,7 +78,9 @@ def coo_matrix(arg1, *,
         pass
     elif isinstance(arg1, (tuple, list)):
         if isinstance(arg1[0], _DT):
-            pass
+            values = arg1[0] # non zero 
+            indices = bm.stack(arg1[1])
+            return COOTensor(indices, values, shape)
         elif isinstance(arg1[0], int):
             pass
         else:
@@ -104,7 +107,10 @@ def csr_matrix(arg1, shape: Size, *,
     Returns:
         CSRTensor: _description_
     """
-    raise NotImplementedError
+    values = arg1[0] # non zero 
+    indices = bm.stack(arg1[1])
+    A = COOTensor(indices, values, shape)
+    return A.tocsr()
 
 
 
