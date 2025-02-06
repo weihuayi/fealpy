@@ -16,7 +16,9 @@ class TestIOptInterfaces:
         lb, ub = data['domain']
         x0 = initialize(NP, data['ndim'], ub, lb)
         option = opt_alg_options(x0, data['objective'], data['domain'], NP)
-        optimizer = TeachingLearningBasedAlg(option)
+        optimizer = InvasiveWeedOpt(option)
+        # optimizer = PlantRhizomeGrowthBasedOpt(option)
+        # optimizer = TeachingLearningBasedAlg(option)
         # optimizer = SineCosineAlg(option)
         # optimizer = MossGrowthOpt(option)
         # optimizer = RimeOptAlg(option)
