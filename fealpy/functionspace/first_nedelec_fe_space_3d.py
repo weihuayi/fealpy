@@ -60,7 +60,7 @@ class FirstNedelecDof3d():
         fdof = self.number_of_local_dofs(doftype='face')
         return bm.arange(NE*edof, NE*edof+NF*fdof,device=self.device).reshape(NF, fdof)[index]
 
-    def face_to_dof(self):
+    def face_to_dof(self,index=_S):
         p = self.p
         fldof = self.number_of_local_dofs('face')
         eldof = self.number_of_local_dofs('edge')
@@ -87,7 +87,7 @@ class FirstNedelecDof3d():
             #f2d = bm.set_at(f2d,(flag,slice(eldof*i,eldof*(i+1))),f2d[flag, eldof*i:eldof*(i+1)][:, ::-1])
         #f2d[:, eldof*3:] = self.face_to_internal_dof() 
         f2d = bm.set_at(f2d,(slice(None),slice(eldof*3,eldof*3+fldof)),self.face_to_internal_dof())
-        return f2d
+        return f2d[index]
 
     def cell_to_dof(self):
         p = self.p
@@ -466,6 +466,9 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
 
     def cell_to_dof(self):
         return self.dof.cell2dof
+           
+    def face_to_dof(self,index=_S):
+        return self.dof.face_to_dof()[index]
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
@@ -635,9 +638,11 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
             points = mesh.bc_to_point(bcs)[index1]
             n = mesh.face_unit_normal()[index1]
             n = n[:,None,:]
-            h2 = gd(points)
-            g = bm.cross(n, h2) 
-            g = bm.cross(g,n)
+            h2 = gd(points,n)
+
+            #g = bm.cross(n, h2) 
+            #g = bm.cross(g,n)
+            g = bm.cross(n,h2)
 
             g1 = bm.einsum("cqld, cqd,q,c->cl", fbasis, g, ws, fm)
 
@@ -663,7 +668,15 @@ class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         Minv = Minv*em[:,None,None]
         
         points1 = mesh.bc_to_point(bcs)[index2]
-        h1 = gd(points1)
+
+        n1 = mesh.face_unit_normal()
+        n2 = bm.zeros((NE,3))
+        f2e = mesh.face_to_edge()
+        n2[f2e] = n1[:,None,:]
+        n2 = n2[:,None,:][index2]
+
+        h1 = gd(points1,n2)
+        h1 = bm.cross(n2,h1)
         b = bm.einsum('eqd, ed->eq', h1, t) 
         
         g2 = bm.einsum('eql, eq,q->el', bphi, b,ws)

@@ -19,25 +19,12 @@ class HarrisHawksOpt(Optimizer):
         super().__init__(option)
 
     def run(self):
-        # options = self.options
-        # x = options["x0"]
-        # N = options["NP"]
         fit = self.fun(self.x)
-        # MaxIT = options["MaxIters"]
-        # dim = options["ndim"]
-        # lb, ub = options["domain"]
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]
         self.gbest_f = fit[gbest_index]
-        # self.curve = bm.zeros((MaxIT,))
-        # self.D_pl = bm.zeros((MaxIT,))
-        # self.D_pt = bm.zeros((MaxIT,))
-        # self.Div = bm.zeros((1, MaxIT))
         for it in range(self.MaxIT):
             self.D_pl_pt(it)
-            # self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
-            # # exploration percentage and exploitation percentage
-            # self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
 
             E1 = 2 * (1 - (it / self.MaxIT))
             q = bm.random.rand(self.N, 1)

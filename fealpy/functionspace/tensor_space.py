@@ -249,7 +249,17 @@ class TensorFunctionSpace(FunctionSpace):
         ipoints = self.interpolation_points()
         scalar_space = self.scalar_space
         mesh = self.mesh
-        if (bm.is_tensor(gd)) or (isinstance(gd, Function)):
+        if isinstance(gd, (int, float)): 
+            if bm.is_tensor(threshold):
+                assert len(threshold) == self.number_of_global_dofs()
+                isTensorBDof = threshold
+            else : #threshold callable None 
+                isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
+            if uh is None:
+                uh = self.function()
+            uh[threshold] = gd 
+            return uh, isTensorBDof
+        elif (bm.is_tensor(gd)) or (isinstance(gd, Function)):
             assert len(gd[:]) == self.number_of_global_dofs()
             if bm.is_tensor(threshold):
                 assert len(threshold) == self.number_of_global_dofs()

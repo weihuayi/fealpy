@@ -246,8 +246,10 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             
         return ws, detJ, D, B
 
-## 组装方法
-# 标准组装方法
+# ------------------------------------------------------------------------------------------- # 
+# 组装方法
+# ------------------------------------------------------------------------------------------- # 
+    # 标准组装方法
     def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
@@ -264,7 +266,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             A_xx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 0], cm)
             A_yy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 1], cm)
             A_xy = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 0], gphi[..., 1], cm)
-            A_yx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 1], cm)
+            A_yx = bm.einsum('q, cqi, cqj, c -> cij', ws, gphi[..., 1], gphi[..., 0], cm)
 
         GD = mesh.geo_dimension()
         if GD == 3:
@@ -653,7 +655,10 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         return KK
     
+# ------------------------------------------------------------------------------------------- # 
 # SOPTX 中使用的组装方法
+# ------------------------------------------------------------------------------------------- # 
+    # 均匀网格的 voigt 组装 (不限维数)
     @assemblymethod('voigt_uniform')
     def voigt_assembly_uniform(self, space: _TS) -> TensorLike:
         cm, ws, D, B = self.fetch_voigt_assembly_uniform(space)
@@ -662,6 +667,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             
         return KK
     
+    # 均匀网格的二维 stress 快速组装
     @assemblymethod('fast_stress_uniform')
     def fast_assembly_stress_uniform(self, space: _TS) -> TensorLike:
         '''SOPTX'''
@@ -715,6 +721,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         return KK
     
+    # 均匀网格的三维快速组装
     @assemblymethod('fast_3d_uniform')
     def fast_assembly_uniform(self, space: _TS) -> TensorLike:
         '''SOPTX'''

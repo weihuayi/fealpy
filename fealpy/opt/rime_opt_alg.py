@@ -19,25 +19,12 @@ class RimeOptAlg(Optimizer):
 
 
     def run(self, w=5):
-        # options = self.options
-        # x = options["x0"]
-        # N = options["NP"]
         fit = self.fun(self.x)
-        # MaxIT = options["MaxIters"]
-        # dim = options["ndim"]
-        # lb, ub = options["domain"]
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]
         self.gbest_f = fit[gbest_index]
-        # self.curve = bm.zeros((MaxIT,))
-        # self.D_pl = bm.zeros((MaxIT,))
-        # self.D_pt = bm.zeros((MaxIT,))
-        # self.Div = bm.zeros((1, MaxIT))
         for it in range(0, self.MaxIT):
             self.D_pl_pt(it)
-            # self.Div[0, it] = bm.sum(bm.sum(bm.abs(bm.mean(x, axis=0) - x))/N)
-            # # exploration percentage and exploitation percentage
-            # self.D_pl[it], self.D_pt[it] = self.D_pl_pt(self.Div[0, it])
             RimeFactor = (bm.random.rand(self.N, 1) - 0.5) * 2 * bm.cos(bm.array(bm.pi * it / (self.MaxIT / 10))) * (1 - bm.round(bm.array(it * w / self.MaxIT)) / w) # Parameters of Eq.(3),(4),(5)
             E = ((it + 1) /self.MaxIT) ** 0.5 # Eq.(6)
             normalized_rime_rates = fit / (bm.linalg.norm(fit) + 1e-10) # Parameters of Eq.(7) 
