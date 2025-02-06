@@ -254,19 +254,20 @@ if __name__ == "__main__":
     参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
     '''
     filter_type2 = 'density'
-    optimizer_type2 = 'oc'
+    nx, ny = 60, 20
+    NC = nx * ny
     config4 = TestConfig(
-        nx=60, ny=20,
+        nx=nx, ny=ny,
         volume_fraction=0.5,
-        filter_radius=2.4,
-        filter_type=filter_type2,        # 指定使用密度滤波器
-        save_dir=f'{base_dir}/mbb_beam_2d_{filter_type2}_{optimizer_type2}',
+        filter_radius=nx*0.04,
+        filter_type=filter_type2,        # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/mbb_beam_2d_{optimizer_type1}_{filter_type2}_{NC}',
         mesh_type='uniform_mesh_2d',
         assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type=optimizer_type2,  # 指定使用 OC 优化器
+        optimizer_type=optimizer_type1,  # 指定使用 OC 优化器
         max_iterations=200,
         tolerance=0.01
     )
 
-    result = run_optimization_test(config1)
+    result = run_optimization_test(config4)
     
