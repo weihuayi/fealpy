@@ -65,7 +65,7 @@ def get_Af(mesh,p):
     F_without_apply = lform.assembly()
 
     A1,f = DirichletBC(space,gd = pde.solution).apply(A_without_apply,F_without_apply)
-    A = A1.tocoo()
+    A = A1.tocsr()
     return A,f
 nx_1 = ny_1 = 16
 p = 1

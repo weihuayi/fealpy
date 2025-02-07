@@ -8,8 +8,7 @@ from .utils import estr2dim
 from .mesh_base import TensorMesh
 from .plot import Plotable
 
-# from fealpy.sparse import coo_matrix,csr_matrix
-from fealpy.sparse import COOTensor,CSRTensor
+from fealpy.sparse import coo_matrix,csr_matrix
 
 
 class QuadrangleMesh(TensorMesh, Plotable):
@@ -342,55 +341,44 @@ class QuadrangleMesh(TensorMesh, Plotable):
         # cell = cell[bm.arange(NC).reshape(-1, 1), self.localCell[idx]]
         # self.ds.reinit(NN, cell)
 
-    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False,returnrm=False) -> 'QuadrangleMesh':
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False) -> 'QuadrangleMesh':
         """
         Uniform refine the triangle mesh n times.
 
         Parameters:
             n (int): times refine the triangle mesh.
             surface (function): the surface function.
-            returnim (bool): return the interpolation matrix or not.
-            returnim (bool): return the restrction matrix or not.
+            returnim (bool): return the interpolation matrix list or not,列表中的插值矩阵从细到粗排列
         """
         if returnim is True:
             IM = []
-        if returnim is True:
-            RM = []
         for i in range(n):
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')            
             edge2node = self.edge_to_node()
             cell2node = self.cell_to_node()
 
-            lh = NN+NE+NC
-            data = bm.zeros(NN+2*NE+4*NC,dtype=bm.float64)
-            indices = bm.zeros(NN+2*NE+4*NC,dtype=bm.int32)
-            indptr = bm.zeros(lh+1,dtype=bm.int32)
-            data[:NN] = 1
-            data[NN:NN+2*NE] = 1/2
-            data[NN+2*NE:] = 1/4
+            if returnim is True:
+                shape = (NN+NE+NC,NN)
+                kargs = bm.context(node)
+                values = bm.ones(NN+2*NE+4*NC,**kargs)
+                values = bm.set_at(values,bm.arange(NN, NN+2*NE), 0.5)
+                values = bm.set_at(values,bm.arange(NN+2*NE,NN+2*NE+4*NC), 0.25)
+                
+                kargs = bm.context(cell)
+                i0 = bm.arange(NN,**kargs)
+                i1 = bm.arange(NN, NN + NE, **kargs)
+                i2 = bm.arange(NN+NE, NN + NE + NC, **kargs)
+                I = bm.concatenate((i0,i1,i1,i2,i2,i2,i2))
+                J = bm.concatenate((i0,edge[:,0],edge[:,1],cell[:,0],cell[:,1],cell[:,2],cell[:,3]))
 
-            indices[:NN] = bm.arange(NN) 
-            indices[NN:NN+2*NE] = self.edge.flatten()
-            indices[NN+2*NE:] = self.cell.flatten()
+                P = csr_matrix((values,(I,J)),shape)
 
-            indptr[:NN+1] = bm.arange(NN+1)
-            indptr[NN+1:NN+NE+1]=bm.arange(NN+2,NN+2*NE+1,step=2)
-            indptr[NN+NE+1:] = bm.arange(NN+2*NE+4,NN+2*NE+4*NC+1,step=4)
-            sparse_shape = bm.tensor([lh, NN])
-            P = CSRTensor(indptr,indices,data,sparse_shape)
-            P = P.tocoo()
-            IM.append(P)
-            
-            col_indices = IM._indices[1, :]
-            column_sums = bm.zeros(IM.shape[1], dtype=IM._values.dtype)
-            bm.add.at(column_sums, col_indices, IM._values)
-            normalized_values = IM._values / column_sums[col_indices]
-            R = CSRTensor(indptr,indices,normalized_values,sparse_shape)
-            R = R.tocoo()
-            R = R.T
-            RM.append(R)
+                IM.append(P)
 
             # Find the cutted edge
             cell2edge = self.cell2edge
@@ -440,9 +428,9 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
             self.construct()
         if returnim is True:
+            IM.reverse()
             return IM
-        if returnrm is True:
-            return RM
+        
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
             VTK_Quad = 9

@@ -304,7 +304,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         Parameters:
             n (int): times refine the triangle mesh.
             surface (function): the surface function.
-            returnirm (bool): return the interpolation,restriction  matrix or not.
+            returnirm (bool): return the interpolation matrix list or not,列表中的插值矩阵从细到粗排列
         """
         if returnim is True:
             IM = []

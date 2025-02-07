@@ -168,9 +168,9 @@ class GAMGSolver():
 
         # 前磨光
         for l in range(level, NL - 1, 1):
-            el = cg(self.A[l],r[l])
+            el = spsolve(self.L[l],r[l])
             for i in range(self.sstep):
-                el += cg(self.A[l], r[l] - self.A[l] @ el)
+                el += spsolve(self.L[l], r[l] - self.A[l] @ el)
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
@@ -180,9 +180,9 @@ class GAMGSolver():
         # 后磨光
         for l in range(NL - 2, level - 1, -1):
             e[l] += self.P[l] @ e[l + 1]
-            e[l] +=cg(self.A[l], r[l] - self.A[l] @ e[l])
+            e[l] +=spsolve(self.U[l], r[l] - self.A[l] @ e[l])
             for i in range(self.sstep): # 后磨光
-                e[l] += cg(self.A[l], r[l] - self.A[l] @ e[l])
+                e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
 
         return e[level]
 
