@@ -67,13 +67,14 @@ def spspmm_csr(crow1: _DT, col1: _DT, values1: _DT, spshape1: _Size,
         raise ValueError(f"the dense shape of matrix2 ({values2.shape[:-1]}) "
                          f"must match that of matrix1 {structure}")
 
-    size = spshape1[1]
+    size = spshape1[0]
     indices_list = []
     values_list = []
-    new_crow = bm.zeros(size+1,dtype=bm.int64)
+    kargs = bm.context(crow1)
+    new_crow = bm.zeros(size+1, **kargs)
 
     for i in range(size):
-        row = bm.array([],dtype=bm.int64)
+        row = bm.array([], **kargs)
         left_col_flag = (col1 == i)
 
         for x in bm.where(left_col_flag == True)[0]+1:
