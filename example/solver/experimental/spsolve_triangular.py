@@ -27,7 +27,6 @@ pde = CosCosData()
 domain = pde.domain()
 mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
 mesh.uniform_refine(n=4)
-ipdb.set_trace()
 s0 = PoissonLFEMSolver(pde, mesh, p, timer=tmr, logger=logger)
 
 r = s0.b
