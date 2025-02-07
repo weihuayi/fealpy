@@ -74,36 +74,39 @@ class CSRTensor(SparseTensor):
     @property
     def nnz(self): return self._col.shape[-1]
 
-    @property
-    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        """
-        """
-        count = self._crow[1:] - self._crow[:-1]
-        nrow = self._crow.shape[0] - 1
-        kargs = bm.context(self._crow)
-        row = bm.repeat(bm.arange(nrow, **kargs), count)
-        return row, self._col
 
     def crow(self) -> TensorLike:
         """Return the row location of non-zero elements."""
         return self._crow
 
-    def row(self) -> TensorLike:
-        """Generate the row id of non-zero elements."""
-        crow = self.crow()
-        n_row = crow.shape[0] - 1
-        return bm.repeat(
-            bm.arange(n_row, dtype=crow.dtype, device=bm.get_device(crow)),
-            crow[1:] - crow[:-1]
-        )
-
-    def col(self) -> TensorLike:
-        """Return the column of non-zero elements."""
-        return self._col
-
     def values(self) -> Optional[TensorLike]:
         """Return the non-zero elements"""
         return self._values
+
+    @property
+    def indptr(self): return self._crow # scipy convention
+
+    @property
+    def indices(self): return self._col # scipy convention
+
+    @property
+    def row(self):
+        count = self._crow[1:] - self._crow[:-1]
+        nrow = self._crow.shape[0] - 1
+        kargs = bm.context(self._crow)
+        return bm.repeat(bm.arange(nrow, **kargs), count)
+
+    @property
+    def col(self): return self._col
+
+    @property
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
+        """
+        """
+        return self.row, self._col
+
+    @property
+    def data(self): return self._values # scipy convention
 
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
@@ -150,11 +153,7 @@ class CSRTensor(SparseTensor):
         """
         """
         from .coo_tensor import COOTensor
-        count = self._crow[1:] - self._crow[:-1]
-        nrow = self._crow.shape[0] - 1
-        kargs = bm.context(self._crow)
-        row = bm.repeat(bm.arange(nrow, **kargs), count)
-        indices = bm.stack([row, self._col], axis=0)
+        indices = bm.stack(self.nonzero_slice, axis=0)
         new_values = bm.copy(self._values) if copy else self._values
         return COOTensor(indices, new_values, self.sparse_shape)
 

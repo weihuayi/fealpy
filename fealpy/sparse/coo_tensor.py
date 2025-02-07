@@ -86,6 +86,15 @@ class COOTensor(SparseTensor):
         """Return the non-zero elements."""
         return self._values
 
+    @property
+    def row(self): return self._indices[0] # scipy convention
+
+    @property
+    def col(self): return self._indices[1] # scipy convenstion
+
+    @property
+    def data(self): return self._values # scipy convention
+
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
         if self._values is None:
