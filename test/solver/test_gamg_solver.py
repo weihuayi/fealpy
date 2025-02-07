@@ -8,6 +8,8 @@ from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import (
         BilinearForm, ScalarDiffusionIntegrator,LinearForm,DirichletBC
     )
+from fealpy.sparse import csr_matrix
+from fealpy.solver import spsolve
 from gamg_solver_data import * 
 
 
@@ -25,6 +27,9 @@ class TestGAMGSolverInterfaces:
         A = [A_0]
         P = []
         R =[]
+        L = [A_0.tril()]
+        U = [A_0.triu()]
+        D = [L[-1]+U[-1]-A_0]
         nx = test_data['nx']
         ny = test_data['ny']
         NN = bm.ceil(bm.log2(A[-1].shape[0])/2-4)
@@ -32,13 +37,25 @@ class TestGAMGSolverInterfaces:
         for l in range(NL):
             nx,ny = nx//2,ny//2
             mesh = TriangleMesh.from_box(domain,nx,ny)
-            IM,RM = mesh.uniform_refine(n=1,returnirm=True)
+            IM = mesh.uniform_refine(n=1,returnim=True)
             P.append(IM[-1])
-            R.append(RM[-1])
-            A.append((RM[-1]@A[l]@IM[-1]).tocoo())
+            for m in P:
+                s = m.sum(axis=1)
+                # m.T/s[None, :]
+                # m = m.div(s)
+                R.append(m.T)
+            print(R[-1]._crow.shape[0]-1)
+            print(R[-1]._spshape[0])
+            print(R[-1].shape)
+            print(A[l].shape)
+            mt = R[-1].matmul(A[l])
+            A.append(mt.matmul(P[-1]))
+            L.append(A[-1].tril())
+            U.append(A[-1].triu()) 
+            D.append(L[-1]+U[-1]-A[-1])
             if A[-1].shape[0] < data['csize']:
                break
-        return A,P,R
+        return A,P,R,L,U,D
 
     @pytest.mark.parametrize("backend", ['numpy'])
     @pytest.mark.parametrize("data", init_data)
@@ -46,8 +63,8 @@ class TestGAMGSolverInterfaces:
     def test_vcycle(self,data,test_data, backend):
         bm.set_backend(backend)
         solver = GAMGSolver(**data) 
-        A,P,R = self.assemble_data(data,test_data)
-        solver.setup(A=A,P=P,R=R)
+        A,P,R,L,U,D = self.assemble_data(data,test_data)
+        solver.setup(A=A,P=P,R=R,L=L,U=U,D=D)
         f = test_data['f']
         phi = solver.vcycle(f)
         e = phi - test_data['sol']
@@ -67,7 +84,7 @@ class TestGAMGSolverInterfaces:
     def test_fcycle(self,data,test_data, backend):
         bm.set_backend(backend)
         solver = GAMGSolver(**data) 
-        A,P,R = self.assemble_data(data,test_data)
+        A,P,R,L,U,D = self.assemble_data(data,test_data)
         solver.setup(A=A,P=P,R=R)
         f = test_data['f']
         phi = solver.fcycle(f)
@@ -108,6 +125,6 @@ class TestGAMGSolverInterfaces:
 if __name__ == "__main__":
     # pytest.main(["./test_gamg_solver.py",'-k' ,"test_vcycle"])
     test = TestGAMGSolverInterfaces()
-
+# , 'test_fcycle', 'test_wcycle'
     [getattr(test, func)(init_data[0], data, "numpy") for func in 
-     ['test_vcycle', 'test_fcycle', 'test_wcycle'] for data in test_data]
+     ['test_vcycle'] for data in test_data]
