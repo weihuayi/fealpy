@@ -163,7 +163,7 @@ class DirichletBC():
         elif isinstance(A, CSRTensor):
             isIDof = bm.logical_not(isDDof)
             crow = A.crow()
-            col = A.col()
+            col = A.col
             indices_context = bm.context(col)
             ZERO = bm.array([0], **indices_context)
 

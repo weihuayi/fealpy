@@ -3,7 +3,7 @@
 # See: https://github.com/pymumps/pymumps
 
 import warnings
-import mumps._dmumps
+import ._dmumps
 
 __all__ = [
     'DMumpsContext',

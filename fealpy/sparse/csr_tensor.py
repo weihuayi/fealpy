@@ -217,7 +217,7 @@ class CSRTensor(SparseTensor):
     def partial(self, index: Union[TensorLike, slice]):
         crow = self.crow()
         ZERO = bm.zeros([1], dtype=crow.dtype, device=bm.get_device(crow))
-        new_col = bm.copy(self.col()[..., index])
+        new_col = bm.copy(self.col[..., index])
         is_selected = bm.zeros((self.nnz,), dtype=bm.bool, device=bm.get_device(new_col))
         is_selected = bm.set_at(is_selected, index, True)
         selected_cum = bm.concat([ZERO, bm.cumsum(is_selected, axis=0)], axis=0)
@@ -232,11 +232,11 @@ class CSRTensor(SparseTensor):
         return CSRTensor(new_crow, new_col, new_values, self._spshape)
 
     def tril(self, k: int = 0) -> 'CSRTensor':
-        tril_loc = (self.row() + k) >= self.col()
+        tril_loc = (self.row + k) >= self.col
         return self.partial(tril_loc)
 
     def triu(self, k: int = 0) -> 'CSRTensor':
-        tril_loc = (self.col() - k) >= self.row()
+        tril_loc = (self.col - k) >= self.row
         return self.partial(tril_loc)
 
     def sum(self, axis=0):

@@ -25,7 +25,7 @@ class PoissonLFEMSolver:
         bform.add_integrator(ScalarDiffusionIntegrator(method='fast'))
         lform = LinearForm(self.space)
         lform.add_integrator(ScalarSourceIntegrator(self.pde.source))
-        A = bform.assembly()
+        A = bform.assembly(format='coo')
         b = lform.assembly()
         if self.timer is not None:
             self.timer.send(f"组装 Poisson 方程离散系统")

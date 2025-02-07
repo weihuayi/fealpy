@@ -1191,7 +1191,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         @return TriangleMesh instance
         """
         if itype is None:
-            itype = bm.int64
+            itype = bm.int32
         if ftype is None:
             ftype = bm.float64
         
