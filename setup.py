@@ -1,8 +1,7 @@
 import os
 import pathlib
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
 from fealpy import __version__
-
 
 here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / "README.md").read_text(encoding="utf-8")
@@ -19,6 +18,23 @@ def load_requirements(path_dir=here, comment_char="#"):
         if line:  # if requirement is not empty
             requirements.append(line)
     return requirements
+
+ext_modules_dict={
+        "mumps": Extension(
+            'fealpy.solver.mumps._dmumps',
+            sources=['fealpy/solver/mumps/_dmumps.pyx'],
+            libraries=['dmumps', 'mumps_common'],
+            ),
+        }
+
+def get_ext_modules():
+    ext_modules = []
+    if os.getenv("WITH_MUMPS"):
+        ext_modules.append(ext_modules_dict['mumps'])
+    return ext_modules
+
+
+ext_modules = get_ext_modules() 
 
 
 setup(
@@ -37,8 +53,9 @@ setup(
     extras_require={
         "doc": ["sphinx", "recommonmark", "sphinx-rtd-theme"],
         "dev": ["pytest", "pytest-cov", "bump2version"],
-        "optional": ["pypardiso", "pyamg"],
+        "optional": ["pypardiso", "pyamg", "mpi4py", "meshpy"],
     },
+    ext_modules=ext_modules,
     include_package_data=True,
-    python_requires=">=3.6",
+    python_requires=">=3.10",
 )
