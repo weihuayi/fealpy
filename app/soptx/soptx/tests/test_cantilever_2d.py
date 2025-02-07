@@ -85,13 +85,16 @@ def create_base_components(config: TestConfig):
                             elastic_modulus=config.elastic_modulus,
                             minimal_modulus=config.minimal_modulus,
                             poisson_ratio=config.poisson_ratio,
-                            plane_assumption="plane_stress"
+                            plane_assumption="plane_stress",
+                            interpolation_model="SIMP",
+                            penalty_factor=config.penalty_factor
                         )
-    interpolation_model = SIMPInterpolation(penalty_factor=config.penalty_factor)
-    material_properties = ElasticMaterialProperties(
-                                config=material_config,
-                                interpolation_model=interpolation_model
-                            )
+    material_properties = ElasticMaterialProperties(config=material_config)
+    # interpolation_model = SIMPInterpolation(penalty_factor=config.penalty_factor)
+    # material_properties = ElasticMaterialProperties(
+    #                             config=material_config,
+    #                             interpolation_model=interpolation_model
+    #                         )
     
     pde = Cantilever2dData1(
                 xmin=0, xmax=extent[1] * h[0],
