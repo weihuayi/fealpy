@@ -11,34 +11,12 @@ class SupportsMatmul(Protocol):
     def __matmul__(self, other: TensorLike) -> TensorLike: ...
 
 
-def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
+def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optional[SupportsMatmul] = None, *,
        batch_first: bool=False,
        atol: float=1e-12, rtol: float=1e-8,
        maxiter: Optional[int]=10000) -> TensorLike:
-    """Solve a linear system Ax = b using the Conjugate Gradient (CG) method.
+ 
 
-    Parameters:
-        A (SupportsMatmul): The coefficient matrix of the linear system.
-        b (TensorLike): The right-hand side vector of the linear system, can be a 1D or 2D tensor.
-        x0 (TensorLike): Initial guess for the solution, a 1D or 2D tensor.\
-        Must have the same shape as b when reshaped appropriately.
-        batch_first (bool, optional): Whether the batch dimension of `b` and `x0`\
-        is the first dimension. Ignored if `b` is an 1-d tensor. Default is False.
-        atol (float, optional): Absolute tolerance for convergence. Default is 1e-12.
-        rtol (float, optional): Relative tolerance for convergence. Default is 1e-8.
-        maxiter (int, optional): Maximum number of iterations allowed. Default is 10000.\
-        If not provided, the method will continue until convergence based on the given tolerances.
-
-    Returns:
-        Tensor: The approximate solution to the system Ax = b.
-
-    Raises:
-        ValueError: If inputs do not meet the specified conditions (e.g., A is not sparse, dimensions mismatch).
-
-    Note:
-        This implementation assumes that A is a symmetric positive-definite matrix,
-        which is a common requirement for the Conjugate Gradient method to work correctly.
-    """
     assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
         assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"
@@ -52,12 +30,16 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
     else:
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
+    
+    if M is not None  and M.shape != A.shape:
+        raise ValueError("A and M must have the same shape")
+
 
     if (not single_vector) and batch_first:
         b = bm.swapaxes(b, 0, 1)
         x0 = bm.swapaxes(x0, 0, 1)
 
-    sol = _cg_impl(A, b, x0, atol, rtol, maxiter)
+    sol = _cg_impl(A, b, x0,M,atol, rtol, maxiter)
 
     if (not single_vector) and batch_first:
         sol = bm.swapaxes(sol, 0, 1)
@@ -65,24 +47,27 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, *,
     return sol
 
 
-def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxiter):
+def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul, atol, rtol, maxiter):
     # initialize
     x = x0              # (dof, batch)
     r = b - A @ x       # (dof, batch)
-    p = r               # (dof, batch)
+    z = M @ r if M is not None else r
+    p = z               # (dof, batch)
     n_iter = 0
     b_norm = bm.linalg.norm(b)
     sum_func = bm.sum
     sqrt_func = bm.sqrt
-
+    rTr = sum_func(r * z, axis=0)
+    Ap = A @ p
+    print(f"rTr = {rTr}, p*Ap = {sum_func(p*Ap, axis=0)}")
     # iterate
     while True:
         Ap = A @ p      # (dof, batch)
-        rTr = sum_func(r**2, axis=0)
         alpha = rTr / sum_func(p*Ap, axis=0)  # r @ r / (p @ Ap) # (batch,)
         x = x + alpha[None, ...] * p  # (dof, batch)
         r_new = r - alpha[None, ...] * Ap
-        rTr_new = sum_func(r_new**2, axis=0)  # (batch,)
+        z_new = M @ r_new if M is not None  else r_new 
+        rTr_new = sum_func(r_new*z_new, axis=0)  # (batch,)
         r_norm_new = sqrt_func(sum_func(rTr_new))
 
         n_iter += 1
@@ -102,8 +87,8 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, atol, rtol, maxit
             break
 
         beta = rTr_new / rTr # (batch,)
-        p = r_new + beta[None, ...] * p
-        r = r_new
+        p = z_new + beta[None, ...] * p
+        r, z, rTr = r_new, z_new, rTr_new
 
     return x
 
