@@ -516,6 +516,13 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
                                       "not been supported yet.")
 
     @staticmethod
+    def csr_spspmm(crow1, col1, values1, shape1, crow2, col2, values2, shape2):
+        mat1 = torch.sparse_csr_tensor(crow1, col1, values1, size=shape1)
+        mat2 = torch.sparse_csr_tensor(crow2, col2, values2, size=shape2)
+        mat3: Tensor = PyTorchBackend._spmm(mat1, mat2)
+        return mat3.crow_indices(), mat3.col_indices(), mat3.values(), mat3.shape
+
+    @staticmethod
     def _spmm(mat, other):
         if other.ndim == 1:
             return torch.sparse.mm(mat, other[:, None])[:, 0]
