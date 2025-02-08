@@ -47,11 +47,11 @@ print(f"[{RANK}] Number of real nodes 真实顶点数", pmesh.count_real('node')
 
 
 ##################################################
-# Example: Integral on cells, then interpolate to nodes
-# 例子：在子网格的单元内积分，然后插值到顶点
+# Example: Integral on cells, then sum to nodes
+# 例子：在子网格的单元内积分，然后求和到顶点
 ##################################################
 
-# 1. 在每个子网格中积分并插值到顶点
+# 1. 在每个子网格中积分并求和到顶点
 
 def func_example(p):
     PI = bm.pi
@@ -66,7 +66,8 @@ def integral_on_mesh_cells_to_nodes(mesh: Mesh, func):
     ms = mesh.entity_measure('cell')
     integral_on_cell = bm.einsum('q, cq, c -> c', ws, val, ms)
 
-    integral_on_node = bm.zeros((mesh.number_of_nodes(),), dtype=mesh.ftype)
+    NN = mesh.number_of_nodes()
+    integral_on_node = bm.zeros((NN, ), dtype=mesh.ftype, device=DEVICE)
     NVC = mesh.number_of_vertices_of_cells()[0]
 
     for local_node in range(NVC):
@@ -74,7 +75,7 @@ def integral_on_mesh_cells_to_nodes(mesh: Mesh, func):
             integral_on_node, mesh.cell[:, local_node], integral_on_cell
         )
 
-    return integral_on_node / NVC
+    return integral_on_node
 
 integral_on_node = integral_on_mesh_cells_to_nodes(pmesh, func_example)
 
