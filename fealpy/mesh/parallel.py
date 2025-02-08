@@ -69,18 +69,23 @@ def split_homogeneous_mesh(mesh: _MT, /, masks: Tuple[_DT, ...]):
         global_flags_on_bdry: Dict[str, _DT] = {}
         src_id_on_bdry: Dict[str, _DT] = {}
         local_id_on_bdry: Dict[str, _DT] = {}
+        global_indices: Dict[str, _DT] = {}
+
         for etype in ('node', 'cell'):
             local_bdry_flag = getattr(local_mesh, f"boundary_{etype}_flag")()
             global_flags_on_bdry[etype] = global_bdry_flags[etype][flags[etype]][local_bdry_flag]
             src_id_on_bdry[etype] = src_id[etype][flags[etype]][local_bdry_flag]
             local_id_on_bdry[etype] = local_id[etype][flags[etype]][local_bdry_flag]
 
-        yield (local_mesh, global_flags_on_bdry, src_id_on_bdry, local_id_on_bdry)
+            all_global_indices = bm.arange(mesh.count(etype), dtype=mesh.itype, device=mesh.device)
+            global_indices[etype] = all_global_indices[flags[etype]]
+
+        yield (local_mesh, global_flags_on_bdry, src_id_on_bdry, local_id_on_bdry, global_indices)
 
 
 ### Genearte Tensor data on a field, such as mesh entities.
 
-class ParallelMesh(Mesh, Generic[_MT]):
+class ParallelMesh(Generic[_MT]):
     # Required attributes
     _id : int
     _mesh : _MT
@@ -101,10 +106,9 @@ class ParallelMesh(Mesh, Generic[_MT]):
     def __init__(self, id: int, mesh: _MT,
                  global_bdry_flags: Dict[str, _DT],
                  src_id_on_bdry: Dict[str, _DT],
-                 virtual_table : Dict[str, _DT], *,
-                 global_indices : Optional[Dict[str, _DT]] = None,
+                 virtual_table : Dict[str, _DT],
+                 global_indices : Optional[Dict[str, _DT]] = None, *,
                  comm: Optional[Comm] = None):
-        super().__init__(TD=mesh.TD, itype=mesh.itype, ftype=mesh.ftype)
         self._id = int(id)
         self._mesh = mesh
         self._global_bdry_flags = global_bdry_flags
@@ -113,7 +117,7 @@ class ParallelMesh(Mesh, Generic[_MT]):
         self._global_indices = global_indices
 
         self._comm = comm if comm else COMM_WORLD
-        self.make_process_table()
+        self._make_process_table()
 
     def __getattr__(self, name):
         return getattr(self._mesh, name)
@@ -140,11 +144,15 @@ class ParallelMesh(Mesh, Generic[_MT]):
         return flag
 
     def virtual_indices(self, etype: str, /):
+        """Return indices of virtual entity in the partition."""
         bdry_flag = getattr(self, f"boundary_{etype}_flag")()
         bdry_indices = bm.nonzero(bdry_flag)[0]
         return bdry_indices[self.virtual_flag_on_boundary(etype)]
 
-    def make_process_table(self) -> None:
+    def global_indices(self, etype: str, /):
+        return self._global_indices[etype]
+
+    def _make_process_table(self) -> None:
         SIZE = self.mpi_size
         send_buf = [self._id,] * SIZE
         recv_buf = self._comm.alltoall(send_buf)
