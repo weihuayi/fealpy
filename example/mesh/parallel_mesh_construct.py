@@ -41,7 +41,7 @@ del data_list
 pmesh = ParallelMesh(RANK, *data)
 
 # Check some info
-print(f"[{RANK}] Total number of nodes 总顶点数（整个网格）", pmesh.count_all('node'))
+print(f"[{RANK}] Total number of nodes 总顶点数（整个网格）", pmesh.Count_all('node'))
 print(f"[{RANK}] Number of nodes 顶点数（包括虚点）", pmesh.count('node'))
 print(f"[{RANK}] Number of real nodes 真实顶点数", pmesh.count_real('node'))
 
@@ -81,7 +81,7 @@ integral_on_node = integral_on_mesh_cells_to_nodes(pmesh, func_example)
 # 2. 获得每个子网格边界顶点上的数据，进程间通信
 
 integral_on_bd_node = integral_on_node[pmesh.boundary_node_flag()]
-recv_list = pmesh.synchronize('node', integral_on_bd_node)
+recv_list = pmesh.Converge('node', integral_on_bd_node)
 
 # 3. 每个进程叠加各自收到的信息，完成计算
 # （结果仍存在于各个进程中，可进行后续计算，若有）

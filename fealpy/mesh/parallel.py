@@ -117,7 +117,7 @@ class ParallelMesh(Generic[_MT]):
         self._global_indices = global_indices
 
         self._comm = comm if comm else COMM_WORLD
-        self._make_process_table()
+        self._Make_process_table()
 
     def __getattr__(self, name):
         return getattr(self._mesh, name)
@@ -152,7 +152,7 @@ class ParallelMesh(Generic[_MT]):
     def global_indices(self, etype: str, /):
         return self._global_indices[etype]
 
-    def _make_process_table(self) -> None:
+    def _Make_process_table(self) -> None:
         SIZE = self.mpi_size
         send_buf = [self._id,] * SIZE
         recv_buf = self._comm.alltoall(send_buf)
@@ -162,8 +162,8 @@ class ParallelMesh(Generic[_MT]):
             par_id = recv_buf[pro_id]
             self._process_table[par_id] = pro_id
 
-    def synchronize(self, etype: str, data_on_bdry: _DT, /) -> List[Union[Tuple[_DT, _DT], None]]:
-        """Gather data from virtual entities to their sources.
+    def Converge(self, etype: str, data_on_bdry: _DT, /) -> List[Union[Tuple[_DT, _DT], None]]:
+        """Every virtual entities send data to their reals.
 
         Return message from other partitions as a list, ordered by partition ID
         (NOT process ID). Each message is given as a 2-tuple, containing the
@@ -190,12 +190,16 @@ class ParallelMesh(Generic[_MT]):
 
         return result
 
+    def Broadcast(self, etype: str, data_on_bdry: _DT, /):
+        """Every virtual entities fetch data from their reals."""
+        pass
+
     ### Counter
 
     def count(self, etype):
         return self._mesh.count(etype)
 
-    def count_all(self, etype: str, /) -> int:
+    def Count_all(self, etype: str, /) -> int:
         num_real = self.count_real(etype)
         return self._comm.allreduce(num_real)
 
