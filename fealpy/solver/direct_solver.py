@@ -158,7 +158,7 @@ def _mumps_spsolve_triangular(A:[COOTensor, CSRTensor], b, lower=True):
 
     x = b.copy()
     ctx = DMumpsContext()
-    #ctx.set_silent()
+    ctx.set_silent()
     ctx.set_centralized_sparse(A)
 
     ctx.set_rhs(x)

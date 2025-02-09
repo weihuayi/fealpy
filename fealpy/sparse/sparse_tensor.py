@@ -30,6 +30,9 @@ class SparseTensor():
     def ftype(self): return None if self._values is None else self._values.dtype
 
     @property
+    def dtype(self): return None if self._values is None else self._values.dtype
+
+    @property
     def shape(self): return self.dense_shape + self.sparse_shape
     @property
     def dense_shape(self): return _dense_shape(self._values)
