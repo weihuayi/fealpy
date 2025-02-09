@@ -13,8 +13,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.mesh import TriangleMesh
 from fealpy.fem import PoissonLFEMSolver
-from fealpy.solver import spsolve_triangular
-from fealpy.solver.mumps import spsolve
+from fealpy.solver.mumps import spsolve_triangular
 
 from mpi4py import MPI # 提前导入
 
@@ -39,14 +38,24 @@ tmr.send('取下三角矩阵时间')
 U = s0.A.triu()
 tmr.send('取上三角矩阵时间')
 
-x = spsolve(L, r, par=4)
+x0 = spsolve_triangular(L, r, transpose=False)
 tmr.send('求解下三角系统时间')
-residual = bm.max(bm.abs(L@x - r))
+residual = bm.max(bm.abs(L@x0 - r))
 print(residual)
 
-x = spsolve(U, r, par=4)
+x1 = spsolve_triangular(L, r, transpose=True)
 tmr.send('求解上三角系统时间')
-residual = bm.max(bm.abs(U@x - r))
+residual = bm.max(bm.abs(L.T@x1 - r))
+print(residual)
+
+x2 = spsolve_triangular(U, r, transpose=True)
+tmr.send('求解下三角系统时间')
+residual = bm.max(bm.abs(U.T@x2 - r))
+print(residual)
+
+x3 = spsolve_triangular(U, r, transpose=False)
+tmr.send('求解上三角系统时间')
+residual = bm.max(bm.abs(U@x3 - r))
 print(residual)
 
 uh = s0.solve()
