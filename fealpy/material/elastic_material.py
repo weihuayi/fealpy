@@ -171,9 +171,9 @@ class LinearElasticMaterial(ElasticMaterial):
     
     def strain_matrix(self, dof_priority: bool, 
                     gphi: TensorLike, 
-                    # shear_order: List[str]=['yz', 'xz', 'xy'],
+                    shear_order: List[str]=['yz', 'xz', 'xy'],
                     # shear_order: List[str]=['xy', 'yz', 'xz'],
-                    shear_order: List[str]=['xy', 'xz', 'yz'], # Abaqus 顺序
+                    # shear_order: List[str]=['xy', 'xz', 'yz'], # Abaqus 顺序
                     correction: Optional[str] = None,  # 'None', 'BBar'
                     cm: TensorLike = None, ws: TensorLike = None, detJ: TensorLike = None) -> TensorLike:
         '''

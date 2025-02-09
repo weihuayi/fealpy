@@ -185,7 +185,7 @@ class DirichletBC():
 
             new_values = bm.empty((NNZ,), **kwargs)
             new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
-            new_values = bm.set_at(new_values, non_diag, A.values()[remain_flag])
+            new_values = bm.set_at(new_values, non_diag, A.values[remain_flag])
 
             # A = CSRTensor(new_crow, new_col, new_values)
             A = CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
