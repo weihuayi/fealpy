@@ -45,42 +45,6 @@ class GAMGSolver():
         self.rtol = rtol
         self.atol = atol
 
-    # def setup(self, A):
-    #     """
-    #     @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
-
-    #     @param[in] A 矩阵
-    #     @param[in] space 离散空间
-    #     @param[in] cdegree 粗空间的次数
-
-    #     @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
-    #     """
-
-    #     # 1. 建立初步的算子存储结构
-    #     self.A = [A]
-    #     self.L = [ ] # 下三角 
-    #     self.U = [ ] # 上三角
-    #     self.D = [ ] # 对角线
-    #     self.P = [ ] # 延拓算子
-    #     self.R = [ ] # 限制矩阵
-
-    def setup(self, A, L=None, U=None, D=None, P=None, R=None):
-        """
-        @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
-        @param[in] A 矩阵
-        @param[in] L 下三角矩阵，默认值为 None
-        @param[in] U 上三角矩阵，默认值为 None
-        @param[in] D 对角线矩阵，默认值为 None
-        @param[in] P 延拓算子，默认值为 None
-        @param[in] R 限制矩阵，默认值为 None
-        @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
-        """
-        self.A = A
-        self.L = L if L is not None else []  # 如果未传入L，默认使用空列表
-        self.U = U if U is not None else []  # 如果未传入U，默认使用空列表
-        self.D = D if D is not None else []  # 如果未传入D，默认使用空列表
-        self.P = P if P is not None else []  # 如果未传入P，默认使用空列表
-        self.R = R if R is not None else []  # 如果未传入R，默认使用空列表
 
     def construct_coarse_equation(self, A, F, level=1):
         """
@@ -139,7 +103,6 @@ class GAMGSolver():
             P = LinearOperator((N, N), matvec=self.fcycle)
 
         if self.isolver == 'CG':
-            counter = IterationCounter()
             x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
             print(info)
 
@@ -231,7 +194,7 @@ class GAMGSolver():
             r.append(self.R[l] @ (r[l] - self.A[l] @ e[l]))
 
         # 最粗层直接求解 
-        ec = cg(self.A[-1], r[-1])
+        ec = spsolve(self.A[-1], r[-1])
         e.append(ec)
 
         # 从次最粗层到最细层
