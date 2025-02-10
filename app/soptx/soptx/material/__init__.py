@@ -4,8 +4,7 @@ from .base import MaterialInterpolation
 from .elastic import (ElasticMaterialProperties, 
                       ElasticMaterialInstance, 
                       ElasticMaterialConfig)
-from .linear_elastic_material import (ElasticMaterialProperties, 
-                                      ElasticMaterialInstance, 
+from .linear_elastic_material import (ElasticMaterialInstance, 
                                       ElasticMaterialConfig)
 from .interpolation_scheme import (SIMPInterpolation, 
                                    RAMPInterpolation)
@@ -13,7 +12,6 @@ from .interpolation_scheme import (SIMPInterpolation,
 __all__ = [
     'MaterialInterpolation',
     'ElasticMaterialInstance',
-    'ElasticMaterialProperties',
     'ElasticMaterialConfig',
     'SIMPInterpolation',
     'RAMPInterpolation'
