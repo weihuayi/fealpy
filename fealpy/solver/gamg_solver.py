@@ -1,11 +1,11 @@
 
 from ..backend import backend_manager as bm
 from .conjugate_gradient import cg
+from .direct_solver import spsolve_triangular as spstri
 from .direct_solver import spsolve
 from ..mesh.triangle_mesh import TriangleMesh
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
-from scipy.sparse.linalg import eigs
 
 
 
@@ -169,9 +169,11 @@ class GAMGSolver():
 
         # 前磨光
         for l in range(level, NL - 1, 1):
-            el = spsolve(self.L[l],r[l],"scipy")
+            el = spstri(self.A[l],r[l],lower=True)
+            # el = spsolve(self.L[l],r[l],"scipy")
             for i in range(self.sstep):
-                el += spsolve(self.L[l], r[l] - self.A[l] @ el,"scipy")
+                el += spstri(self.A[l], r[l] - self.A[l] @ el,lower=True)
+                # el += spsolve(self.L[l], r[l] - self.A[l] @ el,"scipy")
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
@@ -181,9 +183,11 @@ class GAMGSolver():
         # 后磨光
         for l in range(NL - 2, level - 1, -1):
             e[l] += self.P[l] @ e[l + 1]
-            e[l] +=spsolve(self.U[l], r[l] - self.A[l] @ e[l],"scipy")
+            e[l] +=spstri(self.A[l], r[l] - self.A[l] @ e[l],lower=False)
+            # e[l] +=spsolve(self.U[l], r[l] - self.A[l] @ e[l],"scipy")
             for i in range(self.sstep): # 后磨光
-                e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l],"scipy")
+                e[l] += spstri(self.A[l], r[l] - self.A[l] @ e[l],lower=False)
+                # e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l],"scipy")
 
         return e[level]
     

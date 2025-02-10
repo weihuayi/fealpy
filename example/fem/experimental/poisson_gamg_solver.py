@@ -32,14 +32,14 @@ s0 = PoissonLFEMSolver(pde, mesh, p, timer=tmr, logger=logger)
 
 s0.gamg_solve(IM)
 
-uh = s0.solve()
+# uh = s0.solve()
 
-# Plot
-node = mesh.entity('node')
-cell = mesh.entity('cell')
-fig = plt.figure()
-axes = fig.add_subplot(121)
-mesh.add_plot(axes)
-axes = fig.add_subplot(122, projection='3d')
-axes.plot_trisurf(node[:, 0], node[:, 1], uh, triangles=cell, cmap='rainbow')
-plt.show()
+# # Plot
+# node = mesh.entity('node')
+# cell = mesh.entity('cell')
+# fig = plt.figure()
+# axes = fig.add_subplot(121)
+# mesh.add_plot(axes)
+# axes = fig.add_subplot(122, projection='3d')
+# axes.plot_trisurf(node[:, 0], node[:, 1], uh, triangles=cell, cmap='rainbow')
+# plt.show()

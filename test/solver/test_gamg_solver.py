@@ -5,10 +5,6 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.solver import GAMGSolver 
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.fem import (
-        BilinearForm, ScalarDiffusionIntegrator,LinearForm,DirichletBC
-    )
-from scipy.sparse.linalg import eigs
 from fealpy.sparse import csr_matrix
 from fealpy.solver import spsolve
 from gamg_solver_data import * 
@@ -16,13 +12,14 @@ from gamg_solver_data import *
 
 
 class TestGAMGSolverInterfaces:
-    # @pytest.mark.parametrize("backend", ['numpy'])
-    # @pytest.mark.parametrize("data", init_data)
-    # def test_init(self, data, backend):
-    #     bm.set_backend(backend)
-    #     solver = GAMGSolver(**data) 
-    #     assert solver is not None
-    #     assert solver.maxit == data['maxit']
+    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("data", init_data)
+    def test_init(self, data, backend):
+        bm.set_backend(backend)
+        solver = GAMGSolver(**data) 
+        assert solver is not None
+        assert solver.maxit == data['maxit']
+        
     def assemble_data(self,data,test_data):
         A_0 = test_data['A']
         A = [A_0]
