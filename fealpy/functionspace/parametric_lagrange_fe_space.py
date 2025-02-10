@@ -89,8 +89,8 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
             elif u.coordtype == 'barycentric':
                 TD = self.TD
                 p = self.p
-                bcs = self.mesh.multi_index_matrix(p, TD)/p
-                uI = u(bcs)
+                bcs = self.mesh.multi_index_matrix(p, TD)/p # (NQ, TD+1)
+                uI = u(bcs) # (NC, LDOF) bm.set_at(uI, cell2dof, u(bcs))
         return self.function(uI)
 
     def project(self, u: Union[Callable[..., TensorLike], TensorLike], M=None) -> TensorLike:
