@@ -122,25 +122,6 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         return cm, ws, gphi_lambda, glambda_x, JG
     
-    @enable_cache
-    def fetch_symbolic_assembly(self, space: _TS) -> TensorLike:
-        index = self.index
-        scalar_space = space.scalar_space
-        mesh = getattr(scalar_space, 'mesh', None)
-    
-        if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
-                               f"homogeneous meshes, but {type(mesh).__name__} is"
-                               "not a subclass of HomoMesh.")
-    
-        cm = mesh.entity_measure('cell', index=index)
-        glambda_x = mesh.grad_lambda()  # (NC, LDOF, GD)
-        
-        symbolic_int = SymbolicIntegration(scalar_space)
-        M = bm.tensor(symbolic_int.gphi_gphi_matrix()) # (LDOF1, LDOF1, GD+1, GD+1)
-
-        return cm, mesh, glambda_x, bm.asarray(M, dtype=bm.float64)
-    
 # SOPTX 中使用的组装方法的缓存
     @enable_cache
     def fetch_voigt_assembly_uniform(self, space: _FS):
@@ -215,6 +196,25 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         M = bm.einsum('qim, qjn, q -> ijmn', gphi_lambda, gphi_lambda, ws)  # (LDOF, LDOF, BC, BC)
 
         return cm, bcs, J, M
+    
+    @enable_cache
+    def fetch_symbolic_assembly(self, space: _TS) -> TensorLike:
+        index = self.index
+        scalar_space = space.scalar_space
+        mesh = getattr(scalar_space, 'mesh', None)
+    
+        if not isinstance(mesh, HomogeneousMesh):
+            raise RuntimeError("The LinearElasticIntegrator only support spaces on"
+                               f"homogeneous meshes, but {type(mesh).__name__} is"
+                               "not a subclass of HomoMesh.")
+    
+        cm = mesh.entity_measure('cell', index=index)
+        glambda_x = mesh.grad_lambda()  # (NC, LDOF, GD)
+        
+        symbolic_int = SymbolicIntegration(scalar_space)
+        M = bm.tensor(symbolic_int.gphi_gphi_matrix()) # (LDOF1, LDOF1, GD+1, GD+1)
+
+        return cm, mesh, glambda_x, bm.asarray(M, dtype=bm.float64)
     
 # ABAQUS 中使用的组装方法的缓存
     @enable_cache
@@ -504,62 +504,6 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         return KK
     
-    @assemblymethod('symbolic_stress')
-    def symbolic_assembly_stress(self, space: _TS) -> TensorLike:
-        scalar_space = space.scalar_space
-        cm, mesh, glambda_x, M = self.fetch_symbolic_assembly(space)
-
-        if not isinstance(mesh, SimplexMesh):
-            raise RuntimeError("The mesh should be an instance of SimplexMesh.")
-        
-        GD = mesh.geo_dimension()
-        NC = mesh.number_of_cells()
-        ldof = scalar_space.number_of_local_dofs()
-
-        # 计算各方向的矩阵
-        A_xx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 0], cm)
-        A_yy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 1], cm)
-        A_xy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 1], cm)
-        A_yx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 0], cm)
-
-        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
-
-        # 获取材料矩阵
-        D = self.material.elastic_matrix()
-        if D.shape[1] != 1:
-            raise ValueError("symbolic_assembly currently only supports elastic matrices "
-                            "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
-        
-        D00 = D[..., 0, 0, None]  # 2μ + λ
-        D01 = D[..., 0, 1, None]  # λ
-        D22 = D[..., 2, 2, None]  # μ
-
-        if space.dof_priority:
-            # 填充对角块
-            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), 
-                        D00 * A_xx + D22 * A_yy)
-            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), 
-                        D00 * A_yy + D22 * A_xx)
-            
-            # 填充非对角块
-            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), 
-                        D01 * A_xy + D22 * A_yx)
-            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), 
-                        D01 * A_yx + D22 * A_xy)
-        else:
-            # 类似的填充方式，但使用不同的索引方式
-            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
-                        D00 * A_xx + D22 * A_yy)
-            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
-                        D00 * A_yy + D22 * A_xx)
-            
-            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
-                        D01 * A_xy + D22 * A_yx)
-            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
-                        D01 * A_yx + D22 * A_xy)
-
-        return KK
-    
     @assemblymethod('fast_3d')
     def fast_assembly(self, space: _TS) -> TensorLike:
         index = self.index
@@ -783,7 +727,65 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         return KK
     
+    # 单纯形网格的二维 stress 快速组装
+    @assemblymethod('symbolic')
+    def symbolic_assembly(self, space: _TS) -> TensorLike:
+        scalar_space = space.scalar_space
+        cm, mesh, glambda_x, M = self.fetch_symbolic_assembly(space)
+
+        if not isinstance(mesh, SimplexMesh):
+            raise RuntimeError("The mesh should be an instance of SimplexMesh.")
+        
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        ldof = scalar_space.number_of_local_dofs()
+
+        # 计算各方向的矩阵
+        A_xx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 0], cm)
+        A_yy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 1], cm)
+        A_xy = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 0], glambda_x[..., 1], cm)
+        A_yx = bm.einsum('ijkl, ck, cl, c -> cij', M, glambda_x[..., 1], glambda_x[..., 0], cm)
+
+        KK = bm.zeros((NC, GD * ldof, GD * ldof), dtype=bm.float64)
+
+        # 获取材料矩阵
+        D = self.material.elastic_matrix()
+        if D.shape[1] != 1:
+            raise ValueError("symbolic_assembly currently only supports elastic matrices "
+                            "with shape (NC, 1, 3, 3) or (1, 1, 3, 3).")
+        D00 = D[..., 0, 0, None]  # E / (1-\nu^2) * 1
+        D01 = D[..., 0, 1, None]  # E / (1-\nu^2) * \nu
+        D22 = D[..., 2, 2, None]  # E / (1-\nu^2) * (1-nu)/2
+
+        if space.dof_priority:
+            # 填充对角块
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(0, ldof)), 
+                        D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(ldof, KK.shape[1])), 
+                        D00 * A_yy + D22 * A_xx)
+            
+            # 填充非对角块
+            KK = bm.set_at(KK, (slice(None), slice(0, ldof), slice(ldof, KK.shape[1])), 
+                        D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(ldof, KK.shape[1]), slice(0, ldof)), 
+                        D01 * A_yx + D22 * A_xy)
+        else:
+            # 类似的填充方式，但使用不同的索引方式
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
+                        D00 * A_xx + D22 * A_yy)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
+                        D00 * A_yy + D22 * A_xx)
+            
+            KK = bm.set_at(KK, (slice(None), slice(0, KK.shape[1], GD), slice(1, KK.shape[2], GD)), 
+                        D01 * A_xy + D22 * A_yx)
+            KK = bm.set_at(KK, (slice(None), slice(1, KK.shape[1], GD), slice(0, KK.shape[2], GD)), 
+                        D01 * A_yx + D22 * A_xy)
+
+        return KK
+    
+# ------------------------------------------------------------------------------------------- # 
 # ABAQUS 中使用的组装方法
+# ------------------------------------------------------------------------------------------- # 
     @assemblymethod('C3D8_BBar')
     def c3d8_bbar_assembly(self, space: _TS) -> TensorLike:
         ws, detJ, D, B  = self.fetch_c3d8_bbar_assembly(space)
