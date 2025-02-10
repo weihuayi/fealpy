@@ -537,7 +537,10 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         # gval = gD(point, nor[:, None]) #(NF, ldof//2, 3)
         # gval = bm.cross(gval, nor[:, None])
         # print(bm.max(bm.abs(gval)))
-        gval = gd(point)
+        n = mesh.face_unit_normal()[index]
+        n = n[:,None,:]
+        gval = gd(point,n)
+        gval = bm.cross(n,gval)
 
 
         uh[face2dof[:, :ldof//2]] = bm.sum(gval*f2v[:, :ldof//2], axis=-1)
@@ -573,6 +576,9 @@ class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
     
     def cell_to_dof(self):
         return self.dof.cell2dof
+    
+    def face_to_dof(self):
+        return self.dof.face_to_dof()
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()

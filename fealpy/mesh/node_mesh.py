@@ -3,6 +3,7 @@ from typing import Union, Optional, Sequence, Tuple, Any, Dict
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
+from fealpy.cfd.sph.particle_solver_new import Space
 
 from .mesh_base import MeshDS 
 
@@ -47,37 +48,19 @@ class NodeMesh(MeshDS):
         axes.set_aspect('equal')
         return axes.scatter(self.node[..., 0], self.node[..., 1], c=color, s=markersize)
 
-    def neighbors(self, box_size, h) -> TensorLike: 
-        '''
-        @brief Find neighbor particles within the smoothing radius.
-
-        note : Currently using jax's own jax_md, vmap, lax
-        '''
-        displacement, shift = space.periodic(box_size)
-        neighbor_fn = partition.neighbor_list(displacement, box_size, h)
-
-        nbrs = neighbor_fn.allocate(self.node)
-        nbrs = neighbor_fn.update(self.node, nbrs)
-        neighbor = nbrs.idx
-        num = self.node.shape[0]
-        index = vmap(lambda idx, row: jnp.hstack([row, jnp.array([idx])]))(bm.arange(neighbor.shape[0]), neighbor)
-        row_len = bm.sum(index != num,axis=1)
-        indptr = lax.scan(lambda carry, x: (carry + x, carry + x), 0, row_len)[1]
-        indptr = bm.concatenate((bm.tensor([0]), indptr))
-        index = index[index != num]
-
-        return index, indptr
-
     @classmethod
-    def from_tgv_domain(cls, box_size, dx=0.02, dy=0.02):
+    def from_tgv_domain(cls, box_size, dx=0.02):
         rho0 = 1.0 #参考密度
         eta0 = 0.01 #参考动态粘度
-        n = bm.tensor((box_size / dx).round(), dtype=int)
+        
+        #n = bm.tensor((box_size / dx).round(), dtype=int)
+        n = bm.astype(box_size // dx, bm.int32)
         grid = bm.meshgrid(bm.arange(n[0]), bm.arange(n[1]), indexing="xy")
         
-        r = bm.tensor((jnp.vstack(list(map(jnp.ravel, grid))).T + 0.5) * dx)
+        r = (bm.stack((grid[0].flatten(),grid[1].flatten()), 1) + 0.5) * dx
+        
         NN = r.shape[0]
-        tag = jnp.full(NN, 0, dtype=int)
+        tag = bm.zeros(NN)
         mv = bm.zeros((NN, 2), dtype=bm.float64)
         tv = bm.zeros((NN, 2), dtype=bm.float64)
         x = r[:, 0]
@@ -91,9 +74,9 @@ class NodeMesh(MeshDS):
             mv[:, 0] = u0
             mv[:, 1] = v0
         tv = mv
-        volume = bm.ones(NN, dtype=bm.float64) * dx * dy
+        volume = bm.ones(NN, dtype=bm.float64) * dx **2
         rho = bm.ones(NN, dtype=bm.float64) * rho0
-        mass = bm.ones(NN, dtype=bm.float64) * dx * dy * rho0
+        mass = bm.ones(NN, dtype=bm.float64) * dx ** 2 * rho0
         eta = bm.ones(NN, dtype=bm.float64) * eta0
 
         nodedata = {
@@ -343,3 +326,289 @@ class NodeMesh(MeshDS):
         node = jnp.vstack((pp, boundaryp))
 
         return cls(node)
+'''
+class KDTree:
+    def __init__(self, points):
+        """
+        初始化KDTree,输入为一个N x D的NumPy数组,表示N个D维的点集。
+        """
+        self.points = points
+        self.tree = self._build_tree(points, depth=0)
+
+    def _build_tree(self, points, depth):
+        """
+        递归构建KD-Tree。points是当前节点的点集,depth是当前树的深度。
+        """
+        if len(points) == 0:
+            return None
+        
+        # 选择当前维度
+        k = points.shape[1]  # 点的维度
+        axis = depth % k  # 循环选择维度
+        
+        # 排序并选择中位点作为根节点
+        points = points[points[:, axis].argsort()]
+        median_idx = len(points) // 2
+        median_point = points[median_idx]
+
+        # 递归构建左子树和右子树
+        left_tree = self._build_tree(points[:median_idx], depth + 1)
+        right_tree = self._build_tree(points[median_idx + 1:], depth + 1)
+
+        return {
+            'point': median_point,
+            'left': left_tree,
+            'right': right_tree,
+            'axis': axis
+        }
+        
+    #@staticmethod
+    #@bm.compile
+    def range_query(self, query_points, radius, include_self=False):
+        """
+        查找每个查询点距离为radius以内的所有邻居点,并返回邻居粒子的索引和自身粒子的索引。
+        query_points: (M, D) 形状的 NumPy 数组,表示M个查询点。
+        radius: 查找邻居的半径
+        include_self: 是否将查询点本身的索引加入到邻居结果中
+        """
+        neighbors_within_range = []
+        self_indices = []  # 存储查询点的索引
+        for i, query_point in enumerate(query_points):
+            neighbors = self._range_query(self.tree, query_point, radius, depth=0, query_idx=i, include_self=include_self)
+            neighbors_within_range.append(neighbors)
+            self_indices.append([i] * len(neighbors))  # 每个查询点的索引重复以匹配邻居数量
+        
+        # 将查询点索引和邻居粒子的索引拆开，按索引顺序整理
+        neighbors = [item for sublist in neighbors_within_range for item in sublist]
+        indices = [item for sublist in self_indices for item in sublist]
+        
+        return bm.array(neighbors), bm.array(indices)
+
+    #@staticmethod
+    #@bm.compile
+    def _range_query(self, node, query_point, radius, depth, query_idx, include_self):
+        if node is None:
+            return []
+
+        axis = node['axis']
+        neighbors = []
+        point = node['point']
+        dist = bm.linalg.norm(point - query_point)
+
+        # 剪枝策略：距离超过半径时，停止搜索
+        if dist <= radius:
+            if include_self or not (point==query_point).all():
+                neighbor_idx = bm.where(bm.all(self.points == point, axis=1))[0][0]
+                neighbors.append(neighbor_idx)
+
+        next_branch = None
+        opposite_branch = None
+        if query_point[axis] < point[axis]:
+            next_branch = node['left']
+            opposite_branch = node['right']
+        else:
+            next_branch = node['right']
+            opposite_branch = node['left']
+
+        # 递归查询
+        neighbors.extend(self._range_query(next_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        # 剪枝：如果查询点和当前节点的差异已经大于半径，停止递归查询对面子树
+        if abs(query_point[axis] - point[axis]) < radius:
+            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        return neighbors
+
+'''
+'''
+class KDTree:
+    def __init__(self, points, box_size):
+        """
+        初始化KDTree, 输入为一个N x D的NumPy数组，表示N个D维的点集，同时传入box_size用于周期边界处理。
+        """
+        self.points = points
+        self.box_size = box_size  # 储存周期边界的盒子尺寸
+        self.tree = self._build_tree(points, depth=0)
+        self.space = Space()  # 初始化周期边界空间
+
+    def _build_tree(self, points, depth):
+        """
+        递归构建KD-Tree。points是当前节点的点集，depth是当前树的深度。
+        """
+        if len(points) == 0:
+            return None
+        
+        # 选择当前维度
+        k = points.shape[1]  # 点的维度
+        axis = depth % k  # 循环选择维度
+        
+        # 排序并选择中位点作为根节点
+        points = points[points[:, axis].argsort()]
+        median_idx = len(points) // 2
+        median_point = points[median_idx]
+
+        # 递归构建左子树和右子树
+        left_tree = self._build_tree(points[:median_idx], depth + 1)
+        right_tree = self._build_tree(points[median_idx + 1:], depth + 1)
+
+        return {
+            'point': median_point,
+            'left': left_tree,
+            'right': right_tree,
+            'axis': axis
+        }
+        
+    def range_query(self, query_points, radius, include_self=False):
+        """
+        查找每个查询点距离为radius以内的所有邻居点，并返回邻居粒子的索引和自身粒子的索引。
+        query_points: (M, D) 形状的NumPy数组，表示M个查询点。
+        radius: 查找邻居的半径
+        include_self: 是否将查询点本身的索引加入到邻居结果中
+        """
+        neighbors_within_range = []
+        self_indices = []  # 存储查询点的索引
+        for i, query_point in enumerate(query_points):
+            neighbors = self._range_query(self.tree, query_point, radius, depth=0, query_idx=i, include_self=include_self)
+            neighbors_within_range.append(neighbors)
+            self_indices.append([i] * len(neighbors))  # 每个查询点的索引重复以匹配邻居数量
+        
+        # 将查询点索引和邻居粒子的索引拆开，按索引顺序整理
+        neighbors = [item for sublist in neighbors_within_range for item in sublist]
+        indices = [item for sublist in self_indices for item in sublist]
+        
+        return bm.array(neighbors), bm.array(indices)
+
+    def _range_query(self, node, query_point, radius, depth, query_idx, include_self):
+        if node is None:
+            return []
+
+        axis = node['axis']
+        neighbors = []
+        point = node['point']
+
+        # 计算周期边界下的距离
+        dR = self.space.periodic_displacement(self.box_size, query_point - point)
+        dist = bm.linalg.norm(dR)
+
+        # 剪枝策略：距离超过半径时，停止搜索
+        if dist < radius:
+            if include_self or not (point == query_point).all():
+                neighbor_idx = bm.where(bm.all(self.points == point, axis=1))[0][0]
+                neighbors.append(neighbor_idx)
+
+        next_branch = None
+        opposite_branch = None
+        if query_point[axis] < point[axis]:
+            next_branch = node['left']
+            opposite_branch = node['right']
+        else:
+            next_branch = node['right']
+            opposite_branch = node['left']
+
+        # 递归查询
+        neighbors.extend(self._range_query(next_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        # 剪枝：如果查询点和当前节点的差异已经大于半径，停止递归查询对面子树
+        if abs(query_point[axis] - point[axis]) < radius:
+            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        # 对面子树的遍历应该也使用周期位移处理
+        if opposite_branch is not None:
+            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        return neighbors
+'''
+class KDTree:
+    def __init__(self, points, box_size):
+        """
+        初始化KDTree, 输入为一个N x D的NumPy数组，表示N个D维的点集，同时传入box_size用于周期边界处理。
+        """
+        self.points = points
+        self.box_size = box_size  # 储存周期边界的盒子尺寸
+        self.tree = self._build_tree(points, depth=0)
+        self.space = Space()  # 初始化周期边界空间
+
+    def _build_tree(self, points, depth):
+        """
+        递归构建KD-Tree。points是当前节点的点集，depth是当前树的深度。
+        """
+        if len(points) == 0:
+            return None
+        
+        # 选择当前维度
+        k = points.shape[1]  # 点的维度
+        axis = depth % k  # 循环选择维度
+        
+        # 排序并选择中位点作为根节点
+        points = points[points[:, axis].argsort()]
+        median_idx = len(points) // 2
+        median_point = points[median_idx]
+
+        # 递归构建左子树和右子树
+        left_tree = self._build_tree(points[:median_idx], depth + 1)
+        right_tree = self._build_tree(points[median_idx + 1:], depth + 1)
+
+        return {
+            'point': median_point,
+            'left': left_tree,
+            'right': right_tree,
+            'axis': axis
+        }
+        
+    def range_query(self, query_points, radius, include_self=False):
+        neighbors_within_range = []
+        self_indices = []  # 存储查询点的索引
+        for i, query_point in enumerate(query_points):
+            neighbors = self._range_query(self.tree, query_point, radius, depth=0, query_idx=i, include_self=include_self)
+            
+            # 确保邻居索引去重并转换为列表
+            unique_neighbors = sorted(set(map(int, neighbors)))  # 使用set去重，再排序，确保neighbors是整数索引
+            neighbors_within_range.append(unique_neighbors)
+            
+            self_indices.append([i] * len(unique_neighbors))  # 每个查询点的索引重复以匹配邻居数量
+            
+        # 将查询点索引和邻居粒子的索引拆开，按索引顺序整理
+        neighbors = [item for sublist in neighbors_within_range for item in sublist]
+        indices = [item for sublist in self_indices for item in sublist]
+        
+        return bm.array(neighbors), bm.array(indices)
+
+    def _range_query(self, node, query_point, radius, depth, query_idx, include_self):
+        if node is None:
+            return []
+
+        axis = node['axis']
+        neighbors = []
+        point = node['point']
+
+        # 计算周期边界下的距离
+        dR = self.space.periodic_displacement(self.box_size, query_point - point)
+        dist = bm.linalg.norm(dR)
+
+        # 剪枝策略：距离超过半径时，停止搜索
+        if dist < radius:
+            if include_self or not (point == query_point).all():
+                neighbor_idx = bm.where(bm.all(self.points == point, axis=1))[0][0]
+                neighbors.append(neighbor_idx)
+
+        next_branch = None
+        opposite_branch = None
+        if query_point[axis] < point[axis]:
+            next_branch = node['left']
+            opposite_branch = node['right']
+        else:
+            next_branch = node['right']
+            opposite_branch = node['left']
+
+        # 递归查询
+        neighbors.extend(self._range_query(next_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        # 剪枝：如果查询点和当前节点的差异已经大于半径，停止递归查询对面子树
+        if abs(query_point[axis] - point[axis]) < radius:
+            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        # 对面子树的遍历应该也使用周期位移处理
+        if opposite_branch is not None:
+            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
+
+        return neighbors

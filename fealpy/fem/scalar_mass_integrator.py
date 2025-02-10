@@ -71,3 +71,24 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
 
         return bilinear_integral(phi, phi, ws, cm, coef_A, batched=self.batched), \
                linear_integral(phi, ws, cm, coef_F, batched=self.batched)
+
+    @assemblymethod('isopara')
+    def isopara_assembly(self, space: _FS, /, indices=None) -> TensorLike:
+        """
+        等参有限元质量矩阵组装
+        """
+        index = self.entity_selection(indices)
+        mesh = getattr(space, 'mesh', None)
+
+        rm = mesh.reference_cell_measure()
+        cm = mesh.entity_measure('cell', index=index)
+
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = mesh.jacobi_matrix(bcs, index=index)
+        G = mesh.first_fundamental_form(J) 
+        d = bm.sqrt(bm.linalg.det(G))
+        phi = space.basis(bcs)
+        M = bm.einsum('q, cqi, cqj, cq -> cij', ws*rm, phi, phi, d) #(NC, ldof, ldof)
+        return M

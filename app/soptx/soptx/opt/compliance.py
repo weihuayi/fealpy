@@ -4,7 +4,6 @@ from fealpy.typing import TensorLike, Literal
 from typing import Dict, Optional, Any
 from dataclasses import dataclass
 
-from soptx.material import ElasticMaterialProperties
 from soptx.solver import ElasticFEMSolver
 from soptx.opt import ObjectiveBase
 from soptx.utils import timer
@@ -29,17 +28,14 @@ class ComplianceObjective(ObjectiveBase):
     - ce: element compliance, 单元柔顺度
     """
     
-    def __init__(self,
-                 material_properties: ElasticMaterialProperties,
-                 solver: ElasticFEMSolver):
+    def __init__(self, solver: ElasticFEMSolver):
         """
         Parameters
-        ----------
-        material_properties : 材料属性计算器
-        solver : 有限元求解器
+        - solver : 有限元求解器
         """
-        self.material_properties = material_properties
+
         self.solver = solver
+        self.materials = solver.materials
 
         # 缓存状态
         self._current_rho = None          # 当前密度场
@@ -52,15 +48,13 @@ class ComplianceObjective(ObjectiveBase):
     def _update_u(self, rho: TensorLike) -> TensorLike:
         """更新位移场
         
-        如果密度发生变化，重新求解状态方程；否则使用缓存的状态
+        如果密度发生变化，重新求解状态方程; 否则使用缓存的状态
         
         Parameters
-        ----------
-        rho : 密度场
+        - rho : 密度场
         
         Returns
-        -------
-        u : 位移场
+        - u : 位移场
         """
         # 检查是否需要更新
         if (self._current_rho is None or 
@@ -68,7 +62,7 @@ class ComplianceObjective(ObjectiveBase):
             not bm.all(rho == self._current_rho)):
             
             # 更新求解器中的密度并求解
-            self.solver.update_density(rho)
+            self.solver.update_status(rho)
             self._current_u = self.solver.solve().displacement 
             self._current_rho = rho  # 直接引用，内部状态会随外部更新
             
@@ -103,7 +97,7 @@ class ComplianceObjective(ObjectiveBase):
               if self._element_compliance is not None 
               else self._compute_element_compliance(u))
         
-        dE = self.material_properties.calculate_elastic_modulus_derivative(rho)
+        dE = self.materials.calculate_elastic_modulus_derivative(rho)
         dc = -bm.einsum('c, c -> c', dE, ce)
 
         return dc
@@ -131,7 +125,7 @@ class ComplianceObjective(ObjectiveBase):
             ke0_i : (tldof, tldof), 单个单元的基础刚度矩阵
             """
             # 计算该单元的材料属性
-            E = self.material_properties.calculate_elastic_modulus(rho_i)
+            E = self.materials.calculate_elastic_modulus(rho_i)
             
             # 计算单元柔顺度并取负值 : -(E * u^T * K * u)
             dE = -E * bm.einsum('i, ij, j', ue_i, ke0_i, ue_i)
@@ -190,7 +184,7 @@ class ComplianceObjective(ObjectiveBase):
         ce = self._compute_element_compliance(u)
         
         # 计算总柔度
-        E = self.material_properties.calculate_elastic_modulus(rho)
+        E = self.materials.elastic_modulus
         c = bm.einsum('c, c -> ', E, ce)
         
         return c

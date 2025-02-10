@@ -1,6 +1,7 @@
 
 from typing import overload, Optional, Tuple
 
+from ..backend import backend_manager as bm
 from ..backend import TensorLike as _DT
 from ..backend import Size
 from .sparse_tensor import SparseTensor
@@ -9,30 +10,19 @@ from .csr_tensor import CSRTensor
 
 
 @overload
-def coo_matrix(arg1: _DT, *,
-               dims: Optional[int]=None,
-               dtype=None,
-               copy=False) -> COOTensor: ...
+def coo_matrix(arg1: _DT, /, itype=None) -> COOTensor: ...
 @overload
-def coo_matrix(arg1: SparseTensor, *,
-               dtype=None,
-               copy=False) -> COOTensor: ...
+def coo_matrix(arg1: SparseTensor, /) -> COOTensor: ...
 @overload
-def coo_matrix(arg1: Size, *,
-               dims: Optional[int]=None,
-               dtype=None,
-               copy=False) -> COOTensor: ...
+def coo_matrix(arg1: Size, /, *, itype=None, ftype=None, device=None) -> COOTensor: ...
 @overload
-def coo_matrix(arg1: Tuple[_DT, Tuple[_DT, ...]], *,
-               shape: Optional[Size]=None,
-               dtype=None,
-               copy=False) -> COOTensor: ...
-def coo_matrix(arg1, *,
-               shape: Optional[Size]=None,
-               dims: Optional[int]=None,
-               dtype=None,
-               copy=False) -> COOTensor:
+def coo_matrix(arg1: Tuple[_DT, Tuple[_DT, ...]], /, *,
+               shape: Optional[Size] = None) -> COOTensor: ...
+def coo_matrix(arg1, /, *,
+               shape: Optional[Size] = None,
+               itype=None, ftype=None, device=None) -> COOTensor:
     """A sparse matrix in COOrdinate format.
+    (A Scipy-like API to generate sparse tensors without batch.)
 
     Also known as the 'ijv' or 'triplet' format.
 
@@ -60,52 +50,109 @@ def coo_matrix(arg1, *,
     Parameters:
         arg1 (_type_): _description_
         shape (Size | None, optional): _description_
-        dims (int | None, optional): _description_
-        dtype (dtype | None, optional): _description_
+        itype (dtype | None, optional): Scalar type of indices
+        ftype (dtype | None, optional): Scalar type of data
         device (str | device | None, optional): _description_
-        copy (bool, optional): _description_. Defaults to False.
-
-    Raises:
-        TypeError: _description_
-
-    Returns:
-        COOTensor: _description_
     """
     if isinstance(arg1, _DT):
-        pass
+        indices_tuple = bm.nonzero(arg1)
+        indices = bm.stack(indices_tuple, axis=0)
+        if itype is not None:
+            indices = bm.astype(indices, itype)
+        values = bm.copy(arg1[indices_tuple])
+        return COOTensor(indices, values, arg1.shape)
+
     elif isinstance(arg1, (COOTensor, CSRTensor)):
-        pass
+        return arg1.tocoo()
+
     elif isinstance(arg1, (tuple, list)):
-        if isinstance(arg1[0], _DT):
-            pass
-        elif isinstance(arg1[0], int):
-            pass
-        else:
-            raise TypeError(f"Unsupported type {type(arg1[0])}")
-    else:
-        raise TypeError(f"Unsupported type {type(arg1)}")
+        if isinstance(arg1[0], int):
+            ndim = len(arg1)
+            indices = bm.empty((ndim, 0), dtype=itype, device=device)
+            values = bm.empty((0,), dtype=ftype, device=device)
+            return COOTensor(indices, values, spshape=arg1)
+
+        elif isinstance(arg1[0], _DT):
+            assert len(arg1) == 2
+            values = arg1[0] # non-zero elements
+            indices = bm.stack(arg1[1], axis=0)
+            return COOTensor(indices, values, shape)
+
+    raise TypeError(f"Error: Illegal combination of parameters")
 
 
-def csr_matrix(arg1, shape: Size, *,
-               dtype=None,
-               copy=False) -> CSRTensor:
-    """_summary_
+@overload
+def csr_matrix(arg1: _DT, /, itype=None) -> CSRTensor: ...
+@overload
+def csr_matrix(arg1: SparseTensor, /) -> CSRTensor: ...
+@overload
+def csr_matrix(arg1: Size, /, *, itype=None, ftype=None, device=None) -> CSRTensor: ...
+@overload
+def csr_matrix(arg1: Tuple[_DT, Tuple[_DT, _DT]], /, *,
+               shape: Optional[Size] = None) -> CSRTensor: ...
+@overload
+def csr_matrix(arg1: Tuple[_DT, _DT, _DT], /, *,
+               shape: Optional[Size] = None) -> CSRTensor: ...
+def csr_matrix(arg1,
+               shape: Optional[Size] = None,
+               itype=None, ftype=None, device=None) -> CSRTensor:
+    """Compressed Sparse Row matrix.
+    (A Scipy-like API to generate sparse tensors without batch.)
+
+    This can be instantiated in several ways:
+        csr_matrix(D)
+            where D is a 2-D tensor
+
+        csr_matrix(S)
+            with another sparse tensor S (equivalent to S.tocsr())
+
+        csr_matrix((M, N), [dtype])
+            to construct an empty tensor with shape (M, N).
+
+        csr_matrix((data, (row, col)), [shape=(M, N)])
+            where data, row and col satisfy the relationship a[row[k], col[k]] = data[k].
+
+        csr_matrix((data, indices, indptr), [shape=(M, N)])
+            is the standard CSR representation where the column indices\
+            for row i are stored in indices[indptr[i]:indptr[i+1]]\
+            and their corresponding values are stored in data[indptr[i]:indptr[i+1]]
 
     Parameters:
         arg1 (_type_): _description_
         shape (Size): _description_
-        dtype (dtype | None, optional): _description_
+        itype (dtype | None, optional): Scalar type of indices
+        ftype (dtype | None, optional): Scalar type of data
         device (str | device | None, optional): _description_
-        copy (bool, optional): _description_. Defaults to False.
-
-    Raises:
-        TypeError: _description_
-
-    Returns:
-        CSRTensor: _description_
     """
-    raise NotImplementedError
+    if isinstance(arg1, _DT): # From a dense tensor
+        indices_tuple = bm.nonzero(arg1)
+        indices = bm.stack(indices_tuple, axis=0)
+        if itype is not None:
+            indices = bm.astype(indices, itype)
+        values = bm.copy(arg1[indices_tuple])
+        return COOTensor(indices, values, arg1.shape).tocsr()
 
+    elif isinstance(arg1, SparseTensor): # From another sparse tensor
+        return arg1.tocsr()
+
+    elif isinstance(arg1, (tuple, list)):
+        if isinstance(arg1[0], int): # Build an empty sparse tensor
+            assert len(arg1) == 2
+            indptr = bm.zeros((arg1[0]+1,), dtype=itype, device=device)
+            indices = bm.empty((0,), dtype=itype, device=device)
+            data = bm.empty((0,), dtype=ftype, device=device)
+            return CSRTensor(indptr, indices, data, spshape=arg1)
+
+        elif isinstance(arg1[0], _DT):
+            if len(arg1) == 2: # From a COO-like format
+                values = arg1[0]
+                indices = bm.stack(arg1[1], axis=0)
+                return COOTensor(indices, values, shape).tocsr()
+            elif len(arg1) == 3: # From CSR data directly
+                data, indices, indptr = tuple(arg1)
+                return CSRTensor(indptr, indices, data, shape)
+
+    raise ValueError(f"Error: Illegal combination of parameters")
 
 
 # NOTE: APIs for Sparse Tensors

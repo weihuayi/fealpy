@@ -1,5 +1,6 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
+
 from .base import MaterialInterpolation
 
 class SIMPInterpolation(MaterialInterpolation):
