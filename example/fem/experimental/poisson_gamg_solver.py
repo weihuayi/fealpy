@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import ipdb
+# import ipdb
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -21,12 +21,12 @@ tmr = timer()
 next(tmr)
 
 p = 1
-n = 3 
+n = 2
 pde = CosCosData() 
 domain = pde.domain()
 mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
 
-IM = mesh.uniform_refine(n=2, returnim=True)
+IM = mesh.uniform_refine(n=4, returnim=True)
 
 s0 = PoissonLFEMSolver(pde, mesh, p, timer=tmr, logger=logger)
 

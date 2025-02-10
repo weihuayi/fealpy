@@ -5,6 +5,7 @@ from .direct_solver import spsolve
 from ..mesh.triangle_mesh import TriangleMesh
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
+from scipy.sparse.linalg import eigs
 
 
 
@@ -168,24 +169,24 @@ class GAMGSolver():
 
         # 前磨光
         for l in range(level, NL - 1, 1):
-            el = spsolve(self.L[l],r[l])
+            el = spsolve(self.L[l],r[l],"scipy")
             for i in range(self.sstep):
-                el += spsolve(self.L[l], r[l] - self.A[l] @ el)
+                el += spsolve(self.L[l], r[l] - self.A[l] @ el,"scipy")
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
-        el = cg(self.A[-1], r[-1])
+        el = cg(self.A[-1], r[-1],maxiter=5000, atol=1e-14, rtol=1e-14)
         e.append(el)
 
         # 后磨光
         for l in range(NL - 2, level - 1, -1):
             e[l] += self.P[l] @ e[l + 1]
-            e[l] +=spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+            e[l] +=spsolve(self.U[l], r[l] - self.A[l] @ e[l],"scipy")
             for i in range(self.sstep): # 后磨光
-                e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+                e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l],"scipy")
 
         return e[level]
-
+    
     def wcycle(self, r, level=0):
         """
         @brief W-Cycle 方法求解 Ae=r
@@ -196,12 +197,12 @@ class GAMGSolver():
 
         NL = len(self.A)
         if level == (NL - 1): # 如果是最粗层
-            e = cg(self.A[-1], r)
+            e = cg(self.A[-1], r, "scipy")
             return e
 
-        e = cg(self.A[level], r)
+        e = spsolve(self.L[level], r)
         for s in range(self.sstep):
-            e += cg(self.A[level], r - self.A[level] @ e) 
+            e += spsolve(self.L[level], r - self.A[level] @ e,"scipy") 
 
         rc = self.R[level] @ ( r - self.A[level] @ e) 
 
@@ -209,11 +210,10 @@ class GAMGSolver():
         ec += self.wcycle( rc - self.A[level+1] @ ec, level=level+1)
         
         e += self.P[level] @ ec
-        e += cg(self.A[level], r - self.A[level] @ e)
+        e += spsolve(self.U[level], r - self.A[level] @ e,"scipy")
         for s in range(self.sstep):
-            e += cg(self.A[level], r - self.A[level] @ e)
+            e += spsolve(self.U[level], r - self.A[level] @ e,"scipy")
         return e
-
 
     def fcycle(self, r):
         """
