@@ -8,7 +8,7 @@ _solvers ={
 class MumpsSolver:
     def __init__(self, stype='D', 
                  par=1, sym=0, comm=None, 
-                 slient=True, timer=None, logger=None):
+                 silent=True, timer=None, logger=None):
         """Initialize the MumpsSolver object.
 
         Note
@@ -28,12 +28,16 @@ class MumpsSolver:
                0: assembled format (centralized on the host or distributed)
                1: elemental format
             5. ICNTL(18): controls the options to distribute the matrix
-            9. ICNTL(9): compute the solution using A or A^T.
+            6. ICNTL(9): compute the solution using A or A^T.
+            7. ICNTL(16): ontrols the setting of the number of OpenMP threads by 
+               MUMPS and should be used only when the setting of multithreaded 
+               parallelism is not possible outside MUMPS
+
         """
         self.timer = timer
         self.logger = logger
         self.context = _solvers[stype](par=par, sym=sym, comm=comm)
-        if slient:
+        if silent:
             self.context.set_silent()
 
     def solve(self, A, b):
@@ -55,6 +59,7 @@ class MumpsSolver:
             b (TensorLike): the right hand side
             transpose (bool): the flag for 
         """
+        #self.context.set_icntl(16, 10)
         if transpose: # ICNTL(9) compute the solution using A or A^T
             self.context.set_icntl(9, 2) # solve A^T x = b
         return self.solve(A, b)
