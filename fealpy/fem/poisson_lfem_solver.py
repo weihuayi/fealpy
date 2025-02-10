@@ -5,7 +5,10 @@ from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, ScalarDiffusionIntegrator
 from ..fem import LinearForm, ScalarSourceIntegrator
 from ..fem import DirichletBC
-from ..solver import cg
+from fealpy.solver import cg,gamg_solver
+
+from fealpy.sparse import csr_matrix
+
 
 
 class PoissonLFEMSolver:
@@ -46,8 +49,11 @@ class PoissonLFEMSolver:
         return self.uh
 
 
-    def gamg_solve(self, P):
+    def gamg_solve(self, P, ctype: str='v', level=0, rtol: float=1e-8):
         """
+        ctype:选择的循环类型，包括v,w,f循环
+        level:磨光开始的层数，从细到粗
+        rtol:相对误差
         """
         from ..solver import GAMGSolver
         solver = GAMGSolver() 
@@ -55,14 +61,57 @@ class PoissonLFEMSolver:
         solver.A = [self.A]
         solver.P = P
         solver.R = []
+        solver.L = [self.A.tril()]
+        solver.U = [self.A.triu()]
+        solver.D = [self.A.tril()+self.A.triu()-self.A]
+        solver.ctype = ctype
         for m in P:
-            s = m.sum(axis=1)
+            # s = m.sum(axis=1)
             # m.T/s[None, :]
-            solver.R.append(m.T.div(s))
-            print("R.shape", solver.R[-1].shape)
-            print("A.shape", solver.A[-1].shape)
+            # solver.R.append(m.T.div(s))
+            solver.R.append(m.T)
             a = solver.R[-1].matmul(solver.A[-1])
             solver.A.append(a.matmul(m))
+            solver.L.append(solver.A[-1].tril())
+            solver.U.append(solver.A[-1].triu())
 
+        if solver.ctype == 'v':
+            x =  solver.vcycle(self.b)
+        elif solver.ctype == 'w':
+            x = solver.wcycle(self.b)
+        elif solver.ctype == 'f':
+            x = solver.fcycle(self.b)
+
+        res = solver.A[0].matmul(x) - self.b
+        res = bm.sqrt(bm.sum(res**2))
+        res_0 = bm.sqrt(bm.sum(self.b**2))
+
+        stop_res = res/res_0
+        # 输出 stop_res
+        if self.logger is not None:
+            self.logger.info(f"stop_res = {stop_res:.2e}")
+        else:
+            print(f"stop_res = {stop_res:.2e}")
+
+        # 检查收敛状态
+        if stop_res <= rtol:
+            if self.logger is not None:
+                self.logger.info(
+                    f"GAMG solver converged: stop_res = {stop_res:.2e} <= rtol = {rtol:.2e}"
+                )
+            converged = True
+        else:
+            if self.logger is not None:
+                self.logger.warning(
+                    f"GAMG solver NOT converged: stop_res = {stop_res:.2e} > rtol = {rtol:.2e}"
+                )
+            converged = False
+
+        # 返回解和收敛标志
+        return x, converged
+
+
+
+        
 
 

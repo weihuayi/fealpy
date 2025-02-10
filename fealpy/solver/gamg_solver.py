@@ -135,7 +135,7 @@ class GAMGSolver():
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
-        el = cg(self.A[-1], r[-1])
+        el = spsolve(self.A[-1], r[-1])
         e.append(el)
 
         # 后磨光
