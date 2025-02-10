@@ -1,8 +1,8 @@
 
 from ..backend import backend_manager as bm
+from ..operator import LinearOperator
 from .conjugate_gradient import cg
-from .direct_solver import spsolve
-from ..mesh.triangle_mesh import TriangleMesh
+from .mumps import spsolve, spsolve_triangular
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
 
@@ -126,26 +126,24 @@ class GAMGSolver():
                 print("P.shape = ", self.P[l].shape) 
                 print("R.shape = ", self.R[l].shape) 
 
-    # @timer
-    # def solve(self, b):
-    #     """
-    #     @brief 用多重网格方法求解 Ax = b
-    #     """
-    #     N = self.A[0].shape[0]
+    def solve(self, b):
+        """ Solve Ax=b by amg method 
+        """
+        N = self.A[0].shape[0]
 
-    #     if self.ptype == 'V':
-    #         P = LinearOperator((N, N), matvec=self.vcycle, dtype=self.A[0].dtype)
-    #     elif self.ptype == 'W':
-    #         P = LinearOperator((N, N), matvec=self.wcycle, dtype=self.A[0].dtype)
-    #     elif self.ptype == 'F':
-    #         P = LinearOperator((N, N), matvec=self.fcycle, dtype=self.A[0].dtype)
+        if self.ptype == 'V':
+            P = LinearOperator((N, N), matvec=self.vcycle)
+        elif self.ptype == 'W':
+            P = LinearOperator((N, N), matvec=self.wcycle)
+        elif self.ptype == 'F':
+            P = LinearOperator((N, N), matvec=self.fcycle)
 
-    #     if self.isolver == 'CG':
-    #         counter = IterationCounter()
-    #         x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
-    #         print(info)
+        if self.isolver == 'CG':
+            counter = IterationCounter()
+            x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
+            print(info)
 
-    #     return x
+        return x
 
 
     def vcycle(self, r, level=0):
@@ -168,9 +166,9 @@ class GAMGSolver():
 
         # 前磨光
         for l in range(level, NL - 1, 1):
-            el = spsolve(self.L[l],r[l])
+            el = spsolve_triangular(self.L[l], r[l])
             for i in range(self.sstep):
-                el += spsolve(self.L[l], r[l] - self.A[l] @ el)
+                el += spsolve_triangular(self.L[l], r[l] - self.A[l] @ el)
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
@@ -180,9 +178,9 @@ class GAMGSolver():
         # 后磨光
         for l in range(NL - 2, level - 1, -1):
             e[l] += self.P[l] @ e[l + 1]
-            e[l] +=spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+            e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l])
             for i in range(self.sstep): # 后磨光
-                e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+                e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l])
 
         return e[level]
 
@@ -196,12 +194,12 @@ class GAMGSolver():
 
         NL = len(self.A)
         if level == (NL - 1): # 如果是最粗层
-            e = cg(self.A[-1], r)
+            e = spsolve(self.A[-1], r)
             return e
 
-        e = cg(self.A[level], r)
+        e = spsolve_triangular(self.L[level], r)
         for s in range(self.sstep):
-            e += cg(self.A[level], r - self.A[level] @ e) 
+            e += spsolve_triangular(self.L[level], r - self.A[level] @ e) 
 
         rc = self.R[level] @ ( r - self.A[level] @ e) 
 
@@ -209,9 +207,9 @@ class GAMGSolver():
         ec += self.wcycle( rc - self.A[level+1] @ ec, level=level+1)
         
         e += self.P[level] @ ec
-        e += cg(self.A[level], r - self.A[level] @ e)
+        e += spsolve_triangular(self.U[level], r - self.A[level] @ e)
         for s in range(self.sstep):
-            e += cg(self.A[level], r - self.A[level] @ e)
+            e += spsolve_triangular(self.U[level], r - self.A[level] @ e)
         return e
 
 
