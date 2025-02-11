@@ -26,21 +26,13 @@ pde = CosCosData()
 domain = pde.domain()
 mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
 
-IM = mesh.uniform_refine(n=4, returnim=True)
+IM = mesh.uniform_refine(n=3, returnim=True)
 
 s0 = PoissonLFEMSolver(pde, mesh, p, timer=tmr, logger=logger)
 
-x,flag = s0.gamg_solve(IM)
+s0.cg_solve()
+s0.gs_solve()
+error0 = s0.L2_error()
+print('error0:', error0)
+s0.show_mesh_and_solution()
 
-uh,gs = s0.solve()
-
-err_gamg = uh - x
-err_gs = uh - gs
-node = mesh.entity('node')
-cell = mesh.entity('cell')
-fig = plt.figure()
-axes = fig.add_subplot(121)
-mesh.add_plot(axes)
-axes = fig.add_subplot(122, projection='3d')
-axes.plot_trisurf(node[:, 0], node[:, 1], err_gs, triangles=cell, cmap='rainbow')
-plt.show()

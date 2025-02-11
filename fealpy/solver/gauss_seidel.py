@@ -30,26 +30,29 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
             raise ValueError("x0 and b must have the same shape")
 
     #张量分裂
+    info = {}
     U = A.triu(k=1)
     M = A.tril()#M = D-L，A = D-L-U
 
     err = 1
-    iter = 0
+    niter = 0
     x = x0
     while True:
-        B = b + U.matmul(x)
+        B = b - U.matmul(x)
         x_new = spsolve_triangular(M, B)  # 使用前向替换求解线性方程组
         x = x_new
         a = b - A.matmul(x)
-        res = bm.linalg.norm(a)
-        iter +=1
+        res = bm.linalg.norm(b-A.matmul(x))
+        niter +=1
+        print("n=:", niter, "residual: ", res)
         if res < rtol :
             logger.info(f"CG: converged in {iter} iterations, "
                         "stopped by relative tolerance.")
             break
 
-        if (maxiter is not None) and (iter >= maxiter):
+        if (maxiter is not None) and (niter >= maxiter):
             logger.info(f"CG: failed, stopped by maxiter ({maxiter}).")
             break
-        
-    return x,res,iter
+    info['residual'] = res    
+    info['niter'] = niter 
+    return x, info 
