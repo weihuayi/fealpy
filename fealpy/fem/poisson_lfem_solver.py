@@ -83,11 +83,17 @@ class PoissonLFEMSolver:
             solver.U.append(solver.A[-1].triu())
 
         if solver.ptype == 'V':
-            x =  solver.vcycle(self.b)
+            x = bm.zeros(self.b.shape)
+            for i in range(10):
+                x +=  solver.vcycle(self.b - self.A.matmul(x))
         elif solver.ptype == 'W':
             x = solver.wcycle(self.b)
         elif solver.ptype == 'F':
             x = solver.fcycle(self.b)
+
+
+        self.uh[:] = x 
+        print(self.uh)
             
         res = solver.A[0].matmul(x) - self.b
         res = bm.sqrt(bm.sum(res**2))

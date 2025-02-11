@@ -21,17 +21,18 @@ tmr = timer()
 next(tmr)
 
 p = 1
-n = 2
+n = 3
 pde = CosCosData() 
 domain = pde.domain()
 mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
 
-IM = mesh.uniform_refine(n=3, returnim=True)
+IM = mesh.uniform_refine(n=4, returnim=True)
 
 s0 = PoissonLFEMSolver(pde, mesh, p, timer=tmr, logger=logger)
 
-s0.cg_solve()
-s0.gs_solve()
+#s0.cg_solve()
+#s0.gs_solve()
+s0.gamg_solve(IM)
 error0 = s0.L2_error()
 print('error0:', error0)
 s0.show_mesh_and_solution()
