@@ -5,7 +5,6 @@ from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, ScalarDiffusionIntegrator
 from ..fem import LinearForm, ScalarSourceIntegrator
 from ..fem import DirichletBC
-from fealpy.solver import cg,gamg_solver,GaussiSeidei
 
 from fealpy.sparse import csr_matrix
 
@@ -22,6 +21,7 @@ class PoissonLFEMSolver:
         self.logger = logger
 
         self.pde = pde
+        self.mesh = mesh
         self.space= LagrangeFESpace(mesh, p=p)
         self.uh = self.space.function() # 建立一个有限元函数
         bform = BilinearForm(self.space)
@@ -39,15 +39,25 @@ class PoissonLFEMSolver:
             self.timer.send(f"处理 Poisson 方程 D 边界条件")
 
 
-    def solve(self):
+    def cg_solve(self):
         """
         """
+        from ..solver import cg 
         self.uh[:] = cg(self.A, self.b, maxiter=5000, atol=1e-14, rtol=1e-14)
-        gs,res_gs,iter_gs = GaussiSeidei.gs(self.A,self.b)
         if self.timer is not None:
             self.timer.send(f"求解 Poisson 方程线性系统")
 
-        return self.uh,gs
+        return self.uh
+
+    def gs_solve(self):
+        from ..solver import gs
+
+        self.uh[:], info = gs(self.A, self.b, maxiter=200, rtol=1e-8)
+        if self.timer is not None:
+            self.timer.send(f"Gausss Seidel 方法求解 Poisson 方程线性系统")
+        if self.logger is not None:
+            self.logger.info(f"GS solver with {info['niter']} iterations"
+                             f" and relative residual {info['residual']:.4e}")
 
 
     def gamg_solve(self, P, ptype: str='V',level=0,rtol: float=1e-8):
@@ -107,6 +117,29 @@ class PoissonLFEMSolver:
 
         # 返回解和收敛标志
         return x, converged
+
+
+    def show_mesh_and_solution(self):
+        """
+        """
+        from matplotlib import pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        mesh = self.mesh
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        fig = plt.figure()
+        axes = fig.add_subplot(121)
+        mesh.add_plot(axes)
+        axes = fig.add_subplot(122, projection='3d')
+        axes.plot_trisurf(node[:, 0], node[:, 1], self.uh, triangles=cell, cmap='rainbow')
+        plt.show()
+
+
+    def L2_error(self):
+        """
+        """
+        return self.mesh.error(self.pde.solution, self.uh)
 
 
 
