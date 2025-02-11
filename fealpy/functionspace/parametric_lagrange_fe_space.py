@@ -67,8 +67,11 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
     def edge_to_dof(self, index: Index=_S):
         return self.dof.edge_to_dof()[index]
 
-    def is_boundary_dof(self, threshold=None) -> TensorLike:
-        return self.dof.is_boundary_dof(threshold=threshold)
+    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
+        if self.ctype == 'C':
+            return self.dof.is_boundary_dof(threshold=threshold, method=method)
+        else:
+            raise RuntimeError("boundary dof is not supported by discontinuous space.")
 
     def geo_dimension(self):
         return self.GD
@@ -90,15 +93,39 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
                 TD = self.TD
                 p = self.p
                 bcs = self.mesh.multi_index_matrix(p, TD)/p # (NQ, TD+1)
-                uI = u(bcs) # (NC, LDOF) bm.set_at(uI, cell2dof, u(bcs))
+                val = u(bcs) # (NC, ldof)
+                cell2dof = self.cell_to_dof()
+                uI = bm.zeros(self.number_of_global_dofs(), dtype=sellf.ftype)
+                uI = bm.set_at(uI, cell2dof, val)
         return self.function(uI)
+
+    def boundary_interpolate(self, 
+            gD: Union[Callable, int, float, TensorLike],
+            uh: Optional[TensorLike] = None,
+            threshold=None, method=None) -> TensorLike:
+        ipoints = self.interpolation_points()
+        isDDof = self.is_boundary_dof(threshold=threshold, method='interp')
+        if bm.is_tensor(gD):
+            assert len(gD) == self.number_of_global_dofs()
+            if uh is None:
+                uh = bm.zeros_like(gD)
+            uh[isDDof] = gD[isDDof] 
+            return uh,isDDof 
+        if callable(gD):
+            gD = gD(ipoints[isDDof])
+        if uh is None:
+            uh = self.function()
+        uh[:] = bm.set_at(uh[:], (..., isDDof), gD)
+        
+        return self.function(uh), isDDof
+
+    set_dirichlet_bc = boundary_interpolate
 
     def project(self, u: Union[Callable[..., TensorLike], TensorLike], M=None) -> TensorLike:
         """
         """
         pass
 
-    
     @barycentric
     def edge_basis(self, bc: TensorLike):
         phi = self.mesh.shape_function(bc)
@@ -141,7 +168,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
     @barycentric
     def grad_value(self, uh: TensorLike, bc: TensorLike, index:Index=_S):
         gphi = self.grad_basis(bc, index=index)
-        cell2dof = self.dof.cell2dof[index]
+        cell2dof = self.dof.cell2dof()[index]
         dim = len(uh.shape) - 1
         val = bm.einsum('cqlm, cl -> cqm', gphi, uh[cell2dof])
         return val
