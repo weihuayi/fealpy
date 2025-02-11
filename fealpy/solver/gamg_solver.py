@@ -47,23 +47,72 @@ class GAMGSolver():
         self.rtol = rtol
         self.atol = atol
 
-    def setup(self, A, L=None, U=None, D=None, P=None, R=None):
+    def setup(self, A, P=None, R=None, mesh=None, space=None, cdegree=[1]):
         """
-        @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
-        @param[in] A 矩阵
-        @param[in] L 下三角矩阵，默认值为 None
-        @param[in] U 上三角矩阵，默认值为 None
-        @param[in] D 对角线矩阵，默认值为 None
-        @param[in] P 延拓算子，默认值为 None
-        @param[in] R 限制矩阵，默认值为 None
-        @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
+
+        Parameters:
+            A (CSRTensor): the matrix
+            P (Optional[list]): prolongation matrix, from finnest to coarsest
+            R (Optional[list]): restriction matrix, from coarsest to finnest
+            mesh (Optional[Mesh]): the mesh
         """
-        self.A = A
-        self.L = L if L is not None else []  # 如果未传入L，默认使用空列表
-        self.U = U if U is not None else []  # 如果未传入U，默认使用空列表
-        self.D = D if D is not None else []  # 如果未传入D，默认使用空列表
-        self.P = P if P is not None else []  # 如果未传入P，默认使用空列表
-        self.R = R if R is not None else []  # 如果未传入R，默认使用空列表
+
+        # 1. 建立初步的算子存储结构
+        self.A = [A]
+        self.L = [ ] # 下三角 
+        self.U = [ ] # 上三角
+        self.P = [ ] # 延拓算子
+        self.R = [ ] # 限制矩阵
+
+        # 2. 高次元空间到低次元空间的粗化
+        if space is not None:
+            Ps = space.prolongation_matrix(cdegree=cdegree)
+            for P in Ps:
+                self.L.append(self.A[-1].tril())
+                self.U.append(self.A[-1].triu())
+                self.P.append(P)
+                R = P.T.tocsr()
+                self.R.append(R)
+                self.A.append(R @ self.A[-1] @ P)
+
+        if P is not None:
+            assert isinstance(P, list)
+            self.P = P
+            for p in P:
+                self.L.append(self.A[-1].tril())
+                self.U.append(self.A[-1].triu())
+                r = p.T.tocsr()
+                self.R.append(r)
+                self.A.append(r @ self.A[-1] @ p)
+        elif mesh is not None: # geometric coarsening from finnest to coarsest
+            pass
+        else: # algebraic coarsening 
+            NN = bm.ceil(bm.log2(self.A[-1].shape[0])/2-4)
+            NL = max(min( int(NN), 8), 2) # 估计粗化的层数 
+            for l in range(NL):
+                self.L.append(self.A[-1]).tril()) # 前磨光的光滑子
+                self.U.append(self.A[-1]).triu()) # 后磨光的光滑子
+                isC, G = ruge_stuben_chen_coarsen(self.A[-1], self.theta)
+                p, r = two_points_interpolation(G, isC)
+                self.P.append(p)
+                self.R.append(r)
+
+                self.A.append(r@self.A[-1]@p)
+                if self.A[-1].shape[0] < self.csize:
+                    break
+
+            # 计算最粗矩阵最大和最小特征值
+            A = self.A[-1].toarray()
+            emax, _ = eigs(A, 1, which='LM')
+            emin, _ = eigs(A, 1, which='SM')
+
+            # 计算条件数的估计值
+            condest = abs(emax[0] / emin[0])
+
+            if condest > 1e12:
+                N = self.A[-1].shape[0]
+                self.A[-1] += 1e-12*sp.eye(N)  
+
     def construct_coarse_equation(self, A, F, level=1):
         """
         @brief 给定一个线性代数系统，利用已经有的延拓和限制算子，构造一个小规模
@@ -122,8 +171,8 @@ class GAMGSolver():
             P = LinearOperator((N, N), matvec=self.fcycle)
 
         if self.isolver == 'CG':
-            x0 = bm.zeros(shape = (self.A[0].shape[0],1))
-            x = _cg_impl(self.A[0],b,x0=x0,M=P,atol=self.atol,rtol=self.rtol,maxiter=self.maxit)
+            x0 = bm.zeros(shape = (self.A[0].shape[0], 1))
+            x, info = cg(self.A[0], b, x0=x0, M=P, atol=self.atol, rtol=self.rtol, maxit=self.maxit)
         return x
 
 

@@ -83,7 +83,6 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
     sqrt_func = bm.sqrt
     rTr = sum_func(r @ z, axis=0)
     Ap = A @ p
-    print(f"rTr = {rTr}, p*Ap = {sum_func(p*Ap, axis=0)}")
     # iterate
     while True:
         Ap = A @ p      # (dof, batch)
