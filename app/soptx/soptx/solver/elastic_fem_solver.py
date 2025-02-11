@@ -9,7 +9,7 @@ from fealpy.fem import LinearElasticIntegrator, BilinearForm, DirichletBC
 from fealpy.sparse import CSRTensor
 from fealpy.solver import cg, spsolve
 
-from soptx.material import ElasticMaterialInstance, ElasticMaterialProperties
+from soptx.material import ElasticMaterialInstance
 from soptx.utils import timer
 
 @dataclass
@@ -24,11 +24,12 @@ class DirectSolverResult:
 
 class AssemblyMethod(Enum):
     """矩阵组装方法的枚举类"""
-    STANDARD = auto()             # 标准组装方法
+    STANDARD = auto()             # 标准组装
     VOIGT = auto()                # Voigt 格式组装
     VOIGT_UNIFORM = auto          # Voigt 格式组装 (一致网格)
-    FAST_STRESS_UNIFORM = auto()  # 应力快速组装 (一致网格)
+    FAST_STRESS_UNIFORM = auto()  # 2D 应力快速组装 (一致网格)
     FAST_3D_UNIFORM = auto()      # 3D 快速组装 (一致网格)
+    SYMBOLIC = auto()             # 符号组装
 
 class ElasticFEMSolver:
     """专门用于求解线弹性问题的有限元求解器
@@ -41,69 +42,74 @@ class ElasticFEMSolver:
     """
     
     def __init__(self, 
-                material_properties: ElasticMaterialProperties, 
+                materials: ElasticMaterialInstance, 
                 tensor_space: TensorFunctionSpace,
                 pde,
-                assembly_method: AssemblyMethod = AssemblyMethod.VOIGT_UNIFORM,
-                solver_type: str = 'cg',
-                solver_params: Optional[dict] = None):
+                assembly_method: AssemblyMethod,
+                solver_type: str,
+                solver_params: Optional[dict]):
         """
         Parameters
-        - material_properties : 材料属性计算器
+        - materials : 材料
         - tensor_space : 张量函数空间
-        - pde : 包含荷载和边界条件的PDE模型
+        - pde : 包含荷载和边界条件的 PDE 模型
         - assembly_method : 矩阵组装方法
         - solver_type : 求解器类型, 'cg' 或 'direct' 
         - solver_params : 求解器参数
             - cg: maxiter, atol, rtol
             - direct: solver_type
         """
-        self.material_properties = material_properties
+        self.materials = materials
         self.tensor_space = tensor_space
         self.pde = pde
         self.assembly_method = assembly_method
         self.solver_type = solver_type
         self.solver_params = solver_params or {}
 
+        self._integrator = self._create_integrator()
+
         # 状态管理
         self._current_density = None
-        self._current_material = None
             
         # 缓存
         self._base_local_stiffness_matrix = None
         self._global_stiffness_matrix = None
         self._global_force_vector = None
 
+
     #---------------------------------------------------------------------------
     # 公共属性
     #---------------------------------------------------------------------------
     @property
-    def current_density(self) -> Optional[TensorLike]:
+    def get_current_density(self) -> Optional[TensorLike]:
         """获取当前密度"""
         return self._current_density
+    
+    @property
+    def get_current_material(self) -> Optional[ElasticMaterialInstance]:
+        """获取当前材料实例"""
+        if self.materials is None:
+            raise ValueError("Material not initialized. Call update_density first.")
+        
+        return self.materials
 
     #---------------------------------------------------------------------------
     # 状态管理相关方法
     #---------------------------------------------------------------------------
-    def update_density(self, density: TensorLike) -> None:
-        """更新密度并更新相关状态"""
+    def update_status(self, density: TensorLike) -> None:
+        """更新相关状态"""
         if density is None:
             raise ValueError("'density' cannot be None")
             
+        # 1. 更新密度场
         self._current_density = density
-        # 根据新密度计算材料属性
-        E = self.material_properties.calculate_elastic_modulus(density)
-        self._current_material = ElasticMaterialInstance(E, self.material_properties.config)
-        
-        # 清除依赖于密度的缓存
+
+        # 2. 根据新密度更新材料属性
+        self.materials.update_elastic_modulus(self._current_density)
+
+        # 3. 清除依赖于密度的缓存
         self._global_stiffness_matrix = None
         self._global_force_vector = None
-
-    def get_current_material(self) -> Optional[ElasticMaterialInstance]:
-        """获取当前材料实例"""
-        if self._current_material is None:
-            raise ValueError("Material not initialized. Call update_density first.")
-        return self._current_material
 
     #---------------------------------------------------------------------------
     # 矩阵计算和缓存相关方法
@@ -122,11 +128,11 @@ class ElasticFEMSolver:
             base_material = self.material_properties.get_base_material()
             integrator = LinearElasticIntegrator(
                                 material=base_material,
-                                q=self.tensor_space.p + 1,
+                                q=self.tensor_space.p+3,
                                 method='voigt_uniform'
                             )
-            self._base_local_stiffness_matrix = integrator.voigt_assembly_uniform(
-                                                            space=self.tensor_space)
+            self._base_local_stiffness_matrix = integrator.voigt_assembly_uniform(space=self.tensor_space)
+
         return self._base_local_stiffness_matrix
     
     def compute_local_stiffness_matrix(self) -> TensorLike:
@@ -134,16 +140,16 @@ class ElasticFEMSolver:
         if self._current_material is None:
             raise ValueError("Material not initialized. Call update_density first.")
         
-        # 创建适当的积分器
-        integrator = self._create_integrator()
-
+        integrator = self._integrator
+ 
         # 根据 assembly_config.method 选择对应的组装函数
         method_map = {
             AssemblyMethod.STANDARD: integrator.assembly,
             AssemblyMethod.VOIGT: integrator.voigt_assembly,
             AssemblyMethod.VOIGT_UNIFORM: integrator.voigt_assembly_uniform,
             AssemblyMethod.FAST_STRESS_UNIFORM: integrator.fast_assembly_stress_uniform,
-            AssemblyMethod.FAST_3D_UNIFORM: integrator.fast_assembly_uniform
+            AssemblyMethod.FAST_3D_UNIFORM: integrator.fast_assembly_uniform,
+            AssemblyMethod.SYMBOLIC: integrator.symbolic_assembly,
         }
         
         try:
@@ -160,40 +166,32 @@ class ElasticFEMSolver:
     # 内部方法：组装和边界条件处理
     #---------------------------------------------------------------------------
     def _create_integrator(self) -> LinearElasticIntegrator:
-        """创建适当的积分器实例
-        
-        根据配置创建对应的积分器，并设置正确的积分方法
-        """
+        """创建适当的积分器实例"""
         # 确定积分方法
         method_map = {
             AssemblyMethod.STANDARD: 'assembly',
             AssemblyMethod.VOIGT: 'voigt',
             AssemblyMethod.VOIGT_UNIFORM: 'voigt_uniform',
             AssemblyMethod.FAST_STRESS_UNIFORM: 'fast_stress_uniform',
-            AssemblyMethod.FAST_3D_UNIFORM: 'fast_3d_uniform'
+            AssemblyMethod.FAST_3D_UNIFORM: 'fast_3d_uniform',
+            AssemblyMethod.SYMBOLIC: 'symbolic',
         }
         
         method = method_map[self.assembly_method]
-        
+
         # 创建积分器
         q = self.tensor_space.p + 3
         integrator = LinearElasticIntegrator(
-                        material=self._current_material, 
-                        q=q, method=method
-                    )
+                            material=self.materials, 
+                            q=q, method=method
+                        )
+        integrator.keep_data()
         
         return integrator
     
-    
     def _assemble_global_stiffness_matrix(self) -> CSRTensor:
-        """组装全局刚度矩阵"""
-        if self._current_material is None:
-            raise ValueError("Material not initialized. Call update_density first.")
-            
-        # 创建适当的积分器
-        integrator = self._create_integrator()
-        # 保留中间数据
-        integrator.keep_data()
+        """组装全局刚度矩阵"""    
+        integrator = self._integrator
         bform = BilinearForm(self.tensor_space)
         bform.add_integrator(integrator)
         K = bform.assembly(format='csr')
@@ -251,11 +249,10 @@ class ElasticFEMSolver:
         """使用共轭梯度法求解
         
         Parameters
-        ----------
-        maxiter : 最大迭代次数
-        atol : 绝对收敛容差
-        rtol : 相对收敛容差
-        x0 : 初始猜测值
+        - maxiter : 最大迭代次数
+        - atol : 绝对收敛容差
+        - rtol : 相对收敛容差
+        - x0 : 初始猜测值
         """
         if self._current_density is None:
             raise ValueError("Density not set. Call update_density first.")
@@ -290,32 +287,19 @@ class ElasticFEMSolver:
         return IterativeSolverResult(displacement=uh)
     
     def solve_direct(self, solver_type: str = 'mumps') -> DirectSolverResult:
-        """使用直接法求解
-        
-        Parameters
-        ----------
-        solver_type : 求解器类型，默认为'mumps'
-        """
+        """使用直接法求解"""
         if self._current_density is None:
             raise ValueError("Density not set. Call update_density first.")
-    
-        # 创建计时器
-        # t = timer("CG Solver Timing")
-        # next(t)  # 启动计时器
 
         K0 = self._assemble_global_stiffness_matrix()
-        # t.send('Stiffness Matrix Assembly')
 
         F0 = self._assemble_global_force_vector()
-        # t.send('Force Vector Assembly')
         
         K, F = self._apply_boundary_conditions(K0, F0)
-        # t.send('Boundary Conditions')
         
         uh = self.tensor_space.function()
         try:
             uh[:] = spsolve(K, F[:], solver=solver_type)
-            # t.send(None)
         except Exception as e:
             raise RuntimeError(f"Direct solver failed: {str(e)}")
             
