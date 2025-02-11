@@ -52,12 +52,6 @@ class PoissonLFEMSolver:
 
     def gamg_solve(self, P, ptype: str='V',level=0,rtol: float=1e-8):
         """
-        ctype:选择的循环类型，包括v,w,f循环
-        level:磨光开始的层数，从细到粗
-        rtol:相对误差
-        ctype:选择的循环类型，包括v,w,f循环
-        level:磨光开始的层数，从细到粗
-        rtol:相对误差
         """
         from ..solver import GAMGSolver
         solver = GAMGSolver() 
