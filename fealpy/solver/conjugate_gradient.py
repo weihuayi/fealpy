@@ -72,12 +72,6 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
 
 
 def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul, atol, rtol, maxiter):
-    """
-    Parameters:
-        M(SupportsMatmul):The preconditioner Matrix of the linear system
-    Returns:
-        Tensor: The approximate solution to the system Ax = b.
-    """
     # initialize
     x = x0              # (dof, batch)
     r = b - A @ x       # (dof, batch)
@@ -87,7 +81,7 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
     b_norm = bm.linalg.norm(b)
     sum_func = bm.sum
     sqrt_func = bm.sqrt
-    rTr = sum_func(r * z, axis=0)
+    rTr = sum_func(r @ z, axis=0)
     Ap = A @ p
     print(f"rTr = {rTr}, p*Ap = {sum_func(p*Ap, axis=0)}")
     # iterate

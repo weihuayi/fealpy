@@ -59,14 +59,15 @@ class TestGAMGSolverInterfaces:
         A,P,R,L,U,D = self.assemble_data(data,test_data)
         solver.setup(A=A,P=P,R=R,L=L,U=U,D=D)
         f = test_data['f']
-        phi = solver.vcycle(f)
+        phi = solver.solve(f)
+        # phi = solver.vcycle(f)
         e = phi - test_data['sol']
         err = bm.sqrt(test_data['hx']*test_data['hy']*bm.sum(e**2))
         res = A[0].matmul(phi) - f
         res = bm.sqrt(bm.sum(res**2))
         res_0 = bm.array(test_data['f'])
         res_0 = bm.sqrt(bm.sum(res_0**2))
-
+        
         stop_res = res/res_0
         # 输出误差和残差
         print('err:', err)

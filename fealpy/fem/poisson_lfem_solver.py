@@ -5,7 +5,7 @@ from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, ScalarDiffusionIntegrator
 from ..fem import LinearForm, ScalarSourceIntegrator
 from ..fem import DirichletBC
-from fealpy.solver import cg,gamg_solver
+from fealpy.solver import cg,gamg_solver,GaussiSeidei
 
 from fealpy.sparse import csr_matrix
 
@@ -43,14 +43,18 @@ class PoissonLFEMSolver:
         """
         """
         self.uh[:] = cg(self.A, self.b, maxiter=5000, atol=1e-14, rtol=1e-14)
+        gs,res_gs,iter_gs = GaussiSeidei.gs(self.A,self.b)
         if self.timer is not None:
             self.timer.send(f"求解 Poisson 方程线性系统")
 
-        return self.uh
+        return self.uh,gs
 
 
-    def gamg_solve(self, P, ctype: str='v',level=0,rtol: float=1e-8):
+    def gamg_solve(self, P, ptype: str='V',level=0,rtol: float=1e-8):
         """
+        ctype:选择的循环类型，包括v,w,f循环
+        level:磨光开始的层数，从细到粗
+        rtol:相对误差
         ctype:选择的循环类型，包括v,w,f循环
         level:磨光开始的层数，从细到粗
         rtol:相对误差
@@ -63,8 +67,7 @@ class PoissonLFEMSolver:
         solver.R = []
         solver.L = [self.A.tril()]
         solver.U = [self.A.triu()]
-        solver.D = [self.A.tril()+self.A.triu()-self.A]
-        solver.ctype = ctype
+        solver.ptype = ptype
         for m in P:
             # s = m.sum(axis=1)
             # m.T/s[None, :]
@@ -74,14 +77,14 @@ class PoissonLFEMSolver:
             solver.A.append(a.matmul(m))
             solver.L.append(solver.A[-1].tril())
             solver.U.append(solver.A[-1].triu())
-            solver.D.append(solver.L[-1]+solver.U[-1]-solver.A[-1])
-        if solver.ctype == 'v':
-            x =  solver.vcycle(self.b)
-        elif solver.ctype == 'w':
-            x = solver.wcycle(self.b)
-        elif solver.ctype == 'f':
-            x = solver.fcycle(self.b)
 
+        if solver.ptype == 'V':
+            x =  solver.vcycle(self.b)
+        elif solver.ptype == 'W':
+            x = solver.wcycle(self.b)
+        elif solver.ptype == 'F':
+            x = solver.fcycle(self.b)
+            
         res = solver.A[0].matmul(x) - self.b
         res = bm.sqrt(bm.sum(res**2))
         res_0 = bm.sqrt(bm.sum(self.b**2))
