@@ -1,7 +1,8 @@
 import os
 import pathlib
 from setuptools import setup, find_packages, Extension
-from fealpy import __version__
+
+__version__ = "3.0.4"
 
 here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / "README.md").read_text(encoding="utf-8")
