@@ -58,6 +58,16 @@ class PoissonLFEMSolver:
         if self.logger is not None:
             self.logger.info(f"GS solver with {info['niter']} iterations"
                              f" and relative residual {info['residual']:.4e}")
+    
+    def jacobi_solve(self):
+        from ..solver import jacobi
+
+        self.uh[:], info = jacobi(self.A, self.b, maxiter=200, rtol=1e-8)
+        if self.timer is not None:
+            self.timer.send(f"Jacobi 方法求解 Poisson 方程线性系统")
+        if self.logger is not None:
+            self.logger.info(f"Jacobi solver with {info['niter']} iterations"
+                             f" and relative residual {info['residual']:.4e}")
 
 
     def gamg_solve(self, P, ptype: str='V',level=0,rtol: float=1e-8):
@@ -81,14 +91,15 @@ class PoissonLFEMSolver:
             solver.A.append(a.matmul(m))
             solver.L.append(solver.A[-1].tril())
             solver.U.append(solver.A[-1].triu())
+            print(solver.A[-1].toarray())
 
-        # if solver.ptype == 'V':
-        #     x =  solver.vcycle(self.b)
-        # elif solver.ptype == 'W':
-        #     x = solver.wcycle(self.b)
-        # elif solver.ptype == 'F':
-        #     x = solver.fcycle(self.b)
-        x = solver.solve(self.b)
+        if solver.ptype == 'V':
+            x =  solver.vcycle(self.b)
+        elif solver.ptype == 'W':
+            x = solver.wcycle(self.b)
+        elif solver.ptype == 'F':
+            x = solver.fcycle(self.b)
+        # x = solver.solve(self.b)
             
         res = solver.A[0].matmul(x) - self.b
         res = bm.sqrt(bm.sum(res**2))

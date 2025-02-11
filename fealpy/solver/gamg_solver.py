@@ -29,6 +29,7 @@ class GAMGSolver():
             sstep: int = 2, # 默认光滑步数
             isolver: str = 'CG', # 默认迭代解法器
             maxit: int = 200,   # 默认迭代最大次数
+            pcount: int =10,    #默认主循环次数
             csolver: str = 'direct', # 默认粗网格解法器
             rtol: float = 1e-8,      # 相对误差收敛阈值
             atol: float = 1e-8,      # 绝对误差收敛阈值
@@ -41,6 +42,7 @@ class GAMGSolver():
         self.sstep = sstep
         self.isolver = isolver
         self.maxit = maxit
+        self.pcount = pcount
         self.csolver = csolver
         self.rtol = rtol
         self.atol = atol
