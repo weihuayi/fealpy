@@ -1,5 +1,5 @@
 from .elastic_material import ElasticMaterial
-import numpy as np
+from ..backend import backend_manager as bm
 
 class ElastoPlasticMaterial(ElasticMaterial):
     def __init__(self, name):
@@ -20,12 +20,12 @@ class ElastoPlasticMaterial(ElasticMaterial):
 
         # 计算试验应力
         trial_stress = E * strain
-        if np.abs(trial_stress) <= sigma_y:
+        if bm.abs(trial_stress) <= sigma_y:
             # 弹性区域
             return trial_stress, 0
         else:
             # 塑性区域，考虑硬化效应
-            plastic_strain = (np.abs(trial_stress) - sigma_y) / (E + H)
-            stress = np.sign(trial_stress) * (sigma_y + H * plastic_strain)
+            plastic_strain = (bm.abs(trial_stress) - sigma_y) / (E + H)
+            stress = bm.sign(trial_stress) * (sigma_y + H * plastic_strain)
             return stress, plastic_strain
 
