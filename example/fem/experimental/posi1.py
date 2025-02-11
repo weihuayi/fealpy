@@ -11,7 +11,8 @@ logger.setLevel('WARNING')
 from fealpy.backend import backend_manager as bm
 
 from fealpy.pde.poisson_2d import CosCosData 
-from fealpy.mesh import TriangleMesh
+from fealpy.pde.poisson_1d import CosData
+from fealpy.mesh import TriangleMesh,IntervalMesh
 from fealpy.fem import PoissonLFEMSolver
 
 
@@ -22,25 +23,24 @@ next(tmr)
 
 p = 1
 n = 2
-pde = CosCosData() 
+pde = CosData()
 domain = pde.domain()
-mesh = TriangleMesh.from_box(box=domain, nx=n, ny=n)
+mesh = IntervalMesh.from_interval_domain(interval=domain,nx=n)
 
 IM = mesh.uniform_refine(n=4, returnim=True)
 
 s0 = PoissonLFEMSolver(pde, mesh, p, timer=tmr, logger=logger)
 
-x,flag = s0.gamg_solve(IM)
+s0.gamg_solve(IM)
 
-uh,gs = s0.solve()
+uh = s0.solve()
 
-err_gamg = uh - x
-err_gs = uh - gs
+# Plot
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 fig = plt.figure()
 axes = fig.add_subplot(121)
 mesh.add_plot(axes)
 axes = fig.add_subplot(122, projection='3d')
-axes.plot_trisurf(node[:, 0], node[:, 1], err_gs, triangles=cell, cmap='rainbow')
+axes.plot_trisurf(node[:, 0], node[:, 1], uh, triangles=cell, cmap='rainbow')
 plt.show()

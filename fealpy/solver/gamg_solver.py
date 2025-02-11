@@ -1,7 +1,7 @@
 
 from ..backend import backend_manager as bm
 from ..operator import LinearOperator
-from .conjugate_gradient import cg
+from .conjugate_gradient import cg,_cg_impl
 from .mumps import spsolve, spsolve_triangular
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
@@ -45,7 +45,23 @@ class GAMGSolver():
         self.rtol = rtol
         self.atol = atol
 
-
+    def setup(self, A, L=None, U=None, D=None, P=None, R=None):
+        """
+        @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
+        @param[in] A 矩阵
+        @param[in] L 下三角矩阵，默认值为 None
+        @param[in] U 上三角矩阵，默认值为 None
+        @param[in] D 对角线矩阵，默认值为 None
+        @param[in] P 延拓算子，默认值为 None
+        @param[in] R 限制矩阵，默认值为 None
+        @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
+        """
+        self.A = A
+        self.L = L if L is not None else []  # 如果未传入L，默认使用空列表
+        self.U = U if U is not None else []  # 如果未传入U，默认使用空列表
+        self.D = D if D is not None else []  # 如果未传入D，默认使用空列表
+        self.P = P if P is not None else []  # 如果未传入P，默认使用空列表
+        self.R = R if R is not None else []  # 如果未传入R，默认使用空列表
     def construct_coarse_equation(self, A, F, level=1):
         """
         @brief 给定一个线性代数系统，利用已经有的延拓和限制算子，构造一个小规模
@@ -91,7 +107,8 @@ class GAMGSolver():
                 print("R.shape = ", self.R[l].shape) 
 
     def solve(self, b):
-        """ Solve Ax=b by amg method 
+        """ 
+        Solve Ax=b by amg method 
         """
         N = self.A[0].shape[0]
 
@@ -103,9 +120,8 @@ class GAMGSolver():
             P = LinearOperator((N, N), matvec=self.fcycle)
 
         if self.isolver == 'CG':
-            x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
-            print(info)
-
+            x0 = bm.zeros(shape = (self.A[0].shape[0],1))
+            x = _cg_impl(self.A[0],b,x0=x0,M=P,atol=self.atol,rtol=self.rtol,maxiter=self.maxit)
         return x
 
 
@@ -146,7 +162,7 @@ class GAMGSolver():
                 e[l] += spsolve_triangular(self.U[l], r[l] - self.A[l] @ e[l])
 
         return e[level]
-
+    
     def wcycle(self, r, level=0):
         """
         @brief W-Cycle 方法求解 Ae=r
@@ -174,7 +190,6 @@ class GAMGSolver():
         for s in range(self.sstep):
             e += spsolve_triangular(self.U[level], r - self.A[level] @ e)
         return e
-
 
     def fcycle(self, r):
         """
