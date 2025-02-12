@@ -165,7 +165,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return p
     
     # shape function
-    def shape_function(self, bc: TensorLike, p: int=None, variables='x'):
+    def shape_function(self, bc: TensorLike, p: int=None, variables='x',index: Index=_S):
         p = self.p if p is None else p 
         phi = bm.simplex_shape_function(bc, p=p)
         if variables == 'u':
