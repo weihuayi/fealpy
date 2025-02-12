@@ -92,6 +92,12 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
                 bcs = self.mesh.multi_index_matrix(p, TD)/p
                 uI = u(bcs)
         return self.function(uI)
+
+    def project(self, u: Union[Callable[..., TensorLike], TensorLike], M=None) -> TensorLike:
+        """
+        """
+        pass
+
     
     @barycentric
     def edge_basis(self, bc: TensorLike):

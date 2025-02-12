@@ -125,5 +125,60 @@ def spsolve(A:[COOTensor, CSRTensor], b, solver:str="mumps"):
     else:
         raise ValueError(f"Unknown solver: {solver}")
 
+def _cupy_spsolve_triangular(A, b, lower=True):
+    """Solve a linear system using cupy.
+
+    Parameters:
+        A(COOTensor | CSRTensor): The matrix of the linear system.
+        b(Tensor): The right-hand side.
+
+    Returns:
+        Tensor: The solution of the linear system.
+    """
+    import cupy as cp
+    from cupyx.scipy.sparse.linalg import spsolve_triangular as spsol_tri
+
+    iscpu = isinstance(b, np.ndarray) or b.device.type == "cpu"
+    A, b = _to_cupy_data(A, b)
+    x = spsol(A, b, lower=lower)
+    if iscpu:
+        x = cp.asnumpy(x)
+    return x
+
+def _mumps_spsolve_triangular(A:[COOTensor, CSRTensor], b, lower=True):
+    """Sovle a triangular system using mumps on cpu
+    Parameters:
+        A(COOTensor | CSRTensor): The upper or lower matrix of the linear system.
+        b(Tensor): The right-hand side.
+
+    Returns:
+        Tensor: The solution of the linear system.
+    """
+    from .mumps import DMumpsContext 
+
+    x = b.copy()
+    ctx = DMumpsContext()
+    ctx.set_silent()
+    ctx.set_centralized_sparse(A)
+
+    ctx.set_rhs(x)
+    ctx.run(job=6)
+    ctx.destroy()
+    return x
 
 
+def spsolve_triangular(A:[COOTensor, CSRTensor], b, lower=True):
+    """Solve a triangular system Ax = b
+    Parameters:
+        A(COOTensor | CSRTensor): The upper or lower triangular matrix of the linear system.
+        b(Tensor): The right-hand side.
+    """
+    device = bm.device_type(b)
+    if device == 'cpu':
+        x = _mumps_spsolve_triangular(A, b, lower=lower)
+    elif device == 'gpu':
+        x = _cupy_spsolve_triangular(A, b, lower=lower)
+    else:
+        raise ValueError(f"Unsupport device: {device}")
+
+    return x

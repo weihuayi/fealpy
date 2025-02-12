@@ -95,6 +95,11 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return bm.concatenate(ipoint_list, axis=0)[index]  # (gdof, GD)
 
     @classmethod
+    def from_box(cls, box, p: int, nx=2, ny=2):
+        mesh = TriangleMesh.from_box(box, nx, ny)
+        return cls.from_triangle_mesh(mesh, p)
+
+    @classmethod
     def from_curve_triangle_mesh(cls, mesh, p: int, curve=None):
         init_node = mesh.entity('node')
 

@@ -71,21 +71,41 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     def top_dimension(self):
         return self.TD
 
+    def project(self, u: Union[Callable[..., TensorLike], TensorLike],) -> TensorLike:
+        """Project a function to the FE function space.
+        """
+        gdof = self.number_of_global_dofs()
+        NC = self.mesh.number_of_cells()
+        NN = self.mesh.number_of_nodes()
+        assert( NN == gdof )
+        assert( u.shape[0] == NC )
+        assert( self.p == 1 )
+        if u.ndim == 1:
+            u = u[:, None]
+        cell = self.mesh.entity('cell')
+        uh = bm.zeros(gdof, dtype=self.ftype, device=self.device)
+        nn = bm.zeros(gdof, dtype=self.itype, device=self.device)
+        uh = bm.index_add(uh, cell, u) 
+        nn = bm.index_add(nn, cell, 1)
+
+        return self.function(uh/nn)
+
+
+
     def interpolate(self, u: Union[Callable[..., TensorLike], TensorLike],) -> TensorLike:
         assert callable(u)
 
-        if not hasattr(u, 'coordtype'):
+        if not hasattr(u, 'coordtype') or u.coordtype == 'cartesian':
             ips = self.interpolation_points()
             uI = u(ips)
-        else:
-            if u.coordtype == 'cartesian':
-                ips = self.interpolation_points()
-                uI = u(ips)
-            elif u.coordtype == 'barycentric':
-                TD = self.TD
-                p = self.p
-                bcs = self.mesh.multi_index_matrix(p, TD)/p
-                uI = u(bcs)
+        elif u.coordtype == 'barycentric': # TODO: 这个结果是不对的 
+            TD = self.TD
+            p = self.p
+            bcs = self.mesh.multi_index_matrix(p, TD)/p
+            val = u(bcs)
+            cell2dof = self.cell_to_dof()
+            uI = bm.zeros(self.number_of_global_dofs(), dtype=self.ftype)
+            uI = bm.index_add(uI, cell2dof, val) 
         return self.function(uI)
 
     def boundary_interpolate(self,

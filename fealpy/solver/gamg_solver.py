@@ -1,6 +1,11 @@
 
+from ..backend import backend_manager as bm
 from .conjugate_gradient import cg
 from .direct_solver import spsolve
+from ..mesh.triangle_mesh import TriangleMesh
+from ..sparse.coo_tensor import COOTensor
+from ..sparse.csr_tensor import CSRTensor
+
 
 
 class GAMGSolver():
@@ -20,7 +25,7 @@ class GAMGSolver():
             csize: int = 50, # 最粗问题规模
             ctype: str = 'C', # 粗化方法
             itype: str = 'T', # 插值方法
-            ptype: str = 'W', # 预条件类型
+            ptype: str = 'V', # 预条件类型
             sstep: int = 2, # 默认光滑步数
             isolver: str = 'CG', # 默认迭代解法器
             maxit: int = 200,   # 默认迭代最大次数
@@ -40,24 +45,42 @@ class GAMGSolver():
         self.rtol = rtol
         self.atol = atol
 
-    def setup(self, A):
+    # def setup(self, A):
+    #     """
+    #     @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
+
+    #     @param[in] A 矩阵
+    #     @param[in] space 离散空间
+    #     @param[in] cdegree 粗空间的次数
+
+    #     @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
+    #     """
+
+    #     # 1. 建立初步的算子存储结构
+    #     self.A = [A]
+    #     self.L = [ ] # 下三角 
+    #     self.U = [ ] # 上三角
+    #     self.D = [ ] # 对角线
+    #     self.P = [ ] # 延拓算子
+    #     self.R = [ ] # 限制矩阵
+
+    def setup(self, A, L=None, U=None, D=None, P=None, R=None):
         """
         @brief 给定离散矩阵 A, 构造从细空间到粗空间的插值算子
-
         @param[in] A 矩阵
-        @param[in] space 离散空间
-        @param[in] cdegree 粗空间的次数
-
+        @param[in] L 下三角矩阵，默认值为 None
+        @param[in] U 上三角矩阵，默认值为 None
+        @param[in] D 对角线矩阵，默认值为 None
+        @param[in] P 延拓算子，默认值为 None
+        @param[in] R 限制矩阵，默认值为 None
         @note 注意这里假定第 0 层为最细层，第 1、2、3 ... 层变的越来越粗
         """
-
-        # 1. 建立初步的算子存储结构
-        self.A = [A]
-        self.L = [ ] # 下三角 
-        self.U = [ ] # 上三角
-        self.D = [ ] # 对角线
-        self.P = [ ] # 延拓算子
-        self.R = [ ] # 限制矩阵
+        self.A = A
+        self.L = L if L is not None else []  # 如果未传入L，默认使用空列表
+        self.U = U if U is not None else []  # 如果未传入U，默认使用空列表
+        self.D = D if D is not None else []  # 如果未传入D，默认使用空列表
+        self.P = P if P is not None else []  # 如果未传入P，默认使用空列表
+        self.R = R if R is not None else []  # 如果未传入R，默认使用空列表
 
     def construct_coarse_equation(self, A, F, level=1):
         """
@@ -103,26 +126,26 @@ class GAMGSolver():
                 print("P.shape = ", self.P[l].shape) 
                 print("R.shape = ", self.R[l].shape) 
 
-    @timer
-    def solve(self, b):
-        """
-        @brief 用多重网格方法求解 Ax = b
-        """
-        N = self.A[0].shape[0]
+    # @timer
+    # def solve(self, b):
+    #     """
+    #     @brief 用多重网格方法求解 Ax = b
+    #     """
+    #     N = self.A[0].shape[0]
 
-        if self.ptype == 'V':
-            P = LinearOperator((N, N), matvec=self.vcycle, dtype=self.A[0].dtype)
-        elif self.ptype == 'W':
-            P = LinearOperator((N, N), matvec=self.wcycle, dtype=self.A[0].dtype)
-        elif self.ptype == 'F':
-            P = LinearOperator((N, N), matvec=self.fcycle, dtype=self.A[0].dtype)
+    #     if self.ptype == 'V':
+    #         P = LinearOperator((N, N), matvec=self.vcycle, dtype=self.A[0].dtype)
+    #     elif self.ptype == 'W':
+    #         P = LinearOperator((N, N), matvec=self.wcycle, dtype=self.A[0].dtype)
+    #     elif self.ptype == 'F':
+    #         P = LinearOperator((N, N), matvec=self.fcycle, dtype=self.A[0].dtype)
 
-        if self.isolver == 'CG':
-            counter = IterationCounter()
-            x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
-            print(info)
+    #     if self.isolver == 'CG':
+    #         counter = IterationCounter()
+    #         x, info = cg(self.A[0], b, M=P, tol=self.rtol, atol=self.atol, callback=counter)
+    #         print(info)
 
-        return x
+    #     return x
 
 
     def vcycle(self, r, level=0):
@@ -141,23 +164,23 @@ class GAMGSolver():
 
         NL = len(self.A)
         r = [None]*level + [r] # 残量列表
-        e = [None]*level       # 误差列表 
+        e = [None]*level       # 求解列表 
 
         # 前磨光
         for l in range(level, NL - 1, 1):
-            el = spsolve(self.L[l], r[l])
+            el = spsolve(self.L[l],r[l])
             for i in range(self.sstep):
                 el += spsolve(self.L[l], r[l] - self.A[l] @ el)
             e.append(el)
             r.append(self.R[l] @ (r[l] - self.A[l] @ el))
 
-        el = spsolve(self.A[-1], r[-1])
+        el = cg(self.A[-1], r[-1])
         e.append(el)
 
         # 后磨光
         for l in range(NL - 2, level - 1, -1):
             e[l] += self.P[l] @ e[l + 1]
-            e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
+            e[l] +=spsolve(self.U[l], r[l] - self.A[l] @ e[l])
             for i in range(self.sstep): # 后磨光
                 e[l] += spsolve(self.U[l], r[l] - self.A[l] @ e[l])
 
@@ -173,12 +196,12 @@ class GAMGSolver():
 
         NL = len(self.A)
         if level == (NL - 1): # 如果是最粗层
-            e = spsolve(self.A[-1], r)
+            e = cg(self.A[-1], r)
             return e
 
-        e = spsolve(self.L[level], r)
+        e = cg(self.A[level], r)
         for s in range(self.sstep):
-            e += spsolve(self.L[level], r - self.A[level] @ e) 
+            e += cg(self.A[level], r - self.A[level] @ e) 
 
         rc = self.R[level] @ ( r - self.A[level] @ e) 
 
@@ -186,9 +209,9 @@ class GAMGSolver():
         ec += self.wcycle( rc - self.A[level+1] @ ec, level=level+1)
         
         e += self.P[level] @ ec
-        e += spsolve(self.U[level], r - self.A[level] @ e)
+        e += cg(self.A[level], r - self.A[level] @ e)
         for s in range(self.sstep):
-            e += spsolve(self.U[level], r - self.A[level] @ e)
+            e += cg(self.A[level], r - self.A[level] @ e)
         return e
 
 
@@ -210,7 +233,7 @@ class GAMGSolver():
             r.append(self.R[l] @ (r[l] - self.A[l] @ e[l]))
 
         # 最粗层直接求解 
-        ec = spsolve(self.A[-1], r[-1])
+        ec = cg(self.A[-1], r[-1])
         e.append(ec)
 
         # 从次最粗层到最细层
@@ -223,25 +246,25 @@ class GAMGSolver():
         return e[0]
 
 
-    def bpx(self, r):
-        """
-        @brief 
-        @note
-        """
-        NL = len(self.A)
-        r = [r] 
-        e = [ ]
+    # def bpx(self, r):
+    #     """
+    #     @brief 
+    #     @note
+    #     """
+    #     NL = len(self.A)
+    #     r = [r] 
+    #     e = [ ]
 
-        for l in range(0, NL - 1, 1):
-            e.append(r[l]/self.D[l])
-            r.append(self.R[l] @ r[l])
+    #     for l in range(0, NL - 1, 1):
+    #         e.append(r[l]/self.D[l])
+    #         r.append(self.R[l] @ r[l])
 
-        # 最粗层直接求解 
-        # TODO: 最粗层增加迭代求解
-        ec = spsolve(self.A[-1], r[-1])
-        e.append(ec)
+    #     # 最粗层直接求解 
+    #     # TODO: 最粗层增加迭代求解
+    #     ec = cg(self.A[-1], r[-1])
+    #     e.append(ec)
 
-        for l in range(NL - 2, -1, -1):
-            e[l] += self.P[l] @ e[l+1]
+    #     for l in range(NL - 2, -1, -1):
+    #         e[l] += self.P[l] @ e[l+1]
 
-        return e[0]
+    #     return e[0]

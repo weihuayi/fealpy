@@ -1,6 +1,7 @@
 # test_csr_tensor.py
 import pytest
 
+from fealpy.sparse import csr_matrix as fpy_csr_matrix
 from fealpy.sparse.csr_tensor import CSRTensor
 from fealpy.backend import backend_manager as bm
 
@@ -70,9 +71,9 @@ def test_tril(backend):
     expected_col = bm.tensor([1, 2])
     expected_values = bm.tensor([4, 2], dtype=bm.float32)
 
-    assert bm.all(bm.equal(tril_tensor.crow(), expected_crow))
-    assert bm.all(bm.equal(tril_tensor.col(), expected_col))
-    assert bm.allclose(tril_tensor.values(), expected_values)
+    assert bm.all(bm.equal(tril_tensor.crow, expected_crow))
+    assert bm.all(bm.equal(tril_tensor.col, expected_col))
+    assert bm.allclose(tril_tensor.values, expected_values)
 
 def create_csr_tensor(crow, col, values, shape):
     return CSRTensor(crow=crow, col=col, values=values, spshape=shape)
@@ -120,7 +121,7 @@ class TestCSRTensorAdd:
         expected_col2 = bm.tensor([1,2,3,3])
         assert bm.allclose(result2._crow, expected_crow2)
         assert bm.allclose(result2._col, expected_col2)
-        assert result2.values() is None
+        assert result2.values is None
 
     @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_add_tensor(self, backend):
@@ -153,3 +154,26 @@ class TestCSRTensorAdd:
 
         # 验证结果的值（注意，这里只是演示，实际上 result 仍然是 COOTensor 类型）
         assert bm.allclose(result._values, bm.tensor([[3], [4]]))
+
+
+class TestCSRTensorMatmul():
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_matmul_sparse(self, backend):
+        bm.set_backend(backend)
+        m1 = bm.array([
+            [1, 0, 0, 3],
+            [0, 1, 2, 4],
+            [0, 0, 1, 0],
+            [3, 0, 5, 1]
+        ], dtype=bm.float64)
+        m2 = bm.array([
+            [6, 7, 0, 0],
+            [3, 4, 0, 0],
+            [2, 0, 5, 0],
+            [0, 0, 0, 1]
+        ], dtype=bm.float64)
+        m3 = m1 @ m2
+        csr1 = fpy_csr_matrix(m1)
+        csr2 = fpy_csr_matrix(m2)
+        csr3 = csr1 @ csr2
+        assert bm.allclose(csr3.toarray(), m3)

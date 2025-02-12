@@ -85,9 +85,261 @@ class Gear(ABC):
         self.d_b = self.d * cos(self.alpha_t)
         self.r_b = self.d_b / 2
 
+        self.profile_node_normal_right = None
+        self.profile_node_normal_left = None
+
     @abstractmethod
     def get_involute_points(self):
         pass
+
+    def get_involute_points_new(self, r_min, r_max):
+        beta = self.beta
+        number_width = self.nw+1
+        number_radius = self.n1+1
+        tran_module = self.m_t
+        tran_refer = self.d
+        tran_alpha_n = self.alpha_t
+        # TODO: 2.7
+        if self.gear_type == 1:  # 外齿
+            tran_modi = self.x_t
+        elif self.gear_type == 2:  # 内齿
+            tran_modi = -self.x_t
+
+        tran_base_dia = self.d_b
+        tooth_width = self.tooth_width
+        radius_max = r_max
+        radius_min = r_min
+
+        GearType = self.gear_type
+        rotation_direction = self.rotation_direction
+
+        # 定义齿轮右齿面节点坐标值及法向矢量
+        surf_right = np.zeros((self.n1+1, 2))
+        surf_left = np.zeros((self.n1 + 1, 2))
+
+        # 计算轮齿基圆弧齿厚度(mm)
+        if GearType == 1:  # 外齿
+            width_base = (0.5 * np.pi + 2 * tran_modi * np.tan(
+                tran_alpha_n)) * tran_module * tran_base_dia / tran_refer + tran_base_dia * (
+                                 np.tan(tran_alpha_n) - tran_alpha_n)
+        elif GearType == 2:  # 内齿
+            # width_base = np.pi*tran_base_dia/self.z - ((0.5 * np.pi - 2 * tran_modi * np.tan(
+            #     tran_alpha_n)) * tran_module * tran_base_dia / tran_refer - tran_base_dia * (
+            #                      np.tan(tran_alpha_n) - tran_alpha_n))
+            # TODO: 2.7
+            width_base = (0.5 * np.pi - 2 * tran_modi * np.tan(
+                    tran_alpha_n)) * tran_module * tran_base_dia / tran_refer + tran_base_dia * (
+                                     np.tan(tran_alpha_n) - tran_alpha_n)
+
+        # 计算齿轮齿基圆弧齿对应的半角(即旋转角)(rad)
+        angle_base = 0.5 * width_base / (0.5 * tran_base_dia)
+
+        # 计算齿轮的基圆半齿厚/半齿槽的旋转矩阵
+        rotation_left = np.array([[np.cos(angle_base), np.sin(angle_base)], [-np.sin(angle_base), np.cos(angle_base)]])
+        rotation_right = np.array([[np.cos(angle_base), -np.sin(angle_base)], [np.sin(angle_base), np.cos(angle_base)]])
+
+        # 计算齿轮基圆螺旋角(rad)
+        if rotation_direction == 1:  # 右旋齿轮
+            helix_base = abs(np.arctan(np.tan(beta) * tran_base_dia / tran_refer))
+        elif rotation_direction == -1:  # 左旋齿轮
+            helix_base = -1 * abs(np.arctan(np.tan(beta) * tran_base_dia / tran_refer))
+
+        # 计算齿轮的齿廓间隔值
+        delta_radius = abs(radius_max - radius_min) / (number_radius - 1)
+
+        if GearType == 1:  # 外齿
+            for jj in range(1, number_radius + 1):  # 半径方向网格数
+                # 计算齿轮的左齿面的第jj个齿廓节点对应的中心旋转角(rad)
+                radius_temp = min(radius_min, radius_max) + (jj - 1) * delta_radius
+                angle_diameter = np.sqrt(radius_temp ** 2 - (0.5 * tran_base_dia) ** 2) / (0.5 * tran_base_dia)
+                # 计算齿轮左齿面节点的X轴/Y轴坐标系
+                X_left = 0.5 * tran_base_dia * (np.cos(angle_diameter) + angle_diameter * np.sin(angle_diameter))
+                Y_left = 0.5 * tran_base_dia * (np.sin(angle_diameter) - angle_diameter * np.cos(angle_diameter))
+
+                # 计算齿轮右齿面节点的X轴/Y轴坐标系
+                X_right = X_left
+                Y_right = -1 * Y_left
+                # 齿轮的基圆半齿厚/半齿槽的旋转矩阵
+                surf_right[jj-1, :] = (rotation_right @ np.array([[X_right], [Y_right]])).reshape(1, 2)
+
+
+        elif GearType == 2:  # 内齿
+            for jj in range(1, number_radius + 1):  # 半径方向网格数
+                # 计算齿轮的左齿面的第jj个齿廓节点对应的中心旋转角(rad)
+                radius_temp = max(radius_min, radius_max) - (jj - 1) * delta_radius
+                angle_diameter = np.sqrt(radius_temp ** 2 - (0.5 * tran_base_dia) ** 2) / (0.5 * tran_base_dia)
+                # 计算齿轮左齿面节点的X轴/Y轴坐标系
+                X_left = 0.5 * tran_base_dia * (np.cos(angle_diameter) + angle_diameter * np.sin(angle_diameter))
+                Y_left = 0.5 * tran_base_dia * (np.sin(angle_diameter) - angle_diameter * np.cos(angle_diameter))
+
+                # 计算齿轮右齿面节点的X轴/Y轴坐标系
+                X_right = X_left
+                Y_right = -1 * Y_left
+                # 齿轮的基圆半齿厚/半齿槽的旋转矩阵
+                surf_right[jj-1, :] = (rotation_right @ np.array([[X_right], [Y_right]])).reshape(1, 2)
+                surf_left[jj-1, :] = (rotation_left @ np.array([[X_left], [Y_left]])).reshape(1, 2)
+
+            # z = self.z
+            # temp_rotation_matrix = np.array([[np.cos(2*np.pi/z), -np.sin((2*np.pi/z))], [np.sin((2*np.pi/z)), np.cos((2*np.pi/z))]])
+            # surf_right = (temp_rotation_matrix@surf_right.T).T
+            # 绘制 points
+            import matplotlib.pyplot as plt
+
+            plt.figure()
+            plt.plot(surf_right[:, 0], surf_right[:, 1], 'o-', color='blue')
+            plt.plot(surf_left[:, 0], surf_left[:, 1], 'o-', color='red')
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.title('Points Plot')
+            plt.grid(True)
+            plt.axis('equal')
+            plt.show()
+        return surf_right
+
+    def get_profile_node_normal(self, r_min, r_max):
+        beta = self.beta
+        number_width = self.nw + 1
+        number_radius = self.n1 + 1
+        tran_module = self.m_t
+        tran_refer = self.d
+        tran_alpha_n = self.alpha_t
+        # TODO: 2.7
+        if self.gear_type == 1:  # 外齿
+            tran_modi = self.x_t
+        elif self.gear_type == 2:  # 内齿
+            tran_modi = -self.x_t
+        tran_base_dia = self.d_b
+        tooth_width = self.tooth_width
+        radius_max = r_max
+        radius_min = r_min
+
+        GearType = self.gear_type
+        rotation_direction = self.rotation_direction
+
+        # 定义齿轮左齿面节点坐标值及法向矢量
+        surf_left_matrix = np.zeros((number_width*number_radius, 3))
+        # 定义齿轮右齿面节点坐标值及法向矢量
+        surf_right_matrix = np.zeros((number_width*number_radius, 3))
+
+        # 计算轮齿基圆弧齿厚度(mm)
+        if GearType == 1:  # 外齿
+            width_base = (0.5 * np.pi + 2 * tran_modi * np.tan(
+                tran_alpha_n)) * tran_module * tran_base_dia / tran_refer + tran_base_dia * (
+                                 np.tan(tran_alpha_n) - tran_alpha_n)
+        elif GearType == 2:  # 内齿
+            width_base = (0.5 * np.pi - 2 * tran_modi * np.tan(
+                    tran_alpha_n)) * tran_module * tran_base_dia / tran_refer + tran_base_dia * (
+                                     np.tan(tran_alpha_n) - tran_alpha_n)
+
+        # 计算齿轮齿基圆弧齿对应的半角(即旋转角)(rad)
+        angle_base = 0.5 * width_base / (0.5 * tran_base_dia)
+
+        # 计算齿轮的基圆半齿厚/半齿槽的旋转矩阵
+        rotation_left = np.array([[np.cos(angle_base), np.sin(angle_base)], [-np.sin(angle_base), np.cos(angle_base)]])
+        rotation_right = np.array([[np.cos(angle_base), -np.sin(angle_base)], [np.sin(angle_base), np.cos(angle_base)]])
+
+        # 计算齿轮基圆螺旋角(rad)
+        if rotation_direction == 1:  # 右旋齿轮
+            helix_base = abs(np.arctan(np.tan(beta) * tran_base_dia / tran_refer))
+        elif rotation_direction == -1:  # 左旋齿轮
+            helix_base = -1 * abs(np.arctan(np.tan(beta) * tran_base_dia / tran_refer))
+
+        # 计算齿轮的齿向间隔值
+        delta_width = tooth_width / (number_width - 1)
+        # 计算齿轮的齿廓间隔值
+        delta_radius = abs(radius_max - radius_min) / (number_radius - 1)
+
+        # 计算齿轮基圆螺旋角(rad)
+        if rotation_direction == 1:  # 右旋齿轮
+            beta_base = -1 * abs(np.arctan(np.tan(beta) * tran_base_dia / tran_refer))
+        elif rotation_direction == -1:  # 左旋齿轮
+            beta_base = abs(np.arctan(np.tan(beta) * tran_base_dia / tran_refer))
+
+        # 定义计数器
+        nn = 0
+
+        if GearType == 1:  # 外齿
+            for ii in range(1, number_width + 1):  # 齿宽方向网格数
+                # 计算齿轮的左齿面的第ii个齿宽节点对应的中心旋转角(rad)
+                angle_width = (ii - 1) * delta_width * np.tan(helix_base) / (0.5 * tran_base_dia)
+                # 计算齿轮因齿宽的旋转矩阵
+                rotation_width = np.array(
+                    [[np.cos(angle_width), -np.sin(angle_width)], [np.sin(angle_width), np.cos(angle_width)]])
+
+                for jj in range(1, number_radius + 1):  # 半径方向网格数
+                    # 计算齿轮的左齿面的第jj个齿廓节点对应的中心旋转角(rad)
+                    radius_temp = min(radius_min, radius_max) + (jj - 1) * delta_radius
+                    angle_diameter = np.sqrt(radius_temp ** 2 - (0.5 * tran_base_dia) ** 2) / (0.5 * tran_base_dia)
+                    # 计算齿轮左齿面节点单位法向矢量
+                    angle_XY = angle_diameter + angle_width - angle_base + np.pi / 2
+                    direct_X = np.cos(beta_base) * np.cos(angle_XY)
+                    direct_Y = np.cos(beta_base) * np.sin(angle_XY)
+                    direct_Z = np.sin(beta_base)
+
+                    # 记录齿轮左齿面节点坐标值及法向矢量
+                    surf_left_matrix[nn, :] = np.array([direct_X, direct_Y, direct_Z]).reshape(1, -1)
+
+                    # 计算齿轮右齿面节点单位法向矢量
+                    angle_XY = -angle_diameter + angle_width + angle_base - np.pi / 2
+                    direct_X = np.cos(-1 * beta_base) * np.cos(angle_XY)
+                    direct_Y = np.cos(-1 * beta_base) * np.sin(angle_XY)
+                    direct_Z = np.sin(-1 * beta_base)
+                    # 记录齿轮右齿面节点坐标值及法向矢量
+                    surf_right_matrix[nn, :] = np.array([direct_X, direct_Y, direct_Z]).reshape(1, -1)
+                    # 更新计数器
+                    nn += 1
+
+        elif GearType == 2:  # 内齿
+            for ii in range(1, number_width + 1):  # 齿宽方向网格数
+                # 计算齿轮的左齿面的第ii个齿宽节点对应的中心旋转角(rad)
+                angle_width = (ii - 1) * delta_width * np.tan(helix_base) / (0.5 * tran_base_dia)
+                # 计算齿轮因齿宽的旋转矩阵
+                rotation_width = np.array(
+                    [[np.cos(angle_width), -np.sin(angle_width)], [np.sin(angle_width), np.cos(angle_width)]])
+
+                for jj in range(1, number_radius + 1):  # 半径方向网格数
+                    # 计算齿轮的左齿面的第jj个齿廓节点对应的中心旋转角(rad)
+                    radius_temp = max(radius_min, radius_max) - (jj - 1) * delta_radius
+                    angle_diameter = np.sqrt(radius_temp ** 2 - (0.5 * tran_base_dia) ** 2) / (0.5 * tran_base_dia)
+
+                    # 计算齿轮左齿面节点单位法向矢量
+                    # TODO: 2.3
+                    # angle_XY = angle_diameter + angle_width + angle_base + np.pi / 2
+                    angle_XY = -angle_diameter + angle_width + angle_base + np.pi / 2
+                    direct_X = np.cos(-1 * beta_base) * np.cos(angle_XY)
+                    direct_Y = np.cos(-1 * beta_base) * np.sin(angle_XY)
+                    direct_Z = np.sin(-1 * beta_base)
+
+                    # 记录齿轮左齿面节点坐标值及法向矢量
+                    surf_left_matrix[nn, :] = np.array([direct_X, direct_Y, direct_Z]).reshape(1, -1)
+
+                    # 计算齿轮右齿面节点单位法向矢量
+                    # TODO: 2.3
+                    # angle_XY = -angle_diameter + angle_width - angle_base - np.pi / 2
+                    angle_XY = angle_diameter + angle_width - angle_base - np.pi / 2
+                    direct_X = np.cos(beta_base) * np.cos(angle_XY)
+                    direct_Y = np.cos(beta_base) * np.sin(angle_XY)
+                    direct_Z = np.sin(beta_base)
+                    # 记录齿轮右齿面节点坐标值及法向矢量
+                    surf_right_matrix[nn, :] = np.array([direct_X, direct_Y, direct_Z]).reshape(1, -1)
+                    # 更新计数器
+                    nn += 1
+
+        return surf_left_matrix, surf_right_matrix
+
+    def get_profile_node_normal_with_tooth(self, tooth_tag=0):
+        if (tooth_tag >= self.z) or (tooth_tag < 0):
+            raise ValueError('The tooth tag must be in the range of [0, z-1].')
+        origin_normal_right = self.profile_node_normal_right
+        origin_normal_left = self.profile_node_normal_left
+
+        rotation_angel = tooth_tag*2*np.pi/self.z
+        rotation_matrix = np.array([[np.cos(rotation_angel), -np.sin(rotation_angel)], [np.sin(rotation_angel), np.cos(rotation_angel)]])
+        origin_normal_right[:, 0:2] = (rotation_matrix@(origin_normal_right[:, 0:2].T)).T
+        origin_normal_left[:, 0:2] = (rotation_matrix@(origin_normal_left[:, 0:2].T)).T
+
+        return origin_normal_right, origin_normal_left
+
 
     @abstractmethod
     def get_tip_intersection_points(self):
@@ -313,7 +565,7 @@ class Gear(ABC):
         :param tooth_tag: 目标齿编号，默认为 None，即所有齿
         :return: 齿廓节点索引及坐标
         """
-        if not hasattr(self, 'target_hex_mesh'):
+        if (not hasattr(self, 'target_hex_mesh')) or self.target_hex_mesh is None:
             if not hasattr(self, 'hex_mesh'):
                 raise ValueError('The hex_mesh attribute is not set.')
             quad_mesh = self.mesh
@@ -797,6 +1049,8 @@ class ExternalGear(Gear):
         points = np.concatenate([xt, yt], axis=-1)
         return points
 
+
+
     def get_tip_intersection_points(self, t):
 
         points = self.get_involute_points(t)
@@ -858,16 +1112,19 @@ class ExternalGear(Gear):
         t2 = fsolve(involutecross, mn)[0]  # 求解渐开线与齿顶圆的交点
 
         # t3 = 2 * np.pi - alpha_t
-        # t4 = 1.5 * np.pi
+        t4 = 1.5 * np.pi
         def involutecross_rb(t):
             return self.get_transition_intersection_points(t) - self.r_b
 
         def involutecross_rf(t):
             return self.get_transition_intersection_points(t) - self.r_f
 
-        # t3 = fsolve(involutecross_rb, 2 * np.pi - alpha_t)[0]
         t3 = 2 * np.pi - alpha_t
-        t4 = fsolve(involutecross_rf, 1.5 * np.pi)[0]
+        node_t3 = self.get_transition_points(t3).reshape(-1)
+        r3 = np.sqrt(node_t3[0] ** 2 + node_t3[1] ** 2)
+        if r3 < self.r_b:
+            t3 = fsolve(involutecross_rb, 2 * np.pi - alpha_t)[0]
+        # t4 = fsolve(involutecross_rf, 1.5 * np.pi)[0]
         # 检验是否超过最大圆角
         max_angle = pi/z+pi/2
         temp_node = self.get_transition_points(t4)[0]
@@ -885,13 +1142,51 @@ class ExternalGear(Gear):
         t = np.linspace(t4, t3, n2 + 1)
         points[0:n2 + 1, 0:-1] = self.get_transition_points(t)
 
-        width1 = t2 - t1
-        t = np.linspace(t1 + width1 / n1, t2, n1)
-        points[n2 + 1:n2 + n1 + 1, 0:-1] = self.get_involute_points(t)
+        # width1 = t2 - t1
+        # t = np.linspace(t1 + width1 / n1, t2, n1)
+        # points[n2 + 1:n2 + n1 + 1, 0:-1] = self.get_involute_points(t)
+
+        # 原始齿廓节点均匀化
+        tt_old = np.linspace(t1, t2, n1+1)
+        tt_new = np.zeros(n1+1)
+        r_min = max(np.sqrt(points[n2, 0] ** 2 + points[n2, 1] ** 2), self.r_b)
+        r_range = np.linspace(r_min, self.effective_ra, n1+1)
+        for i in range(n1+1):
+            def involutecross_temp(t):
+                return self.get_tip_intersection_points(t) - r_range[i]
+            tt_new[i] = fsolve(involutecross_temp, tt_old[i])[0]
+        node_new = self.get_involute_points(tt_new)
+        node_new_r = np.sqrt(node_new[:, 0] ** 2 + node_new[:, 1] ** 2)
+        node_new_diff = np.diff(node_new_r)
+        points[n2:n2 + n1 + 1, 0:-1] = node_new
+
+        # 使用精益新代码
+        # r_min = max(np.sqrt(points[n2, 0]**2+points[n2, 1]**2), self.r_b)
+        # matrix_right = self.get_involute_points_new(r_min, self.effective_ra)
+        # node_left_new = np.zeros((self.n1+1, 2))
+        # node_left_new[:, 0] = -matrix_right[:, 1]
+        # node_left_new[:, 1] = matrix_right[:, 0]
+        # node_left_new_r = np.sqrt(node_left_new[:, 0] ** 2 + node_left_new[:, 1] ** 2)
+        # node_left_new_diff = np.diff(node_left_new_r)
+
+        t_normal_left, t_normal_right = self.get_profile_node_normal(r_min, self.effective_ra)
+        self.profile_node_normal_right = t_normal_right
+        self.profile_node_normal_left = t_normal_left
+
+        # points[n2:n2 + n1 + 1, 0:-1] = node_left_new
+
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots()
+        # ax.plot(points[n2:n2 + n1 + 1, 0], points[n2:n2 + n1 + 1, 1], 'o')
+        # ax.plot(points[0:n2, 0], points[0:n2, 1], 'o')
+        # plt.axis('equal')
+        # plt.show()
 
         # 构建对称点
         points[n2 + n1 + 1:, 0] = -points[0:n2 + n1 + 1, 0]
         points[n2 + n1 + 1:, 1] = points[0:n2 + n1 + 1, 1]
+
+
 
         return points
 
@@ -1569,7 +1864,7 @@ class ExternalGear(Gear):
 
 class InternalGear(Gear):
     def __init__(self, m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
-                 xn_cutter, tooth_width, material=None, rotation_direction=1, center=(0, 0, 0), name=None):
+                 xn_cutter, tooth_width, chamfer_dia=0.0, material=None, rotation_direction=1, center=(0, 0, 0), name=None):
         """
 
         @param m_n: 法向模数
@@ -1591,19 +1886,23 @@ class InternalGear(Gear):
         @param z_cutter: 刀具齿数
         @param xn_cutter: 刀具变位系数
         @param tooth_width: 齿宽
+        @param chamfer_dia: 倒角高度（直径方向）
         @param material: 齿轮材料
         @param rotation_direction: 旋转方向，1 为右旋齿轮，-1 为左旋齿轮，默认为右旋
         @param center: 齿轮中心坐标，默认为原点
         @param name: 齿轮名称
         """
-        super().__init__(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material,
+        super().__init__(m_n, z, alpha_n, beta, -x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, tooth_width, material,
                          rotation_direction, center, name)
         self.outer_diam = outer_diam
         self.z_cutter = z_cutter
         self.xn_cutter = xn_cutter
         # 齿顶圆直径与半径
         ha = self.m_n * (self.hac - self.x_n)
-        self.d_a = self.d - 2 * ha
+        # TODO: 新增内齿轮倒角高度的处理（2.8）
+        self.real_da = self.d - 2 * ha
+        self.real_ra = self.real_da / 2
+        self.d_a = self.real_da + chamfer_dia
         self.r_a = self.d_a / 2
         # 齿根圆直径与半径
         hf = self.m_n * (self.hac + self.cc + self.x_n)
@@ -1749,8 +2048,39 @@ class InternalGear(Gear):
             t2 = fsolve(func2, 1)[0]
             func1 = lambda t: self.get_tip_intersection_points(t) - 0.5 * self.d_a
             t1 = fsolve(func1, 1)[0]
-            tt = np.linspace(t1, t2, n1, endpoint=False)
-            points[:n1, 0:2] = self.get_involute_points(tt)
+
+            # TODO: 2.7
+            r_max = np.sqrt(points[n1, 0] ** 2 + points[n1, 1] ** 2)
+
+            tt_old = np.linspace(t1, t2, n1 + 1)
+            tt_new = np.zeros(n1 + 1)
+            r_range = np.linspace(self.r_a, r_max, n1 + 1)
+            for i in range(n1 + 1):
+                def involutecross_temp(t):
+                    return self.get_tip_intersection_points(t) - r_range[i]
+
+                tt_new[i] = fsolve(involutecross_temp, tt_old[i])[0]
+            node_new = self.get_involute_points(tt_new)
+            node_new_r = np.sqrt(node_new[:, 0] ** 2 + node_new[:, 1] ** 2)
+            node_new_diff = np.diff(node_new_r)
+            points[0:n1 + 1, 0:2] = node_new
+            # ======================================================================
+
+            # tt = np.linspace(t1, t2, n1, endpoint=False)
+            # points[:n1, 0:2] = self.get_involute_points(tt)
+            # 使用精益新代码
+            # r_max = np.sqrt(points[n1, 0] ** 2 + points[n1, 1] ** 2)
+            # matrix_right = self.get_involute_points_new(self.r_a, r_max)
+            # node_left_new = np.zeros((self.n1 + 1, 2))
+            # node_left_new[:, 0] = -matrix_right[:, 1]
+            # node_left_new[:, 1] = matrix_right[:, 0]
+            # node_left_new_r = np.sqrt(node_left_new[:, 0] ** 2 + node_left_new[:, 1] ** 2)
+            # node_left_new_diff = np.diff(node_left_new_r)
+            # points[:n1+1, 0:2] = node_left_new[::-1]
+
+            t_normal_left, t_normal_right = self.get_profile_node_normal(self.r_a, r_max)
+            self.profile_node_normal_right = t_normal_right
+            self.profile_node_normal_left = t_normal_left
 
             # 对称构造另一侧点
             points[n1 + n2 + 1:, 0] = -points[0:n1 + n2, 0][::-1]
@@ -1782,32 +2112,83 @@ class InternalGear(Gear):
             t4 = t[1]
 
             tt = np.linspace(t4, t3, n2, endpoint=False)
-            points[n1 + 1:n1 + n2 + 1, 0:2] = self.get_transition_points(E, x0, y0, rc, ratio, tt)
+            # TODO: 2.7
+            points[n1:n1 + n2, 0:2] = self.get_transition_points(E, x0, y0, rc, ratio, tt)
 
             func3 = lambda t: self.get_transition_intersection_points(E, 0, 0, ra_cutter, ratio, t) - self.r_f
             t5 = pi / 2 - arctan(x0 / y0)
             # t5 = fsolve(func3, pi / 2 - arctan(x0 / y0))[0]
             t6 = pi / 2
-            tt = np.linspace(t5, t6, nf - 1, endpoint=False)
-            points[n1 + n2 + 1:n1 + n2 + nf, 0:2] = self.get_transition_points(E, 0, 0, ra_cutter, ratio, tt)
+            # TODO: 2.7
+            tt = np.linspace(t5, t6, nf, endpoint=False)
+            points[n1 + n2:n1 + n2 + nf, 0:2] = self.get_transition_points(E, 0, 0, ra_cutter, ratio, tt)
 
             points[n1 + n2 + nf, 0] = 0
             points[n1 + n2 + nf, 1] = 0.5 * df11
 
             func2 = lambda t: self.get_tip_intersection_points(t) - sqrt(
-                points[n1 + 1, 0] ** 2 + points[n1 + 1, 1] ** 2)
+                points[n1, 0] ** 2 + points[n1, 1] ** 2)
             t2 = fsolve(func2, 1)[0]
 
             func1 = lambda t: self.get_tip_intersection_points(t) - 0.5 * self.d_a
             t1 = fsolve(func1, 1)[0]
 
-            tt = np.linspace(t1, t2, n1, endpoint=False)
-            points[0:n1, 0:2] = self.get_involute_points(tt)
+            # TODO: 2.7
+            r_max = np.sqrt(points[n1, 0] ** 2 + points[n1, 1] ** 2)
 
-            points[n1, :] = (points[n1 - 1, :] + points[n1 + 1, :]) / 2
+            tt_old = np.linspace(t1, t2, n1 + 1)
+            tt_new = np.zeros(n1 + 1)
+            r_range = np.linspace(self.r_a, r_max, n1 + 1)
+            for i in range(n1 + 1):
+                def involutecross_temp(t):
+                    return self.get_tip_intersection_points(t) - r_range[i]
+                tt_new[i] = fsolve(involutecross_temp, tt_old[i])[0]
+            node_new = self.get_involute_points(tt_new)
+            node_new_r = np.sqrt(node_new[:, 0] ** 2 + node_new[:, 1] ** 2)
+            node_new_diff = np.diff(node_new_r)
+            points[0:n1+1, 0:2] = node_new
+
+            # tt = np.linspace(t1, t2, n1, endpoint=False)
+            # points[0:n1, 0:2] = self.get_involute_points(tt)
+
+            # points[n1, :] = (points[n1 - 1, :] + points[n1 + 1, :]) / 2
+
+            # # 使用精益新代码
+            # matrix_right = self.get_involute_points_new(self.r_a, r_max)
+            # node_left_new = np.zeros((self.n1 + 1, 2))
+            # node_left_new[:, 0] = -matrix_right[:, 1]
+            # node_left_new[:, 1] = matrix_right[:, 0]
+            # node_left_new_r = np.sqrt(node_left_new[:, 0] ** 2 + node_left_new[:, 1] ** 2)
+            # node_left_new_diff = np.diff(node_left_new_r)
+            # points[:n1+1, 0:2] = node_left_new[::-1]
+
+            t_normal_left, t_normal_right = self.get_profile_node_normal(self.r_a, r_max)
+            self.profile_node_normal_right = t_normal_right
+            self.profile_node_normal_left = t_normal_left
+
+
+
+
 
             points[n1 + n2 + nf + 1:, 0] = -points[0:n1 + n2 + nf, 0][::-1]
             points[n1 + n2 + nf + 1:, 1] = points[0:n1 + n2 + nf, 1][::-1]
+
+            # 绘制 points
+            import matplotlib.pyplot as plt
+
+            plt.figure()
+            plt.plot(points[:n1 + n2 + nf, 0], points[:n1 + n2 + nf, 1], '-')
+            # plt.plot(points[n1 + n2 + nf:, 0], points[n1 + n2 + nf:, 1], '-')
+            # theta = np.linspace(0, 2 * pi, 100)
+            # x_rb = self.r_b * np.cos(theta)
+            # y_rb = self.r_b * np.sin(theta)
+            # plt.plot(x_rb, y_rb)
+            plt.xlabel('X')
+            plt.ylabel('Y')
+            plt.title('Points Plot')
+            plt.grid(True)
+            plt.axis('equal')
+            plt.show()
 
         return points
 

@@ -194,41 +194,80 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
 if __name__ == "__main__":
     base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
 
-    filter_type = 'sensitivity'
-    optimizer_type = 'oc'
     '''
     参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
     '''
+    filter_type1 = 'sensitivity'
+    optimizer_type1 = 'oc'
+    nx, ny = 60, 20
+    NC = nx * ny
     config1 = TestConfig(
         nx=60, ny=20,
         volume_fraction=0.5,
-        filter_radius=2.4,
-        filter_type=filter_type,       # 指定使用灵敏度滤波器
-        save_dir=f'{base_dir}/mbb_beam_2d_{filter_type}_{optimizer_type}',
+        filter_radius=nx*0.04,
+        filter_type=filter_type1,        # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/mbb_beam_2d_{optimizer_type1}_{filter_type1}_{NC}',
         mesh_type='uniform_mesh_2d',
         assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
-        max_iterations=200,
-        tolerance=0.01
-    )
-    
-    filter_type = 'density'
-    optimizer_type = 'oc'
-    '''
-    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
-    '''
-    config2 = TestConfig(
-        nx=60, ny=20,
-        volume_fraction=0.5,
-        filter_radius=2.4,
-        filter_type=filter_type,       # 指定使用密度滤波器
-        save_dir=f'{base_dir}/mbb_beam_2d_{filter_type}_{optimizer_type}',
-        mesh_type='uniform_mesh_2d',
-        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        optimizer_type=optimizer_type1,  # 指定使用 OC 优化器
         max_iterations=200,
         tolerance=0.01
     )
 
-    result = run_optimization_test(config2)
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
+    nx, ny = 150, 50
+    NC = nx * ny
+    config2 = TestConfig(
+        nx=nx, ny=ny,
+        volume_fraction=0.5,
+        filter_radius=nx*0.04,
+        filter_type=filter_type1,        # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/mbb_beam_2d_{optimizer_type1}_{filter_type1}_{NC}',
+        mesh_type='uniform_mesh_2d',
+        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
+        optimizer_type=optimizer_type1,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
+    )
+
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
+    nx, ny = 300, 100
+    NC = nx * ny
+    config3 = TestConfig(
+        nx=nx, ny=ny,
+        volume_fraction=0.5,
+        filter_radius=nx*0.04,
+        filter_type=filter_type1,        # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/mbb_beam_2d_{optimizer_type1}_{filter_type1}_{NC}',
+        mesh_type='uniform_mesh_2d',
+        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
+        optimizer_type=optimizer_type1,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
+    )
+
+    '''
+    参数来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
+    filter_type2 = 'density'
+    nx, ny = 60, 20
+    NC = nx * ny
+    config4 = TestConfig(
+        nx=nx, ny=ny,
+        volume_fraction=0.5,
+        filter_radius=nx*0.04,
+        filter_type=filter_type2,        # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/mbb_beam_2d_{optimizer_type1}_{filter_type2}_{NC}',
+        mesh_type='uniform_mesh_2d',
+        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
+        optimizer_type=optimizer_type1,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
+    )
+
+    result = run_optimization_test(config4)
     
