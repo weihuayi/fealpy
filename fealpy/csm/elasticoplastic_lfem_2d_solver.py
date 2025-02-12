@@ -9,38 +9,12 @@ from fealpy.fem.vector_source_integrator import VectorSourceIntegrator
 from fealpy.fem.bilinear_form import BilinearForm
 from fealpy.fem.linear_form import LinearForm
 from fealpy.fem.dirichlet_bc import DirichletBC
-from fealpy.fem.nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from fealpy.decorator import cartesian
 from fealpy.solver import cg, spsolve
 
-from app.soptx.soptx.utils.timer import timer
-
 from fealpy.material.elastic_material import LinearElasticMaterial
 from fealpy.material.elastico_plastic_material import PlasticMaterial
-
- # 组装弹塑性刚度矩阵
-class TransitionElasticIntegrator(LinearElasticIntegrator):
-    def __init__(self, D_ep, material, q):
-        super().__init__(material, q)
-        self.D_ep = D_ep
-
-    def assembly_cell_matrix(self, space, mesh, cellidx):
-        # 获取单元信息
-        cell = mesh.entity('cell', cellidx)
-        NC = len(cellidx)
-        gphi = space.grad_basis(bcs, cellidx=cellidx)  # (NC, NQ, ldof, GD)
-        
-        # 获取当前单元对应的D_ep
-        cell_D_ep = self.D_ep[cellidx]  # (NC, NQ, N, N)
-        
-        # 计算单元刚度矩阵
-        B = self.material.strain_matrix(True, gphi)  # (NC, NQ, 3/6, tdof)
-        K_cell = bm.einsum('nqij,nqjk,nqkl,nq->nil', 
-                            B.transpose(0,1,3,2), 
-                            cell_D_ep, 
-                            B, 
-                            ws * mesh.cell_volume()[cellidx, None])
-        return K_cell.sum(axis=1)  # (NC, tdof, tdof)
+from fealpy.fem.elasticoplastic_integrator import TransitionElasticIntegrator
 
 import argparse
 # 平面应变问题
@@ -106,8 +80,6 @@ dt = pde.durtion()[1] / nt
 mesh = TriangleMesh.from_box(box=extent, nx=nx, ny=ny)
 
 p = args.degree
-tmr = timer("FEM Solver")
-next(tmr)
 space = LagrangeFESpace(mesh, p=p, ctype='C')
 tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
 gdof = space.number_of_global_dofs()
@@ -132,7 +104,7 @@ for step in range(nt):
         K = bform.assembly(format='csr')
     if step > 0:
          # 创建新积分器并组装刚度矩阵
-        integrator_K = TransitionElasticIntegrator(D_ep, material=pfcm, q=tensor_space.p+3)
+        integrator_K = TransitionElasticIntegrator(D_ep, material=pfcm, q=tensor_space.p+3,method='voigt')
         bform = BilinearForm(tensor_space)
         bform.add_integrator(integrator_K)
         K = bform.assembly(format='csr')
@@ -146,19 +118,16 @@ for step in range(nt):
         return val
     lform.add_integrator(VectorSourceIntegrator(coef))
     F = lform.assembly()
-    tmr.send('source assembly')
     dbc = DirichletBC(space=tensor_space, 
                     gd=pde.dirichlet, 
                     threshold=None, 
                     method='interp')
     K, F = dbc.apply(A=K, f=F, uh=None, gd=pde.dirichlet, check=True)
-    tmr.send('boundary')
     uh = tensor_space.function()
     if args.solver == 'cg':
         uh[:] = cg(K, F, maxiter=1000, atol=1e-14, rtol=1e-14)
     elif args.solver == 'spsolve':
         uh[:] = spsolve(K, F, solver='mumps')
-    tmr.send('solve({})'.format(args.solver))
     
     # 计算单元上积分点的应力、应变和等效应力
     gphi = space.grad_basis(bcs)
