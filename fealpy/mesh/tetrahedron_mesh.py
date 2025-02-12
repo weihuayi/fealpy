@@ -1142,7 +1142,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         NV = cell.shape[-1]
 
         cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
-        cell[:, 0] = NV
+        cell = bm.set_at(cell, (slice(NC), 0), NV)
 
         if etype == 'cell':
             cellType = 10  # 四面体
