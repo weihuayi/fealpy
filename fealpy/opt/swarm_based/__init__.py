@@ -11,7 +11,7 @@ from .cuckoo_search_opt import CuckooSearchOpt
 from .Butterfly_opt_alg import ButterflyOptAlg
 from .marine_predators_alg import MarinePredatorsAlg
 from .crow_drinking_water_alg import CrowDrinkingWaterAlg
-from .whale_opt_alg import WhaleOptAlg, ImprovedWhaleOptAlg
+from .whale_opt_alg import WhaleOptAlg
 from .squirrel_search_alg import SquirrelSearchAlg, DifferentialSquirrelSearchAlg
 from .harris_hawks_opt import HarrisHawksOpt
 from .sand_cat_swarm_opt import SandCatSwarmOpt
