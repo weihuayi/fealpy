@@ -71,19 +71,13 @@ class PoissonLFEMSolver:
                              f" and relative residual {info['residual']:.4e}")
 
 
-    def gamg_solve(self, P, ptype: str='V',level=0,rtol: float=1e-8):
+    def gamg_solve(self, P=None, cdegree=[1]):
         """
         """
         from ..solver import GAMGSolver
         solver = GAMGSolver(isolver='MG') 
 
-        if self.p >1:
-            space = LagrangeFESpace(self.mesh,p = self.p)
-            cdegree = list(range(1,self.p))
-            solver.setup(self.A,P,space,cdegree=cdegree)
-
-        else:
-            solver.setup(self.A,P)
+        solver.setup(self.A, P=P, space=self.space, cdegree=cdegree)
 
         x,info = solver.solve(self.b)
         self.uh[:] = x 

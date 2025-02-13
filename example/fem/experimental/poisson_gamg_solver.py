@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# import ipdb
+import ipdb
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -30,6 +30,7 @@ IM_2d = mesh_2d.uniform_refine(n=4, returnim=True)
 
 s0_2d = PoissonLFEMSolver(pde_2d, mesh_2d, p, timer=tmr, logger=logger)
 
+#ipdb.set_trace()
 x,info = s0_2d.gamg_solve(IM_2d)
 err = s0_2d.L2_error()
 #展示最终解

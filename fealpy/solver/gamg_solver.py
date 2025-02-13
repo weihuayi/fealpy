@@ -68,17 +68,17 @@ class GAMGSolver():
         if space is not None:
             print(2)
             Ps = space.prolongation_matrix(cdegree=cdegree)
-            for P in Ps:
+            for p in Ps:
                 self.L.append(self.A[-1].tril())
                 self.U.append(self.A[-1].triu())
                 self.P.append(P)
-                R = P.T.tocsr()
+                r = p.T.tocsr()
                 self.R.append(R)
-                self.A.append(R @ self.A[-1] @ P)
+                self.A.append(r @ self.A[-1] @ p)
 
         if P is not None:
             assert isinstance(P, list)
-            self.P = P
+            self.P += P
             for p in P:
                 self.L.append(self.A[-1].tril())
                 self.U.append(self.A[-1].triu())
