@@ -17,15 +17,26 @@ from fealpy.decorator import barycentric, cartesian
 
 _MT = TypeVar('_MT', bound=Mesh)
 
-class SMDof2d():
-    """
-    缩放单项式空间自由度管理类
-    """
-    def __init__(self, mesh, p):
+class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
+    def __init__(self, mesh, p, q=None, bc=None):
+        """
+        The Scaled Momomial Space in R^2
+        """
+
         self.mesh = mesh
-        self.p = p # 默认的空间次数
-        self.multiIndex = self.multi_index_matrix() # 默认的多重指标
-        self.cell2dof = self.cell_to_dof() # 默认的自由度数组
+        self.cellbarycenter = mesh.entity_barycenter('cell') if bc is None else bc
+        self.p = p
+        self.cellmeasure = mesh.entity_measure('cell')
+
+        self.cellsize = bm.sqrt(self.cellmeasure)
+        self.GD = 2
+
+        q = q if q is not None else p+3
+
+        mtype = mesh.meshtype
+
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
 
     def multi_index_matrix(self, p=None):
         """
@@ -71,28 +82,6 @@ class SMDof2d():
             N = self.mesh.number_of_edges()
         return N*ldof
 
-
-class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh, p, q=None, bc=None):
-        """
-        The Scaled Momomial Space in R^2
-        """
-
-        self.mesh = mesh
-        self.cellbarycenter = mesh.entity_barycenter('cell') if bc is None else bc
-        self.p = p
-        self.cellmeasure = mesh.entity_measure('cell')
-
-        self.cellsize = bm.sqrt(self.cellmeasure)
-        self.dof = SMDof2d(mesh, p)
-        self.GD = 2
-
-        q = q if q is not None else p+3
-
-        mtype = mesh.meshtype
-
-        self.itype = self.mesh.itype
-        self.ftype = self.mesh.ftype
 
 
     def diff_index_1(self, p=None):
@@ -160,7 +149,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return self.GD
 
     def cell_to_dof(self, p=None):
-        return self.dof.cell_to_dof(p=p)
+        return self.cell_to_dof(p=p)
 
     @cartesian
     def edge_basis(self, point, index=_S, p=None):
@@ -372,7 +361,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     @cartesian
     def value(self, uh, point, index=_S):
         phi = self.basis(point, index=index)
-        cell2dof = self.dof.cell2dof[index]
+        cell2dof = self.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
@@ -381,7 +370,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     @cartesian
     def grad_value(self, uh, point, index=_S):
         gphi = self.grad_basis(point, index=index)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell2dof
         if (type(index) is bm.ndarray) and (index.dtype.name == 'bool'):
             N = bm.sum(index)
         elif type(index) is slice:
@@ -399,20 +388,20 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     @cartesian
     def laplace_value(self, uh, point, index=_S):
         lphi = self.laplace_basis(point, index=index)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell2dof
         return bm.einsum('...ij, ij->...i', lphi, uh[cell2dof[index]])
 
     @cartesian
     def hessian_value(self, uh, point, index=_S):
         hphi = self.hessian_basis(point, index=index) #(NQ, NC, ldof, 2, 2)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell2dof
         return bm.einsum('...clij, cl->...cij', hphi, uh[cell2dof[index]])
 
     @cartesian
     def grad_3_value(self, uh, point, index=_S):
         #TODO
         gmphi = self.grad_m_basis(3, point, index=index) #(NQ, NC, ldof, 8)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell2dof
         return bm.einsum('...cli, cl->...ci', gmphi, uh[cell2dof[index]])
 
     def function(self, dim=None, array=None, dtype=None):
@@ -443,10 +432,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return bm.zeros(shape, dtype=self.ftype)
 
     def number_of_local_dofs(self, p=None, doftype='cell'):
-        return self.dof.number_of_local_dofs(p=p, doftype=doftype)
+        return self.number_of_local_dofs(p=p, doftype=doftype)
 
     def number_of_global_dofs(self, p=None):
-        return self.dof.number_of_global_dofs(p=p)
+        return self.number_of_global_dofs(p=p)
     def show_function_image(self, u, uh, t=None, plot_solution=True):
         mesh = uh.space.mesh
         fig = plt.figure()
@@ -926,7 +915,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         mesh = self.mesh
         NC = self.mesh.number_of_cells()
         cell2edge, cell2edgeloc = mesh.ds.cell_to_edge()
-        ldof = self.dof.number_of_local_dofs()
+        ldof = self.number_of_local_dofs()
 
         if p == 0:
             bcs = bm.array([[0.5, 0.5]])
@@ -999,7 +988,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         bm.add.at(H, edge2cell[:, 0], H0)
         bm.add.at(H, edge2cell[isInEdge, 1], H1)
 
-        multiIndex = self.dof.multi_index_matrix(p=p)
+        multiIndex = self.multi_index_matrix(p=p)
         q = bm.sum(multiIndex, axis=1)
         H /= q + q.reshape(-1, 1) + 2
         return H

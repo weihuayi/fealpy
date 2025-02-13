@@ -192,15 +192,34 @@ class TestPolygonMeshInterfaces:
         for arr1, arr2 in zip(cell1, data['cell']):
             np.testing.assert_array_equal(bm.to_numpy(arr1), arr2)
 
+    @pytest.mark.parametrize("backend", ["numpy","pytorch"])
+    @pytest.mark.parametrize("data",from_box)
+    def test_from_box(self,data,backend):  #未实现 from_box
+        bm.set_backend(backend)
+        from fealpy.mesh import TriangleMesh
+        import matplotlib.pyplot as plt
+        mesh = PolygonMesh.from_box([0,1,0,1],nx=3,ny=2)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        cell1 = np.split(cell[0],cell[1][1:-1])
+        print(data)
+
+        np.testing.assert_allclose(bm.to_numpy(node),data['node'], atol=1e-7)
+        for arr1, arr2 in zip(cell1, data['cell']):
+            np.testing.assert_array_equal(bm.to_numpy(arr1), arr2)
+
+
 
 if __name__ == "__main__":
-    pytest.main(["./test_polygon_mesh.py", "-k", "test_init"])
-    pytest.main(["./test_polygon_mesh.py", "-k", "test_entity"])
-    pytest.main(["./test_polygon_mesh.py", "-k", "test_extend_data"])
-    pytest.main(["./test_polygon_mesh.py", "-k", "test_geo_data"])
-    pytest.main(["./test_polygon_mesh.py", "-k", "test_mesh_example"])
-    pytest.main(["./test_polygon_mesh.py", "-k", "test_rhombic"])
-    pytest.main(["./test_polygon_mesh.py", "-k", "test_nonconvex"])
+    #pytest.main(["./test_polygon_mesh.py", "-k", "test_init"])
+    #pytest.main(["./test_polygon_mesh.py", "-k", "test_entity"])
+    #pytest.main(["./test_polygon_mesh.py", "-k", "test_extend_data"])
+    #pytest.main(["./test_polygon_mesh.py", "-k", "test_geo_data"])
+    #pytest.main(["./test_polygon_mesh.py", "-k", "test_mesh_example"])
+    #pytest.main(["./test_polygon_mesh.py", "-k", "test_rhombic"])
+    #pytest.main(["./test_polygon_mesh.py", "-k", "test_nonconvex"])
+    pytest.main(["./test_polygon_mesh.py", "-k", "test_from_box"])
     a = TestPolygonMeshInterfaces()
+
     
     
