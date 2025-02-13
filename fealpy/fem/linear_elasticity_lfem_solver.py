@@ -4,6 +4,7 @@ from ..functionspace import LagrangeFESpace
 from ..functionspace import TensorFunctionSpace
 from ..fem import BilinearForm, LinearElasticIntegrator
 from ..fem import LinearForm, VectorSourceIntegrator
+from ..fem import DirichletBC
 
 
 
@@ -12,7 +13,7 @@ class LinearElasticityLFEMSolver:
     采用 Lagrange 有限元求解线弹性方程
     """
 
-    def __init__(self, material, mesh, p):
+    def __init__(self, material, mesh, p, method=None):
         """
         生成线弹性离散系统
         """
@@ -26,8 +27,52 @@ class LinearElasticityLFEMSolver:
                 ) 
 
         self.bform = BilinearForm(self.vspace)
-        self.bform.add_integrator(LinearElasticIntegrator(material))
+        self.bform.add_integrator(
+                LinearElasticIntegrator(material, method=None)
+                )
+        self.A = self.bform.assembly()
+
         self.lform = LinearForm(self.vspace)
+        self.b = self.lform.assembly()
+
+    def apply_node_load(self):
+        """
+        """
+
+        mesh = self.mesh
+        node = mesh.entity('node')
+        kwargs = bm.context(node)
+        GD = mesh.geo_dimension()
+        NN = mesh.number_of_nodes()
+        b = bm.zeros((NN, GD), **kwargs)
+        
+        for name in mesh.meshdata['load']['node']:
+            nload = self.mesh.meshdata['load']['node'][name]
+            idx = nload['nset']
+            b = bm.set_at(b, (idx, slice(GD)), nload['value'])
+            self.b = self.b + b.reshape(-1)
+
+    def apply_face_load(self):
+       
+        mesh = self.mesh
+        NN = mesh.number_of_nodes()
+        GD = mesh.geo_dimension()
+        node = mesh.entity('node')
+        kwargs = bm.context(node)
+        f = bm.zeros((NN, GD), **kwargs)
+        for name in self.mesh.meshdata['load']['face']:
+            fload = self.mesh.meshdata['load']['face'][name]
+            if 'nset' in fload: 
+                idx = fload['nset']
+                f = bm.set_at(f, (idx, slice(GD)), fload['value'])
+                print(f[idx])
+                f = self.vspace.function(array=f.reshape(-1))
+
+
+
+    def apply_dirichlet_bc(self, threshold):
+        self.A, self.b = DirichletBC(self.vspace, gd=0.0, 
+                                     threshold=threshold).apply(self.A, self.b)
 
     def set_corner_disp_zero(self):
         """
@@ -88,8 +133,34 @@ class LinearElasticityLFEMSolver:
     def solve(self):
         """
         """
-        from scipy.sparse.linalg import spsolve
+        from ..solver.mumps import spsolve
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
         gdof = self.vspace.number_of_global_dofs() 
         du = spsolve(self.A, self.b)
-        du = du[:gdof].reshape(-1, 2)
-        return du
+        self.du = du[:gdof].reshape(-1, GD)
+        return self.du
+
+    def show_mesh(self, **kwargs):
+        """
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        mesh = self.mesh
+        fig = plt.figure()
+        axes = fig.add_subplot(111, projection='3d')
+        #mesh.add_plot(axes)
+        mesh.find_node(axes, index=kwargs['nindex'], showindex=True)
+        plt.show()
+
+    def show_displacement(self, **kwargs):
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        mesh = self.mesh
+        node = mesh.entity('node')
+        node += kwargs['alpha']*self.du
+        fig = plt.figure()
+        axes = fig.add_subplot(111, projection='3d')
+        mesh.add_plot(axes)
+        #axes.quiver(node[:, 0], node[:, 1], node[:, 2], self.du[:, 0], self.du[:, 1], self.du[:, 2])
+        plt.show()
