@@ -1,5 +1,6 @@
 
 from ..backend import backend_manager as bm
+from ..functionspace import LagrangeFESpace
 from ..functionspace import TensorFunctionSpace
 from ..fem import BilinearForm, LinearElasticIntegrator
 from ..fem import LinearForm, VectorSourceIntegrator
@@ -11,20 +12,22 @@ class LinearElasticityLFEMSolver:
     采用 Lagrange 有限元求解线弹性方程
     """
 
-    def __init__(self, space, GD, material, force):
+    def __init__(self, material, mesh, p):
         """
         生成线弹性离散系统
         """
-        self.vspace = TensorFunctionSpace(space, (-1, GD)) 
+        assert p >= 1, f"p={p} should be greater than 1!"
+        self.mesh = mesh
         self.material = material
-        self.force = force
-        bform = BilinearForm(self.vspace)
-        bform.add_integrator(LinearElasticIntegrator(material))
-        self.A = bform.assembly()
 
-        lform = LinearForm(self.vspace)
-        lform.add_integrator(VectorSourceIntegrator(force))
-        self.b = lform.assembly()
+        self.vspace = TensorFunctionSpace(
+                LagrangeFESpace(mesh, p=p), 
+                (-1, mesh.geo_dimension())
+                ) 
+
+        self.bform = BilinearForm(self.vspace)
+        self.bform.add_integrator(LinearElasticIntegrator(material))
+        self.lform = LinearForm(self.vspace)
 
     def set_corner_disp_zero(self):
         """
