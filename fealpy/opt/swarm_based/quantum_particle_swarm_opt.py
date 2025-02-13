@@ -1,9 +1,7 @@
-
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S
-from .. import logger
-
-from .optimizer_base import Optimizer
+from ...backend import backend_manager as bm 
+from ...typing import TensorLike, Index, _S
+from ... import logger
+from ..optimizer_base import Optimizer
 
 """
 Quantum Particle Swarm Optimization
@@ -52,8 +50,8 @@ QPSO algorithm based on Lévy flight and its application in fuzzy portfolio.
 Applied Soft Computing Journal, 2021, 99: 106894.
 """
 
-from .opt_function import levy
-from .opt_function import initialize
+from ..opt_function import levy
+from ..opt_function import initialize
 
 class LevyQuantumParticleSwarmOpt(Optimizer):
     def __init__(self, option) -> None:

@@ -1,10 +1,9 @@
 
-from .opt_function import levy
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S
-from .. import logger
-
-from .optimizer_base import Optimizer
+from ..opt_function import levy
+from ...backend import backend_manager as bm 
+from ...typing import TensorLike, Index, _S
+from ... import logger
+from ..optimizer_base import Optimizer
 
 """
 Sparrow Search Algorithm  

@@ -1,9 +1,9 @@
 
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S
-from .. import logger
-import random
-from .optimizer_base import Optimizer, opt_alg_options
+from ...backend import backend_manager as bm 
+from ...typing import TensorLike, Index, _S
+from ... import logger
+
+from ..optimizer_base import Optimizer, opt_alg_options
 
 """
 Crayfish Optimization Algorithm

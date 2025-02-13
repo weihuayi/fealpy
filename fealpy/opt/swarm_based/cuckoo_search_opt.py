@@ -1,8 +1,8 @@
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S
-from .. import logger
-from .opt_function import levy
-from .optimizer_base import Optimizer
+from ...backend import backend_manager as bm 
+from ...typing import TensorLike, Index, _S
+from ... import logger
+from ..opt_function import levy
+from ..optimizer_base import Optimizer
 
 """
 Cuckoo Search Optimization
