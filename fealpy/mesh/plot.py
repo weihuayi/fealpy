@@ -139,3 +139,7 @@ class Plotable():
                 markersize=markersize,
                 fontsize=fontsize,
                 fontcolor=fontcolor)
+    @property
+    def show_angle(self):
+        from ..plotting.classic import get_ploter
+        return get_ploter('show_angle')(self)

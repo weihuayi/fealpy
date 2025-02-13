@@ -414,15 +414,9 @@ class TriangleMesh(SimplexMesh, Plotable):
         for i,(j,k) in zip(range(3),localEdge):
             v0 = node[cell[:, j]] - node[cell[:, i]]
             v1 = node[cell[:, k]] - node[cell[:, i]]
-            angle[:,i] = bm.arccos(bm.sum(v0*v1,axis=1)/bm.sqrt(bm.sum(v0**2,axis=1)*bm.sum(v1**2,axis=1)))
+            angle = bm.set_at(angle,(...,i), bm.arccos(bm.sum(v0*v1,axis=1)/bm.sqrt(bm.sum(v0**2,axis=1)*bm.sum(v1**2,axis=1))))
         return angle
 
-    def show_angle(self, axes, angle=None):
-        """
-        @brief 显示网格角度的分布直方图
-        """
-        pass
-    
     def cell_quality(self, measure='radius_ratio'):
         if measure == 'radius_ratio':
             return radius_ratio(self)
@@ -1487,9 +1481,9 @@ class TriangleMesh(SimplexMesh, Plotable):
     def from_meshio(cls, file, show=False):
         import meshio
         data = meshio.read(file)
-        node = data.points
-        cell = data.cells_dict['triangle']
-        print(data.cells_dict)
+        node = bm.from_numpy(data.points)
+        cell = bm.from_numpy(data.cells_dict['triangle'])
+
         mesh = cls(node, cell)
         if show:
             import matplotlib.pyplot as plt
