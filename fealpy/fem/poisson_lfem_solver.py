@@ -20,6 +20,7 @@ class PoissonLFEMSolver:
         self.timer = timer
         self.logger = logger
 
+        self.p = p
         self.pde = pde
         self.mesh = mesh
         self.space= LagrangeFESpace(mesh, p=p)
@@ -74,69 +75,44 @@ class PoissonLFEMSolver:
         """
         """
         from ..solver import GAMGSolver
-        solver = GAMGSolver() 
+        solver = GAMGSolver(isolver='MG') 
 
-        solver.A = [self.A]
-        solver.P = P
-        solver.R = []
-        solver.L = [self.A.tril()]
-        solver.U = [self.A.triu()]
-        solver.ptype = ptype
-        for m in P:
-            # s = m.sum(axis=1)
-            # m.T/s[None, :]
-            # solver.R.append(m.T.div(s))
-            solver.R.append(m.T)
-            a = solver.R[-1].matmul(solver.A[-1])
-            solver.A.append(a.matmul(m))
-            solver.L.append(solver.A[-1].tril())
-            solver.U.append(solver.A[-1].triu())
-            print(solver.A[-1].toarray())
+        if self.p >1:
+            space = LagrangeFESpace(self.mesh,p = self.p)
+            cdegree = list(range(1,self.p))
+            solver.setup(self.A,P,space,cdegree=cdegree)
 
-        if solver.ptype == 'V':
-            x = bm.zeros(self.b.shape)
-            for i in range(10):
-                x +=  solver.vcycle(self.b - self.A.matmul(x))
-        elif solver.ptype == 'W':
-            x = solver.wcycle(self.b)
-        elif solver.ptype == 'F':
-            x = solver.fcycle(self.b)
-<<<<<<< HEAD
-        # x = solver.solve(self.b)
-=======
+        else:
+            solver.setup(self.A,P)
 
-
+        x,info = solver.solve(self.b)
         self.uh[:] = x 
-        print(self.uh)
->>>>>>> 7b8e9acb765ce91bf9d1de0711c2716ff4c2b9ba
             
-        res = solver.A[0].matmul(x) - self.b
-        res = bm.sqrt(bm.sum(res**2))
-        res_0 = bm.sqrt(bm.sum(self.b**2))
-
+        res = info['residual']
+        res_0 = bm.linalg.norm(self.b)
         stop_res = res/res_0
-        # 输出 stop_res
-        if self.logger is not None:
-            self.logger.info(f"stop_res = {stop_res:.2e}")
-        else:
-            print(f"stop_res = {stop_res:.2e}")
 
-        # 检查收敛状态
-        if stop_res <= rtol:
-            if self.logger is not None:
-                self.logger.info(
-                    f"GAMG solver converged: stop_res = {stop_res:.2e} <= rtol = {rtol:.2e}"
-                )
-            converged = True
-        else:
-            if self.logger is not None:
-                self.logger.warning(
-                    f"GAMG solver NOT converged: stop_res = {stop_res:.2e} > rtol = {rtol:.2e}"
-                )
-            converged = False
+        # if self.timer is not None:
+        #     self.timer.send(f"GAMG 方法求解 Poisson 方程线性系统")
+        # if self.logger is not None:
+        #     self.logger.info(f"GAMG solver with {info['niter']} iterations"
+        #                      f" and relative {info['residual']:.4e}")
+        # # 检查收敛状态
+        # if stop_res <= rtol:
+        #     if self.logger is not None:
+        #         self.logger.info(
+        #             f"GAMG solver converged: stop_res = {stop_res:.2e} <= rtol = {rtol:.2e}"
+        #         )
+        #     converged = True
+        # else:
+        #     if self.logger is not None:
+        #         self.logger.warning(
+        #             f"GAMG solver NOT converged: stop_res = {stop_res:.2e} > rtol = {rtol:.2e}"
+        #         )
+        #     converged = False
 
         # 返回解和收敛标志
-        return x, converged
+        return x,info
 
 
     def show_mesh_and_solution(self):

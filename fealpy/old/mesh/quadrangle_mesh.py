@@ -273,6 +273,7 @@ class QuadrangleMesh(Mesh, Plotable):
         bcs = self.multi_index_matrix(p1, 1)/p1 
         # p0 元基函数在 p1 元对应的边内部插值点处的函数值
         phi = self.edge_shape_function(bcs[1:-1], p=p0) # (ldof1 - 2, ldof0)  
+        # print(phi)
        
         e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
         e2p0 = self.edge_to_ipoint(p0)
@@ -288,16 +289,18 @@ class QuadrangleMesh(Mesh, Plotable):
         NC = self.number_of_cells()
         # p1 元在单元上对应插值点的重心坐标
         bcs = self.multi_index_matrix(p1, 1)/p1
-        # p0 元基函数在 p1 元对应的单元内部插值点处的函数值
-        phi = self.cell_shape_function((bcs[1:-1], bcs[1:-1]), p=p0) #
+        # p0 元基函数在 p1 元对应的单元内部插值点处的函数值，在两个方向都去除边界点
+        phi = self.cell_shape_function((bcs[1:-1], bcs[1:-1]), p=p0) 
         c2p1 = self.cell_to_ipoint(p1).reshape(NC, p1+1, p1+1)[:, 1:-1, 1:-1]
+        #首先得到每个单元的每个方向上的插值点，然后去除边界点，就是边界点，就是内部点
         c2p1 = c2p1.reshape(NC, -1)
         c2p0 = self.cell_to_ipoint(p0)
-
         shape = (NC, ) + phi.shape
 
         I = np.broadcast_to(c2p1[:, :, None], shape=shape).flat
+        print(np.broadcast_to(c2p1[:, :, None], shape=shape).flatten())
         J = np.broadcast_to(c2p0[:, None, :], shape=shape).flat
+        print(np.broadcast_to(c2p0[:, None, :], shape=shape).flatten())
         V = np.broadcast_to( phi[None, :, :], shape=shape).flat
 
         P += coo_matrix((V, (I, J)), shape=(gdof1, gdof0))

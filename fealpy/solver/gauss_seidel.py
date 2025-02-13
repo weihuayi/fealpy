@@ -13,7 +13,7 @@ class SupportsMatmul(Protocol):
 
 def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
        atol: float=1e-12, rtol: float=1e-8,
-       maxiter: Optional[int]=10000) -> TensorLike:
+       maxit: Optional[int]=10000) -> TensorLike:
     
     assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
@@ -50,8 +50,8 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
                         "stopped by relative tolerance.")
             break
 
-        if (maxiter is not None) and (niter >= maxiter):
-            logger.info(f"Gauss Seidel: failed, stopped by maxiter ({maxiter}).")
+        if (maxit is not None) and (niter >= maxit):
+            logger.info(f"Gauss Seidel: failed, stopped by maxiter ({maxit}).")
             break
     info['residual'] = res    
     info['niter'] = niter 

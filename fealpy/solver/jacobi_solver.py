@@ -13,7 +13,7 @@ class SupportsMatmul(Protocol):
 
 def jacobi(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
        atol: float=1e-12, rtol: float=1e-8,
-       maxiter: Optional[int]=10000) -> TensorLike:
+       maxit: Optional[int]=10000) -> TensorLike:
     
     assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
@@ -41,11 +41,11 @@ def jacobi(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
     niter = 0
     x = x0
     while True:
-        B = b - N.matmul(x)
+        B = b - N@x
         x_new = spsolve_triangular(M, B)  # 使用前向替换求解线性方程组
         x = x_new
-        a = b - A.matmul(x)
-        res = bm.linalg.norm(b-A.matmul(x))
+        a = b - A@x
+        res = bm.linalg.norm(b-A@x)
         niter +=1
         print("n=:", niter, "residual: ", res)
         if res < rtol :
@@ -53,8 +53,8 @@ def jacobi(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
                         "stopped by relative tolerance.")
             break
 
-        if (maxiter is not None) and (niter >= maxiter):
-            logger.info(f"Jacobi: failed, stopped by maxiter ({maxiter}).")
+        if (maxit is not None) and (niter >= maxit):
+            logger.info(f"Jacobi: failed, stopped by maxiter ({maxit}).")
             break
     info['residual'] = res    
     info['niter'] = niter 

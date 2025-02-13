@@ -397,7 +397,7 @@ class HexahedronMesh(Mesh, Plotable):
         # p0 元基函数在 p1 元对应的单元内部插值点处的函数值
         phi = self.face_shape_function((bcs[1:-1], bcs[1:-1]), p=p0) #
         f2p1 = self.face_to_ipoint(p1).reshape(NF, p1+1, p1+1)[:, 1:-1, 1:-1]
-        f2p1 = c2p1.reshape(NF, -1)
+        f2p1 = f2p1.reshape(NF, -1)
         f2p0 = self.face_to_ipoint(p0)
 
         shape = (NF, ) + phi.shape
@@ -413,7 +413,7 @@ class HexahedronMesh(Mesh, Plotable):
         bcs = self.multi_index_matrix(p1, 1)/p1
         # p0 元基函数在 p1 元对应的单元内部插值点处的函数值
         phi = self.cell_shape_function((bcs[1:-1], bcs[1:-1], bcs[1:-1]), p=p0) #
-        c2p1 = self.cell_to_ipoint(p1).reshape(NF, p1+1, p1+1, p1+1)[:, 1:-1, 1:-1, 1:-1]
+        c2p1 = self.cell_to_ipoint(p1).reshape(NC, p1+1, p1+1, p1+1)[:, 1:-1, 1:-1, 1:-1]
         c2p1 = c2p1.reshape(NC, -1)
         c2p0 = self.cell_to_ipoint(p0)
 
