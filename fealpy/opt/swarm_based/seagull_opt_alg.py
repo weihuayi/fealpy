@@ -1,9 +1,8 @@
 
-from ..backend import backend_manager as bm 
-from ..typing import TensorLike, Index, _S
-from .. import logger
-
-from .optimizer_base import Optimizer
+from ...backend import backend_manager as bm 
+from ...typing import TensorLike, Index, _S
+from ... import logger
+from ..optimizer_base import Optimizer
 
 """
 Seagull Optimization Algorithm
