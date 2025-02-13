@@ -437,15 +437,21 @@ class PolygonMesh(Mesh, Plotable):
         @param mesh
         @param bc bool 如果为真，则对偶网格点为三角形单元重心; 否则为三角形单元外心
         """
-        raise NotImplementedError
+        from .triangle_mesh import TriangleMeshWithInfinityNode
 
+        mesh = TriangleMeshWithInfinityNode(mesh, bc=bc)
+        pnode, pcell= mesh.to_polygonmesh()
+        return cls(pnode, pcell)
 
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
         """
         @brief Generate a polygon mesh for a box domain
         """
-        raise NotImplementedError
+        from .triangle_mesh import TriangleMesh
+        tmesh = TriangleMesh.from_box(box, nx=nx, ny=ny, threshold=threshold)
+        mesh = cls.from_triangle_mesh_by_dual(tmesh)
+        return mesh
 
     @classmethod
     def from_one_triangle(cls,meshtype='iso',*,device=None): 
