@@ -1,6 +1,6 @@
 from .crayfish_opt_alg import CrayfishOptAlg
 from .honeybadger_alg import HoneybadgerAlg
-from .quantum_particle_swarm_opt import QuantumParticleSwarmOpt, LevyQuantumParticleSwarmOpt
+from .quantum_particle_swarm_opt import QuantumParticleSwarmOpt
 from .grey_wolf_optimizer import GreyWolfOpt
 from .particle_swarm_opt import ParticleSwarmOpt
 from .hippopotamus_opt_alg import HippopotamusOptAlg
@@ -11,8 +11,8 @@ from .cuckoo_search_opt import CuckooSearchOpt
 from .Butterfly_opt_alg import ButterflyOptAlg
 from .marine_predators_alg import MarinePredatorsAlg
 from .crow_drinking_water_alg import CrowDrinkingWaterAlg
-from .whale_opt_alg import WhaleOptAlg, ImprovedWhaleOptAlg
-from .squirrel_search_alg import SquirrelSearchAlg, DifferentialSquirrelSearchAlg
+from .whale_opt_alg import WhaleOptAlg
+from .squirrel_search_alg import SquirrelSearchAlg
 from .harris_hawks_opt import HarrisHawksOpt
 from .sand_cat_swarm_opt import SandCatSwarmOpt
 from .jellyfish_search_opt import JellyfishSearchOpt
