@@ -1,7 +1,7 @@
 
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian, barycentric
-
+from fealpy.mesh import QuadrangleMesh
 class CosCosData:
     """
         -\\Delta u = f
@@ -15,6 +15,14 @@ class CosCosData:
         @brief 模型定义域
         """
         return [0, 1, 0, 1]
+    
+    def mesh(self, nx,ny):
+        box = [0, 1, 0, 1]
+        mesh = QuadrangleMesh.from_box(box=[0,1,0,1], nx=nx, ny=ny)
+        self.nx = nx
+        self.ny = ny
+        self.mesh = mesh
+        return mesh
 
     @cartesian
     def solution(self, p):
