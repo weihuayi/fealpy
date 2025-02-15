@@ -1,9 +1,22 @@
-from ..sparse import COOTensor
-from ..backend import backend_manager as bm
-from typing import Optional, Union
-from ..backend import TensorLike
 
-def spdiags(data:TensorLike, diags:Union[TensorLike, int], M:int, N:int, format:Optional[str]='csr'):
+from typing import overload, Optional, Union, Literal
+
+from ..backend import backend_manager as bm
+from ..backend import TensorLike
+from .coo_tensor import COOTensor
+from .csr_tensor import CSRTensor
+
+
+@overload
+def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int) -> CSRTensor: ...
+@overload
+def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
+            format: Literal['csr']) -> CSRTensor: ...
+@overload
+def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
+            format: Literal['coo']) -> COOTensor: ...
+def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
+            format: Optional[str] = 'csr'):
     """Return a sparse matrix from diagonals.
 
     Parameters:

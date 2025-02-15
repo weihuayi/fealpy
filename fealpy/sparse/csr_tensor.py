@@ -69,7 +69,7 @@ class CSRTensor(SparseTensor):
 
     ### 1. Data Fetching ###
     @property
-    def itype(self): return self._crow.dtype
+    def itype(self): return self._col.dtype
 
     @property
     def nnz(self): return self._col.shape[-1]
@@ -80,15 +80,12 @@ class CSRTensor(SparseTensor):
         return self._crow
 
     @property
+    def col(self): return self._col
+
+    @property
     def values(self) -> Optional[TensorLike]:
         """Return the non-zero elements"""
         return self._values
-
-    @property
-    def indptr(self): return self._crow # scipy convention
-
-    @property
-    def indices(self): return self._col # scipy convention
 
     @property
     def row(self):
@@ -98,16 +95,17 @@ class CSRTensor(SparseTensor):
         return bm.repeat(bm.arange(nrow, **kargs), count)
 
     @property
-    def col(self): return self._col
+    def indptr(self): return self._crow # scipy convention
 
     @property
-    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        """
-        """
-        return self.row, self._col
+    def indices(self): return self._col # scipy convention
 
     @property
     def data(self): return self._values # scipy convention
+
+    @property
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
+        return self.row, self._col
 
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
