@@ -63,16 +63,17 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         b = bm.swapaxes(b, 0, 1)
         x0 = bm.swapaxes(x0, 0, 1)
 
-    sol = _cg_impl(A, b, x0,M,atol, rtol, maxiter)
+    sol,info = _cg_impl(A, b, x0,M,atol, rtol, maxiter)
 
     if (not single_vector) and batch_first:
         sol = bm.swapaxes(sol, 0, 1)
 
-    return sol
+    return sol, info
 
 
 def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul, atol, rtol, maxiter):
     # initialize
+    info = {}
     x = x0              # (dof, batch)
     r = b - A @ x       # (dof, batch)
     z = M @ r if M is not None else r
@@ -112,8 +113,11 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
         beta = rTr_new / rTr # (batch,)
         p = z_new + beta[None, ...] * p
         r, z, rTr = r_new, z_new, rTr_new
+        
+        info['residual'] = r_norm_new   
+        info['niter'] = n_iter 
 
-    return x
+    return x, info
 
     # @staticmethod
     # def setup_context(ctx, inputs, output):

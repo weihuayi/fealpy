@@ -461,3 +461,9 @@ class CSRTensor(SparseTensor):
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
+
+    def find(self):
+        """
+        """
+        nz_mask = self.values != 0
+        return self.row[nz_mask], self.col[nz_mask], self.values[nz_mask]

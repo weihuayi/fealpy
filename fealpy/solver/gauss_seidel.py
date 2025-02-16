@@ -46,12 +46,12 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
         niter +=1
         print("n=:", niter, "residual: ", res)
         if res < rtol :
-            logger.info(f"CG: converged in {iter} iterations, "
+            logger.info(f"GS: converged in {iter} iterations, "
                         "stopped by relative tolerance.")
             break
 
         if (maxiter is not None) and (niter >= maxiter):
-            logger.info(f"CG: failed, stopped by maxiter ({maxiter}).")
+            logger.info(f"GS: failed, stopped by maxiter ({maxiter}).")
             break
     info['residual'] = res    
     info['niter'] = niter 

@@ -88,8 +88,8 @@ class GAMGSolver():
             NN = bm.ceil(bm.log2(self.A[-1].shape[0])/2-4)
             NL = max(min( int(NN), 8), 2) # 估计粗化的层数 
             for l in range(NL):
-                self.L.append(self.A[-1]).tril()) # 前磨光的光滑子
-                self.U.append(self.A[-1]).triu()) # 后磨光的光滑子
+                self.L.append(self.A[-1].tril()) # 前磨光的光滑子
+                self.U.append(self.A[-1].triu()) # 后磨光的光滑子
                 isC, G = ruge_stuben_chen_coarsen(self.A[-1], self.theta)
                 p, r = two_points_interpolation(G, isC)
                 self.P.append(p)
