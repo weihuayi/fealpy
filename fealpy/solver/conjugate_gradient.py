@@ -14,7 +14,7 @@ class SupportsMatmul(Protocol):
 def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optional[SupportsMatmul] = None, *,
        batch_first: bool=False,
        atol: float=1e-12, rtol: float=1e-8,
-       maxiter: Optional[int]=10000) -> TensorLike:
+       maxit: Optional[int]=10000) -> TensorLike:
     """Solve a linear system Ax = b using the Conjugate Gradient (CG) method.
 
     Parameters:
@@ -26,7 +26,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         is the first dimension. Ignored if `b` is an 1-d tensor. Default is False.
         atol (float, optional): Absolute tolerance for convergence. Default is 1e-12.
         rtol (float, optional): Relative tolerance for convergence. Default is 1e-8.
-        maxiter (int, optional): Maximum number of iterations allowed. Default is 10000.\
+        maxit (int, optional): Maximum number of iterations allowed. Default is 10000.\
         If not provided, the method will continue until convergence based on the given tolerances.
 
     Returns:
@@ -63,15 +63,15 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         b = bm.swapaxes(b, 0, 1)
         x0 = bm.swapaxes(x0, 0, 1)
 
-    sol,info = _cg_impl(A, b, x0,M,atol, rtol, maxiter)
+    sol = _cg_impl(A, b, x0,M,atol, rtol, maxit)
 
     if (not single_vector) and batch_first:
         sol = bm.swapaxes(sol, 0, 1)
 
-    return sol, info
+    return sol
 
 
-def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul, atol, rtol, maxiter):
+def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul, atol, rtol, maxit):
     # initialize
     info = {}
     x = x0              # (dof, batch)
@@ -106,22 +106,21 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
                         "stopped by relative tolerance.")
             break
 
-        if (maxiter is not None) and (n_iter >= maxiter):
-            logger.info(f"CG: failed, stopped by maxiter ({maxiter}).")
+        if (maxit is not None) and (n_iter >= maxit):
+            logger.info(f"CG: failed, stopped by maxit ({maxit}).")
             break
 
         beta = rTr_new / rTr # (batch,)
         p = z_new + beta[None, ...] * p
         r, z, rTr = r_new, z_new, rTr_new
         
-        info['residual'] = r_norm_new   
-        info['niter'] = n_iter 
 
-    return x, info
+
+    return x
 
     # @staticmethod
     # def setup_context(ctx, inputs, output):
-    #     A, b, x0, atol, rtol, maxiter = inputs
+    #     A, b, x0, atol, rtol, maxit = inputs
     #     x = output
     #     ctx.save_for_backward(A, x)
 

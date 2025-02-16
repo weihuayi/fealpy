@@ -5,6 +5,7 @@ from .conjugate_gradient import cg,_cg_impl
 from .mumps import spsolve, spsolve_triangular
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
+from .. import logger
 
 
 
@@ -27,7 +28,7 @@ class GAMGSolver():
             itype: str = 'T', # 插值方法
             ptype: str = 'V', # 预条件类型
             sstep: int = 2, # 默认光滑步数
-            isolver: str = 'CG', # 默认迭代解法器
+            isolver: str = 'PCG', # 默认迭代解法器，还可以选择'MG'
             maxit: int = 200,   # 默认迭代最大次数
             csolver: str = 'direct', # 默认粗网格解法器
             rtol: float = 1e-8,      # 相对误差收敛阈值
@@ -63,19 +64,21 @@ class GAMGSolver():
         self.R = [ ] # 限制矩阵
 
         # 2. 高次元空间到低次元空间的粗化
+        print(1)
         if space is not None:
+            print(2)
             Ps = space.prolongation_matrix(cdegree=cdegree)
-            for P in Ps:
+            for p in Ps:
                 self.L.append(self.A[-1].tril())
                 self.U.append(self.A[-1].triu())
                 self.P.append(P)
-                R = P.T.tocsr()
+                r = p.T.tocsr()
                 self.R.append(R)
-                self.A.append(R @ self.A[-1] @ P)
+                self.A.append(r @ self.A[-1] @ p)
 
         if P is not None:
             assert isinstance(P, list)
-            self.P = P
+            self.P += P
             for p in P:
                 self.L.append(self.A[-1].tril())
                 self.U.append(self.A[-1].triu())
@@ -98,18 +101,19 @@ class GAMGSolver():
                 self.A.append(r@self.A[-1]@p)
                 if self.A[-1].shape[0] < self.csize:
                     break
+            
+        
+            # # 计算最粗矩阵最大和最小特征值
+            # A = self.A[-1].toarray()
+            # emax, _ = eigs(A, 1, which='LM')
+            # emin, _ = eigs(A, 1, which='SM')
 
-            # 计算最粗矩阵最大和最小特征值
-            A = self.A[-1].toarray()
-            emax, _ = eigs(A, 1, which='LM')
-            emin, _ = eigs(A, 1, which='SM')
+            # # 计算条件数的估计值
+            # condest = abs(emax[0] / emin[0])
 
-            # 计算条件数的估计值
-            condest = abs(emax[0] / emin[0])
-
-            if condest > 1e12:
-                N = self.A[-1].shape[0]
-                self.A[-1] += 1e-12*sp.eye(N)  
+            # if condest > 1e12:
+            #     N = self.A[-1].shape[0]
+            #     self.A[-1] += 1e-12*sp.eye(N)  
 
     def construct_coarse_equation(self, A, F, level=1):
         """
@@ -169,11 +173,66 @@ class GAMGSolver():
             P = LinearOperator((N, N), matvec=self.fcycle)
 
         if self.isolver == 'CG':
-            x0 = bm.zeros(shape = (self.A[0].shape[0], 1))
-            x, info = cg(self.A[0], b, x0=x0, M=P, atol=self.atol, rtol=self.rtol, maxit=self.maxit)
-        return x
+            x0 = bm.zeros(shape = (self.A[0].shape[0], ))
+            x = cg(self.A[0], b, x0=x0, M=P, atol=self.atol, rtol=self.rtol, maxit=self.maxit)
+            return x
+        elif self.isolver == 'MG':
+            x0 = bm.zeros(shape = (self.A[0].shape[0], ))
+            x,info = self.mg_solve(b,x0=x0)
+            return x,info
 
 
+    def mg_solve(self,r,x0=None):
+        info = {}
+        if x0 is not None:
+            x = x0
+        else:
+            x = bm.zeros(r.shape[0],)
+        niter = 0
+        while True:
+            if self.ptype == 'V':
+                a = r-self.A[0] @ x
+                x += self.vcycle(r-self.A[0] @ x)
+
+            elif self.ptype == 'W':
+                x += self.wcycle(r-self.A[0] @ x)   
+            elif self.ptype == 'F':
+                x += self.fcycle(r-self.A[0] @ x)  
+
+            niter +=1
+            res = r - self.A[0] @ x
+            res = bm.linalg.norm(res)
+            info['residual'] = res    
+            info['niter'] = niter
+            if res < self.atol:
+                logger.info(f"MG: converged in {niter} iterations, "
+                            "stopped by absolute tolerance.")
+                break
+
+            if res < self.rtol * bm.linalg.norm(r):
+                logger.info(f"MG: converged in {niter} iterations, "
+                            "stopped by relative tolerance.")
+                break
+
+            if (self.maxit is not None) and (niter >= self.maxit):
+                logger.info(f"CG: failed, stopped by maxit ({self.maxit}).")
+                break
+
+        # if self.ptype == 'V':
+        #     for niter in range(self.maxit):
+        #         x += self.vcycle(r-self.A[0] @ x)   
+        # elif self.ptype == 'W':
+        #     for niter in range(self.maxit):
+        #         x += self.wcycle(r-self.A[0] @ x)   
+        # elif self.ptype == 'F':
+        #     for niter in range(self.maxit):
+        #         x += self.fcycle(r-self.A[0] @ x)   
+        # res = r - self.A[0] @ x
+        # res = bm.linalg.norm(res)
+        # info['residual'] = res    
+        # info['niter'] = self.pmaxit
+        return x,info
+    
     def vcycle(self, r, level=0):
         """
         @brief V-Cycle 方法求解 Ae=r  
