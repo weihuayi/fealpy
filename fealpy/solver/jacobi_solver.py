@@ -11,7 +11,7 @@ from .. import logger
 class SupportsMatmul(Protocol):
     def __matmul__(self, other: TensorLike) -> TensorLike: ...
 
-def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
+def jacobi(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
        atol: float=1e-12, rtol: float=1e-8,
        maxit: Optional[int]=10000) -> TensorLike:
     
@@ -32,26 +32,29 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
     #张量分裂
     info = {}
     U = A.triu(k=1)
-    M = A.tril()#M = D-L，A = D-L-U
+    L = A.tril(k=-1)
+    M = A - L- U
+    N = L+U
+    
 
     err = 1
     niter = 0
     x = x0
     while True:
-        B = b - U.matmul(x)
+        B = b - N@x
         x_new = spsolve_triangular(M, B)  # 使用前向替换求解线性方程组
         x = x_new
-        a = b - A.matmul(x)
-        res = bm.linalg.norm(b-A.matmul(x))
+        a = b - A@x
+        res = bm.linalg.norm(b-A@x)
         niter +=1
         print("n=:", niter, "residual: ", res)
         if res < rtol :
-            logger.info(f"Gauss Seidel: converged in {iter} iterations, "
+            logger.info(f"Jacobi: converged in {iter} iterations, "
                         "stopped by relative tolerance.")
             break
 
         if (maxit is not None) and (niter >= maxit):
-            logger.info(f"Gauss Seidel: failed, stopped by maxiter ({maxit}).")
+            logger.info(f"Jacobi: failed, stopped by maxiter ({maxit}).")
             break
     info['residual'] = res    
     info['niter'] = niter 

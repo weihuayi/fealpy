@@ -275,12 +275,66 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell2faceSign = bm.zeros((NC, NEC), dtype=bm.bool, device=self.device)
         cell2faceSign = bm.set_at(cell2faceSign, (face2cell[:, 0], face2cell[:, 2]), True)
         return cell2faceSign
+    
+    def prolongation_matrix(self, p0: int, p1: int):
+        """
+        @brief :the prolongation_matrix from p0 to p1: 0 < p0 < p1
+        """
 
-    def prolongation_matrix(self, po: int, p1: int):
-        """
-        @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
-        """
-        pass
+        assert 0 < p0 < p1
+
+        TD = self.top_dimension()#Geometric Dimension
+        gdof0 = self.number_of_global_ipoints(p0)
+        gdof1 = self.number_of_global_ipoints(p1)
+        matrix_shape = (gdof1,gdof0)
+
+        # 1. Interpolation points on the mesh nodes: Inherit the original interpolation points
+        NN = self.number_of_nodes()
+        V_1 = bm.ones(NN)
+        I_1 = bm.arange(NN)
+        J_1 = bm.arange(NN)
+
+        # 2. Interpolation points within the mesh edges
+        NE = self.number_of_edges()
+        bcs = self.multi_index_matrix(p1, 1) / p1  
+        phi = self.edge_shape_function(bcs[1:-1], p=p0)  # (ldof1 - 2, ldof0)
+
+        e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
+        e2p0 = self.edge_to_ipoint(p0)
+        shape = (NE,) + phi.shape
+
+        I_2 = bm.broadcast_to(e2p1[:, :, None], shape=shape).flat
+        J_2 = bm.broadcast_to(e2p0[:, None, :], shape=shape).flat
+        V_2 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+
+        # 3. Interpolation points within the mesh cells
+        if p1 > 2:
+            NC = self.number_of_cells()
+            bcs = self.multi_index_matrix(p1, TD) / p1
+            flag = bm.sum(bcs > 0, axis=1) == 3
+            phi = self.shape_function(bcs[flag, :], p=p0)
+            c2p1 = self.cell_to_ipoint(p1)[:, flag]
+            c2p0 = self.cell_to_ipoint(p0)
+
+            shape = (NC,) + phi.shape
+
+            I_3 = bm.broadcast_to(c2p1[:, :, None], shape=shape).flat
+            J_3 = bm.broadcast_to(c2p0[:, None, :], shape=shape).flat
+            V_3 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+
+        # 4.concatenate
+        if p1 <=2:
+            V = bm.concatenate((V_1, V_2), axis=0) 
+            I = bm.concatenate((I_1, I_2), axis=0) 
+            J = bm.concatenate((J_1, J_2), axis=0) 
+            P = csr_matrix((V, (I, J)), matrix_shape)
+        else:
+            V = bm.concatenate((V_1, V_2, V_3), axis=0) 
+            I = bm.concatenate((I_1, I_2, I_3), axis=0) 
+            J = bm.concatenate((J_1, J_2, J_3), axis=0) 
+            P = csr_matrix((V, (I, J)), matrix_shape)
+
+        return P
 
     def edge_frame(self, index: Index=_S):
         """
