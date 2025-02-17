@@ -6,6 +6,122 @@ from scipy import ndimage
 from scipy.ndimage import label
 import matplotlib.pyplot as plt
 
+class PathPlanning:
+    """
+    A class for solving path planning problems using metaheuristic optimization algorithms.
+
+    This class encapsulates the functionality for finding the optimal path between a start
+    point and an end point on a given map. The map is represented as a 2D array, where
+    obstacles are marked with `1` and free spaces with `0`.
+
+    Attributes:
+        MAP (ndarray): A 2D array representing the map.
+        start_point (tuple): Coordinates of the start point, e.g., (row, column).
+        end_point (tuple): Coordinates of the end point, e.g., (row, column).
+        method (class): The optimization algorithm class to use (e.g., `PSO` or `QPSO`).
+        result (dict): The result of the path planning, including the optimal path and distance.
+        running_time (float): The time taken to solve the path planning problem.
+    """
+
+    def __init__(self, MAP, start_point, end_point, method):
+        """
+        Initializes the PathPlanner with a map, start point, end point, and optimization method.
+
+        Args:
+            MAP (ndarray): A 2D array representing the map. Values should be:
+                - 0: Free space (traversable).
+                - 1: Obstacle (non-traversable).
+            start_point (tuple): Coordinates of the start point, e.g., (row, column).
+            end_point (tuple): Coordinates of the end point, e.g., (row, column).
+            method (class): The optimization algorithm class to use (e.g., `PSO` or `QPSO`).
+
+        Raises:
+            ValueError: If the start or end point is invalid (e.g., lies on an obstacle).
+        """
+        self.MAP = MAP
+        self.start_point = start_point
+        self.end_point = end_point
+        self.method = method
+        self.result = None
+        self.running_time = None
+
+        # Validate start and end points
+        if self.MAP[self.start_point[0]][self.start_point[1]] != 0 or \
+           self.MAP[self.end_point[0]][self.end_point[1]] != 0:
+            raise ValueError("Error: Invalid start point or end point (lies on an obstacle).")
+        
+    def solve(self):
+        """
+        Solves the path planning problem using the specified optimization algorithm.
+
+        Returns:
+            dict: A dictionary containing the following keys:
+                - "path": The optimal path as a list of coordinates.
+                - "distance": The distance of the optimal path.
+        """
+        # from fealpy.opt.particle_swarm_opt_alg import PathPlanningProblem
+        from fealpy.opt import initialize, opt_alg_options
+        import time
+
+        start_time = time.perf_counter()
+
+        # Initialize the path planning problem
+        self.textMAP = PathPlanningProblem(self.MAP, self.start_point, self.end_point)
+        self.textMAP.builddata()  # Build the map dictionary
+
+        # Define the fitness function
+        fobj = lambda x: self.textMAP.fitness(x)
+
+        # Set algorithm parameters
+        N = 20  # Number of particles
+        MaxIT = 50  # Maximum iterations
+        lb = 0  # Lower bound
+        ub = 1  # Upper bound
+        dim = self.textMAP.data["landmark"].shape[0]  # Problem dimension
+
+        # Initialize particles and run the optimizer
+        xo = initialize(N, dim, ub, lb)
+        option = opt_alg_options(xo, fobj, (lb, ub), N, MaxIters=MaxIT)
+        self.optimizer = self.method(option)
+        self.optimizer.run()
+
+        # Calculate and process the result
+        self.result = self.textMAP.calresult(self.optimizer.gbest)
+        self.result["path"] = [x for x, y in zip(self.result["path"], self.result["path"][1:] + [None]) if x != y]
+
+        # Record running time
+        end_time = time.perf_counter()
+        self.running_time = end_time - start_time
+
+        return self.result
+    
+    def print_results(self):
+        """
+        Prints the results of the path planning, including the optimal path and running time.
+        """
+        if self.result is None:
+            print("Error: No results available. Please run the `solve` method first.")
+        else:
+            # print('The optimal path distance: ', self.result["distance"])
+            print("The optimal path: ", self.result["path"])
+            print("Running time: ", self.running_time, "seconds")
+            path_x = self.textMAP.data["node"][self.result["path"], 0]
+            path_y = self.textMAP.data["node"][self.result["path"], 1]
+            print("The opimal path coordinates: ")
+            for x, y in zip(path_x, path_y):
+                print("({}, {})".format(x, y))
+            # self.textMAP.printMAP(self.result, self.running_time)
+
+    def visualize(self):
+        """
+        Visualizes the map with the optimal path highlighted.
+        """
+        if self.result is None:
+            print("Error: No results available. Please run the `solve` method first.")
+        else:
+            self.textMAP.printMAP(self.result, self.running_time)
+
+
 class PathPlanningProblem:
     def __init__(self, MAP, dataS, dataE):
         self.MAP = MAP
@@ -113,9 +229,6 @@ class PathPlanningProblem:
         plt.title(f'( {round(time, 4)} s) The optimal path from QPSO : ')
         xpath = self.data["node"][result["path"], 0]
         ypath = self.data["node"][result["path"], 1]
-        print("The opimal path coordinates: ")
-        for x, y in zip(xpath, ypath):
-            print("({}, {})".format(x, y))
         plt.plot(xpath, ypath, '-', color = 'red')
         plt.plot([xpath[-1], self.dataE[0]], [ypath[-1], self.dataE[1]], '-', color = 'red')
         

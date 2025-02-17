@@ -2,7 +2,6 @@
 from .objective import Objective
 from .A_star import AStar, GridMap
 from .ANT_TSP import calD, Ant_TSP
-from .particle_swarm_opt_alg import PathPlanningProblem, PSO
 from .optimizer_base import opt_alg_options, Optimizer
 from .swarm_based import (AntColonyOptAlg, ArtificialRabbitsOpt, BlackwingedKiteAlg, ButterflyOptAlg, 
                           CrayfishOptAlg, CrowDrinkingWaterAlg, CrestedPorcupineOpt, CuckooSearchOpt,
