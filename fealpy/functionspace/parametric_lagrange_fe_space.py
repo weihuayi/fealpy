@@ -1,6 +1,6 @@
 
 from typing import Optional, TypeVar, Union, Generic, Callable
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, Threshold
 
 from ..backend import TensorLike
 from ..backend import backend_manager as bm
@@ -83,11 +83,11 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         assert callable(u)
 
         if not hasattr(u, 'coordtype'):
-            ips = self.interpolation_points()
+            ips = self.mesh.node
             uI = u(ips)
         else:
             if u.coordtype == 'cartesian':
-                ips = self.interpolation_points()
+                ips = self.mesh.node
                 uI = u(ips)
             elif u.coordtype == 'barycentric':
                 TD = self.TD
@@ -99,24 +99,37 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
                 uI = bm.set_at(uI, cell2dof, val)
         return self.function(uI)
 
-    def boundary_interpolate(self, 
-            gD: Union[Callable, int, float, TensorLike],
+    def boundary_interpolate(self,
+            gd: Union[Callable, int, float, TensorLike],
             uh: Optional[TensorLike] = None,
-            threshold=None, method=None) -> TensorLike:
-        ipoints = self.interpolation_points()
+            *, threshold: Optional[Threshold]=None, method=None) -> TensorLike:
+        """Set the first type (Dirichlet) boundary conditions.
+
+        Parameters:
+            gd: boundary condition function or value (can be a callable, int, float, TensorLike).
+            uh: TensorLike, FE function uh .
+            threshold: optional, threshold for determining boundary degrees of freedom (default: None).
+
+        Returns:
+            TensorLike: a bool array indicating the boundary degrees of freedom.
+
+        This function sets the Dirichlet boundary conditions for the FE function `uh`. It supports
+        different types for the boundary condition `gd`, such as a function, a scalar, or a array.
+        """
+        ipoints = self.mesh.node
         isDDof = self.is_boundary_dof(threshold=threshold, method='interp')
-        if bm.is_tensor(gD):
-            assert len(gD) == self.number_of_global_dofs()
+        if bm.is_tensor(gd):
+            assert len(gd) == self.number_of_global_dofs()
             if uh is None:
-                uh = bm.zeros_like(gD)
-            uh[isDDof] = gD[isDDof] 
+                uh = bm.zeros_like(gd)
+            uh[isDDof] = gd[isDDof] 
             return uh,isDDof 
-        if callable(gD):
-            gD = gD(ipoints[isDDof])
+        if callable(gd):
+            gd = gd(ipoints[isDDof])
         if uh is None:
             uh = self.function()
-        uh[:] = bm.set_at(uh[:], (..., isDDof), gD)
-        
+        uh[:] = bm.set_at(uh[:], (..., isDDof), gd)
+
         return self.function(uh), isDDof
 
     set_dirichlet_bc = boundary_interpolate
@@ -168,7 +181,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
     @barycentric
     def grad_value(self, uh: TensorLike, bc: TensorLike, index:Index=_S):
         gphi = self.grad_basis(bc, index=index)
-        cell2dof = self.dof.cell2dof()[index]
+        cell2dof = self.dof.cell_to_dof()[index]
         dim = len(uh.shape) - 1
         val = bm.einsum('cqlm, cl -> cqm', gphi, uh[cell2dof])
         return val

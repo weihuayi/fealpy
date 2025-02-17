@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(description=
 
 parser.add_argument('--sdegree',
         default=1, type=int,
-        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+        help='Lagrange 参数有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--mdegree',
         default=1, type=int,
@@ -100,7 +100,7 @@ for i in range(maxit):
     A = bfrom.assembly(format='coo')
     F = lfrom.assembly()
     C = space.integral_basis()
-
+    
     def coo(A):
         data = A._values
         indices = A._indices
