@@ -21,14 +21,14 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         self.mesh = mesh
         self.p = p
         self.m = m
-        self.isCornerNode = self.isCornerNode()
-        self.bspace = BernsteinFESpace(mesh, p)
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
         self.device = mesh.device
-        self.ikwargs = bm.context(cell)
-        self.fkwargs = bm.context(node)
+        self.ikwargs = bm.context(mesh.cell)
+        self.fkwargs = bm.context(mesh.node)
+        self.isCornerNode = self.isCornerNode()
+        self.bspace = BernsteinFESpace(mesh, p)
 
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()

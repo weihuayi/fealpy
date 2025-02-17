@@ -1279,15 +1279,10 @@ class TriangleMesh(SimplexMesh, Plotable):
         gmsh.model.mesh.generate(2)
 
         # 获取节点信息
-<<<<<<< HEAD
-        node_tags, node_coor, _ = gmsh.model.mesh.getNodes()
-        node = node_coorreshape((-1, 3))[:, :2]
-=======
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
         node_tags = bm.from_numpy(node_tags)
         node_coords = bm.from_numpy(node_coords)
         node = node_coords.reshape((-1, 3))[:, :2]
->>>>>>> develop
 
         # 节点编号映射
         nodetags_map = dict({int(j): i for i, j in enumerate(node_tags)})
