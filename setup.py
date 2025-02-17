@@ -25,17 +25,25 @@ ext_modules_dict={
             'fealpy.solver.mumps._dmumps',
             sources=['fealpy/solver/mumps/_dmumps.pyx'],
             libraries=['dmumps', 'mumps_common'],
-            ),
-        }
+        ),
+        "p4est": Extension(
+            'fealpy.mesh.libp4est._p4est',
+            sources=['fealpy/mesh/libp4est/p4est.pyx'],
+            libraries=['p4est'],
+            include_dirs=['/usr/include/x86_64-linux-gnu/mpich/']
+        ),
+    }
 
 def get_ext_modules():
     ext_modules = []
     if os.getenv("WITH_MUMPS"):
         ext_modules.append(ext_modules_dict['mumps'])
+    if os.getenv("WITH_P4EST"):
+        ext_modules.append(ext_modules_dict["p4est"])
     return ext_modules
 
 
-ext_modules = get_ext_modules() 
+ext_modules = get_ext_modules()
 
 
 setup(
