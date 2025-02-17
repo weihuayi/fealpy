@@ -46,7 +46,7 @@ class LogicMesh():
         self.Vertex_idx = Vertex_idx
         self.Bdinnernode_idx = Bdinnernode_idx
         self.sort_BdNode_idx = sort_BdNode_idx
-
+        self.roll_SortBdNode()
         self.isconvex = self.is_convex()
         if self.isconvex == False:
             if sort_BdNode_idx is None:
@@ -71,7 +71,7 @@ class LogicMesh():
                 raise ValueError('TD = 3, you must give the Arrisnode_idx')
             self.Arrisnode_idx = Arrisnode_idx
             self.Bi_Lnode_normal, self.Ar_Lnode_normal = self.get_normal_information(self.logic_mesh)
-        self.roll_SortBdNode()
+        
 
     def isinstance_mesh_type(self,mesh):
         if isinstance(mesh, TriangleMesh):
@@ -340,7 +340,7 @@ class Harmap_MMPDE(LogicMesh):
             bm.add_at(guh_innode , cell , cm[:,None,None]*guh_incell)
             guh_innode /= self.star_measure[:,None]
             max_norm_guh = bm.max(bm.linalg.norm(guh_innode,axis=1))
-            M = bm.sqrt(1 + self.beta * bm.sum(guh_innode**2,axis=1)/max_norm_guh) # (NN,)
+            M = bm.sqrt(1 + self.beta * bm.sum(guh_innode**2,axis=1)/max_norm_guh**2) # (NN,)
             for k in range(self.mol_times):
                 M_incell = bm.mean(M[cell],axis=1)
                 M = bm.zeros(self.NN,dtype=bm.float64)
@@ -383,7 +383,10 @@ class Harmap_MMPDE(LogicMesh):
         cell2dof = mesh.entity('cell')
         GDOF = self.node.shape[0]
         if self.mesh_type == "LagrangeTriangleMesh":
-            H = bm.einsum('q , cqid , cq ,cqjd, c -> cij ',ws, gphi ,G , gphi, cm)
+            # rm = mesh.reference_cell_measure()
+            # J = mesh.jacobi_matrix(bcs)
+            # d = rm * bm.linalg.det(J)
+            H = bm.einsum('q , cqid , cq ,cqjd, c -> cij ',ws, gphi ,G , gphi,cm)
         else:
             H = bm.einsum('q , cqid , c ,cqjd, c -> cij ',ws, gphi ,G , gphi, cm)
         I = bm.broadcast_to(cell2dof[:, :, None], shape=H.shape)
@@ -500,12 +503,7 @@ class Harmap_MMPDE(LogicMesh):
         move_bdlogic_node = move_bdlogic_node.reshape((TD, BDNN)).T
         process_logic_node = bm.set_at(process_logic_node , isBdNode, move_bdlogic_node)
         move_vector_field = init_logic_node - process_logic_node
-        # fig1 = plt.figure()  
-        # ax1 = fig1.gca()
-        # ax1.quiver(init_logic_node[:,0],init_logic_node[:,1]
-        #             ,move_vector_field[:,0],move_vector_field[:,1]
-        #             ,angles='xy', scale_units='xy', scale=1, color='r')
-        # plt.show()
+
         return process_logic_node,move_vector_field
 
     def get_physical_node(self,move_vertor_field,logic_node_move):
@@ -519,8 +517,8 @@ class Harmap_MMPDE(LogicMesh):
         cm = self.cm
         TD = self.TD
         p = self.p
+        space = self.space
         multi_index = self.multi_index 
-        space = LagrangeFESpace(self.mesh, p=p)
         gphi = space.grad_basis(multi_index)
         grad_X_incell = bm.einsum('cin, cqim -> cqnm',logic_node_move[cell], gphi)
         grad_x = bm.zeros((self.NN,2,2),dtype=bm.float64)
@@ -656,9 +654,9 @@ class Harmap_MMPDE(LogicMesh):
         """
         delta_x = self.node - move_node
         cell = self.cell
-        mesh0 = self.mesh
+        mesh = self.mesh
         space = self.space
-        qf = mesh0.quadrature_formula(self.p+1,'cell')
+        qf = mesh.quadrature_formula(self.p+1,'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         if self.mesh_type == "LagrangeTriangleMesh":
             cell2dof = bm.concat([cell[:,0:3],cell[:,[1,3,4]],
@@ -670,16 +668,17 @@ class Harmap_MMPDE(LogicMesh):
             phi = space1.basis(bc = bcs)
             gphi = space1.grad_basis(bc = bcs)
             cm = mesh0.entity_measure('cell')
-            # phi = mesh0.shape_function(bc = bcs,p = self.p)
+            M = bm.einsum('q , cqi ,cqj, c -> cij ',ws, phi ,phi ,cm)  
+            P = bm.einsum('q , cqid , cid ,cqj ,c -> cij' , ws , gphi, delta_x[cell2dof], phi, cm)
         else:
             cell2dof = space.cell_to_dof()
             GDOF = space.number_of_global_dofs()
             phi = space.basis(bcs)
             gphi = space.grad_basis(bcs)
             cm = self.cm
-        
-        M = bm.einsum('q , cqi ,cqj, c -> cij ',ws, phi ,phi ,cm)  
-        P = bm.einsum('q , cqid , cid ,cqj ,c -> cij' , ws , gphi, delta_x[cell2dof], phi, cm)
+            M = bm.einsum('q , cqi ,cqj, c -> cij ',ws, phi ,phi ,cm)  
+            P = bm.einsum('q , cqid , cid ,cqj ,c -> cij' , ws , gphi, delta_x[cell2dof], phi, cm)
+
         I = bm.broadcast_to(cell2dof[:, :, None], shape=P.shape)
         J = bm.broadcast_to(cell2dof[:, None, :], shape=P.shape)
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(GDOF, GDOF))
@@ -713,37 +712,29 @@ class Harmap_MMPDE(LogicMesh):
         self.star_measure = self.get_star_measure()
         self.G,self.M = self.get_control_function()
 
-    def construct_new(self,new_node,pde,t):
+    def construct_with_pde(self,new_node,pde):
         self.mesh.node = new_node
         self.space.mesh = self.mesh
 
-        bform = BilinearForm(self.space)
-        lform = LinearForm(self.space)
+        # bform = BilinearForm(self.space)
+        # lform = LinearForm(self.space)
 
-        SDI = ScalarDiffusionIntegrator(q = self.p+1)
-        SSI = ScalarSourceIntegrator(source = lambda p,index: pde.source(p ,index, t))
-        bform.add_integrator(SDI)
-        lform.add_integrator(SSI)
-        A = bform.assembly()
-        b = lform.assembly()
+        # SDI = ScalarDiffusionIntegrator(q = self.p+1,method='isopara')
+        # SSI = ScalarSourceIntegrator(source = pde.source,method='isopara')
+        # bform.add_integrator(SDI)
+        # lform.add_integrator(SSI)
+        # A = bform.assembly()
+        # b = lform.assembly()
 
-        bc = DirichletBC(self.space, gd = lambda p : pde.dirichlet(p , t))
-        A ,b = bc.apply(A,b)
-        self.uh = spsolve(A,b,solver='scipy')
-
-        nodes = new_node
+        # bc = DirichletBC(self.space, gd = lambda p : pde.dirichlet(p))
+        # A ,b = bc.apply(A,b)
+        # self.uh = spsolve(A,b,solver='scipy')
+        self.uh = pde.solution(new_node)
 
         self.node = new_node
         self.cm = self.mesh.entity_measure('cell')
         self.star_measure = self.get_star_measure()
         self.G,self.M = self.get_control_function()
-        cells = bm.concat([cells[:,0:3],cells[:,[1,3,4]],cells[:,[1,4,2]],cells[:,[2,4,5]]],axis = 0)
-        fig = plt.figure()
-        ax1 = fig.add_subplot(111, projection='3d')
-        ax1.plot_trisurf(nodes[:, 0], nodes[:, 1], 1/self.M,
-                            triangles = cells, cmap='viridis', 
-                            edgecolor='b',linewidth=0.2)
-        plt.show()
 
     def preprocessor(self,uh0,pde = None, steps = 10):
         """
@@ -755,8 +746,8 @@ class Harmap_MMPDE(LogicMesh):
         for i in range(steps):
             t = (i+1)/steps
             self.uh = t * uh0
-            # self.mesh , self.uh = self.mesh_redistribution(self.uh,pde = pde , t = t)
-            self.mesh , self.uh = self.mesh_redistribution(self.uh)
+            self.mesh , self.uh = self.mesh_redistribution(self.uh,pde = pde)
+            # self.mesh , self.uh = self.mesh_redistribution(self.uh)
             uh0 = self.uh
         return self.mesh , self.uh
             
@@ -778,7 +769,7 @@ class Harmap_MMPDE(LogicMesh):
             d = bm.min(bm.prod(em_cell,axis=1)/(2*logic_cm))
         return d*0.1/self.p
     
-    def mesh_redistribution(self ,uh, tol = None , pde = None ,t = None, maxit = 1000):
+    def mesh_redistribution(self ,uh, tol = None , pde = None , maxit = 1000):
         """
         @brief mesh_redistribution: 网格重构算法
         @param tol: 容许误差
@@ -803,7 +794,7 @@ class Harmap_MMPDE(LogicMesh):
                 break
             node = self.get_physical_node(vector_field,logic_node)
             if pde is not None:
-                self.construct_new(node,pde,t)
+                self.construct_with_pde(node,pde)
             else:
                 self.construct(node)
 
