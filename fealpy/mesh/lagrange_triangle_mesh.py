@@ -116,7 +116,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lmesh.linearmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
-        lmesh.cell2edge = mesh.cell_to_edge()
+        lmesh.cell2edge = mesh.cell2edge
         lmesh.edge  = mesh.edge_to_ipoint(p)
         return lmesh
 
@@ -134,7 +134,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lmesh.linearmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
-        lmesh.cell2edge = mesh.cell_to_edge()
+        lmesh.cell2edge = mesh.cell2edge
         lmesh.edge  = mesh.edge_to_ipoint(p)
         return lmesh 
 
@@ -415,7 +415,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             return e
         else:
             return bm.sum(e)
-    
+
     def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
         """
         @brief Calculate the error between two functions.
@@ -465,7 +465,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             e = bm.sum(e)**(1/power)
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
-        return e # float or (NC, )
+        return e # float or (NC, )  
     
     # 可视化
     def vtk_cell_type(self, etype='cell'):
