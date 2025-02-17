@@ -18,6 +18,10 @@ class PolygonMesh(Mesh, Plotable):
         super().__init__(TD=2, itype=cell[0].dtype, ftype=node.dtype)
         kwargs = bm.context(cell[0]) 
         self.node = node
+        self.ikwargs = bm.context(cell[0])
+        self.fkwargs = bm.context(node)
+
+
         if cell[1] is None: 
             assert cell[0].ndim == 2
             NC = cell[0].shape[0]
@@ -27,7 +31,7 @@ class PolygonMesh(Mesh, Plotable):
             self.cell = cell
 
         self.meshtype = 'polygon'
-
+        
         self.construct()
 
         self.nodedata = {}
@@ -35,6 +39,10 @@ class PolygonMesh(Mesh, Plotable):
         self.facedata = self.edgedata
         self.celldata = {}
         self.meshdata = {}
+
+    @property
+    def device(self):
+        return bm.get_device(self.node)
 
     def total_edge(self) -> TensorLike:
         cell, cellLocation = self.cell
@@ -101,7 +109,7 @@ class PolygonMesh(Mesh, Plotable):
         if isinstance(etype, str):
             etype = estr2dim(self,etype)
         if etype == 0:
-            return bm.tensor([0,],dtype = self.ftype)
+            return bm.tensor([0,], **self.fkwagrs)
         elif etype == 1:
             edge = self.entity(1,index)
             return bm.edge_length(edge,node)
@@ -177,7 +185,7 @@ class PolygonMesh(Mesh, Plotable):
         """
         assert self.geo_dimension() == 2
         v = self.edge_tangent(index=index)
-        w = bm.tensor([(0,-1),(1,0)],dtype=self.ftype)
+        w = bm.tensor([(0,-1),(1,0)],**self.ftype)
         return v@w
 
     def edge_unit_normal(self, index=_S):
@@ -186,9 +194,18 @@ class PolygonMesh(Mesh, Plotable):
         """
         assert self.geo_dimension() == 2
         v = self.edge_tangent(index=index,unit=True)
-        w = bm.tensor([(0,-1),(1,0)],dtype=self.ftype)
+        w = bm.tensor([(0,-1),(1,0)],**self.fkwargs)
         return v@w
-
+        
+    def edge_bc_to_point(self, bcs, index=_S):
+        """
+        @brief 给出边上的重心坐标，返回其对应的插值点
+        """
+        node = self.entity('node')
+        edge = self.entity('edge')
+        ps = bm.einsum('ij, kjm->kim', bcs, node[edge[index]])
+        return ps
+        
     def interpolation_points(self, p: int, index=_S, scale: float=0.3):
         """
         @brief 获取多边形网格上的插值点
@@ -207,7 +224,7 @@ class PolygonMesh(Mesh, Plotable):
         NE = self.number_of_edges()
         NC = self.number_of_cells()
         start = 0
-        ipoint = bm.zeros((gdof, GD), dtype=self.ftype)
+        ipoint = bm.zeros((gdof, GD), **self.fkwargs)
         if bm.backend_name in ["numpy","pytorch"]:
             ipoint[start:NN, :] = node
 
@@ -229,16 +246,16 @@ class PolygonMesh(Mesh, Plotable):
             t = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, sqrt(3)/2]], dtype=self.ftype)
-            t -= bm.tensor([0.5, sqrt(3)/6.0], dtype=self.ftype)
+                [0.5, sqrt(3)/2]], **self.fkwargs)
+            t -= bm.tensor([0.5, sqrt(3)/6.0], **self.fkwargs)
 
-            tri = bm.zeros((NC, 3, GD), dtype=self.ftype)
+            tri = bm.zeros((NC, 3, GD), **self.fkwargs)
             tri[:, 0, :] = bc + t[0]*h
             tri[:, 1, :] = bc + t[1]*h
             tri[:, 2, :] = bc + t[2]*h
 
             bcs = self.multi_index_matrix(p-2, 2)/(p-2)
-            bcs = bm.astype(bcs,self.ftype)
+            bcs = bm.astype(bcs,**self.fkwargs)
             ipoint[start:] = bm.einsum('ij, ...jm->...im', bcs, tri).reshape(-1, GD)
             return ipoint
 
@@ -262,10 +279,10 @@ class PolygonMesh(Mesh, Plotable):
             t = bm.tensor([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, sqrt(3)/2]], dtype=self.ftype)
-            t -= bm.tensor([0.5, sqrt(3)/6.0], dtype=self.ftype)
+                [0.5, sqrt(3)/2]], **self.fkwargs)
+            t -= bm.tensor([0.5, sqrt(3)/6.0], **self.fkwargs)
 
-            tri = bm.zeros((NC, 3, GD), dtype=self.ftype)
+            tri = bm.zeros((NC, 3, GD), **self.fkwargs)
             tri = tri.at[...,0,:].set(bc + t[0]*h)
             tri = tri.at[...,1,:].set(bc + t[1]*h)
             tri = tri.at[...,2,:].set(bc + t[2]*h)
@@ -287,10 +304,10 @@ class PolygonMesh(Mesh, Plotable):
                 NC = self.number_of_cells()
                 ldof = self.number_of_local_ipoints(p, iptype='all')
 
-                location = bm.zeros(NC+1, dtype=self.itype)
+                location = bm.zeros(NC+1, **self.ikwargs)
                 location[1:] = bm.cumsum(ldof,axis=0)
 
-                cell2ipoint = bm.zeros(location[-1], dtype=self.itype)
+                cell2ipoint = bm.zeros(location[-1], **self.ikwargs)
 
                 edge2ipoint = self.edge_to_ipoint(p)
                 edge2cell = self.edge2cell
@@ -315,10 +332,10 @@ class PolygonMesh(Mesh, Plotable):
                 NC = self.number_of_cells()
                 ldof = self.number_of_local_ipoints(p, iptype='all')
 
-                location = bm.zeros(NC+1, dtype=self.itype)
+                location = bm.zeros(NC+1, **self.ikwargs)
                 location = location.at[1:].set(bm.cumsum(ldof,axis=0))
 
-                cell2ipoint = bm.zeros(location[-1], dtype=self.itype)
+                cell2ipoint = bm.zeros(location[-1], **self.ikwargs)
 
                 edge2ipoint = self.edge_to_ipoint(p)
                 edge2cell = self.edge2cell
@@ -361,10 +378,10 @@ class PolygonMesh(Mesh, Plotable):
         NE = self.number_of_edges()
 
         bcs, ws = self.quadrature_formula(q).get_quadrature_points_and_weights()
-        bcs = bm.astype(bcs,self.ftype) 
-        ws = bm.astype(ws,self.ftype)
+        bcs = bm.astype(bcs,**self.fkwargs) 
+        ws = bm.astype(ws,**self.fkwargs)
         bc = self.entity_barycenter('cell')
-        tri = bm.zeros((3,NE,2),dtype=self.ftype)
+        tri = bm.zeros((3,NE,2),**self.fkwargs)
         
         tri = bm.set_at(tri,(0),bc[edge2cell[:,0]])
         tri = bm.set_at(tri,(1),node[edge[:,0]])
@@ -378,14 +395,14 @@ class PolygonMesh(Mesh, Plotable):
         val = u(pp, edge2cell[:, 0])
 
         shape = (NC, ) + val.shape[2:]
-        e = bm.zeros(shape, dtype=self.ftype)
+        e = bm.zeros(shape, **self.fkwargs)
 
         ee = bm.einsum('i, ij..., j->j...', ws, val, a)
         e = bm.index_add(e, edge2cell[:, 0], ee)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if bm.sum(isInEdge) > 0:
-            tri = bm.zeros((3,bm.sum(isInEdge),2),dtype=self.ftype)
+            tri = bm.zeros((3,bm.sum(isInEdge),2),**self.fkwargs)
             tri = bm.set_at(tri,(0),bc[edge2cell[isInEdge,1]])
             tri = bm.set_at(tri,(1),node[edge[isInEdge,1]])
             tri = bm.set_at(tri,(2),node[edge[isInEdge,0]])
@@ -444,12 +461,14 @@ class PolygonMesh(Mesh, Plotable):
         return cls(pnode, pcell)
 
     @classmethod
-    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None, device:
+                 str=None):
         """
         @brief Generate a polygon mesh for a box domain
         """
         from .triangle_mesh import TriangleMesh
-        tmesh = TriangleMesh.from_box(box, nx=nx, ny=ny, threshold=threshold)
+        tmesh = TriangleMesh.from_box(box, nx=nx, ny=ny,
+                                      threshold=threshold,device=device)
         mesh = cls.from_triangle_mesh_by_dual(tmesh)
         return mesh
 
@@ -511,7 +530,9 @@ class PolygonMesh(Mesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def distorted_concave_rhombic_quadrilaterals_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10, ratio=0.618):
+    def distorted_concave_rhombic_quadrilaterals_mesh(cls, box=[0, 1, 0, 1],
+                                                      nx=10, ny=10, ratio=0.618,
+                                                      device:str=None):
         """
         @brief 虚单元网格，矩形内部包含一个菱形，两者共用左下和右上的节点
 
@@ -557,7 +578,8 @@ class PolygonMesh(Mesh, Plotable):
         return cls(new_node, cell)
 
     @classmethod
-    def nonconvex_octagonal_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10):
+    def nonconvex_octagonal_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10,
+                                 device=None):
         """
         @brief 虚单元网格，矩形网格的每条内部边上加一个点后形成的八边形网格
 

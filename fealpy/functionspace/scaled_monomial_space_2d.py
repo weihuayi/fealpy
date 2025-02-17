@@ -24,6 +24,9 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         """
 
         self.mesh = mesh
+        self.device = mesh.device
+        self.ikwargs = bm.context(mesh.cell[0]) if mesh.meshtype =='polygon' else bm.context(mesh.cell)
+        self.fkwargs = bm.context(mesh.node)
         self.cellbarycenter = mesh.entity_barycenter('cell') if bc is None else bc
         self.p = p
         self.cellmeasure = mesh.entity_measure('cell')
@@ -92,7 +95,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         对基函数求一阶导后非零项的编号，及系数
         """
         p = self.p if p is None else p
-        index = multi_index_matrix2d(p)
+        #index = multi_index_matrix2d(p)
+        index = self.mesh.multi_index_matrix(p, 2)
 
         x, = bm.nonzero(index[:, 1] > 0) # 关于 x 求导非零的缩放单项式编号
         y, = bm.nonzero(index[:, 2] > 0) # 关于 y 求导非零的缩放单项式编号
@@ -109,7 +113,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         对基函数求二阶导后非零项的编号，及系数
         """
         p = self.p if p is None else p
-        index = multi_index_matrix2d(p)
+        #index = multi_index_matrix2d(p)
+        index = self.mesh.multi_index_matrix(p, 2)
 
         xx, = bm.nonzero(index[:, 1] > 1)
         yy, = bm.nonzero(index[:, 2] > 1)
@@ -128,7 +133,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         p : >= 1
         """
         p = self.p if p is None else p
-        index = multi_index_matrix1d(p)
+        #index = multi_index_matrix1d(p)
+        index = self.mesh.multi_index_matrix(p, 1)
         x, = bm.nonzero(index[:, 0] > 0)
         y, = bm.nonzero(index[:, 1] > 0)
         return {'x': x, 'y':y}
@@ -140,7 +146,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         p : >= 1
         """
         p = self.p if p is None else p
-        index = multi_index_matrix1d(p)
+        index = self.mesh.multi_index_matrix(p, 1)
+        #index = multi_index_matrix1d(p)
         x, = bm.nonzero(index[:, 0] > 0)
         y, = bm.nonzero(index[:, 1] > 0)
         return {'x': x, 'y':y}
@@ -148,26 +155,27 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     def geo_dimension(self):
         return self.GD
 
-    def cell_to_dof(self, p=None):
-        return self.cell_to_dof(p=p)
-
     @cartesian
     def edge_basis(self, point, index=_S, p=None):
         p = self.p if p is None else p
         if p == 0:
             shape = len(point.shape)*(1, )
-            return bm.array([1.0], dtype=self.ftype).reshape(shape)
+            return bm.array([1.0], **self.fkwargs).reshape(shape)
 
-        ec = self.integralalg.edgebarycenter
-        eh = self.integralalg.edgemeasure
-        et = self.mesh.edge_unit_tangent()
-        val = bm.sum((point - ec[index])*et[index], axis=-1)/eh[index]
-        phi = bm.ones(val.shape + (p+1,), dtype=self.ftype)
+        #ec = self.integralalg.edgebarycenter
+        #eh = self.integralalg.edgemeasure
+        ec = self.mesh.entity_barycenter('edge') #(NE,2)
+        eh = self.mesh.entity_measure('edge') # NE
+        et = self.mesh.edge_tangent(unit=True) 
+        val = bm.sum((point - ec[:,None,:][index])*et[:,None,:][index],
+                     axis=-1)/eh[:, None][index] #(NE, NQ, GD)
+        phi = bm.ones(val.shape + (p+1,), **self.fkwargs) #(NE, NQ, GD, p+1)
         if p == 1:
             phi[..., 1] = val
         else:
             phi[..., 1:] = val[..., bm.newaxis]
-            bm.multiply.accumulate(phi, axis=-1, out=phi)
+            #bm.multiply.accumulate(phi, axis=-1, out=phi)
+            bm.cumprod(phi, axis=-1, out=phi)
         return phi
 
     @barycentric
@@ -180,10 +188,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         p = self.p if p is None else p
         if p == 0:
             shape = len(bcs.shape)*(1, )
-            return bm.array([[1.0]], dtype=self.ftype).reshape(shape)
+            return bm.array([[1.0]], **self.fkwargs).reshape(shape)
         else:
             shape = bcs.shape[:-1]+(p+1, )
-            phi = bm.ones(shape, dtype=self.ftype)
+            phi = bm.ones(shape, **self.fkwargs)
             phi[..., 1:] = bcs[..., 1, None]-0.5
             bm.multiply.accumulate(phi, axis=-1, out=phi)
             return phi
@@ -211,10 +219,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         if p == 0:
             shape = len(point.shape)*(1, )
-            return bm.array([1.0], dtype=self.ftype).reshape(shape)
+            return bm.array([1.0], **self.fkwargs).reshape(shape)
 
         shape = point.shape[:-1]+(ldof,)
-        phi = bm.ones(shape, dtype=self.ftype)  # (..., M, ldof)
+        phi = bm.ones(shape, **self.fkwargs)  # (..., M, ldof)
 
         phi[..., 1:3] = (point - self.cellbarycenter[index])/h[index].reshape(-1, 1)
         if p > 1:
@@ -239,7 +247,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof, 2)
-        gphi = bm.zeros(shape, dtype=self.ftype)
+        gphi = bm.zeros(shape, **self.fkwargs)
 
         if p == 0:
             return gphi
@@ -266,7 +274,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         area = self.cellmeasure
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof,)
-        lphi = bm.zeros(shape, dtype=self.ftype)
+        lphi = bm.zeros(shape, **self.fkwargs)
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
             idx = self.diff_index_2(p=p)
@@ -298,7 +306,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         area = self.cellmeasure
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof, 2, 2)
-        hphi = bm.zeros(shape, dtype=self.ftype)
+        hphi = bm.zeros(shape, **self.fkwargs)
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
             idx = self.diff_index_2(p=p)
@@ -318,7 +326,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         """
         #TODO test
         phi = self.basis(point, index=index, p=p)
-        gmphi = bm.zeros(phi.shape+(2**m, ), dtype=self.ftype)
+        gmphi = bm.zeros(phi.shape+(2**m, ), **self.fkwargs)
         P = self.partial_matrix(index=index)
         f = lambda x: bm.array([int(ss) for ss in bm.binary_repr(x, m)], dtype=bm.int32)
         idx = bm.array(list(map(f, bm.arange(2**m))))
@@ -339,11 +347,11 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         h = bm.sqrt(cellarea)
 
         I, = bm.where(mindex[:, 1] > 0)
-        Px = bm.zeros([NC, N, N], dtype=self.ftype)
+        Px = bm.zeros([NC, N, N], **self.fkwargs)
         Px[:, bm.arange(len(I)), I] = mindex[None, I, 1]/h[:, None]
 
         I, = bm.where(mindex[:, 2] > 0)
-        Py = bm.zeros([NC, N, N], dtype=self.ftype)
+        Py = bm.zeros([NC, N, N], **self.fkwargs)
         Py[:, bm.arange(len(I)), I] = mindex[None, I, 2]/h[:, None]
         return Px[index], Py[index]
 
@@ -354,7 +362,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         h = self.mesh.entity_measure("edge")
         NE = self.mesh.number_of_edges()
 
-        P = bm.zeros([NE, p+1, p+1], dtype=self.ftype)
+        P = bm.zeros([NE, p+1, p+1], **self.fkwargs)
         P[:, I, I+1] = bm.arange(1, p+1)[None, :]/h[:, None]
         return P
 
@@ -429,13 +437,9 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return bm.zeros(shape, dtype=self.ftype)
+        return bm.zeros(shape, **self.fkwargs)
 
-    def number_of_local_dofs(self, p=None, doftype='cell'):
-        return self.number_of_local_dofs(p=p, doftype=doftype)
 
-    def number_of_global_dofs(self, p=None):
-        return self.number_of_global_dofs(p=p)
     def show_function_image(self, u, uh, t=None, plot_solution=True):
         mesh = uh.space.mesh
         fig = plt.figure()
@@ -483,7 +487,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         q = bm.arange(p+1)
         Q = q.reshape(-1, 1) + q + 1
         flag = Q%2==1
-        H = bm.zeros((NE, ldof, ldof), dtype=self.ftype)
+        H = bm.zeros((NE, ldof, ldof), **self.fkwargs)
         H[:, flag] = eh.reshape(-1, 1)
         H[:, flag] /= Q[flag]
         H[:, flag] /=2**(Q[flag]-1)
@@ -494,11 +498,13 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         mesh = self.mesh
         edge = mesh.entity('edge')
         measure = mesh.entity_measure('edge')
-        qf = GaussLegendreQuadrature(p + 3)
-        bcs, ws = qf.quadpts, qf.weights
-        ps = self.mesh.edge_bc_to_point(bcs)
-        phi = self.edge_basis(ps, p=p)
-        H = bm.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
+        #qf = GaussLegendreQuadrature(p + 3)
+        qf = mesh.quadrature_formula(p+3, etype=1, qtype='legendre') # NQ
+        bcs, ws = qf.quadpts, qf.weights # NQ
+        ps = self.mesh.edge_bc_to_point(bcs) # (NE, NQ, 2)
+        phi = self.edge_basis(ps, p=p) #(NE,NQ,2,ldof=p+1)
+        #H = bm.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
+        H = bm.einsum('q, eqk, eqm, e->ekm', ws, phi, phi, measure)
         return H
 
     def edge_cell_mass_matrix(self, p=None, cp=None):
@@ -620,7 +626,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         ldof = self.number_of_local_dofs(doftype='cell')
 
         shape = ps.shape[:-1] + (2*ldof, )
-        phi = bm.zeros(shape, dtype=self.ftype)
+        phi = bm.zeros(shape, **self.fkwargs)
 
         phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
         phi[:, isInEdge, ldof:] = -self.basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
@@ -659,8 +665,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         ps = self.mesh.edge_bc_to_point(bcs, index=index)
 
         shape = ps.shape[:-1] + (2*ldof, )
-        phi = bm.zeros(shape, dtype=self.ftype)
-        gphi = bm.zeros(shape, dtype=self.ftype)
+        phi = bm.zeros(shape, **self.fkwargs)
+        gphi = bm.zeros(shape, **self.fkwargs)
 
         phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
         phi[:, isInEdge, ldof:] = -self.basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
@@ -702,7 +708,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         ps = self.mesh.edge_bc_to_point(bcs, index=index)
 
         shape = ps.shape[:-1] + (2*ldof, )
-        gphi = bm.zeros(shape, dtype=self.ftype)
+        gphi = bm.zeros(shape, **self.fkwargs)
 
         gphi[:, :, :ldof]= bm.sum(self.grad_basis(ps, index=edge2cell[:, 0])*en[:, None, :], axis=-1) # (NQ, NE, ldof)
         gphi[:, isInEdge, ldof:] = -bm.sum(self.grad_basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
@@ -744,14 +750,14 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         gdof = self.number_of_global_dofs(p=p)
 
         shape = ps.shape[:-1] + (2*ldof, )
-        gphi = bm.zeros(shape, dtype=self.ftype)
+        gphi = bm.zeros(shape, **self.fkwargs)
 
         gphi[:, :, :ldof]= bm.sum(self.grad_basis(ps, index=edge2cell[:, 0])*en[:, None, :], axis=-1) # (NQ, NE, ldof)
         gphi[:, isInEdge, ldof:] = -bm.sum(self.grad_basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
 
         A = bm.einsum('q, qe, qej->ej', ws, gval, gphi, optimize=True)
 
-        F = bm.zeros(gdof, dtype=self.ftype)
+        F = bm.zeros(gdof, **self.fkwargs)
         cell2dof = self.cell_to_dof()
         bm.add.at(F, cell2dof[edge2cell[:, 0]], A[:, :ldof])
         bm.add.at(F, cell2dof[edge2cell[isInEdge, 1]], A[isInEdge, ldof:])
@@ -794,7 +800,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         gdof = self.number_of_global_dofs(p=p)
 
         shape = ps.shape[:-1] + (2*ldof, )
-        phi = bm.zeros(shape, dtype=self.ftype)
+        phi = bm.zeros(shape, **self.fkwargs)
 
         phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
         phi[:, isInEdge, ldof:] = -self.basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
@@ -802,7 +808,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         S = bm.einsum('q, qe, qei->ei', ws, gval, phi, optimize=True)
         if hpower!=-1:
             S = S*(eh.reshape(-1, 1)**(hpower+1))
-        F = bm.zeros(gdof, dtype=self.ftype)
+        F = bm.zeros(gdof, **self.fkwargs)
         cell2dof = self.cell_to_dof()
         bm.add.at(F, cell2dof[edge2cell[:, 0]], S[:, :ldof])
         bm.add.at(F, cell2dof[edge2cell[isInEdge, 1]], S[isInEdge, ldof:])
@@ -838,7 +844,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
         phi_0 = self.basis(pp_0, edge2cell[:, 0], p=p)
 
-        F = bm.zeros(shape, dtype=self.ftype)
+        F = bm.zeros(shape, **self.fkwargs)
         bb_0 = bm.einsum('q, qe..., qel,e->el...', ws, fval_0, phi_0, a_0)
 
         bm.add.at(F, cell2dof[edge2cell[:, 0]], bb_0)
@@ -888,7 +894,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
         phi_0 = self.basis(pp_0, edge2cell[:, 0])
 
-        F = bm.zeros(shape, dtype=self.ftype)
+        F = bm.zeros(shape, **self.fkwargs)
         bb_0 = bm.einsum('q, qe..., qel,e->el...', ws, fval_0, phi_0, a_0)
 
         bm.add.at(F, cell2dof[edge2cell[:, 0]], bb_0)
@@ -920,14 +926,14 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         if p == 0:
             bcs = bm.array([[0.5, 0.5]])
         else:
-            bcs = bm.zeros((p+1, 2), dtype=self.ftype)
+            bcs = bm.zeros((p+1, 2), **self.fkwargs)
             bcs[:, 0] = bm.arange(p)/p
             bcs[:, 1] = 1-bcs[:, 1]
 
         #M (NE, p+1, p+1) 是每个边上的 p+1 个基函数在 p+1 个点处的值组成矩阵的逆
         M = bm.linalg.inv(self.edge_basis_with_barycentric(bcs, p))
         #C (N, ldof, p+1) 是每个单元基函数在每条边上基函数的系数
-        C = bm.zeros((cell2edgeloc[-1], ldof, p+1), dtype=self.ftype)
+        C = bm.zeros((cell2edgeloc[-1], ldof, p+1), **self.fkwargs)
 
         points = self.mesh.bc_to_point(bcs) #(p+1, NE, 2)
         isNotOK = bm.ones(NC, dtype=bm.bool_)
@@ -984,7 +990,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         H1 = bm.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
-        H = bm.zeros((NC, ldof, ldof), dtype=self.ftype)
+        H = bm.zeros((NC, ldof, ldof), **self.fkwargs)
         bm.add.at(H, edge2cell[:, 0], H0)
         bm.add.at(H, edge2cell[isInEdge, 1], H1)
 
@@ -1072,11 +1078,11 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         c = sh0.reshape(-1, ldofs)
         d = sh1.reshape(-1, ldofs)
 
-        num = bm.zeros(NC, dtype=self.itype)
+        num = bm.zeros(NC, **ikwargs)
         bm.add.at(num, HB[:, 0], 1)
 
         m = HB.shape[0]
-        td = bm.zeros((m, ldofs), dtype=self.ftype)
+        td = bm.zeros((m, ldofs), **self.fkwargs)
 
         td[:, 0] = c[HB[:, 1], 0] + c[HB[:, 1], 1]*bc[:, 0] + c[HB[:, 1], 2]*bc[:, 1]
         td[:, 1] = h*c[HB[:, 1], 1]
