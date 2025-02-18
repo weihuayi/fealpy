@@ -39,8 +39,7 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
     x = x0
     while True:
         B = b - U.matmul(x)
-        x_new = spsolve_triangular(M, B)  # 使用前向替换求解线性方程组
-        x = x_new
+        x += spsolve_triangular(M, B)  # 使用前向替换求解线性方程组
         a = b - A.matmul(x)
         res = bm.linalg.norm(b-A.matmul(x))
         niter +=1

@@ -48,6 +48,7 @@ class MumpsSolver:
         self.context.set_rhs(x)
 
         self.context.run(6)
+        self.context.destroy()
 
         return x 
 
