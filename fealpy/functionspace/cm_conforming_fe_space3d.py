@@ -20,7 +20,7 @@ Number = Union[int, float]
 _S = slice(None)
 
 class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh:_MT, p: int, m: int, isCornerNode:bool): 
+    def __init__(self, mesh:_MT, p: int, m: int): 
         assert(p>8*m)
         self.mesh = mesh
         self.p = p
@@ -28,9 +28,12 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         self.bspace = BernsteinFESpace(mesh, p)
         self.device = mesh.device
 
+        #self.device = mesh.device
+        self.ikwargs = bm.context(mesh.cell)
+        self.fkwargs = bm.context(mesh.node)
         self.ftype = mesh.ftype
         self.itype = mesh.itype
-        #self.device = mesh.device
+
 
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
@@ -49,7 +52,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         midx = self.multiIndex
         ldof = midx.shape[0]
 
-        isn_cell_dof = bm.zeros(ldof, dtype=bm.bool)
+        isn_cell_dof = bm.zeros(ldof, dtype=bm.bool, device=self.device)
 
         node_dof_index = []
         for i in range(4):
@@ -60,10 +63,10 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                 a.append(bm.where(bm.array(Dvr))[0])
             node_dof_index.append(a)
 
-        locEdge = bm.array([[0, 1],[0, 2],[0, 3],[1, 2],[1, 3],[2, 3]], dtype=
-                           self.itype)
+        locEdge = bm.array([[0, 1],[0, 2],[0, 3],[1, 2],[1, 3],[2, 3]],
+                           **self.ikwargs)
         dualEdge = bm.array([[2, 3],[1, 3],[1, 2],[0, 3],[0, 2],[0, 1]],
-                            dtype=self.itype)
+                            **self.ikwargs)
         edge_dof_index = []  
         for i in range(6):
             a = []
@@ -97,7 +100,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         self.dof_index["all"] = bm.concatenate((all_node_dof_index,
                                                all_edge_dof_index,
                                                all_face_dof_index,
-                                               self.dof_index["cell"]),dtype=self.itype)
+                                               self.dof_index["cell"]),**self.ikwargs)
 
     def number_of_local_dofs(self, etype, p=None) -> int: #TODO:去掉etype 2d同样
         p = self.p if p is None else p
@@ -138,7 +141,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         mesh = self.mesh
         ndof = self.number_of_internal_dofs('node')
         NN = mesh.number_of_nodes()
-        n2d = bm.arange(NN*ndof, dtype=self.itype).reshape(NN, ndof)
+        n2d = bm.arange(NN*ndof, **self.ikwargs).reshape(NN, ndof)
         return n2d
 
     def edge_to_internal_dof(self):
@@ -150,7 +153,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
-        e2id = bm.arange(NN*ndof, NN*ndof + NE*eidof, dtype=self.itype).reshape(NE, eidof)
+        e2id = bm.arange(NN*ndof, NN*ndof + NE*eidof, **self.ikwargs).reshape(NE, eidof)
         return e2id
 
     def face_to_internal_dof(self):
@@ -165,7 +168,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         NE = mesh.number_of_edges()
         NF = mesh.number_of_faces()
         Ndof = NN*ndof + NE*eidof
-        f2id = bm.arange(Ndof, Ndof + NF*fidof, dtype=self.itype).reshape(NF, fidof)
+        f2id = bm.arange(Ndof, Ndof + NF*fidof, **self.ikwargs).reshape(NF, fidof)
         return f2id
 
     def cell_to_internal_dof(self):
@@ -183,7 +186,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         NF = mesh.number_of_faces()
         NC = mesh.number_of_cells()
         Ndof = NN*ndof + NE*eidof + NF*fidof
-        c2id = bm.arange(Ndof, Ndof + NC*cidof, dtype=self.itype).reshape(NC, cidof)
+        c2id = bm.arange(Ndof, Ndof + NC*cidof, **self.ikwargs).reshape(NC, cidof)
         return c2id
 
     def cell_to_dof(self):
@@ -211,14 +214,14 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         c2e = mesh.cell_to_edge()
         c2f = mesh.cell_to_face()
 
-        c2dof = bm.zeros((NC, ldof), dtype=self.itype)
+        c2dof = bm.zeros((NC, ldof), **self.ikwargs)
         ## node
         for v in range(4):
             c2dof[:, v*ndof:(v+1)*ndof] = n2d[cell[:, v]]
 
         ## edge
         localEdge = bm.array([[0, 1],[0, 2],[0, 3],[1, 2],[1, 3],[2, 3]],
-                             dtype=self.itype)
+                             **self.ikwargs)
         for e in range(6):
             N = ndof*4 + eidof*e
             c2dof[:, N:N+eidof] = e2id[c2e[:, e]]
@@ -226,20 +229,21 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
             n0, n1 = 0, p-8*m-1
             for r in range(2*m+1):
                 for j in range(r+1):
-                    c2dof[flag, N+n0:N+n0+n1] = bm.flip(c2dof[flag, N+n0:N+n0+n1], axis=-1)
+                    #c2dof[flag, N+n0:N+n0+n1] = bm.flip(c2dof[flag, N+n0:N+n0+n1], axis=-1)
+                    c2dof = bm.set_at(c2dof, (flag, slice(N+n0,N+n0+n1)), bm.flip(c2dof[flag, N+n0:N+n0+n1], axis=-1))
                     n0 +=n1
                 n1 += 1
         ## face
         fdof_index = self.dof_index["face"]
         perms = bm.array(list(itertools.permutations([0,1,2])))
-        locFace = bm.array([[1,2,3],[0,2,3],[0,1,3],[0,1,2]], dtype=self.itype)
+        locFace = bm.array([[1,2,3],[0,2,3],[0,1,3],[0,1,2]], **self.ikwargs)
         midx2num = lambda a: (a[:, 1]+a[:, 2])*(1+a[:, 1]+a[:, 2])//2+a[:, 2]
 
         indices = []
         for r in range(m+1):
             dof_fc2f = midx2num(self.multiIndex[fdof_index[0][r]][:, locFace[0]])
             midx = self.mesh.multi_index_matrix(p-r, 2)
-            indices_r = bm.zeros((6, len(dof_fc2f)), dtype=self.itype)
+            indices_r = bm.zeros((6, len(dof_fc2f)), **self.ikwargs)
             for i in range(6):
                 indices_r[i] = bm.argsort(dof_fc2f)[bm.argsort(bm.argsort( midx2num( self.multiIndex[ fdof_index[0][r]][:, locFace[0]][:, perms[i]])))]
                 indices_r[i] = bm.argsort(bm.argsort(midx2num(midx[dof_fc2f][ :, perms[i]])))
@@ -248,7 +252,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         perm2num = lambda a: a[:, 0]*2 +(a[:, 1]>a[:, 2])
         for f in range(4):
             N = ndof*4 +eidof*6 +fidof*f
-            c2dof[:, N:N+fidof]  = f2id[c2f[:, f]]
+            #c2dof[:, N:N+fidof]  = f2id[c2f[:, f]]
+            c2dof = bm.set_at(c2dof, (slice(None), slice(N, N+fidof)),
+                              f2id[c2f[:, f]])
             pnum = perm2num(c2fp[:, f])
             for i in range(6):
                 n0 = 0
@@ -303,7 +309,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         fidx = f2id[isbdface].flatten()
         idx = bm.concatenate([nidx, eidx, fidx])
 
-        isBdDof = bm.zeros(gdof, dtype=bm.bool)
+        isBdDof = bm.zeros(gdof, dtype=bm.bool, device=self.device)
         isBdDof[idx] = True
         return isBdDof
 
@@ -397,9 +403,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         #isCornerNode = ((bm.abs(node[:, 0]-box[0])<1e-14) | (bm.abs(node[:, 0]-box[1])<1e-14)) & ((bm.abs(node[:, 1]-box[2])<1e-14) | (bm.abs(node[:, 1]-box[3])<1e-14)) & ((bm.abs(node[:, 2]-box[4])<1e-14)| (bm.abs(node[:, 2]-box[5])<1e-14)) 
 
         # 棱边
-        isCornerEdge = bm.zeros(NE, dtype=bm.bool)
+        isCornerEdge = bm.zeros(NE, dtype=bm.bool, device=self.device)
         isBdFace = mesh.boundary_face_flag()
-        bb = bm.zeros((NE, 3), dtype=self.ftype)
+        bb = bm.zeros((NE, 3), **self.fkwargs)
         bb[f2e[isBdFace]] = fn[isBdFace, None]
         fn = bm.tile(fn[:, None], (1, 3, 1))
         flag = bm.linalg.norm(bm.cross(bb[f2e[isBdFace]], fn[isBdFace]), axis=-1)>1e-10
@@ -407,10 +413,10 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
         # 棱点
         cornernode, num = bm.unique(edge[isCornerEdge].flatten(), return_counts=True)
-        isBdEdgeNode = bm.zeros(NN, dtype=bm.bool)
+        isBdEdgeNode = bm.zeros(NN, dtype=bm.bool, device=self.device)
         isBdEdgeNode[cornernode[num==2]] = True
 
-        isCornerNode = bm.zeros(NN, dtype=bm.bool)
+        isCornerNode = bm.zeros(NN, dtype=bm.bool, device=self.device)
         isCornerNode[cornernode[num>2]] = True
         #isBdEdgeNode[edge[isCornerEdge]] = True
         #isBdEdgeNode[isCornerNode] = False
@@ -451,7 +457,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
         # face frame
         NF = mesh.number_of_faces()
-        face_frame = bm.zeros((NF, 3, 3), dtype=self.ftype)
+        face_frame = bm.zeros((NF, 3, 3), **self.fkwargs)
         face_frame[:, 2] = fn
         face_frame[:, 0] = et[f2e[:, 0]] 
         face_frame[:, 1] = bm.cross(face_frame[:, 2], face_frame[:, 0])
@@ -459,7 +465,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
         # edge frame
         NE = mesh.number_of_edges()
-        edge_frame = bm.zeros((NE, 3, 3), dtype=self.ftype)
+        edge_frame = bm.zeros((NE, 3, 3), **self.fkwargs)
         edge_frame[:, 0] = et
         edge_frame[f2e, 2] = fn[:, None] 
 
@@ -469,8 +475,8 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
         # node frame 
         NN = mesh.number_of_nodes()
-        node_frame = bm.zeros((NN, 3, 3), dtype=self.ftype)
-        node_frame[:] = bm.eye(3, dtype=self.ftype)
+        node_frame = bm.zeros((NN, 3, 3), **self.fkwargs)
+        node_frame[:] = bm.eye(3, **self.fkwargs)
 
         # 边界表面点
         node_frame[face[isBdFace]] = face_frame[isBdFace, None]
@@ -480,7 +486,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         node_frame[edge[iscorneredge]] = edge_frame[iscorneredge, None]
 
         # 角点
-        node_frame[isCornerNode] = bm.eye(3, dtype=self.ftype)
+        node_frame[isCornerNode] = bm.eye(3, **self.fkwargs)
 #        for i in range(len(f2e)):
 #            edge_frame[f2e[i], 2] = fn[i][None,:]
 #        for i in range(len(edge[iscorneredge])):
@@ -492,11 +498,6 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 #
       
         return node_frame, edge_frame, face_frame
-
-
-
-
-
 
 
 
@@ -518,18 +519,18 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         NE = mesh.number_of_edges()
         ldof = self.number_of_local_dofs('cell')
 
-        tem = bm.eye(ldof, dtype=self.ftype)
+        tem = bm.eye(ldof, **self.fkwargs)
         coeff = bm.tile(tem, (NC, 1, 1)) 
 
         all_dof_idx = self.dof_index["all"]
-        dof2num = bm.zeros(ldof, dtype=self.itype) 
-        dof2num[all_dof_idx] = bm.arange(ldof, dtype=self.itype)
+        dof2num = bm.zeros(ldof, **self.ikwargs) 
+        dof2num[all_dof_idx] = bm.arange(ldof, **self.ikwargs)
 
         multiIndex = self.multiIndex
         S04m = self.dof_index["node"]
         # node
         for v in range(4):
-            flag = bm.ones(4, dtype=bm.bool)
+            flag = bm.ones(4, dtype=bm.bool, device=self.device)
             flag[v] = False # v^*
             S04mv = bm.concatenate(S04m[v])
             for i in S04mv:
@@ -562,9 +563,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         glambda = mesh.grad_lambda() # (NC, 4, 3)
         S12m = self.dof_index["edge"]
         locEdge = bm.array([[0 ,1], [0, 2], [0, 3], 
-                            [1, 2], [1, 3], [2, 3]], dtype=self.itype)
+                            [1, 2], [1, 3], [2, 3]], **self.ikwargs)
         dualEdge = bm.array([[2, 3], [1, 3], [1, 2], 
-                             [0, 3], [0, 2], [0, 1]], dtype=self.itype)
+                             [0, 3], [0, 2], [0, 1]], **self.ikwargs)
         for e in range(6):
             ii, jj = locEdge[e]
             kk, ll = dualEdge[e]
@@ -574,7 +575,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
             Ni = bm.cross(glambda[:, ll], nlambdaktl)/nlambdaktl_l # (NC, 3)
             Nj = bm.cross(nlambdaktl, glambda[:, kk])/nlambdaktl_l
             S12me = bm.concatenate([bm.concatenate(item) for item in S12m[e]])
-            Eij = bm.zeros((NC, 4), dtype=self.ftype)
+            Eij = bm.zeros((NC, 4), **self.fkwargs)
             Eij[:, 0] = bm.sum(glambda[:, ii]*Ni, axis=1)
             Eij[:, 1] = bm.sum(glambda[:, ii]*Nj, axis=1)
             Eij[:, 2] = bm.sum(glambda[:, jj]*Ni, axis=1)
@@ -617,7 +618,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         fn = mesh.face_unit_normal()
         S2m = self.dof_index["face"]
         locFace = bm.array([[1, 2, 3], [0, 2, 3], [0, 1, 3], [0, 1, 2]],
-                           dtype=self.itype)
+                           **self.ikwargs)
         for f in range(4):
             ii, jj, kk = locFace[f] 
             ni = fn[c2f[:, f]] # (NC, 3) 
@@ -662,10 +663,10 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         # 全局自由度矩阵
         # node 
         ndof = self.number_of_internal_dofs('node')
-        coeff1 = bm.zeros((NC, 4*ndof, 4*ndof), dtype=self.ftype)
+        coeff1 = bm.zeros((NC, 4*ndof, 4*ndof), **self.fkwargs)
         for v in range(4):
             j, k, l = locFace[v]
-            Nv = bm.zeros((NC, 3, 3), dtype=self.ftype) # N_v
+            Nv = bm.zeros((NC, 3, 3), **self.fkwargs) # N_v
             Nv[:, 0] = node[cell[:, j]] - node[cell[:, v]]
             Nv[:, 1] = node[cell[:, k]] - node[cell[:, v]]
             Nv[:, 2] = node[cell[:, l]] - node[cell[:, v]]
@@ -677,7 +678,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                 multiidx = mesh.multi_index_matrix(r, 2)
 
                 NSr2 = len(multiidx)
-                T = bm.zeros((NC, NSr2, NSr2), dtype=self.ftype)
+                T = bm.zeros((NC, NSr2, NSr2), **self.fkwargs)
                 for iii, alphaa in enumerate(multiidx): 
                     Nv_sym = symmetry_span_array(Nv, alphaa).reshape(-1, 3**r)[:, symidx]
                     for jjj, betaa in enumerate(multiidx):
@@ -693,7 +694,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
         # edge
         edof = self.number_of_internal_dofs('edge')
-        coeff2 = bm.zeros((NC, 6*edof, 6*edof), dtype=self.ftype)
+        coeff2 = bm.zeros((NC, 6*edof, 6*edof), **self.fkwargs)
 
         fn = mesh.face_unit_normal()
         et = mesh.edge_tangent(unit=True)
@@ -706,7 +707,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
             Ni = bm.cross(glambda[:, ll], nlambdaktl)/nlambdaktl_l # (NC, 3)
             Nj = bm.cross(nlambdaktl, glambda[:, kk])/nlambdaktl_l
 
-            Ncoef = bm.zeros((NC, 2, 2), dtype=self.ftype)
+            Ncoef = bm.zeros((NC, 2, 2), **self.fkwargs)
             Ncoef[:, 0, 0] = bm.sum(Ni*en[c2e[:, e], 0], axis=1) 
             Ncoef[:, 0, 1] = bm.sum(Ni*en[c2e[:, e], 1], axis=1)
             Ncoef[:, 1, 0] = bm.sum(Nj*en[c2e[:, e], 0], axis=1)
@@ -834,9 +835,9 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
         #        k += 1
         # edge
         locEdge = bm.array([[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]],
-                           dtype=self.itype)
+                           **self.ikwargs)
         dualEdge = bm.array([[2, 3], [1, 3], [1, 2], [0, 3], [0, 2], [0, 1]],
-                            dtype=self.itype)
+                            **self.ikwargs)
         S12m = self.dof_index["edge"]
         en = eframe[:, 1:]
 
@@ -852,7 +853,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                 alphaes = alpha[es]
                 r = int(bm.sum(alphaes))
 
-                bcs = mesh.multi_index_matrix(p-r, 1, dtype=self.ftype)/(p-r) # (NQ, 2)
+                bcs = mesh.multi_index_matrix(p-r, 1, **self.fkwargs)/(p-r) # (NQ, 2)
                 b2l = self.bspace.bernstein_to_lagrange(p-r, 1) #(p-r+1, p-r+1)
 
                 point = bm.einsum("qi, cid-> qcd", bcs, node[cell[:, e]])
@@ -873,8 +874,8 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
 
         # face
         locFace = bm.array([[1, 2, 3], [0, 2, 3], [0, 1, 3], [0, 1, 2]],
-                           dtype=self.itype)
-        dualFace = bm.array([[0],[1],[2],[3]], dtype=self.itype)
+                           **self.ikwargs)
+        dualFace = bm.array([[0],[1],[2],[3]], **self.ikwargs)
 
         S2m = self.dof_index["face"]
         fn = mesh.face_unit_normal()
@@ -893,7 +894,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                 alphafs = alpha[fs]
                 r = int(alphafs)
 
-                bcs = mesh.multi_index_matrix(p-r, 2, dtype=self.ftype)/(p-r) # (NQ, 3)
+                bcs = mesh.multi_index_matrix(p-r, 2, **self.fkwargs)/(p-r) # (NQ, 3)
                 b2l = self.bspace.bernstein_to_lagrange(p-r, 2) # (NQ, NQ)
 
                 point = bm.einsum("qi, cid-> qcd", bcs, node[cell[:, f]]) # (NQ, NC, 3)
@@ -912,7 +913,7 @@ class CmConformingFESpace3d(FunctionSpace, Generic[_MT]):
                     fI[c2d[ccc, N]] = bcoeff[ccc, Ralpha]
                 N += 1
 
-        bcs = mesh.multi_index_matrix(p, 3, dtype=self.ftype)/p
+        bcs = mesh.multi_index_matrix(p, 3, **self.fkwargs)/p
         b2l = self.bspace.bernstein_to_lagrange(p, 3)
         point = mesh.bc_to_point(bcs) #(NC, NQ, 3) 
         ffval = bm.array(flist[0](point)) # (NC, NQ, )
