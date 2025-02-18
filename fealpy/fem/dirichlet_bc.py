@@ -144,13 +144,13 @@ class DirichletBC():
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
         if isinstance(A, COOTensor):
-            indices = A.indices()
+            indices = A.indices
             remove_flag = bm.logical_or(
                 isDDof[indices[0, :]], isDDof[indices[1, :]]
             )
             retain_flag = bm.logical_not(remove_flag)
             new_indices = indices[:, retain_flag]
-            new_values = A.values()[..., retain_flag]
+            new_values = A.values[..., retain_flag]
             A = COOTensor(new_indices, new_values, A.sparse_shape)
 
             index = bm.nonzero(isDDof)[0]
@@ -158,40 +158,16 @@ class DirichletBC():
             one_values = bm.ones(shape, **kwargs)
             one_indices = bm.stack([index, index], axis=0)
             A1 = COOTensor(one_indices, one_values, A.sparse_shape)
-            A = A.add(A1).coalesce()
+            return A.add(A1).coalesce()
 
         elif isinstance(A, CSRTensor):
-            isIDof = bm.logical_not(isDDof)
-            crow = A.crow
-            col = A.col
-            indices_context = bm.context(col)
-            ZERO = bm.array([0], **indices_context)
+            from ..sparse.ops import spdiags
+            isDDof = bm.astype(isDDof, A.ftype)
+            D0 = spdiags(1-isDDof, 0, A.shape[0], A.shape[0])
+            D1 = spdiags(isDDof, 0, A.shape[0], A.shape[0], format='coo')
+            A = (D0@A@D0).tocoo() + D1
 
-            nnz_per_row = crow[1:] - crow[:-1]
-            remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
-            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
-            nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
-
-            new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
-
-            NNZ = new_crow[-1]
-            non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
-            loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
-            non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
-
-            new_col = bm.empty((NNZ,), **indices_context)
-            new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], self.boundary_dof_index)
-            new_col = bm.set_at(new_col, non_diag, col[remain_flag])
-
-            new_values = bm.empty((NNZ,), **kwargs)
-            new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
-            new_values = bm.set_at(new_values, non_diag, A.values[remain_flag])
-
-            # A = CSRTensor(new_crow, new_col, new_values)
-            A = CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
-
-
-        return A
+        return A.coalesce().tocsr()
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
                      uh: Optional[TensorLike]=None,
@@ -267,3 +243,34 @@ class DirichletBC():
     #     A = D0@A@D0 + D1
     #     f[dflag.flat] = uh.ravel()[dflag.flat]
     #     return A, f
+
+
+# backup
+def apply_csr_matrix(A: CSRTensor, isDDof: TensorLike):
+    isIDof = bm.logical_not(isDDof)
+    crow = A.crow
+    col = A.col
+    indices_context = bm.context(col)
+    ZERO = bm.array([0], **indices_context)
+
+    nnz_per_row = crow[1:] - crow[:-1]
+    remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
+    rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
+    nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
+
+    new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
+
+    NNZ = new_crow[-1]
+    non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
+    loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
+    non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
+
+    new_col = bm.empty((NNZ,), **indices_context)
+    new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], isDDof)
+    new_col = bm.set_at(new_col, non_diag, col[remain_flag])
+
+    new_values = bm.empty((NNZ,), **A.values_context())
+    new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
+    new_values = bm.set_at(new_values, non_diag, A.values[remain_flag])
+
+    return CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
