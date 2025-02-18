@@ -1,4 +1,5 @@
 from fealpy.backend import backend_manager as bm
+from fealpy.pde.biharmonic_triharmonic_2d import get_flist
 import numpy as np
 import pytest
 import sympy as sp
@@ -80,10 +81,34 @@ class TestCmfespace2d:
             isCornerNode = isCornerNode | (np.linalg.norm(node-n[None, :], axis=1)<1e-10)
         space = CmConformingFESpace2d(mesh, 5, 1, isCornerNode) 
         space.isCornerNode()
+    
+    @pytest.mark.parametrize("backend", ["numpy"])
+    def test_smooth_to_lagrange(self, backend):
+        bm.set_backend(backend)
+        from fealpy.functionspace import LagrangeFESpace
+        mesh = TriangleMesh.from_box([0,1,0,1],2,2,device='cpu')
+        sspace = CmConformingFESpace2d(mesh, 9, 1) 
+        lsapce = LagrangeFESpace(mesh,p=9)
+        x = sp.symbols('x')
+        y = sp.symbols('y')
+        f = x**9+y**5*x**4
+        flist = get_flist(f)[:3]
+        def f(p):
+            x = p[...,0]
+            y = p[...,1]
+            return x**9+y**5*x**4
+        us = sspace.interpolation(flist)
+        ul = lsapce.interpolate(f)
+        R = sspace.smooth_to_lagrange()
+        usl = us@ R
+        np.testing.assert_allclose(ul,usl,atol=1e-12)
+
 
 
 if __name__=="__main__":
     t = TestCmfespace2d()
     #t.test_matrix("pytorch")
-    t.test_isConerNode()
+    #t.test_isConerNode()
+    #t.test_smooth_to_lagrange("numpy")
+    pytest.main(["-k","test_smooth_to_lagrange"])
 
