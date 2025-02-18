@@ -85,43 +85,46 @@ class TestCSRTensorAdd:
         bm.set_backend(backend)
         # 初始化两个 CSRTensors
         csr1 = create_csr_tensor(
-            crow=bm.tensor([0,1,1,2,2]), col=bm.tensor([1,3]), values=bm.tensor([1, 2]),
+            crow=bm.tensor([0, 1, 1, 2, 2]), col=bm.tensor([1, 3]), values=bm.tensor([1, 2]),
             shape=(4, 4)
         )
         csr2 = create_csr_tensor(
-            crow=bm.tensor([0,1,2,2,2]), col=bm.tensor([2, 3]), values=bm.tensor([3, 4]),
+            crow=bm.tensor([0, 1, 2, 2, 2]), col=bm.tensor([2, 3]), values=bm.tensor([3, 4]),
             shape=(4, 4)
         )
         csr3 = create_csr_tensor(
-            crow=bm.tensor([0,1,2,2,2]), col=bm.tensor([2, 3]), values=None,
+            crow=bm.tensor([0, 1, 2, 2, 2]), col=bm.tensor([2, 3]), values=None,
             shape=(4, 4)
         )
         csr4 = create_csr_tensor(
-            crow=bm.tensor([0,1,1,2,2]), col=bm.tensor([1, 3]), values=None,
+            crow=bm.tensor([0, 1, 1, 2, 2]), col=bm.tensor([1, 3]), values=None,
             shape=(4, 4)
         )
 
         # 执行 add 操作
         result1 = csr1.add(csr2, alpha=2)
         result2 = csr3.add(csr4, alpha=2)
-
-        with pytest.raises(ValueError):
-            csr1.add(csr3)
+        result3 = csr1.add(csr3, alpha=2) 
 
         # 验证结果
-        expected_crow1 = bm.tensor([0,2,3,4,4])
-        expected_col1 = bm.tensor([1,2,3,3])
+        expected_crow1 = bm.tensor([0, 2, 3, 4, 4])
+        expected_col1 = bm.tensor([1, 2, 3, 3])
         expected_values1 = bm.tensor([1, 6, 8, 2])
 
         assert bm.allclose(result1._crow, expected_crow1)
         assert bm.allclose(result1._col, expected_col1)
-        
         assert bm.allclose(result1._values, expected_values1)
-        expected_crow2 = bm.tensor([0,2,3,4,4])
-        expected_col2 = bm.tensor([1,2,3,3])
-        assert bm.allclose(result2._crow, expected_crow2)
-        assert bm.allclose(result2._col, expected_col2)
-        assert result2.values is None
+
+        expected_csr2 = create_csr_tensor(
+            crow=bm.tensor([0, 2, 3, 4, 4]), col=bm.tensor([1, 2, 3, 3]), values=bm.tensor([2., 1., 1., 2.]),
+            shape=(4, 4)
+        )
+        expected_csr3 = create_csr_tensor(
+            crow=bm.tensor([0, 2, 3, 4, 4]), col=bm.tensor([1, 2, 3, 3]), values=bm.tensor([1., 2., 2., 2.]),
+            shape=(4, 4)
+        )
+        assert bm.allclose(expected_csr2.toarray(), result2.toarray())
+        assert bm.allclose(expected_csr3.toarray(), result3.toarray())
 
     @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_add_tensor(self, backend):
@@ -177,3 +180,4 @@ class TestCSRTensorMatmul():
         csr2 = fpy_csr_matrix(m2)
         csr3 = csr1 @ csr2
         assert bm.allclose(csr3.toarray(), m3)
+        
