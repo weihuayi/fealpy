@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 from fealpy.mesh.node_mesh import NodeMesh
 from fealpy.cfd.sph.particle_solver import SPHSolver,TimeLine
-from fealpy.cfd.sph import partition 
-from fealpy.cfd.sph.jax_md.partition import Sparse
+from fealpy.backend.jax import partition 
+from fealpy.backend.jax.jax_md.partition import Sparse
 from fealpy.cfd.sph.particle_kernel_function import QuinticKernel
 #from fealpy.jax.sph.jax_md import space
 from jax_md import space

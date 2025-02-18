@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 from fealpy.mesh.node_mesh import NodeMesh
 from fealpy.cfd.sph.particle_solver import SPHSolver,TimeLine
-from fealpy.cfd.sph import partition 
-from fealpy.cfd.sph.jax_md.partition import Sparse
+from fealpy.backend.jax import partition 
+from fealpy.backend.jax.jax_md.partition import Sparse
 from fealpy.cfd.sph.particle_kernel_function import QuinticKernel
 from jax_md import space
 from jax import ops, vmap
@@ -29,7 +29,7 @@ T = 2 #终止时间
 dt = 0.0004 #时间间隔
 t_num = int(T / dt)
 dim = 2 #维数
-box_size = jnp.array([1.0,1.0]) #模拟区域
+box_size = jnp.array([1.0,1.0], dtype=jnp.float64) #模拟区域
 path = "./"
 
 #初始化
