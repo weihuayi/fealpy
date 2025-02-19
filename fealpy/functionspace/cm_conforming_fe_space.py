@@ -7,6 +7,7 @@ from .bernstein_fe_space import BernsteinFESpace
 from .functional import symmetry_span_array, symmetry_index, span_array
 from scipy.special import factorial, comb
 from scipy.linalg import solve_triangular
+from scipy.sparse import csr_matrix
 from fealpy.decorator import barycentric
 
 
@@ -16,23 +17,40 @@ Number = Union[int, float]
 _S = slice(None)
 
 class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh: _MT, p: int, m: int, isCornerNode: bool, device=None):
+    def __init__(self, mesh: _MT, p: int, m: int, device=None):
         assert(p>4*m)
-        self.device = device
         self.mesh = mesh
         self.p = p
         self.m = m
-        self.isCornerNode = isCornerNode
-        self.bspace = BernsteinFESpace(mesh, p)
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
         self.device = mesh.device
+        self.ikwargs = bm.context(mesh.cell)
+        self.fkwargs = bm.context(mesh.node)
+        self.isCornerNode = self.isCornerNode()
+        self.bspace = BernsteinFESpace(mesh, p)
 
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
         self.coeff = self.coefficient_matrix()
+    def isCornerNode(self):
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        NN = mesh.number_of_nodes()
+        boundary_edge = mesh.boundary_edge_flag()
+        edge = edge[boundary_edge]
+        en = mesh.edge_unit_normal()[boundary_edge]
+
+        nnn = bm.zeros((NN,2,3),**self.fkwargs)
+        isCornerNode = bm.zeros(NN, dtype=bm.bool, device=self.device)
+        nnn[edge[:, 0],0,:2] = en
+        nnn[edge[:, 1],1,:2] = en
+        
+        flag = bm.abs(bm.cross(nnn[:,0,:],nnn[:,1,:],axis=1)[:,2])>1e-10
+        return flag
+
 
     def number_of_local_dofs(self, etype) -> int: 
         p = self.p
@@ -246,8 +264,8 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         #    np.testing.assert_allclose(coeff[i,:18,:18],coeff[i+1,:18,:18], atol=1e-15)
         #    print(i)
         #print(coeff[:, :18, :18])
-        import numpy as np
-        np.savetxt('c.csv', coeff[0], delimiter=',')
+        #import numpy as np
+        #np.savetxt('c.csv', coeff[0], delimiter=',')
         
 
         #for i in range(NC):
@@ -541,7 +559,30 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         return self.grad_m_value(uh, bcs, 1)
 
 
-
+    def smooth_to_lagrange(self):                                               
+        """                                                                     
+        Interpolate from the smooth finite element space to the same-order lagrange finite element space
+        """                                                                     
+        from fealpy.functionspace import LagrangeFESpace                        
+        mesh = self.mesh                                                        
+        p = self.p                                                              
+        NC = mesh.number_of_cells()                                             
+        lspace = LagrangeFESpace(mesh, p)                                       
+        lcell2dof = lspace.cell_to_dof()                                        
+        scell2dof = self.cell_to_dof()                                          
+        lgdof = lspace.number_of_global_dofs()                                  
+        lldof = lspace.number_of_local_dofs('cell')                             
+        sgdof = self.number_of_global_dofs()                                    
+        sldof = self.number_of_local_dofs('cell')                               
+                                                                                
+        bcs = self.mesh.multi_index_matrix(p, 2)/p                              
+        a = self.basis(bcs).transpose(0,2,1) # NC, ldof, NQ                     
+        I = bm.broadcast_to(scell2dof[:,:,None],shape=(NC, sldof, lldof))        
+        J = bm.broadcast_to(lcell2dof[:,None,:],shape=(NC, sldof, lldof))        
+        R = csr_matrix((a.flat, (I.flat, J.flat)), shape=(sgdof, lgdof))        
+        c = bm.zeros(lgdof, **self.ikwargs)                                                     
+        bm.add_at(c,lcell2dof,bm.ones((NC,lldof), **self.ikwargs))                              
+        return R/c[None,:]
 
                 
 
