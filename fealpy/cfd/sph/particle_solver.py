@@ -8,6 +8,7 @@
 	@ref 
 '''  
 from jax import ops, vmap, jit, lax
+import jax
 import jax.lax as lax 
 from functools import partial
 import jax.numpy as jnp
@@ -16,7 +17,7 @@ import h5py
 import pyvista
 from typing import Dict
 import enum
-from fealpy.cfd.sph.jax_md import space
+from fealpy.backend.jax.jax_md import space
 #from jax_md import space
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -56,6 +57,7 @@ class SPHSolver:
     @jit
     def compute_rho(mass, i_node, w_ij):
         """Density summation."""
+        #jax.debug.print("wij:{}", w_ij)
         return mass * ops.segment_sum(w_ij, i_node, len(mass))
 
     #计算运输速度的加速度

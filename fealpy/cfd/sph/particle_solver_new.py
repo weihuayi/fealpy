@@ -106,26 +106,16 @@ class Space:
 
         return displacement_fn, shift_fn
 
-class VmapBackend:
-    def __init__(self):
-        current_backend = bm.backend_name
+    def distance(self, dR: TensorLike):
+        dr = self.square_distance(dR)
+        return self.safe_mask(dr > 0, bm.sqrt, dr)
 
-        # 根据当前后端设置 vmap 函数
-        if current_backend == 'jax':
-            # 使用 JAX 的 vmap
-            self.vmap_func = jax.vmap
-        elif current_backend == 'numpy':
-            # 使用 NumPy 的 vectorize
-            self.vmap_func = np.vectorize
-        elif current_backend == 'pytorch':
-            # 使用 PyTorch 的 vmap
-            self.vmap_func = torch.vmap
-        else:
-            raise ValueError(f"Unsupported backend: {current_backend}")
+    def square_distance(self, dR: TensorLike):
+        return bm.sum(dR**2, axis=-1)
 
-    def apply(self, func, *args, **kwargs):
-        # 返回已经适配的 vmap 函数
-        return self.vmap_func(func)(*args, **kwargs)
+    def safe_mask(self, mask, fn, operand, placeholder=0):
+        masked = bm.where(mask, operand, 0)
+        return bm.where(mask, fn(masked), placeholder)
 
 class SPHSolver:
     def __init__(self, mesh):
