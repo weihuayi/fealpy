@@ -36,6 +36,27 @@ class TestgradmIntegrator:
         #np.testing.assert_allclose(bm.to_numpy(M.toarray()), data["M"], atol=1e-14)
 
     @pytest.mark.parametrize("backend", ['numpy','pytorch'])
+    @pytest.mark.parametrize("data", mass)
+    def test_mass_integrator(self, backend, data): 
+        bm.set_backend(backend)
+        
+        mesh = TriangleMesh.from_box([0,1,0,1], 1, 1)
+        node = mesh.entity('node')
+        isCornerNode = bm.zeros(len(node),dtype=bm.bool)
+        for n in bm.array([[0,0],[1,0],[0,1],[1,1]], dtype=bm.float64):
+            isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
+
+        space = CmConformingFESpace2d(mesh, 5, 1, isCornerNode)
+        bform = BilinearForm(space)
+        integrator = MthLaplaceIntegrator(m=0, coef=1, q=9)
+        FM = integrator.assembly(space)
+        bform.add_integrator(integrator)
+
+        M = bform.assembly()
+        np.testing.assert_allclose(M.toarray(), data['M1'], atol=1e-14)
+ 
+
+    @pytest.mark.parametrize("backend", ['numpy','pytorch'])
     @pytest.mark.parametrize("data", grad_m)
     def test_assembly_without_numerical_mlaplace_integrator(self, backend, data): 
         from fealpy.mesh.tetrahedron_mesh import TetrahedronMesh
@@ -67,5 +88,8 @@ class TestgradmIntegrator:
 if __name__ == "__main__":
     #pytest.main(['test_grad_m_integrator.py', "-q", "-k","test_grad_m_integrator", "-s"])
     t = TestgradmIntegrator()
-    t.test_assembly_without_numerical_mlaplace_integrator('numpy', grad_m[0])
-    t.test_assembly_without_numerical_mlaplace_integrator('pytorch', grad_m[0])
+    t.test_mass_integrator('numpy', mass[0])
+
+    #t.test_grad_m_integrator('numpy', grad_m[0])
+    #t.test_assembly_without_numerical_mlaplace_integrator('numpy', grad_m[0])
+    #t.test_assembly_without_numerical_mlaplace_integrator('pytorch', grad_m[0])

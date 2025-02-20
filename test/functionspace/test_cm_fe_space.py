@@ -72,7 +72,18 @@ class TestCmfespace2d:
         print(bm.abs(aa-gF).max())
         #np.testing.assert_allclose(aa, gF, atol=1e-14,rtol=0)
 
+    def test_isConerNode(self):
+        mesh = TriangleMesh.from_box([0,1,0,1],2,2)
+        node = mesh.entity('node')
+        isCornerNode = np.zeros(len(node),dtype=np.bool)
+        for n in np.array([[0,0],[1,0],[0,1],[1,1]], dtype=np.float64):
+            isCornerNode = isCornerNode | (np.linalg.norm(node-n[None, :], axis=1)<1e-10)
+        space = CmConformingFESpace2d(mesh, 5, 1, isCornerNode) 
+        space.isCornerNode()
+
+
 if __name__=="__main__":
     t = TestCmfespace2d()
-    t.test_matrix("pytorch")
+    #t.test_matrix("pytorch")
+    t.test_isConerNode()
 

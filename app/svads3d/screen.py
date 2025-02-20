@@ -5,7 +5,7 @@ from typing import Union
 from camera_system import CameraSystem
 from scipy.optimize import fsolve
 from harmonic_map import * 
-from COA import COA
+#from COA import COA
 #from fealpy.opt import *
 from fealpy.opt.optimizer_base import Optimizer, opt_alg_options
 from fealpy.opt.crayfish_opt_alg import CrayfishOptAlg
@@ -119,11 +119,20 @@ class Screen:
         self.ground_nonoverlapmesh = [] 
         self.eillposid_overlapmesh = []
         self.eillposid_nonoverlapmesh = []
-
+        
+        print("优化相机参数...")
         self.optimize()
+        print("优化完成！")
         #self.draw_frature_points()
+
+        print("正在生成网格...")
         self.meshing()
+        print("网格生成完成！")
+
+        print("计算网格点参数...")
         self.compute_uv()
+        print("计算完成！")
+
 
     def get_feature_point(self):
         """
@@ -171,7 +180,6 @@ class Screen:
             init_x[i, :3] = camsys.cameras[i].location
             init_x[i, 3:6] = camsys.cameras[i].eular_angle
             init_x[i, 6:] = np.array([1.0, 0.000001, 0.000001, 0.000001])
-        print("init error : ", object_function(init_x.flatten().reshape(1,60)))
 
         #参数设置
         N = 100
@@ -199,13 +207,10 @@ class Screen:
         option = opt_alg_options(init_x, object_function, (lb, ub), N, MaxIters=50)
         optimizer = CrayfishOptAlg(option)
 
-
-        best_position,bestfitness = optimizer.run()
-        print( bestfitness)
+        optimizer.run()
+        best_position = optimizer.gbest
         print(best_position)
-
         camsys.set_parameters(best_position.reshape(6, -1))
-
 
     def get_implict_function(self):
         """

@@ -16,23 +16,40 @@ Number = Union[int, float]
 _S = slice(None)
 
 class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
-    def __init__(self, mesh: _MT, p: int, m: int, isCornerNode: bool, device=None):
+    def __init__(self, mesh: _MT, p: int, m: int, device=None):
         assert(p>4*m)
-        self.device = device
         self.mesh = mesh
         self.p = p
         self.m = m
-        self.isCornerNode = isCornerNode
+        self.isCornerNode = self.isCornerNode()
         self.bspace = BernsteinFESpace(mesh, p)
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
         self.device = mesh.device
+        self.ikwargs = bm.context(cell)
+        self.fkwargs = bm.context(node)
 
         self.TD = mesh.top_dimension()
         self.GD = mesh.geo_dimension()
 
         self.coeff = self.coefficient_matrix()
+    def isCornerNode(self):
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        NN = mesh.number_of_nodes()
+        boundary_edge = mesh.boundary_edge_flag()
+        edge = edge[boundary_edge]
+        en = mesh.edge_unit_normal()[boundary_edge]
+
+        nnn = bm.zeros((NN,2,2))
+        isCornerNode = bm.zeros(NN, dtype=bm.bool, device=self.device)
+        nnn[edge[:, 0],0] = en
+        nnn[edge[:, 1],1] = en
+        
+        flag = bm.abs(bm.cross(nnn[:,0,:],nnn[:,1,:],axis=1))>1e-10
+        return flag
+
 
     def number_of_local_dofs(self, etype) -> int: 
         p = self.p
@@ -99,7 +116,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         c2id = bm.arange(NN*ndof + NE*eidof,
                 NN*ndof+NE*eidof+NC*cidof,dtype=self.itype, device=self.device).reshape(NC, cidof)
         return c2id
-    def cell_to_dof(self):
+    def cell_to_dof(self, index=_S):
         p = self.p
         m = self.m
         mesh = self.mesh
@@ -132,7 +149,7 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     N+n0:N+n0+n1],axis=1)
                 n0 += n1
                 n1 += 1
-        return c2d
+        return c2d[index]
     def is_boundary_dof(self, threshold, method="interp"): #TODO:这个threshold 没有实现
         p = self.p
         m = self.m
@@ -210,6 +227,11 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     #coeff[:, i, j] = sign*comb(bm.sum(beta),r)*bm.prod(bm.array(comb(dalpha, dbeta),**ikwargs),
                     #                                                   axis=0)*factorial(r)
 
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i],coeff[i+1], atol=1e-15)
+        #    print(i)
+
 
         # 局部自由度 边
         glambda = mesh.grad_lambda()
@@ -234,6 +256,17 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
                     j = dof2num[j]
                     coeff[:, i, j] = comb(beta_sum_cpu,
                                           int(dalpha))*(factorial(int(dalpha)))**2*val[:, None]
+        
+        ## 测试每个单元顶点的系数矩阵是一样的,与单元无关
+        #import numpy as np
+        #for i  in range(NC-1):
+        #    np.testing.assert_allclose(coeff[i,:18,:18],coeff[i+1,:18,:18], atol=1e-15)
+        #    print(i)
+        #print(coeff[:, :18, :18])
+        #import numpy as np
+        #np.savetxt('c.csv', coeff[0], delimiter=',')
+        
+
         #for i in range(NC):
         
         #    coeff[i] = solve_triangular(coeff[i], bm.eye(ldof), lower=True)

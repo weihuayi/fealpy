@@ -155,22 +155,22 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
 
     ### Sparse Functions ###
     @staticmethod
-    def coo_spmm(indices, value, shape, other):
-        nnz = value.shape[-1]
+    def coo_spmm(indices, values, shape, other):
+        nnz = values.shape[-1]
         row = indices[0]
         col = indices[1]
 
-        if value.ndim == 1:
+        if values.ndim == 1:
             if other.ndim == 1:
                 result = np.zeros((shape[0],), dtype=other.dtype)
-                coo_matvec(nnz, row, col, value, other, result)
+                coo_matvec(nnz, row, col, values, other, result)
                 return result
             elif other.ndim == 2:
                 new_shape = (shape[0], other.shape[-1])
                 result = np.zeros(new_shape, dtype=other.dtype)
                 rT = result.T
                 for i, acol in enumerate(other.T):
-                    coo_matvec(nnz, row, col, value, acol, rT[i])
+                    coo_matvec(nnz, row, col, values, acol, rT[i])
                 return result
             else:
                 raise ValueError("`other` must be a 1-D or 2-D array.")
@@ -179,25 +179,33 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
                                       "not been supported yet.")
 
     @staticmethod
-    def csr_spmm(crow, col, value, shape, other):
+    def csr_spmm(crow, col, values, shape, other):
         M, N = shape
 
-        if value.ndim == 1:
+        if values.ndim == 1:
             if other.ndim == 1:
                 result = np.zeros((shape[0],), dtype=other.dtype)
-                csr_matvec(M, N, crow, col, value, other, result)
+                csr_matvec(M, N, crow, col, values, other, result)
                 return result
             elif other.ndim == 2:
                 n_vecs = other.shape[-1]
                 new_shape = (shape[0], other.shape[-1])
                 result = np.zeros(new_shape, dtype=other.dtype)
-                csr_matvecs(M, N, n_vecs, crow, col, value, other.ravel(), result.ravel())
+                csr_matvecs(M, N, n_vecs, crow, col, values, other.ravel(), result.ravel())
                 return result
             else:
                 raise ValueError("`other` must be a 1-D or 2-D array.")
         else:
             raise NotImplementedError("Batch sparse matrix multiplication has "
                                       "not been supported yet.")
+
+    @staticmethod
+    def csr_spspmm(crow1, col1, values1, shape1, crow2, col2, values2, shape2):
+        from scipy.sparse import csr_matrix
+        m1 = csr_matrix((values1, col1, crow1), shape=shape1)
+        m2 = csr_matrix((values2, col2, crow2), shape=shape2)
+        m3 = m1._matmul_sparse(m2)
+        return m3.indptr, m3.indices, m3.data, m3.shape
 
     @staticmethod
     def coo_tocsr(indices, values, shape):
@@ -211,6 +219,26 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
         coo_tocsr(M, N, nnz, major, minor, values, crow, col, data)
 
         return crow, col, data
+
+    ### Function Transforms ###
+    @staticmethod
+    def vmap(func, /, in_axes=0, out_axes=0, *args, **kwds):
+        if in_axes != out_axes:
+            raise ValueError(f"Only support in_axes == out_axes with numpy backend")
+        from functools import partial
+        def vectorized(*args, **kwargs):
+            arr_lists = [np.unstack(arr, axis=in_axes)
+                         for arr in args if isinstance(arr, np.ndarray)]
+            results = tuple(map(partial(func, **kwargs), *arr_lists))
+
+            if isinstance(results[0], tuple):
+                results = map(partial(np.stack, axis=in_axes), zip(*results))
+                results = tuple(results)
+            else:
+                results = np.stack(results, axis=in_axes)
+            return results
+
+        return vectorized
 
     ### FEALPy Functions ###
 

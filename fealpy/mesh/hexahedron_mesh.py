@@ -6,7 +6,7 @@ from .mesh_base import TensorMesh
 from ..typing import TensorLike, Index, _S
 from .plot import Plotable
 
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from fealpy.sparse import coo_matrix,csr_matrix
 
 class HexahedronMesh(TensorMesh, Plotable):
     def __init__(self, node, cell):
@@ -242,7 +242,7 @@ class HexahedronMesh(TensorMesh, Plotable):
         Parameters:
             n (int): times refine the hexahedron mesh.
             surface (function): the surface function.
-            returnim (bool): return the interpolation matrix or not.
+            returnirm (bool): return the interpolation matrix list or not,列表中的插值矩阵从细到粗排列
         """
         if returnim is True:
             IM = []
@@ -251,6 +251,35 @@ class HexahedronMesh(TensorMesh, Plotable):
             NE = self.number_of_edges()
             NF = self.number_of_faces()
             NC = self.number_of_cells()
+            node_old = self.entity('node')
+            edge_old = self.entity('edge')
+            cell_old = self.entity('cell')
+            face_old = self.entity('face')
+
+            if returnim is True:
+                shape = (NN+NE+NF+NC,NN)
+                kargs = bm.context(node_old)
+                values = bm.ones(NN+2*NE+4*NF+8*NC,**kargs)
+                values = bm.set_at(values,bm.arange(NN, NN+2*NE), 0.5)
+                values = bm.set_at(values,bm.arange(NN+2*NE,NN+2*NE+4*NF), 0.25)
+                values = bm.set_at(values,bm.arange(NN+2*NE+4*NF,NN+2*NE+4*NF+8*NC),0.125) 
+
+                kargs = bm.context(cell_old)
+                i0 = bm.arange(NN,**kargs)
+                i1 = bm.arange(NN, NN + NE, **kargs)
+                i2 = bm.arange(NN+NE, NN+NE+NF, **kargs)
+                i3 = bm.arange(NN+NE+NF,NN+NE+NF+NC, **kargs)
+                I = bm.concatenate((i0,i1,i1,i2,i2,i2,i2,
+                                    i3,i3,i3,i3,i3,i3,i3,i3))
+                J = bm.concatenate((i0,edge_old[:,0],edge_old[:,1],
+                                    face_old[:,0],face_old[:,1],face_old[:,2],face_old[:,3],
+                                    cell_old[:,0],cell_old[:,1],cell_old[:,2],cell_old[:,3],
+                                    cell_old[:,4],cell_old[:,5],cell_old[:,6],cell_old[:,7]))
+
+                P = csr_matrix((values,(I,J)),shape)
+
+                IM.append(P)
+
             node = bm.zeros((NN + NE + NF + NC, 3),
                             dtype=self.ftype, device=self.device)
             start = 0
@@ -275,29 +304,6 @@ class HexahedronMesh(TensorMesh, Plotable):
             edge2node = self.edge_to_node()
             face2node = self.face_to_node()
             cell2node = self.cell_to_node()
-            if returnim is True:
-                new_node_num = NN+NE+NF+NC
-                nonzeros = NN+2*NE+4*NF+8*NC
-                data = bm.zeros(nonzeros,dtype=bm.float64)
-                data[:NN] = 1
-                data[NN:NN+2*NE] = 1/2
-                data[NN+2*NE:NN+2*NE+4*NE] = 1/4
-                data[NN+2*NE+4*NF:] = 1/8
-
-                indices = bm.zeros(nonzeros,dtype=bm.int32)
-                indices[:NN] = bm.arange(NN)
-                indices[NN:NN+2*NE] = edge2node.flatten()
-                indices[NN+2*NE:NN+2*NE+4*NF] = face2node.flatten()
-                indices[NN+2*NE+4*NF:] = cell2node.flatten()
-
-                indptr = bm.zeros(new_node_num+1,dtype=bm.int32)
-                indptr[:NN+1] = bm.arange(NN+1)
-                indptr[NN+1:NN+NE+1]=bm.arange(NN+2,NN+2*NE+1,step=2)
-                indptr[NN+NE+1:NN+NE+NF+1] = bm.arange(NN+2*NE+4,NN+2*NE+4*NF+1,step=4)
-                indptr[NN+NE+NF+1:] = bm.arange(NN+2*NE+4*NF+8,nonzeros+1,step=8)
-
-                A = csr_matrix((data,indices,indptr),dtype=bm.float64)
-                IM.append(A)
 
             cell[0::8, 0] = c2n[:, 0]
             cell[0::8, 1] = c2e[:, 0]
@@ -376,8 +382,8 @@ class HexahedronMesh(TensorMesh, Plotable):
             self.construct()
 
         if returnim is True:
+            IM.reverse()
             return IM
-
 
     @classmethod
     def from_one_hexahedron(cls, twist=False):

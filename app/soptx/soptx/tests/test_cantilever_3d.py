@@ -46,7 +46,7 @@ class TestConfig:
     # 新增优化器类型参数
     optimizer_type: Literal['oc', 'mma'] = 'oc'  # 默认使用 OC 方法
     max_iterations: int = 200
-    tolerance: float = 0.001
+    tolerance: float = 0.01
     
     # OC 优化器的参数
     move_limit: float = 0.2
@@ -189,31 +189,58 @@ def run_optimization_test(config: TestConfig) -> Dict[str, Any]:
     }
 
 if __name__ == "__main__":
+    base_dir = '/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/vtu'
+
+    '''
+    参数来源论文: An efficient 3D topology optimization code written in Matlab
+    '''
     # 使用 OC 优化器的配置
-    config1 = TestConfig(
-        nx=160, ny=100, nz=4,
-        volume_fraction=0.4,
-        filter_radius=6.0,
-        filter_type='sensitivity',
-        max_iterations=100,
-        save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_3d_oc',
-        mesh_type='uniform_mesh_2d',
-        assembly_method=AssemblyMethod.FAST_STRESS_UNIFORM,
-        optimizer_type='oc'  # 指定使用 OC 优化器
+    optimizer_type = 'oc'
+    filter_type = 'density'
+    config_oc_dens = TestConfig(
+        nx=60, ny=20, nz=4,
+        volume_fraction=0.3,
+        filter_radius=1.5,
+        filter_type=filter_type,       # 指定使用密度滤波器
+        save_dir=f'{base_dir}/cantilever_3d_{optimizer_type}_{filter_type}',
+        mesh_type='uniform_mesh_3d',
+        assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
+    )
+    filter_type = 'sensitivity'
+    config_oc_sens = TestConfig(
+        nx=60, ny=20, nz=4,
+        volume_fraction=0.3,
+        filter_radius=1.5,
+        filter_type=filter_type,       # 指定使用灵敏度滤波器
+        save_dir=f'{base_dir}/cantilever_3d_{optimizer_type}_{filter_type}',
+        mesh_type='uniform_mesh_3d',
+        assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
+        optimizer_type=optimizer_type,  # 指定使用 OC 优化器
+        max_iterations=200,
+        tolerance=0.01
     )
     
+    '''
+    参数来源论文: An efficient 3D topology optimization code written in Matlab
+    '''
     # 使用 MMA 优化器的配置
+    filter_type = 'density'
+    optimizer_type = 'mma'
     config2 = TestConfig(
         nx=60, ny=20, nz=4,
         volume_fraction=0.3,
         filter_radius=1.5,
-        filter_type='density',
-        max_iterations=15,
-        save_dir='/home/heliang/FEALPy_Development/fealpy/app/soptx/soptx/tests/cantilever_3d_mma',
+        filter_type=filter_type,        # 指定使用密度滤波器
+        save_dir=f'{base_dir}/cantilever_3d_{optimizer_type}_{filter_type}',
         mesh_type='uniform_mesh_3d',
         assembly_method=AssemblyMethod.FAST_3D_UNIFORM,
-        optimizer_type='mma'  # 指定使用 MMA 优化器
+        optimizer_type=optimizer_type,  # 指定使用 MMA 优化器
+        max_iterations=200,
+        tolerance=0.01
     )
 
-    result = run_optimization_test(config2)
+    result = run_optimization_test(config_oc_dens)
     

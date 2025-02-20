@@ -7,6 +7,9 @@ from typing import Tuple, Callable
 from builtins import list
 
 class MBBBeam2dData1:
+    '''
+    模型来源论文: Efficient topology optimization in MATLAB using 88 lines of code
+    '''
     def __init__(self, 
                 xmin: float=0, xmax: float=60, 
                 ymin: float=0, ymax: float=20):

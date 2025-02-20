@@ -11,7 +11,7 @@ from .utils import (
 )
 from ._spspmm import spspmm_csr
 from ._spmm import spmm_csr
-
+from .coo_tensor import COOTensor
 
 class CSRTensor(SparseTensor):
     def __init__(self, crow: TensorLike, col: TensorLike, values: Optional[TensorLike],
@@ -69,44 +69,43 @@ class CSRTensor(SparseTensor):
 
     ### 1. Data Fetching ###
     @property
-    def itype(self): return self._crow.dtype
+    def itype(self): return self._col.dtype
 
     @property
     def nnz(self): return self._col.shape[-1]
 
     @property
-    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        nonzero_row = bm.zeros(len(self._values),dtype=bm.int64)
-        nonzero_col = bm.zeros(len(self._values),dtype=bm.int64)
-
-        for i in range(1, self._crow.shape[0]):
-                start = self._crow[i - 1]
-                end = self._crow[i]
-                nonzero_row[start:end] = bm.zeros(end - start) + i-1
-                nonzero_col[start:end] = self._col[start:end]
-
-        return nonzero_row, nonzero_col
-
     def crow(self) -> TensorLike:
         """Return the row location of non-zero elements."""
         return self._crow
 
-    def row(self) -> TensorLike:
-        """Generate the row id of non-zero elements."""
-        crow = self.crow()
-        n_row = crow.shape[0] - 1
-        return bm.repeat(
-            bm.arange(n_row, dtype=crow.dtype, device=bm.get_device(crow)),
-            crow[1:] - crow[:-1]
-        )
+    @property
+    def col(self): return self._col
 
-    def col(self) -> TensorLike:
-        """Return the column of non-zero elements."""
-        return self._col
-
+    @property
     def values(self) -> Optional[TensorLike]:
         """Return the non-zero elements"""
         return self._values
+
+    @property
+    def row(self):
+        count = self._crow[1:] - self._crow[:-1]
+        nrow = self._crow.shape[0] - 1
+        kargs = bm.context(self._crow)
+        return bm.repeat(bm.arange(nrow, **kargs), count)
+
+    @property
+    def indptr(self): return self._crow # scipy convention
+
+    @property
+    def indices(self): return self._col # scipy convention
+
+    @property
+    def data(self): return self._values # scipy convention
+
+    @property
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
+        return self.row, self._col
 
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
@@ -150,11 +149,10 @@ class CSRTensor(SparseTensor):
         return dense_tensor.reshape(self.shape)
 
     def tocoo(self, *, copy=False):
+        """
+        """
         from .coo_tensor import COOTensor
-        count = self._crow[1:] - self._crow[:-1]
-        nrow = self._crow.shape[0] - 1
-        row = bm.repeat(bm.arange(nrow, device=bm.get_device(count)), count)
-        indices = bm.stack([row, self._col], axis=0)
+        indices = bm.stack(self.nonzero_slice, axis=0)
         new_values = bm.copy(self._values) if copy else self._values
         return COOTensor(indices, new_values, self.sparse_shape)
 
@@ -210,19 +208,22 @@ class CSRTensor(SparseTensor):
 
     @property
     def T(self):
-        raise NotImplementedError
+        """
+        """
+        A = self.tocoo()
+        return A.T.tocsr()
 
     def partial(self, index: Union[TensorLike, slice]):
-        crow = self.crow()
+        crow = self.crow
         ZERO = bm.zeros([1], dtype=crow.dtype, device=bm.get_device(crow))
-        new_col = bm.copy(self.col()[..., index])
+        new_col = bm.copy(self.col[..., index])
         is_selected = bm.zeros((self.nnz,), dtype=bm.bool, device=bm.get_device(new_col))
         is_selected = bm.set_at(is_selected, index, True)
         selected_cum = bm.concat([ZERO, bm.cumsum(is_selected, axis=0)], axis=0)
         new_nnz_per_row = selected_cum[crow[1:]] - selected_cum[crow[:-1]]
         new_crow = bm.concat([ZERO, bm.cumsum(new_nnz_per_row, axis=0)], axis=0)
 
-        new_values = self.values()
+        new_values = self.values
 
         if new_values is not None:
             new_values = bm.copy(new_values[..., index])
@@ -230,12 +231,23 @@ class CSRTensor(SparseTensor):
         return CSRTensor(new_crow, new_col, new_values, self._spshape)
 
     def tril(self, k: int = 0) -> 'CSRTensor':
-        tril_loc = (self.row() + k) >= self.col()
+        tril_loc = (self.row + k) >= self.col
         return self.partial(tril_loc)
 
     def triu(self, k: int = 0) -> 'CSRTensor':
-        tril_loc = (self.col() - k) >= self.row()
+        tril_loc = (self.col - k) >= self.row
         return self.partial(tril_loc)
+
+    def sum(self, axis=0):
+        """
+        """
+        kargs = bm.context(self._values)
+        if axis == 0: # the sum of row
+            return self@bm.ones(self._spshape[1], **kargs)
+        elif axis == 1: # the sum of column
+            r = bm.zeros(self._spshape[1], **kargs)
+            r = bm.index_add(r, self._col, self._values)
+            return r
 
     ### 6. Arithmetic Operations ###
     def neg(self) -> 'CSRTensor':
@@ -265,49 +277,32 @@ class CSRTensor(SparseTensor):
             out (CSRTensor | Tensor): A new CSRTensor if `other` is a CSRTensor,\
             or a Tensor if `other` is a dense tensor.
         """
+        self_indices = bm.stack(self.nonzero_slice, axis=0)
         if isinstance(other, CSRTensor):
+            other_indices = bm.stack(other.nonzero_slice, axis=0)
             check_shape_match(self.shape, other.shape)
             check_spshape_match(self.sparse_shape, other.sparse_shape)
-
-            if (self._values is None) and (not other._values is None):  
-                raise ValueError("self has no value while other does")
-            elif (not self._values is None) and (other._values is None):
-                raise ValueError("self has value while other does not")
-
-            new_crow = bm.array([0],dtype=bm.int64)
-            new_col = bm.array([],dtype=bm.int64)
-            new_values = bm.array([],dtype=bm.int64)
-
-            for i in range(0, self._crow.shape[0]-1): 
-                indices1 = self._col[self._crow[i]:self._crow[i+1]]
-                indices2 = other._col[other._crow[i]:other._crow[i+1]]
-                col, inverse_indices = bm.unique(bm.concat((indices1,indices2)), return_inverse=True)
-
-                if self._values is None:
-                    new_values = None
+            
+            new_indices = bm.concat((self_indices, other_indices), axis=1)
+            context = bm.context(new_indices)
+            if self._values is None:
+                if other._values is None:
+                    self._values = bm.zeros((self._crow[-1], ), **context) + 1.0
+                    other._values = bm.zeros((other._crow[-1], ), **context) + 1.0
                 else:
-                    value1 = self._values[self._crow[i]:self._crow[i+1]]
-                    value2 = other._values[other._crow[i]:other._crow[i+1]]
-                    val =bm.concat((value1,alpha*value2))
-                    values = bm.zeros(col.shape[0],dtype=val.dtype)
-                    values = bm.index_add(values, inverse_indices, val, axis=-1)
-                    new_values = bm.concat((new_values,values))
-                new_crow = bm.concat((new_crow,bm.tensor([len(col)+new_crow[-1]])))
-                new_col = bm.concat((new_col,col))
-
-            return CSRTensor(new_crow, new_col,new_values ,self.sparse_shape)
+                    self._values = bm.zeros((self._crow[-1], ), **context) + 1.0
+            else:
+                if other._values is None:
+                    other._values = bm.zeros((other._crow[-1], ), **context) + 1.0
+            new_values = bm.concat((self._values, other._values*alpha), axis=-1)
+            return COOTensor(new_indices, new_values, self.sparse_shape).tocsr()
 
         elif isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
             output = other * alpha
             context = bm.context(output)
             output = output.reshape(self.dense_shape + (prod(self._spshape),))
-
-            count = self._crow[1:] - self._crow[:-1]
-            nrow = self._crow.shape[0] - 1
-            row = bm.repeat(bm.arange(nrow), count)
-            indices = bm.stack([row, self._col], axis=0)
-            flattened = flatten_indices(indices, self._spshape)[0]
+            flattened = flatten_indices(self_indices, self._spshape)[0]
 
             if self._values is None:
                 src = bm.ones((1,) * (self.dense_ndim + 1), **context)
@@ -320,7 +315,7 @@ class CSRTensor(SparseTensor):
 
         elif isinstance(other, (int, float)):
             new_values = self._values + alpha * other
-            return CSRTensor(bm.copy(self._crow), bm.copy(self._col),new_values, self.sparse_shape)
+            return CSRTensor(bm.copy(self._crow), bm.copy(self._col), new_values, self.sparse_shape)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in addition")
@@ -340,7 +335,7 @@ class CSRTensor(SparseTensor):
             if self._values is not None:
                 bm.multiply(self._values, new_values, out=new_values)
 
-            return CSRTensor(self._crow, self._col,new_values, self.sparse_shape)
+            return CSRTensor(self._crow, self._col, new_values, self.sparse_shape)
 
         elif isinstance(other, (int, float)):
             if self._values is None:
@@ -361,15 +356,20 @@ class CSRTensor(SparseTensor):
                 raise ValueError("Cannot divide CSRTensor without value")
 
         if isinstance(other, TensorLike):
-            check_shape_match(self.shape, other.shape)
+            if len(other.shape) == 1: #TODO: deal with case self.shape[0] == self.shape[1]
+                if other.shape[0] == self.shape[0]:
+                    other = bm.broadcast_to(other[:, None], self.shape)
+                elif other.shape[0] == self.shape[1]:
+                    other = bm.broadcast_to(other[None, :], self.shape)
+            check_shape_match(other.shape, self.shape)
             new_values = bm.copy(other[self.nonzero_slice])
   
             bm.divide(self._values, new_values, out=new_values)
-            return CSRTensor(self._crow,self._col,new_values, self.sparse_shape)
+            return CSRTensor(self._crow, self._col, new_values, self.sparse_shape)
 
         elif isinstance(other, (int, float)):
             new_values = self._values / other
-            return CSRTensor(self._indices, new_values, self.sparse_shape)
+            return CSRTensor(self._crow, self._col, new_values, self.sparse_shape)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in division")
@@ -387,11 +387,11 @@ class CSRTensor(SparseTensor):
             new_values = bm.copy(other[self.nonzero_slice])
 
             new_values = bm.power(self._values, new_values)
-            return CSRTensor(self._crow, self._col,new_values, self.sparse_shape)
+            return CSRTensor(self._crow, self._col, new_values, self.sparse_shape)
 
         elif isinstance(other, (int, float)):
             new_values = self._values ** other
-            return CSRTensor(self._indices, new_values, self.sparse_shape)
+            return CSRTensor(self._crow, self._col, new_values, self.sparse_shape)
 
         else:
             raise TypeError(f'Unsupported type {type(other).__name__} in power')
@@ -417,24 +417,28 @@ class CSRTensor(SparseTensor):
             or a Tensor if `other` is a dense tensor.
         """
         if isinstance(other, CSRTensor):
-            if (self.values() is None) or (other.values() is None):
+            if (self.values is None) or (other.values is None):
                 raise ValueError("Matrix multiplication between CSRTensor without "
                                  "value is not implemented now")
-            crow, col,values, spshape = spspmm_csr(
-                self._crow,self._col ,self._values, self.sparse_shape,
-                other._crow, other._col,other._values, other.sparse_shape,
-            )
-            return CSRTensor(crow, col,values, spshape)
+            if hasattr(bm, 'csr_spspmm'):
+                crow, col, values, spshape = bm.csr_spspmm(
+                    self.crow, self.col, self.values, self.sparse_shape,
+                    other.crow, other.col, other.values, other.sparse_shape
+                )
+            else:
+                crow, col,values, spshape = spspmm_csr(
+                    self._crow,self._col ,self._values, self.sparse_shape,
+                    other._crow, other._col,other._values, other.sparse_shape,
+                )
+            return CSRTensor(crow, col, values, spshape)
 
         elif isinstance(other, TensorLike):
-            if self.values() is None:
+            if self.values is None:
                 raise ValueError()
-            try:
+            if hasattr(bm, 'csr_spmm'):
                 return bm.csr_spmm(self._crow, self._col, self._values, self._spshape, other)
-            except (AttributeError, NotImplementedError):
-                pass
-
-            return spmm_csr(self._crow, self._col,self._values,self.sparse_shape, other)
+            else:
+                return spmm_csr(self._crow, self._col,self._values,self.sparse_shape, other)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")

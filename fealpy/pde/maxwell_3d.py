@@ -231,8 +231,9 @@ class BubbleData3d():
         return bm.concatenate([f1, f2, f3], axis=-1)
     
     @cartesian
-    def dirichlet(self, p):
-        val = self.solution(p)
+    def dirichlet(self, p,n):
+        val1 = self.solution(p)
+        val = bm.cross(val1,n)
         return val
     
     @cartesian

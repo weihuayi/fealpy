@@ -1,6 +1,7 @@
 # test_coo_tensor.py
 import pytest
 
+from fealpy.sparse import coo_matrix as fpy_coo_matrix
 from fealpy.sparse.coo_tensor import COOTensor
 from fealpy.backend import backend_manager as bm
 
@@ -132,11 +133,11 @@ def test_ravel(backend):
     expected_indices = bm.tensor([[1, 9]])
     expected_sparse_shape = (12, )
 
-    assert bm.allclose(raveled_coo_tensor.indices(), expected_indices)
-    assert raveled_coo_tensor.values() is coo_tensor.values() # must be the same object
+    assert bm.allclose(raveled_coo_tensor.indices, expected_indices)
+    assert raveled_coo_tensor.values is coo_tensor.values # must be the same object
     assert raveled_coo_tensor.sparse_shape == expected_sparse_shape
     # make sure the COOTensor is shaped (*dense_shape, 1)
-    assert raveled_coo_tensor.indices().shape[0] == 1
+    assert raveled_coo_tensor.indices.shape[0] == 1
 
 
 @pytest.mark.parametrize("backend", ALL_BACKENDS)
@@ -230,7 +231,7 @@ class TestCOOTensorAdd:
         assert bm.allclose(result1._values, expected_values1)
         expected_indices2 = bm.tensor([[0, 1, 0, 2], [2, 3, 1, 3]])
         assert bm.allclose(result2._indices, expected_indices2)
-        assert result2.values() is None
+        assert result2.values is None
 
     @pytest.mark.parametrize("backend", ALL_BACKENDS)
     def test_add_tensor(self, backend):
@@ -273,6 +274,28 @@ class TestCOOTensorAdd:
         # 尝试添加不支持的类型，期望抛出 TypeError
         with pytest.raises(TypeError):
             coo.add("a string", alpha=1.0)
+
+class TestCOOTensorMatmul():
+    @pytest.mark.parametrize("backend", ALL_BACKENDS)
+    def test_matmul_sparse(self, backend):
+        bm.set_backend(backend)
+        m1 = bm.array([
+            [1, 0, 0, 3],
+            [0, 1, 2, 4],
+            [0, 0, 1, 0],
+            [3, 0, 5, 1]
+        ], dtype=bm.float64)
+        m2 = bm.array([
+            [6, 7, 0, 0],
+            [3, 4, 0, 0],
+            [2, 0, 5, 0],
+            [0, 0, 0, 1]
+        ], dtype=bm.float64)
+        m3 = m1 @ m2
+        csr1 = fpy_coo_matrix(m1)
+        csr2 = fpy_coo_matrix(m2)
+        csr3 = csr1 @ csr2
+        assert bm.allclose(csr3.toarray(), m3)
 
 
 class TestCOOTensorConcat:
@@ -318,8 +341,8 @@ class TestCOOTensorConcat:
         expected_values = [1, 2, 3, 4]
         expected_shape = (6, 4)
 
-        assert bm.tolist(result.indices()) == expected_indices
-        assert bm.tolist(result.values()) == expected_values
+        assert bm.tolist(result.indices) == expected_indices
+        assert bm.tolist(result.values) == expected_values
         assert result.sparse_shape == expected_shape
 
     @pytest.mark.parametrize("backend", ALL_BACKENDS)
@@ -345,6 +368,6 @@ class TestCOOTensorConcat:
         expected_values = [1, 2, 3, 4]
         expected_shape = (2, 7)
 
-        assert bm.tolist(result.indices()) == expected_indices
-        assert bm.tolist(result.values()) == expected_values
+        assert bm.tolist(result.indices) == expected_indices
+        assert bm.tolist(result.values) == expected_values
         assert result.sparse_shape == expected_shape

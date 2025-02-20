@@ -109,20 +109,12 @@ class Filter:
         应用滤波器修改灵敏度
         
         Parameters
-        ----------
-        gradient : TensorLike
-            原始梯度
-        design_vars : TensorLike
-            设计变量
-        gradient_type : Literal['objective', 'constraint']
-            梯度类型，用于区分目标函数梯度和约束函数梯度
-        filter_params : Optional[dict]
-            过滤器参数
+        - gradient : 原始梯度
+        - design_vars : 设计变量
+        - gradient_type : 梯度类型, 用于区分目标函数梯度和约束函数梯度
+        - filter_params : 滤波器参数
             
         Returns
-        -------
-        TensorLike
-            过滤后的梯度
         """
         cell_measure = self._mesh.entity_measure('cell')
 
@@ -177,17 +169,12 @@ class Filter:
         对密度进行滤波
 
         Parameters
-        ----------
-        density : TensorLike
-            原始密度场
-        filter_params : Optional[dict]
-            过滤器参数，对于 Heaviside 滤波需要:
+        - density : 原始密度场
+        - filter_params : 过滤器参数, 对于 Heaviside 滤波需要:
             - beta: 投影参数
 
         Returns
-        -------
-        TensorLike
-            过滤后的物理密度场
+        - 过滤后的物理密度场
         """
         # 获取单元度量
         cell_measure = self._mesh.entity_measure('cell')
