@@ -131,18 +131,16 @@ class DirichletBC():
         Returns:
             SparseTensor: New adjusted left-hand-size matrix.
         """
-        # NOTE: Code in the numpy version:
-        # ```
-        # bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        # bdIdx[isDDof.reshape(-1)] = 1
-        # D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        # D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        # A = D0@A@D0 + D1
-        # ```
-        # Here the adjustment is done by operating the sparse structure directly.
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
+        bdIdx = np.zeros(A.shape[0], dtype=**kwargs)
+        bdIdx[isDDof.reshape(-1)] = 1
+        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        A = D0@A@D0 + D1
+        return A
+        '''
         if isinstance(A, COOTensor):
             indices = A.indices()
             remove_flag = bm.logical_or(
@@ -189,9 +187,8 @@ class DirichletBC():
 
             # A = CSRTensor(new_crow, new_col, new_values)
             A = CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
-
-
         return A
+        '''
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
                      uh: Optional[TensorLike]=None,

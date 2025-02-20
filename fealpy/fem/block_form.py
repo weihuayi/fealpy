@@ -50,8 +50,8 @@ class BlockForm(Form):
                 if block is None:
                     continue
                 block_matrix = block.assembly(format='coo')
-                block_indices = block_matrix.indices() + bm.array([[row_offset[i]], [col_offset[j]]])
-                block_values = block_matrix.values() 
+                block_indices = block_matrix.indices + bm.array([[row_offset[i]], [col_offset[j]]])
+                block_values = block_matrix.values 
                 indices = bm.concatenate((indices, block_indices), axis=1)
                 values = bm.concatenate((values, block_values))
         M = COOTensor(indices, values, sparse_shape) 
