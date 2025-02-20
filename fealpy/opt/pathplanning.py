@@ -102,7 +102,7 @@ class PathPlanning:
         if self.result is None:
             print("Error: No results available. Please run the `solve` method first.")
         else:
-            # print('The optimal path distance: ', self.result["distance"])
+            print('The optimal path distance: ', self.result["fit"])
             print("The optimal path: ", self.result["path"])
             print("Running time: ", self.running_time, "seconds")
             path_x = self.textMAP.data["node"][self.result["path"], 0]
@@ -226,7 +226,7 @@ class PathPlanningProblem:
 
         plt.xticks([])
         plt.yticks([])
-        plt.title(f'( {round(time, 4)} s) The optimal path from QPSO : ')
+        plt.title(f'( {round(time, 4)} s) The optimal path from: ')
         xpath = self.data["node"][result["path"], 0]
         ypath = self.data["node"][result["path"], 1]
         plt.plot(xpath, ypath, '-', color = 'red')
