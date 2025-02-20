@@ -11,7 +11,7 @@ from .utils import (
 )
 from ._spspmm import spspmm_csr
 from ._spmm import spmm_csr
-
+from .coo_tensor import COOTensor
 
 class CSRTensor(SparseTensor):
     def __init__(self, crow: TensorLike, col: TensorLike, values: Optional[TensorLike],
@@ -69,7 +69,7 @@ class CSRTensor(SparseTensor):
 
     ### 1. Data Fetching ###
     @property
-    def itype(self): return self._crow.dtype
+    def itype(self): return self._col.dtype
 
     @property
     def nnz(self): return self._col.shape[-1]
@@ -80,15 +80,12 @@ class CSRTensor(SparseTensor):
         return self._crow
 
     @property
+    def col(self): return self._col
+
+    @property
     def values(self) -> Optional[TensorLike]:
         """Return the non-zero elements"""
         return self._values
-
-    @property
-    def indptr(self): return self._crow # scipy convention
-
-    @property
-    def indices(self): return self._col # scipy convention
 
     @property
     def row(self):
@@ -98,16 +95,17 @@ class CSRTensor(SparseTensor):
         return bm.repeat(bm.arange(nrow, **kargs), count)
 
     @property
-    def col(self): return self._col
+    def indptr(self): return self._crow # scipy convention
 
     @property
-    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        """
-        """
-        return self.row, self._col
+    def indices(self): return self._col # scipy convention
 
     @property
     def data(self): return self._values # scipy convention
+
+    @property
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
+        return self.row, self._col
 
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
@@ -279,49 +277,32 @@ class CSRTensor(SparseTensor):
             out (CSRTensor | Tensor): A new CSRTensor if `other` is a CSRTensor,\
             or a Tensor if `other` is a dense tensor.
         """
+        self_indices = bm.stack(self.nonzero_slice, axis=0)
         if isinstance(other, CSRTensor):
+            other_indices = bm.stack(other.nonzero_slice, axis=0)
             check_shape_match(self.shape, other.shape)
             check_spshape_match(self.sparse_shape, other.sparse_shape)
-
-            if (self._values is None) and (not other._values is None):  
-                raise ValueError("self has no value while other does")
-            elif (not self._values is None) and (other._values is None):
-                raise ValueError("self has value while other does not")
-
-            new_crow = bm.array([0],dtype=bm.int64)
-            new_col = bm.array([],dtype=bm.int64)
-            new_values = bm.array([],dtype=bm.int64)
-
-            for i in range(0, self._crow.shape[0]-1): 
-                indices1 = self._col[self._crow[i]:self._crow[i+1]]
-                indices2 = other._col[other._crow[i]:other._crow[i+1]]
-                col, inverse_indices = bm.unique(bm.concat((indices1,indices2)), return_inverse=True)
-
-                if self._values is None:
-                    new_values = None
+            
+            new_indices = bm.concat((self_indices, other_indices), axis=1)
+            context = bm.context(new_indices)
+            if self._values is None:
+                if other._values is None:
+                    self._values = bm.zeros((self._crow[-1], ), **context) + 1.0
+                    other._values = bm.zeros((other._crow[-1], ), **context) + 1.0
                 else:
-                    value1 = self._values[self._crow[i]:self._crow[i+1]]
-                    value2 = other._values[other._crow[i]:other._crow[i+1]]
-                    val =bm.concat((value1,alpha*value2))
-                    values = bm.zeros(col.shape[0],dtype=val.dtype)
-                    values = bm.index_add(values, inverse_indices, val, axis=-1)
-                    new_values = bm.concat((new_values,values))
-                new_crow = bm.concat((new_crow,bm.tensor([len(col)+new_crow[-1]])))
-                new_col = bm.concat((new_col,col))
-
-            return CSRTensor(new_crow, new_col,new_values ,self.sparse_shape)
+                    self._values = bm.zeros((self._crow[-1], ), **context) + 1.0
+            else:
+                if other._values is None:
+                    other._values = bm.zeros((other._crow[-1], ), **context) + 1.0
+            new_values = bm.concat((self._values, other._values*alpha), axis=-1)
+            return COOTensor(new_indices, new_values, self.sparse_shape).tocsr()
 
         elif isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
             output = other * alpha
             context = bm.context(output)
             output = output.reshape(self.dense_shape + (prod(self._spshape),))
-
-            count = self._crow[1:] - self._crow[:-1]
-            nrow = self._crow.shape[0] - 1
-            row = bm.repeat(bm.arange(nrow), count)
-            indices = bm.stack([row, self._col], axis=0)
-            flattened = flatten_indices(indices, self._spshape)[0]
+            flattened = flatten_indices(self_indices, self._spshape)[0]
 
             if self._values is None:
                 src = bm.ones((1,) * (self.dense_ndim + 1), **context)

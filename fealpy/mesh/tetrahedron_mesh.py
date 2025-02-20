@@ -16,27 +16,28 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         self.p = 1 # linear mesh
 
         #kwargs = {"dtype": self.cell.dtype, } # TODO: 增加 device 参数
-        kwargs = bm.context(cell)
+        self.ikwargs = bm.context(cell)
+        self.fkwargs = bm.context(node)
         self.localEdge = bm.tensor([
-            (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)], **kwargs)
+            (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)], **self.ikwargs)
         self.localFace = bm.tensor([
-            (1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)], **kwargs)
+            (1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)], **self.ikwargs)
         self.localCell = bm.tensor([
             (0, 1, 2, 3), (0, 2, 3, 1), (0, 3, 1, 2),
             (1, 2, 0, 3), (1, 0, 3, 2), (1, 3, 2, 0),
             (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
-            (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)], **kwargs)
+            (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)], **self.ikwargs)
 
-        self.ccw = bm.tensor([0, 1, 2], **kwargs)
+        self.ccw = bm.tensor([0, 1, 2], **self.ikwargs)
         self.construct()
         self.OFace = bm.tensor([
-            (1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)], **kwargs)
+            (1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)], **self.ikwargs)
         self.SFace = bm.tensor([
-            (1, 2, 3),  (0, 2, 3), (0, 1, 3), (0, 1, 2)], **kwargs)
+            (1, 2, 3),  (0, 2, 3), (0, 1, 3), (0, 1, 2)], **self.ikwargs)
         self.localFace2edge = bm.tensor([
-            (5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)], **kwargs)
+            (5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)], **self.ikwargs)
         self.localEdge2face = bm.tensor(
-                [[2, 3], [3, 1], [1, 2], [0, 3], [2, 0], [0, 1]], **kwargs)
+                [[2, 3], [3, 1], [1, 2], [0, 3], [2, 0], [0, 1]], **self.ikwargs)
 
         self.nodedata = {}
         self.edgedata = {}
@@ -72,7 +73,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         
         NC = self.number_of_cells()
         NFC = self.number_of_faces_of_cells()
-        cell2faceSign = bm.zeros((NC, NFC), dtype=bm.bool)
+        cell2faceSign = bm.zeros((NC, NFC), dtype=bm.bool, device=self.device)
         f2c = self.face_to_cell()
         cell2faceSign[f2c[:, 0], f2c[:, 2]] = True
         return cell2faceSign
@@ -80,7 +81,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def from_one_tetrahedron(cls, meshtype='equ'):
+    def from_one_tetrahedron(cls, meshtype='equ', device=None):
         """
         """
         if meshtype == 'equ':
@@ -88,14 +89,14 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.5, sqrt(3)/2, 0.0],
-                [0.5, sqrt(3)/6, sqrt(2/3)]], dtype=bm.float64)
+                [0.5, sqrt(3)/6, sqrt(2/3)]], dtype=bm.float64, device=device)
         elif meshtype == 'iso':
             node = bm.tensor([
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0],
                 [0.0, 0.0, 1.0]], dtype=bm.float64)
-        cell = bm.tensor([[0, 1, 2, 3]], dtype=bm.int32)
+        cell = bm.tensor([[0, 1, 2, 3]], dtype=bm.int32, device=device)
         return cls(node, cell)
 
     def face_to_edge_sign(self):
@@ -104,7 +105,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         face = self.face
         NF = len(face2edge)
         NEF = 3
-        face2edgeSign = bm.zeros((NF, NEF),device=bm.get_device(face), dtype=bm.bool)
+        face2edgeSign = bm.zeros((NF, NEF),dtype=bm.bool, device=self.device)
         n = [1, 2, 0]
         for i in range(3):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
@@ -118,7 +119,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             cell = self.cell
         NC = self.number_of_cells()
         NEC = self.number_of_edges_of_cells()
-        cell2edgeSign = bm.zeros((NC, NEC), dtype=bm.bool)
+        cell2edgeSign = bm.zeros((NC, NEC), dtype=bm.bool, device=self.device)
         localEdge = self.localEdge
         E = localEdge.shape[0]
         #for i, (j, k) in zip(range(E), localEdge):
@@ -193,7 +194,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         elif etype in {'edge', 1}:
             return self.edge_length(index=index)
         elif etype in {'node', 0}:
-            return bm.zeros(1, dtype=self.ftype)
+            return bm.zeros(1, **self.fkwargs)
         else:
             raise ValueError(f"entity type: {etype} is wrong!")
     
@@ -216,7 +217,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         node = self.node
         cell = self.cell
         NC = self.number_of_cells() if bm.all(index == _S) else len(index)
-        Dlambda = bm.zeros((NC, 4, 3), device=self.device, dtype=self.ftype)
+        Dlambda = bm.zeros((NC, 4, 3), device=self.device, **self.fkwargs)
         volume = self.entity_measure('cell', index=index)
         for i in range(4):
             j,k,m = localFace[i]
@@ -235,7 +236,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         v2 = node[face[..., 1]] - node[face[..., 0]]
         GD = self.geo_dimension()
         nv = bm.cross(v1, v2)
-        Dlambda = bm.zeros((NF, 3, GD),device=bm.get_device(face), dtype=self.ftype)
+        Dlambda = bm.zeros((NF, 3, GD),device=bm.get_device(face), **self.fkwargs)
 
         length = bm.linalg.norm(nv, axis=-1, keepdims=True)
         n = nv / length
@@ -252,7 +253,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         NE = self.number_of_edges()
         face2edge = self.face_to_edge()
         isBdFace = self.boundary_face_flag()
-        isBdEdge = bm.zeros(NE, dtype=bm.bool)
+        isBdEdge = bm.zeros(NE, dtype=bm.bool, device=self.device)
         isBdEdge[face2edge[isBdFace, :]] = True
         return isBdEdge 
         
@@ -309,19 +310,19 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
         ldof = self.number_of_local_ipoints(p)
         gdof = self.number_of_global_ipoints(p)
-        ipoints = bm.zeros((gdof, GD), dtype=self.ftype)
+        ipoints = bm.zeros((gdof, GD), **self.fkwargs)
         ipoints[:NN, :] = node
 
         if p > 1:
             NE = self.number_of_edges()
             edge = self.entity('edge')
-            w = bm.zeros((p-1,2), dtype=self.ftype) #TODO: fix it
+            w = bm.zeros((p-1,2), **self.fkwargs) #TODO: fix it
             w[:, 0] = bm.arange(p-1, 0, -1)/p
             w[:, 1] = bm.flip(w,axis=0)[:,0]
             ipoints[NN:NN+(p-1)*NE, :] = bm.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, GD)
 
         if p > 2:
-            mi = self.multi_index_matrix(p, TD-1, dtype=self.ftype)
+            mi = self.multi_index_matrix(p, TD-1, **self.fkwargs)
             NF = self.number_of_faces()
             fidof = (p+1)*(p+2)//2 - 3*p
             face = self.entity('face')
@@ -330,7 +331,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             ipoints[NN+(p-1)*NE:NN+(p-1)*NE+fidof*NF, :] = bm.einsum('ij, kj...->ki...', w, node[face, :]).reshape(-1, GD)
 
         if p > 3:
-            mi = self.multi_index_matrix(p, TD, dtype=self.ftype)
+            mi = self.multi_index_matrix(p, TD, **self.fkwargs)
             isInCellIPoints = bm.sum(mi > 0, axis=-1) == 4
             w = mi[isInCellIPoints, :]/p
             ipoints[NN+(p-1)*NE+fidof*NF:, :] = bm.einsum('ij, kj...->ki...', w,
@@ -372,7 +373,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             base = NN + (p-1)*NE
             isInFaceIPoint = ~(isEdgeIPoint[:, 0] | isEdgeIPoint[:, 1] | isEdgeIPoint[:, 2])
             fidof = fdof - 3*p
-            face2ipoint[:, isInFaceIPoint] = base + bm.arange(NF*fidof,dtype=self.itype).reshape(NF, fidof)
+            face2ipoint[:, isInFaceIPoint] = base + bm.arange(NF*fidof,**self.ikwargs).reshape(NF, fidof)
 
         return face2ipoint[index]
 
@@ -399,7 +400,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         cell = self.entity('cell')
         cell2face = self.cell_to_face()
 
-        cell2ipoint = bm.zeros((NC, ldof), dtype=self.itype)
+        cell2ipoint = bm.zeros((NC, ldof), **self.ikwargs)
 
         face2ipoint = self.face_to_ipoint(p)
         m2 = self.multi_index_matrix(p, TD-1).T
@@ -427,7 +428,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             base = NN + (p-1)*NE + (fdof - 3*p)*NF
             idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
             isInCellIPoint = ~(isFaceIPoint[0] | isFaceIPoint[1] | isFaceIPoint[2] | isFaceIPoint[3])
-            cell2ipoint[:, isInCellIPoint] = base + bm.arange(NC*idof,dtype=self.itype).reshape(NC, idof)
+            cell2ipoint[:, isInCellIPoint] = base + bm.arange(NC*idof,**self.ikwargs).reshape(NC, idof)
 
         return cell2ipoint
 
@@ -508,17 +509,17 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             self.node = bm.concatenate((node, newNode), axis=0)
 
             if returnim:
-                A = coo_matrix((bm.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
+                A = coo_matrix((bm.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), **self.fkwargs)
+                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), **self.fkwargs)
+                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), **self.fkwargs)
                 nodeIMatrix.append(A.tocsr())
 
-                B = eye(NC, dtype=self.ftype)
+                B = eye(NC, **self.fkwargs)
                 B = bmat([[B], [B], [B], [B], [B], [B], [B], [B]])
                 cellIMatrix.append(B.tocsr())
 
             p = edge2newNode[cell2edge]
-            newCell = bm.zeros((8*NC, 4), dtype=self.itype)
+            newCell = bm.zeros((8*NC, 4), **self.ikwargs)
 
             newCell = bm.set_at(newCell , (slice(4*NC),3) , cell.T.flatten())
             newCell = bm.set_at(newCell , (slice(NC),slice(3)) , p[:,[0,2,1]])
@@ -526,7 +527,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             newCell = bm.set_at(newCell , (slice(2*NC , 3*NC),slice(3)) , p[:, [1, 5, 3]])
             newCell = bm.set_at(newCell , (slice(3*NC , 4*NC),slice(3)) , p[:, [2, 4, 5]])
 
-            l = bm.zeros((NC, 3), dtype=self.ftype)
+            l = bm.zeros((NC, 3), **self.fkwargs)
             node = self.node
             l = bm.set_at(l , (slice(None) , 0) , bm.sum((node[p[:, 0]] - node[p[:, 5]])**2, axis=1))
             l = bm.set_at(l , (slice(None) , 1) , bm.sum((node[p[:, 1]] - node[p[:, 4]])**2, axis=1))
@@ -664,19 +665,19 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             options["HB"] = HB
    
         if isMarkedCell is None: # 加密所有的单元
-            markedCell = bm.arange(NC, dtype=self.itype)
+            markedCell = bm.arange(NC, **self.ikwargs)
         else:
             markedCell, = bm.nonzero(isMarkedCell)
 
         # allocate new memory for node and cell
-        node = bm.zeros((9*NN, 3), dtype=self.ftype)
-        cell = bm.zeros((4*NC, 4), dtype=self.itype)
+        node = bm.zeros((9*NN, 3), **self.fkwargs)
+        cell = bm.zeros((4*NC, 4), **self.ikwargs)
 
         node = bm.set_at(node, slice(NN), self.entity('node'))
         cell = bm.set_at(cell, slice(NC), self.entity('cell'))
 
         for key in self.celldata:
-            data = bm.zeros(4*NC, dtype=self.ftype)
+            data = bm.zeros(4*NC, **self.fkwargs)
             data = bm.set_at(data, slice(NC), self.celldata[key])
             data = bm.set_at(self.celldata , key, data.copy())
 
@@ -684,13 +685,13 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         generation = bm.zeros(NN + 6*NC, dtype=bm.uint8)
 
         # 用于记录被二分的边及其中点编号
-        cutEdge = bm.zeros((8*NN, 3), dtype=self.itype)
+        cutEdge = bm.zeros((8*NN, 3), **self.ikwargs)
 
         # 当前的二分边的数目
         nCut = 0
 
         # 非协调边的标记数组
-        nonConforming = bm.ones(8*NN, dtype=bm.bool)
+        nonConforming = bm.ones(8*NN, dtype=bm.bool, device=self.device)
         IM = eye(NN)
         while len(markedCell) != 0:
             # 标记最长边
@@ -704,7 +705,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
             # 找到新的二分边和新的中点
             nMarked = len(markedCell)
-            p4 = bm.zeros(nMarked, dtype=self.itype)
+            p4 = bm.zeros(nMarked, **self.ikwargs)
 
             if nCut == 0: # 如果是第一次循环
                 idx = bm.arange(nMarked) # cells introduce new cut edges
@@ -714,12 +715,12 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 NE = len(ncEdge)
                 I = cutEdge[ncEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[ncEdge][:, [0, 1]].reshape(-1)
-                val = bm.ones(len(I), dtype=bm.bool)
+                val = bm.ones(len(I), dtype=bm.bool, device=self.device)
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
                 i, j =  (nv2v[:, p0].multiply(nv2v[:, p1])).nonzero()
-                p4 = bm.set_at(p4, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
+                p4 = bm.set_at(p4, bm.array(j,**self.ikwargs), bm.array(i,**self.ikwargs))
                 idx, = bm.nonzero(p4 == 0)
 
             if len(idx) != 0:
@@ -729,7 +730,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 cellCutEdge = bm.sort(cellCutEdge,axis=0)
                 s = csr_matrix(
                     (
-                        bm.ones(NE, dtype=bm.bool),
+                        bm.ones(NE, dtype=bm.bool, device=self.device),
                         (
                             cellCutEdge[0, ...],
                             cellCutEdge[1, ...]
@@ -737,23 +738,23 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                     ), shape=(NN, NN))
                 # 获得唯一的边
                 i, j = s.nonzero()
-                i = bm.tensor(i,dtype=self.itype)
-                j = bm.tensor(j,dtype=self.itype)
+                i = bm.tensor(i,**self.ikwargs)
+                j = bm.tensor(j,**self.ikwargs)
                 nNew = len(i)
                 newCutEdge = bm.arange(nCut, nCut+nNew)
                 cutEdge = bm.set_at(cutEdge, (newCutEdge,0), i)
                 cutEdge = bm.set_at(cutEdge, (newCutEdge,1), j)
-                cutEdge = bm.set_at(cutEdge, (newCutEdge,2), bm.arange(NN, NN+nNew,dtype=self.itype))
+                cutEdge = bm.set_at(cutEdge, (newCutEdge,2), bm.arange(NN, NN+nNew,**self.ikwargs))
                 node = bm.set_at(node, slice(NN, NN+nNew), (node[i, :] + node[j, :])/2.0)
 
                 if returnim is True:
                     val = bm.full(nNew, 0.5)
                     I = coo_matrix(
                             (val, (range(nNew), i)), shape=(nNew, NN),
-                            dtype=self.ftype)
+                            **self.fkwargs)
                     I += coo_matrix(
                             (val, (range(nNew), j)), shape=(nNew, NN),
-                            dtype=self.ftype)
+                            **self.fkwargs)
                     I = bmat([[eye(NN)], [I]], format='csr')
                     IM = I@IM
 
@@ -763,12 +764,12 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 # 新点和旧点的邻接矩阵
                 I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
-                val = bm.ones(len(I), dtype=bm.bool)
+                val = bm.ones(len(I), dtype=bm.bool, device=self.device)
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
                 i, j =  (nv2v[:, p0].multiply(nv2v[:, p1])).nonzero()
-                p4 = bm.set_at(p4, bm.array(j,dtype=self.itype), bm.array(i,dtype=self.itype))
+                p4 = bm.set_at(p4, bm.array(j,**self.ikwargs), bm.array(i,**self.ikwargs))
 
             # 如果新点的代数仍然为 0
             idx = (generation[p4] == 0)
@@ -799,7 +800,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
             # 找到非协调的单元
             checkEdge, = bm.nonzero(nonConforming[:nCut])
-            isCheckNode = bm.zeros(NN, dtype=bm.bool)
+            isCheckNode = bm.zeros(NN, dtype=bm.bool, device=self.device)
             isCheckNode = bm.set_at(isCheckNode, cutEdge[checkEdge], True)
             isCheckCell = bm.sum(
                     isCheckNode[cell[:NC]],
@@ -808,7 +809,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             checkCell, = bm.nonzero(isCheckCell)
             I = bm.repeat(checkCell, 4)
             J = cell[checkCell].reshape(-1)
-            val = bm.ones(len(I), dtype=bm.bool)
+            val = bm.ones(len(I), dtype=bm.bool, device=self.device)
             cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             i, j =  (cell2node[:, cutEdge[checkEdge, 0]].multiply(
                         cell2node[:, cutEdge[checkEdge, 1]]
@@ -1142,7 +1143,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         NV = cell.shape[-1]
 
         cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
-        cell[:, 0] = NV
+        cell = bm.set_at(cell, (slice(NC), 0), NV)
 
         if etype == 'cell':
             cellType = 10  # 四面体

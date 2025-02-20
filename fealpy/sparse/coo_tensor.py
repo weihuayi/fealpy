@@ -6,8 +6,7 @@ from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
 from .sparse_tensor import SparseTensor
 from .utils import (
-    flatten_indices, tril_coo,
-    check_shape_match, check_spshape_match
+    flatten_indices, check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_coo
 from ._spmm import spmm_coo
@@ -74,11 +73,6 @@ class COOTensor(SparseTensor):
     def nnz(self): return self._indices.shape[1]
 
     @property
-    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        slicing = [self._indices[i] for i in range(self.sparse_ndim)]
-        return (slice(None),) * self.dense_ndim + tuple(slicing)
-
-    @property
     def indices(self) -> TensorLike:
         """Return the indices of the non-zero elements."""
         return self._indices
@@ -96,6 +90,11 @@ class COOTensor(SparseTensor):
 
     @property
     def data(self): return self._values # scipy convention
+
+    @property
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
+        slicing = [self._indices[i] for i in range(self.sparse_ndim)]
+        return (slice(None),) * self.dense_ndim + tuple(slicing)
 
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
