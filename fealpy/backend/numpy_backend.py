@@ -220,6 +220,26 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
 
         return crow, col, data
 
+    ### Function Transforms ###
+    @staticmethod
+    def vmap(func, /, in_axes=0, out_axes=0, *args, **kwds):
+        if in_axes != out_axes:
+            raise ValueError(f"Only support in_axes == out_axes with numpy backend")
+        from functools import partial
+        def vectorized(*args, **kwargs):
+            arr_lists = [np.unstack(arr, axis=in_axes)
+                         for arr in args if isinstance(arr, np.ndarray)]
+            results = tuple(map(partial(func, **kwargs), *arr_lists))
+
+            if isinstance(results[0], tuple):
+                results = map(partial(np.stack, axis=in_axes), zip(*results))
+                results = tuple(results)
+            else:
+                results = np.stack(results, axis=in_axes)
+            return results
+
+        return vectorized
+
     ### FEALPy Functions ###
 
     @staticmethod
