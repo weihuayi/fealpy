@@ -3,13 +3,14 @@ import jax.numpy as jnp
 import numpy as np
 from fealpy.mesh.node_mesh import NodeMesh
 from fealpy.cfd.sph.particle_solver import SPHSolver, Tag, TimeLine
-from fealpy.cfd.sph import partition 
-from fealpy.cfd.sph.jax_md.partition import Sparse
+from fealpy.backend.jax import partition 
+from fealpy.backend.jax.jax_md.partition import Sparse
 from fealpy.cfd.sph.particle_kernel_function import QuinticKernel
 from jax_md import space
 from jax import vmap
 import time
 
+jnp.set_printoptions(threshold=jnp.inf) # 打印
 jax.config.update("jax_enable_x64", True) # 启用 float64 支持
 #jax.config.update('jax_platform_name', 'cpu')
 
@@ -37,7 +38,6 @@ t_num = int(T / dt)
 
 #初始化
 mesh = NodeMesh.from_heat_transfer_domain(dx=dx,dy=dx)
-
 solver = SPHSolver(mesh)
 kernel = QuinticKernel(h=h, dim=2)
 displacement, shift = space.periodic(side=box_size)
@@ -120,9 +120,6 @@ for i in range(100):
     #更新边界条件
     mesh.nodedata = solver.boundary_conditions(mesh.nodedata, box_size, dx=dx)
 
-    jnp.set_printoptions(threshold=jnp.inf)
-    jnp.set_printoptions(formatter={'float': '{: .10f}'.format})
-    
     #fname = path + 'test_'+ str(i+1).zfill(10) + '.h5'
     #solver.write_h5(mesh.nodedata, fname)
     #fname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'

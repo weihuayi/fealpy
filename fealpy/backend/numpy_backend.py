@@ -224,7 +224,7 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
     @staticmethod
     def query_point(x, y, h, box_size, mask_self=True, periodic=[True, True, True]):
         if not isinstance(periodic, list) or len(periodic) != 3 or not all(isinstance(p, bool) for p in periodic):
-            raise TypeError("periodic的类型应该是：[bool, bool, bool]，即一个包含三个布尔值的列表")
+            raise TypeError("periodic type is：[bool, bool, bool]")
         def map_points(a, b, r, positions):
             x, y = positions[:, 0], positions[:, 1]
             cond_1 = (0 <= x) & (x <= r) & (r < y) & (y < b - r)  # 区域[(0, r), (r, b-r)]
@@ -296,7 +296,7 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
             mapped_bool = np.concatenate([bool_positions, bool_5, bool_3, bool_6, bool_1, bool_2, bool_7, bool_4, bool_8], axis=0)
             return mapped_positions, mapped_indices, mapped_bool
 
-        if mask_self and all(periodic):
+        if all(periodic):
             map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], h, x)
             map_y , map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], h, y)
             tree = KDTree(map_x)
@@ -310,7 +310,13 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
             neighbors = neighbors[map_bool]
             node_self = node_self[node_self < x.shape[0]]
 
-        elif mask_self and not any(periodic):
+            if not mask_self:
+                mask = node_self == neighbors
+                node_self = node_self[~mask]
+                neighbors = neighbors[~mask]
+
+        elif not any(periodic):
+        #TODO 用for循环得到bool值和索引来实现单边周期边界条件
             map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], 0, x)
             map_y , map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], 0, y)
             tree = KDTree(map_x)
@@ -324,39 +330,11 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
             neighbors = neighbors[map_bool]
             node_self = node_self[node_self < x.shape[0]]
 
-        elif not mask_self and all(periodic):
-            map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], h, x)
-            map_y , map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], h, y)
-            tree = KDTree(map_x)
-            neighbors = tree.query_ball_point(map_y, h)
-            lengths = np.array([len(sublist) for sublist in neighbors]) 
-            a = np.arange(len(lengths))
-            node_self = np.repeat(a, lengths)
-            neighbors = np.concatenate(neighbors)
-            map_bool = map_bool_x[node_self]
-            neighbors = map_idx_x[neighbors]
-            neighbors = neighbors[map_bool]
-            node_self = node_self[node_self < x.shape[0]]
-            mask = node_self == neighbors
-            node_self = node_self[~mask]
-            neighbors = neighbors[~mask]
+            if not mask_self:
+                mask = node_self == neighbors
+                node_self = node_self[~mask]
+                neighbors = neighbors[~mask]
 
-        elif not mask_self and any(periodic):
-            map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], 0, x)
-            map_y , map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], 0, y)
-            tree = KDTree(map_x)
-            neighbors = tree.query_ball_point(map_y, h)
-            lengths = np.array([len(sublist) for sublist in neighbors]) 
-            a = np.arange(len(lengths))
-            node_self = np.repeat(a, lengths)
-            neighbors = np.concatenate(neighbors)
-            map_bool = map_bool_x[node_self]
-            neighbors = map_idx_x[neighbors]
-            neighbors = neighbors[map_bool]
-            node_self = node_self[node_self < x.shape[0]]
-            mask = node_self == neighbors
-            node_self = node_self[~mask]
-            neighbors = neighbors[~mask]
         return node_self, neighbors
 
     ### FEALPy Functions ###
