@@ -4,15 +4,14 @@ from matplotlib import pyplot as plt
 
 from fealpy import logger
 logger.setLevel('WARNING')
-from fealpy.mesh import TriangleMesh
-from fealpy.functionspace import CmConformingFESpace2d 
+from fealpy.mesh import TetrahedronMesh
+from fealpy.functionspace.cm_conforming_fe_space3d import CmConformingFESpace3d 
 from fealpy.fem import BilinearForm 
 from fealpy.fem.mthlaplace_integrator import MthLaplaceIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
 from fealpy.fem import DirichletBC
 from fealpy.backend import backend_manager as bm
-from fealpy.solver import cg
-from fealpy.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, get_flist
+from fealpy.pde.biharmonic_triharmonic_3d import DoubleLaplacePDE, get_flist
 from fealpy.utils import timer
 from fealpy.decorator import barycentric
 from scipy.sparse.linalg import spsolve
@@ -23,20 +22,20 @@ logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        光滑元有限元方法求解双调和方程
+        光滑元有限元方法求解三维双调和方程
         """)
 
 parser.add_argument('--degree',
-        default=5, type=int,
-        help='光滑有限元空间的次数, 默认为 5 次.')
+        default=9, type=int,
+        help='光滑有限元空间的次数, 默认为 9 次.')
 
 parser.add_argument('--n',
-        default=4, type=int,
+        default=1, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=4, type=int,
-        help='默认网格加密求解的次数, 默认加密求解 4 次')
+        default=3, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 3 次')
 
 parser.add_argument('--backend',
         default='numpy', type=str,
@@ -60,11 +59,13 @@ tmr = timer()
 next(tmr)
 x = sp.symbols('x')
 y = sp.symbols('y')
+z = sp.symbols('z')
 #u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**4
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+#u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+u = sp.sin(4*x)*sp.sin(4*y)*sp.sin(4*z)
 pde = DoubleLaplacePDE(u, device=device) 
-ulist = get_flist(u, device=device)[:3]
-mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
+ulist = get_flist(u, device=device)
+mesh = TetrahedronMesh.from_box([0,1,0,1,0,1], n, n, n, device=device)
 
 ikwargs = bm.context(mesh.cell)
 fkwargs = bm.context(mesh.node)
@@ -78,7 +79,7 @@ errorMatrix = bm.zeros((3, maxit), **fkwargs)
 tmr.send('网格和pde生成时间')
 
 for i in range(maxit):
-    space = CmConformingFESpace2d(mesh, p, 1)
+    space = CmConformingFESpace3d(mesh, p, 1)
     
     tmr.send(f'第{i}次空间生成时间')
 
@@ -86,7 +87,8 @@ for i in range(maxit):
 
     bform = BilinearForm(space)
     coef = 1
-    integrator = MthLaplaceIntegrator(m=2, coef=1, q=p+4)
+    integrator = MthLaplaceIntegrator(m=2, coef=1, q=p+4,
+                                      method='without_numerical_integration')
     bform.add_integrator(integrator)
     lform = LinearForm(space)
     lform.add_integrator(ScalarSourceIntegrator(pde.source, q=p+4))
@@ -101,21 +103,10 @@ for i in range(maxit):
     gdof = space.number_of_global_dofs()
     NDof[i] = 1/4/2**i
     bc1 = DirichletBC(space, gd = ulist)
-    #import ipdb
-    #ipdb.set_trace()
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
-    #A = A.to_scipy()
-
-    #from numpy.linalg import cond
-    #print(gdof)
-    #print(cond(A.toarray()))
-    #A = coo_matrix(A)
-    #A = csr_matrix((A.values(), A.indices()),A.shape)
-    #uh[:] = bm.tensor(spsolve(A, F))
-    uh[:] = spsolve(A, F, "scipy")
+    uh[:] = spsolve(A, F, "mumps")
     
-    #uh[:] = cg(A, F, maxiter=400000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
 
     @barycentric
