@@ -153,11 +153,10 @@ class JAXBackend(BackendProxy, backend_name='jax'):
     @staticmethod
     def query_point(x, y, h, box_size, mask_self=True, periodic=[True, True, True]):
         if not isinstance(periodic, list) or len(periodic) != 3 or not all(isinstance(p, bool) for p in periodic):
-            raise TypeError("periodic的类型应该是：[bool, bool, bool]，即一个包含三个布尔值的列表")
+            raise TypeError("periodic type is：[bool, bool, bool]")
         displacement, shift = space.periodic(side=box_size)
        
-        if mask_self and all(periodic):
-            neighbor_fn = partition.neighbor_list(
+        neighbor_fn = partition.neighbor_list(
             displacement,
             box_size,
             r_cutoff = jnp.array(h, dtype=jnp.float64),
@@ -168,63 +167,10 @@ class JAXBackend(BackendProxy, backend_name='jax'):
             num_particles_max = x.shape[0],
             num_partitions = x.shape[0],
             pbc = periodic,
-        )
-            neighbor_list = neighbor_fn.allocate(x, num_particles=x.shape[0])
-            neighbors, node_self = neighbor_list.idx
-        
-        elif mask_self and not any(periodic):
-            neighbor_fn = partition.neighbor_list(
-            displacement,
-            box_size,
-            r_cutoff = jnp.array(h, dtype=jnp.float64),
-            backend ="jaxmd_vmap",
-            capacity_multiplier = 1,
-            mask_self = not mask_self,
-            format = Sparse,
-            num_particles_max = x.shape[0],
-            num_partitions = x.shape[0],
-            pbc = periodic,
-        )
-            neighbor_list = neighbor_fn.allocate(x, num_particles=x.shape[0])
-            neighbors, node_self = neighbor_list.idx
+            )
+        neighbor_list = neighbor_fn.allocate(x, num_particles=y.shape[0])
+        neighbors, node_self = neighbor_list.idx
 
-        elif not mask_self and all(periodic):
-            neighbor_fn = partition.neighbor_list(
-            displacement,
-            box_size,
-            r_cutoff = jnp.array(h, dtype=jnp.float64),
-            backend ="jaxmd_vmap",
-            capacity_multiplier = 1,
-            mask_self = not mask_self,
-            format = Sparse,
-            num_particles_max = x.shape[0],
-            num_partitions = x.shape[0],
-            pbc = periodic,
-        )
-            neighbor_list = neighbor_fn.allocate(x, num_particles=x.shape[0])
-            neighbors, node_self = neighbor_list.idx
-            mask = node_self == neighbors
-            node_self = node_self[~mask]
-            neighbors = neighbors[~mask]
-
-        elif not mask_self and not any(periodic):
-            neighbor_fn = partition.neighbor_list(
-            displacement,
-            box_size,
-            r_cutoff = jnp.array(h, dtype=jnp.float64),
-            backend ="jaxmd_vmap",
-            capacity_multiplier = 1,
-            mask_self = not mask_self,
-            format = Sparse,
-            num_particles_max = x.shape[0],
-            num_partitions = x.shape[0],
-            pbc = periodic,
-        )
-            neighbor_list = neighbor_fn.allocate(x, num_particles=x.shape[0])
-            neighbors, node_self = neighbor_list.idx
-            mask = node_self == neighbors
-            node_self = node_self[~mask]
-            neighbors = neighbors[~mask]
         return node_self, neighbors
 
     ### FEALPy functionals ###

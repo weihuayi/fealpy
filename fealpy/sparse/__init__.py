@@ -8,6 +8,9 @@ from .sparse_tensor import SparseTensor
 from .coo_tensor import COOTensor
 from .csr_tensor import CSRTensor
 
+from .ops import spdiags
+
+
 
 @overload
 def coo_matrix(arg1: _DT, /, itype=None) -> COOTensor: ...
