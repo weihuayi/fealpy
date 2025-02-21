@@ -30,7 +30,7 @@ ext_modules_dict={
             'fealpy.mesh.libp4est._p4est',
             sources=['fealpy/mesh/libp4est/p4est.pyx'],
             libraries=['p4est'],
-            include_dirs=['/usr/include/x86_64-linux-gnu/mpich/']
+            include_dirs=['/usr/lib/x86_64-linux-gnu/openmpi/include']
         ),
     }
 

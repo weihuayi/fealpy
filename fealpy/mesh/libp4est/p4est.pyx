@@ -210,9 +210,6 @@ cdef void init_fn (p4est_t *p4est, p4est_topidx_t which_tree,
 ### Constructors
 
 def p4est_new_py(py_comm_addr, conn_cap):
-    if MPI_Init() != 0:
-        raise RuntimeError("Failed to initialize MPI environment")
-
     cdef unsigned long comm_hdl = py_comm_addr
     cdef MPI_Comm* comm_ptr = <MPI_Comm*>comm_hdl
     cdef MPI_Comm comm = comm_ptr[0]
@@ -222,3 +219,8 @@ def p4est_new_py(py_comm_addr, conn_cap):
 
 
 ### Operations
+
+
+### VTK
+def p4est_vtk_write_file_py(p4est_cap, geom_cap, vtk_file_name):
+    p4est_t* p4est_ptr = get_p4est_ptr(p4est_cap)
