@@ -454,6 +454,7 @@ def _matscipy_neighbor_list(
         edge_list = matscipy_nl(
             "ij", cutoff=r_cutoff, positions=position, cell=box_size, pbc=pbc
         )
+        
         edge_list = jnp.asarray(edge_list, dtype=dtype_idx)
         if not mask_self:
             # add self connection, which matscipy does not do
