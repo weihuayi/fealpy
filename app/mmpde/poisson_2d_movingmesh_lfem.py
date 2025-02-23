@@ -18,7 +18,8 @@ from app.mmpde.harmap_mmpde import *
 from fealpy.solver import cg, spsolve
 from scipy.sparse import spdiags
 
-## 参数解析
+
+# 参数解析
 parser = argparse.ArgumentParser(description="""高阶移动网格方法""")
 parser.add_argument('--mdegree', 
        default=2, type=int,
@@ -37,7 +38,7 @@ parser.add_argument('--n',
         help='初始网格剖分规格.')
 
 parser.add_argument('--h',
-        default=0.15, type=bm.float64,
+        default=0.5, type=bm.float64,
         help='初始网格剖分大小.')
 
 parser.add_argument('--beta',
@@ -96,8 +97,11 @@ elif itype == 'equ':
 
 pro_mesh = mesh
 
+# poisson 求解
 def poisson_solver(pde, mesh, p):
     space = ParametricLagrangeFESpace(mesh, p=p)
+    NDof = space.number_of_global_dofs()
+    print('NDof', NDof)
     uh = space.function()
     bform = BilinearForm(space)
     bform.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
@@ -109,6 +113,7 @@ def poisson_solver(pde, mesh, p):
     uh[:] = cg(A , b,maxiter=5000, atol=1e-14, rtol=1e-14)
     return uh
 
+# 插值误差计算
 def interplote_error(pde, mesh, p):
     space = ParametricLagrangeFESpace(mesh=mesh, p=p)
     uI = space.interpolate(pde.solution)
@@ -164,7 +169,8 @@ def high_order_meshploter(mesh , uh = None , model = 'mesh'):
         plt.gca().set_aspect('equal')
         plt.xlabel('X')
         plt.ylabel('Y')
-    
+        plt.axis('off') # 关闭坐标轴
+
     elif model == 'surface':
         if uh.all() == None:
             raise ValueError("uh is none")
@@ -178,7 +184,6 @@ def high_order_meshploter(mesh , uh = None , model = 'mesh'):
 
 # Poisson eqution 求解
 uh = poisson_solver(pde=pde, mesh=mesh, p=sdegree)
-
 error0 = interplote_error(pde=pde, mesh=pro_mesh, p=sdegree)
 print("移动网格前的误差error0:", error0)
 

@@ -18,7 +18,7 @@ from app.mmpde.harmap_mmpde import *
 from fealpy.solver import cg, spsolve
 from scipy.sparse import spdiags
 
-## 参数解析
+# 参数解析
 parser = argparse.ArgumentParser(description="""高阶移动网格方法""")
 parser.add_argument('--mdegree', 
        default=2, type=int,
@@ -37,7 +37,7 @@ parser.add_argument('--n',
         help='初始网格剖分规格.')
 
 parser.add_argument('--h',
-        default=1.2, type=bm.float64,
+        default=1.7, type=bm.float64,
         help='初始网格剖分大小.')
 
 parser.add_argument('--alpha',
@@ -109,10 +109,13 @@ elif itype == 'equ':
     fix_mesh = LagrangeTriangleMesh.from_triangle_mesh(tmesh1, p=mdegree)
     
 pro_mesh = mesh
+NDof = bm.zeros(maxit, dtype=bm.int32)
 
-## poisson 求解
+# poisson 求解
 def poisson_solver(pde, mesh, p):
     space = ParametricLagrangeFESpace(mesh, p=p)
+    NDof = space.number_of_global_dofs()
+    print('NDof:', NDof)
     uh = space.function()
     bform = BilinearForm(space)
     bform.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
@@ -124,47 +127,14 @@ def poisson_solver(pde, mesh, p):
     uh[:] = cg(A , b,maxiter=5000, atol=1e-14, rtol=1e-14)
     return uh
 
-## 误差计算
+# 插值误差计算
 def interplote_error(pde, mesh, p):
     space = ParametricLagrangeFESpace(mesh=mesh, p=p)
     uI = space.interpolate(pde.solution)
     error = mesh.error(pde.solution , uI)
     return error
 
-## 移动网格加密
-def uniform_refine_lmesh(mesh: LagrangeTriangleMesh, n=1):
-    ref_mesh = TriangleMesh.from_one_triangle()
-    ref_node = ref_mesh.node
-    ref_cell = ref_mesh.cell
-    ref_mesh.uniform_refine()
-    Lg_ref_node = ref_mesh.interpolation_points(mesh.p)
-    Lg_ref_cell = ref_mesh.cell_to_ipoint(mesh.p)
-
-    v = ref_node[ref_cell] - Lg_ref_node[:,None,:]
-    a0 = 0.5 * bm.abs(bm.cross(v[:, 1, :], v[:, 2, :]))
-    a1 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 2, :]))
-    a2 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 1, :]))
-    re = bm.zeros((len(Lg_ref_node),3), dtype = bm.float64)
-    re = bm.set_at(re, (...,0), 2*a0)
-    re = bm.set_at(re, (...,1), 2*a1)
-    re = bm.set_at(re, (...,2), 2*a2)
-    for i in range(n):
-        linear_mesh = mesh.linearmesh
-        linear_mesh.uniform_refine()
-        Lg_mesh = LagrangeTriangleMesh.from_triangle_mesh(linear_mesh, p=mesh.p)
-        node = mesh.node
-        cell = mesh.cell
-        phi = mesh.shape_function(re , variables= "u")[None,...]
-        nen = bm.einsum('cql, cld -> cqd', phi, node[cell])
-
-        c = nen[:,Lg_ref_cell,:].transpose(1,0,2,3).reshape(-1,cell.shape[-1],2)
-        new_node = bm.zeros((Lg_mesh.number_of_nodes(),2),dtype = bm.float64)
-        new_node = bm.set_at(new_node, Lg_mesh.cell, c)
-        Lg_mesh.node = new_node
-
-    return Lg_mesh
-
-## 可视化
+# 可视化
 def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True):
     nodes = mesh.node
     edges = mesh.edge
@@ -209,12 +179,6 @@ def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True):
         if uh.all() == None:
             raise ValueError("uh is none")
         cell = mesh.cell
-        # n = bm.arange(1 , mesh.p+1)
-        # m = bm.arange(0 , mesh.p+1)
-        # idx = bm.zeros((mesh.p**2 , 3),dtype = bm.int32)
-        # for i in range(mesh.p-1):
-        #     idx = bm.set_at(idx , (i**2,...), math.factorial(n[i]))
-        #     m = bm.delete(m,0)
         n_f = math.factorial(n)
         print(n_f)
         fig = plt.figure()
@@ -225,11 +189,8 @@ def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True):
 
     plt.show()
 
-## 移动网格前的误差
+# 移动网格前的误差
 uh = poisson_solver(pde=pde, mesh=fix_mesh, p=sdegree)
-
-## 移动网格前图像
-#high_order_meshploter(fix_mesh)
 
 # 网格移动
 Vertex = bm.array([[0.0,0.0],[1.0,0.0],[1.0,1.0],
@@ -240,7 +201,7 @@ error_matrix_1 = bm.zeros(maxit+1)
 error_matrix_0[0] = interplote_error(pde=pde , mesh=pro_mesh , p=sdegree)
 error_matrix_1[0] = interplote_error(pde=pde, mesh=fix_mesh , p=sdegree)
 
-## 移动网格加密
+# 移动网格加密
 for i in range(maxit):
     MDH = Mesh_Data_Harmap(pro_mesh, Vertex)
     Vertex_idx , Bdinnernode_idx ,sort_BdNode_idx= MDH.get_basic_infom()
@@ -254,9 +215,9 @@ for i in range(maxit):
         HMP.tol = 3.5e-2
     pro_mesh, uh = HMP.mesh_redistribution(uh, pde=pde)
     high_order_meshploter(pro_mesh, model="mesh")
-    pro_mesh = uniform_refine_lmesh(pro_mesh)
+    pro_mesh.uniform_refine()
     high_order_meshploter(pro_mesh, model="mesh")
-    fix_mesh = uniform_refine_lmesh(fix_mesh)
+    fix_mesh.uniform_refine()
     error0 = interplote_error(pde=pde, mesh=pro_mesh, p=sdegree)
     error1 = interplote_error(pde=pde, mesh=fix_mesh, p=sdegree)
     error_matrix_0[i+1] = error0
@@ -266,10 +227,11 @@ for i in range(maxit):
 
 print(error_matrix_0)
 print(error_matrix_1)
-rate0 = bm.log(error_matrix_0[:-1] / error_matrix_0[1:]) / bm.log(2)
-rate1 = bm.log(error_matrix_1[:-1] / error_matrix_1[1:]) / bm.log(2)
-print(rate0)
-print(rate1)
+
+pro_order = bm.log2(error_matrix_0[:-1]/error_matrix_0[1:])
+fix_order = bm.log2(error_matrix_1[:-1]/error_matrix_1[1:])
+print('pro_order:', pro_order)
+print('fix_order:', fix_order)
 
 # 绘制误差折线图
 plt.figure()
@@ -283,11 +245,11 @@ plt.legend()
 
 # 绘制收敛阶折线图
 plt.figure()
-plt.plot(range(1, maxit), rate0[1:], 'o-', label='mesh_moved_refined')
-plt.plot(range(1, maxit), rate1[1:], '^-', label='mesh_fixed_refined')
+plt.plot(range(1, maxit), pro_order[1:], 'o-', label='mesh_moved_refined')
+plt.plot(range(1, maxit), fix_order[1:], '^-', label='mesh_fixed_refined')
 plt.xlabel('Refinement step')
 plt.ylabel('Convergence rate')
-plt.ylim(1, max(rate0[1:].max(), rate1[1:].max()) + 1)  # 设置 y 轴从 1 开始
+plt.ylim(1, max(fix_order[1:].max(), pro_order[1:].max()) + 1)  # 设置 y 轴从 1 开始
 plt.title('Convergence rate')
 plt.legend()
 plt.show()

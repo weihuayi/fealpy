@@ -122,5 +122,5 @@ for i in range(maxit):
 print("最终误差:", errorMatrix)
 print("order:", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 show_error_table(NDof, errorType, errorMatrix)
-showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
+showmultirate(plt, 1, NDof, errorMatrix,  errorType, propsize=20)
 plt.show()
