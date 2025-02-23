@@ -189,10 +189,15 @@ class IntervalMesh(SimplexMesh,Plotable):
     
     def uniform_refine(self, n=1, options={},returnim = False):
         """
-        @brief 一致加密网格
+        Uniform refine the interval mesh n times.
+
         Parameters:
-            n (int): times refine the triangle mesh.
-            returnirm (bool): return the interpolation matrix list or not,列表中的插值矩阵从细到粗排列
+            n (int): Times refine the triangle mesh.
+            returnirm (bool): Return the prolongation matrix list or not,from the finest to the the coarsest
+        
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest
         """
         if returnim is True:
             IM = []

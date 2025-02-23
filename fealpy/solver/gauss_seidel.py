@@ -13,7 +13,35 @@ class SupportsMatmul(Protocol):
 
 def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
        atol: float=1e-12, rtol: float=1e-8,
-       maxit: Optional[int]=10000) -> TensorLike:
+       maxit: Optional[int]=10000,returninfo: bool=False) -> TensorLike:
+    
+    """
+    Solve a linear system Ax = b using the Gauss-Seidel method.
+
+    Parameters:
+        A (SupportsMatmul): The coefficient matrix of the linear system.
+        b (TensorLike): The right-hand side vector of the linear system, can be a 1D or 2D tensor.
+        x0 (TensorLike, optional): Initial guess for the solution, a 1D or 2D tensor. Must have the same shape as `b`.\
+        Defaults to a zero tensor if not provided.
+        atol (float, optional): Absolute tolerance for convergence. Default is 1e-12.
+        rtol (float, optional): Relative tolerance for convergence. Default is 1e-8.
+        maxit (int, optional): Maximum number of iterations allowed. Default is 10000. If not provided, the method will\
+        continue until convergence based on the given tolerances.
+
+    Returns:
+        Tensor: The approximate solution to the system Ax = b.
+        dict: A dictionary containing the residual and the number of iterations taken.
+
+    Raises:
+        ValueError: If inputs do not meet the specified conditions (e.g., A is not sparse, dimensions mismatch).
+
+    Note:
+        This implementation decomposes the matrix A into its upper triangular part (U) and lower triangular part (L),
+        with A = L + D + U. The algorithm solves iteratively by updating the solution with forward substitution on M = L + D,
+        until the residual norm meets the specified tolerance or the maximum number of iterations is reached.
+
+        This method assumes that the system is well-conditioned for the Gauss-Seidel iteration.
+    """
     
     assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
@@ -29,21 +57,18 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
 
-    #张量分裂
     info = {}
     U = A.triu(k=1)
-    M = A.tril()#M = D-L，A = D-L-U
+    M = A.tril()  #M = D-L，A = D-L-U
 
-    err = 1
     niter = 0
     x = x0
     while True:
         B = b - U.matmul(x)
-        x += spsolve_triangular(M, B)  # 使用前向替换求解线性方程组
+        x = spsolve_triangular(M, B)   # Use forward substitution to solve the linear system
         a = b - A.matmul(x)
         res = bm.linalg.norm(b-A.matmul(x))
         niter +=1
-        print("n=:", niter, "residual: ", res)
         if res < rtol :
             logger.info(f"Gauss Seidel: converged in {iter} iterations, "
                         "stopped by relative tolerance.")
@@ -54,4 +79,7 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
             break
     info['residual'] = res    
     info['niter'] = niter 
-    return x, info 
+    if returninfo is True:
+        return x, info
+    if returninfo is True:
+        return x
