@@ -53,7 +53,7 @@ import jax.numpy as jnp
 from jax import custom_jvp, eval_shape, vmap
 from jax.core import ShapedArray
 
-from fealpy.cfd.sph.jax_md.util import Array, f32, safe_mask
+from fealpy.backend.jax.jax_md.util import Array, f32, safe_mask
 
 # Types
 

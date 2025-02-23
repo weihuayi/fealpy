@@ -1,23 +1,16 @@
-#!/usr/bin/python3
-'''!    	
-	@Author: wpx
-	@File Name: particle_solver_new.py
-	@Mail: wpx15673207315@gmail.com 
-	@Created Time: Tue 14 Jan 2025 03:44:28 PM CST
-	@bref 
-	@ref 
-'''  
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
+from typing import Dict
+import pyvista
 
-import numpy as np
-import jax
-import jax.numpy as jnp
-import torch
+import jax #打印
+#jax.debug.print("result:{}", bm.sum(a))
+import numpy as np #画图
 
 # Types
 Box = TensorLike
 f32 = bm.float32
+EPS = bm.finfo(float).eps
 
 class Space:
     def raw_transform(self, box:Box, R:TensorLike):
@@ -57,8 +50,7 @@ class Space:
         return Ra - Rb
 
     def periodic_displacement(self, side: Box, dR: TensorLike):
-        _dR = ((dR + side * f32(0.5)) % side) - f32(0.5) * side
-        
+        _dR = ((dR + side * 0.5) % side) - 0.5 * side
         return _dR
 
     def periodic_shift(self, side: Box, R: TensorLike, dR: TensorLike):
@@ -106,28 +98,94 @@ class Space:
 
         return displacement_fn, shift_fn
 
-class VmapBackend:
-    def __init__(self):
-        current_backend = bm.backend_name
+    def distance(self, dR: TensorLike):
+        dr = self.square_distance(dR)
+        return self.safe_mask(dr > 0, bm.sqrt, dr)
 
-        # 根据当前后端设置 vmap 函数
-        if current_backend == 'jax':
-            # 使用 JAX 的 vmap
-            self.vmap_func = jax.vmap
-        elif current_backend == 'numpy':
-            # 使用 NumPy 的 vectorize
-            self.vmap_func = np.vectorize
-        elif current_backend == 'pytorch':
-            # 使用 PyTorch 的 vmap
-            self.vmap_func = torch.vmap
-        else:
-            raise ValueError(f"Unsupported backend: {current_backend}")
+    def square_distance(self, dR: TensorLike):
+        return bm.sum(dR**2, axis=-1)
 
-    def apply(self, func, *args, **kwargs):
-        # 返回已经适配的 vmap 函数
-        return self.vmap_func(func)(*args, **kwargs)
+    def safe_mask(self, mask, fn, operand, placeholder=0):
+        masked = bm.where(mask, operand, 0)
+        return bm.where(mask, fn(masked), placeholder)
 
 class SPHSolver:
     def __init__(self, mesh):
         self.mesh = mesh 
     
+    @staticmethod
+    #@bm.compile
+    def compute_rho(mass, i_node, w_ij):
+        """Density summation"""
+        a = bm.zeros_like(mass)
+        return mass * bm.index_add(a, i_node, w_ij, axis=0, alpha=1)
+
+    @staticmethod
+    #@bm.compile
+    def tait_eos(rho, c0, rho0, gamma=1.0, X=0.0):
+        """Equation of state update pressure"""
+        return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
+
+    @staticmethod
+    #@bm.compile
+    def compute_mv_acceleration(state, i_node, j_node, r_ij, dij, grad, p):
+        """Momentum velocity variation"""
+        def compute_A(rho, mv, tv):
+            a = rho[:, bm.newaxis] * mv
+            dv = tv - mv
+            result = bm.einsum('ki,kj->kij', a, dv).reshape(a.shape[0], 2, 2)
+            return result
+
+        eta_i = state["eta"][i_node]
+        eta_j = state["eta"][j_node]
+        p_i = p[i_node]
+        p_j = p[j_node]
+        rho_i = state["rho"][i_node]
+        rho_j = state["rho"][j_node]
+        m_i = state["mass"][i_node]
+        m_j = state["mass"][j_node]
+        mv_i = state["mv"][i_node]
+        mv_j = state["mv"][j_node]
+        tv_i = state["tv"][i_node]
+        tv_j = state["tv"][j_node]   
+
+        volume_square = ((m_i/rho_i)**2 + (m_j/rho_j)**2) / m_i
+        eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
+        p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
+        c = volume_square * grad / (dij + EPS)
+        A = (compute_A(rho_i, mv_i, tv_i) + compute_A(rho_j, mv_j, tv_j))/2
+        mv_ij = mv_i -mv_j
+        b = bm.sum(A * r_ij[:, bm.newaxis, :], axis=2)
+        a = c[:, None] * (-p_ij[:, None] * r_ij + b + (eta_ij[:, None] * mv_ij))
+        add_dv = bm.zeros_like(state["mv"])
+        return bm.index_add(add_dv, i_node, a, axis=0, alpha=1)
+        
+
+    
+
+    def write_vtk(self, data_dict: Dict, path: str):
+        """Store a .vtk file for ParaView."""
+        data_pv = self.dict2pyvista(data_dict)
+        data_pv.save(path)
+
+    def dict2pyvista(self, data_dict):
+        # TODO bm
+        # PyVista works only with 3D objects, thus we check whether the inputs
+        # are 2D and then increase the degrees of freedom of the second dimension.
+        # N is the number of points and dim the dimension
+        r = np.asarray(data_dict["position"])
+        N, dim = r.shape
+        # PyVista treats the position information differently than the rest
+        if dim == 2:
+            r = np.hstack([r, np.zeros((N, 1))])
+        data_pv = pyvista.PolyData(r)
+        # copy all the other information also to pyvista, using plain numpy arrays
+        for k, v in data_dict.items():
+            # skip r because we already considered it above
+            if k == "r":
+                continue
+            # working in 3D or scalar features do not require special care
+            if dim == 2 and v.ndim == 2:
+                v = np.hstack([v, np.zeros((N, 1))])
+            data_pv[k] = np.asarray(v)
+        return data_pv
