@@ -1,5 +1,5 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.opt.opt_function import PathPlanning
+from fealpy.opt.pathplanning import PathPlanning
 from fealpy.opt import ParticleSwarmOpt
 
 # bm.set_backend('pytorch')
@@ -35,8 +35,10 @@ MAP=bm.array([[0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0],
               [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
 
 #起点终点坐标
-dataS=[0, 0]
-dataE=[19, 19]
+dataS = (0, 0)
+dataE = (19, 19)
 
-
-PathPlanning(MAP, dataS, dataE, ParticleSwarmOpt)
+pathplanner = PathPlanning(MAP, dataS, dataE, ParticleSwarmOpt)
+pathplanner.solve()
+pathplanner.print_results()
+pathplanner.visualize()
