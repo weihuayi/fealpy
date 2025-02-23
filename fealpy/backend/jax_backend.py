@@ -2,6 +2,9 @@ from typing import Optional, Union, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
 import numpy as np
+from .jax.jax_md import space
+from .jax import partition
+from .jax.jax_md.partition import Sparse
 
 try:
     import jax
@@ -109,7 +112,7 @@ class JAXBackend(BackendProxy, backend_name='jax'):
         if any_return:
             result = (b, )
         else:
-            retult = b
+            result = b
 
         if return_index:
             result += (index, )
@@ -146,6 +149,29 @@ class JAXBackend(BackendProxy, backend_name='jax'):
         idx = jnp.arange(inverse.shape[0], dtype=indices0.dtype)
         indices1 = indices1.at[inverse].set(idx)
         return b, indices0, indices1, inverse, counts
+
+    @staticmethod
+    def query_point(x, y, h, box_size, mask_self=True, periodic=[True, True, True]):
+        if not isinstance(periodic, list) or len(periodic) != 3 or not all(isinstance(p, bool) for p in periodic):
+            raise TypeError("periodic type is：[bool, bool, bool]")
+        displacement, shift = space.periodic(side=box_size)
+       
+        neighbor_fn = partition.neighbor_list(
+            displacement,
+            box_size,
+            r_cutoff = jnp.array(h, dtype=jnp.float64),
+            backend ="jaxmd_vmap",
+            capacity_multiplier = 1,
+            mask_self = not mask_self,
+            format = Sparse,
+            num_particles_max = x.shape[0],
+            num_partitions = x.shape[0],
+            pbc = periodic,
+            )
+        neighbor_list = neighbor_fn.allocate(x, num_particles=y.shape[0])
+        neighbors, node_self = neighbor_list.idx
+
+        return node_self, neighbors
 
     ### FEALPy functionals ###
     @staticmethod
