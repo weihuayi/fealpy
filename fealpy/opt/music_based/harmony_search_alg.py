@@ -2,17 +2,6 @@ from fealpy.backend import backend_manager as bm
 from fealpy.opt.optimizer_base import Optimizer
 from fealpy.opt.opt_function import initialize
 
-
-"""
-Harmony Search Algorithm  
-
-Reference:
-~~~~~~~~~~
-Zong Woo Geem, Joong Hoon Kim, G.V. Loganathan.
-A New Heuristic Optimization Algorithm: Harmony Search.
-Simulation, 2001, 76: 60-68.
-"""
-
 class HarmonySearchAlg(Optimizer):
     """
     A Harmony Search Algorithm (HSA), inheriting from the Optimizer class.
@@ -32,6 +21,11 @@ class HarmonySearchAlg(Optimizer):
 
     Methods:
         run(): Executes the Harmony Search Algorithm.
+
+    Reference:
+        Zong Woo Geem, Joong Hoon Kim, G.V. Loganathan.
+        A New Heuristic Optimization Algorithm: Harmony Search.
+        Simulation, 2001, 76: 60-68.
     """
     def __init__(self, option) -> None:
         """
