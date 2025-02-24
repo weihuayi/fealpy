@@ -10,6 +10,7 @@ class LaplacePDE():
     def __init__(self, u):
         x = sp.symbols("x")
         y = sp.symbols("y")
+        self.su = u
 
         ux = sp.diff(u, x)
         uy = sp.diff(u, y)
@@ -63,6 +64,7 @@ class DoubleLaplacePDE():
         self.device = device
         x = sp.symbols("x")
         y = sp.symbols("y")
+        self.su = u
 
         ux = sp.diff(u, x)
         uy = sp.diff(u, y)
@@ -144,6 +146,7 @@ class TripleLaplacePDE():
     def __init__(self, u):
         x = sp.symbols("x")
         y = sp.symbols("y")
+        self.su = u
 
         ux = sp.diff(u, x)
         uy = sp.diff(u, y)

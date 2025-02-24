@@ -7,10 +7,10 @@
 	@bref 
 	@ref 
 '''  
-from fealpy.backend import backend_manager as bm
-from fealpy.decorator import cartesian,barycentric
-from fealpy.fem import BilinearForm, LinearForm, BlockForm, LinearBlockForm
-from fealpy.fem import (ScalarConvectionIntegrator, 
+from ..backend import backend_manager as bm
+from ..decorator import cartesian,barycentric
+from ..fem import BilinearForm, LinearForm, BlockForm, LinearBlockForm
+from ..fem import (ScalarConvectionIntegrator, 
                         ScalarDiffusionIntegrator, 
                         ScalarMassIntegrator,
                         SourceIntegrator,
@@ -18,7 +18,7 @@ from fealpy.fem import (ScalarConvectionIntegrator,
                         FluidBoundaryFrictionIntegrator,
                         ViscousWorkIntegrator,
                         GradSourceIntegrator)
-from fealpy.fem import (BoundaryFaceMassIntegrator,
+from ..fem import (BoundaryFaceMassIntegrator,
                         BoundaryFaceSourceIntegrator)
 
 class NSFEMSolver():

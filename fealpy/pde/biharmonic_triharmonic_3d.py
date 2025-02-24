@@ -68,7 +68,9 @@ class LaplacePDE():
         return self.solution(p)
 
 class DoubleLaplacePDE():
-    def __init__(self, u):
+    def __init__(self, u, device=None):
+        self.device = device
+        self.su = u
         x = sp.symbols("x")
         y = sp.symbols("y")
         z = sp.symbols("z")
@@ -110,25 +112,35 @@ class DoubleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return self.L2u(x, y, z)
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+        return bm.array(self.L2u(x, y, z), device=self.device)
 
     def solution(self, p):
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return self.u(x, y, z) 
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
+
+        return bm.array(self.u(x, y, z), device=self.device) 
 
     def gradient(self, p):
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
         sin = bm.sin
         pi = bm.pi
         cos = bm.cos
-        val = bm.zeros(p.shape, dtype=bm.float64)
-        val[..., 0] = self.ux(x, y, z)
-        val[..., 1] = self.uy(x, y, z) 
-        val[..., 2] = self.uz(x, y, z)
+        val = bm.zeros(p.shape, dtype=bm.float64, device=self.device)
+        val[..., 0] = bm.array(self.ux(x, y, z), device=self.device)
+        val[..., 1] = bm.array(self.uy(x, y, z), device=self.device) 
+        val[..., 2] = bm.array(self.uz(x, y, z), device=self.device)
         return val
 
     @cartesian
@@ -136,16 +148,19 @@ class DoubleLaplacePDE():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
+        x = bm.to_numpy(x)
+        y = bm.to_numpy(y)
+        z = bm.to_numpy(z)
         sin = bm.sin
         pi = bm.pi
         cos = bm.cos
-        val = bm.zeros(p.shape[:-1]+(6, ), dtype=bm.float64)
-        val[..., 0] = self.uxx(x, y, z) 
-        val[..., 1] = self.uxy(x, y, z) 
-        val[..., 2] = self.uxz(x, y, z)
-        val[..., 3] = self.uyy(x, y, z) 
-        val[..., 4] = self.uyz(x, y, z) 
-        val[..., 5] = self.uzz(x, y, z)
+        val = bm.zeros(p.shape[:-1]+(6, ), dtype=bm.float64, device=self.device)
+        val[..., 0] = bm.array(self.uxx(x, y, z), device=self.device) 
+        val[..., 1] = bm.array(self.uxy(x, y, z), device=self.device) 
+        val[..., 2] = bm.array(self.uxz(x, y, z), device=self.device)
+        val[..., 3] = bm.array(self.uyy(x, y, z), device=self.device) 
+        val[..., 4] = bm.array(self.uyz(x, y, z), device=self.device) 
+        val[..., 5] = bm.array(self.uzz(x, y, z), device=self.device)
         return val
 
     def dirichlet(self, p):
@@ -287,7 +302,7 @@ class TripleLaplacePDE():
         return self.solution(p)
 
 
-def get_flist(u_sp): 
+def get_flist(u_sp, device=None): 
     x = sp.symbols("x")
     y = sp.symbols("y")
     z = sp.symbols("z")
@@ -380,7 +395,7 @@ def get_flist(u_sp):
         x = bm.to_numpy(x)
         y = bm.to_numpy(y)
         z = bm.to_numpy(z)
-        return bm.array(u(x, y, z))
+        return bm.array(u(x, y, z), device=device)
 
     @cartesian
     def grad_f(node):
@@ -391,9 +406,9 @@ def get_flist(u_sp):
         x = bm.to_numpy(x)
         y = bm.to_numpy(y)
         z = bm.to_numpy(z)
-        val[..., 0] = bm.array(ux(x, y, z))
-        val[..., 1] = bm.array(uy(x, y, z))
-        val[..., 2] = bm.array(uz(x, y, z))
+        val[..., 0] = bm.array(ux(x, y, z), device=device)
+        val[..., 1] = bm.array(uy(x, y, z), device=device)
+        val[..., 2] = bm.array(uz(x, y, z), device=device)
         return bm.array(val) 
     @cartesian
     def grad_2_f(node):
@@ -404,13 +419,13 @@ def get_flist(u_sp):
         x = bm.to_numpy(x)
         y = bm.to_numpy(y)
         z = bm.to_numpy(z)
-        val[..., 0] = bm.array(uxx(x, y, z))
-        val[..., 1] = bm.array(uxy(x, y, z))
-        val[..., 2] = bm.array(uxz(x, y, z))
-        val[..., 3] = bm.array(uyy(x, y, z))
-        val[..., 4] = bm.array(uyz(x, y, z))
-        val[..., 5] = bm.array(uzz(x, y, z))
-        return bm.array(val) 
+        val[..., 0] = bm.array(uxx(x, y, z), device=device)
+        val[..., 1] = bm.array(uxy(x, y, z), device=device)
+        val[..., 2] = bm.array(uxz(x, y, z), device=device)
+        val[..., 3] = bm.array(uyy(x, y, z), device=device)
+        val[..., 4] = bm.array(uyz(x, y, z), device=device)
+        val[..., 5] = bm.array(uzz(x, y, z), device=device)
+        return bm.array(val, device=device) 
     def grad_3_f(node):
         x = node[..., 0]
         y = node[..., 1]
@@ -421,17 +436,17 @@ def get_flist(u_sp):
         y = bm.to_numpy(y)
         z = bm.to_numpy(z)
         
-        val[..., 0] = uxxx(x, y, z)          
-        val[..., 1] = uxxy(x, y, z)
-        val[..., 2] = uxxz(x, y, z) 
-        val[..., 3] = uxyy(x, y, z) 
-        val[..., 4] = uxyz(x, y, z)
-        val[..., 5] = uxzz(x, y, z)
-        val[..., 6] = uyyy(x, y, z)
-        val[..., 7] = uyyz(x, y, z)
-        val[..., 8] = uyzz(x, y, z)
-        val[..., 9] = uzzz(x, y, z)
-        val = bm.array(val)
+        val[..., 0] = bm.array(uxxx(x, y, z), device=device)          
+        val[..., 1] = bm.array(uxxy(x, y, z), device=device)
+        val[..., 2] = bm.array(uxxz(x, y, z), device=device) 
+        val[..., 3] = bm.array(uxyy(x, y, z), device=device) 
+        val[..., 4] = bm.array(uxyz(x, y, z), device=device)
+        val[..., 5] = bm.array(uxzz(x, y, z), device=device)
+        val[..., 6] = bm.array(uyyy(x, y, z), device=device)
+        val[..., 7] = bm.array(uyyz(x, y, z), device=device)
+        val[..., 8] = bm.array(uyzz(x, y, z), device=device)
+        val[..., 9] = bm.array(uzzz(x, y, z), device=device)
+        val = bm.array(val, device=device)
         return val 
     def grad_4_f(node):
         x = node[..., 0]
@@ -442,22 +457,22 @@ def get_flist(u_sp):
         x = bm.to_numpy(x)
         y = bm.to_numpy(y)
         z = bm.to_numpy(z)
-        val[..., 0] = uxxxx(x, y, z)
-        val[..., 1] = uyxxx(x, y, z)
-        val[..., 2] = uxxxz(x, y, z)
-        val[..., 3] = uyyxx(x, y, z)
-        val[..., 4] = uxxyz(x, y, z)
-        val[..., 5] = uxxzz(x, y, z)
-        val[..., 6] = uyyyx(x, y, z)
-        val[..., 7] = uxyyz(x, y, z)
-        val[..., 8] = uxyzz(x, y, z)
-        val[..., 9] = uxzzz(x, y, z)
-        val[..., 10] = uyyyy(x, y, z)
-        val[..., 11] = uyyyz(x, y, z)
-        val[..., 12] = uyyzz(x, y, z)
-        val[..., 13] = uyzzz(x, y, z)
-        val[..., 14] = uzzzz(x, y, z)
-        val = bm.array(val)
+        val[..., 0] =bm.array(uxxxx(x, y, z), device=device)  
+        val[..., 1] =bm.array(uyxxx(x, y, z), device=device)
+        val[..., 2] =bm.array(uxxxz(x, y, z), device=device)
+        val[..., 3] =bm.array(uyyxx(x, y, z), device=device)
+        val[..., 4] =bm.array(uxxyz(x, y, z), device=device)
+        val[..., 5] =bm.array(uxxzz(x, y, z), device=device)
+        val[..., 6] =bm.array(uyyyx(x, y, z), device=device)
+        val[..., 7] =bm.array(uxyyz(x, y, z), device=device)
+        val[..., 8] =bm.array(uxyzz(x, y, z), device=device)
+        val[..., 9] =bm.array(uxzzz(x, y, z), device=device)
+        val[..., 10] = bm.array(uyyyy(x, y, z), device=device) 
+        val[..., 11] = bm.array(uyyyz(x, y, z), device=device)
+        val[..., 12] = bm.array(uyyzz(x, y, z), device=device)
+        val[..., 13] = bm.array(uyzzz(x, y, z), device=device)
+        val[..., 14] = bm.array(uzzzz(x, y, z), device=device)
+        val = bm.array(val,device=device)
         return val 
 
     flist = [f, grad_f, grad_2_f, grad_3_f, grad_4_f]
