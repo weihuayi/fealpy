@@ -90,8 +90,6 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
 
         return self.function(uh/nn)
 
-
-
     def interpolate(self, u: Union[Callable[..., TensorLike], TensorLike],) -> TensorLike:
         assert callable(u)
 
@@ -218,4 +216,28 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         e2dof = self.dof.entity_to_dof(TD, index=index)
         val = bm.einsum('cilm, cl -> cim', gphi, uh[e2dof])
         return val
+    
+    def prolongation_matrix(self, cdegree=[1]):
+        """
+        Generate a list of interpolation matrices from lower-order spaces to higher-order spaces,
+        from the highest to the lowest.
+        
+        Parameters:
+            cdegree[list]: list of the degree of the needed space,from low space to high space
+        
+        Returns:
+            IM[list]: list of the prolongation matrix,from high space to low space
+        """
+        assert isinstance(cdegree, list), "cdegree must be a list"
+        assert all(isinstance(c, int) for c in cdegree), "All in elements cdegree must be integers"
+        assert all(c < self.p for c in cdegree), "All elements in cdegree must be less than self.p"
+        assert cdegree == sorted(cdegree), "cdegree must be in ascending order"
+        assert self.ctype == 'C'
+        p = self.p
+        Ps = []
+        for c in cdegree[-1::-1]:
+            Ps.append(self.mesh.prolongation_matrix(c, p))
+            p = c
+        return Ps
+
     
