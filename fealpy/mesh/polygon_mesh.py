@@ -20,6 +20,8 @@ class PolygonMesh(Mesh, Plotable):
         self.node = node
         self.ikwargs = bm.context(cell[0])
         self.fkwargs = bm.context(node)
+        self.ftype = node.dtype
+        self.itype = cell[0].dtype
 
 
         if cell[1] is None: 
@@ -185,7 +187,7 @@ class PolygonMesh(Mesh, Plotable):
         """
         assert self.geo_dimension() == 2
         v = self.edge_tangent(index=index)
-        w = bm.tensor([(0,-1),(1,0)],**self.ftype)
+        w = bm.tensor([(0,-1),(1,0)],**self.fkwargs)
         return v@w
 
     def edge_unit_normal(self, index=_S):
@@ -378,8 +380,9 @@ class PolygonMesh(Mesh, Plotable):
         NE = self.number_of_edges()
 
         bcs, ws = self.quadrature_formula(q).get_quadrature_points_and_weights()
-        bcs = bm.astype(bcs,**self.fkwargs) 
-        ws = bm.astype(ws,**self.fkwargs)
+        
+        bcs = bm.astype(bcs,self.ftype) 
+        ws = bm.astype(ws,self.ftype)
         bc = self.entity_barycenter('cell')
         tri = bm.zeros((3,NE,2),**self.fkwargs)
         
@@ -391,13 +394,13 @@ class PolygonMesh(Mesh, Plotable):
         v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]]
         a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
     
-        pp = bm.einsum('ij, jkm->ikm', bcs, tri)
+        pp = bm.einsum('ij, jkm->kim', bcs, tri)
         val = u(pp, edge2cell[:, 0])
 
         shape = (NC, ) + val.shape[2:]
         e = bm.zeros(shape, **self.fkwargs)
 
-        ee = bm.einsum('i, ij..., j->j...', ws, val, a)
+        ee = bm.einsum('i, ji..., j->j...', ws, val, a)
         e = bm.index_add(e, edge2cell[:, 0], ee)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
@@ -412,9 +415,9 @@ class PolygonMesh(Mesh, Plotable):
             
             a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
 
-            pp = bm.einsum('ij, jkm->ikm', bcs, tri)
+            pp = bm.einsum('ij, jkm->kim', bcs, tri)
             val = u(pp, edge2cell[isInEdge, 1])
-            ee = bm.einsum('i, ij..., j->j...', ws, val, a)
+            ee = bm.einsum('i, ji..., j->j...', ws, val, a)
             e = bm.index_add(e, edge2cell[isInEdge, 1], ee)
             
         if celltype is True:
