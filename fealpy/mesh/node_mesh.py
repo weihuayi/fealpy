@@ -171,40 +171,34 @@ class NodeMesh(MeshDS):
         velocity_wall = 0.3 #每段温度边界长度
 
         #wall particles
-        dxn1 = dx * n_walls
-        n1 = bm.tensor((bm.tensor([L, dxn1]) / dx).round(), dtype=int)
+        dxn1 = bm.array(dx * n_walls, dtype=bm.float64)
+        n1 = bm.astype(bm.array([L, dxn1]) / dx, bm.int32)
         grid1 = bm.meshgrid(bm.arange(n1[0]), bm.arange(n1[1]), indexing="xy")
-        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
-        wall_b = r1.copy()
-        wall_t = r1.copy() + bm.tensor([0.0, H + dxn1])
+        r1 = (bm.stack((grid1[0].flatten(),grid1[1].flatten()), 1) + 0.5) * dx
+        wall_b = bm.copy(r1)
+        wall_t = bm.copy(r1) + bm.array([0.0, H + dxn1], dtype=bm.float64)
         r_w = bm.concatenate([wall_b, wall_t])
 
         #fuild particles
-        n2 = bm.array((bm.array([L, H]) / dx).round(), dtype=int)
+        n2 = bm.astype(bm.array([L, H]) / dx, bm.int32)
         grid2 = bm.meshgrid(bm.arange(n2[0]), bm.arange(n2[1]), indexing="xy")
-        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
-        r_f = bm.tensor([0.0, 1.0]) * n_walls * dx + r2
+        r2 = (bm.stack((grid2[0].flatten(),grid2[1].flatten()), 1) + 0.5) * dx
+        r_f = bm.astype(bm.array([0.0, 1.0]) * n_walls * dx + r2, bm.float64)
 
-        #tag
-        '''
-        0 fluid
-        1 solid wall
-        2 moving wall
-        3 velocity wall
-        '''
-        r = bm.tensor(bm.concatenate([r_w, r_f])) 
-        tag_f = jnp.full(len(r_f), 0, dtype=int)
-        tag_w = jnp.full(len(r_w), 1, dtype=int)
-        r = bm.tensor(bm.concatenate([r_w, r_f]))
+        #tag:0-fluid,1-solid wall,2-moving wall,3-dirchilet wall
+        tag_f = bm.full((r_f.shape[0],), 0, dtype=bm.int32)
+        tag_w = bm.full((r_w.shape[0],), 1, dtype=bm.int32)
+
+        r = bm.concatenate([r_w, r_f])
         tag = bm.concatenate([tag_w, tag_f])
 
-        dx2n = dx * n_walls * 2
-        _box_size = bm.tensor([L, H + dx2n])
+        dx2n = bm.array(dx * n_walls * 2, dtype=bm.float64)
+        _box_size = bm.array([L, H + dx2n], dtype=bm.float64)
         mask_hot_wall = (
         ((r[:, 1] < dx * n_walls) | (r[:, 1] > H + dx * n_walls)) &
         (((r[:, 0] > 0.3) & (r[:, 0] < 0.6)) | ((r[:, 0] > 0.9) & (r[:, 0] < 1.2)))
     )
-        tag = jnp.where(mask_hot_wall, 3, tag)
+        tag = bm.where(mask_hot_wall, 3, tag)
 
         NN_sum = r.shape[0]
         mv = bm.zeros_like(r)
