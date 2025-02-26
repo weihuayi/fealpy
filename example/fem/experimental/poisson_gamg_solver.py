@@ -16,7 +16,7 @@ next(tmr)
 
 # Different configurations: coarsest mesh size and number of refinements.
 configurations = [
-    (2, 5),  
+    (2, 6),  
     #(2, 4),   
     #(32, 6)   
 ]
@@ -36,8 +36,8 @@ for n, m in configurations:
     tmr.send(f"Completed gamg_solve for (n, m) = ({n}, {m})")
 
 s0.cg_solve()
-s0.gs_solve()
-s0.jacobi_solve()
+#s0.gs_solve()
+#s0.jacobi_solve()
 s0.minres_solve()
 tmr.send(None)
 

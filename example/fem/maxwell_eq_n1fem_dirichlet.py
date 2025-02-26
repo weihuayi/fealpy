@@ -67,6 +67,7 @@ maxit = args.maxit
 dim = args.dim
 backend = args.backend
 bm.set_backend(backend)
+dim = 3
 if dim == 2:
     pde = PDE2d()
 else:
@@ -84,7 +85,7 @@ NDof = bm.zeros(maxit, dtype=bm.float64)
 tmr = timer()
 next(tmr)
 
-ps = [2, 3, 4]
+ps = [2, 6, 8]
 #ps = [1]
 for j, p in enumerate(ps):
     for i in range(maxit):

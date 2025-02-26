@@ -3,12 +3,13 @@ from ..backend import backend_manager as bm
 from ..operator import LinearOperator
 from .conjugate_gradient import cg
 from scipy.sparse.linalg import spsolve_triangular,spsolve
-from .amg_coarsen import ruge_stuben_coarsen
+from .amg_coarsen import ruge_stuben_coarsen,ruge_stuben_chen_coarsen,standard_interpolation,aggregation_coarsen
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
 from .. import logger
 from ..utils import timer
 import time 
+from scipy.sparse.linalg import eigs
 class GAMGSolver():
     """
     Fast Solvers for Geometric and Algebraic Multigrid Methods
@@ -106,8 +107,10 @@ class GAMGSolver():
             for l in range(NL):
                 self.L.append(self.A[-1].tril()) # 前磨光的光滑子
                 self.U.append(self.A[-1].triu()) # 后磨光的光滑子
-                #isC, G = ruge_stuben_chen_coarsen(self.A[-1], self.theta)
-                p, r = ruge_stuben_coarsen(self.A[-1], self.theta)
+                isC, G = aggregation_coarsen(self.A[-1], self.theta)
+                p, r = standard_interpolation(self.A[-1], isC)
+                #p, r = ruge_stuben_coarsen(self.A[-1], self.theta)
+                
                 self.P.append(p)
                 self.R.append(r)
 
@@ -126,7 +129,7 @@ class GAMGSolver():
 
             # if condest > 1e12:
             #     N = self.A[-1].shape[0]
-            #     self.A[-1] += 1e-12*sp.eye(N)  
+            #     self.A[-1] += 1e-12*bm.eye(N)  
 
     def construct_coarse_equation(self, A, F, level=1):
         """

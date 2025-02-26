@@ -127,7 +127,7 @@ class PoissonLFEMSolver:
             Tensor: The solution of the multigrid solver.
         """
         from ..solver import GAMGSolver
-        solver = GAMGSolver(isolver='MG') 
+        solver = GAMGSolver(isolver='CG') 
         if self.p < 2:
             self.space = None
         cdegree = list(range(1,self.p))
