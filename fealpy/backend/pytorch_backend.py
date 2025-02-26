@@ -624,32 +624,28 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
             neighbors = map_idx_x[neighbors]
             neighbors = neighbors[map_bool]
             node_self = node_self[node_self < x.shape[0]]
-
             if not mask_self:
                 mask = node_self == neighbors
                 node_self = node_self[~mask]
                 neighbors = neighbors[~mask]
             
         elif not any(periodic):
-        #TODO 用for循环得到bool值和索引来实现单边周期边界条件
-            map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], 0, x)
-            map_y , map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], 0, y)
-            tree = KDTree(map_x)
-            neighbors = tree.query_ball_point(map_y, h)
+            tree = KDTree(x)
+            neighbors = tree.query_ball_point(y, h)
             lengths = torch.tensor([len(sublist) for sublist in neighbors]) 
             a = torch.arange(len(lengths))
             node_self = torch.repeat_interleave(a, lengths)
             neighbors = torch.concatenate([torch.tensor(c) for c in neighbors])
-            map_bool = map_bool_x[node_self]
-            neighbors = map_idx_x[neighbors]
-            neighbors = neighbors[map_bool]
-            node_self = node_self[node_self < x.shape[0]]
-
             if not mask_self:
                 mask = node_self == neighbors
                 node_self = node_self[~mask]
                 neighbors = neighbors[~mask]
 
+        else:
+            for dim in range(3):
+                if not periodic[dim]:
+                    raise NotImplementedError(f"Single-side periodic boundary condition for dimension {dim} is not implemented yet.")
+                    pass
         return node_self, neighbors
 
     ### FEALPy functionals ###
