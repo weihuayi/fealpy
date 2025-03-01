@@ -105,8 +105,7 @@ class CSRTensor(SparseTensor):
 
     @property
     def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        non_zero_mask = self.data != 0  
-        return self.row[non_zero_mask], self._col[non_zero_mask]
+        return self.row, self._col
 
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
