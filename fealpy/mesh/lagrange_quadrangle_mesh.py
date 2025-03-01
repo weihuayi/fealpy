@@ -8,6 +8,7 @@ from .utils import estr2dim
 from .mesh_base import TensorMesh
 from .quadrangle_mesh import QuadrangleMesh
 
+
 class LagrangeQuadrangleMesh(TensorMesh):
     def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
             construct=False):

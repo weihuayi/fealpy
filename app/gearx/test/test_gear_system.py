@@ -2,7 +2,6 @@ import pickle
 import json
 import numpy as np
 import pandas as pd
-from jax.experimental.array_api import reshape
 from numpy import tan, arctan, sin, cos, pi, arctan2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -35,15 +34,31 @@ class TestGearSystem:
         nw = data['nw']
         tooth_width = data['tooth_width']
         inner_diam = data['inner_diam']  # 轮缘内径
+        # m_n = 2.25
+        # z = 18
+        # alpha_n = 17.5
+        # beta = 30
+        # x_n = 0.4
+        # hac = 1
+        # cc = 1.4
+        # inner_diam = 10
         chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
 
         external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia,
                                      inner_diam, tooth_width)
 
         quad_mesh = external_gear.generate_mesh()
-        # quad_mesh.to_vtk(fname='../data/external_quad_mesh.vtu')
+        # quad_mesh.to_vtk(fname='../data/external_quad_mesh_new.vtu')
         hex_mesh = external_gear.generate_hexahedron_mesh()
-        # hex_mesh.to_vtk(fname='external_hex_mesh.vtu')
+        profile_node_idx_right, profile_node_idx_left = external_gear.get_profile_node_index(tooth_tag=0)[0]
+        profile_node_idx_right = profile_node_idx_right.reshape(-1)
+        profile_node_idx_left = profile_node_idx_left.reshape(-1)
+        profile_node_normal_right, profile_node_normal_left = external_gear.get_profile_node_normal_with_tooth(tooth_tag=0)
+        node_data = np.zeros((hex_mesh.number_of_nodes(), 3))
+        node_data[profile_node_idx_right] = profile_node_normal_right
+        node_data[profile_node_idx_left] = profile_node_normal_left
+        hex_mesh.nodedata['normal'] = node_data
+        hex_mesh.to_vtk(fname='../data/external_hex_mesh_new.vtu')
         #
         # with open('external_gear.pkl', 'wb') as f:
         #     pickle.dump({'quad_mesh': quad_mesh, 'gear': external_gear, 'hex_mesh': hex_mesh}, f)
@@ -54,11 +69,11 @@ class TestGearSystem:
         # quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
         # quad_mesh_from_cpp.to_vtk(fname='external_quad_mesh_cpp.vtu')
 
-        # with open('../data/external_gear.pkl', 'wb') as f:
+        # with open('../data/external_gear_new.pkl', 'wb') as f:
         #     pickle.dump({'external_gear': external_gear, 'hex_mesh': hex_mesh, 'quad_mesh': quad_mesh}, f)
 
     def test_internal_gear(self):
-        with open('../data/internal_gear_data.json', 'r') as file:
+        with open('../data/internal_gear_data_new.json', 'r') as file:
             data = json.load(file)
         m_n = data['mn']  # 法向模数
         z = data['z']  # 齿数
@@ -79,36 +94,53 @@ class TestGearSystem:
         outer_diam = data['outer_diam']  # 轮缘内径
         z_cutter = data['z_cutter']
         xn_cutter = data['xn_cutter']
+        # z = 70
 
         internal_gear = InternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
                                      xn_cutter, tooth_width)
 
-        t = np.array([0.1, 0.2, 25])
-        p1 = internal_gear.get_involute_points(t)
-        p1_dis = internal_gear.get_tip_intersection_points(t)
+        quad_mesh = internal_gear.mesh
+        hex_mesh = internal_gear.generate_hexahedron_mesh()
+        profile_node_idx_right, profile_node_idx_left = internal_gear.get_profile_node_index(tooth_tag=0)[0]
+        profile_node_idx_right = profile_node_idx_right.reshape(-1)
+        profile_node_idx_left = profile_node_idx_left.reshape(-1)
+        profile_node_normal_right, profile_node_normal_left = internal_gear.get_profile_node_normal_with_tooth(
+            tooth_tag=0)
+        node_data = np.zeros((hex_mesh.number_of_nodes(), 3))
+        node_data[profile_node_idx_right] = profile_node_normal_right
+        node_data[profile_node_idx_left] = profile_node_normal_left
+        hex_mesh.nodedata['normal'] = node_data
+        hex_mesh.to_vtk(fname='../data/test_internal_hex_mesh_new.vtu')
 
-        alphawt = InternalGear.ainv(
-            2 * (internal_gear.x_n - internal_gear.xn_cutter) * tan(internal_gear.alpha_n) / (internal_gear.z - internal_gear.z_cutter) + (
-                    tan(internal_gear.alpha_t) - internal_gear.alpha_t))
-        E = 0.5 * (internal_gear.d - internal_gear.d_cutter) + internal_gear.m_t * (
-                0.5 * (internal_gear.z - internal_gear.z_cutter) * (cos(internal_gear.alpha_t) / cos(alphawt) - 1))
-        ratio = internal_gear.z / internal_gear.z_cutter
-        p2 = internal_gear.get_transition_points(E, 0, 0, internal_gear.ra_cutter, ratio, t)
-        p2_dis = internal_gear.get_transition_intersection_points(E, 0, 0, internal_gear.ra_cutter, ratio, t)
-
-        # p = internal_gear.get_profile_points()
-
-        quad_mesh = internal_gear.generate_mesh()
-        # quad_mesh.to_vtk(fname='../data/internal_quad_mesh.vtu')
-        # r = internal_gear.r
-        # # hex_mesh = generate_hexahedral_mesh(quad_mesh, internal_gear.beta, r, tooth_width, nw)
-        # # hex_mesh.to_vtk(fname='internal_hex_mesh.vtu')
-        # # 读取 CSV 文件
-        # node_from_cpp = np.loadtxt("../data/internal_node.csv", delimiter=",")
-        # cell_from_cpp = np.loadtxt("../data/internal_cell.csv", delimiter=",", dtype=np.int64)
+        # with open('../data/internal_gear_new.pkl', 'wb') as f:
+        #     pickle.dump({'internal_gear': internal_gear, 'hex_mesh': hex_mesh, 'quad_mesh': quad_mesh}, f)
         #
-        # quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
-        # quad_mesh_from_cpp.to_vtk(fname='internal_quad_mesh_cpp.vtu')
+        # t = np.array([0.1, 0.2, 25])
+        # p1 = internal_gear.get_involute_points(t)
+        # p1_dis = internal_gear.get_tip_intersection_points(t)
+        #
+        # alphawt = InternalGear.ainv(
+        #     2 * (internal_gear.x_n - internal_gear.xn_cutter) * tan(internal_gear.alpha_n) / (internal_gear.z - internal_gear.z_cutter) + (
+        #             tan(internal_gear.alpha_t) - internal_gear.alpha_t))
+        # E = 0.5 * (internal_gear.d - internal_gear.d_cutter) + internal_gear.m_t * (
+        #         0.5 * (internal_gear.z - internal_gear.z_cutter) * (cos(internal_gear.alpha_t) / cos(alphawt) - 1))
+        # ratio = internal_gear.z / internal_gear.z_cutter
+        # p2 = internal_gear.get_transition_points(E, 0, 0, internal_gear.ra_cutter, ratio, t)
+        # p2_dis = internal_gear.get_transition_intersection_points(E, 0, 0, internal_gear.ra_cutter, ratio, t)
+        #
+        # # p = internal_gear.get_profile_points()
+        #
+        # # quad_mesh = internal_gear.generate_mesh()
+        # # quad_mesh.to_vtk(fname='../data/internal_quad_mesh.vtu')
+        # # r = internal_gear.r
+        # # # hex_mesh = generate_hexahedral_mesh(quad_mesh, internal_gear.beta, r, tooth_width, nw)
+        # # # hex_mesh.to_vtk(fname='internal_hex_mesh.vtu')
+        # # # 读取 CSV 文件
+        # # node_from_cpp = np.loadtxt("../data/internal_node.csv", delimiter=",")
+        # # cell_from_cpp = np.loadtxt("../data/internal_cell.csv", delimiter=",", dtype=np.int64)
+        # #
+        # # quad_mesh_from_cpp = QuadrangleMesh(node_from_cpp, cell_from_cpp)
+        # # quad_mesh_from_cpp.to_vtk(fname='internal_quad_mesh_cpp.vtu')
 
     def test_get_profile_node(self):
         with open('../data/external_gear.pkl', 'rb') as f:
@@ -116,8 +148,48 @@ class TestGearSystem:
         external_gear = data['external_gear']
 
         idx0, node0 = external_gear.get_profile_node_index(tooth_tag=0)
-        idx1, node1 = external_gear.get_profile_node_index(tooth_tag=(0, 2, 3))
-        idx2, node2 = external_gear.get_profile_node_index(tooth_tag=None)
+        # idx1, node1 = external_gear.get_profile_node_index(tooth_tag=(0, 2, 3))
+        # idx2, node2 = external_gear.get_profile_node_index(tooth_tag=None)
+        idx_right = idx0[0][0, ...]
+        idx_left = idx0[1][0, ...]
+        node_right = node0[0][0, ...]
+        node_left = node0[1][0, ...]
+
+        num_col = idx_right.shape[0]
+        num_row = idx_right.shape[1]
+        num_cell = (num_col-1) * (num_row-1)
+        num_node = num_col * num_row
+        # profile_mesh_node = np.concatenate([node_right.reshape(-1, 3), node_left.reshape(-1, 3)], axis=0)
+        # profile_mesh_cell = np.zeros((num_cell*2, 4), dtype=np.int32)
+        # temp_idx_right = np.arange(num_node).reshape(num_col, num_row)
+        # temp_idx_left = temp_idx_right + num_node
+        # profile_mesh_cell[0:num_cell, 0] = temp_idx_right[0:num_col-1, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[0:num_cell, 1] = temp_idx_right[1:num_col, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[0:num_cell, 2] = temp_idx_right[1:num_col, 1:num_row].reshape(-1)
+        # profile_mesh_cell[0:num_cell, 3] = temp_idx_right[0:num_col-1, 1:num_row].reshape(-1)
+        #
+        # profile_mesh_cell[num_cell:, 0] = temp_idx_left[0:num_col-1, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[num_cell:, 1] = temp_idx_left[1:num_col, 0:num_row-1].reshape(-1)
+        # profile_mesh_cell[num_cell:, 2] = temp_idx_left[1:num_col, 1:num_row].reshape(-1)
+        # profile_mesh_cell[num_cell:, 3] = temp_idx_left[0:num_col-1, 1:num_row].reshape(-1)
+
+        profile_mesh_node = node_left.reshape(-1, 3)
+        profile_mesh_cell = np.zeros((num_cell, 4), dtype=np.int32)
+        temp_idx_right = np.arange(num_node).reshape(num_col, num_row)
+        # temp_idx_left = temp_idx_right + num_node
+        profile_mesh_cell[0:num_cell, 0] = temp_idx_right[0:num_col-1, 0:num_row-1].reshape(-1)
+        profile_mesh_cell[0:num_cell, 1] = temp_idx_right[1:num_col, 0:num_row-1].reshape(-1)
+        profile_mesh_cell[0:num_cell, 2] = temp_idx_right[1:num_col, 1:num_row].reshape(-1)
+        profile_mesh_cell[0:num_cell, 3] = temp_idx_right[0:num_col-1, 1:num_row].reshape(-1)
+
+        profile_mesh = QuadrangleMesh(profile_mesh_node, profile_mesh_cell)
+        np.savetxt('/home/concha/openfinite3/app/gearx/data/profile_mesh_nodes.txt',
+                   np.column_stack((np.arange(profile_mesh.node.shape[0]), profile_mesh.node)),
+                   delimiter=',', fmt='%d,%.6f,%.6f,%.6f')
+        np.savetxt('/home/concha/openfinite3/app/gearx/data/profile_mesh_cells.txt',
+                   np.column_stack((np.arange(profile_mesh.cell.shape[0]), profile_mesh.cell)),
+                   delimiter=',', fmt='%d,%d,%d,%d,%d')
+        profile_mesh.to_vtk(fname="/home/concha/openfinite3/app/gearx/data/one_tooth_external_gear_quad_mesh_left.vtu")
 
         print(-1)
 
@@ -342,7 +414,110 @@ class TestGearSystem:
         plt.show()
 
 
+    def test_get_part_internal_gear(self):
+        with open('../data/internal_gear_data.json', 'r') as file:
+            data = json.load(file)
+        m_n = data['mn']  # 法向模数
+        z = data['z']  # 齿数
+        alpha_n = data['alpha_n']  # 法向压力角
+        beta = data['beta']  # 螺旋角
+        x_n = data['xn']  # 法向变位系数
+        hac = data['hac']  # 齿顶高系数
+        cc = data['cc']  # 顶隙系数
+        rcc = data['rcc']  # 刀尖圆弧半径
+        jn = data['jn']  # 法向侧隙
+        n1 = data['n1']  # 渐开线分段数
+        n2 = data['n2']  # 过渡曲线分段数
+        n3 = data['n3']
+        na = data['na']
+        nf = data['nf']
+        nw = data['nw']
+        tooth_width = data['tooth_width']
+        outer_diam = data['outer_diam']  # 轮缘内径
+        z_cutter = data['z_cutter']
+        xn_cutter = data['xn_cutter']
 
+        internal_gear = InternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, outer_diam, z_cutter,
+                                     xn_cutter, tooth_width)
+
+        hex_mesh = internal_gear.generate_hexahedron_mesh()
+        target_hex_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
+        part_internal_gear_mesh = internal_gear.set_target_tooth([0, 1, 2, 78, 79])
+        part_internal_gear_mesh_wheel = internal_gear.set_target_tooth([0, 1, 2, 78, 79], get_wheel=True)
+
+        part_internal_gear_mesh.to_vtk(fname='../data/part_internal_gear_mesh.vtu')
+        part_internal_gear_mesh_wheel.to_vtk(fname='../data/part_internal_gear_hex_mesh_wheel_new.vtu')
+
+    def test_get_part_external_gear(self):
+        with open('../data/external_gear_data.json', 'r') as file:
+            data = json.load(file)
+        m_n = data['mn']  # 法向模数
+        z = data['z']  # 齿数
+        alpha_n = data['alpha_n']  # 法向压力角
+        beta = data['beta']  # 螺旋角
+        x_n = data['xn']  # 法向变位系数
+        hac = data['hac']  # 齿顶高系数
+        cc = data['cc']  # 顶隙系数
+        rcc = data['rcc']  # 刀尖圆弧半径
+        jn = data['jn']  # 法向侧隙
+        n1 = data['n1']  # 渐开线分段数
+        n2 = data['n2']  # 过渡曲线分段数
+        n3 = data['n3']
+        na = data['na']
+        nf = data['nf']
+        nw = data['nw']
+        tooth_width = data['tooth_width']
+        inner_diam = data['inner_diam']  # 轮缘内径
+        chamfer_dia = data['chamfer_dia']  # 倒角高度（直径）
+
+        external_gear = ExternalGear(m_n, z, alpha_n, beta, x_n, hac, cc, rcc, jn, n1, n2, n3, na, nf, nw, chamfer_dia,
+                                     inner_diam, tooth_width)
+        hex_mesh = external_gear.generate_hexahedron_mesh()
+        part_external_gear_mesh = external_gear.set_target_tooth([18, 0, 1, 2, 3, 4])
+        part_external_gear_mesh_wheel = external_gear.set_target_tooth([18, 0, 1, 2, 3, 4], get_wheel=True)
+
+        part_external_gear_mesh.to_vtk(fname='../data/part_external_gear_mesh.vtu')
+        part_external_gear_mesh_wheel.to_vtk(fname='../data/part_external_gear_hex_mesh_wheel.vtu')
+
+    def test_get_profile_face_normal_external(self):
+        with open('../data/external_gear_new.pkl', 'rb') as f:
+            data = pickle.load(f)
+        external_gear = data['external_gear']
+        hex_mesh = data['hex_mesh']
+        quad_mesh = data['quad_mesh']
+
+        mesh = external_gear.set_target_tooth([0, 1, 18])
+        # external_gear.target_quad_mesh.to_vtk(fname='../data/face_normal_target_quad_mesh.vtu')
+
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        print(f"NC: {NC}")
+        NN = mesh.number_of_nodes()
+        print(f"NN: {NN}")
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        print(f"cell: {cell}")
+        print(f"node: {node}")
+
+        # 齿面上的节点索引和坐标
+        node_indices_tuple, noe_coord_tuple, profile_node_normal = external_gear.get_profile_node_index(tooth_tag=0)
+
+        print(-1)
+
+    def test_get_profile_face_normal_internal(self):
+        with open('../data/internal_gear_new.pkl', 'rb') as f:
+            data = pickle.load(f)
+        internal_gear = data['internal_gear']
+        hex_mesh = data['hex_mesh']
+        quad_mesh = data['quad_mesh']
+
+        mesh = internal_gear.set_target_tooth([78, 79, 0, 1, 2])
+        # internal_gear.target_quad_mesh.to_vtk(fname='../data/face_normal_target_quad_mesh_internal.vtu')
+
+        # 齿面上的节点索引和坐标
+        node_indices_tuple, noe_coord_tuple, profile_node_normal = internal_gear.get_profile_node_index(tooth_tag=0)
+
+        print(-1)
 
 
 

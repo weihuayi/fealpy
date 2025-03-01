@@ -171,9 +171,9 @@ class LinearElasticMaterial(ElasticMaterial):
     
     def strain_matrix(self, dof_priority: bool, 
                     gphi: TensorLike, 
-                    # shear_order: List[str]=['yz', 'xz', 'xy'],
+                    shear_order: List[str]=['yz', 'xz', 'xy'],
                     # shear_order: List[str]=['xy', 'yz', 'xz'],
-                    shear_order: List[str]=['xy', 'xz', 'yz'], # Abaqus 顺序
+                    # shear_order: List[str]=['xy', 'xz', 'yz'], # Abaqus 顺序
                     correction: Optional[str] = None,  # 'None', 'BBar'
                     cm: TensorLike = None, ws: TensorLike = None, detJ: TensorLike = None) -> TensorLike:
         '''
@@ -282,7 +282,6 @@ class LinearElasticMaterial(ElasticMaterial):
             if out.shape != new_shape:
                 raise ValueError(f'out.shape={out.shape} != {new_shape}')
 
-        # average_gphi = bm.einsum('cqid, cq, q -> cid', gphi, detJ, ws)  # (NC, LDOF, GD)
         average_gphi = bm.einsum('cqid, cq, q -> cid', gphi, detJ, ws) / (3 * cm[:, None, None])  # (NC, LDOF, GD)
         for i in range(GD):
             for j in range(GD):

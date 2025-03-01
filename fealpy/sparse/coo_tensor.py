@@ -6,8 +6,7 @@ from ..backend import TensorLike, Number, Size
 from ..backend import backend_manager as bm
 from .sparse_tensor import SparseTensor
 from .utils import (
-    flatten_indices, tril_coo,
-    check_shape_match, check_spshape_match
+    flatten_indices, check_shape_match, check_spshape_match
 )
 from ._spspmm import spspmm_coo
 from ._spmm import spmm_coo
@@ -74,17 +73,28 @@ class COOTensor(SparseTensor):
     def nnz(self): return self._indices.shape[1]
 
     @property
-    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
-        slicing = [self._indices[i] for i in range(self.sparse_ndim)]
-        return (slice(None),) * self.dense_ndim + tuple(slicing)
-
     def indices(self) -> TensorLike:
         """Return the indices of the non-zero elements."""
         return self._indices
 
+    @property
     def values(self) -> Optional[TensorLike]:
         """Return the non-zero elements."""
         return self._values
+
+    @property
+    def row(self): return self._indices[0] # scipy convention
+
+    @property
+    def col(self): return self._indices[1] # scipy convenstion
+
+    @property
+    def data(self): return self._values # scipy convention
+
+    @property
+    def nonzero_slice(self) -> Tuple[Union[slice, TensorLike]]:
+        slicing = [self._indices[i] for i in range(self.sparse_ndim)]
+        return (slice(None),) * self.dense_ndim + tuple(slicing)
 
     ### 2. Data Type & Device Management ###
     def astype(self, dtype=None, /, *, copy=True):
@@ -129,7 +139,7 @@ class COOTensor(SparseTensor):
     def tocsr(self, *, copy=False):
         from .csr_tensor import CSRTensor
         try:
-            crow, col, values = bm.coo_tocsr(self.indices(), self.values(), self.sparse_shape)
+            crow, col, values = bm.coo_tocsr(self.indices, self.values, self.sparse_shape)
             return CSRTensor(crow, col, values, spshape=self._spshape)
         except (AttributeError, NotImplementedError):
             pass
@@ -140,10 +150,10 @@ class COOTensor(SparseTensor):
         crow = bm.concat([crow, bm.tensor([self.nnz], **bm.context(crow))])
         new_col = bm.copy(self._indices[-1, order])
 
-        if self.values() is None:
+        if self.values is None:
             new_values = None
         else:
-            new_values = self.values()[..., order]
+            new_values = self.values[..., order]
             new_values = bm.copy(new_values) if copy else new_values
 
         return CSRTensor(crow, new_col, new_values, spshape=self._spshape)
@@ -157,7 +167,7 @@ class COOTensor(SparseTensor):
 
 
         return coo_matrix(
-            (bm.to_numpy(self.values()), bm.to_numpy(self.indices())),
+            (bm.to_numpy(self.values), bm.to_numpy(self.indices)),
             shape = self.sparse_shape
         )
 
@@ -242,8 +252,8 @@ class COOTensor(SparseTensor):
         return COOTensor(new_indices, self._values, shape)
 
     def partial(self, index: Union[TensorLike, slice], /):
-        new_indices = bm.copy(self.indices()[:, index])
-        new_values = self.values()
+        new_indices = bm.copy(self.indices[:, index])
+        new_values = self.values
 
         if new_values is not None:
             new_values = bm.copy(new_values[..., index])
@@ -251,12 +261,12 @@ class COOTensor(SparseTensor):
         return COOTensor(new_indices, new_values, self._spshape)
 
     def tril(self, k: int = 0) -> 'COOTensor':
-        indices = self.indices()
+        indices = self.indices
         tril_loc = (indices[-2] + k) >= indices[-1]
         return self.partial(tril_loc)
 
     def triu(self, k: int = 0) -> 'COOTensor':
-        indices = self.indices()
+        indices = self.indices
         triu_loc = (indices[-1] - k) >= indices[-2]
         return self.partial(triu_loc)
 
@@ -270,17 +280,17 @@ class COOTensor(SparseTensor):
 
         fcoo = coo_tensors[0]
         total_nnz = sum(coo.nnz for coo in coo_tensors)
-        new_indices = bm.empty((fcoo.sparse_ndim, total_nnz), **bm.context(fcoo.indices()))
-        new_indices[:, :fcoo.nnz] = fcoo.indices()
+        new_indices = bm.empty((fcoo.sparse_ndim, total_nnz), **bm.context(fcoo.indices))
+        new_indices[:, :fcoo.nnz] = fcoo.indices
         nnz_cursor = fcoo.nnz
         size_cursor = fcoo.sparse_shape[axis]
-        values_list = [fcoo.values()]
+        values_list = [fcoo.values]
 
         for coo in coo_tensors[1:]:
             slicing = slice(nnz_cursor, nnz_cursor + coo.nnz)
-            new_indices[:, slicing] = coo.indices()
+            new_indices[:, slicing] = coo.indices
             new_indices[axis, slicing] += size_cursor
-            values_list.append(coo.values())
+            values_list.append(coo.values)
             nnz_cursor += coo.nnz
             size_cursor += coo.sparse_shape[axis]
 
@@ -441,24 +451,32 @@ class COOTensor(SparseTensor):
             or a Tensor if `other` is a dense tensor.
         """
         if isinstance(other, COOTensor):
-            if (self.values() is None) or (other.values() is None):
+            if (self.values is None) or (other.values is None):
                 raise ValueError("Matrix multiplication between COOTensor without "
                                  "value is not implemented now")
-            indices, values, spshape = spspmm_coo(
-                self.indices(), self.values(), self.sparse_shape,
-                other.indices(), other.values(), other.sparse_shape,
-            )
-            return COOTensor(indices, values, spshape).coalesce()
+            if hasattr(bm, 'csr_spspmm'):
+                from .csr_tensor import CSRTensor
+                mat1 = self.tocsr()
+                mat2 = other.tocsr()
+                crow, col, values, spshape = bm.csr_spspmm(
+                    mat1.crow, mat1.col, mat1.values, mat1.sparse_shape,
+                    mat2.crow, mat2.col, mat2.values, mat2.sparse_shape
+                )
+                return CSRTensor(crow, col, values, spshape)
+            else:
+                indices, values, spshape = spspmm_coo(
+                    self.indices, self.values, self.sparse_shape,
+                    other.indices, other.values, other.sparse_shape,
+                )
+            return COOTensor(indices, values, spshape).coalesce().tocsr()
 
         elif isinstance(other, TensorLike):
-            if self.values() is None:
+            if self.values is None:
                 raise ValueError()
-            try:
+            if hasattr(bm, 'coo_spmm'):
                 return bm.coo_spmm(self._indices, self._values, self._spshape, other)
-            except (AttributeError, NotImplementedError):
-                pass
-
-            return spmm_coo(self.indices(), self.values(), self.sparse_shape, other)
+            else:
+                return spmm_coo(self.indices, self.values, self.sparse_shape, other)
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")

@@ -235,7 +235,7 @@ class Mesh(MeshDS):
         subprocess.run(command)
         os.remove(fname)
 
-    def vtkview(self, showedge=True,
+    def vtkview(self, etype='cell', showedge=True,
             background_color: Tuple[float, float, float]=(0.3, 0.2, 0.1),
             edge_color: Tuple[float, float, float]=(0, 0, 0),
             edge_width=1.5,
@@ -256,8 +256,8 @@ class Mesh(MeshDS):
                 axis=1
             )
 
-        cell = bm.to_numpy(self.entity('cell'))
-        cellType = self.vtk_cell_type('cell')
+        cell = bm.to_numpy(self.entity(etype))
+        cellType = self.vtk_cell_type(etype)
         NV = cell.shape[-1]
 
         cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
@@ -492,7 +492,7 @@ class SimplexMesh(HomogeneousMesh):
         if variables == 'u':
             return R
         elif variables == 'x':
-            Dlambda = self.grad_lambda(index=index)
+            Dlambda = self.grad_lambda(index=index, TD=TD)
             gphi = bm.einsum('...bm, qjb -> ...qjm', Dlambda, R) # (NC, NQ, ldof, dim)
             # NOTE: the subscript 'q': NQ, 'm': dim, 'j': ldof, 'b': bc, '...': cell
             return gphi

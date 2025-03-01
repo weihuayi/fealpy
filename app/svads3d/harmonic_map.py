@@ -93,7 +93,7 @@ def sphere_harmonic_map(data : HarmonicMapData):
         ue = extend_fun(u) 
         return (SS@ue).dot(ue)
     E = compute_energy(uh)
-    print("init energy: ", E)
+    #print("init energy: ", E)
 
     k = 0
     # 2. 迭代求解
@@ -116,7 +116,7 @@ def sphere_harmonic_map(data : HarmonicMapData):
         vh = uh.reshape(-1, GD) + wh.reshape(-1, GD)
         uh = (vh/np.linalg.norm(vh, axis=1, keepdims=True)).reshape(-1)
         E0 = compute_energy(uh)
-        print("energy: ", E0)
+        #print("energy: ", E0)
         if (np.linalg.norm(E - E0) < 1e-2)|(k>100):
             break
         k += 1

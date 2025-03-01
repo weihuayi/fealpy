@@ -4,6 +4,7 @@ from typing import Union, Optional, Dict, overload, Callable, Any
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, EntityName, _S, _int_func
 from .. import logger
+from ..sparse import COOTensor
 from .utils import estr2dim, edim2entity, MeshMeta, flocc
 
 
@@ -180,6 +181,48 @@ class MeshDS(metaclass=MeshMeta):
         cell2cell[face2cell[:, 0], face2cell[:, 2]] = face2cell[:, 1]
         cell2cell[face2cell[:, 1], face2cell[:, 3]] = face2cell[:, 0]
         return cell2cell
+    
+    def node_to_node(self):
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        edge = self.edge
+        indice = bm.stack([edge.reshape(-1), edge[:, [1, 0]].reshape(-1)], axis=0)
+        data = bm.ones((2*NE,),  dtype=bm.bool, device=edge.device)
+        node2node = COOTensor(indice, data, spshape=(NN, NN))
+        return node2node
+
+    def node_to_edge(self):
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        nv = self.number_of_vertices_of_edges()
+        edge = self.edge
+        kwargs = bm.context(edge)
+        indice = bm.stack([edge.reshape(-1), bm.repeat(bm.arange(NE,**kwargs), nv)], axis=0)
+        data = bm.ones((NE*nv), dtype=bm.bool, device=edge.device)
+        node2edge = COOTensor(indice, data, spshape=(NN, NE))
+        return node2edge
+
+    def node_to_cell(self):
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        nv = self.number_of_vertices_of_cells()
+        cell = self.cell
+        kwargs = bm.context(cell)
+        indice = bm.stack([cell.reshape(-1), bm.repeat(bm.arange(NC,**kwargs), nv)], axis=0)
+        data = bm.ones((NC*nv),  dtype=bm.bool, device=cell.device)
+        node2edge = COOTensor(indice, data, spshape=(NN, NC))
+        return node2edge
+    
+    def node_to_face(self):
+        NN = self.number_of_nodes()
+        NF = self.number_of_faces()
+        nv = self.number_of_vertices_of_faces()
+        face = self.face
+        kwargs = bm.context(face)
+        indice = bm.stack([face.reshape(-1), bm.repeat(bm.arange(NF,**kwargs), nv)], axis=0)
+        data = bm.ones((NF*nv),  dtype=bm.bool, device=face.device)
+        node2edge = COOTensor(indice, data, spshape=(NN, NF))
+        return node2edge
 
     ### boundary
     def boundary_node_flag(self) -> TensorLike:

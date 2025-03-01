@@ -10,22 +10,22 @@ from fealpy.opt.benchmark import iopt_benchmark_data as iopt_data
 # device = 'cuda'
 # bm.set_default_device(device)
 
-import time 
-start_time = time.perf_counter()
+# import time 
+# start_time = time.perf_counter()
 
 num = 0
 lb, ub = iopt_data[num]['domain']
-NP = 100
+NP = 5
 MaxIters = 1000
 dim = 30
-x0 = lb + bm.random.rand(NP, dim) * (ub - lb)
+x0 = initialize(NP, dim, ub, lb, method=None)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
-optimizer = ExponentialTrigonometricOptAlg(option)
-
-gbest, gbest_f = optimizer.run()
-print("The final result: ", gbest_f)
-print("The final solution: ", gbest)
-
-end_time = time.perf_counter()
-running_time = end_time - start_time
-print("Running time :", running_time)
+optimizer = InvasiveWeedOpt(option)
+optimizer.run()
+optimizer.plot_curve("WhaleOptAlg")
+optimizer.plot_plpt_percen()
+optimizer.print_optimal_result()
+# print("Function times:", optimizer.NF)
+# end_time = time.perf_counter()
+# running_time = end_time - start_time
+# print("Running time :", running_time)

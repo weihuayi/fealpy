@@ -12,30 +12,31 @@ class FilterMatrix:
     @staticmethod
     def create_filter_matrix(mesh, filter_radius: float) -> Tuple[COOTensor, TensorLike]:
         """
-        根据网格创建滤波矩阵
+        创建网格依赖滤波矩阵 (仅支持单位长度的均匀网格)
         
         Parameters
-        ----------
-        mesh : UniformMesh2d or UniformMesh3d
-            计算网格
-        radius : float
-            滤波半径
+        - mesh : 网格
+        - radius : 滤波半径
             
         Returns
-        -------
-        H : 滤波矩阵
-        Hs : 滤波矩阵行和向量
+        - H : 滤波矩阵
+        - Hs : 滤波矩阵行和向量
         """
         if isinstance(mesh, UniformMesh2d):
+            if not (mesh.h[0] == mesh.h[1] == 1.0):
+                raise ValueError("FilterMatrix only supports uniform mesh with unit length (h[0] = h[1] = 1.0)")
             return FilterMatrix._compute_filter_2d(mesh.nx, mesh.ny, filter_radius)
         elif isinstance(mesh, UniformMesh3d):
+            if not (mesh.h[0] == mesh.h[1] == mesh.h[2] == 1.0):
+                raise ValueError("FilterMatrix only supports uniform mesh with unit length (h[0] = h[1] = h[2] = 1.0)")
             return FilterMatrix._compute_filter_3d(mesh.nx, mesh.ny, mesh.nz, filter_radius)
         else:
             raise TypeError("Mesh must be UniformMesh2d or UniformMesh3d")
     
     @staticmethod
     def _compute_filter_2d(nx: int, ny: int, rmin: float) -> Tuple[COOTensor, TensorLike]:
-        """计算2D滤波矩阵"""
+        """计算 UniformMesh2d 下的滤波矩阵"""
+        
         nfilter = int(nx * ny * ((2 * (ceil(rmin) - 1) + 1) ** 2))
         iH = bm.zeros(nfilter, dtype=bm.int32)
         jH = bm.zeros(nfilter, dtype=bm.int32)
@@ -57,7 +58,8 @@ class FilterMatrix:
                         if fac > 0:
                             iH[cc] = row
                             jH[cc] = col
-                            sH[cc] = fac
+                            sH[cc] = max(0.0, fac)
+                            # sH[cc] = fac
                             cc += 1
 
         H = COOTensor(

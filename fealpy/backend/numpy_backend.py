@@ -7,6 +7,7 @@ from itertools import combinations_with_replacement
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.spatial import KDTree
 from numpy.linalg import det
 from scipy.sparse._sparsetools import coo_matvec, csr_matvec, csr_matvecs, coo_tocsr
 
@@ -155,22 +156,22 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
 
     ### Sparse Functions ###
     @staticmethod
-    def coo_spmm(indices, value, shape, other):
-        nnz = value.shape[-1]
+    def coo_spmm(indices, values, shape, other):
+        nnz = values.shape[-1]
         row = indices[0]
         col = indices[1]
 
-        if value.ndim == 1:
+        if values.ndim == 1:
             if other.ndim == 1:
                 result = np.zeros((shape[0],), dtype=other.dtype)
-                coo_matvec(nnz, row, col, value, other, result)
+                coo_matvec(nnz, row, col, values, other, result)
                 return result
             elif other.ndim == 2:
                 new_shape = (shape[0], other.shape[-1])
                 result = np.zeros(new_shape, dtype=other.dtype)
                 rT = result.T
                 for i, acol in enumerate(other.T):
-                    coo_matvec(nnz, row, col, value, acol, rT[i])
+                    coo_matvec(nnz, row, col, values, acol, rT[i])
                 return result
             else:
                 raise ValueError("`other` must be a 1-D or 2-D array.")
@@ -179,25 +180,33 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
                                       "not been supported yet.")
 
     @staticmethod
-    def csr_spmm(crow, col, value, shape, other):
+    def csr_spmm(crow, col, values, shape, other):
         M, N = shape
 
-        if value.ndim == 1:
+        if values.ndim == 1:
             if other.ndim == 1:
                 result = np.zeros((shape[0],), dtype=other.dtype)
-                csr_matvec(M, N, crow, col, value, other, result)
+                csr_matvec(M, N, crow, col, values, other, result)
                 return result
             elif other.ndim == 2:
                 n_vecs = other.shape[-1]
                 new_shape = (shape[0], other.shape[-1])
                 result = np.zeros(new_shape, dtype=other.dtype)
-                csr_matvecs(M, N, n_vecs, crow, col, value, other.ravel(), result.ravel())
+                csr_matvecs(M, N, n_vecs, crow, col, values, other.ravel(), result.ravel())
                 return result
             else:
                 raise ValueError("`other` must be a 1-D or 2-D array.")
         else:
             raise NotImplementedError("Batch sparse matrix multiplication has "
                                       "not been supported yet.")
+
+    @staticmethod
+    def csr_spspmm(crow1, col1, values1, shape1, crow2, col2, values2, shape2):
+        from scipy.sparse import csr_matrix
+        m1 = csr_matrix((values1, col1, crow1), shape=shape1)
+        m2 = csr_matrix((values2, col2, crow2), shape=shape2)
+        m3 = m1._matmul_sparse(m2)
+        return m3.indptr, m3.indices, m3.data, m3.shape
 
     @staticmethod
     def coo_tocsr(indices, values, shape):
@@ -211,6 +220,138 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
         coo_tocsr(M, N, nnz, major, minor, values, crow, col, data)
 
         return crow, col, data
+
+    @staticmethod
+    def query_point(x, y, h, box_size, mask_self=True, periodic=[True, True, True]):
+        if not isinstance(periodic, list) or len(periodic) != 3 or not all(isinstance(p, bool) for p in periodic):
+            raise TypeError("periodic type is：[bool, bool, bool]")
+        def map_points(a, b, r, positions):
+            x, y = positions[:, 0], positions[:, 1]
+            cond_1 = (0 <= x) & (x <= r) & (r < y) & (y < b - r)  # 区域[(0, r), (r, b-r)]
+            cond_2 = (a - r <= x) & (x <= a) & (r < y) & (y < b - r)  # 区域[(a-r, a), (r, b-r)]
+            cond_3 = (r < x) & (x < a - r) & (0 <= y) & (y <= r)  # 区域[(r, a-r), (0, r)]
+            cond_4 = (r < x) & (x < a - r) & (b - r <= y) & (y <= b)  # 区域[(r, a-r), (b-r, b)]
+            cond_5 = (0 <= x) & (x <= r) & (0 <= y) & (y <= r)  # 角区域[(0, r), (0, r)]
+            cond_6 = (a - r <= x) & (x <= a) & (0 <= y) & (y <= r)  # 角区域[(a-r, a), (0, r)]
+            cond_7 = (0 <= x) & (x <= r) & (b - r <= y) & (y <= b)  # 角区域[(0, r), (b-r, b)]
+            cond_8 = (a - r <= x) & (x <= a) & (b - r <= y) & (y <= b)  # 角区域[(a-r, a), (b-r, b)]
+            cond_9 = ~(cond_1 | cond_2 | cond_3 | cond_4 | cond_5 | cond_6 | cond_7 | cond_8) # 其他区域
+            idx_positions = np.arange(len(positions))
+            bool_positions = np.ones(len(positions), dtype=bool)
+
+            cond_5_1 = np.concatenate([(x[cond_5] + a).reshape(-1,1), (y[cond_5]).reshape(-1,1)], axis=-1) # 右侧映射
+            cond_5_2 = np.concatenate([(x[cond_5]).reshape(-1,1), (y[cond_5] + b).reshape(-1,1)], axis=-1) # 上方映射 
+            cond_5_3 = np.concatenate([(x[cond_5] + a).reshape(-1,1), (y[cond_5] + b).reshape(-1,1)], axis=-1) # 右上方映射
+            _cond_5 = np.concatenate([cond_5_1, cond_5_2, cond_5_3], axis=0)
+            idx_cond_5_1 = np.nonzero(cond_5)[0]
+            idx_5 = np.concatenate([idx_cond_5_1, idx_cond_5_1, idx_cond_5_1], axis=0)
+            bool_cond_5_1 = np.zeros(len(cond_5_1), dtype=bool)
+            bool_5 = np.concatenate([bool_cond_5_1, bool_cond_5_1, bool_cond_5_1], axis=0)
+
+            _cond_3 = np.concatenate([(x[cond_3]).reshape(-1,1), (y[cond_3] + b).reshape(-1,1)], axis=-1) # 上侧映射 
+            idx_3 = np.nonzero(cond_3)[0]
+            bool_3 = np.zeros(len(_cond_3), dtype=bool)
+
+            cond_6_1 = np.concatenate([(x[cond_6] - a).reshape(-1,1), (y[cond_6]).reshape(-1,1)], axis=-1) # 左侧映射
+            cond_6_2 = np.concatenate([(x[cond_6]).reshape(-1,1), (y[cond_6] + b).reshape(-1,1)], axis=-1) # 上方映射
+            cond_6_3 = np.concatenate([(x[cond_6] - a).reshape(-1,1), (y[cond_6] + b).reshape(-1,1)], axis=-1) # 左上方映射
+            _cond_6 = np.concatenate([cond_6_1, cond_6_2, cond_6_3], axis=0)
+            idx_cond_6_1 = np.nonzero(cond_6)[0]
+            idx_6 = np.concatenate([idx_cond_6_1, idx_cond_6_1, idx_cond_6_1], axis=0)
+            bool_cond_6_1 = np.zeros(len(cond_6_1), dtype=bool)
+            bool_6 = np.concatenate([bool_cond_6_1, bool_cond_6_1, bool_cond_6_1], axis=0)
+
+            _cond_1 = np.concatenate([(x[cond_1] + a).reshape(-1,1), y[cond_1].reshape(-1,1)], axis=-1) # 右侧映射
+            idx_1 = np.nonzero(cond_1)[0]
+            bool_1 = np.zeros(len(_cond_1), dtype=bool)
+
+            _cond_2 = np.concatenate([(x[cond_2] - a).reshape(-1,1), y[cond_2].reshape(-1,1)], axis=-1) # 左侧映射
+            idx_2 = np.nonzero(cond_2)[0]
+            bool_2 = np.zeros(len(_cond_2), dtype=bool)
+
+            cond_7_1 = np.concatenate([(x[cond_7] + a).reshape(-1,1), (y[cond_7]).reshape(-1,1)], axis=-1) # 右侧映射
+            cond_7_2 = np.concatenate([(x[cond_7]).reshape(-1,1), (y[cond_7] - b).reshape(-1,1)], axis=-1) # 下方映射
+            cond_7_3 = np.concatenate([(x[cond_7] + a).reshape(-1,1), (y[cond_7] - b).reshape(-1,1)], axis=-1) # 右下方映射
+            _cond_7 = np.concatenate([cond_7_1, cond_7_2, cond_7_3], axis=0)
+            idx_cond_7_1 = np.nonzero(cond_7)[0]
+            idx_7 = np.concatenate([idx_cond_7_1, idx_cond_7_1, idx_cond_7_1], axis=0)
+            bool_cond_7_1 = np.zeros(len(cond_7_1), dtype=bool)
+            bool_7 = np.concatenate([bool_cond_7_1, bool_cond_7_1, bool_cond_7_1], axis=0)
+
+            _cond_4 = np.concatenate([(x[cond_4]).reshape(-1,1), (y[cond_4] - b).reshape(-1,1)], axis=-1) #下侧映射
+            idx_4 = np.nonzero(cond_4)[0]
+            bool_4 = np.zeros(len(_cond_4), dtype=bool)
+
+            cond_8_1 = np.concatenate([(x[cond_8] - a).reshape(-1,1), (y[cond_8]).reshape(-1,1)], axis=-1) # 左侧映射
+            cond_8_2 = np.concatenate([(x[cond_8]).reshape(-1,1), (y[cond_8] - b).reshape(-1,1)], axis=-1) # 下侧映射
+            cond_8_3 = np.concatenate([(x[cond_8] - a).reshape(-1,1), (y[cond_8] - b).reshape(-1,1)], axis=-1) # 左下方映射
+            _cond_8 = np.concatenate([cond_8_1, cond_8_2, cond_8_3], axis=0)
+            idx_cond_8_1 = np.nonzero(cond_8)[0]
+            idx_8 = np.concatenate([idx_cond_8_1, idx_cond_8_1, idx_cond_8_1], axis=0)
+            bool_cond_8_1 = np.zeros(len(cond_8_1), dtype=bool)
+            bool_8 = np.concatenate([bool_cond_8_1, bool_cond_8_1, bool_cond_8_1], axis=0)
+
+            mapped_positions = np.concatenate([positions, _cond_5, _cond_3, _cond_6, _cond_1, _cond_2, _cond_7, _cond_4, _cond_8], axis=0)
+            mapped_indices = np.concatenate([idx_positions, idx_5, idx_3, idx_6, idx_1, idx_2, idx_7, idx_4, idx_8], axis=0)
+            mapped_bool = np.concatenate([bool_positions, bool_5, bool_3, bool_6, bool_1, bool_2, bool_7, bool_4, bool_8], axis=0)
+            return mapped_positions, mapped_indices, mapped_bool
+
+        if all(periodic):
+            map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], h, x)
+            map_y , map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], h, y)
+            tree = KDTree(map_x)
+            neighbors = tree.query_ball_point(map_y, h)
+            lengths = np.array([len(sublist) for sublist in neighbors]) 
+            a = np.arange(len(lengths))
+            node_self = np.repeat(a, lengths)
+            neighbors = np.concatenate(neighbors)
+            map_bool = map_bool_x[node_self]
+            neighbors = map_idx_x[neighbors]
+            neighbors = neighbors[map_bool]
+            node_self = node_self[node_self < x.shape[0]]
+            if not mask_self:
+                mask = node_self == neighbors
+                node_self = node_self[~mask]
+                neighbors = neighbors[~mask]
+
+        elif not any(periodic):
+            tree = KDTree(x)
+            neighbors = tree.query_ball_point(y, h)
+            lengths = np.array([len(sublist) for sublist in neighbors])  
+            a = np.arange(len(lengths))
+            node_self = np.repeat(a, lengths)
+            neighbors = np.concatenate(neighbors)
+            if not mask_self:
+                mask = node_self == neighbors
+                node_self = node_self[~mask]
+                neighbors = neighbors[~mask]
+
+        else:
+            for dim in range(3):
+                if not periodic[dim]:
+                    raise NotImplementedError(f"Single-side periodic boundary condition for dimension {dim} is not implemented yet.")
+                    pass
+        return node_self, neighbors
+
+    ### Function Transforms ###
+    @staticmethod
+    def vmap(func, /, in_axes=0, out_axes=0, *args, **kwds):
+        if in_axes != out_axes:
+            raise ValueError(f"Only support in_axes == out_axes with numpy backend")
+        from functools import partial
+        def vectorized(*args, **kwargs):
+            arr_lists = [np.unstack(arr, axis=in_axes)
+                         for arr in args if isinstance(arr, np.ndarray)]
+            results = tuple(map(partial(func, **kwargs), *arr_lists))
+
+            if isinstance(results[0], tuple):
+                results = map(partial(np.stack, axis=in_axes), zip(*results))
+                results = tuple(results)
+            else:
+                results = np.stack(results, axis=in_axes)
+            return results
+
+        return vectorized
 
     ### FEALPy Functions ###
 

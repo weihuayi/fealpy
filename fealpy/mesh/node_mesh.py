@@ -3,6 +3,7 @@ from typing import Union, Optional, Sequence, Tuple, Any, Dict
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
+from fealpy.cfd.sph.particle_solver_new import Space
 
 from .mesh_base import MeshDS 
 
@@ -47,37 +48,17 @@ class NodeMesh(MeshDS):
         axes.set_aspect('equal')
         return axes.scatter(self.node[..., 0], self.node[..., 1], c=color, s=markersize)
 
-    def neighbors(self, box_size, h) -> TensorLike: 
-        '''
-        @brief Find neighbor particles within the smoothing radius.
-
-        note : Currently using jax's own jax_md, vmap, lax
-        '''
-        displacement, shift = space.periodic(box_size)
-        neighbor_fn = partition.neighbor_list(displacement, box_size, h)
-
-        nbrs = neighbor_fn.allocate(self.node)
-        nbrs = neighbor_fn.update(self.node, nbrs)
-        neighbor = nbrs.idx
-        num = self.node.shape[0]
-        index = vmap(lambda idx, row: jnp.hstack([row, jnp.array([idx])]))(bm.arange(neighbor.shape[0]), neighbor)
-        row_len = bm.sum(index != num,axis=1)
-        indptr = lax.scan(lambda carry, x: (carry + x, carry + x), 0, row_len)[1]
-        indptr = bm.concatenate((bm.tensor([0]), indptr))
-        index = index[index != num]
-
-        return index, indptr
-
     @classmethod
-    def from_tgv_domain(cls, box_size, dx=0.02, dy=0.02):
+    def from_tgv_domain(cls, box_size, dx=0.02):
         rho0 = 1.0 #参考密度
         eta0 = 0.01 #参考动态粘度
-        n = bm.tensor((box_size / dx).round(), dtype=int)
-        grid = bm.meshgrid(bm.arange(n[0]), bm.arange(n[1]), indexing="xy")
+
+        n = bm.astype(box_size // dx, bm.int32)
+        grid = bm.meshgrid(bm.arange(n[0],dtype=bm.float64), bm.arange(n[1], dtype=bm.float64), indexing="xy")
         
-        r = bm.tensor((jnp.vstack(list(map(jnp.ravel, grid))).T + 0.5) * dx)
+        r = (bm.stack((grid[0].flatten(),grid[1].flatten()), 1) + 0.5) * dx
         NN = r.shape[0]
-        tag = jnp.full(NN, 0, dtype=int)
+        tag = bm.zeros(NN)
         mv = bm.zeros((NN, 2), dtype=bm.float64)
         tv = bm.zeros((NN, 2), dtype=bm.float64)
         x = r[:, 0]
@@ -91,9 +72,9 @@ class NodeMesh(MeshDS):
             mv[:, 0] = u0
             mv[:, 1] = v0
         tv = mv
-        volume = bm.ones(NN, dtype=bm.float64) * dx * dy
+        volume = bm.ones(NN, dtype=bm.float64) * dx **2
         rho = bm.ones(NN, dtype=bm.float64) * rho0
-        mass = bm.ones(NN, dtype=bm.float64) * dx * dy * rho0
+        mass = bm.ones(NN, dtype=bm.float64) * dx ** 2 * rho0
         eta = bm.ones(NN, dtype=bm.float64) * eta0
 
         nodedata = {
@@ -122,37 +103,32 @@ class NodeMesh(MeshDS):
         hot_wall_half_width = 0.25 #温度一半长
 
         #wall particles
-        dxn1 = dx * n_walls
-        n1 = bm.tensor((bm.tensor([L, dxn1]) / dx).round(), dtype=int)
+        dxn1 = bm.array(dx * n_walls, dtype=bm.float64)
+        n1 = bm.astype(bm.array([L, dxn1]) / dx, bm.int32)
         grid1 = bm.meshgrid(bm.arange(n1[0]), bm.arange(n1[1]), indexing="xy")
-        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
-        wall_b = r1.copy()
-        wall_t = r1.copy() + bm.tensor([0.0, H + dxn1])
+        r1 = (bm.stack((grid1[0].flatten(),grid1[1].flatten()), 1) + 0.5) * dx
+        wall_b = bm.copy(r1)
+        wall_t = bm.copy(r1) + bm.array([0.0, H + dxn1], dtype=bm.float64)
         r_w = bm.concatenate([wall_b, wall_t])
 
         #fuild particles
-        n2 = bm.tensor((bm.tensor([L, H]) / dx).round(), dtype=int)
+        n2 = bm.astype(bm.array([L, H]) / dx, bm.int32)
         grid2 = bm.meshgrid(bm.arange(n2[0]), bm.arange(n2[1]), indexing="xy")
-        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
-        r_f = bm.tensor([0.0, 1.0]) * n_walls * dx + r2
+        r2 = (bm.stack((grid2[0].flatten(),grid2[1].flatten()), 1) + 0.5) * dx
+        r_f = bm.astype(bm.array([0.0, 1.0]) * n_walls * dx + r2, bm.float64)
 
-        #tag
-        '''
-        0 fluid
-        1 solid wall
-        2 moving wall
-        3 dirchilet wall
-        '''
-        tag_f = jnp.full(len(r_f), 0, dtype=int)
-        tag_w = jnp.full(len(r_w), 1, dtype=int)
-        r = bm.tensor(bm.concatenate([r_w, r_f]))
+        #tag:0-fluid,1-solid wall,2-moving wall,3-dirchilet wall
+        tag_f = bm.full((r_f.shape[0],), 0, dtype=bm.int32)
+        tag_w = bm.full((r_w.shape[0],), 1, dtype=bm.int32)
+        
+        r = bm.concatenate([r_w, r_f])
         tag = bm.concatenate([tag_w, tag_f])
 
-        dx2n = dx * n_walls * 2
-        _box_size = bm.tensor([L, H + dx2n])
+        dx2n = bm.array(dx * n_walls * 2, dtype=bm.float64)
+        _box_size = bm.array([L, H + dx2n], dtype=bm.float64)
         mask_hot_wall = ((r[:, 1] < dx * n_walls) * (r[:, 0] < (_box_size[0] / 2) + \
                 hot_wall_half_width) * (r[:, 0] > (_box_size[0] / 2) - hot_wall_half_width))
-        tag = jnp.where(mask_hot_wall, 3, tag)
+        tag = bm.where(mask_hot_wall, 3, tag)
         
         NN_sum = r.shape[0]
         mv = bm.zeros_like(r)
@@ -195,40 +171,34 @@ class NodeMesh(MeshDS):
         velocity_wall = 0.3 #每段温度边界长度
 
         #wall particles
-        dxn1 = dx * n_walls
-        n1 = bm.tensor((bm.tensor([L, dxn1]) / dx).round(), dtype=int)
+        dxn1 = bm.array(dx * n_walls, dtype=bm.float64)
+        n1 = bm.astype(bm.array([L, dxn1]) / dx, bm.int32)
         grid1 = bm.meshgrid(bm.arange(n1[0]), bm.arange(n1[1]), indexing="xy")
-        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
-        wall_b = r1.copy()
-        wall_t = r1.copy() + bm.tensor([0.0, H + dxn1])
+        r1 = (bm.stack((grid1[0].flatten(),grid1[1].flatten()), 1) + 0.5) * dx
+        wall_b = bm.copy(r1)
+        wall_t = bm.copy(r1) + bm.array([0.0, H + dxn1], dtype=bm.float64)
         r_w = bm.concatenate([wall_b, wall_t])
 
         #fuild particles
-        n2 = bm.array((bm.array([L, H]) / dx).round(), dtype=int)
+        n2 = bm.astype(bm.array([L, H]) / dx, bm.int32)
         grid2 = bm.meshgrid(bm.arange(n2[0]), bm.arange(n2[1]), indexing="xy")
-        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
-        r_f = bm.tensor([0.0, 1.0]) * n_walls * dx + r2
+        r2 = (bm.stack((grid2[0].flatten(),grid2[1].flatten()), 1) + 0.5) * dx
+        r_f = bm.astype(bm.array([0.0, 1.0]) * n_walls * dx + r2, bm.float64)
 
-        #tag
-        '''
-        0 fluid
-        1 solid wall
-        2 moving wall
-        3 velocity wall
-        '''
-        r = bm.tensor(bm.concatenate([r_w, r_f])) 
-        tag_f = jnp.full(len(r_f), 0, dtype=int)
-        tag_w = jnp.full(len(r_w), 1, dtype=int)
-        r = bm.tensor(bm.concatenate([r_w, r_f]))
+        #tag:0-fluid,1-solid wall,2-moving wall,3-dirchilet wall
+        tag_f = bm.full((r_f.shape[0],), 0, dtype=bm.int32)
+        tag_w = bm.full((r_w.shape[0],), 1, dtype=bm.int32)
+
+        r = bm.concatenate([r_w, r_f])
         tag = bm.concatenate([tag_w, tag_f])
 
-        dx2n = dx * n_walls * 2
-        _box_size = bm.tensor([L, H + dx2n])
+        dx2n = bm.array(dx * n_walls * 2, dtype=bm.float64)
+        _box_size = bm.array([L, H + dx2n], dtype=bm.float64)
         mask_hot_wall = (
         ((r[:, 1] < dx * n_walls) | (r[:, 1] > H + dx * n_walls)) &
         (((r[:, 0] > 0.3) & (r[:, 0] < 0.6)) | ((r[:, 0] > 0.9) & (r[:, 0] < 1.2)))
     )
-        tag = jnp.where(mask_hot_wall, 3, tag)
+        tag = bm.where(mask_hot_wall, 3, tag)
 
         NN_sum = r.shape[0]
         mv = bm.zeros_like(r)

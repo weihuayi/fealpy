@@ -27,6 +27,7 @@ from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 from .cell_source_integrator import CellSourceIntegrator
 SourceIntegrator = CellSourceIntegrator
 
+from .grad_source_integrator import GradSourceIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
 from .vector_source_integrator import VectorSourceIntegrator
 
@@ -49,3 +50,8 @@ from .recovery_alg import RecoveryAlg
 
 ### Other
 from .nonlinear_wrapper import NonlinearWrapperInt
+
+
+### solver
+from .poisson_lfem_solver import PoissonLFEMSolver
+from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver
