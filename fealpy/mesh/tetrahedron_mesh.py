@@ -484,9 +484,15 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
     def prolongation_matrix(self, p0: int, p1: int):
         """
-        @brief :the prolongation_matrix from p0 to p1: 0 < p0 < p1
-        """
+        Return the prolongation_matrix from p0 to p1: 0 < p0 < p1
 
+        Parameters:
+            p0(int): The degree of the lowest-order space.
+            p1(int): The degree of the highest-order space.
+
+        Returns:
+            CSRTensor: the prolongation_matrix from p0 to p1
+        """
         assert 0 < p0 < p1
 
         TD = self.top_dimension()#Geometric Dimension
@@ -562,15 +568,20 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
         return P
 
-    def uniform_refine(self, n=1, returnim=False,returnrm=False):
+    def uniform_refine(self, n=1, returnim=False):
         """
-        Perform uniform refinement on the tetrahedral mesh.
+        Uniform refine the tetrahedral mesh n times.
 
-        @param n Number of refinement iterations (default: 1)
+        Parameters:
+            n (int): Times refine the triangle mesh.
+            returnirm (bool): Return the prolongation matrix list or not,from the finest to the the coarsest
+        
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest
         """
         if returnim:
-            nodeIMatrix = []
-            cellIMatrix = []
+            IM = []
 
         for i in range(n):
             NN = self.number_of_nodes()
@@ -582,20 +593,26 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             cell = self.entity('cell')
             cell2edge = self.cell_to_edge()
 
-            edge2newNode = bm.arange(NN, NN+NE)
+            kargs = bm.context(cell)
+            edge2newNode = bm.arange(NN, NN + NE, **kargs)
             newNode = (node[edge[:, 0], :]+node[edge[:, 1], :])/2.0
 
             self.node = bm.concatenate((node, newNode), axis=0)
 
-            if returnim:
-                A = coo_matrix((bm.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), **self.fkwargs)
-                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), **self.fkwargs)
-                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), **self.fkwargs)
-                nodeIMatrix.append(A.tocsr())
+            if returnim is True:
+                shape = (NN + NE, NN)
+                kargs = bm.context(node)
+                values = bm.ones(NN+2*NE, **kargs) 
+                values = bm.set_at(values, bm.arange(NN, NN+2*NE), 0.5)
 
-                B = eye(NC, **self.fkwargs)
-                B = bmat([[B], [B], [B], [B], [B], [B], [B], [B]])
-                cellIMatrix.append(B.tocsr())
+                kargs = bm.context(cell)
+                i0 = bm.arange(NN, **kargs) 
+                I = bm.concatenate((i0, edge2newNode, edge2newNode))
+                J = bm.concatenate((i0, edge[:, 0], edge[:, 1]))   
+
+                P = csr_matrix((values, (I, J)), shape)
+
+                IM.append(P)
 
             p = edge2newNode[cell2edge]
             newCell = bm.zeros((8*NC, 4), **self.ikwargs)
@@ -641,6 +658,10 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             newCell = bm.set_at(newCell , (slice(7*NC , 8*NC),3) , p[bm.arange(NC), T[:, 5]])
             self.cell = newCell
             self.construct()
+
+        if returnim is True:
+            IM.reverse()
+            return IM
 
             #self.ds.reinit(NN+NE, newCell)
     def circumcenter(self, index=_S, returnradius=False):

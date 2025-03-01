@@ -219,6 +219,9 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     
     def prolongation_matrix(self, cdegree=[1]):
         """
+        Generate a list of interpolation matrices from lower-order spaces to higher-order spaces,
+        from the highest to the lowest.
+        
         Parameters:
             cdegree[list]: list of the degree of the needed space,from low space to high space
         

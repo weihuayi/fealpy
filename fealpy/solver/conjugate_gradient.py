@@ -14,7 +14,7 @@ class SupportsMatmul(Protocol):
 def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optional[SupportsMatmul] = None, *,
        batch_first: bool=False,
        atol: float=1e-12, rtol: float=1e-8,
-       maxit: Optional[int]=10000) -> TensorLike:
+       maxit: Optional[int]=10000,returninfo: bool=False) -> TensorLike:
     """Solve a linear system Ax = b using the Conjugate Gradient (CG) method.
 
     Parameters:
@@ -28,6 +28,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         rtol (float, optional): Relative tolerance for convergence. Default is 1e-8.
         maxit (int, optional): Maximum number of iterations allowed. Default is 10000.\
         If not provided, the method will continue until convergence based on the given tolerances.
+        returninfo(bool):if or not return info{['residual],['niter]}
 
     Returns:
         Tensor: The approximate solution to the system Ax = b.
@@ -55,24 +56,27 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
     
-    if M is not None  and M.shape != A.shape:
-        raise ValueError("A and M must have the same shape")
+    # if M is not None  and M.shape != A.shape:
+    #     raise ValueError("A and M must have the same shape")
 
 
     if (not single_vector) and batch_first:
         b = bm.swapaxes(b, 0, 1)
         x0 = bm.swapaxes(x0, 0, 1)
 
-    sol = _cg_impl(A, b, x0,M,atol, rtol, maxit)
+    sol,info = _cg_impl(A, b, x0,M,atol, rtol, maxit)
 
     if (not single_vector) and batch_first:
         sol = bm.swapaxes(sol, 0, 1)
-
-    return sol
+    if returninfo is True:
+        return sol,info
+    if returninfo is True:
+        return sol
 
 
 def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul, atol, rtol, maxit):
     # initialize
+    info = {}
     x = x0              # (dof, batch)
     r = b - A @ x       # (dof, batch)
     z = M @ r if M is not None else r
@@ -94,7 +98,8 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
         r_norm_new = sqrt_func(sum_func(rTr_new))
 
         n_iter += 1
-
+        info['residual'] = r_norm_new
+        info['niter'] = n_iter
         if r_norm_new < atol:
             logger.info(f"CG: converged in {n_iter} iterations, "
                         "stopped by absolute tolerance.")
@@ -113,7 +118,7 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
         p = z_new + beta[None, ...] * p
         r, z, rTr = r_new, z_new, rTr_new
 
-    return x
+    return x,info
 
     # @staticmethod
     # def setup_context(ctx, inputs, output):

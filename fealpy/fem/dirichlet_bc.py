@@ -3,7 +3,7 @@ from typing import Optional, Tuple, Callable, Union, TypeVar
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike
-from ..sparse import SparseTensor, COOTensor, CSRTensor
+from ..sparse import SparseTensor, COOTensor, CSRTensor, spdiags
 from ..functionspace.space import FunctionSpace
 
 CoefLike = Union[float, int, TensorLike, Callable[..., TensorLike]]
@@ -131,18 +131,10 @@ class DirichletBC():
         Returns:
             SparseTensor: New adjusted left-hand-size matrix.
         """
-        # NOTE: Code in the numpy version:
-        # ```
-        # bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        # bdIdx[isDDof.reshape(-1)] = 1
-        # D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        # D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        # A = D0@A@D0 + D1
-        # ```
-        # Here the adjustment is done by operating the sparse structure directly.
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
+
         if isinstance(A, COOTensor):
             indices = A.indices
             remove_flag = bm.logical_or(
