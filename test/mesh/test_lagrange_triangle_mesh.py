@@ -65,13 +65,30 @@ class TestLagrangeTriangleMeshInterfaces:
         lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=3, surface=sphere)
         fname = f"sphere_test.vtu"
         lmesh.to_vtk(fname=fname)
+    
+    @pytest.mark.parametrize("backend", ['numpy'])
+    def test_uniform_refine(self, backend):
+        bm.set_backend(backend)
+
+        sphere = SphereSurface()
+        mesh = TriangleMesh.from_unit_sphere_surface()
         
+        maxit = 5
+        for i in range(maxit):
+            lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=3, surface=sphere)
+            
+            fname = f"sp{i}_test.vtu"
+            lmesh.to_vtk(fname=fname)
+
+            if i < maxit-1:
+                mesh.uniform_refine()
+                
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_curve_mesh(self, backend):
         bm.set_backend(backend)
 
         circle = CircleCurve()
-        mesh = TriangleMesh.from_unit_circle_gmesh(h=0.3)
+        mesh = TriangleMesh.from_unit_circle_gmsh(h=0.3)
 
         lmesh = LagrangeTriangleMesh.from_curve_triangle_mesh(mesh, p=2, curve=circle)
 
@@ -143,12 +160,6 @@ class TestLagrangeTriangleMeshInterfaces:
 
 
 if __name__ == "__main__":
-    a = TestLagrangeTriangleMeshInterfaces()
-    #a.test_init_mesh(init_data[0], 'numpy')
-    #a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
-    #a.test_surface_mesh('numpy')
-    a.test_curve_mesh('numpy')
-    #a.test_cell_area(cell_area_data[0], 'numpy')
-    #a.test_(cell_[0], 'numpy')
-    #a.test_error('numpy')
-    #pytest.main(["./test_lagrange_triangle_mesh.py"])
+    #a = TestLagrangeTriangleMeshInterfaces()
+    #a.test_uniform_refine('numpy')
+    pytest.main(["./test_lagrange_triangle_mesh.py"])
