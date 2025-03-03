@@ -1,0 +1,5 @@
+from .cuckoo_quantum_particle_swarm_opt import CuckooQuantumParticleSwarmOpt
+from .levy_quantum_butterfly_opt_alg import LevyQuantumButterflyOptAlg
+from .Improved_whale_opt_alg import ImprovedWhaleOptAlg
+from .levy_quantum_particle_swarm_opt import LevyQuantumParticleSwarmOpt
+from .differential_squirrel_search_alg import DifferentialSquirrelSearchAlg
