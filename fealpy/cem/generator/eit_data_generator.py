@@ -17,7 +17,7 @@ from fealpy.solver import cg, spsolve
 class EITDataGenerator():
     """Generate boundary voltage and current data for EIT.
     """
-    def __init__(self, mesh: Mesh, p: int=1, q: Optional[int]=None) -> None:
+    def __init__(self, mesh: Mesh, p: int = 1, q: Optional[int] = None) -> None:
         """Create a new EIT data generator.
 
         Args:
@@ -78,8 +78,8 @@ class EITDataGenerator():
 
         cdata_indices = self.cdata_indices
         cdataT_indices = bm.flip(cdata_indices, axis=0)
-        A_n_indices = bm.concat([self._A.indices(), cdata_indices, cdataT_indices], axis=1)
-        A_n_values = bm.concat([self._A.values(), self.cdata, self.cdata], axis=-1)
+        A_n_indices = bm.concat([self._A.indices, cdata_indices, cdataT_indices], axis=1)
+        A_n_values = bm.concat([self._A.values, self.cdata, self.cdata], axis=-1)
         A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
         self.A_n = A_n.tocsr()
 

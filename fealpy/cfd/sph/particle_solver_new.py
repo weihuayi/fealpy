@@ -115,9 +115,9 @@ class SPHSolver:
     
     @staticmethod
     #@bm.compile
-    def compute_rho(mass, i_node, w_ij):
+    def compute_rho(mass, i_node, w_ij, dtype=bm.float64):
         """Density summation"""
-        a = bm.zeros_like(mass)
+        a = bm.zeros_like(mass, dtype=dtype)
         return mass * bm.index_add(a, i_node, w_ij, axis=0, alpha=1)
 
     @staticmethod
@@ -125,6 +125,13 @@ class SPHSolver:
     def tait_eos(rho, c0, rho0, gamma=1.0, X=0.0):
         """Equation of state update pressure"""
         return gamma * c0**2 * ((rho/rho0)**gamma - 1) / rho0 + X
+
+    @staticmethod
+    #@bm.compile
+    def tait_eos_p2rho(p, p0, rho0, gamma=1.0, X=0.0):
+        """Calculate density by pressure"""
+        p_temp = p + p0 - X
+        return rho0 * (p_temp / p0) ** (1 / gamma)
 
     @staticmethod
     #@bm.compile
@@ -160,8 +167,120 @@ class SPHSolver:
         add_dv = bm.zeros_like(state["mv"])
         return bm.index_add(add_dv, i_node, a, axis=0, alpha=1)
         
+    @staticmethod
+    #@bm.compile
+    def compute_tv_acceleration(state, i_node, j_node, r_ij, dij, grad, pb):
+        """Transport velocity variation"""
+        m_i = state["mass"][i_node]
+        m_j = state["mass"][j_node]
+        rho_i = state["rho"][i_node]
+        rho_j = state["rho"][j_node]
 
-    
+        volume_square = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
+        c = volume_square * grad / (dij + EPS)
+        a = c[:, None] * pb[i_node][:, None] * r_ij      
+        return bm.index_add(bm.zeros_like(state["tv"]), i_node, a, axis=0, alpha=1) 
+
+    @staticmethod
+    #@bm.compile
+    def boundary_conditions(state, box_size, n_walls=3, dx=0.02, T0=1.0, hot_T=1.23):
+        """Boundary condition settings""" 
+        # 将输入流体温度设置为参考温度
+        fluid = state["tag"] == 0
+        inflow = fluid * (state["position"][:, 0] < n_walls * dx)
+        state["T"] = bm.where(inflow, T0, state["T"])
+        state["dTdt"] = bm.where(inflow, 0.0, state["dTdt"])
+
+        # 设置热壁温度
+        hot = state["tag"] == 3
+        state["T"] = bm.where(hot, hot_T, state["T"])
+        state["dTdt"] = bm.where(hot, 0.0, state["dTdt"])
+
+        # 将墙设置为参考温度
+        solid = state["tag"] == 1
+        state["T"] = bm.where(solid, T0, state["T"])
+        state["dTdt"] = bm.where(solid, 0, state["dTdt"])
+
+        # 确保静态墙没有速度或加速度
+        static = (hot + solid)[:, None]
+        state["mv"] = bm.where(static, 0.0, state["mv"])
+        state["tv"] = bm.where(static, 0.0, state["tv"])
+        state["dmvdt"] = bm.where(static, 0.0, state["dmvdt"])
+        state["dtvdt"] = bm.where(static, 0.0, state["dtvdt"])
+
+        # 将出口温度梯度设置为零，以避免与流入相互作用
+        bound = bm.concatenate([bm.zeros_like(box_size).reshape(-1,1), box_size.reshape(-1,1)], axis=-1)
+        outflow = fluid * (state["position"][:, 0] > bound[0, 1] - n_walls * dx)
+        state["dTdt"] = bm.where(outflow, 0.0, state["dTdt"])
+        return state
+
+    @staticmethod
+    #@bm.compile
+    def external_acceleration(position, box_size, dx=0.02):
+        """Set external velocity field"""
+        dxn = 3 * dx
+        res = bm.zeros_like(position)
+        force = bm.ones(len(position))
+        fluid = (position[:, 1] < box_size[1] - dxn) * (position[:, 1] > dxn)
+        force = bm.where(fluid, force, 0)
+        res = 2.3 * bm.set_at(res, (slice(None), 0), force)
+        return res
+
+    @staticmethod
+    #@bm.compile
+    def enforce_wall_boundary(state, p, g_ext, i_s, j_s, w_dist, dr_i_j, c0=10.0, rho0=1.0, X=5.0, \
+        p0=100.0, with_temperature=False, dtype=bm.float64):
+        """Enforce wall boundary conditions by treating boundary particles in a special way"""
+        mask_bc = bm.isin(state["tag"], bm.array([1, 3]))
+        mask_j_s_fluid = bm.where(state["tag"][j_s] == 0, 1.0, 0.0)
+        w_j_s_fluid = w_dist * mask_j_s_fluid
+        w_i_sum_wf = bm.index_add(bm.zeros(len(state["position"]), dtype=dtype), i_s, w_j_s_fluid, axis=0, alpha=1)
+
+        # no-slip boundary condition
+        def no_slip_bc(x):
+            x_wall_unnorm = bm.index_add(bm.zeros_like(state["position"], dtype=dtype), i_s, w_j_s_fluid[:, None] * x[j_s], axis=0, alpha=1)
+            x_wall = x_wall_unnorm / (w_i_sum_wf[:, None] + EPS)
+            x = bm.where(mask_bc[:, None], 2 * x - x_wall, x)
+            return x
+        mv = no_slip_bc(state["mv"])
+        tv = no_slip_bc(state["tv"])
+        
+        # Pressure summation
+        p_wall_unnorm = bm.index_add(bm.zeros(len(state["position"]), dtype=dtype), i_s, w_j_s_fluid * p[j_s], axis=0, alpha=1)
+
+        # External acceleration term
+        rho_wf_sum = (state["rho"][j_s] * w_j_s_fluid)[:, None] * dr_i_j
+        rho_wf_sum = bm.index_add(bm.zeros_like(state["position"], dtype=dtype), i_s, rho_wf_sum, axis=0, alpha=1)
+        p_wall_ext = (g_ext * rho_wf_sum).sum(axis=1)
+        
+        # Normalize pressure
+        p_wall = (p_wall_unnorm + p_wall_ext) / (w_i_sum_wf + EPS)
+        p = bm.where(mask_bc, p_wall, p)
+        
+        rho = SPHSolver.tait_eos_p2rho(p, p0, rho0, X=5.0)
+        
+        def compute_temperature():
+            t_wall_unnorm = bm.index_add(bm.zeros(len(state["position"]), dtype=dtype), i_s, w_j_s_fluid * state["T"][j_s], axis=0, alpha=1)
+            t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
+            mask = bm.isin(state["tag"], bm.array([1, 2]))
+            t_wall = bm.where(mask, t_wall, state["T"])
+            return t_wall
+
+        T = bm.where(bm.array(with_temperature), compute_temperature(), state["T"])
+        return p, rho, mv, tv, T 
+
+    @staticmethod
+    #@bm.compile(static_argnames=('kernel',))
+    def temperature_derivative(state, kernel, e_s, dr_i_j, dist, i_s, j_s, grad):
+        """compute temperature derivative for next step"""
+        kernel_grad_vector = grad[:, None] * e_s
+        k = (state["kappa"][i_s] * state["kappa"][j_s]) / (state["kappa"][i_s] + state["kappa"][j_s])
+        a = bm.sum(dr_i_j * kernel_grad_vector, axis=1)
+        F_ab = a / ((dist * dist) + EPS)
+        b = 4 * state["mass"][j_s] * k * (state["T"][i_s] - state["T"][j_s])
+        dTdt = (b * F_ab) / (state["Cp"][i_s] * state["rho"][i_s] * state["rho"][j_s])
+        result = bm.index_add(bm.zeros_like(state["T"]), i_s, dTdt, axis=0, alpha=1)
+        return result
 
     def write_vtk(self, data_dict: Dict, path: str):
         """Store a .vtk file for ParaView."""

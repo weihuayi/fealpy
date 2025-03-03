@@ -2,9 +2,6 @@ from typing import Optional, Union, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
 import numpy as np
-from .jax.jax_md import space
-from .jax import partition
-from .jax.jax_md.partition import Sparse
 
 try:
     import jax
@@ -152,6 +149,10 @@ class JAXBackend(BackendProxy, backend_name='jax'):
 
     @staticmethod
     def query_point(x, y, h, box_size, mask_self=True, periodic=[True, True, True]):
+        from .jax.jax_md import space
+        from .jax import partition
+        from .jax.jax_md.partition import Sparse
+
         if not isinstance(periodic, list) or len(periodic) != 3 or not all(isinstance(p, bool) for p in periodic):
             raise TypeError("periodic type is：[bool, bool, bool]")
         displacement, shift = space.periodic(side=box_size)
@@ -168,7 +169,7 @@ class JAXBackend(BackendProxy, backend_name='jax'):
             num_partitions = x.shape[0],
             pbc = periodic,
             )
-        neighbor_list = neighbor_fn.allocate(x, num_particles=y.shape[0])
+        neighbor_list = neighbor_fn.allocate(x, num_particles=x.shape[0])
         neighbors, node_self = neighbor_list.idx
 
         return node_self, neighbors
