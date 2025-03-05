@@ -176,12 +176,10 @@ prs_data = sio.loadmat('./potential_roller_screw.mat')
 
 data = prs_data['roller_screw_initial'][0]
 
-a = prs_data['mesh_inner_matrix'][0, 6]  - prs_data['mesh_outer_matrix'][0, 6]
-b = prs_data['mesh_inner_matrix'][0, 8] + prs_data['mesh_outer_matrix'][0, 8]
+mesh_inner_data = prs_data['mesh_inner_matrix']
+mesh_outer_data = prs_data['mesh_outer_matrix']
 
-print(a, b)
-
-prs = PlanetaryRollerScrew(data)
+prs = PlanetaryRollerScrew(data, mesh_inner_data, mesh_outer_data)
 
 tri = np.array([[0, 0], [1, 0], [0, 1]], dtype=np.float64)
 print(prs.circumcenter(tri))
