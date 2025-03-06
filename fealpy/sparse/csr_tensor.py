@@ -442,3 +442,111 @@ class CSRTensor(SparseTensor):
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
+
+
+    def find(self):
+        """
+        Find the non-zero entries in the sparse matrix..
+
+        Returns:
+                - row indices of non-zero values.
+                - column indices of non-zero values.
+                - non-zero values themselves.
+        """
+        nz_mask = self.values != 0
+        return self.row[nz_mask], self.col[nz_mask], self.values[nz_mask]
+
+    def diags(self) -> 'CSRTensor':
+        """
+        Extract the diagonal elements from the sparse matrix.
+
+        Returns:
+            CSRTensor: A new CSRTensor object containing the diagonal values.
+        """
+        diags_loc = (self.row) == self.col
+        return self.partial(diags_loc)
+
+    def col_min(self):
+        """
+        Compute the minimum values in each column of the sparse matrix.
+
+        Returns:
+            Tensor: A tensor containing the minimum values for each column.
+        """
+        M = bm.zeros(self._spshape[1], dtype=self._values.dtype)
+        bm.minimum.at(M, self._col, self._values)
+        
+        return M
+
+    def __getitem__(self, index):
+        if isinstance(index, Tuple):
+            crow_index, col_index = index 
+        else:
+            crow_index = index
+            col_index = None
+
+        if col_index is not None:
+            if isinstance(col_index, slice):
+                start = col_index.start if col_index.start is not None else 0
+                stop = col_index.stop if col_index.stop is not None else self._spshape[1]
+                step = col_index.step if col_index.step is not None else 1
+                new_shape = (stop - start + step - 1) // step
+                col_index = bm.arange(start, stop, step)
+                if new_shape == self._spshape[1]:
+                    new_crow = self._crow
+                    new_col = self._col
+                    new_values = self._values
+                    new_col_shape = self._spshape[1] 
+            elif isinstance(col_index, (List, TensorLike)):
+                new_shape = len(col_index)
+            elif isinstance(col_index, int):
+                new_shape = 1
+            else:
+                raise TypeError(f'index must be a slice or int, but got {type(index)}')
+
+            kwargs = bm.context(self._col)
+            nrz = self.crow[1:] - self.crow[:-1]
+            isfindnode = bm.zeros((self._spshape[1],), **kwargs)
+            isfindnode = bm.add_at(isfindnode, col_index, 1) == 1
+            row = bm.repeat(bm.arange(self._spshape[0]), nrz)
+            new_row = row[isfindnode[self._col]]
+            new_row = bm.concat((new_row, [self._spshape[0] - 1]))
+            new_crow = bm.concat(([0], bm.cumsum(bm.bincount(new_row))))
+            new_crow[-1] = new_crow[-1] - 1
+            new_values = self._values[isfindnode[self._col]]
+            if isinstance(col_index, int):
+                new_col = bm.zeros((self._col[isfindnode[self._col]].shape[0],), dtype=bm.int64)
+            else:
+                a = bm.searchsorted(col_index, self._col[isfindnode[self._col]]) 
+                new_col = bm.arange(new_shape)[a]
+            new_col_shape = new_shape
+        else:
+            new_crow = self._crow
+            new_col = self._col
+            new_values = self._values
+            new_col_shape = self._spshape[1]
+
+        if isinstance(crow_index, slice):
+            start = crow_index.start if crow_index.start is not None else 0
+            stop = crow_index.stop if crow_index.stop is not None else new_crow.shape[0] - 1
+            step = crow_index.step if crow_index.step is not None else 1
+            new_row_shape = (stop - start + step - 1) // step
+            if new_row_shape == new_crow.shape[0] - 1:
+                return CSRTensor(new_crow, new_col, new_values, spshape=(new_row_shape, new_col_shape)) 
+        elif isinstance(crow_index, (List, TensorLike)):
+            new_row_shape = len(crow_index)
+        elif isinstance(crow_index, int):
+            new_row_shape = 1
+        else:
+            raise TypeError(f'index must be a slice or int, but got {type(index)}')
+
+        kwargs = bm.context(self.crow)
+        nrz = new_crow[1:] - new_crow[:-  1]
+        isfindnode = bm.zeros((new_crow.shape[0] - 1,), **kwargs)
+        isfindnode = bm.add_at(isfindnode, crow_index, 1)
+        findnode = bm.repeat(isfindnode == 1, nrz) 
+        new_col = new_col[findnode]
+        new_values = new_values[findnode]
+        new_crow = bm.concat(([0], bm.cumsum(nrz[isfindnode == 1])))
+        
+        return CSRTensor(new_crow, new_col, new_values, spshape=(new_row_shape, new_col_shape))
