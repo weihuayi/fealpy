@@ -47,6 +47,22 @@ class LagrangeQuadrangleMesh(TensorMesh):
     def reference_cell_measure(self):
         return 1
     
+    def generate_local_lagrange_edges(self, p: int) -> TensorLike:
+        """
+        Generate the local edges for Lagrange elements of order p.
+        """
+        k = bm.arange((p + 1)**2, dtype=self.itype , device=self.device)
+        k = k.reshape((p + 1, p + 1)).T
+        
+        kwargs = bm.context(k)
+        localEdge = bm.zeros((4, p+1), **kwargs)
+        localEdge = bm.set_at(localEdge, (0, slice(None)), k[0, :])
+        localEdge = bm.set_at(localEdge, (1, slice(None)), k[:, -1])
+        localEdge = bm.set_at(localEdge, (2, slice(None)), bm.flip(k[-1, :]))
+        localEdge = bm.set_at(localEdge, (3, slice(None)), bm.flip(k[:, 0]))
+
+        return localEdge
+    
     def interpolation_points(self, p: int, index: Index = _S):
         """
         @brief Get all p-th order interpolation points on the quadrilateral mesh
