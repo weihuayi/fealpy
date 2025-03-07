@@ -235,14 +235,89 @@ class HexahedronMesh(TensorMesh, Plotable):
 
         return cell2ipoint[index]
 
-    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
+    def prolongation_matrix(self, p0: int, p1: int):
         """
-        @brief Uniform refine the hexahedron mesh n times.
+        Return the prolongation_matrix from p0 to p1: 0 < p0 < p1
 
         Parameters:
-            n (int): times refine the hexahedron mesh.
-            surface (function): the surface function.
-            returnirm (bool): return the interpolation matrix list or not,列表中的插值矩阵从细到粗排列
+            p0(int): The degree of the lowest-order space.
+            p1(int): The degree of the highest-order space.
+
+        Returns:
+            CSRTensor: the prolongation_matrix from p0 to p1
+        """
+        assert 0 < p0 < p1
+
+        TD = self.top_dimension()#Geometric Dimension
+        gdof0 = self.number_of_global_ipoints(p0)
+        gdof1 = self.number_of_global_ipoints(p1)
+        matrix_shape = (gdof1,gdof0)
+
+        # 1. Interpolation points on the mesh nodes: Inherit the original interpolation points
+        NN = self.number_of_nodes()
+        V_1 = bm.ones(NN)
+        I_1 = bm.arange(NN)
+        J_1 = bm.arange(NN)
+
+        # 2. Interpolation points within the mesh edges
+        NE = self.number_of_edges()
+        bcs = self.multi_index_matrix(p1, 1) / p1
+
+        phi = self.edge_shape_function(bcs=(bcs[1:-1],), p=p0)  # (ldof1 - 2, ldof0)
+
+        e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
+        e2p0 = self.edge_to_ipoint(p0)
+        shape = (NE,) + phi.shape
+
+        I_2 = bm.broadcast_to(e2p1[:, :, None], shape=shape).flat
+        J_2 = bm.broadcast_to(e2p0[:, None, :], shape=shape).flat
+        V_2 = bm.broadcast_to( phi[None, :, :], shape=shape).flat
+
+        # 3. Interpolation points within the mesh faces
+        NF = self.number_of_faces()
+        bcs = self.multi_index_matrix(p1, 1) / p1
+        phi = self.face_shape_function((bcs[1:-1],bcs[1:-1]), p=p0)
+        f2p1 = self.face_to_ipoint(p1).reshape(NF,p1+1,p1+1)[:,1:-1,1:-1]
+        f2p1 = f2p1.reshape(NF,-1)
+        f2p0 = self.face_to_ipoint(p0)
+        shape = (NF,) + phi.shape
+
+        I_3 = bm.broadcast_to(f2p1[:, :, None], shape=shape).flat
+        J_3 = bm.broadcast_to(f2p0[:, None, :], shape=shape).flat
+        V_3 = bm.broadcast_to( phi[None, :, :], shape=shape).flat
+       
+        # 4. Interpolation points within the mesh cells
+        NC = self.number_of_cells()
+        bcs = self.multi_index_matrix(p1, 1) / p1
+        phi = self.shape_function((bcs[1:-1],bcs[1:-1],bcs[1:-1]), p=p0)
+        c2p1 = self.cell_to_ipoint(p1).reshape(NC,p1+1,p1+1,p1+1)[:,1:-1,1:-1,1:-1]
+        c2p1 = c2p1.reshape(NC,-1)
+        c2p0 = self.cell_to_ipoint(p0)
+        shape = (NC,) + phi.shape
+
+        I_4 = bm.broadcast_to(c2p1[:, :, None], shape=shape).flat
+        J_4 = bm.broadcast_to(c2p0[:, None, :], shape=shape).flat
+        V_4 = bm.broadcast_to( phi[None, :, :], shape=shape).flat
+       
+        # 5.concatenate
+        V = bm.concatenate((V_1, V_2, V_3, V_4), axis=0) 
+        I = bm.concatenate((I_1, I_2, I_3, I_4), axis=0) 
+        J = bm.concatenate((J_1, J_2, J_3, J_4), axis=0) 
+        P = csr_matrix((V, (I, J)), matrix_shape)
+
+        return P
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
+        """
+        Uniform refine the hexahedron mesh n times.
+
+        Parameters:
+            n (int): Times refine the triangle mesh.
+            surface (function): The surface function.
+            returnirm (bool): Return the prolongation matrix list or not,from the finest to the the coarsest
+        
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest
         """
         if returnim is True:
             IM = []
