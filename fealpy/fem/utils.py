@@ -48,7 +48,7 @@ class LinearSymbolicIntegration:
             self.setup_structured_2d_symbols()
         else:
             # 对于三维结构网格, 设置参考坐标
-            self.setup_structured_2d_symbols()
+            self.setup_structured_3d_symbols()
 
     def setup_structured_2d_symbols(self) -> None:
         """设置二维结构网格的参考坐标(使用 [0,1]² 参考单元)"""
@@ -404,7 +404,7 @@ class LinearSymbolicIntegration:
             print(error_msg)  # 打印错误信息
             raise ValueError(error_msg)  # 抛出更具体的错误
 
-    def integrate_structured_2d(self, f: sp.Expr) -> sp.Expr:
+    def integrate_structured_3d(self, f: sp.Expr) -> sp.Expr:
         """在参考三维结构单元上积分"""
         try:
             result = sp.integrate(sp.integrate(sp.integrate(f, 
