@@ -187,7 +187,7 @@ class MeshDS(metaclass=MeshMeta):
         NE = self.number_of_edges()
         edge = self.edge
         indice = bm.stack([edge.reshape(-1), edge[:, [1, 0]].reshape(-1)], axis=0)
-        data = bm.ones((2*NE,),  dtype=bm.bool, device=edge.device)
+        data = bm.ones((2*NE,),  dtype=bm.bool, device=self.device)
         node2node = COOTensor(indice, data, spshape=(NN, NN))
         return node2node
 
@@ -198,7 +198,7 @@ class MeshDS(metaclass=MeshMeta):
         edge = self.edge
         kwargs = bm.context(edge)
         indice = bm.stack([edge.reshape(-1), bm.repeat(bm.arange(NE,**kwargs), nv)], axis=0)
-        data = bm.ones((NE*nv), dtype=bm.bool, device=edge.device)
+        data = bm.ones((NE*nv), dtype=bm.bool, device=self.device)
         node2edge = COOTensor(indice, data, spshape=(NN, NE))
         return node2edge
 
@@ -209,7 +209,7 @@ class MeshDS(metaclass=MeshMeta):
         cell = self.cell
         kwargs = bm.context(cell)
         indice = bm.stack([cell.reshape(-1), bm.repeat(bm.arange(NC,**kwargs), nv)], axis=0)
-        data = bm.ones((NC*nv),  dtype=bm.bool, device=cell.device)
+        data = bm.ones((NC*nv),  dtype=bm.bool, device=self.device)
         node2edge = COOTensor(indice, data, spshape=(NN, NC))
         return node2edge
     
@@ -220,7 +220,7 @@ class MeshDS(metaclass=MeshMeta):
         face = self.face
         kwargs = bm.context(face)
         indice = bm.stack([face.reshape(-1), bm.repeat(bm.arange(NF,**kwargs), nv)], axis=0)
-        data = bm.ones((NF*nv),  dtype=bm.bool, device=face.device)
+        data = bm.ones((NF*nv),  dtype=bm.bool, device=self.device)
         node2edge = COOTensor(indice, data, spshape=(NN, NF))
         return node2edge
 
