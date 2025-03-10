@@ -65,14 +65,14 @@ class RTDof2d():
 
         c2d = bm.zeros((NC, ldof),device=self.device, dtype=self.itype)
         #c2d[:, :eldof*3] = e2dof[c2e].reshape(NC, eldof*3)
-        c2d = bm.set_at(c2d,(slice(None),slice(None,eldof*3)),e2dof[c2e].reshape(NC, eldof*3))
+        c2d = bm.set_at(c2d, (slice(None), slice(None, eldof*3)), e2dof[c2e].reshape(NC, eldof*3))
         s = [1, 0, 0]
         for i in range(3):
             flag = cell[:, s[i]] == edge[c2e[:, i], 1]
             #c2d[flag, eldof*i:eldof*(i+1)] = c2d[flag, eldof*i:eldof*(i+1)][:,::-1]
-            c2d = bm.set_at(c2d,(flag,slice(eldof*i,eldof*(i+1))),bm.flip(c2d[flag, eldof*i:eldof*(i+1)],axis=-1))
+            c2d = bm.set_at(c2d, (flag, slice(eldof*i, eldof*(i+1))), bm.flip(c2d[flag, eldof*i:eldof*(i+1)], axis=-1))
         #c2d[:, eldof*3:] = bm.arange(NE*eldof, gdof).reshape(NC, -1)
-        c2d = bm.set_at(c2d,(slice(None),slice(eldof*3,None)),bm.arange(NE*eldof, gdof).reshape(NC, -1))
+        c2d = bm.set_at(c2d, (slice(None), slice(eldof*3,None)),bm.arange(NE*eldof, gdof).reshape(NC, -1))
         return c2d
 
     @property
@@ -99,9 +99,9 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         self.mesh = mesh
         self.dof = RTDof2d(mesh, p)
 
-        #self.bspace = BernsteinFESpace(mesh, p)
-        self.bspace =LagrangeFESpace(mesh, p)
-        self.bspace1 = LagrangeFESpace(mesh, p-1)
+        self.bspace = BernsteinFESpace(mesh, p)
+        # self.bspace =LagrangeFESpace(mesh, p)
+        # self.bspace1 = LagrangeFESpace(mesh, p-1)
         self.cellmeasure = mesh.entity_measure('cell')
         self.qf = self.mesh.quadrature_formula(p+3)
         self.ftype = mesh.ftype
@@ -125,53 +125,53 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         gp = bm.zeros_like(glambda,device=self.device)
         # gp[..., 0] = -glambda[..., 1]
         # gp[..., 1] =  glambda[..., 0]
-        gp = bm.set_at(gp,(...,0),-glambda[...,1])
-        gp = bm.set_at(gp,(...,1),glambda[...,0])
+        gp = bm.set_at(gp,(...,0), -glambda[..., 1])
+        gp = bm.set_at(gp,(...,1), glambda[..., 0])
 
 
         ledge = mesh.localEdge
 
         c2esign = mesh.cell_to_face_sign() #(NC, 3, 2)
 
-        l = bm.zeros((3, )+bcs[None,:, 0, None, None].shape, device=self.device, dtype=self.ftype)
+        l = bm.zeros((3, )+bcs[None, :, 0, None, None].shape, device=self.device, dtype=self.ftype)
         # l[0] = bc[..., 0, None, None, None]
         # l[1] = bc[..., 1, None, None, None]
         # l[2] = bc[..., 2, None, None, None] #(NQ, NC, ldof, 2)
-        l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
-        l = bm.set_at(l,(1),bcs[None, :,1,  None, None])
-        l = bm.set_at(l,(2),bcs[None, :,2,  None, None])
+        l = bm.set_at(l, (0), bcs[None, :, 0,  None, None])
+        l = bm.set_at(l, (1), bcs[None, :, 1,  None, None])
+        l = bm.set_at(l, (2), bcs[None, :, 2,  None, None])
 
         # edge basis
-        phi = self.bspace.basis(bcs)
+        phi = self.bspace.basis(bcs,p=p)
         multiIndex = self.mesh.multi_index_matrix(p, 2)
-        val = bm.zeros((NC,)+bcs.shape[:-1]+(ldof, 2), device=self.device, dtype=self.ftype)
+        val = bm.zeros((NC, )+bcs.shape[:-1]+(ldof, 2), device=self.device, dtype=self.ftype)
         for i in range(3):
             phie = phi[:, :, multiIndex[:, i]==0] #(NQ, NC, eldof)
             c2esi = c2esign[:, i] #(NC, )
-            v = l[ledge[i, 0]]*gp[:,None, ledge[i, 1], None] - l[ledge[i, 1]]*gp[:,None ,ledge[i, 0], None]
+            v = l[ledge[i, 0]]*gp[:, None, ledge[i, 1], None] - l[ledge[i, 1]]*gp[:,None ,ledge[i, 0], None]
             #v[..., ~c2esi, :, :] *= -1
             #val[..., eldof*i:eldof*(i+1), :] = phie[..., None]*v
-            v = bm.set_at(v,(~c2esi,slice(None),slice(None),slice(None)),-v[~c2esi, :, :, :])
-            val = bm.set_at(val,(...,slice(eldof*i,eldof*(i+1)),slice(None)),phie[..., None]*v)
+            v = bm.set_at(v, (~c2esi, slice(None), slice(None), slice(None)), -v[~c2esi, :, :, :])
+            val = bm.set_at(val, (..., slice(eldof*i, eldof*(i+1)), slice(None)), phie[..., None]*v)
         
         # cell basis
         if(p > 0):
-            phi1 = self.bspace1.basis(bcs) #(NQ, NC, cldof)
-            v0 = l[2]*(l[0]*gp[:,None, 1, None] - l[1]*gp[:,None, 0, None]) #(NQ, NC, ldof, 2)
-            v1 = l[0]*(l[1]*gp[:,None, 2, None] - l[2]*gp[:,None, 1, None])
+            phi1 = self.bspace.basis(bcs, p=p-1) #(NQ, NC, cldof)
+            v0 = l[2]*(l[0]*gp[:, None, 1, None] - l[1]*gp[:, None, 0, None]) #(NQ, NC, ldof, 2)
+            v1 = l[0]*(l[1]*gp[:, None, 2, None] - l[2]*gp[:, None, 1, None])
 
             # val[..., eldof*3:eldof*3+cldof//2, :] = v0*phi[..., None] 
             # val[..., eldof*3+cldof//2:, :] = v1*phi[..., None] 
 
-            val = bm.set_at(val,(...,slice(eldof*3,eldof*3+cldof//2),slice(None)),v0*phi1[..., None])
-            val = bm.set_at(val,(...,slice(eldof*3+cldof//2,None),slice(None)),v1*phi1[..., None])
+            val = bm.set_at(val,(..., slice(eldof*3,eldof*3+cldof//2), slice(None)), v0*phi1[..., None])
+            val = bm.set_at(val,(..., slice(eldof*3+cldof//2, None), slice(None)), v1*phi1[..., None])
         return val[index]
     
-    def cross2d(self,a,b):
-        return a[...,0]*b[...,1] - a[...,1]*b[...,0]
+    def cross2d(self, a, b):
+        return a[..., 0]*b[..., 1] - a[..., 1]*b[..., 0]
     
     @barycentric
-    def div_basis(self, bcs,index=_S):
+    def div_basis(self, bcs, index=_S):
         p = self.p
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -185,44 +185,44 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         gp = bm.zeros_like(glambda)
         # gp[..., 0] = -glambda[..., 1]
         # gp[..., 1] =  glambda[..., 0]
-        gp = bm.set_at(gp,(...,0),-glambda[...,1])
-        gp = bm.set_at(gp,(...,1),glambda[...,0])
+        gp = bm.set_at(gp, (...,0), -glambda[..., 1])
+        gp = bm.set_at(gp, (...,1), glambda[..., 0])
 
         ledge = mesh.localEdge
 
         c2esign = mesh.cell_to_face_sign() #(NC, 3, 2)
 
-        l = bm.zeros((3, )+bcs[None,:, 0, None, None].shape, device=self.device, dtype=self.ftype)
+        l = bm.zeros((3, )+bcs[None ,: , 0, None, None].shape, device=self.device, dtype=self.ftype)
         # l[0] = bc[..., 0, None, None, None]
         # l[1] = bc[..., 1, None, None, None]
         # l[2] = bc[..., 2, None, None, None] #(NQ, NC, ldof, 2)
-        l = bm.set_at(l,(0),bcs[None, :,0,  None, None])
-        l = bm.set_at(l,(1),bcs[None, :,1,  None, None])
-        l = bm.set_at(l,(2),bcs[None, :,2,  None, None])
+        l = bm.set_at(l, (0), bcs[None, :, 0,  None, None])
+        l = bm.set_at(l, (1), bcs[None, :, 1,  None, None])
+        l = bm.set_at(l, (2), bcs[None, :, 2,  None, None])
         # edge basis
         phi = self.bspace.basis(bcs)
         gphi = self.bspace.grad_basis(bcs)
         multiIndex = self.mesh.multi_index_matrix(p, 2)
-        val = bm.zeros((NC,)+bcs.shape[:-1]+(ldof,),device=self.device, dtype=self.ftype)
+        val = bm.zeros((NC,)+bcs.shape[:-1]+(ldof, ), device=self.device, dtype=self.ftype)
         for i in range(3):
             phie = phi[..., multiIndex[:, i]==0] #(NQ, NC, eldof)
             gphie = gphi[..., multiIndex[:, i]==0, :] #(NQ, NC, eldof, 2)
             c2esi = c2esign[:, i] #(NC, )
-            v = l[ledge[i, 0]]*gp[:,None, ledge[i, 1], None] - l[ledge[i, 1]]*gp[:,None, ledge[i, 0], None]
-            v = bm.set_at(v,(~c2esi,slice(None),slice(None),slice(None)),-v[~c2esi, :, :, :]) #(NQ, NC, eldof, 2)
+            v = l[ledge[i, 0]]*gp[:, None, ledge[i, 1], None] - l[ledge[i, 1]]*gp[:,None, ledge[i, 0], None]
+            v = bm.set_at(v,(~c2esi, slice(None),slice(None), slice(None)), -v[~c2esi, :, :, :]) #(NQ, NC, eldof, 2)
             dv = -2*self.cross2d(glambda[:, ledge[i, 0]], glambda[:, ledge[i, 1]]) #(NC, )
             dv[~c2esi] *= -1
             #val[..., eldof*i:eldof*(i+1)] = phie*dv[:, None] + bm.sum(gphie*v, axis=-1)
-            val = bm.set_at(val,(...,slice(eldof*i,eldof*(i+1))),phie*dv[:, None,None] + bm.sum(gphie*v, axis=-1)) #(NC, ldof)
+            val = bm.set_at(val, (..., slice(eldof*i, eldof*(i+1))), phie*dv[:, None, None] + bm.sum(gphie*v, axis=-1)) #(NC, ldof)
 
         # cell basis
         if(p > 0):
-            phi =  self.bspace1.basis(bcs) #(NC1, NC, cldof)
-            gphi = self.bspace1.grad_basis(bcs)# (NC,NQ,cldof,2)
+            phi =  self.bspace.basis(bcs, p=p-1) #(NC1, NC, cldof)
+            gphi = self.bspace.grad_basis(bcs, p=p-1)# (NC,NQ,cldof,2)
 
 
-            w0 = l[0]*gp[:,None, 1, None] - l[1]*gp[:,None, 0, None]#(NQ, NC, ldof1, 2)
-            w1 = l[1]*gp[:,None, 2, None] - l[2]*gp[:,None, 1, None]
+            w0 = l[0]*gp[:, None, 1, None] - l[1]*gp[:, None, 0, None]#(NQ, NC, ldof1, 2)
+            w1 = l[1]*gp[:, None, 2, None] - l[2]*gp[:, None, 1, None]
 
             dw0 = -2*self.cross2d(glambda[:, 0, None], glambda[:, 1, None]) #(NC,1)
             dw1 = -2*self.cross2d(glambda[:, 1, None], glambda[:, 2, None])
@@ -245,7 +245,7 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         en /= bm.sum(en**2, axis=1)[:, None]
 
         ephi = self.bspace.basis(bcs) #(NE, NQ, eldof)
-        val = ephi[..., None] * en[:, None,None,:]
+        val = ephi[..., None] * en[:, None, None,:]
         return -val
     
     def is_boundary_dof(self, threshold=None, method=None):
