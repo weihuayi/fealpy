@@ -119,7 +119,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         """
         index = self.entity_selection(indices)
         mesh = getattr(space, 'mesh', None)
-
+        coef = self.coef
         rm = mesh.reference_cell_measure()
         cm = mesh.entity_measure('cell', index=index)
 
@@ -129,6 +129,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         J = mesh.jacobi_matrix(bcs, index=index)
         G = mesh.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G))
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         gphi = space.grad_basis(bcs, index=index, variable='x')
-        A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d)
+        A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d) * coef
         return A
