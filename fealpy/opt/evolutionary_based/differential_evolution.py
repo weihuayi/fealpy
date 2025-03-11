@@ -33,7 +33,7 @@ class DifferentialEvolution(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, f=0.2, cr=0.5):
+    def run(self, params={'f':0.2, 'cr':0.5}):
         """
         Runs the differential evolution algorithm.
 
@@ -42,6 +42,8 @@ class DifferentialEvolution(Optimizer):
             CR (float): The crossover probability, default is 0.5.
         """
         # Initialize fitness values and find the best solution in the initial population
+        f = params.get('f')
+        cr = params.get('cr')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]
