@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from fealpy.functionspace.RaviartThomasFiniteElementSpace2d import RTDof2d
-from fealpy.functionspace.RaviartThomasFiniteElementSpace2d import RTFiniteElementSpace2d
+from fealpy.functionspace.raviartthomas_fe_space_2d import RTDof2d
+from fealpy.functionspace.raviartthomas_fe_space_2d import RTFiniteElementSpace2d
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.triangle_mesh import TriangleMesh
 

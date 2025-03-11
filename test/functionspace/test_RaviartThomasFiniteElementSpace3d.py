@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from fealpy.functionspace.RaviartThomasFiniteElementSpace3d import RTDof3d
-from fealpy.functionspace.RaviartThomasFiniteElementSpace3d import RTFiniteElementSpace3d
+from fealpy.functionspace.raviartthomas_fe_space_3d import RTDof3d
+from fealpy.functionspace.raviartthomas_fe_space_3d import RTFiniteElementSpace3d
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TetrahedronMesh
 

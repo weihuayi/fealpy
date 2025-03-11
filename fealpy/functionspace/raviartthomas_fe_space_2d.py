@@ -289,68 +289,6 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     def face_value(self, uh, bcs, index=_S):
         pass
 
-    def mass_matrix(self):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        ldof = self.dof.number_of_local_dofs()
-        gdof = self.dof.number_of_global_dofs()
-        cm = self.cellmeasure
-        c2d = self.dof.cell_to_dof() #(NC, ldof)
-
-        bcs, ws = self.qf.get_quadrature_points_and_weights()
-        phi = self.basis(bcs) #(NQ, NC, ldof, GD)
-        mass = bm.einsum("cqlg, cqdg, c, q->cld", phi, phi, cm, ws)
-
-        I = bm.broadcast_to(c2d[:, :, None], shape=mass.shape)
-        J = bm.broadcast_to(c2d[:, None, :], shape=mass.shape)
-        M = csr_matrix((mass.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return M 
-
-    def div_matrix(self, space):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        ldof = self.dof.number_of_local_dofs()
-        gdof0 = self.dof.number_of_global_dofs()
-        gdof1 = space.dof.number_of_global_dofs()
-        cm = self.cellmeasure
-
-        c2d = self.dof.cell_to_dof() #(NC, ldof)
-        c2d_space = space.dof.cell_to_dof()
-
-        bcs, ws = self.qf.get_quadrature_points_and_weights()
-        # if space.basis.coordtype == 'barycentric':
-        fval = space.basis(bcs) #(NQ, NC, ldof1)
-        # else:
-        #     points = self.mesh.bc_to_point(bcs)
-        #     fval = space.basis(points)
-
-        phi = self.div_basis(bcs) #(NQ, NC, ldof)
-        A = bm.einsum("cql, cqd, c, q->cld", phi, fval, cm, ws)
-
-        I = bm.broadcast_to(c2d[:, :, None], shape=A.shape)
-        J = bm.broadcast_to(c2d_space[:, None, :], shape=A.shape)
-        B = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
-        return B
-
-    def source_vector(self, f):
-        mesh = self.mesh
-        cm = self.cellmeasure
-        ldof = self.dof.number_of_local_dofs()
-        gdof = self.dof.number_of_global_dofs()
-        bcs, ws = self.qf.get_quadrature_points_and_weights()
-        c2d = self.dof.cell_to_dof() #(NC, ldof)
-
-        p = mesh.bc_to_point(bcs) #(NQ, NC, GD)
-        fval = f(p) #(NQ, NC, GD)
-
-        phi = self.basis(bcs) #(NQ, NC, ldof, GD)
-        val = bm.einsum("cqg, cqlg, q, c->cl", fval, phi, ws, cm)# (NC, ldof)
-        vec = bm.zeros(gdof, device=self.device, dtype=self.ftype)
-        bm.add.at(vec, c2d, val)
-        #bm.scatter_add(vec, c2d.reshape(-1), val.reshape(-1))
-        return vec
-
-
     def interplation(self, f):
         pass
 
@@ -368,7 +306,6 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         val = bm.einsum("cq, q, c->", errval, ws, cm)
         return bm.sqrt(val)
     
-
     def set_neumann_bc(self, g):
         p = self.p
         mesh = self.mesh
@@ -427,27 +364,33 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
 
     boundary_interpolate = set_dirichlet_bc
 
+    def show_basis(self, fig, index=0, box=None):
+        """
+        Plot quvier graph for every basis in a fig object
+        """
+        multiIndex = self.mesh.multi_index_matrix(p, 2)
+        p = self.p
+        mesh = self.mesh
 
-#     def set_neumann_bc(self, g):
-#         bcs, ws = self.integralalg.faceintegrator.get_quadrature_points_and_weights()
+        ldof = self.number_of_local_dofs()
 
-#         edof = self.dof.number_of_local_dofs('edge')
-#         eidx = self.mesh.ds.boundary_edge_index()
-#         phi = self.edge_basis(bcs, index=eidx) #(NQ, NE0, edof, GD)
-#         e2n = self.mesh.edge_unit_normal(index=eidx)
-#         phi = np.einsum("qelg, eg->qel", phi, e2n) #(NQ, NE0, edof)
+        bcs = multiIndex(10)/10
+        ps = mesh.bc_to_point(bcs)
+        phi = self.basis(bcs)
 
-#         point = self.mesh.edge_bc_to_point(bcs, index=eidx)
-#         gval = g(point) #(NQ, NE0)
-
-#         em = self.mesh.entity_measure("edge")[eidx]
-#         integ = np.einsum("qel, qe, e, q->el", phi, gval, em, ws)
-
-#         e2d = np.ones((len(eidx), edof), dtype=np.int_)
-#         e2d[:, 0] = edof*eidx
-#         e2d = np.cumsum(e2d, axis=-1)
-
-#         gdof = self.dof.number_of_global_dofs()
-#         val = np.zeros(gdof, dtype=np.float_)
-#         np.add.at(val, e2d, integ)
-#         return val
+        if p == 0:
+            m = 1
+            n = 3
+        elif p == 1:
+            m = 4 
+            n = 2 
+        elif p == 2:
+            m = 5 
+            n = 3 
+        for i in range(ldof):
+            axes = fig.add_subplot(m, n, i+1)
+            mesh.add_plot(axes, box=box)
+            node = ps[:, index, :]
+            uv = phi[:, index, i, :]
+            axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1], 
+                    units='xy')
