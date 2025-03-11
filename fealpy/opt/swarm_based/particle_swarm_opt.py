@@ -14,7 +14,7 @@ class ParticleSwarmOpt(Optimizer):
         super().__init__(option)
 
 
-    def run(self, c1=2, c2=2, w_max=0.9, w_min=0.4):
+    def run(self, params={'c1':2, 'c2':2, 'w_max':0.9, 'w_min':0.4}):
         """
         Executes the PSO algorithm.
 
@@ -34,6 +34,10 @@ class ParticleSwarmOpt(Optimizer):
             - The best fitness value at each iteration is stored in `self.curve`.
             
         """
+        c1 = params.get('c1')
+        c2 = params.get('c2')
+        w_max = params.get('w_max')
+        w_min = params.get('w_min')
         fit = self.fun(self.x)
         pbest = bm.copy(self.x)
         pbest_f = bm.copy(fit)

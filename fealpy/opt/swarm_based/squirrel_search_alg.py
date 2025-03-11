@@ -52,7 +52,7 @@ class SquirrelSearchAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, g_c=1.9, p_dp=0.1):
+    def run(self, params={'g_c':1.9, 'p_dp':0.1}):
         """
         Runs the Squirrel Search Algorithm.
 
@@ -68,6 +68,8 @@ class SquirrelSearchAlg(Optimizer):
             5. Track the fitness of the global best solution over iterations.
         """
         # Initial fitness evaluation
+        g_c = params.get('g_c')
+        p_dp = params.get('p_dp')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest_f = fit[gbest_index]
