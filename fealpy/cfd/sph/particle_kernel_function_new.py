@@ -122,9 +122,9 @@ class WendlandC2Kernel(KernelFunctionBase):
         if dim == 1:
             self.alpha = 5.0/8.0 * self.h_derivative
         elif dim == 2:
-            self.alpha = 7.0/4.0/jnp.pi * self.h_derivative**2
+            self.alpha = 7.0/4.0/bm.pi * self.h_derivative**2
         elif dim == 3:
-            self.alpha = 21.0/16.0/jnp.pi * self.h_derivative**3
+            self.alpha = 21.0/16.0/bm.pi * self.h_derivative**3
 
     def value(self,r):
         if self.dim == 1:
@@ -159,3 +159,35 @@ class WendlandC2Kernel(KernelFunctionBase):
             dW_dq = -2.0 * q0**3 * q1 + 2.0 * q0**4 # dw/dq
 
             return self.alpha * dW_dq * dq_dr
+
+class QuinticWendlandKernel(KernelFunctionBase):
+
+    def __init__(self,h,dim=3):
+        self.h_derivative = 1.0/h
+        self.constant = 2.0
+        self.cutoff_radius = self.constant * h
+        self.dim = dim
+
+        if dim == 1:
+            self.alpha = 3.0/64.0 * self.h_derivative
+        elif dim == 2:
+            self.alpha = 7.0/64.0/bm.pi * self.h_derivative**2
+        elif dim == 3:
+            self.alpha = 21.0/256.0/bm.pi * self.h_derivative**3
+
+    def value(self,r):
+        q = r * self.h_derivative
+        q0 = bm.maximum(bm.array(0.0),1.0-q/2)
+        q1 = 2.0 * q + 1.0
+
+        return self.alpha * (q0**4 * q1)
+
+    def grad_value(self, r):
+        q = r * self.h_derivative
+        q0 = bm.maximum(bm.array(0.0),1.0-q/2)
+        q1 = 2.0 * q + 1.0
+
+        dq_dr = self.h_derivative  # 1/h
+        dW_dq = -2 * q0**3 * q1 + 2 * q0**4 # dw/dq
+
+        return self.alpha * dW_dq * dq_dr
