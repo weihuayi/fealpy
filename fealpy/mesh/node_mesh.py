@@ -313,3 +313,113 @@ class NodeMesh(MeshDS):
         node = jnp.vstack((pp, boundaryp))
 
         return cls(node)
+
+    @classmethod
+    def from_pipe_domain0(cls, box_size, dx=1.25e-4, dy=1.25e-4):
+        u_in = bm.array([5.0, 0.0], dtype=bm.float64) 
+        rho_0 = 737.54
+        mass_0 = rho_0 * dx * dy
+
+        def node_position(x_min, x_max, y_min, y_max, dx, dy):
+            x_position = bm.arange(x_min, x_max, dx)
+            y_position = bm.arange(y_min, y_max, dy)
+            X, Y = bm.meshgrid(x_position, y_position, indexing="xy")
+            positions = bm.concatenate([X.reshape(-1,1), Y.reshape(-1,1)], axis=1)
+            return positions
+
+        #fluid particles
+        fuild_particles = node_position(0, 40*dx, 4*dy, 44*dy, dx, dy)
+        fuild_tag = bm.zeros(len(fuild_particles), dtype=bm.int64)
+        
+        #wall particles
+        wall_particles0 = node_position(0, box_size[0], 3*dy, 4*dy, dx, dy)
+        wall_particles1 = node_position(0, box_size[0], 44*dy, 44.5*dy, dx, dy)
+        wall_tag = bm.ones(len(wall_particles0)*2, dtype=bm.int64)
+
+        #virtual particles
+        virtual_particles0 = node_position(0, box_size[0], 0, 3*dy, dx, dy)
+        virtual_particles1 = node_position(0,box_size[0], 45*dy, 47.5*dy, dx, dy)
+        virtual_tag = bm.full((len(virtual_particles0)*2,), 2, dtype=bm.int64)
+
+        r = bm.concatenate([fuild_particles, wall_particles0, wall_particles1, virtual_particles0, virtual_particles1], axis=0)
+
+        #tag:0-fluid particles,1-wall particles,2-virtual particles
+        tag = bm.concatenate([fuild_tag, wall_tag, virtual_tag], axis=0)
+        
+        u = bm.zeros((len(r), 2), dtype=bm.float64)
+        u = bm.set_at(u, tag == 0, u_in)
+        rho = bm.full((len(r),), rho_0, dtype=bm.float64)
+        mass = bm.full((len(r),), mass_0, dtype=bm.float64)
+
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "u": u,
+            "dudt": bm.zeros_like(u),
+            "rho": rho,
+            "drhodt": bm.zeros_like(rho),
+            "p": bm.zeros_like(rho),
+            "sound": bm.zeros_like(rho),
+            "mass": mass,
+            "mu": bm.zeros_like(rho),
+        }
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_pipe_domain(cls, domain, init_domain, H, dx=1.25e-4):
+        u_in = bm.array([5.0, 0.0], dtype=bm.float64) 
+        rho_0 = 737.54
+
+        f_x = bm.arange(init_domain[0], init_domain[1], dx, dtype=bm.float64)
+        f_y = bm.arange(init_domain[2] + dx, init_domain[3], dx, dtype=bm.float64)
+        fy, fx = bm.meshgrid(f_y, f_x, indexing='xy')
+        fp = bm.stack((fx.ravel(), fy.ravel()), axis=1)
+        f_tag = bm.zeros(len(fp), dtype=bm.int64)
+        
+        x0 = bm.arange(domain[0], domain[1], dx, dtype=bm.float64)
+        bwp = bm.stack((x0, bm.full_like(x0, domain[2])), axis=1)
+        uwp = bm.stack((x0, bm.full_like(x0, domain[3])), axis=1)
+        wp = bm.concatenate((bwp, uwp), axis=0)
+        w_tag = bm.ones(len(wp), dtype=bm.int64)
+        
+        d_xb = bm.arange(domain[0], domain[1], dx, dtype=bm.float64)
+        d_yb = bm.arange(domain[2] - dx, domain[2] - dx * 4, -dx, dtype=bm.float64)
+        dyb, dxb = bm.meshgrid(d_yb, d_xb, indexing='xy')
+        bdp = bm.stack((dxb.ravel(), dyb.ravel()), axis=1)
+        d_yu = bm.arange(domain[3] + dx, domain[3] + dx * 3, dx, dtype=bm.float64)
+        dyu, dxu = bm.meshgrid(d_yu, d_xb, indexing='xy')
+        udp = bm.stack((dxu.ravel(), dyu.ravel()), axis=1)
+        dp = bm.concatenate((bdp, udp), axis=0)
+        d_tag = bm.full((len(dp),), 2, dtype=bm.int64)
+
+        g_x = bm.arange(-dx, -dx - 4 * H, -dx, dtype=bm.float64)
+        g_y = bm.arange(domain[2] + dx, domain[3], dx, dtype=bm.float64)
+        gy, gx = bm.meshgrid(g_y, g_x, indexing='xy')
+        gp = bm.stack((gx.ravel(), gy.ravel()), axis=1)
+        g_tag = bm.full((len(gp),), 3, dtype=bm.int64)
+
+        r = bm.concatenate((fp, wp, dp, gp), axis=0)
+        tag = bm.concatenate((f_tag, w_tag, d_tag, g_tag), axis=0)
+        u = bm.zeros((len(r), 2), dtype=bm.float64)
+        u = bm.set_at(u, (tag == 0)|(tag == 3), u_in)
+        rho = bm.full((len(r),), rho_0, dtype=bm.float64)
+        m0 = rho_0 * (init_domain[1] - init_domain[0]) * (init_domain[3] - init_domain[2]) / fp.shape[0]
+        m1 = rho_0 * 6 * dx * (domain[3] - domain[2]) / gp.shape[0]
+        mass0 = bm.full((len(r[tag != 3]),), m0, dtype=bm.float64)
+        mass1 = bm.full((len(r[tag == 3]),), m1, dtype=bm.float64)
+        mass = bm.concatenate((mass0, mass1), axis=0)
+        
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "u": u,
+            "dudt": bm.zeros_like(u),
+            "rho": rho,
+            "drhodt": bm.zeros_like(rho),
+            "p": bm.zeros_like(rho),
+            "sound": bm.zeros_like(rho),
+            "mass": mass,
+            "mu": bm.zeros_like(rho),
+            "drdt": bm.zeros_like(r),
+        }
+        return cls(r, nodedata=nodedata)
