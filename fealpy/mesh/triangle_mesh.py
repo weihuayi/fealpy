@@ -1612,7 +1612,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                          nodedata=self.nodedata,
                          celldata=self.celldata)
     @classmethod        
-    def from_meshio(cls, file, show=False):
+    def from_vtu(cls, file, show=False):
         import meshio
         data = meshio.read(file)
         node = bm.from_numpy(data.points)

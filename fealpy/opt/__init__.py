@@ -19,3 +19,6 @@ from .human_based import DifferentialtedCreativeSearch, TeachingLearningBasedAlg
 from .bio_based import PlantRhizomeGrowthBasedOpt, InvasiveWeedOpt
 from .chaos import *
 from .evolutionary_based import (GeneticAlg, DifferentialEvolution)
+from .PLBFGSAlg import PLBFGS
+from .PNLCGAlg import PNLCG
+from .GradientDescentAlg import GradientDescent
