@@ -298,10 +298,10 @@ class SPHSolver:
     @staticmethod
     def fuild_p(state, B, rho_0, c_1):
         """Updates the pressure of fluid particles"""
-        f_rho = state["rho"][state["tag"] == 0]
-        f_p = B * (bm.exp((1 - rho_0 / f_rho) / c_1) - 1)
-        f_indx = bm.where(state["tag"] == 0)[0]
-        state["p"] = bm.set_at(state["p"], f_indx, f_p)
+        f_rho = state["rho"][(state["tag"] == 0)|(state["tag"] == 3)]
+        fg_p = B * (bm.exp((1 - rho_0 / f_rho) / c_1) - 1)
+        fg_indx = bm.where((state["tag"] == 0)|(state["tag"] ==3))[0]
+        state["p"] = bm.set_at(state["p"], fg_indx, fg_p)
         return state["p"]
 
     @staticmethod
@@ -311,13 +311,14 @@ class SPHSolver:
         f_rho = state["rho"][f_neighbors]
         f_p = state["p"][f_neighbors] 
         w_unique = bm.unique(w_node)
-        
+    
         s0 = (f_mass / f_rho) * f_p * w
         result0 = bm.zeros(len(state["p"]), dtype=bm.float64)
         result0 = bm.index_add(result0, w_node, s0, axis=0, alpha=1)
         s1 = (f_mass / f_rho) * w
         result1 = bm.zeros(len(state["p"]), dtype=bm.float64)
         result1 = bm.index_add(result1, w_node, s1, axis=0, alpha=1)
+
         result0 = result0[w_unique]
         result1 = result1[w_unique]     
         state["p"] = bm.set_at(state["p"], w_unique, result0 / result1) 
@@ -354,13 +355,7 @@ class SPHSolver:
         return mu_value
 
     @staticmethod
-    def A_matrix(state, node_self, neighbors, dr, dw, mask_self=True):
-        if not mask_self:
-            mask = node_self == neighbors
-            node_self = node_self[~mask]
-            neighbors = neighbors[~mask]
-            dr = dr[~mask]
-            dw = dw[~mask]
+    def A_matrix(state, node_self, neighbors, dr, dw):
         mass_j = state["mass"][neighbors]
         rho_j = state["rho"][neighbors]
         value = (mass_j / rho_j)[:, None, None] * bm.einsum('ij, ik->ijk', -dr, dw) #外积
@@ -445,12 +440,13 @@ class SPHSolver:
         f_tag = bm.where(state["tag"] == 0)[0]
         
         #找精确自由表面流体粒子的索引
-        a = ((state["mass"][neighbors] * w)/ state["rho"][neighbors])
+        a = (state["mass"][neighbors] / state["rho"][neighbors]) * w
         C_i = bm.zeros((len(state["tag"]), ), dtype=bm.float64)
         C_i = bm.index_add(C_i, node_self, a, axis=0, alpha=1)
         b = (state["mass"][neighbors] / state["rho"][neighbors])[:, None] * dw
         dC_i = bm.zeros((len(state["tag"]), 2), dtype=bm.float64)
         dC_i = bm.index_add(dC_i, node_self, b, axis=0, alpha=1)
+        
         idx_c = bm.where(C_i[state["tag"] == 0] < 0.85)[0] #0.75 TODO
         bool1 = bm.zeros_like(C_i[state["tag"] == 0], dtype=bm.bool)
         bool1 = bm.set_at(bool1, idx_c, True)
@@ -470,47 +466,55 @@ class SPHSolver:
         cond3 = dist < bm.sqrt(bm.array([2], dtype=bm.float64)) * h
         cond4 = bm.abs(bm.einsum('ij,ij->i', normal[neighbors], x_jT)) + bm.abs(bm.einsum('ij,ij->i', tau[neighbors], x_jT)) < h
 
-        mask1 = bm.zeros((len(state["tag"]),), dtype=bool)
-        mask2 = bm.zeros((len(state["tag"]),), dtype=bool)
-        mask1 = bm.index_add(mask1, node_self, cond1 & cond2)
-        mask2 = bm.index_add(mask2, node_self, cond3 & cond4)
-        free_mask = ~(mask1[f_tag] | mask2[f_tag])
+        mask1 = (cond1 & cond2) | (cond3 & cond4)
+        mask = bm.zeros((len(state["tag"]),), dtype=bool)
+        mask = bm.index_add(mask, node_self, mask1)
+        free_mask = ~(mask[f_tag])
         free_mask = bool1 & free_mask
         free = bm.where(free_mask == True)[0]
+
+        wvg_tag = bm.where((state["tag"] == 1) | (state["tag"] == 2) | (state["tag"] == 3))[0]
+        wvg_indx = bm.where(bm.isin(node_self, wvg_tag))[0]
+        wvg_mask = bm.ones(len(node_self), dtype=bm.bool)
+        wvg_mask = bm.set_at(wvg_mask, wvg_indx, False)
+        node = node_self[wvg_mask]
+        neig = neighbors[wvg_mask]
+        free_indices = bm.where(bm.isin(node, free))[0]
+        neig_free = bm.unique(neig[free_indices])
         
         #找内部流体粒子的索引
-        mask3 = ~bm.isin(bm.where(state["tag"] == 0)[0], free)
+        mask3 = ~bm.isin(bm.where(state["tag"] == 0)[0], neig_free)
         in_f = f_tag[mask3]
-        return in_f, free, dC_i, normal
+        return in_f, neig_free, dC_i, normal
 
     @staticmethod
     def gate_change(state, dx, domain, H, u_in, rho_0, dt):
         g_tag = state["tag"] == 3
         state["position"] = bm.set_at(state["position"], g_tag, state["position"][g_tag] + state["u"][g_tag] * dt)
 
-        out_of_bounds = (state["position"][:, 0] >= domain[0]) & g_tag
+        out_of_bounds = bm.where((state["position"][:, 0] > domain[0]) & g_tag)[0]
         state["tag"] = bm.set_at(state["tag"], out_of_bounds, 0)
         
-        if bm.any(out_of_bounds):
+        if out_of_bounds.shape[0] > 0:
             y_new = bm.arange(domain[2] + dx, domain[3], dx, dtype=bm.float64)
-            new_positions = bm.concatenate((bm.full((len(y_new), 1), domain[0] - 4 * H), y_new.reshape(-1, 1)), axis=1)
-            num_new = len(new_positions)
-            mass_0 = rho_0 * dx * (domain[3]-domain[2]) / num_new
-            
-            new_data = {
-                "position": new_positions,
-                "tag": bm.full((num_new,), 3, dtype=bm.int64),  
-                "u": bm.tile(u_in.reshape(1, -1), (num_new, 1)),
-                "dudt": bm.zeros((num_new, 2), dtype=bm.float64),
-                "rho": bm.full((num_new,), rho_0, dtype=bm.float64),
-                "drhodt": bm.zeros((num_new,), dtype=bm.float64),
-                "p": bm.zeros((num_new,), dtype=bm.float64),
-                "sound": bm.zeros((num_new,), dtype=bm.float64),
-                "mass": bm.full((num_new,), mass_0, dtype=bm.float64),
-                "mu": bm.zeros((num_new,), dtype=bm.float64),
-                "drdt": bm.zeros((num_new, 2), dtype=bm.float64),
-            }
-            state = {key: bm.concatenate([state[key], new_data[key]]) for key in state}
+            new_r = bm.concatenate((bm.full((len(y_new), 1), domain[0] - 4 * H), y_new.reshape(-1, 1)), axis=1)
+            num = len(new_r)
+            tag = bm.full((num,), 3, dtype=bm.int64)
+            u = bm.tile(u_in, (num, 1))
+            rho = bm.full((num,), rho_0, dtype=bm.float64)
+            mass_0 = rho_0 * dx * (domain[3]-domain[2]) / num
+            mass = bm.full((num,), mass_0, dtype=bm.float64)
+            state["position"] =  bm.concatenate((state["position"], new_r), axis=0)
+            state["tag"] = bm.concatenate((state["tag"], tag), axis=0)
+            state["u"] = bm.concatenate((state["u"], u), axis=0)
+            state["dudt"] = bm.concatenate((state["dudt"], bm.zeros((num, 2), dtype=bm.float64)), axis=0)
+            state["rho"] = bm.concatenate((state["rho"], rho), axis=0)
+            state["drhodt"] = bm.concatenate((state["drhodt"], bm.zeros((num,), dtype=bm.float64)), axis=0)
+            state["p"] = bm.concatenate((state["p"], bm.zeros((num,), dtype=bm.float64)), axis=0)
+            state["sound"] = bm.concatenate((state["sound"], bm.zeros((num,), dtype=bm.float64)), axis=0)
+            state["mass"] = bm.concatenate((state["mass"], mass), axis=0)
+            state["mu"] = bm.concatenate((state["mu"], bm.zeros((num,), dtype=bm.float64)), axis=0)
+            state["drdt"] = bm.concatenate((state["drdt"], bm.zeros((num, 2), dtype=bm.float64)), axis=0)
         return state
 
     @staticmethod
@@ -533,13 +537,13 @@ class SPHSolver:
 
         a = (mass_j / rho_j)[:, None] * (u_ij + (p_ij / (rho * c))[:, None] * (dr / (dist+EPS)[:, None]))
         
-        A_s_n = A_s[neighbors]
+        A_s_n = A_s[node_self]
         cond_A_s = bm.linalg.cond(A_s_n)
-        mask1 = (cond_A_s > 1e15) | bm.isnan(cond_A_s) | bm.isinf(cond_A_s)
+        mask1 = cond_A_s >= 1e15
         if not mask1.all(): 
             corrected_dw = bm.linalg.solve(A_s_n[~mask1], dw[~mask1][..., None]).squeeze(-1) #核梯度修正
             dw = bm.set_at(dw, ~mask1, corrected_dw)
-        
+
         s = bm.einsum('ij,ij->i', a, dw) 
         result = bm.zeros_like(state["drhodt"], dtype=bm.float64)
         result = bm.index_add(result, node_self, s, axis=0, alpha=1)
@@ -569,9 +573,9 @@ class SPHSolver:
         u_ij = state["u"][node_self] - state["u"][neighbors]
         mu = state["mu"][node_self] + state["mu"][neighbors]
         
-        A_s_n = A_s[neighbors]
+        A_s_n = A_s[node_self]
         cond_A_s = bm.linalg.cond(A_s_n)
-        mask1 = (cond_A_s > 1e15) | bm.isnan(cond_A_s) | bm.isinf(cond_A_s)
+        mask1 = cond_A_s >= 1e15
         if not mask1.all(): 
             corrected_dw = bm.linalg.solve(A_s_n[~mask1], dw[~mask1][..., None]).squeeze(-1) #核梯度修正
             dw = bm.set_at(dw, ~mask1, corrected_dw)
