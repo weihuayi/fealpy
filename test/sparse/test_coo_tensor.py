@@ -5,7 +5,7 @@ from fealpy.sparse import coo_matrix as fpy_coo_matrix
 from fealpy.sparse.coo_tensor import COOTensor
 from fealpy.backend import backend_manager as bm
 
-ALL_BACKENDS = ['numpy', 'pytorch']
+ALL_BACKENDS = ['numpy', 'pytorch', 'jax']
 
 
 @pytest.mark.parametrize("backend", ALL_BACKENDS)
@@ -371,3 +371,20 @@ class TestCOOTensorConcat:
         assert bm.tolist(result.indices) == expected_indices
         assert bm.tolist(result.values) == expected_values
         assert result.sparse_shape == expected_shape
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_coo_to_csr(backend):
+    from fealpy.sparse import coo_matrix, csr_matrix
+    bm.set_backend(backend)
+    D = bm.tensor([[0, 0, 0],
+                   [1, 0, 0],
+                   [0, 2, 0],
+                   [0, 0, 0],
+                   [0, 3, 4]])
+    A = coo_matrix(D).tocsr()
+    B = csr_matrix(
+        (bm.tensor([1, 2, 3, 4]), bm.tensor([0, 1, 1, 2]), bm.tensor([0, 0, 1, 2, 2, 4])),
+        shape=(5, 3))
+    assert bm.allclose(A.crow, B.crow)
+    assert bm.allclose(A.toarray(), B.toarray())
