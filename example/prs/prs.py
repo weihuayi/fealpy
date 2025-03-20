@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import scipy.io as sio
 from scipy.interpolate import interp1d
 from scipy.optimize import fsolve
@@ -1293,6 +1294,98 @@ class PlanetaryRollerScrew():
             x = r * np.cos(theta) + cx
             y = r * np.sin(theta) + cy
             axes.plot(x, y, 'b-')  
+            
+    def add_plot_3D(self, axes):
+        # 螺旋线
+        d1, alpha1, h1, color1 = self._data[0, 43-1], self._data[0, 10-1], self._data[0, 46-1], 'royalblue'  # 丝杠螺旋线参数
+        d2, alpha2, h2, color2 = self._data[0, 44-1], self._data[0, 11-1], self._data[0, 47-1], 'crimson'   # 螺母螺旋线参数
+        d3, alpha3, h3, color3 = self._data[0, 45-1], self._data[0, 12 -1], self._data[0, 48-1], 'green'   # 滚柱螺旋线参数
+
+        # 螺旋线参数计算函数
+        def calculate_helix(diameter, alpha_rad, target_height, color):
+            radius = diameter / 2
+            lead = 2 * np.pi * radius * np.tan(alpha_rad)
+            num_turns = target_height / lead
+            t_max = 2 * np.pi * num_turns
+            resolution = int(3000 * num_turns/10)
+            t = np.linspace(0, t_max, resolution)
+            return {
+                'x': radius * np.cos(t),
+                'y': radius * np.sin(t),
+                'z': (lead / (2*np.pi)) * t,
+                'lead': lead,
+                'turns': num_turns,
+                'color': color
+            }
+        
+        # 生成螺旋线数据
+        helix1 = calculate_helix(d1, alpha1, h1, color1)
+        helix2 = calculate_helix(d2, alpha2, h2, color2)
+        helix3 = calculate_helix(d3, alpha3, h3, color3)
+        helix3['x'] = helix3['x'] + 13
+
+        # 绘制螺旋线
+        for helix, label in zip([helix1, helix2, helix3], ['Helix 1', 'Helix 2', 'Helix3']):
+            ax.plot(helix['x'], helix['y'], helix['z'], 
+                    color=helix['color'], 
+                    lw=1.2,
+                    label=f'{label}\nD={d1 if label=="Helix 1" else d2} '
+                        f'o={alpha1 if label=="Helix 1" else alpha2}rad')
+
+        num_points = 100  # 细分度
+        theta = np.linspace(0, 2 * np.pi, num_points)
+
+        # 绘制螺母
+        nut_inner_radius = self._data[0, 53-1] / 2  # 螺母内半径
+        nut_outer_radius = self._data[0, 50-1] / 2  # 螺母外半径
+        nut_height = self._data[0, 47-1]  # 螺母高度
+        z_nut = np.linspace(0, nut_height, 2)
+        theta_nut, z_nut = np.meshgrid(theta, z_nut)
+        x_nut_outer = nut_outer_radius * np.cos(theta_nut)
+        y_nut_outer = nut_outer_radius * np.sin(theta_nut)
+        x_nut_inner = nut_inner_radius * np.cos(theta_nut)
+        y_nut_inner = nut_inner_radius * np.sin(theta_nut)
+        ax.plot_surface(x_nut_outer, y_nut_outer, z_nut, color='gray', alpha=0.5)# 绘制螺母外表面和内孔
+        ax.plot_surface(x_nut_inner, y_nut_inner, z_nut, color='white', alpha=0.6)
+        theta_circle = np.linspace(0, 2 * np.pi, num_points)
+        x_nut_outer_top = nut_outer_radius * np.cos(theta_circle)
+        y_nut_outer_top = nut_outer_radius * np.sin(theta_circle)
+        x_nut_inner_top = nut_inner_radius * np.cos(theta_circle)
+        y_nut_inner_top = nut_inner_radius * np.sin(theta_circle)
+        for z_pos in [0, nut_height]:# 绘制螺母的顶部和底部环形面
+            # 外环灰色
+            ax.plot_trisurf(x_nut_outer_top, y_nut_outer_top, 
+                            np.full_like(x_nut_outer_top, z_pos), 
+                            color='gray', alpha=0)
+            # 内环白色
+            ax.plot_trisurf(x_nut_inner_top, y_nut_inner_top, 
+                            np.full_like(x_nut_inner_top, z_pos), 
+                            color='white', alpha=0)
+            
+        # 绘制丝杠
+        screw_radius = self._data[0, 49-1] / 2  # 丝杠外半径
+        screw_height = self._data[0, 46-1]  # 丝杠高度
+        z_screw = np.linspace(0, screw_height, 2)
+        theta_screw, z_screw = np.meshgrid(theta, z_screw)
+        x_screw = screw_radius * np.cos(theta_screw)
+        y_screw = screw_radius * np.sin(theta_screw)
+        ax.plot_surface(x_screw, y_screw, z_screw, color='black', alpha=0.5)
+        x_screw_top = screw_radius * np.cos(theta_circle)
+        y_screw_top = screw_radius * np.sin(theta_circle)
+        for z_pos in [0, screw_height]:
+            ax.plot_trisurf(x_screw_top, y_screw_top, 
+                            np.full_like(x_screw_top, z_pos), 
+                            color='silver', alpha=0.5)
+            
+        # 绘制滚柱
+        roller_radius = self._data[0, 45-1] / 2 # 滚柱半径
+        roller_height = self._data[0, 48-1] # 滚柱高度
+        z_roller = np.linspace(0, roller_height, 2)
+        theta_roller, z_roller = np.meshgrid(theta, z_roller)
+        x_roller = roller_radius * np.cos(theta_roller) + 13
+        y_roller = roller_radius * np.sin(theta_roller)
+        ax.plot_surface(x_roller, y_roller, z_roller, color='black', alpha=0.5)
+        # pass
 
 
 # 获取当前脚本 `prs.py` 所在目录
@@ -1313,52 +1406,52 @@ mesh_outer_data = prs_data['mesh_outer_matrix']
 
 prs = PlanetaryRollerScrew(order_load, data, mesh_outer_data, mesh_inner_data, norm_roller_screw, modify_nut, modify_screw, type_load)
 
-# 计算外啮合影响系数
-prs.C_a_outer, prs.C_b_outer, prs.C_delta_outer = prs.compute_influence_coefficients_outer(H, [2, 3, 4])
+# # 计算外啮合影响系数
+# prs.C_a_outer, prs.C_b_outer, prs.C_delta_outer = prs.compute_influence_coefficients_outer(H, [2, 3, 4])
 
-# 计算内啮合影响系数
-prs.C_a_inner, prs.C_b_inner, prs.C_delta_inner = prs.compute_influence_coefficients_inner(H, [2, 3, 4])
+# # 计算内啮合影响系数
+# prs.C_a_inner, prs.C_b_inner, prs.C_delta_inner = prs.compute_influence_coefficients_inner(H, [2, 3, 4])
 
-# 计算行星滚柱丝杠内螺纹 / 外螺纹的啮合柔度
-prs.flexible_roller_screw()
+# # 计算行星滚柱丝杠内螺纹 / 外螺纹的啮合柔度
+# prs.flexible_roller_screw()
 
-# 求解行星滚柱丝杠各接触点的受载法向载荷
-prs.solver()
+# # 求解行星滚柱丝杠各接触点的受载法向载荷
+# prs.solver()
 
-# 计算啮合接触半轴长
-prs.compute_half_width()
-# 计算接触应力
-prs.compute_stress()
-# 计算接触变形量
-prs.computer_delta()
-# 计算载荷分布均方值
-prs.compute_s_load()
-# 计算行星滚柱丝杠总势能
-prs.potential_roller_screw()
-# 保存结果
-prs.result={
-    'potential_total': prs.potential_total, # 行星滚柱丝杠总的势能
-    'Fn_nut': prs.nut.Fn, # 螺母的接触点法向载荷的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷(N)]
-    'Fn_screw': prs.screw.Fn, # 丝杠的接触点法向载荷的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷(N)]
-    'flexible_inner': prs.flexible_inner, # 内螺纹的啮合柔度
-    'flexible_outer': prs.flexible_outer, # 外螺纹的啮合柔度
-    'B_inner': prs.B_inner, # 内啮合压缩势能辅助值
-    'B_outer': prs.B_outer, # 外啮合压缩势能辅助值
-    'half_width_a_inner': prs.half_width_a_inner, # 内啮合的接触长半轴(mm)
-    'half_width_b_inner': prs.half_width_b_inner, # 内啮合的接触短半轴(mm)
-    'stress_inner': prs.stress_inner, # 内啮合接触应力(Mpa)
-    'half_width_a_outer': prs.half_width_a_outer, # 外啮合的接触长半轴(mm)
-    'half_width_b_outer': prs.half_width_b_outer, # 外啮合的接触短半轴(mm)
-    'stress_outer': prs.stress_outer, # 外啮合接触应力(Mpa)
-    'ratio_nut': prs.nut.ratio, # 螺母轴向分量比例
-    'ratio_screw': prs.screw.ratio, # 丝杠轴向分量比例
-    'distribution_nut': prs.distribution_nut, # 螺母的接触点法向载荷不均载系数的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷的不均载系数]
-    'distribution_screw': prs.distribution_screw, #丝杠的接触点法向载荷不均载系数的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷的不均载系数]
-    'delta_outer': prs.delta_outer, # 外啮合接触变形量
-    'delta_inner': prs.delta_inner, # 内啮合接触变形量
-    'S_load_nut': prs.nut.s_load, # 螺母载荷分布均方值
-    'S_load_screw': prs.screw.s_load, # 丝杠载荷分布均方值
-}
+# # 计算啮合接触半轴长
+# prs.compute_half_width()
+# # 计算接触应力
+# prs.compute_stress()
+# # 计算接触变形量
+# prs.computer_delta()
+# # 计算载荷分布均方值
+# prs.compute_s_load()
+# # 计算行星滚柱丝杠总势能
+# prs.potential_roller_screw()
+# # 保存结果
+# prs.result={
+#     'potential_total': prs.potential_total, # 行星滚柱丝杠总的势能
+#     'Fn_nut': prs.nut.Fn, # 螺母的接触点法向载荷的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷(N)]
+#     'Fn_screw': prs.screw.Fn, # 丝杠的接触点法向载荷的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷(N)]
+#     'flexible_inner': prs.flexible_inner, # 内螺纹的啮合柔度
+#     'flexible_outer': prs.flexible_outer, # 外螺纹的啮合柔度
+#     'B_inner': prs.B_inner, # 内啮合压缩势能辅助值
+#     'B_outer': prs.B_outer, # 外啮合压缩势能辅助值
+#     'half_width_a_inner': prs.half_width_a_inner, # 内啮合的接触长半轴(mm)
+#     'half_width_b_inner': prs.half_width_b_inner, # 内啮合的接触短半轴(mm)
+#     'stress_inner': prs.stress_inner, # 内啮合接触应力(Mpa)
+#     'half_width_a_outer': prs.half_width_a_outer, # 外啮合的接触长半轴(mm)
+#     'half_width_b_outer': prs.half_width_b_outer, # 外啮合的接触短半轴(mm)
+#     'stress_outer': prs.stress_outer, # 外啮合接触应力(Mpa)
+#     'ratio_nut': prs.nut.ratio, # 螺母轴向分量比例
+#     'ratio_screw': prs.screw.ratio, # 丝杠轴向分量比例
+#     'distribution_nut': prs.distribution_nut, # 螺母的接触点法向载荷不均载系数的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷的不均载系数]
+#     'distribution_screw': prs.distribution_screw, #丝杠的接触点法向载荷不均载系数的向量 [1 接触点序号(注:序号从螺母受载端开始) 2至1+滚柱个数 接触点法向载荷的不均载系数]
+#     'delta_outer': prs.delta_outer, # 外啮合接触变形量
+#     'delta_inner': prs.delta_inner, # 内啮合接触变形量
+#     'S_load_nut': prs.nut.s_load, # 螺母载荷分布均方值
+#     'S_load_screw': prs.screw.s_load, # 丝杠载荷分布均方值
+# }
 
 
 
@@ -1366,7 +1459,13 @@ prs.result={
 # print(prs.circumcenter(tri))
 
 
-fig = plt.figure()
-axes = fig.add_subplot(111)
-prs.add_plot(axes)
+# fig = plt.figure()
+# axes = fig.add_subplot(111)
+# prs.add_plot(axes)
+
+
+fig = plt.figure(figsize=(10, 10))
+ax = fig.add_subplot(111, projection='3d')
+prs.add_plot_3D(ax)
+
 plt.show()
