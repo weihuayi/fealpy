@@ -16,19 +16,19 @@ class MthLaplaceSmoothFEMSolver:
     """
     def __init__(self, pde, mesh, p, m, timer=None, logger=None):
         """
-        @param pde:
-            The partial differential equation to solve.
+        Smooth Finite Element Method to solve the equation \(\Delta^{m+1} u =
+        f\).
 
-        @param mesh:
-            The finite element mesh, specifically for a 2D triangular mesh.
+        Parameters:
+            pde: The partial differential equation to solve.
 
-        @param m:
-            The type of PDE to solve:
+            mesh: The finite element mesh, specifically for a 2D triangular mesh.
+
+            m: The type of PDE to solve:
             - m = 1: Double Laplace equation (双调和方程)
             - m = 2: Triple Laplace equation (三调和方程)
 
-        @param p:
-            The degree of the finite element space. Should satisfy:
+            p: The degree of the finite element space. Should satisfy:
             - p >= 4 * m + 1
 
         Example:

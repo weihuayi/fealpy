@@ -11,24 +11,22 @@ from fealpy.pde.biharmonic_triharmonic_3d import DoubleLaplacePDE, get_flist
 
 
 class DoubleLaplaceSmoothFEMSolver:
-    """
-     光滑元方法计算 \(\Delta^{m+1} u = f\) 方程
-    """
     def __init__(self, pde, mesh, p, m, timer=None, logger=None):
         """
-        @param pde:
-            The partial differential equation to solve.
+        Smooth Finite Element Method (SmoothFEM) solver for the equation
+        \(\Delta^{m+1} u = f\).
 
-        @param mesh:
-            The finite element mesh, specifically for a 3D Tetrahedron mesh.
+        Parameters:
 
-        @param m:
-            The type of PDE to solve:
+            pde: The partial differential equation to solve.
+
+            mesh:The finite element mesh, specifically for a 3D Tetrahedron mesh.
+
+            m: The type of PDE to solve:
             - m = 1: Double Laplace equation (双调和方程)
             - m = 2: Triple Laplace equation (三调和方程)
 
-        @param p:
-            The degree of the finite element space. Should satisfy:
+            p: The degree of the finite element space. Should satisfy:
             - p >= 4 * m + 1
 
         Example:
