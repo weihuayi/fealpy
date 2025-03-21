@@ -1,8 +1,21 @@
+import sys
 import os
 import pathlib
 from setuptools import setup, find_packages, Extension
 
-__version__ = "3.0.4"
+# add current directory to Python Path 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+from external_deps import build_ext, create_directory
+
+# create the directory ~/.local/include and ~/.local/lib for the installation of
+# the external dependencies
+create_directory(os.path.expanduser("~/.local/include"))
+create_directory(os.path.expanduser("~/.local/lib"))
+
+
+__version__ = "3.1.1"
 
 here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / "README.md").read_text(encoding="utf-8")
@@ -20,23 +33,8 @@ def load_requirements(path_dir=here, comment_char="#"):
             requirements.append(line)
     return requirements
 
-ext_modules_dict={
-        "mumps": Extension(
-            'fealpy.solver.mumps._dmumps',
-            sources=['fealpy/solver/mumps/_dmumps.pyx'],
-            libraries=['dmumps', 'mumps_common'],
-            ),
-        }
-
-def get_ext_modules():
-    ext_modules = []
-    if os.getenv("WITH_MUMPS"):
-        ext_modules.append(ext_modules_dict['mumps'])
-    return ext_modules
-
-
-ext_modules = get_ext_modules() 
-
+# build the third-party libraries and get the extension list
+ext_modules = build_ext()
 
 setup(
     name="fealpy",
@@ -60,3 +58,4 @@ setup(
     include_package_data=True,
     python_requires=">=3.10",
 )
+

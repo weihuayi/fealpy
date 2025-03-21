@@ -225,7 +225,7 @@ class Mesh3dDataStructure(HomogeneousMeshDS):
         NF = self.number_of_faces()
 
         face = self.face
-        NVF = self.NVF
+        NVF = self.number_of_vertices_of_faces()
         node2face = csr_matrix(
                 (
                     np.ones(NVF*NF, dtype=np.bool_),
