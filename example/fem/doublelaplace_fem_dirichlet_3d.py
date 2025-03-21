@@ -34,7 +34,7 @@ parser.add_argument('--n',
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
-        default=3, type=int,
+        default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 3 次')
 
 parser.add_argument('--backend',
@@ -76,6 +76,7 @@ errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\\Omega,0}$',
              '$||\\nabla^2 u - \\nabla^2 u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((3, maxit), **fkwargs)
+errorMatrix1 = bm.zeros((3, maxit), **fkwargs)
 tmr.send('网格和pde生成时间')
 
 for i in range(maxit):
@@ -106,6 +107,9 @@ for i in range(maxit):
     A, F = bc1.apply(A, F)  
     tmr.send(f'第{i}次边界处理时间')
     uh[:] = spsolve(A, F, "mumps")
+    uh1 = space.function()
+    uI = space.interpolation(ulist)
+    uh1[:] = uI- uh[:]
     
     tmr.send(f'第{i}次求解器时间')
 
@@ -119,6 +123,16 @@ for i in range(maxit):
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
     errorMatrix[1, i] = mesh.error(pde.gradient, ugval)
     errorMatrix[2, i] = mesh.error(pde.hessian, ug2val)
+    @barycentric
+    def ugval1(p):
+        return space.grad_m_value(uh1, p, 1)
+
+    @barycentric
+    def ug2val1(p):
+        return space.grad_m_value(uh1, p, 2)
+    errorMatrix1[0, i] = mesh.error(uh1, 0)
+    errorMatrix1[1, i] = mesh.error(ugval1, 0)
+    errorMatrix1[2, i] = mesh.error(ug2val1, 0)
     if i < maxit-1:
         mesh.uniform_refine(n=1)
     tmr.send(f'第{i}次误差计算及网格加密时间')
@@ -128,4 +142,7 @@ print("最终误差",errorMatrix)
 print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 print("order : ", bm.log2(errorMatrix[1,:-1]/errorMatrix[1,1:]))
 print("order : ", bm.log2(errorMatrix[2,:-1]/errorMatrix[2,1:]))
-
+print("最终误差",errorMatrix1)                                                  
+print("order : ", bm.log2(errorMatrix1[0,:-1]/errorMatrix1[0,1:]))              
+print("order : ", bm.log2(errorMatrix1[1,:-1]/errorMatrix1[1,1:]))              
+print("order : ", bm.log2(errorMatrix1[2,:-1]/errorMatrix1[2,1:]))

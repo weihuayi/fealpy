@@ -5,6 +5,7 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 from .utils import estr2dim
 from ..sparse import COOTensor
+import inspect
 
 from .mesh_base import Mesh
 from .plot import Plotable
@@ -424,6 +425,37 @@ class PolygonMesh(Mesh, Plotable):
             return e
         else:
             return e.sum(axis=0)
+
+    def error(self, u, v, q=3, power=2, celltype=False):
+        """
+        @brief 计算数值解的误差
+        """
+        nu = len(inspect.signature(u).parameters)                                   
+        nv = len(inspect.signature(v).parameters)                                   
+                                                                                    
+        assert 1 <= nu <= 2                                                         
+        assert 1 <= nv <= 2                                                         
+                                                                                
+        if (nu == 1) and (nv == 2):                                             
+            def efun(x, index):                                                 
+                return bm.abs(u(x) - v(x, index))**power                        
+        elif (nu == 2) and (nv == 2):                                           
+            def efun(x, index):                                                 
+                return bm.abs(u(x, index) - v(x, index))**power                 
+        elif (nu == 1) and (nv == 1):                                           
+            def efun(x, index):                                                 
+                return bm.abs(u(x) - v(x))**power                               
+        else:                                                                   
+            def efun(x, index):                                                 
+                return bm.abs(u(x, index) - v(x))**power                        
+                                                              
+        e = self.integral(efun, q, celltype=celltype)
+        if celltype == False:
+            e = bm.power(bm.sum(e), 1/power)
+        else:
+            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e
+
     def edge_to_cell(self):
         return self.edge2cell
 

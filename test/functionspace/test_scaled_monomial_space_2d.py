@@ -155,23 +155,43 @@ class TestScaledMonomialSpace2d():
         np.testing.assert_allclose(flux_matrix.toarray(), data['flux_matrix'],atol=1e-10)
         np.testing.assert_allclose(normal_grad_penalty_matrix.toarray(), data['normal_grad_penalty_matrix'],atol=1e-10)
         
+    #@pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    #@pytest.mark.parametrize("data", vector)
+    #def test_vector(self, backend, data): 
+    #    bm.set_backend(backend)
+    #    mesh = PolygonMesh.from_box([0,1,0,1],1,1)
+    #    space = ScaledMonomialSpace2d(mesh, p=3)
+    #def f(p):                                                                   
+    #    x = p[...,0]                                                            
+    #    y = p[...,1]                                                            
+    #    return np.sin(np.pi*x)*np.sin(np.pi*y)                                  
+    #edge_normal_source_vector = space.edge_normal_source_vector(f)              
+    #edge_source_vector = space.edge_source_vector(f)                            
+    #source_vector0 = space.source_vector0(f)                                    
+
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
-    @pytest.mark.parametrize("data", vector)
-    def test_vector(self, backend, data): 
+    @pytest.mark.parametrize("data", cellmatrix)
+    def test_cellmatrix(self, backend, data): 
         bm.set_backend(backend)
         mesh = PolygonMesh.from_box([0,1,0,1],1,1)
-        space = ScaledMonomialSpace2d(mesh, p=3)
-    def f(p):                                                                   
-        x = p[...,0]                                                            
-        y = p[...,1]                                                            
-        return np.sin(np.pi*x)*np.sin(np.pi*y)                                  
-    edge_normal_source_vector = space.edge_normal_source_vector(f)              
-    edge_source_vector = space.edge_source_vector(f)                            
-    source_vector0 = space.source_vector0(f)                                    
-     
+        p = 3
+        space = ScaledMonomialSpace2d(mesh, p=p)
+        from fealpy.fem import  ScalarMassIntegrator
+        integrator = ScalarMassIntegrator(q=p+1,method='homogeneous')
+        mass_matrix = integrator.homogeneous_assembly(space)
+        np.testing.assert_allclose(mass_matrix, data["mass_matrix"], atol=1e-8)
+        from fealpy.fem import  ScalarDiffusionIntegrator
+        integrator = ScalarDiffusionIntegrator(q=p+1,method='homogeneous')
+        stiff_matrix = integrator.homogeneous_assembly(space)
+        np.testing.assert_allclose(stiff_matrix, data["cell_stiff_matrix"], atol=1e-8)
+        
+
+    
  
 if __name__ == '__main__':
     ts = TestScaledMonomialSpace2d()
+    ts.test_cellmatrix('numpy',cellmatrix[0])
+    ts.test_cellmatrix('pytorch',cellmatrix[0])
     #ts.test_multi_index_matrix('numpy', multi_index_matrix[0])
     #ts.test_multi_index_matrix('pytorch', multi_index_matrix[0])
     #ts.test_cell_to_dof('pytorch', cell_to_dof[0])
@@ -181,31 +201,8 @@ if __name__ == '__main__':
     #ts.test_value('numpy', value[0])
     #ts.test_matrix('pytorch', matrix[0])
     #ts.test_matrix('numpy', matrix[0])
-    ts.test_matrix1('pytorch', matrix1[0])
-    ts.test_matrix1('numpy', matrix1[0])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    #ts.test_matrix1('pytorch', matrix1[0])
+    #ts.test_matrix1('numpy', matrix1[0])
 
 
 

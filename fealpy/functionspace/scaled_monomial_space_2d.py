@@ -370,6 +370,69 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         Py = bm.zeros([NC, N, N], **self.fkwargs)
         Py[:, bm.arange(len(I)), I] = mindex[None, I, 2]/h[:, None]
         return Px[index], Py[index]
+    def edge_integral(self, f):
+        mesh = self.mesh
+        p = self.p
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        edge2cell = mesh.edge_to_cell()
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        NC = mesh.number_of_cells()
+        qf = mesh.quadrature_formula(p+3, etype='edge', qtype='legendre') # NQ
+        bcs, ws = qf.quadpts, qf.weights # (NQ, 2)  (NQ,)
+        ps = bm.einsum('ij, kjm->kim', bcs, node[edge]) # (NQ, 2) (NE, 2, 2)
+        f1 = f(ps, index=edge2cell[:, 0]) # (NE, NQ, ldof)
+        measure = mesh.entity_measure('edge')
+        H0 = bm.einsum('eq..., q, e-> e...', f1, ws, measure) # (NC, 2, 2)
+        f2 = f(ps, index=edge2cell[:, 1])
+        H1 = bm.einsum('eq..., q, e-> e...', f2[isInEdge], ws, measure[isInEdge]) # (NC, 2, 2)
+        H = bm.zeros((NC,)+ f1.shape[2:], **mesh.fkwargs)
+        bm.index_add(H, edge2cell[:, 0], H0)
+        bm.index_add(H, edge2cell[isInEdge, 1], H1)
+        return H
+
+
+
+
+
+    def integral(self, f):
+        """
+        homogenous function integral, applicable to arbitrary polygonal meshes
+        """
+        mesh = self.mesh
+        p = self.p
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        edge2cell = mesh.edge_to_cell()
+        edgebarycenter = mesh.entity_barycenter('edge')
+        cellbarycenter = mesh.entity_barycenter('cell')
+        #edgebarycenter = node[edge[:, 0]] - cellbarycenter[edge2cell[:, 0]] # (NE, 2)
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        NC = mesh.number_of_cells()
+        qf = mesh.quadrature_formula(p+3, etype='edge', qtype='legendre') # NQ
+        bcs, ws = qf.quadpts, qf.weights # (NQ, 2)  (NQ,)
+        ps = bm.einsum('ij, kjm->kim', bcs, node[edge]) # (NQ, 2) (NE, 2, 2)
+        f1 = f(ps, index=edge2cell[:, 0]) # (NE, NQ, ldof)
+        nm = mesh.edge_normal()
+        b = node[edge[:, 0]] - cellbarycenter[edge2cell[:, 0]]
+        H0 = bm.einsum('eq..., q, ed, ed-> e...', f1, ws, b, nm) # (NC, 2, 2)
+        f2 = f(ps, index=edge2cell[:, 1])
+        b = node[edge[isInEdge, 0]] - cellbarycenter[edge2cell[isInEdge, 1]]
+        H1 = bm.einsum('eq..., q, ed, ed-> e...', f2[isInEdge], ws, b, -nm[isInEdge]) # (NC, 2, 2)
+        H = bm.zeros((NC,)+ f1.shape[2:], **mesh.fkwargs)
+        bm.index_add(H, edge2cell[:, 0], H0)
+        bm.index_add(H, edge2cell[isInEdge, 1], H1)
+        multiIndex = self.multi_index_matrix(p=p)
+        q = bm.sum(multiIndex, axis=1)
+        if H.ndim == 2:
+            H /= q+2
+        else:
+            H /= q + q.reshape(-1, 1) + 2
+        return H
 
     def partial_matrix_on_edge(self, p=None):
         p = p or self.p
@@ -389,7 +452,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         #cell2dof = self.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        s1 = 'i...j, ij{}->i...{}'.format(s0[:dim], s0[:dim])
         return bm.einsum(s1, phi, uh[cell2dof])
 
     @cartesian
@@ -1021,6 +1084,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         b = node[edge[:, 0]] - self.cellbarycenter[edge2cell[:, 0]] # (NE, 2)
         H0 = bm.einsum('ij, ij, ikm->ikm', b, nm, H0) # (NE, 2), (NE,2),(NE, ldof, ldof) -> (NE, ldof, ldof)
         b = node[edge[isInEdge, 0]] - self.cellbarycenter[edge2cell[isInEdge, 1]]
+
         H1 = bm.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
