@@ -1,12 +1,3 @@
-#!/usr/bin/python3
-'''!    	
-	@Author: wpx
-	@File Name: ls_fem_solver.py
-	@Mail: wpx15673207315@gmail.com 
-	@Created Time: Fri 14 Mar 2025 10:32:41 AM CST
-	@bref 
-	@ref 
-'''  
 import warnings
 
 from ..backend import backend_manager as bm
