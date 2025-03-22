@@ -133,3 +133,19 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d) * coef
         return A
+
+    @assemblymethod('homogeneous')
+    def homogeneous_assembly(self, space: _FS, /, indices=None) -> TensorLike:
+        """
+        homogenous funciton space(scaled monomial space) assembly, applicable to arbitrary polygonal meshes.
+        """
+        mesh = space.mesh
+        p = space.p
+        from . import ScalarMassIntegrator
+        mass_integrator = ScalarMassIntegrator(q=p+1,method='homogeneous')
+        M = mass_integrator.homogeneous_assembly(space)
+        Px, Py  = space.partial_matrix()
+        S1 = bm.einsum('cji, cjk, ckl -> cil', Px, M, Px)
+        S2 = bm.einsum('cji, cjk, ckl -> cil', Py, M, Py)
+        return S1 + S2
+ 

@@ -92,3 +92,47 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         phi = space.basis(bcs)
         M = bm.einsum('q, cqi, cqj, cq -> cij', ws*rm, phi, phi, d) #(NC, ldof, ldof)
         return M
+
+    @assemblymethod('homogeneous')
+    def homogeneous_assembly(self, space: _FS):
+        """
+        homogenous funciton space(scaled monomial space) assembly, applicable to arbitrary polygonal meshes.
+        """
+        def integral(f):
+            """
+            homogenous function integral, applicable to arbitrary polygonal meshes
+            """
+            mesh = space.mesh                                                        
+            node = mesh.entity('node')                                              
+            edge = mesh.entity('edge')                                              
+            edge2cell = mesh.edge_to_cell()                                         
+            edgebarycenter = mesh.entity_barycenter('edge')
+            cellbarycenter = mesh.entity_barycenter('cell')
+            #edgebarycenter = node[edge[:, 0]] - cellbarycenter[edge2cell[:, 0]] # (NE, 2)
+                                                                                 
+            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])                         
+                                                                                 
+            NC = mesh.number_of_cells()                                             
+            qf = mesh.quadrature_formula(p+1, etype='edge', qtype='legendre') # NQ  
+            bcs, ws = qf.quadpts, qf.weights # (NQ, 2)  (NQ,)                       
+            ps = bm.einsum('ij, kjm->kim', bcs, node[edge]) # (NQ, 2) (NE, 2, 2)                        
+            f1 = f(ps, index=edge2cell[:, 0]) # (NE, NQ, ldof)
+            nm = mesh.edge_normal()
+            b = node[edge[:, 0]] - cellbarycenter[edge2cell[:, 0]]
+            H0 = bm.einsum('eqlk, q, ed, ed-> elk', f1, ws, b, nm) # (NC, 2, 2)
+            f2 = f(ps, index=edge2cell[:, 1])
+            b = node[edge[isInEdge, 0]] - cellbarycenter[edge2cell[isInEdge, 1]]
+            H1 = bm.einsum('eqlk, q, ed, ed-> elk', f2[isInEdge], ws, b, -nm[isInEdge]) # (NC, 2, 2)
+            H = bm.zeros((NC, f1.shape[-2], f1.shape[-1]), **mesh.fkwargs)
+            bm.index_add(H, edge2cell[:, 0], H0)
+            bm.index_add(H, edge2cell[isInEdge, 1], H1)
+            multiIndex = space.multi_index_matrix(p=p)
+            q = bm.sum(multiIndex, axis=1)
+            H /= q + q.reshape(-1, 1) + 2
+            return H
+
+        p = space.p                                    
+        def f(x, index):
+            phi = space.basis(x, index=index, p=p)
+            return bm.einsum('eqi, eqj->eqij', phi, phi)
+        return integral(f)

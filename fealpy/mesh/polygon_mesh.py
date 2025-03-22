@@ -5,6 +5,7 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 from .utils import estr2dim
 from ..sparse import COOTensor
+import inspect
 
 from .mesh_base import Mesh
 from .plot import Plotable
@@ -20,6 +21,8 @@ class PolygonMesh(Mesh, Plotable):
         self.node = node
         self.ikwargs = bm.context(cell[0])
         self.fkwargs = bm.context(node)
+        self.ftype = node.dtype
+        self.itype = cell[0].dtype
 
 
         if cell[1] is None: 
@@ -185,7 +188,7 @@ class PolygonMesh(Mesh, Plotable):
         """
         assert self.geo_dimension() == 2
         v = self.edge_tangent(index=index)
-        w = bm.tensor([(0,-1),(1,0)],**self.ftype)
+        w = bm.tensor([(0,-1),(1,0)],**self.fkwargs)
         return v@w
 
     def edge_unit_normal(self, index=_S):
@@ -378,8 +381,9 @@ class PolygonMesh(Mesh, Plotable):
         NE = self.number_of_edges()
 
         bcs, ws = self.quadrature_formula(q).get_quadrature_points_and_weights()
-        bcs = bm.astype(bcs,**self.fkwargs) 
-        ws = bm.astype(ws,**self.fkwargs)
+        
+        bcs = bm.astype(bcs,self.ftype) 
+        ws = bm.astype(ws,self.ftype)
         bc = self.entity_barycenter('cell')
         tri = bm.zeros((3,NE,2),**self.fkwargs)
         
@@ -391,13 +395,13 @@ class PolygonMesh(Mesh, Plotable):
         v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]]
         a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
     
-        pp = bm.einsum('ij, jkm->ikm', bcs, tri)
+        pp = bm.einsum('ij, jkm->kim', bcs, tri)
         val = u(pp, edge2cell[:, 0])
 
         shape = (NC, ) + val.shape[2:]
         e = bm.zeros(shape, **self.fkwargs)
 
-        ee = bm.einsum('i, ij..., j->j...', ws, val, a)
+        ee = bm.einsum('i, ji..., j->j...', ws, val, a)
         e = bm.index_add(e, edge2cell[:, 0], ee)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
@@ -412,15 +416,46 @@ class PolygonMesh(Mesh, Plotable):
             
             a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
 
-            pp = bm.einsum('ij, jkm->ikm', bcs, tri)
+            pp = bm.einsum('ij, jkm->kim', bcs, tri)
             val = u(pp, edge2cell[isInEdge, 1])
-            ee = bm.einsum('i, ij..., j->j...', ws, val, a)
+            ee = bm.einsum('i, ji..., j->j...', ws, val, a)
             e = bm.index_add(e, edge2cell[isInEdge, 1], ee)
             
         if celltype is True:
             return e
         else:
             return e.sum(axis=0)
+
+    def error(self, u, v, q=3, power=2, celltype=False):
+        """
+        @brief 计算数值解的误差
+        """
+        nu = len(inspect.signature(u).parameters)                                   
+        nv = len(inspect.signature(v).parameters)                                   
+                                                                                    
+        assert 1 <= nu <= 2                                                         
+        assert 1 <= nv <= 2                                                         
+                                                                                
+        if (nu == 1) and (nv == 2):                                             
+            def efun(x, index):                                                 
+                return bm.abs(u(x) - v(x, index))**power                        
+        elif (nu == 2) and (nv == 2):                                           
+            def efun(x, index):                                                 
+                return bm.abs(u(x, index) - v(x, index))**power                 
+        elif (nu == 1) and (nv == 1):                                           
+            def efun(x, index):                                                 
+                return bm.abs(u(x) - v(x))**power                               
+        else:                                                                   
+            def efun(x, index):                                                 
+                return bm.abs(u(x, index) - v(x))**power                        
+                                                              
+        e = self.integral(efun, q, celltype=celltype)
+        if celltype == False:
+            e = bm.power(bm.sum(e), 1/power)
+        else:
+            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e
+
     def edge_to_cell(self):
         return self.edge2cell
 
