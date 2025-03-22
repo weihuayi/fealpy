@@ -73,5 +73,11 @@
         "env": "WITH_P4EST",
         "compile_from_source": false,
         "apt_package": "libp4est-dev"
+    },
+    {
+        "name": "openblas",
+        "env": "WITH_OPENBLAS",
+        "compile_from_source": false,
+        "apt_package": "libopenblas-openmp-dev"
     }
 ]
