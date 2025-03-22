@@ -16,8 +16,8 @@ from .first_nedelec_fe_space_3d import FirstNedelecFiniteElementSpace3d
 from .second_nedelec_fe_space_2d import SecondNedelecFiniteElementSpace2d
 from .second_nedelec_fe_space_3d import SecondNedelecFiniteElementSpace3d
 
-from .RaviartThomasFiniteElementSpace2d import RTFiniteElementSpace2d
-from .RaviartThomasFiniteElementSpace3d import RTFiniteElementSpace3d
+from .raviart_thomas_fe_space_2d import RTFiniteElementSpace2d
+from .raviart_thomas_fe_space_3d import RTFiniteElementSpace3d
 
 from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
 

@@ -4,7 +4,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
 
-from .utils import estr2dim
+from .utils import estr2dim,tensor_ldof,tensor_gdof
 from .mesh_base import TensorMesh
 from .quadrangle_mesh import QuadrangleMesh
 
@@ -30,6 +30,8 @@ class LagrangeQuadrangleMesh(TensorMesh):
         self.surface = surface
 
         self.node = node
+        self.localEdge = self.generate_local_lagrange_edges(p)
+        self.localFace = self.localEdge
         self.ccw = bm.tensor([0, 2, 3, 1], **kwargs)
 
         if construct:
@@ -46,6 +48,22 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     def reference_cell_measure(self):
         return 1
+    
+    def generate_local_lagrange_edges(self, p: int) -> TensorLike:
+        """
+        Generate the local edges for Lagrange elements of order p.
+        """
+        k = bm.arange((p + 1)**2, dtype=self.itype , device=self.device)
+        k = k.reshape((p + 1, p + 1)).T
+        
+        kwargs = bm.context(k)
+        localEdge = bm.zeros((4, p+1), **kwargs)
+        localEdge = bm.set_at(localEdge, (0, slice(None)), k[0, :])
+        localEdge = bm.set_at(localEdge, (1, slice(None)), k[:, -1])
+        localEdge = bm.set_at(localEdge, (2, slice(None)), bm.flip(k[-1, :]))
+        localEdge = bm.set_at(localEdge, (3, slice(None)), bm.flip(k[:, 0]))
+
+        return localEdge
     
     def interpolation_points(self, p: int, index: Index = _S):
         """
@@ -78,7 +96,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             init_node[:],_ = surface.project(init_node)
             node,_ = surface.project(node)
 
-        lmesh = cls(node, cell, p=p, construct=False)
+        lmesh = cls(node, cell, p=p, construct=True)
         lmesh.linearmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
@@ -132,7 +150,10 @@ class LagrangeQuadrangleMesh(TensorMesh):
         """
         sp = self.p
         cell = self.cell[:, [0, -sp-1, 1]]  # 取角点
-        
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        edge2cell = self.edge2cell
         if p == 0:
             return bm.arange(len(cell)).reshape((-1, 1))[index]
         if p == 1:
