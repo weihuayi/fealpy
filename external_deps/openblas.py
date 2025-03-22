@@ -197,3 +197,27 @@ def build(dep, ext_modules):
     if dep["compile_from_source"]:
         installer = Installer(dep, ext_modules)
         installer.build()
+
+
+
+if __name__ == "__main__":
+    # add the current directory to the path 
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, current_dir)
+
+    dep = {
+        "name": "pangulu",
+        "env": "WITH_PANGULU",
+        "compile_from_source": True,
+        "version": "4.2.0",
+        "source_url": [
+            "git@github.com:SuperScientificSoftwareLaboratory/PanguLU.git",
+            "https://www.ssslab.cn/assets/panguLU/PanguLU-4.2.0.zip"
+        ],
+        "install_prefix": "~/.local"
+        }
+    ext_modules = []
+
+    # Use the factory to create the appropriate installer for the current platform
+    installer = Installer(dep, ext_modules)
+    installer.build()  # Run the build process
