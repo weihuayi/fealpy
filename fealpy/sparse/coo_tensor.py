@@ -147,6 +147,9 @@ class COOTensor(SparseTensor):
         count = bm.bincount(self._indices[0], minlength=self._spshape[0])
         crow = bm.cumsum(count)
         crow = bm.concat([bm.tensor([0], **bm.context(crow)), crow])
+        count = bm.bincount(self._indices[0], minlength=self._spshape[0])
+        crow = bm.cumsum(count)
+        crow = bm.concat([bm.tensor([0], **bm.context(crow)), crow])
         order = bm.argsort(self._indices[0], stable=True)
         new_col = bm.copy(self._indices[-1, order])
 
@@ -278,6 +281,27 @@ class COOTensor(SparseTensor):
         if len(coo_tensors) == 1:
             return coo_tensors[0]
 
+        indices_list = []
+        values_list = []
+        prev_len = 0
+
+        for coo in coo_tensors:
+            indices = bm.copy(coo.indices)
+            indices = bm.index_add(
+                indices, bm.array([axis], device=indices.device), prev_len,
+                axis=0
+            )
+            indices_list.append(indices)
+            values_list.append(bm.copy(coo.values))
+            prev_len += coo.sparse_shape[axis]
+
+        new_indices = bm.concat(indices_list, axis=1)
+        del indices_list
+        new_values = bm.concat(values_list, axis=-1)
+        del values_list
+        spshape = list(coo_tensors[-1].sparse_shape)
+        spshape[axis] = prev_len
+        return cls(new_indices, new_values, spshape)
         indices_list = []
         values_list = []
         prev_len = 0
