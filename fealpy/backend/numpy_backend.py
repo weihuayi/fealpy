@@ -16,14 +16,12 @@ from .base import (
     ATTRIBUTE_MAPPING, FUNCTION_MAPPING
 )
 
-
 def _remove_device(func):
     def wrapper(*args, **kwargs):
         if 'device' in kwargs:
             kwargs.pop('device')
         return func(*args, **kwargs)
     return wrapper
-
 
 class NumPyBackend(BackendProxy, backend_name='numpy'):
     DATA_CLASS = np.ndarray
