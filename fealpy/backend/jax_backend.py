@@ -21,6 +21,13 @@ from .base import BackendProxy, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_
 Array = jax.Array
 _device = jax.Device
 
+def _remove_device(func):
+    def wrapper(*args, **kwargs):
+        if 'device' in kwargs:
+            kwargs.pop('device')
+        return func(*args, **kwargs)
+    return wrapper
+
 class JAXBackend(BackendProxy, backend_name='jax'):
     DATA_CLASS = Array
     linalg = jnp.linalg
@@ -43,9 +50,11 @@ class JAXBackend(BackendProxy, backend_name='jax'):
     @staticmethod
     def get_device(tensor_like: Array, /): return tensor_like.device
 
+    # TODO 
     @staticmethod
     def device_put(tensor_like: Array, /, device=None) -> Array:
-        return jax.device_put(tensor_like, device)
+        return tensor_like
+        # return jax.device_put(tensor_like, device)
 
     @staticmethod
     def to_numpy(jax_array: Array, /) -> Any:
@@ -73,6 +82,15 @@ class JAXBackend(BackendProxy, backend_name='jax'):
 
     ### Binary methods ###
     # NOTE: all copied
+
+    # NOTE 临时删除 device
+    arange = staticmethod(_remove_device(jnp.arange))
+    zeros = staticmethod(_remove_device(jnp.zeros))
+    linspace = staticmethod(_remove_device(jnp.linspace))
+    empty = staticmethod(_remove_device(jnp.empty))
+    array = staticmethod(_remove_device(jnp.array))
+    tensor = staticmethod(_remove_device(jnp.array))
+    ones = staticmethod(_remove_device(jnp.ones))
 
     @staticmethod
     def set_at(x: Array, indices, val, /):
@@ -418,7 +436,10 @@ class JAXBackend(BackendProxy, backend_name='jax'):
 
 JAXBackend.attach_attributes(ATTRIBUTE_MAPPING, jnp)
 function_mapping = FUNCTION_MAPPING.copy()
-function_mapping.update(tensor='array')
+function_mapping.update(
+    tensor='array',
+    concat='concatenate'
+    )
 JAXBackend.attach_methods(function_mapping, jnp)
 JAXBackend.attach_methods({'compile': 'jit'}, jax)
 JAXBackend.attach_methods(TRANSFORMS_MAPPING, jax)
