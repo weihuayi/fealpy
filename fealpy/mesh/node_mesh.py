@@ -9,7 +9,7 @@ from .mesh_base import MeshDS
 
 import jax.numpy as jnp
 import jax
-from jax_md import space, partition
+from ..backend.jax.jax_md import space, partition
 from jax import vmap, lax
 
 class NodeMesh(MeshDS):
