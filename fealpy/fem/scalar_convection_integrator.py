@@ -22,7 +22,7 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
-        super().__init__(method=method)
+        super().__init__(method=method if method else 'assembly')
         self.coef = coef
         self.q = q
         self.index = index
@@ -58,6 +58,26 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         if is_tensor(coef):
             gphi = bm.einsum('cqi...j, cq...j->cqi...' ,gphi, coef)
             result = bilinear_integral(phi, gphi, ws, cm, coef=None, batched=self.batched)
+        else:
+            raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
+        return result
+
+    @assemblymethod('isopara')
+    def isopara_assembly(self, space: _FS) -> TensorLike:
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, gphi, cm, index = self.fetch(space)
+        
+        rm = space.mesh.reference_cell_measure()
+        J = space.mesh.jacobi_matrix(bcs)
+        G = space.mesh.first_fundamental_form(J)
+        d = bm.sqrt(bm.linalg.det(G)) # |G|
+
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        
+        if is_tensor(coef):
+            gphi = bm.einsum('cqi...j, cq...j -> cqi...' ,gphi, coef)
+            result = bilinear_integral(ws*rm, phi, gphi, d, coef=None, batched=self.batched)
         else:
             raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
         return result
