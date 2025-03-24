@@ -288,12 +288,65 @@ class QuadrangleMesh(TensorMesh, Plotable):
         # else:
         #     raise ValueError("Unsupported backend")
         return cell2ipoint[index]
-
+    
     def prolongation_matrix(self, p0: int, p1: int):
         """
-        @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
+        Return the prolongation_matrix from p0 to p1: 0 < p0 < p1
+
+        Parameters:
+            p0(int): The degree of the lowest-order space.
+            p1(int): The degree of the highest-order space.
+
+        Returns:
+            CSRTensor: the prolongation_matrix from p0 to p1
         """
-        raise NotImplementedError
+        assert 0 < p0 < p1
+
+        TD = self.top_dimension()#Geometric Dimension
+        gdof0 = self.number_of_global_ipoints(p0)
+        gdof1 = self.number_of_global_ipoints(p1)
+        matrix_shape = (gdof1,gdof0)
+
+        # 1. Interpolation points on the mesh nodes: Inherit the original interpolation points
+        NN = self.number_of_nodes()
+        V_1 = bm.ones(NN)
+        I_1 = bm.arange(NN)
+        J_1 = bm.arange(NN)
+
+        # 2. Interpolation points within the mesh edges
+        NE = self.number_of_edges()
+        bcs = self.multi_index_matrix(p1, TD - 1) / p1
+
+        phi = self.edge_shape_function(bcs=(bcs[1:-1],), p=p0)  # (ldof1 - 2, ldof0)
+
+        e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
+        e2p0 = self.edge_to_ipoint(p0)
+        shape = (NE,) + phi.shape
+
+        I_2 = bm.broadcast_to(e2p1[:, :, None], shape=shape).flat
+        J_2 = bm.broadcast_to(e2p0[:, None, :], shape=shape).flat
+        V_2 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+
+        # 3. Interpolation points within the mesh cells
+        NC = self.number_of_cells()
+        bcs = self.multi_index_matrix(p1, TD -1) / p1
+        phi = self.cell_shape_function((bcs[1:-1],bcs[1:-1]), p=p0)
+        c2p1 = self.cell_to_ipoint(p1).reshape(NC,p1+1,p1+1)[:,1:-1,1:-1]
+        c2p1 = c2p1.reshape(NC,-1)
+        c2p0 = self.cell_to_ipoint(p0)
+        shape = (NC,) + phi.shape
+
+        I_3 = bm.broadcast_to(c2p1[:, :, None], shape=shape).flat
+        J_3 = bm.broadcast_to(c2p0[:, None, :], shape=shape).flat
+        V_3 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+       
+        # 4.concatenate
+        V = bm.concatenate((V_1, V_2, V_3), axis=0) 
+        I = bm.concatenate((I_1, I_2, I_3), axis=0) 
+        J = bm.concatenate((J_1, J_2, J_3), axis=0) 
+        P = csr_matrix((V, (I, J)), matrix_shape)
+
+        return P
 
     def jacobi_at_corner(self) -> TensorLike:
         NC = self.number_of_cells()
@@ -343,12 +396,16 @@ class QuadrangleMesh(TensorMesh, Plotable):
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False) -> 'QuadrangleMesh':
         """
-        Uniform refine the triangle mesh n times.
+        Uniform refine the quadrangle mesh n times.
 
         Parameters:
-            n (int): times refine the triangle mesh.
-            surface (function): the surface function.
-            returnim (bool): return the interpolation matrix list or not,列表中的插值矩阵从细到粗排列
+            n (int): Times refine the triangle mesh.
+            surface (function): The surface function.
+            returnirm (bool): Return the prolongation matrix list or not,from the finest to the the coarsest
+        
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest
         """
         if returnim is True:
             IM = []

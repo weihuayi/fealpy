@@ -69,8 +69,9 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         d = bm.sqrt(bm.linalg.det(G))
 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-
-        if isinstance(val, (int, float)):
+        if  val is None:
+            return bm.einsum('q, cql, cq -> cl', ws*rm, phi, d)
+        elif isinstance(val, (int, float)):
             return bm.einsum('q, cql, cq -> cl', ws*rm, phi, d)*val
         elif isinstance(val, TensorLike):
             if val.shape == (NC, ): # 分片常数
@@ -79,4 +80,3 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
                 return bm.einsum('q, cq, cql, cq -> cl', ws*rm, val, phi, d)
             else:
                 raise ValueError(f"I can not deal with {f.shape}!")
-

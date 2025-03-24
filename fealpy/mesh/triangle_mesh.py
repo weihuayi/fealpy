@@ -275,18 +275,82 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell2faceSign = bm.zeros((NC, NEC), dtype=bm.bool, device=self.device)
         cell2faceSign = bm.set_at(cell2faceSign, (face2cell[:, 0], face2cell[:, 2]), True)
         return cell2faceSign
+    
+    def prolongation_matrix(self, p0: int, p1: int):
+        """
+        Return the prolongation_matrix from p0 to p1: 0 < p0 < p1
 
-    def prolongation_matrix(self, po: int, p1: int):
+        Parameters:
+            p0(int): The degree of the lowest-order space.
+            p1(int): The degree of the highest-order space.
+
+        Returns:
+            CSRTensor: the prolongation_matrix from p0 to p1
         """
-        @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
-        """
-        pass
+        assert 0 < p0 < p1
+
+        TD = self.top_dimension()#Geometric Dimension
+        gdof0 = self.number_of_global_ipoints(p0)
+        gdof1 = self.number_of_global_ipoints(p1)
+        matrix_shape = (gdof1,gdof0)
+
+        kargs_node = bm.context(self.entity('node'))
+        kargs_cell = bm.context(self.entity('cell'))
+
+        # 1. Interpolation points on the mesh nodes: Inherit the original interpolation points
+        NN = self.number_of_nodes()
+        V_1 = bm.ones(NN,**kargs_node)
+        I_1 = bm.arange(NN,**kargs_cell)
+        J_1 = bm.arange(NN,**kargs_cell)
+
+        # 2. Interpolation points within the mesh edges
+        NE = self.number_of_edges()
+        bcs = self.multi_index_matrix(p1, 1) / p1  
+        phi = self.edge_shape_function(bcs[1:-1], p=p0)  # (ldof1 - 2, ldof0)
+
+        e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
+        e2p0 = self.edge_to_ipoint(p0)
+        shape = (NE,) + phi.shape
+
+        I_2 = bm.broadcast_to(e2p1[:, :, None], shape=shape).flat
+        J_2 = bm.broadcast_to(e2p0[:, None, :], shape=shape).flat
+        V_2 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+
+        # 3. Interpolation points within the mesh cells
+        if p1 > 2:
+            NC = self.number_of_cells()
+            bcs = self.multi_index_matrix(p1, TD) / p1
+            flag = bm.sum(bcs > 0, axis=1) == 3
+            phi = self.shape_function(bcs[flag, :], p=p0)
+            c2p1 = self.cell_to_ipoint(p1)[:, flag]
+            c2p0 = self.cell_to_ipoint(p0)
+
+            shape = (NC,) + phi.shape
+
+            I_3 = bm.broadcast_to(c2p1[:, :, None], shape=shape).flat
+            J_3 = bm.broadcast_to(c2p0[:, None, :], shape=shape).flat
+            V_3 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+
+        # 4.concatenate
+        if p1 <=2:
+            V = bm.concatenate((V_1, V_2), axis=0) 
+            I = bm.concatenate((I_1, I_2), axis=0) 
+            J = bm.concatenate((J_1, J_2), axis=0) 
+            P = csr_matrix((V, (I, J)), matrix_shape)
+        else:
+            V = bm.concatenate((V_1, V_2, V_3), axis=0) 
+            I = bm.concatenate((I_1, I_2, I_3), axis=0) 
+            J = bm.concatenate((J_1, J_2, J_3), axis=0) 
+            P = csr_matrix((V, (I, J)), matrix_shape)
+
+        return P
 
     def edge_frame(self, index: Index=_S):
         """
         @brief 计算二维网格中每条边上的局部标架
         """
         pass
+    
     def edge_unit_tangent(self, index=_S):
         """
         @brief Calculate the tangent vector with unit length of each edge.See `Mesh.edge_tangent`.
@@ -302,9 +366,13 @@ class TriangleMesh(SimplexMesh, Plotable):
         Uniform refine the triangle mesh n times.
 
         Parameters:
-            n (int): times refine the triangle mesh.
-            surface (function): the surface function.
-            returnirm (bool): return the interpolation matrix list or not,列表中的插值矩阵从细到粗排列
+            n (int): Times refine the triangle mesh.
+            surface (function): The surface function.
+            returnirm (bool): Return the prolongation matrix list or not,from the finest to the the coarsest
+        
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest
         """
         if returnim is True:
             IM = []
@@ -414,15 +482,9 @@ class TriangleMesh(SimplexMesh, Plotable):
         for i,(j,k) in zip(range(3),localEdge):
             v0 = node[cell[:, j]] - node[cell[:, i]]
             v1 = node[cell[:, k]] - node[cell[:, i]]
-            angle[:,i] = bm.arccos(bm.sum(v0*v1,axis=1)/bm.sqrt(bm.sum(v0**2,axis=1)*bm.sum(v1**2,axis=1)))
+            angle = bm.set_at(angle,(...,i), bm.arccos(bm.sum(v0*v1,axis=1)/bm.sqrt(bm.sum(v0**2,axis=1)*bm.sum(v1**2,axis=1))))
         return angle
 
-    def show_angle(self, axes, angle=None):
-        """
-        @brief 显示网格角度的分布直方图
-        """
-        pass
-    
     def cell_quality(self, measure='radius_ratio'):
         if measure == 'radius_ratio':
             return radius_ratio(self)
@@ -1261,7 +1323,7 @@ class TriangleMesh(SimplexMesh, Plotable):
         return cls(node, cell)
 
     @classmethod
-    def from_unit_circle_gmesh(cls, h, *, itype=None, ftype=None, device=None):
+    def from_unit_circle_gmsh(cls, h):
         """
         Generate a triangular mesh for a unit circle by gmsh.
 
@@ -1286,17 +1348,19 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_tags = bm.from_numpy(node_tags)
+        node_coords = bm.from_numpy(node_coords)
         node = node_coords.reshape((-1, 3))[:, :2]
 
         # 节点编号映射
-        nodetags_map = dict({j: i for i, j in enumerate(node_tags)})
+        nodetags_map = dict({int(j): i for i, j in enumerate(node_tags)})
 
         # 获取单元信息
         cell_type = 2  # 三角形单元的类型编号为 2
         cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
 
         # 节点编号映射到单元
-        evid = bm.array([nodetags_map[j] for j in cell_connectivity])
+        evid = bm.array([nodetags_map[int(j)] for j in cell_connectivity])
         cell = evid.reshape((cell_tags.shape[-1], -1))
 
         gmsh.finalize()
@@ -1307,6 +1371,70 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         return cls(node, cell)
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_polygon_gmsh(cls, vertices, h):
+        """
+        Generate a triangle mesh for a polygonal region by gmsh.
+
+        @param vertices List of tuples representing vertices of the polygon
+        @param h Parameter controlling mesh density
+        @return TriangleMesh instance
+        """
+
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("Polygon")
+
+        # 创建多边形
+        lc = h  # 设置网格大小
+        polygon_points = []
+        for i, vertex in enumerate(vertices):
+            point = gmsh.model.geo.addPoint(vertex[0], vertex[1], 0, lc)
+            polygon_points.append(point)
+
+        # 添加线段和循环
+        lines = []
+        for i in range(len(polygon_points)):
+            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i + 1) % len(polygon_points)])
+            lines.append(line)
+        curve_loop = gmsh.model.geo.addCurveLoop(lines)
+
+        # 创建平面表面
+        surface = gmsh.model.geo.addPlaneSurface([curve_loop])
+
+        # 同步几何模型
+        gmsh.model.geo.synchronize()
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_tags = bm.from_numpy(node_tags)
+        node = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)[:, 0:2]
+
+        # 获取三角形单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+        cell = bm.array(cell_connectivity, dtype=bm.int64).reshape(-1, 3) - 1
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+        gmsh.finalize()
+
+        NN = len(node)
+        isValidNode = bm.zeros(NN, dtype=bm.bool)
+        isValidNode = bm.set_at(isValidNode, cell, True)
+        node = node[isValidNode]
+        idxMap = bm.zeros(NN, dtype=cell.dtype)
+        idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=bm.int64))
+        cell = idxMap[cell]
+
+        return cls(node, cell)
+    
     ## @ingroup MeshGenerators
     @classmethod
     def from_ellipsoid(cls, radius=[9, 3, 1], refine=0, *, itype=None, ftype=None, device=None):
@@ -1473,9 +1601,9 @@ class TriangleMesh(SimplexMesh, Plotable):
         NV = cell.shape[-1]
 
         cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
-        cell[:, 0] = NV
-
         NC = len(cell)
+        cell = bm.set_at(cell, (slice(NC), 0), NV)
+        
         if fname is None:
             return node, cell.flatten(), cellType, NC
         else:
@@ -1487,9 +1615,9 @@ class TriangleMesh(SimplexMesh, Plotable):
     def from_meshio(cls, file, show=False):
         import meshio
         data = meshio.read(file)
-        node = data.points
-        cell = data.cells_dict['triangle']
-        print(data.cells_dict)
+        node = bm.from_numpy(data.points)
+        cell = bm.from_numpy(data.cells_dict['triangle'])
+
         mesh = cls(node, cell)
         if show:
             import matplotlib.pyplot as plt

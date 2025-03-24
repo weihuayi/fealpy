@@ -8,6 +8,7 @@
 	@ref 
 '''  
 from jax import ops, vmap, jit, lax
+import jax
 import jax.lax as lax 
 from functools import partial
 import jax.numpy as jnp
@@ -16,11 +17,12 @@ import h5py
 import pyvista
 from typing import Dict
 import enum
-from fealpy.cfd.sph.jax_md import space
+from fealpy.backend.jax.jax_md import space
 #from jax_md import space
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.animation import PillowWriter
+#jax.debug.print("result:{}", jnp.sum(a))
 
 #设置标签
 class Tag(enum.IntEnum):
@@ -82,6 +84,7 @@ class SPHSolver:
             dv = tv - mv
             result = jnp.einsum('ki,kj->kij', a, dv).reshape(a.shape[0], 2, 2)
             return result
+
         eta_i = state["eta"][i_node]
         eta_j = state["eta"][j_node]
         p_i = p[i_node]

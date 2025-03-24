@@ -65,7 +65,7 @@ class TestLagrangeTriangleMeshInterfaces:
         lmesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, p=3, surface=sphere)
         fname = f"sphere_test.vtu"
         lmesh.to_vtk(fname=fname)
-        
+    
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_uniform_refine(self, backend):
         bm.set_backend(backend)
@@ -88,7 +88,7 @@ class TestLagrangeTriangleMeshInterfaces:
         bm.set_backend(backend)
 
         circle = CircleCurve()
-        mesh = TriangleMesh.from_unit_circle_gmesh(h=0.3)
+        mesh = TriangleMesh.from_unit_circle_gmsh(h=0.3)
 
         lmesh = LagrangeTriangleMesh.from_curve_triangle_mesh(mesh, p=2, curve=circle)
 
