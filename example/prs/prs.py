@@ -567,7 +567,7 @@ class PlanetaryRollerScrew():
                                                            self.roller.E, self.nut.area, self.screw.area, self.roller.area, 
                                                            self.C_delta_inner, self.C_delta_outer, self.E0_inner, self.E0_outer, 
                                                            self.p_inner_sum, self.p_outer_sum, self.flexible_inner, self.flexible_outer, 
-                                                           modify_nut, modify_screw, share), 
+                                                           self.nut.modify, self.screw.modify, share), 
                             F0, xtol=1e-6, full_output=True)
                 Fn = Fn.reshpe(62, 5)
                 fval = info['fvec']
@@ -664,7 +664,7 @@ class PlanetaryRollerScrew():
                 Fn, fval, _, _ = fsolve(lambda Fn: load_roller_screw_2(Fn, self.force_axial, self.pitch_screw, self.number_roller, self.nut.ratio, self.screw.ratio,
                                                  self.nut.E, self.screw.E, self.roller.E, self.nut.area, self.screw.area, self.roller.area, self.C_delta_inner, self.C_delta_outer,
                                                  self.E0_inner, self.E0_outer, self.p_inner_sum, self.p_outer_sum, self.flexible_inner, self.flexible_outer,
-                                                 nut_temp, screw_temp, share),
+                                                 self.nut.modify, self.screw.modify, share),
                                         F0, full_output=True)
                 
                 if np.any(np.abs(fval[1:self.number, :]) > 0.01) or np.any(np.abs(fval[self.number + 1:2 * self.number, :]) > 0.01):
@@ -1321,13 +1321,21 @@ class PlanetaryRollerScrew():
         # 生成螺旋线数据
         helix1 = calculate_helix(d1, alpha1, h1, color1)
         helix2 = calculate_helix(d2, alpha2, h2, color2)
-        helix3 = calculate_helix(d3, alpha3, h3, color3)
-        helix3['x'] = helix3['x'] + 13
+        helix3 = calculate_helix(d3, alpha3, h3, color3)     
 
         # 绘制螺旋线
-        for helix, label in zip([helix1, helix2, helix3], ['Helix 1', 'Helix 2', 'Helix3']):
-            ax.plot(helix['x'], helix['y'], helix['z'], 
+        for helix, label in zip([helix1, helix2], ['Helix 1', 'Helix 2']):
+            axes.plot(helix['x'], helix['y'], helix['z'], 
                     color=helix['color'], 
+                    lw=1.2,
+                    label=f'{label}\nD={d1 if label=="Helix 1" else d2} '
+                        f'o={alpha1 if label=="Helix 1" else alpha2}rad')
+        theta_r = np.linspace(0, 2 * np.pi, self.number_roller, endpoint=False)
+        centers_x = 13 * np.cos(theta_r)
+        centers_y = 13 * np.sin(theta_r)
+        for i in range(self.number_roller):
+            axes.plot(helix3['x'] + centers_x[i], helix3['y'] + centers_y[i], helix3['z'], 
+                    color=helix3['color'], 
                     lw=1.2,
                     label=f'{label}\nD={d1 if label=="Helix 1" else d2} '
                         f'o={alpha1 if label=="Helix 1" else alpha2}rad')
@@ -1345,8 +1353,8 @@ class PlanetaryRollerScrew():
         y_nut_outer = nut_outer_radius * np.sin(theta_nut)
         x_nut_inner = nut_inner_radius * np.cos(theta_nut)
         y_nut_inner = nut_inner_radius * np.sin(theta_nut)
-        ax.plot_surface(x_nut_outer, y_nut_outer, z_nut, color='gray', alpha=0.5)# 绘制螺母外表面和内孔
-        ax.plot_surface(x_nut_inner, y_nut_inner, z_nut, color='white', alpha=0.6)
+        axes.plot_surface(x_nut_outer, y_nut_outer, z_nut, color='gray', alpha=0.5)# 绘制螺母外表面和内孔
+        axes.plot_surface(x_nut_inner, y_nut_inner, z_nut, color='white', alpha=0.6)
         theta_circle = np.linspace(0, 2 * np.pi, num_points)
         x_nut_outer_top = nut_outer_radius * np.cos(theta_circle)
         y_nut_outer_top = nut_outer_radius * np.sin(theta_circle)
@@ -1354,11 +1362,11 @@ class PlanetaryRollerScrew():
         y_nut_inner_top = nut_inner_radius * np.sin(theta_circle)
         for z_pos in [0, nut_height]:# 绘制螺母的顶部和底部环形面
             # 外环灰色
-            ax.plot_trisurf(x_nut_outer_top, y_nut_outer_top, 
+            axes.plot_trisurf(x_nut_outer_top, y_nut_outer_top, 
                             np.full_like(x_nut_outer_top, z_pos), 
                             color='gray', alpha=0)
             # 内环白色
-            ax.plot_trisurf(x_nut_inner_top, y_nut_inner_top, 
+            axes.plot_trisurf(x_nut_inner_top, y_nut_inner_top, 
                             np.full_like(x_nut_inner_top, z_pos), 
                             color='white', alpha=0)
             
@@ -1369,11 +1377,11 @@ class PlanetaryRollerScrew():
         theta_screw, z_screw = np.meshgrid(theta, z_screw)
         x_screw = screw_radius * np.cos(theta_screw)
         y_screw = screw_radius * np.sin(theta_screw)
-        ax.plot_surface(x_screw, y_screw, z_screw, color='black', alpha=0.5)
+        axes.plot_surface(x_screw, y_screw, z_screw, color='black', alpha=0.5)
         x_screw_top = screw_radius * np.cos(theta_circle)
         y_screw_top = screw_radius * np.sin(theta_circle)
         for z_pos in [0, screw_height]:
-            ax.plot_trisurf(x_screw_top, y_screw_top, 
+            axes.plot_trisurf(x_screw_top, y_screw_top, 
                             np.full_like(x_screw_top, z_pos), 
                             color='silver', alpha=0.5)
             
@@ -1382,9 +1390,13 @@ class PlanetaryRollerScrew():
         roller_height = self._data[0, 48-1] # 滚柱高度
         z_roller = np.linspace(0, roller_height, 2)
         theta_roller, z_roller = np.meshgrid(theta, z_roller)
-        x_roller = roller_radius * np.cos(theta_roller) + 13
-        y_roller = roller_radius * np.sin(theta_roller)
-        ax.plot_surface(x_roller, y_roller, z_roller, color='black', alpha=0.5)
+        theta_r = np.linspace(0, 2 * np.pi, self.number_roller, endpoint=False)
+        centers_x = 13 * np.cos(theta_r)
+        centers_y = 13 * np.sin(theta_r)
+        for cx, cy in zip(centers_x, centers_y):
+            x_roller = roller_radius * np.cos(theta_roller) + cx
+            y_roller = roller_radius * np.sin(theta_roller) + cy
+            axes.plot_surface(x_roller, y_roller, z_roller, color='black', alpha=0.5)
         # pass
 
 
