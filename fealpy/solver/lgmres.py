@@ -4,6 +4,7 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
+
 from .. import logger
 
 
@@ -11,14 +12,16 @@ class SupportsMatmul(Protocol):
     def __matmul__(self, other: TensorLike) -> TensorLike: ...
 
 
-def gmres(
+def lgmres(
     A: SupportsMatmul,
     b: TensorLike,
     x0: Optional[TensorLike] = None,
     atol: float = 1e-12,
     rtol: float = 1e-8,
-    restart: Optional[int] = None,
-    maxit: Optional[int] = None
+    inner_m: Optional[int] = None,
+    outer_k: Optional[int] = None,
+    maxit: Optional[int] = None,
+    M: Optional[SupportsMatmul] = None
 ) -> tuple[TensorLike, dict]:
     """
     Solve a linear system Ax = b using Generalized Minimal RESidual iteration (gmres) method.
@@ -30,10 +33,15 @@ def gmres(
             Must have the same shape as b. Defaults to None.
         atol (float, optional): Absolute tolerance for convergence. Defaults to 1e-12.
         rtol (float, optional): Relative tolerance for convergence. Defaults to 1e-8.
-        restart (int, optional): Number of iterations between restarts. Larger values increase
-            iteration cost but may be necessary for convergence. Defaults to ``min(20, m)``.
+        inner_m (int, optional): Number of inner iterations between restarts. Larger values increase
+            iteration cost but may be necessary for convergence. Defaults to 20.
+        outer_k (int, optional): Number of vectors to carry over between restarts. These vectors
+            augment the subspace, potentially improving convergence. Defaults to 3.
         maxit (int, optional): Maximum number of iterations allowed. Defaults to 5*m.
             If not provided, the method will continue until convergence based on tolerances.
+        M (TensorLike): Inverse of the preconditioner of `A`.  `M` should approximate the
+            inverse of `A` and be easy to solve. In this implementation, left preconditioning 
+            is used, and the preconditioned residual is minimized. Defaults to None.
 
     Returns:
         TensorLike: The approximate solution to the system Ax = b.
@@ -55,25 +63,34 @@ def gmres(
     else:
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
-    
+
     m, n = A.shape  # Comma spacing
-    if restart is None:
-        restart = 20
-    restart = min(restart, m)
+
+    if inner_m is None:
+        inner_m = 20
+
+    if outer_k is None:
+        outer_k = 3
 
     if maxit is None:
         maxit = 5 * m
-    
+
     if x0 is not None:
         kwags = bm.context(x0)
     else:
         kwags = bm.context(b)
-    
+
     info = {}
-    H = bm.zeros((restart, restart + 1), **kwags)
-    Q = bm.zeros((restart + 1, n), **kwags)
-    givens = bm.zeros((restart, 2), **kwags)
-    
+
+    dim = inner_m + outer_k
+    dim = min(dim, m)
+    w = bm.zeros(n, **kwags)
+    Q = bm.zeros((dim + 1, n), **kwags)
+    H = bm.zeros(dim + 1, **kwags)
+    R = bm.zeros((dim + 1, dim + 1), **kwags)
+    givens = bm.zeros((dim, 2), **kwags)
+    z = []
+
     b_norm = bm.linalg.norm(b, ord=2)
     atol = max(float(atol), float(rtol) * float(b_norm))
     eps = bm.finfo(x0.dtype).eps
@@ -81,80 +98,119 @@ def gmres(
     all_iter = 0
     x = x0
 
+    if M is not None:
+        Mb_norm = bm.linalg.norm(M @ b, ord=2)
+    else:
+        Mb_norm = b_norm
+    ptol_max_factor = 1.0
+    ptol = Mb_norm * min(ptol_max_factor, atol / b_norm)
+    presid = 0
+
     for niter in range(maxit):
+        W = []
         if niter == 0:
             r = b - A @ x if x.any() else b
-            if bm.linalg.norm(r) < atol:  # Early convergence check
-                return x, {"residual": bm.linalg.norm(r), "niter": niter}
-            
-        beta = bm.linalg.norm(r, ord=2)
-        Q[0, :] = r / beta
-        t = bm.zeros(restart + 1, **kwags)
-        t[0] = beta
-        
-        breakdown = False
-        ptol = b_norm * min(1, atol / b_norm)
+            res = bm.linalg.norm(r)
+            if res < atol:  # Early convergence check
+                return x, {"residual": res, "niter": niter}
 
-        for i in range(restart):
+        if M is not None:
+            r_pre = M @ r
+            beta = bm.linalg.norm(r_pre, ord=2)
+            Q[0, :] = r_pre / beta
+        else:
+            beta = bm.linalg.norm(r, ord=2)
+            Q[0, :] = r / beta
+        t = bm.zeros(dim + 1, **kwags)
+        t[0] = beta
+
+        breakdown = False
+        
+        for i in range(inner_m + len(z)):
             all_iter += 1
-            w = A @ Q[i, :]
+
+            if i < inner_m:
+                W.append(Q[i, :])
+            else:
+                W.append(z[i - inner_m])
+
+            w = bm.tensor(A @ W[-1])
+            if M is not None:
+                w = M @ w
             h0 = bm.linalg.norm(w, ord=2)
 
             # Arnoldi process to get Q, H
-            projs = bm.dot(Q[:i + 1, :], w)
-            H[i, :i + 1] = projs
-            w -= bm.dot(Q[:i + 1, :].T, projs)
+            projs = Q[: i + 1, :] @ w
+            H[: i + 1] = projs
+            w -= Q[: i + 1, :].T @ projs
             h1 = bm.linalg.norm(w, ord=2)
-            H[i, i + 1] = h1
-            
+            H[i + 1] = h1
+
             if h1 <= eps * h0:  # Breakdown check
-                H[i, i + 1] = 0
+                H[i + 1] = 0
                 breakdown = True
-                break
-            else:
-                Q[i + 1, :] = w[:] / h1  # Fixed spacing
-            
+            Q[i + 1, :] = w[:] / h1
+
             # QR decomposition step
+            # 待优化(SciPy中使用qr_insert函数）
             for k in range(i):
                 c, s = givens[k, 0], givens[k, 1]
-                n0, n1 = H[i, [k, k + 1]]
-                H[i, [k, k + 1]] = bm.tensor([c * n0 + s * n1, -s.conj() * n0 + c * n1])
-            
-            # Compute new Givens rotation
-            c = H[i, i] / bm.sqrt(H[i, i]**2 + H[i, i + 1]**2)
-            s = H[i, i + 1] / bm.sqrt(H[i, i]**2 + H[i, i + 1]**2)
-            givens[i, :] = bm.tensor([c, s])
-            H[i, i] = c * H[i, i] + s * H[i, i + 1]
-            H[i, i + 1] = 0.0
+                n0, n1 = H[[k, k + 1]]
+                H[[k, k + 1]] = bm.tensor([c*n0 + s*n1, -s.conj()*n0 + c*n1])
 
-            # Update t vector
-            t = bm.set_at(t, i + 1, -s * t[i])
-            t = bm.set_at(t, i, c * t[i])
-            
-            if bm.abs(t[i + 1]) <= ptol:  # Tolerance check
+            # Compute new Givens rotation
+            sqrt = bm.sqrt(H[i]**2 + H[i + 1]**2)
+            c = H[i] / sqrt
+            s = H[i + 1] / sqrt
+            givens[i, :] = bm.tensor([c, s])
+            H[i] = sqrt
+            H[i + 1] = 0
+            R[i,:] = H
+
+            # # Update t vector
+            t = bm.set_at(t, i + 1, -s.conj()*t[i])
+            t = bm.set_at(t, i, c*t[i])
+            presid = bm.abs(t[i + 1])
+            if presid <= ptol or breakdown:
                 break
-        
-        # Solve for y using backward substitution
-        if H[i, i] == 0:
+            
+       # Solve for y using backward substitution
+        if R[i, i] == 0:
             t[i] = 0
         y = bm.zeros([i + 1], **kwags)
         y[:] = t[:i + 1]
         for k in range(i, 0, -1):
             if y[k] != 0:
-                y[k] /= H[k, k]
+                y[k] /= R[k, k]
                 tmp = y[k]
-                y[:k] -= tmp * H[k, :k]
+                y[:k] -= tmp * R[k,:k]
         if y[0] != 0:
-            y[0] /= H[0, 0]
-            
-        x = x + y @ Q[:i + 1, :]
-        
+            y[0] /= R[0, 0]
+
+        # dx = y @ W[:]
+        # 待优化(SciPy中使用blas函数）
+        dx = bm.zeros_like(W[0])
+        for k in range(i+1):
+            dx += y[k] * W[k]
+
+
+        if outer_k > 0:
+            nx = bm.linalg.norm(dx)
+            z.append(dx / nx)
+            if len(z) > outer_k:
+                z.pop(0)
+        x = x + dx
+
         r = b - A @ x
-        res = bm.linalg.norm(r, ord=2)
+        if M is None:
+            res = presid
+        else:
+            res = bm.linalg.norm(r, ord=2)
+
         if breakdown:
             logger.info("Breakdown detected in Arnoldi process.")
             break
-    
+
         if res <= atol:
             logger.info(
                 f"GMRES converged in {all_iter} iterations (absolute tolerance: {atol:.1e})"
@@ -170,6 +226,13 @@ def gmres(
         if (maxit is not None) and (niter >= maxit):
             logger.info(f"GMRES failed to converge within {maxit} iterations.")
             break
+
+        if presid <= ptol:
+            ptol_max_factor = max(eps, 0.25 * ptol_max_factor)
+        else:
+            ptol_max_factor = min(1.0, 1.5 * ptol_max_factor)
+
+        ptol = presid * min(ptol_max_factor, atol / res)
 
     info['residual'] = res
     info['niter'] = all_iter

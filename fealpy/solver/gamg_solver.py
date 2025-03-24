@@ -1,7 +1,7 @@
 
 from ..backend import backend_manager as bm
 from ..operator import LinearOperator
-from .conjugate_gradient import cg
+from .cg import cg
 from scipy.sparse.linalg import spsolve_triangular,spsolve
 from .amg_coarsen import *
 from .amg_interpolation import *
