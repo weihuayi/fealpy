@@ -1,12 +1,3 @@
-#!/usr/bin/python3
-'''!    	
-	@Author: wpx
-	@File Name: level_set_lfem.py
-	@Mail: wpx15673207315@gmail.com 
-	@Created Time: Fri 14 Mar 2025 10:50:44 AM CST
-	@bref 
-	@ref 
-'''  
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
 from fealpy.fem import LevelSetLFEModel 

@@ -613,7 +613,9 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
 
         if all(periodic):
             map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], h, x)
-            map_y , map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], h, y)
+            map_y, map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], h, y)
+            map_x = map_x.to('cpu')
+            map_y = map_y.to('cpu')
             tree = KDTree(map_x)
             neighbors = tree.query_ball_point(map_y, h)
             lengths = torch.tensor([len(sublist) for sublist in neighbors]) 
