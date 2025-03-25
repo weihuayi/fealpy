@@ -26,7 +26,7 @@ class QuantumParticleSwarmOpt(Optimizer):
     def __init__(self, option) -> None:
         super().__init__(option)
 
-    def run(self, alpha_max=0.9, alpha_min=0.4):
+    def run(self, params={'alpha_max':0.9, 'alpha_min':0.4}):
         """
         Run the Quantum Particle Swarm Optimization (QPSO) algorithm.
 
@@ -35,6 +35,8 @@ class QuantumParticleSwarmOpt(Optimizer):
             alpha_min (float): Minimum contraction-expansion coefficient.
         """
         # Compute the initial fitness of the population
+        alpha_max = params.get('alpha_max')
+        alpha_min = params.get('alpha_min')
         fit = self.fun(self.x)
         
         # Initialize the personal best positions (pbest) and their fitness values (pbest_f)

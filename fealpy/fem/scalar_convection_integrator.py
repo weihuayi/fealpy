@@ -61,3 +61,22 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         else:
             raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
         return result
+    
+    @assemblymethod('isopara')
+    def isopara_assembly(self, space: _FS) -> TensorLike:
+        coef = self.coef
+        mesh = getattr(space, 'mesh', None)
+        bcs, ws, phi, gphi, cm, index = self.fetch(space)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+
+        rm = space.mesh.reference_cell_measure()
+        J = space.mesh.jacobi_matrix(bcs)
+        G = space.mesh.first_fundamental_form(J)
+        d = bm.sqrt(bm.linalg.det(G))
+
+        if is_tensor(coef):
+            gphi = bm.einsum('cqi...j, cq...j->cqi...' ,gphi, coef)
+            result = bm.einsum('q, cqi, cqj , cq -> cij', ws*rm, phi, gphi, d)
+        else:
+            raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
+        return result

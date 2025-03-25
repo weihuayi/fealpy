@@ -24,7 +24,7 @@ class InvasiveWeedOpt(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, n_max=100, s_min=0, s_max=5, n=3, sigma_initial=3, sigma_final=0.001):
+    def run(self, params={'n_max':100, 's_min':0, 's_max':5, 'n':3, 'sigma_initial':3, 'sigma_final':0.001}):
         """
         Runs the Invasive Weed Optimization (IWO) algorithm.
 
@@ -40,6 +40,12 @@ class InvasiveWeedOpt(Optimizer):
             sigma_final (float): Final standard deviation for Gaussian perturbation (default: 0.001).
         """
         # Evaluate the fitness of the initial population
+        n_max = params.get('n_max')
+        s_min = params.get('s_min')
+        s_max = params.get('s_max')
+        n = params.get('n')
+        sigma_final = params.get('sigma_final')
+        sigma_initial = params.get('sigma_initial')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]

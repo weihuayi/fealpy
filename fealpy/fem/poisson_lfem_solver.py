@@ -159,6 +159,23 @@ class PoissonLFEMSolver:
         self.logger.info(f"minres solver with {info['niter']} iterations"
                          f" and relative residual {stop_res:.4e},absolute error {err:.4e}")
         return self.uh[:]
+    
+    
+    def gmres_solve(self):
+        """
+        """
+        from ..solver import gmres 
+        self.uh[:],info = gmres(self.A, self.b,atol=1e-14, rtol=1e-14)
+        err = self.L2_error()
+        if self.timer is not None:
+            self.timer.send(f"gmres方法求解 Poisson 方程线性系统")
+        res = info['residual']
+        res_0 = bm.linalg.norm(self.b)
+        stop_res = res/res_0
+        self.logger.info(f"minres solver with {info['niter']} iterations"
+                         f" and relative residual {stop_res:.4e},absolute error {err:.4e}")
+        return self.uh[:]
+
 
     def show_mesh_and_solution(self):
         """
@@ -195,6 +212,10 @@ class PoissonLFEMSolver:
 
 
 
+<<<<<<< HEAD
         
 
 
+=======
+        
+>>>>>>> origin/develop

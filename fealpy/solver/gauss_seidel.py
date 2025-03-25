@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/develop
 from typing import Optional, Protocol
 
 from ..backend import backend_manager as bm
@@ -11,7 +15,11 @@ from .. import logger
 class SupportsMatmul(Protocol):
     def __matmul__(self, other: TensorLike) -> TensorLike: ...
 
+<<<<<<< HEAD
 def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
+=======
+def gauss_seidel(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
+>>>>>>> origin/develop
        atol: float=1e-12, rtol: float=1e-8,
        maxit: Optional[int]=10000,returninfo: bool=False) -> TensorLike:
     
@@ -82,4 +90,8 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
     if returninfo is True:
         return x, info
     if returninfo is True:
+<<<<<<< HEAD
         return x
+=======
+        return x
+>>>>>>> origin/develop

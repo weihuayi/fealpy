@@ -442,6 +442,8 @@ class CSRTensor(SparseTensor):
 
         else:
             raise TypeError(f"Unsupported type {type(other).__name__} in matmul")
+
+
     def find(self):
         """
         Find the non-zero entries in the sparse matrix..

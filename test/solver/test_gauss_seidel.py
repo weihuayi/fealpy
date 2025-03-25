@@ -1,8 +1,7 @@
-
 import pytest
 from fealpy.backend import backend_manager as bm
-from fealpy.solver import gs 
-from test.solver.gamg_data import * 
+from fealpy.solver import gauss_seidel as gs
+from gamg_data import * 
 import time 
 
 class TestGSSolver:

@@ -4,7 +4,6 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
-
 from .. import logger
 
 
@@ -19,8 +18,7 @@ def gmres(
     atol: float = 1e-12,
     rtol: float = 1e-8,
     restart: Optional[int] = None,
-    maxit: Optional[int] = None,
-    M: Optional[SupportsMatmul] = None
+    maxit: Optional[int] = None
 ) -> tuple[TensorLike, dict]:
     """
     Solve a linear system Ax = b using Generalized Minimal RESidual iteration (gmres) method.
@@ -36,9 +34,6 @@ def gmres(
             iteration cost but may be necessary for convergence. Defaults to ``min(20, m)``.
         maxit (int, optional): Maximum number of iterations allowed. Defaults to 5*m.
             If not provided, the method will continue until convergence based on tolerances.
-        M (TensorLike): Inverse of the preconditioner of `A`.  `M` should approximate the
-            inverse of `A` and be easy to solve. In this implementation, left preconditioning 
-            is used, and the preconditioned residual is minimized. Defaults to None.
 
     Returns:
         TensorLike: The approximate solution to the system Ax = b.
@@ -86,37 +81,23 @@ def gmres(
     all_iter = 0
     x = x0
 
-    if M is not None:
-        Mb_norm = bm.linalg.norm(M @ b, ord=2)
-    else:
-        Mb_norm = b_norm
-    ptol_max_factor = 1.
-    ptol = Mb_norm * min(ptol_max_factor, atol / b_norm)
-    presid = 0.
-
     for niter in range(maxit):
         if niter == 0:
             r = b - A @ x if x.any() else b
-            res = bm.linalg.norm(r)
-            if res < atol:  # Early convergence check
-                return x, {"residual": res, "niter": niter}
+            if bm.linalg.norm(r) < atol:  # Early convergence check
+                return x, {"residual": bm.linalg.norm(r), "niter": niter}
             
-        if M is not None:
-            r_pre = M @ r
-            beta = bm.linalg.norm(r_pre, ord=2)
-            Q[0, :] = r_pre / beta
-        else:
-            beta = bm.linalg.norm(r, ord=2)
-            Q[0, :] = r / beta
+        beta = bm.linalg.norm(r, ord=2)
+        Q[0, :] = r / beta
         t = bm.zeros(restart + 1, **kwags)
         t[0] = beta
         
         breakdown = False
+        ptol = b_norm * min(1, atol / b_norm)
+
         for i in range(restart):
             all_iter += 1
-            w = bm.tensor(A @ Q[i, :])
-            if M is not None:
-                w = M @ w
+            w = A @ Q[i, :]
             h0 = bm.linalg.norm(w, ord=2)
 
             # Arnoldi process to get Q, H
@@ -129,6 +110,7 @@ def gmres(
             if h1 <= eps * h0:  # Breakdown check
                 H[i, i + 1] = 0
                 breakdown = True
+                break
             else:
                 Q[i + 1, :] = w[:] / h1  # Fixed spacing
             
@@ -136,21 +118,20 @@ def gmres(
             for k in range(i):
                 c, s = givens[k, 0], givens[k, 1]
                 n0, n1 = H[i, [k, k + 1]]
-                H[i, [k, k + 1]] = bm.tensor([c*n0 + s*n1, -s.conj()*n0 + c*n1])
+                H[i, [k, k + 1]] = bm.tensor([c * n0 + s * n1, -s.conj() * n0 + c * n1])
             
             # Compute new Givens rotation
-            sqrt = bm.sqrt(H[i, i]**2 + H[i, i + 1]**2)
-            c = H[i, i] / sqrt
-            s = H[i, i + 1] / sqrt
+            c = H[i, i] / bm.sqrt(H[i, i]**2 + H[i, i + 1]**2)
+            s = H[i, i + 1] / bm.sqrt(H[i, i]**2 + H[i, i + 1]**2)
             givens[i, :] = bm.tensor([c, s])
             H[i, i] = c * H[i, i] + s * H[i, i + 1]
-            H[i, i + 1] = 0
+            H[i, i + 1] = 0.0
 
             # Update t vector
-            t = bm.set_at(t, i + 1, -s.conj()*t[i])
-            t = bm.set_at(t, i, c*t[i])
-            presid = bm.abs(t[i + 1])
-            if presid <= ptol or breakdown:  # Tolerance check
+            t = bm.set_at(t, i + 1, -s * t[i])
+            t = bm.set_at(t, i, c * t[i])
+            
+            if bm.abs(t[i + 1]) <= ptol:  # Tolerance check
                 break
         
         # Solve for y using backward substitution
@@ -169,11 +150,7 @@ def gmres(
         x = x + y @ Q[:i + 1, :]
         
         r = b - A @ x
-        if M is None:
-            res = presid
-        else:
-            res = bm.linalg.norm(r, ord=2)
-        
+        res = bm.linalg.norm(r, ord=2)
         if breakdown:
             logger.info("Breakdown detected in Arnoldi process.")
             break
@@ -193,13 +170,6 @@ def gmres(
         if (maxit is not None) and (niter >= maxit):
             logger.info(f"GMRES failed to converge within {maxit} iterations.")
             break
-
-        if presid <= ptol:
-            ptol_max_factor = max(eps, 0.25 * ptol_max_factor)
-        else:
-            ptol_max_factor = min(1.0, 1.5 * ptol_max_factor)
-
-        ptol = presid * min(ptol_max_factor, atol / res)
 
     info['residual'] = res
     info['niter'] = all_iter

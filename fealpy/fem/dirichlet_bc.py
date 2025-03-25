@@ -134,6 +134,7 @@ class DirichletBC():
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
+<<<<<<< HEAD
 
         if isinstance(A, COOTensor):
             indices = A.indices
@@ -160,6 +161,15 @@ class DirichletBC():
             A = (D0@A@D0).tocoo() + D1
 
         return A.coalesce().tocsr()
+=======
+        bdIdx = bm.zeros(A.shape[0], **kwargs)
+        # bdIdx[isDDof.reshape(-1)] = 1
+        bdIdx = bm.set_at(bdIdx, isDDof.reshape(-1), 1)
+        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        A = D0@A@D0 + D1
+        return A
+>>>>>>> origin/develop
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
                      uh: Optional[TensorLike]=None,

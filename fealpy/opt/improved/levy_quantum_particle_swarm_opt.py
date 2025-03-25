@@ -38,7 +38,7 @@ class LevyQuantumParticleSwarmOpt(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, delta=0.1, sigma=0.001):
+    def run(self, params={'delta':0.1, 'sigma':0.001}):
         """
         Runs the Levy Quantum Particle Swarm Optimization algorithm.
 
@@ -58,6 +58,8 @@ class LevyQuantumParticleSwarmOpt(Optimizer):
             - `gbest_f`: Fitness of the global best position.
             - `curve`: Fitness values over all iterations.
         """
+        delta = params.get('delta')
+        sigma = params.get('sigma')
         options = self.options
         x = options["x0"]
         N = options["NP"]

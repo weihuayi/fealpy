@@ -1,5 +1,9 @@
 from fealpy.backend import backend_manager as bm
+<<<<<<< HEAD
 from fealpy.solver.direct_solver import spsolve_triangular
+=======
+from fealpy.solver.direct import spsolve_triangular
+>>>>>>> origin/develop
 from fealpy.solver import gmres as fealpy_gmres
 
 import pytest
@@ -90,12 +94,22 @@ class TestGMRESSolver:
         if tmr is not None:
             tmr.send("Convert A to SciPy format")
 
+<<<<<<< HEAD
         uh_1[:], info_1 = gmres(A, f, atol=1e-8, rtol=1e-8, restart=20)
         if tmr is not None:
             tmr.send("SciPy gmres solving")
 
         print('Error (SciPy):', mesh_1.error(pde.solution, uh_1))
   
+=======
+        uh_1[:], info_1, rnorm, inner_iter = gmres(A, f, atol=1e-8, rtol=1e-8, restart=20)
+        if tmr is not None:
+            tmr.send("SciPy gmres solving")
+        
+        print('Iterations (SciPy):', inner_iter)
+        print('Error (SciPy):', mesh_1.error(pde.solution, uh_1))
+        print('Relative residual (SciPy):', rnorm / res_0)
+>>>>>>> origin/develop
         tmr.send(None)
 
         # Check convergence
@@ -152,4 +166,8 @@ class TestGMRESSolver:
 if __name__ == '__main__':
     test = TestGMRESSolver() 
     test.test_gmres_cpu('numpy')
+<<<<<<< HEAD
     #test.test_gmres_gpu()
+=======
+    test.test_gmres_gpu()
+>>>>>>> origin/develop

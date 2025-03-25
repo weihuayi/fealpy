@@ -1,5 +1,5 @@
 
-from .conjugate_gradient import cg
+from .cg import cg
 from .direct import spsolve, spsolve_triangular
 from .gamg import GAMGSolver
 from .minres import minres

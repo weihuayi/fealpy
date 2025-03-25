@@ -1261,6 +1261,30 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         return J
     
+        
+    # 第一基本形式
+    def first_fundamental_form(self, J: TensorLike) -> TensorLike:
+        """
+        @brief Compute the first fundamental form from the Jacobi matrix.
+        """
+        TD = J.shape[-1]
+
+        shape = J.shape[0:-2] + (TD, TD)
+        G = bm.zeros(shape, dtype=self.ftype)
+
+        for i in range(TD):
+            # 计算对角元素
+            diag_val = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
+            G = bm.set_at(G, (..., i, i), diag_val)
+            
+            for j in range(i+1, TD):
+                # 计算非对角元素
+                off_diag_val = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
+                G = bm.set_at(G, (..., i, j), off_diag_val)
+                G = bm.set_at(G, (..., j, i), off_diag_val)
+
+        return G  
+
 
     # 其他方法
     def quadrature_formula(self, q: int, etype:Union[int, str]='cell'):

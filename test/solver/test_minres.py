@@ -67,15 +67,22 @@ class TestMINRESSolver:
 
         A, f = self.get_Af(mesh_1, p=p)
         print(A.shape)
+<<<<<<< HEAD
         
         # M：Jacobi
         M = None
+=======
+>>>>>>> origin/develop
 
         if tmr is not None:
             tmr.send("Matrix construction completed.")
         
         # Solve using minres in fealpy
+<<<<<<< HEAD
         uh[:], info = fealpy_minres(A, f, rtol=1e-14, M=M)
+=======
+        uh[:], info = fealpy_minres(A, f, rtol=1e-14)
+>>>>>>> origin/develop
 
         if tmr is not None:
             tmr.send("fealpy_minres solver completed.")
@@ -89,15 +96,29 @@ class TestMINRESSolver:
         print('Error in fealpy:', err)
 
         # Solve using minres in scipy
+<<<<<<< HEAD
+=======
+        from scipy.sparse.linalg import minres
+>>>>>>> origin/develop
         A = A.to_scipy()
         # M = M.to_scipy()
         if tmr is not None:
             tmr.send("A 转换为scipy.")
+<<<<<<< HEAD
         from scipy.sparse.linalg import minres
         uh_1[:], info_1= minres(A, f, rtol=1e-14, M=M)
         if tmr is not None:
             tmr.send("minres solver completed.")
 
+=======
+
+        uh_1[:], info_1, itn, test1 = minres(A, f, rtol=1e-14)
+        if tmr is not None:
+            tmr.send("minres solver completed.")
+        
+        print('Iterations in scipy:', itn)
+        print('Stop residual in scipy:', test1)
+>>>>>>> origin/develop
         print('Error in scipy:', mesh_1.error(pde.solution, uh_1))
         
         tmr.send(None)  # End timer
@@ -131,13 +152,20 @@ class TestMINRESSolver:
         print(A.shape)
         
         # M
+<<<<<<< HEAD
         kwags = bm.context(f)
         M = bm.eye(A.shape[0], **kwags)
+=======
+>>>>>>> origin/develop
         if tmr is not None:
             tmr.send("Matrix construction completed.")
         
         # Solve using minres in fealpy
+<<<<<<< HEAD
         uh[:], info = fealpy_minres(A, f, rtol=1e-14, M=M)
+=======
+        uh[:], info = fealpy_minres(A, f, rtol=1e-14)
+>>>>>>> origin/develop
 
         if tmr is not None:
             tmr.send("fealpy_minres solver completed.")
@@ -168,4 +196,8 @@ class TestMINRESSolver:
 if __name__ == '__main__':
     test = TestMINRESSolver()
     test.test_minres_cpu('numpy')
+<<<<<<< HEAD
     # test.test_minres_gpu()
+=======
+    # test.test_minres_gpu()
+>>>>>>> origin/develop

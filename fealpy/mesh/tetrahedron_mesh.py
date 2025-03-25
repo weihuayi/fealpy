@@ -1231,6 +1231,14 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         node = bm.concatenate((node, node[nidx]), axis=0)
         mesh = cls(node, cell)
         return mesh
+    @classmethod
+    def from_vtu(cls,file):
+        import meshio
+        data = meshio.read(file)
+        node = data.points
+        cell = data.cells_dict['tetra']
+        mesh = cls(node, cell)
+        return mesh
 
     def to_vtk(self, fname=None, etype='cell', index:Index=_S):
         from .vtk_extent import  write_to_vtu
