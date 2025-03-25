@@ -162,11 +162,5 @@ class TestLagrangeTriangleMeshInterfaces:
 if __name__ == "__main__":
     a = TestLagrangeTriangleMeshInterfaces()
     #a.test_init_mesh(init_data[0], 'numpy')
-    #a.test_from_triangle_mesh(from_triangle_mesh_data[0], 'numpy')
-    #a.test_surface_mesh('numpy')
-    a.test_uniform_refine('numpy')
-    #a.test_curve_mesh('numpy')
-    #a.test_cell_area(cell_area_data[0], 'numpy')
-    #a.test_(cell_[0], 'numpy')
-    #a.test_error('numpy')
+    a.test_surface_mesh('numpy')
     #pytest.main(["./test_lagrange_triangle_mesh.py"])

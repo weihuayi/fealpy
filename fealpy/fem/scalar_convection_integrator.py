@@ -22,7 +22,7 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         method = 'assembly' if (method is None) else method
-        super().__init__(method=method)
+        super().__init__(method=method if method else 'assembly')
         self.coef = coef
         self.q = q
         self.index = index
@@ -80,3 +80,4 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         else:
             raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
         return result
+

@@ -1,6 +1,7 @@
 import argparse
 from sympy import *
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from fealpy.tools.show import showmultirate, show_error_table
 
 from fealpy.backend import backend_manager as bm
@@ -111,6 +112,59 @@ elif itype == 'equ':
 pro_mesh = mesh
 NDof = bm.zeros(maxit, dtype=bm.int32)
 
+# 可视化
+def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True , scat_index = slice(None)):
+    nodes = mesh.node
+    n = mesh.p
+    def lagrange_interpolation(points, num_points=100, n = n):
+        """
+        @brief 利用拉格朗日插值构造曲线
+        @param points: 插值点的列表 [(x0, y0), (x1, y1), ..., (xp, yp)]
+        @param num_points: 曲线上点的数量
+        @param n: 插值多项式的次数
+        @return: 曲线上点的坐标数组
+        """
+        t = bm.linspace(0, n, num_points)
+
+        def L(k, t):
+            Lk = bm.ones_like(t)
+            for i in range(n + 1):
+                if i != k:
+                    Lk *= (t - i) / (k - i)
+            return Lk
+        GD = points.shape[-1]
+        curve = bm.zeros((t.shape[0], points.shape[0],GD), dtype=bm.float64)
+        for k in range(n + 1):
+            Lk = L(k, t)
+            for i in range(GD):
+                xk = points[:,k,i]
+                bm.add_at(curve , (...,i) ,Lk[:,None] * xk)
+        return curve
+    fig = plt.figure()
+    edges = mesh.edge
+    if model == 'mesh':
+        p = nodes[edges]
+        curve = lagrange_interpolation(p,n=n)
+        plt.plot(curve[...,0], curve[...,1], 'b-',linewidth=0.5)
+        if scat_node:
+            plt.scatter(nodes[scat_index, 0], 
+                        nodes[scat_index, 1],s = 3, color='r')  # 绘制节点
+        plt.gca().set_aspect('equal')
+        plt.axis('off') # 关闭坐标轴
+    elif model == 'surface':
+        points = bm.concat([nodes, uh[...,None]], axis=-1)
+        ax = fig.add_subplot(111, projection='3d')
+        p = points[edges]
+        curve = lagrange_interpolation(p,n=n).transpose(1,0,2)
+        nan_separator = bm.full((curve.shape[0], 1, 3), bm.nan)  # 每条曲线之间插入 NaN
+        concatenated = bm.concat([curve, nan_separator], axis=1)  # 插入分隔符
+        curve = concatenated.reshape(-1, 3) 
+        ax.plot(curve[..., 0], curve[..., 1], curve[..., 2], linewidth=1)
+        if scat_node:
+            ax.scatter(points[scat_index, 0], 
+                       points[scat_index, 1], 
+                       points[scat_index, 2],s = 2, color='r')  # 绘制节点
+    plt.show()
 # poisson 求解
 def poisson_solver(pde, mesh, p):
     space = ParametricLagrangeFESpace(mesh, p=p)
@@ -134,62 +188,8 @@ def interplote_error(pde, mesh, p):
     error = mesh.error(pde.solution , uI)
     return error
 
-# 可视化
-def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True):
-    nodes = mesh.node
-    edges = mesh.edge
-    def lagrange_interpolation(points, num_points=100):
-        """
-        利用拉格朗日插值构造曲线
-        :param points: 插值点的列表 [(x0, y0), (x1, y1), ..., (xp, yp)]
-        :param num_points: 曲线上点的数量
-        :return: 曲线上点的坐标数组
-        """
-        n = points.shape[1] - 1  # 插值多项式的次数
-        t = bm.linspace(0, n, num_points)
 
-        def L(k, t):
-            Lk = bm.ones_like(t)
-            for i in range(n + 1):
-                if i != k:
-                    Lk *= (t - i) / (k - i)
-            return Lk
-
-        curve = bm.zeros((t.shape[0], points.shape[0],2), dtype=bm.float64)
-        for k in range(n + 1):
-            xk = points[:,k,0]
-            yk = points[:,k,1]
-            Lk = L(k, t)
-            bm.add_at(curve , (...,0) ,Lk[:,None] * xk)
-            bm.add_at(curve , (...,1) ,Lk[:,None] * yk)
-        return curve
-
-    if model == 'mesh':
-        plt.figure()
-        p = nodes[edges]
-        curve = lagrange_interpolation(p)
-        plt.plot(curve[...,0], curve[...,1], 'b-',linewidth=0.5)
-        if scat_node:
-            plt.scatter(nodes[:, 0], nodes[:, 1],s = 5, color='r')  # 绘制节点
-        plt.gca().set_aspect('equal')
-        plt.axis('off') # 关闭坐标轴
-
-    elif model == 'surface':
-        import math
-        if uh.all() == None:
-            raise ValueError("uh is none")
-        cell = mesh.cell
-        n_f = math.factorial(n)
-        print(n_f)
-        fig = plt.figure()
-        ax1 = fig.add_subplot(111, projection='3d')
-        ax1.plot_trisurf(nodes[:, 0], nodes[:, 1], uh,
-                            triangles = cell, cmap='viridis',
-                            edgecolor='b',linewidth=0.2)
-
-    plt.show()
-
-# 移动网格前的误差
+# 移动网格前的求解
 uh = poisson_solver(pde=pde, mesh=fix_mesh, p=sdegree)
 
 # 网格移动
@@ -209,6 +209,11 @@ for i in range(maxit):
     HMP = Harmap_MMPDE(pro_mesh, uh, beta, Vertex_idx, 
                     Bdinnernode_idx, sort_BdNode_idx=sort_BdNode_idx, alpha = alpha,
                     mol_times=moltimes)
+
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    M1 = HMP.M
+    M = 1/M1
+    high_order_meshploter(pro_mesh, M, 'surface')
 
     if i == 3:
         alpha = 0.125
@@ -235,8 +240,8 @@ print('fix_order:', fix_order)
 
 # 绘制误差折线图
 plt.figure()
-plt.plot(range(1,maxit+1), error_matrix_0[1:], 'o-', label='mesh_moved_refined')
-plt.plot(range(1,maxit+1), error_matrix_1[1:], '^-', label='mesh_fixed_refined')
+plt.plot(range(1,maxit+1), error_matrix_0[1:], 'o-', label='moved_mesh_refined')
+plt.plot(range(1,maxit+1), error_matrix_1[1:], '^-', label='uniform_mesh_refined')
 plt.xlabel('Refinement step')
 plt.ylabel('Error')
 plt.yscale('log')
@@ -245,8 +250,8 @@ plt.legend()
 
 # 绘制收敛阶折线图
 plt.figure()
-plt.plot(range(1, maxit), pro_order[1:], 'o-', label='mesh_moved_refined')
-plt.plot(range(1, maxit), fix_order[1:], '^-', label='mesh_fixed_refined')
+plt.plot(range(1, maxit), pro_order[1:], 'o-', label='moved_mesh_refined')
+plt.plot(range(1, maxit), fix_order[1:], '^-', label='uniform_mesh_refined')
 plt.xlabel('Refinement step')
 plt.ylabel('Convergence rate')
 plt.ylim(1, max(fix_order[1:].max(), pro_order[1:].max()) + 1)  # 设置 y 轴从 1 开始

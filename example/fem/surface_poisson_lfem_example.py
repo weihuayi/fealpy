@@ -64,6 +64,8 @@ elif mtype == 'lquad':
     LinearMesh = QuadrangleMesh
     LagrangeMesh = LagrangeQuadrangleMesh
 
+tmr = timer()
+next(tmr)
 x, y, z = sp.symbols('x, y, z', real=True)
 F = x**2 + y**2 + z**2
 u = x * y
@@ -77,7 +79,8 @@ lmesh = LinearMesh.from_unit_sphere_surface()
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
-NDof = bm.zeros(maxit, dtype=bm.int32)
+NDof = bm.zeros(maxit, dtype=bm.float64)
+h = bm.zeros(maxit, dtype=bm.float64)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
@@ -89,6 +92,7 @@ for i in range(maxit):
     
     space = ParametricLagrangeFESpace(mesh, p=sdegree)
     NDof[i] = space.number_of_global_dofs()
+    h[i] = mesh.entity_measure('edge').max()
 
     uI = space.interpolate(pde.solution)
 
@@ -112,15 +116,17 @@ for i in range(maxit):
     
     uh = space.function()
     x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
-    uh[:] = -x[:-1] 
+    uh[:] = -x[:-1]
+    tmr.send(f'第{i}次求解时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)
 
     if i < maxit-1:
         lmesh.uniform_refine()
-
+    tmr.send(f'第{i}次去查计算及网格加密时间')
+next(tmr)
 print("最终误差:", errorMatrix)
 print("order:", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 show_error_table(NDof, errorType, errorMatrix)
-showmultirate(plt, 1, NDof, errorMatrix,  errorType, propsize=20)
+showmultirate(plt, 1, h, errorMatrix,  errorType, propsize=20)
 plt.show()
