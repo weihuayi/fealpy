@@ -3,7 +3,7 @@ from ..backend import backend_manager as bm
 from ..operator import LinearOperator
 from .cg import cg
 from scipy.sparse.linalg import spsolve_triangular,spsolve
-from .amg_solver import Ruge_Stuben_AMG
+from .amg import Ruge_Stuben_AMG
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
 from .. import logger
