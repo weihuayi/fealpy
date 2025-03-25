@@ -6,7 +6,7 @@ from fealpy.mesh.triangle_mesh import TriangleMesh
 from fealpy.solver import GAMGSolver 
 from fealpy.sparse import csr_matrix,coo_matrix
 from fealpy.functionspace import LagrangeFESpace
-from gamg_solver_data import * 
+from test.solver.gamg_data import * 
 
 
 
@@ -85,6 +85,7 @@ class TestGAMGSolverInterfaces:
     @pytest.mark.parametrize("test_data",test_data)
     def test_fcycle(self,data,test_data, backend):
         bm.set_backend(backend)
+        solver = GAMGSolver()
         data['ptype'] = 'F'
         A = test_data['A']
         p = test_data['p']
@@ -114,5 +115,5 @@ class TestGAMGSolverInterfaces:
 
 
 if __name__ == "__main__":
-    pytest.main(["./test_gamg_solver.py",'-k' ,"test_vcycle"])
+    pytest.main(["./test_gamg.py",'-k' ,"test_vcycle"])
     test = TestGAMGSolverInterfaces()

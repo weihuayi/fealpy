@@ -3,7 +3,7 @@ from ..backend import backend_manager as bm
 from ..operator import LinearOperator
 from .conjugate_gradient import cg
 from scipy.sparse.linalg import spsolve_triangular,spsolve
-from .amg_coarsen import ruge_stuben_coarsen,ruge_stuben_chen_coarsen,standard_interpolation,aggregation_coarsen
+from .amg_solver import Ruge_Stuben_AMG
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
 from .. import logger
@@ -38,7 +38,7 @@ class GAMGSolver():
         Tensor: The numerical solutions under Multigrid solver.
     """
     def __init__(self,
-            theta: float = 0.025, # 粗化系数
+            theta: float = 0.25, # 粗化系数
             csize: int = 50, # 最粗问题规模
             ctype: str = 'C', # 粗化方法
             itype: str = 'T', # 插值方法
@@ -101,15 +101,14 @@ class GAMGSolver():
         elif mesh is not None: # geometric coarsening from finnest to coarsest
             pass
         else: # algebraic coarsening 
-            NN = bm.ceil(bm.log2(self.A[-1].shape[0])/2-4)
-            NL = max(min( int(NN), 8), 2) # 估计粗化的层数 
+            NN = bm.ceil(bm.log2(self.A[-1].shape[0])/2-8)
+            NL = max(min(int(NN), 8), 2) # 估计粗化的层数 
             start_time = time.time()
             for l in range(NL):
                 self.L.append(self.A[-1].tril()) # 前磨光的光滑子
                 self.U.append(self.A[-1].triu()) # 后磨光的光滑子
-                isC, G = aggregation_coarsen(self.A[-1], self.theta)
-                p, r = standard_interpolation(self.A[-1], isC)
-                #p, r = ruge_stuben_coarsen(self.A[-1], self.theta)
+
+                p, r = Ruge_Stuben_AMG(self.A[-1], theta=self.theta)
                 
                 self.P.append(p)
                 self.R.append(r)

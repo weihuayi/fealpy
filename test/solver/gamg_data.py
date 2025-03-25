@@ -44,4 +44,3 @@ test_data = [{'A': s0.A ,
               'ny':ny,
               'domain':pde.domain(),
 }]
-
