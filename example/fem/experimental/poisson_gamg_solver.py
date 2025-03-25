@@ -16,7 +16,7 @@ next(tmr)
 
 # Different configurations: coarsest mesh size and number of refinements.
 configurations = [
-    (2, 6),  
+    (2, 8),  
     #(2, 4),   
     #(32, 6)   
 ]

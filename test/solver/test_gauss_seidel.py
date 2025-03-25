@@ -2,7 +2,7 @@
 import pytest
 from fealpy.backend import backend_manager as bm
 from fealpy.solver import gs 
-from gamg_solver_data import * 
+from test.solver.gamg_data import * 
 import time 
 
 class TestGSSolver:
