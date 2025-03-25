@@ -16,11 +16,7 @@ next(tmr)
 
 # Different configurations: coarsest mesh size and number of refinements.
 configurations = [
-<<<<<<< HEAD
     (2, 8),  
-=======
-    (2, 6),  
->>>>>>> origin/develop
     #(2, 4),   
     #(32, 6)   
 ]
@@ -43,10 +39,5 @@ s0.cg_solve()
 #s0.gs_solve()
 #s0.jacobi_solve()
 s0.minres_solve()
-<<<<<<< HEAD
 tmr.send(None)
 
-=======
-s0.gmres_solve()
-tmr.send(None)
->>>>>>> origin/develop
