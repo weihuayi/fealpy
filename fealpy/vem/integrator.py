@@ -2,11 +2,11 @@
 from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Callable
 from typing import Generic
 import logging
-from fealpy.typing import TensorLike, Index, CoefLike
-from ... import logger
-from fealpy.mesh import Mesh
-from fealpy.functionspace.space import FunctionSpace as _FS
-from fealpy.utils import ftype_memory_size
+from ..typing import TensorLike, Index, CoefLike
+from .. import logger
+from ..mesh import Mesh
+from ..functionspace.space import FunctionSpace as _FS
+from ..utils import ftype_memory_size
 
 __all__ = [
     'Integrator',

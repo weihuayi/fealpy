@@ -1,9 +1,9 @@
 from fealpy.backend import backend_manager as bm                                   
-from fealpy.vem.vem.bilinear_form import BilinearForm                              
-from fealpy.vem.vem.linear_form import LinearForm                                  
-from fealpy.vem.vem.scalar_diffusion_integrator import ScalarDiffusionIntegrator
-from fealpy.vem.vem.scalar_source_integrator import ScalarSourceIntegrator         
-from fealpy.vem.vem.dirichlet_bc import DirichletBC                                
+from fealpy.vem.bilinear_form import BilinearForm                              
+from fealpy.vem.linear_form import LinearForm                                  
+from fealpy.vem.scalar_diffusion_integrator import ScalarDiffusionIntegrator
+from fealpy.vem.scalar_source_integrator import ScalarSourceIntegrator         
+from fealpy.vem.dirichlet_bc import DirichletBC                                
 from fealpy.pde.poisson_2d import CosCosData                                       
 from fealpy.mesh import TriangleMesh, PolygonMesh                                  
 from fealpy.functionspace import ConformingScalarVESpace2d                         
@@ -51,10 +51,12 @@ class PoissonCVEMModel:
         return error
 if __name__ == "__main__":
     n = 4
-    p = 5
+    p = 3
     errorMatrix = bm.zeros((2, 4))
     for i in range(4):
         mesh = PolygonMesh.from_box([0,1,0,1],n, n, device='cpu')
+        mesh = TriangleMesh.from_box([0,1,0,1],n,n,device='cpu')
+        mesh = PolygonMesh.from_mesh(mesh)
         pde = CosCosData()
         model = PoissonCVEMModel(pde, mesh, p=p)
         model.solver()

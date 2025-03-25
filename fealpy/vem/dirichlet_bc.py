@@ -1,10 +1,10 @@
 
 from typing import Optional, Tuple, Callable, Union, TypeVar
 
-from fealpy.backend import backend_manager as bm
-from fealpy.typing import TensorLike
-from fealpy.sparse import SparseTensor, COOTensor, CSRTensor
-from fealpy.functionspace.space import FunctionSpace
+from ..backend import backend_manager as bm
+from ..typing import TensorLike
+from ..sparse import SparseTensor, COOTensor, CSRTensor
+from ..functionspace.space import FunctionSpace
 
 CoefLike = Union[float, int, TensorLike, Callable[..., TensorLike]]
 _ST = TypeVar('_ST', bound=SparseTensor)
