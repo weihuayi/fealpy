@@ -27,11 +27,11 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--degree',
-        default=5, type=int,
-        help='光滑有限元空间的次数, 默认为 5 次.')
+        default=9, type=int,
+        help='光滑有限元空间的次数, 默认为 9 次.')
 
 parser.add_argument('--n',
-        default=4, type=int,
+        default=1, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',

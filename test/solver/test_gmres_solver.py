@@ -1,67 +1,98 @@
-
-import numpy as np
-import pytest
-import scipy.sparse as sp
-
 from fealpy.backend import backend_manager as bm
-from fealpy.solver.gmres_solver import gmres
-from fealpy.sparse import COOTensor, CSRTensor
+from fealpy.solver import gmres
 
-class TestDirectSolver:
+import pytest
+from fealpy.utils import timer
+from fealpy import logger
 
-    def _check_solution(self, x0, x, tolerance=1e-5):
-        residual = bm.max(bm.abs(x0-x))
-        return residual < tolerance
+from fealpy.pde.poisson_2d import CosCosData
+from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import (
+    BilinearForm,
+    ScalarDiffusionIntegrator,
+    ScalarSourceIntegrator,
+    LinearForm,
+    DirichletBC
+)
 
-    def _get_cpu_data(self):
-        A = sp.rand(10, 10, density=0.3)  # 随机生成一个稀疏矩阵
-        A = A + sp.eye(10)  # 保证矩阵非奇异
-        A = A.tocoo()
-        x = np.random.rand(10)
-        b = A.dot(x)
+logger.setLevel('INFO')
 
-        A = COOTensor.from_scipy(A)
-        b = bm.tensor(b)
-        x = bm.tensor(x)
-        return A, x, b
+tmr = timer()
+next(tmr)
 
-    def _get_gpu_data(self):
-        A, x, b = self._get_cpu_data()
-        A = A.device_put('cuda')
-        print(A.indices().device, A.values().device, b.device, x.device)
-        return A, x, b
+# Define PDE model
+pde = CosCosData()
+domain = pde.domain()
 
-    @pytest.mark.parametrize('backend', ['numpy', 'pytorch'])
-    @pytest.mark.parametrize('solver_type', ['scipy', 'mumps', 'cupy'])
-    def test_cpu(self, backend, solver_type):
+def get_Af(mesh, p):
+    """
+    Assemble the stiffness matrix and load vector for the problem.
+    """
+    space = LagrangeFESpace(mesh, p=p)
+
+    uh = space.function()
+    bform = BilinearForm(space)
+    bform.add_integrator(ScalarDiffusionIntegrator(method='fast'))
+
+    lform = LinearForm(space)
+    lform.add_integrator(ScalarSourceIntegrator(pde.source))
+
+    A_without_apply = bform.assembly()
+    F_without_apply = lform.assembly()
+
+    A1, f = DirichletBC(space, gd=pde.solution).apply(A_without_apply, F_without_apply)
+    A = A1.tocsr()  # Convert to compressed sparse row format
+    return A, f
+
+
+class TestGMRESSolver:
+    """
+    Test case for GMRES solver.
+    """
+    @pytest.mark.parametrize("backend", ['numpy', 'torch'])
+    def test_gmres(self, backend):
         bm.set_backend(backend)
-        solver = lambda A, b: spsolve(A, b, solver_type)
-        A, x, b = self._get_cpu_data()
-        x0 = solver(A, b) 
-        assert self._check_solution(x0, x), "f{backend} Test failed!!!!!!!!!!!!!!!!!!!!!!!!"
+        
+        # Generate A, f, x
+        nx_1 = ny_1 = 200
+        p = 1
+        mesh_1 = TriangleMesh.from_box(domain, nx_1, ny_1)
+        space = LagrangeFESpace(mesh_1, p=p)
+        uh = space.function()
+        uh_1 = space.function()
 
-    def test_gpu(self):
-        bm.set_backend("pytorch")
-        bm.set_default_device("cuda")
-        solver = lambda A, b: spsolve(A, b, 'cupy')
+        A, f = get_Af(mesh_1, p=p)
+        print(A.shape)
+        if tmr is not None:
+            tmr.send("Matrix assembly")
 
-        A, x, b = self._get_gpu_data()
-        x0 = solver(A, b)
-        assert self._check_solution(x0, x), "Pytorch GPU test failed!!!!!!!!!!!!!!!!!!!!!!!!"
-        print("Pytorch GPU test passed!")
+        # Solve using gmres
+        uh[:], info = gmres(A, f, atol=1e-8, rtol=1e-8, restart=20)
+        if tmr is not None:
+            tmr.send("gmres solving")
 
+        err = mesh_1.error(pde.solution, uh)
+        res_0 = bm.linalg.norm(f)
+        stop_res = info['residual'] / res_0
+
+        # Output iteration info
+        print('Iterations (fealpy):', info['niter'])
+        print('Error (fealpy):', err)
+        print('Relative residual (fealpy):', stop_res)
+        
+        tmr.send(None)
+
+        # Check convergence
+        rtol = 1e-4
+        converged = stop_res <= rtol
+        print(f"Converged: {converged}")
+
+        # Assert convergence
+        assert converged, f"GMRES did not converge: residual = {stop_res:.2e} > rtol = {rtol}"
+
+        
 if __name__ == '__main__':
-    test = TestDirectSolver()
-    #test.test_cpu('numpy', 'scipy')
-    #test.test_cpu('numpy', 'mumps')
-    #test.test_cpu('numpy', 'cupy')
-    #test.test_gpu()
-
-    #test1 = TestDirectSolver(solver_type='mumps')
-    #test1.test_cpu()
-
-    pytest.main(['test_cpu', "-q"])   
-    pytest.main(['test_gpu', "-q"])   
-
-
-
+    test = TestGMRESSolver() 
+    test.test_gmres('numpy')
+    #test.test_gmres('pytorch')
