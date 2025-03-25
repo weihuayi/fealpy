@@ -10,8 +10,4 @@ class LinearOperator:
         return self.__matvec_impl(x)
 
     def __matmul__(self, x):
-<<<<<<< HEAD
         return self.__matvec_impl(x)
-=======
-        return self.__matvec_impl(x)
->>>>>>> origin/develop

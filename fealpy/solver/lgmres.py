@@ -236,8 +236,4 @@ def lgmres(
 
     info['residual'] = res
     info['niter'] = all_iter
-<<<<<<< HEAD
     return x, info
-=======
-    return x, info
->>>>>>> origin/develop

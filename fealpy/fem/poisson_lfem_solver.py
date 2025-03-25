@@ -210,12 +210,4 @@ class PoissonLFEMSolver:
         """
         return self.mesh.error(self.pde.solution, self.uh)
 
-
-
-<<<<<<< HEAD
         
-
-
-=======
-        
->>>>>>> origin/develop

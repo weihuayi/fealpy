@@ -134,34 +134,6 @@ class DirichletBC():
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
-<<<<<<< HEAD
-
-        if isinstance(A, COOTensor):
-            indices = A.indices
-            remove_flag = bm.logical_or(
-                isDDof[indices[0, :]], isDDof[indices[1, :]]
-            )
-            retain_flag = bm.logical_not(remove_flag)
-            new_indices = indices[:, retain_flag]
-            new_values = A.values[..., retain_flag]
-            A = COOTensor(new_indices, new_values, A.sparse_shape)
-
-            index = bm.nonzero(isDDof)[0]
-            shape = new_values.shape[:-1] + (len(index), )
-            one_values = bm.ones(shape, **kwargs)
-            one_indices = bm.stack([index, index], axis=0)
-            A1 = COOTensor(one_indices, one_values, A.sparse_shape)
-            return A.add(A1).coalesce()
-
-        elif isinstance(A, CSRTensor):
-            from ..sparse.ops import spdiags
-            isDDof = bm.astype(isDDof, A.ftype)
-            D0 = spdiags(1-isDDof, 0, A.shape[0], A.shape[0])
-            D1 = spdiags(isDDof, 0, A.shape[0], A.shape[0], format='coo')
-            A = (D0@A@D0).tocoo() + D1
-
-        return A.coalesce().tocsr()
-=======
         bdIdx = bm.zeros(A.shape[0], **kwargs)
         # bdIdx[isDDof.reshape(-1)] = 1
         bdIdx = bm.set_at(bdIdx, isDDof.reshape(-1), 1)
@@ -169,7 +141,6 @@ class DirichletBC():
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
         return A
->>>>>>> origin/develop
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
                      uh: Optional[TensorLike]=None,
