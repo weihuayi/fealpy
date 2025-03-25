@@ -78,14 +78,7 @@ errorMatrix = bm.zeros((3, maxit), **fkwargs)
 tmr.send('网格和pde生成时间')
 
 for i in range(maxit):
-    node = mesh.entity('node')
-    isCornerNode = bm.zeros(len(node),dtype=bm.bool, device=device)
-    for n in bm.array([[0,0],[1,0],[0,1],[1,1]], **fkwargs):
-        isCornerNode = isCornerNode | (bm.linalg.norm(node-n[None, :], axis=1)<1e-10)
-
-
-
-    space = CmConformingFESpace2d(mesh, p, 1, isCornerNode)
+    space = CmConformingFESpace2d(mesh, p, 1)
     
     tmr.send(f'第{i}次空间生成时间')
 

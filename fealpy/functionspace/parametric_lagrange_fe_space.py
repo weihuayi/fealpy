@@ -1,4 +1,3 @@
-
 from typing import Optional, TypeVar, Union, Generic, Callable
 from ..typing import TensorLike, Index, _S, Threshold
 
@@ -95,7 +94,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
                 bcs = self.mesh.multi_index_matrix(p, TD)/p # (NQ, TD+1)
                 val = u(bcs) # (NC, ldof)
                 cell2dof = self.cell_to_dof()
-                uI = bm.zeros(self.number_of_global_dofs(), dtype=sellf.ftype)
+                uI = bm.zeros(self.number_of_global_dofs(), dtype=self.ftype)
                 uI = bm.set_at(uI, cell2dof, val)
         return self.function(uI)
 
@@ -139,6 +138,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         pass
 
+    
     @barycentric
     def edge_basis(self, bc: TensorLike):
         phi = self.mesh.shape_function(bc)
@@ -154,9 +154,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         @berif 计算基函数在重心坐标点处的函数值，注意 bc 的形状为 (..., TD+1), TD 为 bc
         所在空间的拓扑维数。
-
         """
-        
         p = self.p
         phi = self.mesh.shape_function(bc, p=p, variables='x')
         return phi 
