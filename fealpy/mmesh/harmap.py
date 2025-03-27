@@ -91,15 +91,20 @@ class Harmap(MM_monitor,MM_Interpolater):
             if self.TD == 3:
                 raise ValueError('Non-convex polyhedra cannot construct a logical mesh')
             self.logic_node = self._get_logic_node_init()
-            if self.logic_domain is None:
-                G = bm.ones(self.NC,**self.kwargs0)[:,None]
-                self.logic_node,_ = self._solve_harmap(G,self.logic_node)
             if self.mesh_type == "LagrangeTriangleMesh":
-                self.logic_mesh = self.mesh_class.from_triangle_mesh(self.linermesh, self.p)
-                self.logic_mesh.node = self.logic_node
+                logic_cell = self.linermesh.cell
+                linear_logic_mesh = TriangleMesh(self.logic_node,logic_cell)
+                self.logic_mesh = self.mesh_class.from_triangle_mesh(linear_logic_mesh, self.p)
+                self.logic_node = self.logic_mesh.node
+                # self.logic_mesh = self.mesh_class.from_triangle_mesh(self.linermesh, self.p)
+                # self.logic_mesh.node = self.logic_node
             elif self.mesh_type == "LagrangeQuadrangleMesh":
-                self.logic_mesh = self.mesh_class.from_quadrangle_mesh(self.linermesh, self.p)
-                self.logic_mesh.node = self.logic_node
+                logic_cell = self.linermesh.cell
+                linear_logic_mesh = QuadrangleMesh(self.logic_node,logic_cell)
+                self.logic_mesh = self.mesh_class.from_quadrangle_mesh(linear_logic_mesh, self.p)
+                self.logic_node = self.logic_mesh.node
+                # self.logic_mesh = self.mesh_class.from_quadrangle_mesh(self.linermesh, self.p)
+                # self.logic_mesh.node = self.logic_node
             else:
                 logic_cell = self.cell
                 self.logic_mesh = self.mesh_class(self.logic_node,logic_cell)
@@ -201,7 +206,6 @@ class Harmap(MM_monitor,MM_Interpolater):
         @param G: the inverse of monitor function
         @param logic_node: the logic node
         """
-
         isBdNode = self.isBdNode
         TD = self.TD
         BDNN = self.BDNN
@@ -236,7 +240,6 @@ class Harmap(MM_monitor,MM_Interpolater):
         move_bdlogic_node = move_bdlogic_node.reshape((TD, BDNN)).T
         harmap = bm.set_at(harmap , isBdNode, move_bdlogic_node)
         move_vector_field = logic_node - harmap
-
         return harmap,move_vector_field
     
     def _get_physical_node(self,harmap,move_vertor_field):
@@ -280,7 +283,7 @@ class Harmap(MM_monitor,MM_Interpolater):
             coef = self.compute_coef(A,C)
 
         x = self.equ_solver(coef)
-        positive_x = bm.where(x.real>0, x.real, 1)
+        positive_x = bm.where(x>0, x, 1)
         eta = bm.min(positive_x)
         node = node +  self.alpha*eta* delta_x
         return node
@@ -439,7 +442,7 @@ class Harmap(MM_monitor,MM_Interpolater):
                     t = (i+1)/steps
                     self.uh = t * uh0
                     self.mesh_redistributor()
-                    uh0 = pde.init_solution(self.mesh.node)
+                    uh0 = pde.solution(self.mesh.node)
                 self.uh = uh0
         else:
             for i in range(steps):

@@ -348,7 +348,7 @@ class MM_PREProcessor:
             judge_Vertices = bm.array(bm.sum(minus**2,axis=-1) < 1e-10,**self.kwargs1)
             K = bm.arange(mesh.number_of_nodes(),**self.kwargs1)
             Vertices_idx = bm.matmul(judge_Vertices,K)
-            sort_Bdnode_idx,sort_Bdface_idx = self.sort_bdnode_and_bdface(mesh)
+            sort_Bdnode_idx,sort_Bdface_idx = self._sort_bdnode_and_bdface(mesh)
             return Vertices_idx,Bdinnernode_idx,sort_Bdnode_idx
         
     def _get_normal_information(self,mesh:_U) -> TensorLike:
@@ -449,8 +449,8 @@ class MM_PREProcessor:
         node = self.node
         Verticesidx = self.Vertices_idx
         physics_domain = node[Verticesidx]
+        num_sides = physics_domain.shape[0]
         if logic_domain is None:
-            num_sides = physics_domain.shape[0]
             angles = bm.linspace(0,2*(1-1/(num_sides))*bm.pi,num_sides,**self.kwargs0)
             initial_logic_domain = bm.stack([bm.cos(angles),bm.sin(angles)],axis=1)
             # generate logic domain
@@ -461,7 +461,6 @@ class MM_PREProcessor:
         Lside_length = bm.linalg.norm(Lside_vector_rotated, axis=1)
         Logic_unit_norm = Lside_vector_rotated / Lside_length[:, None]
         b_part = bm.sum(Logic_unit_norm * logic_domain,axis=1)
-        
         K = bm.where(sBdNodeidx[:,None] == Verticesidx)[0]
         K = bm.concat([K,bm.array([len(sBdNodeidx)])])
         if p is None:
@@ -476,6 +475,12 @@ class MM_PREProcessor:
             
             return LBd_node2unorm,b_val,logic_domain
         else:
+            if self.mesh_type in ["LagrangeTriangleMesh","LagrangeQuadrangleMesh"]:
+                node = self.linermesh.node
+                map = bm.where(self.sort_BdNode_idx < len(node))[0]
+                sBdNodeidx = self.sort_BdNode_idx[map]
+            K = bm.where(sBdNodeidx[:,None] == Verticesidx)[0]
+            K = bm.concat([K,bm.array([len(sBdNodeidx)])])
             logic_bdnode = bm.zeros_like(node,**self.kwargs0)
             Pside_vector = bm.roll(physics_domain,-1,axis=0) - physics_domain
             Pside_length = bm.linalg.norm(Pside_vector,axis=1)
@@ -499,14 +504,20 @@ class MM_PREProcessor:
         """
         @brief get the initial guess of the logic node
         """
+        if self.mesh_type in ["LagrangeTriangleMesh","LagrangeQuadrangleMesh"]:
+            mesh = self.linermesh
+        else:
+            mesh = self.mesh
         bdc = self._get_logic_boundary
-        p = self.p 
-        space = self.space
+        # p = self.p 
+        p = 1
+        # space = self.space
+        space = LagrangeFESpace(mesh, p=p)
         bform = BilinearForm(space)
-        bform.add_integrator(ScalarDiffusionIntegrator(q=p+1,method=self.assambly_method))
+        bform.add_integrator(ScalarDiffusionIntegrator(q=p+1,method=None))
         A = bform.assembly()
         lform = LinearForm(space)
-        lform.add_integrator(ScalarSourceIntegrator(source=0,q=p+1,method=self.assambly_method))
+        lform.add_integrator(ScalarSourceIntegrator(source=0,q=p+1,method=None))
         F = lform.assembly()
         bc0 = DirichletBC(space = space, gd = lambda p : bdc(p)[:,0])
         bc1 = DirichletBC(space = space, gd = lambda p : bdc(p)[:,1])
@@ -570,7 +581,7 @@ class MM_monitor(MM_PREProcessor):
         cm = self.cm
         sm = self.sm
         guh_incell = self._grad_uh()
-        M = bm.sqrt(1 + self.beta * bm.sum(guh_incell**2,axis=-1))
+        M = bm.sqrt(1 +  self.beta * bm.sum(guh_incell**2,axis=-1))
         M_innode = bm.zeros(NN,dtype=bm.float64)
         bm.index_add(M_innode,cell,M*cm[:,None])
         M_innode = M_innode/sm
@@ -584,11 +595,11 @@ class MM_monitor(MM_PREProcessor):
         cell = self.cell
         cm = self.cm
         sm = self.sm
-        guh_incell = self._grad_uh()
-        R = bm.max(bm.linalg.norm(guh_incell,axis=-1))
+        guh_innode = self._grad_uh()
+        R = bm.max(bm.linalg.norm(guh_innode,axis=-1))
         if R <= 1e-15:
             R = 1
-        M = bm.sqrt(1 + self.beta * bm.sum(guh_incell**2,axis=-1)/R**2)
+        M = bm.sqrt(1 + self.beta * bm.sum(guh_innode**2,axis=-1)/R**2)
         M_innode = bm.zeros(NN,dtype=bm.float64)
         bm.index_add(M_innode,cell,M*cm[:,None])
         M_innode = M_innode/sm
@@ -620,7 +631,7 @@ class MM_monitor(MM_PREProcessor):
             SSI.source = M
             SSI.clear()
             b = lform.assembly()
-            M[:] = cg(A,b,atol=1e-3,returninfo=True)[0]
+            M[:] = cg(A,b,atol=1e-8,returninfo=True)[0]
         self.M = M(self.bcs)
 
     def projector(self):
@@ -691,7 +702,7 @@ class MM_Interpolater(MM_PREProcessor):
         @brief get the solution
         """
         pde = self.pde
-        return pde.init_solution(moved_node)
+        return pde.solution(moved_node)
     
     def poisson(self,moved_node:TensorLike):
         """

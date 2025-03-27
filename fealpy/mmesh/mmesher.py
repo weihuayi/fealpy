@@ -56,29 +56,24 @@ class MMesher:
         instance.uh = uh
         self.process = self.instance.mesh_redistributor
 
-    def show_mesh(self,scat_node = True , scat_index = slice(None)):
+    def show_mesh(self,ax,scat_node = True , scat_index = slice(None)):
         instance = self.instance
         mesh = instance.mesh
         if instance.mesh_type in ["LagrangeTriangleMesh", "LagrangeQuadrangleMesh"]:
             from .tool import high_order_meshploter
-            high_order_meshploter(mesh,scat_node = scat_node , scat_index = scat_index)
+            high_order_meshploter(ax,mesh,scat_node = scat_node , scat_index = scat_index)
         else:
-            import matplotlib.pyplot as plt
-            fig = plt.figure()
-            if instance.TD == 2:
-                ax = fig.gca()
-            else:
-                ax = fig.add_subplot(111, projection='3d')
             mesh.add_plot(ax)
-            plt.show()
+        # ax.clear()
 
-    def show_function(self,uh,scat_node = True , index = slice(None)):
+    def show_function(self,ax,uh,scat_node = True , index = slice(None)):
         from .tool import high_order_meshploter,linear_surfploter
         instance = self.instance
         mesh = instance.mesh
         if instance.mesh_type in ["LagrangeTriangleMesh", "LagrangeQuadrangleMesh"]:    
-            high_order_meshploter(mesh,uh,model='surface',
+            high_order_meshploter(ax,mesh,uh,model='surface',
                                   scat_node = scat_node, scat_index = index)
         else:
-            linear_surfploter(mesh,uh,
+            linear_surfploter(ax,mesh,uh,
                               scat_node = scat_node, scat_index = index)
+        ax.clear()

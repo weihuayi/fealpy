@@ -61,8 +61,7 @@ class MeshGenerator():
 
 # visualize the mesh and solution   
 
-def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True , scat_index = slice(None)):
-    import matplotlib.pyplot as plt
+def high_order_meshploter(ax,mesh, uh= None, model='mesh', scat_node=True , scat_index = slice(None)):
     nodes = mesh.node
     n = mesh.p
     def lagrange_interpolation(points, num_points=100, n = n):
@@ -89,20 +88,19 @@ def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True , scat_in
                 xk = points[:,k,i]
                 bm.add_at(curve , (...,i) ,Lk[:,None] * xk)
         return curve
-    fig = plt.figure()
     edges = mesh.edge
     if model == 'mesh':
         p = nodes[edges]
-        curve = lagrange_interpolation(p,n=n)
-        plt.plot(curve[...,0], curve[...,1], 'b-',linewidth=0.5)
+        curve = lagrange_interpolation(p, n=n)
+        ax.plot(curve[..., 0], curve[..., 1], 'b-', linewidth=0.5)  # 使用 ax 绘制曲线
         if scat_node:
-            plt.scatter(nodes[scat_index, 0], 
-                        nodes[scat_index, 1],s = 3, color='r')  # 绘制节点
-        plt.gca().set_aspect('equal')
-        plt.axis('off') # 关闭坐标轴
+            ax.scatter(nodes[scat_index, 0], 
+                       nodes[scat_index, 1], s=3, color='r')  # 使用 ax 绘制节点
+        ax.set_aspect('equal')  # 设置坐标轴比例
+        ax.axis('off')  # 关闭坐标轴
+
     elif model == 'surface':
         points = bm.concat([nodes, uh[...,None]], axis=-1)
-        ax = fig.add_subplot(111, projection='3d')
         p = points[edges]
         curve = lagrange_interpolation(p,n=n).transpose(1,0,2)
         nan_separator = bm.full((curve.shape[0], 1, 3), bm.nan)  # 每条曲线之间插入 NaN
@@ -113,12 +111,8 @@ def high_order_meshploter(mesh, uh= None, model='mesh', scat_node=True , scat_in
             ax.scatter(points[scat_index, 0], 
                        points[scat_index, 1], 
                        points[scat_index, 2],s = 2, color='r')  # 绘制节点
-    plt.show()
 
-def linear_surfploter(mesh, uh,scat_node =False , scat_index = slice(None)):
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+def linear_surfploter(ax,mesh, uh,scat_node =False , scat_index = slice(None)):
     node = mesh.entity('node')
     cell = mesh.entity('cell')
     if isinstance(mesh, TriangleMesh):
@@ -140,7 +134,46 @@ def linear_surfploter(mesh, uh,scat_node =False , scat_index = slice(None)):
         ax.add_collection3d(quad_mesh)
     if scat_node:
         ax.scatter(node[scat_index, 0], node[scat_index, 1], uh[scat_index],s = 2, color='r')  # 绘制节点
-    plt.show()
+    ax.clear()
+
+
+import matplotlib.pyplot as plt
+class AnimationTool: 
+    def __init__(self, update_func, frames, save_path=None, fps=30, fig=None, **kwargs):
+        """
+        @brief 动图工具类
+        @param update_func: 更新函数，接受一个参数 frame
+        @param frames: 动画的帧数或帧生成器
+        @param save_path: 保存路径，如果为 None 则不保存
+        @param fps: 动画帧率
+        @param fig: 可选的 matplotlib Figure 对象，如果为 None 则自动创建
+        @param kwargs: 传递给 plt.figure 的其他参数
+        """
+        
+        self.update_func = update_func
+        self.frames = frames
+        self.save_path = save_path
+        self.fps = fps
+        self.fig = fig or plt.figure(**kwargs)
+        # self.ax = self.fig.add_subplot(111, projection='3d') if 'projection' in kwargs and \
+        #                             kwargs['projection'] == '3d' else self.fig.add_subplot()
+
+    def run(self):
+        from matplotlib.animation import FuncAnimation, PillowWriter
+        """
+        @brief 运行动画
+        """
+        ani = FuncAnimation(self.fig, self.update_func, frames=self.frames, repeat=False)
+        if self.save_path:
+            if self.save_path.endswith('.gif'):
+                # 使用 PillowWriter 保存为 GIF
+                ani.save(self.save_path, writer=PillowWriter(fps=self.fps))
+            else:
+                # 默认保存为 MP4
+                ani.save(self.save_path, writer='ffmpeg', fps=self.fps)
+        else:
+            plt.show()
+    
 
 def quad_equ_solver(coef:list):
     """
