@@ -70,7 +70,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         sol = bm.swapaxes(sol, 0, 1)
     if returninfo is True:
         return sol,info
-    if returninfo is True:
+    else:
         return sol
 
 
