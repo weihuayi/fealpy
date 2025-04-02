@@ -4,9 +4,9 @@ from typing import (
     Callable
 )
 
-from fealpy.typing import TensorLike, Size, Index
-from fealpy.backend import backend_manager as bm
-from fealpy.functionspace import FunctionSpace as _FS
+from ..typing import TensorLike, Size, Index
+from ..backend import backend_manager as bm
+from ..functionspace import FunctionSpace as _FS
 from .integrator import Integrator, GroupIntegrator
 
 from fealpy import logger

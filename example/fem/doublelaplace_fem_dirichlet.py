@@ -23,15 +23,15 @@ logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        光滑元有限元方法求解双调和方程
+        光滑元有限元方法求解二维双调和方程
         """)
 
 parser.add_argument('--degree',
-        default=5, type=int,
+        default=9, type=int,
         help='光滑有限元空间的次数, 默认为 5 次.')
 
 parser.add_argument('--n',
-        default=4, type=int,
+        default=3, type=int,
         help='初始网格剖分段数.')
 
 parser.add_argument('--maxit',
@@ -61,8 +61,12 @@ next(tmr)
 x = sp.symbols('x')
 y = sp.symbols('y')
 #u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**4
-#u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
-u = (sp.sin(5*sp.pi*y)*sp.sin(5*sp.pi*x))**2
+#u = (sp.sin(4*sp.pi*y)*sp.sin(5*sp.pi*x))**3
+#u = (sp.sin(16*y)*sp.sin(15*x))**2
+u = (sp.sin(9*y)*sp.sin(9*x))**3
+#u = (sp.sin(4*sp.pi*y)*sp.sin(4*sp.pi*x))**3
+#u = (sp.sin(6*y)*sp.sin(6*x))**4
+#u = (sp.sin(5*sp.pi*y)*sp.sin(5*sp.pi*x))**2
 pde = DoubleLaplacePDE(u, device=device) 
 ulist = get_flist(u, device=device)[:3]
 mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
@@ -81,7 +85,16 @@ errorMatrix2 = bm.zeros((3, maxit), **fkwargs)
 tmr.send('网格和pde生成时间')
 
 for i in range(maxit):
+    #import ipdb
+    #ipdb.set_trace()
+
     space = CmConformingFESpace2d(mesh, p, 1)
+        #fig = plt.figure()
+    #axes = fig.gca()
+    #mesh.add_plot(axes)
+    #mesh.find_cell(axes, showindex=True)
+    #plt.show()
+
     
     tmr.send(f'第{i}次空间生成时间')
 
@@ -117,7 +130,9 @@ for i in range(maxit):
     #A = csr_matrix((A.values(), A.indices()),A.shape)
     #uh[:] = bm.tensor(spsolve(A, F))
     uh[:] = spsolve(A, F, "scipy")
+    uhh = bm.copy(uh)
     uI = space.interpolation(ulist)
+    uII = bm.copy(uI)
     uh1 = space.function()
     uh1[:] = uI - uh[:]
 
@@ -144,9 +159,26 @@ for i in range(maxit):
     @barycentric
     def ug2val1(p):
         return space.grad_m_value(uh1, p, 2)
-    errorMatrix1[0, i] = mesh.error(uh1, 0, q=p+3)
-    errorMatrix1[1, i] = mesh.error(ugval1, 0, q=p+3)
-    errorMatrix1[2, i] = mesh.error(ug2val1, 0, q=p+3)
+    barycenter = mesh.entity_barycenter(etype='cell')
+    idx = (barycenter[:, 0] < 2/3) & (barycenter[:, 1] < 2/3) & (barycenter[:, 0] > 1/3) & (barycenter[:, 1] > 1/3) 
+
+    error = mesh.error(uh1, 0, q=p+3, celltype=True)[idx]
+    errorMatrix1[0, i] = bm.power(bm.sum(error**2), 1/2)
+    error = mesh.error(ugval1, 0, q=p+3, celltype=True)[idx]
+    errorMatrix1[1, i] = bm.power(bm.sum(error**2), 1/2)
+    error = mesh.error(ug2val1, 0, q=p+3, celltype=True)[idx]
+    errorMatrix1[2, i] = bm.power(bm.sum(error**2), 1/2)
+    nldof = space.number_of_local_dofs('node')
+    NN = mesh.number_of_nodes()
+    uu = (uII-uhh)[:nldof*NN].reshape(NN, nldof)
+    cell = mesh.entity('cell')
+    errorMatrix2[0, i] = bm.max(bm.abs(uu[cell[idx], 0]))
+    errorMatrix2[1, i] = bm.max(bm.abs(bm.sqrt(uu[cell[idx], 1]**2 + uu[cell[idx], 2]**2)))
+    errorMatrix2[2, i] = bm.max(bm.abs(bm.sqrt(uu[cell[idx], 3]**2 +
+                                               uu[cell[idx], 4]**2 +
+                                               uu[cell[idx], 5]**2 +
+                                               uu[cell[idx], 4]**2)))
+
 
     if i < maxit-1:
         mesh.uniform_refine(n=1)
@@ -161,6 +193,11 @@ print("最终误差",errorMatrix1)
 print("order : ", bm.log2(errorMatrix1[0,:-1]/errorMatrix1[0,1:]))
 print("order : ", bm.log2(errorMatrix1[1,:-1]/errorMatrix1[1,1:]))
 print("order : ", bm.log2(errorMatrix1[2,:-1]/errorMatrix1[2,1:]))
+print("最终误差",errorMatrix2)
+print("order : ", bm.log2(errorMatrix2[0,:-1]/errorMatrix2[0,1:]))
+print("order : ", bm.log2(errorMatrix2[1,:-1]/errorMatrix2[1,1:]))
+print("order : ", bm.log2(errorMatrix2[2,:-1]/errorMatrix2[2,1:]))
+
 import numpy as np    
 import matplotlib.pyplot as plt
 fig = plt.figure()    
@@ -169,13 +206,31 @@ linetype = ['k-*', 'r-o', 'b-D', 'g-->', 'k--8', 'm--x','r-.x']
 c = np.polyfit(np.log(NDof),np.log(errorMatrix1[0]),1)    
 print(c)
 axes.loglog(NDof,errorMatrix1[0],linetype[0],label =    
-            '$||u-u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))    
+            '$||u_I-u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))    
 c = np.polyfit(np.log(NDof),np.log(errorMatrix1[1]),1)    
 axes.loglog(NDof,errorMatrix1[1],linetype[1],label =    
-            '$||\\nabla u-\\nabla u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0])) 
+            '$||\\nabla_I u-\\nabla u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0])) 
 c = np.polyfit(np.log(NDof),np.log(errorMatrix1[2]),1)
 axes.loglog(NDof,errorMatrix1[2],linetype[2],label =      
-            '$||\\nabla^2 u-\\nabla^2 u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))  
+            '$||\\nabla^2 u_I-\\nabla^2 u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))  
+axes.legend()
+#filename = f'cm.png'
+#plt.savefig(filename)   
+                         
+plt.show()
+fig = plt.figure()    
+axes = fig.gca()    
+linetype = ['k-*', 'r-o', 'b-D', 'g-->', 'k--8', 'm--x','r-.x']    
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[0]),1)    
+print(c)
+axes.loglog(NDof,errorMatrix2[0],linetype[0],label =    
+            '$||u_I-u_h||_{\max}=O(h^{%0.4f})$'%(c[0]))    
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[1]),1)    
+axes.loglog(NDof,errorMatrix2[1],linetype[1],label =    
+            '$||\\nabla_I u-\\nabla u_h||_{\max}=O(h^{%0.4f})$'%(c[0])) 
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[2]),1)
+axes.loglog(NDof,errorMatrix2[2],linetype[2],label =      
+            '$||\\nabla^2 u_I-\\nabla^2 u_h||_{\max}=O(h^{%0.4f})$'%(c[0]))  
 axes.legend()
 #filename = f'cm.png'
 #plt.savefig(filename)   

@@ -1,9 +1,9 @@
 from fealpy.backend import backend_manager as bm                                   
-from fealpy.vem.vem.bilinear_form import BilinearForm                              
-from fealpy.vem.vem.linear_form import LinearForm                                  
-from fealpy.vem.vem.scalar_diffusion_integrator import ScalarDiffusionIntegrator
-from fealpy.vem.vem.scalar_source_integrator import ScalarSourceIntegrator         
-from fealpy.vem.vem.dirichlet_bc import DirichletBC                                
+from fealpy.vem.bilinear_form import BilinearForm                              
+from fealpy.vem.linear_form import LinearForm                                  
+from fealpy.vem.scalar_diffusion_integrator import ScalarDiffusionIntegrator
+from fealpy.vem.scalar_source_integrator import ScalarSourceIntegrator         
+from fealpy.vem.dirichlet_bc import DirichletBC                                
 from fealpy.pde.poisson_2d import CosCosData                                       
 from fealpy.mesh import TriangleMesh, PolygonMesh                                  
 from fealpy.functionspace import ConformingScalarVESpace2d                         
@@ -25,7 +25,11 @@ class PoissonCVEMModel:
         self.pde = pde
         space = ConformingScalarVESpace2d(mesh, p=p)
         self.space = space
+        self.assemble()
 
+    def assemble(self):
+        space = self.space
+        pde = self.pde
         bform = BilinearForm(space)
         integrator = ScalarDiffusionIntegrator(coef=1, q=p+3)
         bform.add_integrator(integrator)
@@ -49,19 +53,19 @@ class PoissonCVEMModel:
         error[0] = mesh.error(sh.value, pde.solution)
         error[1] = mesh.error(sh.grad_value, pde.gradient)
         return error
-if __name__ == "__main__":
-    n = 4
-    p = 5
-    errorMatrix = bm.zeros((2, 4))
-    for i in range(4):
-        mesh = PolygonMesh.from_box([0,1,0,1],n, n, device='cpu')
-        pde = CosCosData()
-        model = PoissonCVEMModel(pde, mesh, p=p)
+
+    def run(self):
         model.solver()
-        errorMatrix[:, i] = model.error()
-        n = n*2
-    print('errorMatrix',errorMatrix)
-    print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
-    print("order : ", bm.log2(errorMatrix[1,:-1]/errorMatrix[1,1:]))
+        error = model.error()
+        print('L2 error:', error[0])
+        print('H1 error:', error[1])
+
+if __name__ == '__main__':
+    pde = CosCosData()
+    p = 3
+    n = 4
+    mesh = PolygonMesh.from_box([0,1,0,1],n,n,device='cpu')
+    model = PoissonCVEMModel(pde, mesh, p)
+    model.run()
 
 

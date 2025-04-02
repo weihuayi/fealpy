@@ -5,4 +5,4 @@ from .gamg_solver import GAMGSolver
 from .minres_solver import minres
 from .gmres_solver import gmres
 from .jacobi_solver import jacobi
-#from .gauss_seidel import gs
+from .gauss_seidel import gs

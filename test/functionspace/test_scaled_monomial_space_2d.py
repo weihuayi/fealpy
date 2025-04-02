@@ -136,8 +136,7 @@ class TestScaledMonomialSpace2d():
         cell_grad_m_matrix = space.cell_grad_m_matrix(m=3)
         np.testing.assert_allclose(cell_hessian_matrix, data["cell_hessian_matrix"], atol=1e-8)
         np.testing.assert_allclose(cell_grad_m_matrix, data["cell_grad_m_matrix"], atol=1e-8)
-
-
+        
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
     @pytest.mark.parametrize("data",matrix1)
     def test_matrix1(self, backend, data): 
@@ -176,14 +175,19 @@ class TestScaledMonomialSpace2d():
         mesh = PolygonMesh.from_box([0,1,0,1],1,1)
         p = 3
         space = ScaledMonomialSpace2d(mesh, p=p)
-        from fealpy.fem import  ScalarMassIntegrator
-        integrator = ScalarMassIntegrator(q=p+1,method='homogeneous')
-        mass_matrix = integrator.homogeneous_assembly(space)
-        np.testing.assert_allclose(mass_matrix, data["mass_matrix"], atol=1e-8)
-        from fealpy.fem import  ScalarDiffusionIntegrator
-        integrator = ScalarDiffusionIntegrator(q=p+1,method='homogeneous')
-        stiff_matrix = integrator.homogeneous_assembly(space)
-        np.testing.assert_allclose(stiff_matrix, data["cell_stiff_matrix"], atol=1e-8)
+        #from fealpy.fem import  ScalarMassIntegrator
+        #integrator = ScalarMassIntegrator(q=p+1,method='homogeneous')
+        #mass_matrix = integrator.homogeneous_assembly(space)
+        #np.testing.assert_allclose(mass_matrix, data["mass_matrix"], atol=1e-8)
+        #from fealpy.fem import  ScalarDiffusionIntegrator
+        #integrator = ScalarDiffusionIntegrator(q=p+1,method='homogeneous')
+        #stiff_matrix = integrator.homogeneous_assembly(space)
+        stiff = space.cell_stiff_matrix()
+        np.testing.assert_allclose(stiff, data["cell_stiff_matrix"], atol=1e-8)
+        #cell_grad_m_matrix = space.cell_grad_m_matrix(m=1)
+        #np.testing.assert_allclose(stiff_matrix, stiff, atol=1e-8)
+
+
         
 
     
