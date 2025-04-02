@@ -80,5 +80,5 @@ def jacobi(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
     info['niter'] = niter 
     if returninfo is True:
         return x, info
-    if returninfo is True:
+    else:
         return x
