@@ -37,8 +37,62 @@ class TestConformingScalarVESpace2d():
                                 data["cell_to_dof_location"])
 
         #np.testing.assert_equal(multi_index_matrix, data["multi_index_matrix"])
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", PI1)
+    def test_PI1(self, backend, data):
+        bm.set_backend(backend)
+        mesh = PolygonMesh.from_box([0,1,0,1],1,1)
+        NC = mesh.number_of_cells()
+        space = ConformingScalarVESpace2d(mesh, p=3)
+        PI1 = space.PI1
+        for i in range(NC):
+            np.testing.assert_allclose(PI1[i], data["PI1"][i], atol=1e-10)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", DOF)
+    def test_DOF(self, backend, data):
+        bm.set_backend(backend)
+        mesh = PolygonMesh.from_box([0,1,0,1],1,1)
+        NC = mesh.number_of_cells()
+        space = ConformingScalarVESpace2d(mesh, p=3)
+        DOF = space.dof_matrix
+        for i in range(NC):
+            np.testing.assert_allclose(DOF[i], data["DOF"][i], atol=1e-10)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", PI0)
+    def test_PI0(self, backend, data):
+        bm.set_backend(backend)
+        mesh = PolygonMesh.from_box([0,1,0,1],1,1)
+        NC = mesh.number_of_cells()
+        space = ConformingScalarVESpace2d(mesh, p=3)
+        PI0 = space.PI0
+        for i in range(NC):
+            np.testing.assert_allclose(PI0[i], data["PI0"][i], atol=1e-10)
+
+    @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
+    @pytest.mark.parametrize("data", stab)
+    def test_stab(self, backend, data):
+        bm.set_backend(backend)
+        mesh = PolygonMesh.from_box([0,1,0,1],1,1)
+        NC = mesh.number_of_cells()
+        space = ConformingScalarVESpace2d(mesh, p=3)
+        stab = space.stab
+        for i in range(NC):
+            np.testing.assert_allclose(stab[i], data["stab"][i], atol=1e-10)
+
+
 if __name__ == "__main__":
     t = TestConformingScalarVESpace2d()
     t.test_dof('pytorch', dof[0])
     t.test_dof('numpy', dof[0])
+    t.test_PI1('numpy', PI1[0])
+    t.test_PI1('pytorch', PI1[0])
+    t.test_DOF('numpy', DOF[0])
+    t.test_DOF('pytorch', DOF[0])
+    t.test_PI0('numpy', PI0[0])
+    t.test_PI0('pytorch', PI0[0])
+    t.test_stab('numpy', stab[0])
+    t.test_stab('pytorch', stab[0])
 

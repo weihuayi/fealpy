@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from fealpy import logger
 logger.setLevel('WARNING')
 from fealpy.mesh import TetrahedronMesh
-from fealpy.functionspace.cm_conforming_fe_space3d import CmConformingFESpace3d 
+from fealpy.functionspace.cm_conforming_fe_space_3d import CmConformingFESpace3d 
 from fealpy.fem import BilinearForm 
 from fealpy.fem.mthlaplace_integrator import MthLaplaceIntegrator
 from fealpy.fem import LinearForm, ScalarSourceIntegrator
@@ -70,7 +70,7 @@ mesh = TetrahedronMesh.from_box([0,1,0,1,0,1], n, n, n, device=device)
 ikwargs = bm.context(mesh.cell)
 fkwargs = bm.context(mesh.node)
 
-NDof = bm.zeros(maxit, **ikwargs)
+NDof = bm.zeros(maxit, **fkwargs)
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\\Omega,0}$',
@@ -146,3 +146,23 @@ print("最终误差",errorMatrix1)
 print("order : ", bm.log2(errorMatrix1[0,:-1]/errorMatrix1[0,1:]))              
 print("order : ", bm.log2(errorMatrix1[1,:-1]/errorMatrix1[1,1:]))              
 print("order : ", bm.log2(errorMatrix1[2,:-1]/errorMatrix1[2,1:]))
+import numpy as np                                                              
+import matplotlib.pyplot as plt                                                 
+fig = plt.figure()                                                              
+axes = fig.gca()                                                                
+linetype = ['k-*', 'r-o', 'b-D', 'g-->', 'k--8', 'm--x','r-.x']                 
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[0]),1)                          
+print(c)                                                                           
+axes.loglog(NDof,errorMatrix1[0],linetype[0],label =                            
+            '$||u-u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))                      
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[1]),1)                          
+axes.loglog(NDof,errorMatrix1[1],linetype[1],label =                            
+            '$||\\nabla u-\\nabla u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))      
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[2]),1)                          
+axes.loglog(NDof,errorMatrix1[2],linetype[2],label =                            
+            '$||\\nabla^2 u-\\nabla^2 u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))  
+axes.legend()
+#filename = f'cm.png'
+#plt.savefig(filename)
+
+plt.show()

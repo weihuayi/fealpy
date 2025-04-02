@@ -65,7 +65,7 @@ y = sp.symbols('y')
 #u = (sp.sin(2*y)*sp.sin(2*x))
 #u = x**3*y**4
 #u = x**2*(x-1)**5*y+2*x*y**2*(y-1)**5
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))
+u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 pde = TripleLaplacePDE(u) 
 ulist = get_flist(u, device=device)
 mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
@@ -73,13 +73,13 @@ mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
 ikwargs = bm.context(mesh.cell)
 fkwargs = bm.context(mesh.node)
 
-NDof = bm.zeros(maxit, **ikwargs)
+NDof = bm.zeros(maxit, **fkwargs)
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\\Omega,0}$',
              '$||\\nabla^2 u - \\nabla^2 u_h||_{\\Omega,0}$']
-errorMatrix = bm.zeros((3, maxit), **fkwargs)
-errorMatrix1 = bm.zeros((3, maxit), **fkwargs)
+errorMatrix = bm.zeros((4, maxit), **fkwargs)
+errorMatrix1 = bm.zeros((4, maxit), **fkwargs)
 tmr.send('网格和pde生成时间')
 
 for i in range(maxit):
@@ -141,9 +141,14 @@ for i in range(maxit):
     @barycentric
     def ug2val(p):
         return space.grad_m_value(uh, p, 2)
+    @barycentric
+    def ug3val(p):
+        return space.grad_m_value(uh, p, 3)
+
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
     errorMatrix[1, i] = mesh.error(pde.gradient, ugval)
     errorMatrix[2, i] = mesh.error(pde.hessian, ug2val)
+    errorMatrix[3, i] = mesh.error(pde.grad_3, ug3val)
 
     @barycentric                                                                
     def ugval1(p):                                                              
@@ -152,9 +157,13 @@ for i in range(maxit):
     @barycentric                                                                
     def ug2val1(p):                                                             
         return space.grad_m_value(uh1, p, 2)                                    
+    @barycentric                                                                
+    def ug3val1(p):                                                             
+        return space.grad_m_value(uh1, p, 3)       
     errorMatrix1[0, i] = mesh.error(uh1, 0, q=p+3)                              
     errorMatrix1[1, i] = mesh.error(ugval1, 0, q=p+3)                           
     errorMatrix1[2, i] = mesh.error(ug2val1, 0, q=p+3) 
+    errorMatrix1[3, i] = mesh.error(ug3val1, 0, q=p+3) 
     if i < maxit-1:
         mesh.uniform_refine(n=1)
     tmr.send(f'第{i}次误差计算及网格加密时间')
@@ -164,7 +173,33 @@ print("最终误差",errorMatrix)
 print("order : ", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 print("order : ", bm.log2(errorMatrix[1,:-1]/errorMatrix[1,1:]))
 print("order : ", bm.log2(errorMatrix[2,:-1]/errorMatrix[2,1:]))
+print("order : ", bm.log2(errorMatrix[3,:-1]/errorMatrix[3,1:]))
 print("最终误差",errorMatrix1)                                                  
 print("order : ", bm.log2(errorMatrix1[0,:-1]/errorMatrix1[0,1:]))              
 print("order : ", bm.log2(errorMatrix1[1,:-1]/errorMatrix1[1,1:]))              
 print("order : ", bm.log2(errorMatrix1[2,:-1]/errorMatrix1[2,1:]))    
+print("order : ", bm.log2(errorMatrix1[3,:-1]/errorMatrix1[3,1:]))    
+import numpy as np
+import matplotlib.pyplot as plt
+fig = plt.figure()                                                              
+axes = fig.gca()                                                                
+linetype = ['k-*', 'r-o', 'b-D', 'g-->', 'k--8', 'm--x','r-.x']                 
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[0]),1)                          
+print(c)                                                                        
+axes.loglog(NDof,errorMatrix1[0],linetype[0],label =                            
+            '$||u-u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))                      
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[1]),1)                          
+axes.loglog(NDof,errorMatrix1[1],linetype[1],label =                            
+            '$||\\nabla u-\\nabla u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))         
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[2]),1)                          
+axes.loglog(NDof,errorMatrix1[2],linetype[2],label =                            
+            '$||\\nabla^2 u-\\nabla^2 u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))  
+c = np.polyfit(np.log(NDof),np.log(errorMatrix1[3]),1)                          
+axes.loglog(NDof,errorMatrix1[2],linetype[2],label =                            
+            '$||\\nabla^2 u-\\nabla^2 u_h||_{\\Omega,0}=O(h^{%0.4f})$'%(c[0]))  
+
+axes.legend()                                                                   
+#filename = f'cm.png'                                                           
+#plt.savefig(filename)                                                          
+                                                                                
+plt.show()             

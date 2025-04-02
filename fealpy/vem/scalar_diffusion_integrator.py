@@ -31,24 +31,24 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
-
-    @enable_cache
-    def fetch(self, space: _FS):
-        q = self.q
-        index = self.index
-        mesh = getattr(space, 'mesh', None)
-
-        if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarMassIntegrator only support spaces on"
-                               f"homogeneous meshes, but {type(mesh).__name__} is"
-                               "not a subclass of HomoMesh.")
-
-        cm = mesh.entity_measure('cell', index=index)
-        q = space.p+3 if self.q is None else self.q
-        qf = mesh.quadrature_formula(q, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.basis(bcs, index=index)
-        return bcs, ws, phi, cm, index
+#
+#    @enable_cache
+#    def fetch(self, space: _FS):
+#        q = self.q
+#        index = self.index
+#        mesh = getattr(space, 'mesh', None)
+#
+#        if not isinstance(mesh, HomogeneousMesh):
+#            raise RuntimeError("The ScalarMassIntegrator only support spaces on"
+#                               f"homogeneous meshes, but {type(mesh).__name__} is"
+#                               "not a subclass of HomoMesh.")
+#
+#        cm = mesh.entity_measure('cell', index=index)
+#        q = space.p+3 if self.q is None else self.q
+#        qf = mesh.quadrature_formula(q, 'cell')
+#        bcs, ws = qf.get_quadrature_points_and_weights()
+#        phi = space.basis(bcs, index=index)
+#        return bcs, ws, phi, cm, index
 
     @enable_cache
     def assembly(self, space):

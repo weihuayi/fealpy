@@ -1,8 +1,6 @@
 import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 from itertools import combinations_with_replacement
-#from .femdof import multi_index_matrix2d, multi_index_matrix1d
-#from .lagrange_fe_space import LagrangeFESpace
 
 from typing import Optional, TypeVar, Union, Generic, Callable
 from ..typing import TensorLike, Index, _S, Threshold
@@ -370,6 +368,27 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         Py = bm.zeros([NC, N, N], **self.fkwargs)
         Py[:, bm.arange(len(I)), I] = mindex[None, I, 2]/h[:, None]
         return Px[index], Py[index]
+
+    def cell_mass_matrix(self, p=None):
+        """
+        Cell mass matrix, shape:(NC, ldof, ldof)
+        """
+        #M = self.matrix_H(p=p)
+        p = self.p if p is None else p
+        def f(x, index):
+            phi = self.basis(x, index=index, p=p)
+            return bm.einsum('eqi, eqj -> eqij', phi, phi)
+        return self.integral(f) # 积分
+
+    def cell_stiff_matrix(self, p=None):
+        p = self.p if p is None else p
+        M = self.cell_mass_matrix()
+        Px, Py = self.partial_matrix()
+        S1 = bm.einsum("cji, cjk, ckl -> cil", Px, M, Px)
+        S2 = bm.einsum("cji, cjk, ckl -> cil", Py, M, Py)
+        return S1 + S2
+
+
     def edge_integral(self, f):
         mesh = self.mesh
         p = self.p
@@ -556,9 +575,6 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
                 axes.plot_trisurf(coor[ii, :, 0], coor[ii, :, 1], fval[ii], color = 'b', lw=0.0)#真解图像
         plt.show()
         return
-
-    def cell_mass_matrix(self, p=None):
-        return self.matrix_H(p=p)
 
     def edge_mass_matrix(self, p=None):
         p = self.p if p is None else p
@@ -1242,3 +1258,4 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         err = bm.sqrt(self.integralalg.integral(f))
         return err
 
+                
