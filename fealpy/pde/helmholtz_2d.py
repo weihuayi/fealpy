@@ -67,7 +67,7 @@ class HelmholtzData2d():
         y = p[..., 1]
         grad = self.gradient(p) # (NC, NQ, dof_numel)
         val = np.sum(grad*n[:, np.newaxis, :], axis=-1)
-        kappa = np.broadcast_to(np.complex_(0.0 + 1j * k), shape=x.shape)
+        kappa = np.broadcast_to(np.array([0.0 + 1j * k,], dtype=np.complex128), shape=x.shape)
         val += kappa*self.solution(p) 
         return val
 
