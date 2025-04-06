@@ -38,7 +38,7 @@ class DifferentialtedCreativeSearch(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, pc=0.5):
+    def run(self, params={'pc':0.5}):
         """
         Runs the Differentialted Creative Search algorithm.
 
@@ -46,6 +46,7 @@ class DifferentialtedCreativeSearch(Optimizer):
             pc (float): The probability of team diversification, default is 0.5.
         """
         # Initialize fitness values and find the best solution in the initial population
+        pc = params.get('pc')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]

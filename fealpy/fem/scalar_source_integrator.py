@@ -34,10 +34,10 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         index = self.entity_selection(inidces)
         mesh = getattr(space, 'mesh', None)
 
-        if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
-                               f"homogeneous meshes, but {type(mesh).__name__} is"
-                               "not a subclass of HomoMesh.")
+        # if not isinstance(mesh, HomogeneousMesh):
+        #     raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
+        #                        f"homogeneous meshes, but {type(mesh).__name__} is"
+        #                        "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
         q = space.p+3 if self.q is None else self.q

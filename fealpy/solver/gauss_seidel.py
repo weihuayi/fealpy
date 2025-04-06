@@ -3,19 +3,15 @@ from typing import Optional, Protocol
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
-from .mumps import spsolve, spsolve_triangular
-from ..sparse.coo_tensor import COOTensor
-from ..sparse.csr_tensor import CSRTensor
 
 from .. import logger
 
 class SupportsMatmul(Protocol):
     def __matmul__(self, other: TensorLike) -> TensorLike: ...
 
-def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
+def gauss_seidel(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
        atol: float=1e-12, rtol: float=1e-8,
        maxit: Optional[int]=10000,returninfo: bool=False) -> TensorLike:
-    
     """
     Solve a linear system Ax = b using the Gauss-Seidel method.
 
@@ -43,7 +39,7 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
 
         This method assumes that the system is well-conditioned for the Gauss-Seidel iteration.
     """
-    
+    from .mumps import spsolve_triangular
     assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
         assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"
@@ -82,5 +78,5 @@ def gs(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None,
     info['niter'] = niter 
     if returninfo is True:
         return x, info
-    if returninfo is True:
+    else:
         return x

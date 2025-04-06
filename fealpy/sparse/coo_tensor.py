@@ -144,10 +144,13 @@ class COOTensor(SparseTensor):
         except (AttributeError, NotImplementedError):
             pass
 
+        count = bm.bincount(self._indices[0], minlength=self._spshape[0])
+        crow = bm.cumsum(count)
+        crow = bm.concat([bm.tensor([0], **bm.context(crow)), crow])
+        count = bm.bincount(self._indices[0], minlength=self._spshape[0])
+        crow = bm.cumsum(count)
+        crow = bm.concat([bm.tensor([0], **bm.context(crow)), crow])
         order = bm.argsort(self._indices[0], stable=True)
-        new_row = self._indices[0, order]
-        crow = bm.nonzero((bm.not_equal(new_row, bm.roll(new_row, 1))))[0]
-        crow = bm.concat([crow, bm.tensor([self.nnz], **bm.context(crow))])
         new_col = bm.copy(self._indices[-1, order])
 
         if self.values is None:
@@ -190,7 +193,7 @@ class COOTensor(SparseTensor):
         order = bm.lexsort(tuple(reversed(self._indices)))
         sorted_indices = self._indices[:, order]
         unique_mask = bm.concat([
-            bm.ones((1, ), dtype=bm.bool, device=bm.get_device(sorted_indices)),
+            bm.ones((1, ), dtype=bool, device=bm.get_device(sorted_indices)),
             bm.any(sorted_indices[:, 1:] - sorted_indices[:, :-1], axis=0)
         ], axis=0)
         new_indices = bm.copy(sorted_indices[..., unique_mask])
@@ -275,29 +278,51 @@ class COOTensor(SparseTensor):
         if len(coo_tensors) == 0:
             raise ValueError("coo_tensors cannot be empty")
 
-        elif len(coo_tensors) == 1:
+        if len(coo_tensors) == 1:
             return coo_tensors[0]
 
-        fcoo = coo_tensors[0]
-        total_nnz = sum(coo.nnz for coo in coo_tensors)
-        new_indices = bm.empty((fcoo.sparse_ndim, total_nnz), **bm.context(fcoo.indices))
-        new_indices[:, :fcoo.nnz] = fcoo.indices
-        nnz_cursor = fcoo.nnz
-        size_cursor = fcoo.sparse_shape[axis]
-        values_list = [fcoo.values]
+        indices_list = []
+        values_list = []
+        prev_len = 0
 
-        for coo in coo_tensors[1:]:
-            slicing = slice(nnz_cursor, nnz_cursor + coo.nnz)
-            new_indices[:, slicing] = coo.indices
-            new_indices[axis, slicing] += size_cursor
-            values_list.append(coo.values)
-            nnz_cursor += coo.nnz
-            size_cursor += coo.sparse_shape[axis]
+        for coo in coo_tensors:
+            indices = bm.copy(coo.indices)
+            indices = bm.index_add(
+                indices, bm.array([axis], device=indices.device), prev_len,
+                axis=0
+            )
+            indices_list.append(indices)
+            values_list.append(bm.copy(coo.values))
+            prev_len += coo.sparse_shape[axis]
 
-        spshape = list(fcoo.sparse_shape)
-        spshape[axis] = size_cursor
+        new_indices = bm.concat(indices_list, axis=1)
+        del indices_list
+        new_values = bm.concat(values_list, axis=-1)
+        del values_list
+        spshape = list(coo_tensors[-1].sparse_shape)
+        spshape[axis] = prev_len
+        return cls(new_indices, new_values, spshape)
+        indices_list = []
+        values_list = []
+        prev_len = 0
 
-        return cls(new_indices, bm.concat(values_list, axis=-1), spshape)
+        for coo in coo_tensors:
+            indices = bm.copy(coo.indices)
+            indices = bm.index_add(
+                indices, bm.array([axis], device=indices.device), prev_len,
+                axis=0
+            )
+            indices_list.append(indices)
+            values_list.append(bm.copy(coo.values))
+            prev_len += coo.sparse_shape[axis]
+
+        new_indices = bm.concat(indices_list, axis=1)
+        del indices_list
+        new_values = bm.concat(values_list, axis=-1)
+        del values_list
+        spshape = list(coo_tensors[-1].sparse_shape)
+        spshape[axis] = prev_len
+        return cls(new_indices, new_values, spshape)
 
     ### 6. Arithmetic Operations ###
     def neg(self) -> 'COOTensor':

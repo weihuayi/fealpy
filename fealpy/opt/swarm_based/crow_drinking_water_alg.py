@@ -30,7 +30,7 @@ class CrowDrinkingWaterAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, p=0.9):
+    def run(self, params={'p':0.9}):
         """
         Executes the Crow Drinking Water optimization algorithm.
         
@@ -38,6 +38,7 @@ class CrowDrinkingWaterAlg(Optimizer):
             p (float): Probability factor for exploitation vs exploration.
         """
         # Evaluate initial fitness for all solutions
+        p = params.get('p')
         fit = self.fun(self.x)
 
         # Initialize the global best solution

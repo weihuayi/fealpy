@@ -47,7 +47,7 @@ class MarinePredatorsAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, P=0.5, FADs=0.2):
+    def run(self, params={'P':0.5, 'FADs':0.2}):
         """
         Runs the Marine Predators Algorithm to find the optimal solution.
 
@@ -60,6 +60,8 @@ class MarinePredatorsAlg(Optimizer):
         """
         
         # Initial fitness and global best solution
+        P = params.get('P')
+        FADs = params.get('FADs')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]

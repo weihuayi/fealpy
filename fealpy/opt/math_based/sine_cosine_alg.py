@@ -33,7 +33,7 @@ class SineCosineAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, a=2):
+    def run(self, params={'a':2}):
         """
         Runs the Sine Cosine Algorithm.
 
@@ -42,6 +42,7 @@ class SineCosineAlg(Optimizer):
                        default is 2.
         """
         # Initialize fitness values and find the best solution in the initial population
+        a = params.get('a')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]
