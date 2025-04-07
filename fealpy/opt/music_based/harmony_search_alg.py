@@ -1,6 +1,6 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-from fealpy.opt.opt_function import initialize
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
+from ..opt_function import initialize
 
 class HarmonySearchAlg(Optimizer):
     """

@@ -1,11 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-
-"""
-StarFish Optimization Algorithm
-
-
-"""
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class StarFishOptAlg(Optimizer):
     """

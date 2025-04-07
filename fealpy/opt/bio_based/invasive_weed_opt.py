@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class InvasiveWeedOpt(Optimizer):
     """
@@ -52,11 +52,11 @@ class InvasiveWeedOpt(Optimizer):
         self.gbest_f = fit[gbest_index]
 
         # Main optimization loop
-        for it in range(self.maxit):
-            self.d_pl_pt(it)  # Calculate exploration and exploitation percentages
+        for it in range(self.MaxIT):
+            self.D_pl_pt(it)  # Calculate exploration and exploitation percentages
 
             # Update sigma based on the iteration number
-            sigma = ((self.maxit - it) / self.maxit) ** n * (sigma_initial - sigma_final) + sigma_final
+            sigma = ((self.MaxIT - it) / self.MaxIT) ** n * (sigma_initial - sigma_final) + sigma_final
             
             # Calculate the number of seeds for each solution
             seed_num = bm.floor((s_max - s_min) * (fit - bm.min(fit)) / (bm.max(fit) - bm.min(fit)) + s_min)
