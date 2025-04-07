@@ -136,15 +136,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the nodes in a structured mesh.
         """
-        device = self.device
-
         GD = 2
         nx, ny = self.nx, self.ny
         box = [self.origin[0], self.origin[0] + nx * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1]]
 
-        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype, device=device)
-        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype, device=device)
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype, device=self.device)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype, device=self.device)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
 
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
@@ -189,15 +187,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the cells in a structured mesh.
         """
-        device = self.device
-
         nx, ny = self.nx, self.ny
         NN = self.NN
         NC = self.NC
 
-        idx = bm.arange(NN, device=device).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, device=self.device).reshape(nx + 1, ny + 1)
 
-        cell = bm.zeros((NC, 4), dtype=self.itype, device=device)
+        cell = bm.zeros((NC, 4), dtype=self.itype, device=self.device)
         c = idx[:-1, :-1]
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1

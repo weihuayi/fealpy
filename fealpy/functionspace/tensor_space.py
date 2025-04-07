@@ -180,7 +180,7 @@ class TensorFunctionSpace(FunctionSpace):
             if self.dof_priority:
                 return bm.concatenate(scalar_is_bd_dof)
             else:
-                return bm.concatenate([bm.array([j[i] for j in scalar_is_bd_dof]) for i in range(scalar_gdof)])
+                return bm.concatenate([bm.array([j[i] for j in scalar_is_bd_dof], device=self.device) for i in range(scalar_gdof)])
                         
         else:
             raise ValueError(f"Unknown type of threshold {type(threshold)}")
@@ -247,7 +247,7 @@ class TensorFunctionSpace(FunctionSpace):
                         for j in range(self.dof_numel):
                             # 从 gd_tensor[j] 中获取第 i 个标量基函数的值
                             gd_values.append(gd_tensor[j][i] if i < len(gd_tensor[j]) else 0.0)
-                    gd_tensor = bm.array(gd_values)
+                    gd_tensor = bm.array(gd_values, device=self.device)
                     gd_tensor = gd_tensor[isTensorBDof]
 
                 uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor)
