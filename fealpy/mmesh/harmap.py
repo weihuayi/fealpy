@@ -1,9 +1,11 @@
 from .base import *
 from .tool import quad_equ_solver,cubic_equ_solver
 
+
 class Harmap(MM_monitor,MM_Interpolater):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self,mesh,beta,vertices,r, config:Config):
+        MM_monitor.__init__(self,mesh,beta,vertices,r,config)
+        MM_Interpolater.__init__(self,mesh,vertices,config)
         self.alpha = config.alpha
         self.tol = config.tol
         self.maxit = config.maxit
@@ -19,10 +21,10 @@ class Harmap(MM_monitor,MM_Interpolater):
         """
         if self.TD == 2:
             self.equ_solver = quad_equ_solver
-            self.compute_coef = self._compute_coef_general_2d
+            self.compute_coef = self._compute_coef_2d
         elif self.TD == 3:
             self.equ_solver = cubic_equ_solver
-            self.compute_coef = self._compute_coef_general_3d
+            self.compute_coef = self._compute_coef_3d
 
         if self.mesh_type in ["TriangleMesh","TetrahedronMesh"]:
             self.scell = self.cell
@@ -224,7 +226,7 @@ class Harmap(MM_monitor,MM_Interpolater):
         for i in range(TD):
             blocks[i][i] = H11
         H0 = bmat(blocks, format='csr')
-        move_innerlogic_node = cg(H0, F, atol=1e-6,returninfo=True)[0]
+        move_innerlogic_node = cg(H0, F, atol=1e-8,returninfo=True)[0]
         move_innerlogic_node = move_innerlogic_node.reshape((TD, INN)).T
         harmap = bm.set_at(harmap, ~isBdNode, move_innerlogic_node)
 
@@ -276,12 +278,7 @@ class Harmap(MM_monitor,MM_Interpolater):
                             delta_x[Bdinnernode_idx] - dot[:,None] * self.Bi_Pnode_normal)
 
         # physical node move distance
-        if self.mesh_type in ["LagrangeTriangleMesh", "LagrangeQuadrangleMesh"]:
-            coef = self._compute_coef_lagrange(delta_x)             
-        else:
-            A,C = self.AC_gererator(self.scell,node,delta_x)
-            coef = self.compute_coef(A,C)
-
+        coef = self.compute_coef(delta_x)
         x = self.equ_solver(coef)
         positive_x = bm.where(x>0, x, 1)
         eta = bm.min(positive_x)
@@ -300,7 +297,26 @@ class Harmap(MM_monitor,MM_Interpolater):
         b = (J[..., 0, 0] * dJ[..., 1, 1] + J[..., 1, 1] * dJ[..., 0, 0]
              - J[..., 0, 1] * dJ[..., 1, 0] - J[..., 1, 0] * dJ[..., 0, 1]) @ self.ws
         return [a, b, c]
+    
+    def _compute_coef_2d(self, p):
+        """
+        Compute coefficients for 2D case.
+        """
+        return self._compute_general_coef(p, self._compute_coef_general_2d)
 
+    def _compute_coef_3d(self, p):
+        """
+        Compute coefficients for 3D case.
+        """
+        return self._compute_general_coef(p, self._compute_coef_general_3d)
+    
+    def _compute_general_coef(self, delta_x , fun):
+        """
+        @brief compute the coefficient of the quadratic equation
+        """
+        A, C = self.AC_gererator(delta_x)
+        return fun(A, C)
+    
     def _compute_coef_general_2d(self,A,C):
         """
         @brief compute the coefficient of the quadratic equation
@@ -341,12 +357,14 @@ class Harmap(MM_monitor,MM_Interpolater):
         a, b, c, d = a[ridx], b[ridx], c[ridx], d[ridx]
         return [a, b, c, d]
     
-    def AC_gererator(self,scell,node,delta_x):
+    def AC_gererator(self,delta_x):
         """
         @brief generate the tensor A and C to construct the equation
         @param scell: the cell has been splited
         @param node: the physical node
         """
+        node = self.node
+        scell = self.scell
         A = bm.permute_dims((node[scell[:,1:]] - node[scell[:,0,None]]),axes=(0,2,1))
         C = bm.permute_dims((delta_x[scell[:,1:]] - delta_x[scell[:,0,None]]),axes=(0,2,1))
         return A,C
@@ -402,7 +420,7 @@ class Harmap(MM_monitor,MM_Interpolater):
         self.cm = self.mesh.entity_measure('cell')
         self.sm = self._get_star_measure()
         self.d = self._sqrt_det_G(self.bcs)
-        self._mass_gererator()
+        self.update_matrix()
         self.mot()
 
     def mesh_redistributor(self):
@@ -417,11 +435,16 @@ class Harmap(MM_monitor,MM_Interpolater):
             if L_infty_error < self.tol:
                 print(f'total iteration: {i}')
                 break
-            elif i == self.maxit - 1:
-                print('exceed the maximum iteration')
-                break
+
             moved_node = self._get_physical_node(harmap,move_vector_field)
             self._construct(moved_node)
+        else:
+            print('exceed the maximum iteration')
+
+    def mp_mesh_redistributor(self):
+        self.repack()
+        self.mesh_redistributor()
+        self.uh = self.uh.T.reshape(-1,)
 
     def preprocessor(self,fun_solver =None):
         """
@@ -429,24 +452,53 @@ class Harmap(MM_monitor,MM_Interpolater):
         @param steps: fake time steps
         """
         pde = self.pde
-        uh0 = self.uh
         steps = self.pre_steps
         if fun_solver is None:
             if pde is None:
-                self.uh = uh0/steps
+                self.uh = self.uh/steps
                 for i in range(steps):
                     self.mesh_redistributor()
                     self.uh *= 1+1/(i+1)
             else:
                 for i in range(steps):
                     t = (i+1)/steps
-                    self.uh = t * uh0
+                    self.uh = t * self.uh
                     self.mesh_redistributor()
-                    uh0 = pde.solution(self.mesh.node)
-                self.uh = uh0
+                    self.uh = pde.init_solution(self.mesh.node)
         else:
             for i in range(steps):
                 t = (i+1)/steps
                 self.uh *= t
                 self.mesh_redistributor()
                 self.uh = fun_solver(self.mesh)
+        
+    def mp_preprocessor(self):
+        """
+        @brief preprocessor: linear transition initialization with multi-physics
+        @param steps: fake time steps
+        """
+        pde = self.pde
+        self.repack()
+        steps = self.pre_steps
+        if pde is None:
+            self.uh = self.uh/steps
+            for i in range(steps):
+                self.mesh_redistributor()
+                self.uh *= 1+1/(i+1)
+        else:
+            for i in range(steps):
+                t = (i+1)/steps
+                self.uh = t * self.uh
+                self.mesh_redistributor()
+                self.uh = pde.init_solution(self.mesh.node)
+        self.uh = self.uh.T.reshape(-1,)
+
+    def repack(self):
+        GDOF = self.space.number_of_global_dofs()
+        pro_uh = bm.zeros((GDOF,self.dim),**self.kwargs0)
+        for i in range(self.dim):
+            pro_uh = bm.set_at(pro_uh,(...,i), segmenter(self.uh,self.dim,i))
+        self.uh = pro_uh
+
+    
+

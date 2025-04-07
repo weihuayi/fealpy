@@ -42,45 +42,41 @@ __all__ = [
 ]
 
 class Config:
-    def __init__(self,mesh:_U,
-                    uh: Union[TensorLike, callable],
-                    beta:float,
-                    vertices:TensorLike,
-                    r = 0.15,
-                    alpha = 0.5,
-                    mol_times = 1,
-                    active_method:str = 'Harmap',
-                    pde = None,
-                    logic_domain = None,
-                    tol = None,
-                    maxit = 500,
-                    is_pre = True,
-                    pre_steps = 5,
-                    fun_solver:callable = None,
-                    monitor:str = 'arc_length',
-                    mol_meth:str = 'heatequ',
-                    int_meth:str = 'comass'):
+    def __init__(self,
+                 beta:Union[float, list] = 0.5,
+                 r:Union[float, list] = 0.15,
+                 alpha = 0.5,
+                 mol_times = 1,
+                 active_method:str = 'Harmap',
+                 pde = None,
+                 logic_domain = None,
+                 tol = None,
+                 maxit = 500,
+                 is_pre = True,
+                 pre_steps = 5,
+                 fun_solver:callable = None,
+                 monitor:str = 'arc_length',
+                 mol_meth:str = 'heatequ',
+                 int_meth:str = 'comass'):
         """
-        @param mesh: mesh instance include TriangleMesh,TetrahedronMesh,
-                                            QuadrangleMesh,HexahedronMesh,
-                                            LagrangeTriangleMesh,LagrangeQuadrangleMesh
-        @param uh: solution of the problem
-        @param beta: parameter of the monitor function
-        @param vertices: vertices of the domain
         @param r: parameter of the mollification method
         @param alpha: parameter of the mollification method
         @param mol_times: times of the mollification
         @param method: method of moving mesh
         @param logic_domain: logic domain of the problem
+        @param pde: PDEData instance
+        @param tol: tolerance of the solver
+        @param maxit: maximum iteration of the solver
+        @param is_pre: whether to use preprocessor
+        @param pre_steps: number of preprocessor steps
+        @param fun_solver: function solver
+        @param is_multi_phy: whether multi-physics problem
         @param monitor: monitor function
         @param mol_meth: mollification method
         @param int_meth: interpolation method
         @param odes_solver: odes solver
         """
-        self.mesh = mesh
-        self.uh = uh 
         self.beta = beta
-        self.vertices = vertices
         self.r = r
         self.alpha = alpha
         self.mol_times = mol_times
@@ -95,24 +91,10 @@ class Config:
         self.monitor = monitor
         self.mol_meth = mol_meth
         self.int_meth = int_meth
+        self.parallel_mode = 'none'
         self._check()
 
     def _check(self):
-        if not isinstance(self.mesh, _U.__args__):
-            raise TypeError(f"mesh must be one of the types: {', '.join([t.__name__ for t in _U.__args__])}")
-        
-        if not (callable(self.uh) or isinstance(self.uh, TensorLike)):
-            raise TypeError("uh must be a function or tensor-like data")
-        
-        if not isinstance(self.beta, (float,int)):
-            raise TypeError("beta must be a float")
-        
-        if not isinstance(self.vertices, TensorLike):
-            raise TypeError("vertices must be tensor-like data")
-        
-        if not isinstance(self.r, (int, float)):
-            raise TypeError("r must be an int or float")
-        
         if not isinstance(self.alpha, float):
             raise TypeError("alpha must be a float")
         
@@ -137,6 +119,9 @@ class Config:
         if not isinstance(self.pre_steps, int):
             raise TypeError("pre_steps must be an int")
         
+        if self.fun_solver is not None and not callable(self.fun_solver):
+            raise TypeError("fun_solver must be a callable or None")
+        
         if not isinstance(self.monitor, str):
             raise TypeError("monitor must be a string")
         
@@ -148,3 +133,6 @@ class Config:
         
         if self.int_meth not in ['comass'] and self.pde is None:
             raise ValueError("pde must be given when int_meth is not 'comass'")
+        
+        if self.parallel_mode not in ['none', 'thread', 'process']:
+            raise ValueError("parallel_mode must be 'none', 'thread', 'process'")
