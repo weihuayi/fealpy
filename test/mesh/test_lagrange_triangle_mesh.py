@@ -82,7 +82,7 @@ class TestLagrangeTriangleMeshInterfaces:
 
             if i < maxit-1:
                 mesh.uniform_refine()
-                
+
     @pytest.mark.parametrize("backend", ['numpy'])
     def test_curve_mesh(self, backend):
         bm.set_backend(backend)
@@ -160,6 +160,7 @@ class TestLagrangeTriangleMeshInterfaces:
 
 
 if __name__ == "__main__":
-    #a = TestLagrangeTriangleMeshInterfaces()
-    #a.test_uniform_refine('numpy')
-    pytest.main(["./test_lagrange_triangle_mesh.py"])
+    a = TestLagrangeTriangleMeshInterfaces()
+    #a.test_init_mesh(init_data[0], 'numpy')
+    a.test_surface_mesh('numpy')
+    #pytest.main(["./test_lagrange_triangle_mesh.py"])

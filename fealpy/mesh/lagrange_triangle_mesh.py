@@ -137,6 +137,36 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         lmesh.cell2edge = mesh.cell2edge
         lmesh.edge  = mesh.edge_to_ipoint(p)
         return lmesh 
+    
+    def uniform_refine(self , n:int = 1 ):
+        """
+        @brief 高阶网格一致加密方法
+        @param n: int, 加密次数
+        """
+        ref_mesh = TriangleMesh.from_one_triangle()
+        ref_node = ref_mesh.node
+        ref_cell = ref_mesh.cell
+        ref_mesh.uniform_refine(n)
+        Lg_ref_node = ref_mesh.interpolation_points(self.p)
+        Lg_ref_cell = ref_mesh.cell_to_ipoint(self.p)
+        v = ref_node[ref_cell] - Lg_ref_node[:,None,:]
+        a0 = 0.5 * bm.abs(bm.cross(v[:, 1, :], v[:, 2, :]))
+        a1 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 2, :]))
+        a2 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 1, :]))
+        re = bm.zeros((len(Lg_ref_node),3), dtype = self.ftype)
+        re = bm.set_at(re, (...,0), 2*a0)
+        re = bm.set_at(re, (...,1), 2*a1)
+        re = bm.set_at(re, (...,2), 2*a2)
+        self.linearmesh.uniform_refine(n)
+        phi = self.shape_function(re , variables= "u")[None,...]
+        nen = bm.einsum('cql, cld -> cqd', phi, self.node[self.cell])
+        self.cell = self.linearmesh.cell_to_ipoint(self.p)
+        c = nen[:,Lg_ref_cell,:].transpose(1,0,2,3).reshape(-1,self.cell.shape[-1], self.GD)
+        kwargs = bm.context(self.node)
+        new_node = bm.zeros((bm.max(self.cell)+1,self.node.shape[-1]),**kwargs)
+        new_node = bm.set_at(new_node, self.cell, c)
+        self.node = new_node
+        self.construct()
 
     def uniform_refine(self , n:int = 1 ):
         """
@@ -195,7 +225,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return p
     
     # shape function
-    def shape_function(self, bc: TensorLike, p: int=None, variables='x'):
+    def shape_function(self, bc: TensorLike, p: int=None, variables='x',index: Index=_S):
         p = self.p if p is None else p 
         phi = bm.simplex_shape_function(bc, p=p)
         if variables == 'u':
@@ -445,7 +475,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             return e
         else:
             return bm.sum(e)
-    
+
     def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
         """
         @brief Calculate the error between two functions.
@@ -495,7 +525,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             e = bm.sum(e)**(1/power)
         else:
             e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
-        return e # float or (NC, )
+        return e # float or (NC, )  
     
     # 可视化
     def vtk_cell_type(self, etype='cell'):

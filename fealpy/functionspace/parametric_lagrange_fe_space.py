@@ -65,7 +65,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
 
     def edge_to_dof(self, index: Index=_S):
         return self.dof.edge_to_dof()[index]
-    
+
     def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
             return self.dof.is_boundary_dof(threshold=threshold, method=method)
@@ -94,7 +94,7 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
                 bcs = self.mesh.multi_index_matrix(p, TD)/p # (NQ, TD+1)
                 val = u(bcs) # (NC, ldof)
                 cell2dof = self.cell_to_dof()
-                uI = bm.zeros(self.number_of_global_dofs(), dtype=sellf.ftype)
+                uI = bm.zeros(self.number_of_global_dofs(), dtype=self.ftype)
                 uI = bm.set_at(uI, cell2dof, val)
         return self.function(uI)
 
@@ -137,7 +137,8 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         """
         """
         pass
- 
+
+    
     @barycentric
     def edge_basis(self, bc: TensorLike):
         phi = self.mesh.shape_function(bc)
