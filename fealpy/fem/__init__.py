@@ -56,3 +56,4 @@ from .nonlinear_wrapper import NonlinearWrapperInt
 from .poisson_lfem_solver import PoissonLFEMSolver
 from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver
 from .level_set_lfem_model import LevelSetLFEMModel
+from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
