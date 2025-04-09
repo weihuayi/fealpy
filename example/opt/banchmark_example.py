@@ -15,14 +15,14 @@ from fealpy.opt.benchmark import iopt_benchmark_data as iopt_data
 
 num = 0
 lb, ub = iopt_data[num]['domain']
-NP = 5
+NP = 100
 MaxIters = 1000
 dim = 30
 x0 = initialize(NP, dim, ub, lb, method=None)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
-optimizer = InvasiveWeedOpt(option)
+optimizer = ExponentialTrigonometricOptAlg(option)
 optimizer.run()
-optimizer.plot_curve("WhaleOptAlg")
+optimizer.plot_curve()
 optimizer.plot_plpt_percen()
 optimizer.print_optimal_result()
 # print("Function times:", optimizer.NF)
