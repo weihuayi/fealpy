@@ -1,17 +1,6 @@
-from fealpy.opt.opt_function import levy
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-
-"""
-Squirrel Search Algorithm  
-
-Reference:
-~~~~~~~~~~
-Mohit Jain, Vijander Singh, Asha Rani.
-A novel nature-inspired algorithm for optimization: Squirrel search algorithm.
-Swarm and Evolutionary Computation, 2019, 44: 148-175
-"""
-
+from ..opt_function import levy
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class SquirrelSearchAlg(Optimizer):
     """

@@ -180,9 +180,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                self.origin[1], self.origin[1] + ny * self.h[1],
                self.origin[2], self.origin[2] + nz * self.h[2]]
 
-        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype)
-        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype)
-        z = bm.linspace(box[4], box[5], nz + 1, dtype=self.ftype)
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype, device=self.device)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype, device=self.device)
+        z = bm.linspace(box[4], box[5], nz + 1, dtype=self.ftype, device=self.device)
         xx, yy, zz = bm.meshgrid(x, y, z, indexing='ij')
         node = bm.concatenate((xx[..., None], yy[..., None], zz[..., None]), axis=-1)
 
@@ -209,19 +209,22 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         NE0 = 0
         NE1 = nx * (ny + 1) * (nz + 1)
-        c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
+        # c = bm.transpose(idx, (0, 1, 2))[:-1, :, :]
+        c = bm.permute_dims(idx, axes=(0, 1, 2))[:-1, :, :]
         edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
         edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
         
         NE0 = NE1
         NE1 += (nx + 1) * ny * (nz + 1)
-        c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
+        # c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
+        c = bm.permute_dims(idx, axes=(0, 1, 2))[:, :-1, :]
         edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
         edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (nz + 1))
 
         NE0 = NE1
         NE1 += (nx + 1) * (ny + 1) * nz
-        c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
+        # c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
+        c = bm.permute_dims(idx, axes=(0, 1, 2))[:, :, :-1]
         edge = bm.set_at(edge, (slice(NE0, NE1), 0), c.flatten())
         edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + 1)
 
@@ -243,7 +246,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         NF0 = 0
         NF1 = (nx + 1) * ny * nz
         c = idx[:, :-1, :-1]
-        face[NF0:NF1, 0] = c.flatten()
+        # face[NF0:NF1, 0] = c.flatten()
         face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
         face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + nz + 1)
@@ -253,7 +256,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         NF0 = NF1
         NF1 += nx * (ny + 1) * nz
-        c = bm.transpose(idx, (0, 1, 2))[:-1, :, :-1]
+        # c = bm.transpose(idx, (0, 1, 2))[:-1, :, :-1]
+        c = bm.permute_dims(idx, axes=(0, 1, 2))[:-1, :, :-1]
         face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
         face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
@@ -268,7 +272,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         NF0 = NF1
         NF1 += nx * ny * (nz + 1)
-        c = bm.transpose(idx, (0, 1, 2))[:-1, :-1, :]
+        # c = bm.transpose(idx, (0, 1, 2))[:-1, :-1, :]
+        c = bm.permute_dims(idx, axes=(0, 1, 2))[:-1, :-1, :]
         face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
         face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + nz + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + (ny + 1) * (nz + 1))
@@ -291,10 +296,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         NC = self.NC
         nx, ny, nz = self.nx, self.ny, self.nz
 
-        idx = bm.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
+        idx = bm.arange(NN, device=self.device).reshape(nx + 1, ny + 1, nz + 1)
         c = idx[:-1, :-1, :-1]
 
-        cell = bm.zeros((NC, 8), dtype=self.itype)
+        cell = bm.zeros((NC, 8), dtype=self.itype, device=self.device)
         nyz = (ny + 1) * (nz + 1)
 
         cell = bm.set_at(cell, (slice(None), 0), c.flatten())
@@ -305,35 +310,16 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         cell = bm.set_at(cell, (slice(None), 5), cell[:, 4] + 1)
         cell = bm.set_at(cell, (slice(None), 6), cell[:, 2] + nyz)
         cell = bm.set_at(cell, (slice(None), 7), cell[:, 6] + 1)
+        # cell[:, 0] = c.flatten()
+        # cell[:, 1] = cell[:, 0] + 1
+        # cell[:, 2] = cell[:, 0] + nz + 1
+        # cell[:, 3] = cell[:, 2] + 1
+        # cell[:, 4] = cell[:, 0] + nyz
+        # cell[:, 5] = cell[:, 4] + 1
+        # cell[:, 6] = cell[:, 2] + nyz
+        # cell[:, 7] = cell[:, 6] + 1
 
         return cell
-
-        # # TODO: Provide a unified implementation that is not backend-specific
-        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-        #     cell[:, 0] = c.flatten()
-        #     cell[:, 1] = cell[:, 0] + 1
-        #     cell[:, 2] = cell[:, 0] + nz + 1
-        #     cell[:, 3] = cell[:, 2] + 1
-        #     cell[:, 4] = cell[:, 0] + nyz
-        #     cell[:, 5] = cell[:, 4] + 1
-        #     cell[:, 6] = cell[:, 2] + nyz
-        #     cell[:, 7] = cell[:, 6] + 1
-
-        #     return cell
-        # elif bm.backend_name == 'jax':
-        #     cell = cell.at[:, 0].set(c.flatten())
-        #     cell = cell.at[:, 1].set(cell[:, 0] + 1)
-        #     cell = cell.at[:, 2].set(cell[:, 0] + nz + 1)
-        #     cell = cell.at[:, 3].set(cell[:, 2] + 1)
-        #     cell = cell.at[:, 4].set(cell[:, 0] + nyz)
-        #     cell = cell.at[:, 5].set(cell[:, 4] + 1)
-        #     cell = cell.at[:, 6].set(cell[:, 2] + nyz)
-        #     cell = cell.at[:, 7].set(cell[:, 6] + 1)
-
-        #     return cell
-        # else:
-        #     raise NotImplementedError("Backend is not yet implemented.")
-    
     
     # 实体拓扑
     def number_of_nodes_of_cells(self):
@@ -564,7 +550,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         # face2cell[fidy[0], 3] = 0
 
         # z direction
-        idz = bm.astype(bm.transpose(idx, (2, 0, 1)), face2cell.dtype)
+        # idz = bm.astype(bm.transpose(idx, (2, 0, 1)), face2cell.dtype)
+        idz = bm.astype(bm.permute_dims(idx, axes=(2, 0, 1)), face2cell.dtype)
         NF0 = NF1
         NF1 += nx * ny * (nz + 1)
         # NOTE 2021/09/07: The following line is incorrect. The correct line is the next one. 
@@ -663,7 +650,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             return temp2.reshape(-1)
         elif etype == 3:
             # Measure of cells (volumes)
-            temp = bm.tensor(self.h[0] * self.h[1] * self.h[2], dtype=self.ftype)
+            temp = bm.tensor(self.h[0] * self.h[1] * self.h[2], dtype=self.ftype, device=self.device)
             return bm.broadcast_to(temp, (NC,))
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
@@ -1034,9 +1021,9 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             niy = ny + 1 + ny * (p - 1)
             niz = nz + 1 + nz * (p - 1)
             
-            node_x_indices = bm.arange(0, nix, p)
-            node_y_indices = bm.arange(0, niy, p)
-            node_z_indices = bm.arange(0, niz, p)
+            node_x_indices = bm.arange(0, nix, p, device=self.device)
+            node_y_indices = bm.arange(0, niy, p, device=self.device)
+            node_z_indices = bm.arange(0, niz, p, device=self.device)
             
             node_z_grid, node_y_grid, node_x_grid = bm.meshgrid(node_z_indices, node_y_indices, node_x_indices, indexing='ij')
             
@@ -1071,10 +1058,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             start_indices = node_to_ipoint[edges[:, 0]]
             end_indices = node_to_ipoint[edges[:, 1]]
             
-            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype, device=self.device).reshape(1, -1)
             edge2ipoint = start_indices[:, None] * (1 - linspace_indices) + \
                           end_indices[:, None] * linspace_indices
-            edge2ipoint = edge2ipoint.astype(self.itype)
+            edge2ipoint = bm.astype(edge2ipoint, self.itype)
         elif ordering == 'nefc':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -1110,11 +1097,12 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
             start_indices = edge_to_ipoint[face2edge[:, 0]]
             end_indices = edge_to_ipoint[face2edge[:, 1]]  
 
-            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype).reshape(1, -1)
+            linspace_indices = bm.linspace(0, 1, p + 1, endpoint=True, dtype=self.ftype, device=self.device).reshape(1, -1)
             face_ipoints_interpolated = start_indices[:, :, None] * (1 - linspace_indices) + \
                                         end_indices[:, :, None] * linspace_indices
 
-            face2ipoint = face_ipoints_interpolated.reshape(-1, (p+1)**2).astype(self.itype)
+            # face2ipoint = face_ipoints_interpolated.reshape(-1, (p+1)**2).astype(self.itype)
+            face2ipoint = bm.astype(face_ipoints_interpolated.reshape(-1, (p+1)**2), self.itype)
         elif ordering == 'nefc':
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -1270,7 +1258,7 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         TD = J.shape[-1]
 
         shape = J.shape[0:-2] + (TD, TD)
-        G = bm.zeros(shape, dtype=self.ftype)
+        G = bm.zeros(shape, dtype=self.ftype, device=self.device)
 
         for i in range(TD):
             # 计算对角元素

@@ -46,7 +46,8 @@ class Optimizer():
         self.N = options["NP"]
         self.MaxIT = options["MaxIters"]
         self.dim = options["ndim"]
-        self.lb, self.ub = options["domain"]
+        if options["domain"] is not None:
+            self.lb, self.ub = options["domain"]
         self.curve = bm.zeros((self.MaxIT,))
         self.D_pl = bm.zeros((self.MaxIT,))
         self.D_pt = bm.zeros((self.MaxIT,))

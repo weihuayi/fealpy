@@ -107,7 +107,8 @@ def spspmm_csr(crow1: _DT, col1: _DT, values1: _DT, spshape1: _Size,
     new_values = bm.index_add(new_values, inverse_indices, values, axis=-1)
 
     for x in unique_indices[0,:]:
-        new_crow[x+1]+=1
+        # new_crow[x+1]+=1
+        new_crow = bm.set_at(new_crow, x+1, new_crow[x+1])
 
     new_crow=bm.cumsum(new_crow, axis =-1)
 

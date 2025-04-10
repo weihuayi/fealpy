@@ -420,13 +420,14 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
 
         symbolic_int = LinearSymbolicIntegration(space1=scalar_space, space2=scalar_space)
         kwargs = bm.context(node)
+
         S = bm.tensor(symbolic_int.gphi_gphi_matrix(), **kwargs)  # (LDOF1, LDOF1, BC, BC)
 
         if isinstance(mesh, SimplexMesh):   
             glambda_x = mesh.grad_lambda()  # (NC, LDOF, GD)
             return cm, bcs, glambda_x, S
         elif isinstance(mesh, StructuredMesh):
-            JG = bm.tensor(symbolic_int.compute_mapping(vertices=cell_vertices), **kwargs)  # (NC, GD, GD)
+            JG = symbolic_int.compute_mapping(vertices=cell_vertices)  # (NC, GD, GD)
             return cm, bcs, JG, S
         else:
             raise NotImplementedError("symbolic assembly for general meshes is not implemented yet.")
