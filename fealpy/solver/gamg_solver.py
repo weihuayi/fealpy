@@ -3,14 +3,14 @@ from ..backend import backend_manager as bm
 from ..operator import LinearOperator
 from .cg import cg
 from scipy.sparse.linalg import spsolve_triangular,spsolve
-from .amg_coarsen import *
-from .amg_interpolation import *
+from .amg import ruge_stuben_amg
 from ..sparse.coo_tensor import COOTensor
 from ..sparse.csr_tensor import CSRTensor
 from .. import logger
 from ..utils import timer
 import time 
 from scipy.sparse.linalg import eigs
+
 class GAMGSolver():
     """
     Fast Solvers for Geometric and Algebraic Multigrid Methods
@@ -109,8 +109,7 @@ class GAMGSolver():
                 self.L.append(self.A[-1].tril()) # 前磨光的光滑子
                 self.U.append(self.A[-1].triu()) # 后磨光的光滑子
 
-                isC, G = ruge_stuben_coarsen(self.A[-1], self.theta)
-                p, r = ruge_stuben_interpolation(isC, G)
+                p, r = ruge_stuben_amg(self.A[-1], self.theta)
                 
                 self.P.append(p)
                 self.R.append(r)
