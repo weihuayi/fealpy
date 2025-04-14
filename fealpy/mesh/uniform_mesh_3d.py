@@ -1389,6 +1389,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                     current_data = data[0]  # 获取当前密度值
                 else:
                     current_data = data
+
+                # 确保数据在 CPU 上
+                current_data = current_data.cpu() if hasattr(current_data, 'cpu') else current_data
+            
                 
                 # 检查是否为向量场数据
                 if len(current_data.shape) > 1 and current_data.shape[-1] > 1:
@@ -1417,7 +1421,10 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
                     current_data = data[0]  # 获取当前密度值
                 else:
                     current_data = data
-                
+
+                # 确保数据在 CPU 上
+                current_data = current_data.cpu() if hasattr(current_data, 'cpu') else current_data
+
                 # 将数据展平
                 data_array = numpy_to_vtk(current_data.flatten(), deep=True)
                 data_array.SetName(name)
