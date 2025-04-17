@@ -43,15 +43,15 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
     def interpolation_points(self) -> TensorLike:
         return self.dof.interpolation_points()
 
-    def cell_to_dof(self) -> TensorLike:
-        return self.dof.cell_to_dof()
+    def cell_to_dof(self, index: Index = _S) -> TensorLike:
+        return self.dof.cell_to_dof(index=index)
 
-    def face_to_dof(self) -> TensorLike:
-        return self.dof.face_to_dof()
+    def face_to_dof(self, index: Index = _S) -> TensorLike:
+        return self.dof.face_to_dof(index=index)
 
-    def is_boundary_dof(self, threshold=None) -> TensorLike:
+    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
-            return self.dof.is_boundary_dof(threshold)
+            return self.dof.is_boundary_dof(threshold, method=method)
         else:
             raise RuntimeError("boundary dof is not supported by discontinuous spaces.")
 
@@ -328,8 +328,8 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         uI = bm.set_at(uI,(c2d),bm.einsum('ij, cj->ci', l2b, uI[c2d]))
         return uI
 
-    def boundary_interpolate(self, gD: Union[Callable, int, float],
-            uh: TensorLike, threshold) -> TensorLike:
+    def boundary_interpolate(self, gd: Union[Callable, int, float],
+            uh: TensorLike, threshold=None, method=None) -> TensorLike:
         """
         @brief Interpolates the Dirichlet boundary condition.
         """
@@ -341,16 +341,16 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         isDDof = bm.zeros(gdof, device=self.device, dtype=bm.bool)
         # isDDof[f2d] = True
         isDDof = bm.set_at(isDDof,(f2d),True)
-        if callable(gD):
+        if callable(gd):
             ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
-            gD = gD(ipoints[isDDof])
+            gd = gd(ipoints[isDDof])
 
         # uh[isDDof] = gD
-        uh = bm.set_at(uh,(isDDof),gD)
+        uh = bm.set_at(uh,(isDDof), gd)
         l2b = self.bernstein_to_lagrange(self.p, self.TD - 1) 
         # uh[f2d] = bm.einsum('ij, fj->fi', l2b, uh[f2d])
         uh = bm.set_at(uh,(f2d),bm.einsum('ij, fj->fi', l2b, uh[f2d])) 
-        return isDDof
+        return self.function(uh), isDDof
 
     set_dirichlet_bc = boundary_interpolate
 
