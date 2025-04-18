@@ -179,9 +179,7 @@ class TensorFunctionSpace(FunctionSpace):
             if self.dof_priority:
                 return bm.concatenate(scalar_is_bd_dof)
             else:
-                return bm.stack(scalar_is_bd_dof, axis=1).flatten()
-                # return bm.concatenate([bm.array([j[i] for j in scalar_is_bd_dof], device=self.device) for i in range(scalar_gdof)])
-                        
+                return bm.stack(scalar_is_bd_dof, axis=1).flatten()                        
         else:
             raise ValueError(f"Unknown type of threshold {type(threshold)}")
         return is_bd_dof.reshape(-1)   
@@ -236,7 +234,19 @@ class TensorFunctionSpace(FunctionSpace):
                 if self.dof_priority:
                     gd_tensor = bm.concatenate(gd_tensor)
                 else:
-                    gd_tensor = bm.stack(gd_tensor, axis=1).flatten()
+                    # ! 注意这里的效率没有 dof_priority 的高
+                    scalar_gdof = scalar_space.number_of_global_dofs()
+                    full_values = bm.zeros((scalar_gdof, self.dof_numel), 
+                                            dtype=bm.float64, device=self.device)
+                    
+                    for i in range(self.dof_numel):
+                        indices = bm.where(isScalarBDof[i])[0]
+                        full_values = bm.set_at(full_values, (indices, i), gd_tensor[i])
+                    
+                    gd_tensor = full_values.reshape(-1)
+                    gd_tensor = gd_tensor[isTensorBDof]
+
+                    # gd_tensor = bm.stack(gd_tensor, axis=1).flatten()
                     # scalar_gdof = scalar_space.number_of_global_dofs()
                     # # 使用列表推导式重新排列数据
                     # gd_values = []
