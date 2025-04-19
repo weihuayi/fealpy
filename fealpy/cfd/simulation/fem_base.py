@@ -100,7 +100,12 @@ class FEM:
             if isinstance(space, str):
                 updates['type'] = space
             elif isinstance(space, FunctionSpace):
-                updates['space_obj'] = space
+                if isinstance(space, TensorFunctionSpace):
+                    updates['type'] = space.scalar_space.__str__().split()[0]
+                    updates['p'] = space.scalar_space.p
+                else:
+                    updates['type'] = space.scalar_space.__str__().split()[0]
+                    updates['p'] = space.p
 
             if p is not None:
                 updates['p'] = p

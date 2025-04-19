@@ -285,7 +285,6 @@ class ipcs_simulation(SimulationBase):
             if self.params._params["output"]["onoff"]:
                 name = 'test_'+ str(i+1).zfill(10) + '.vtu'
                 self.output(name)
-            print("max_u",bm.max(bm.abs(u0)))
     
     def run_one_step(self, u0:TensorLike, p0:TensorLike, output:bool=False):
         """单步求解"""
