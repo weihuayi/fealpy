@@ -210,7 +210,7 @@ class NSFEMSolver():
 
         def B_coef(bcs, index):
             result = -bm.einsum('...i, ...j->...ij', p0(bcs, index), self.mesh.face_unit_normal(index=index))
-            #result += bm.einsum('eqij, ej->eqi', u0.grad_value(bcs, index), self.mesh.face_unit_normal(index=index))
+            result += bm.einsum('eqij, ej->...i', u0.grad_value(bcs, index), self.mesh.face_unit_normal(index=index))
             return result
 
         self.ipcs0_lform_SI.source = coef
