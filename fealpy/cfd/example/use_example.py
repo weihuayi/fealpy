@@ -13,10 +13,8 @@ pde = Channel()
 ns_eq = IncompressibleNS(pde)
 fem = IPCS(ns_eq)
 sim = fem.simulation()
-sim.run()
-
-
-
+#sim.run()
+#exit()
 
 
 '''
@@ -32,12 +30,10 @@ print(bm.sum(bm.abs(p1)))
 #print(fem.params)
 #print(ns_eq)
 #print(sim.params)
-'''
-discret.set.assembly(quadrature_order=4)
+fem.set.assembly(quadrature_order=4)
 space = LagrangeFESpace(pde.mesh, p=3)
 space = TensorFunctionSpace(space, (2,-1))
-discret.set.uspace(space=space)
-discret.set.uspace('Lagrange', p=3)
-discret.set.pspace(space)
-'''
-
+fem.set.uspace(space=space)
+#fem.set.uspace('Lagrange', p=3)
+fem.set.pspace(space)
+#print(fem.params)

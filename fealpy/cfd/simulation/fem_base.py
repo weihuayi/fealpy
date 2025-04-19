@@ -107,9 +107,10 @@ class FEM:
             updates.update(kwargs)
 
             self._parent.params.update(**{space_name: updates})
-
+            
+            property_name = '_' + space_name
             # 重新创建空间（会自动更新__str__）
-            setattr(self._parent, space_name, self._parent._create_space(space_name))
+            setattr(self._parent, property_name, self._parent._create_space(space_name))
             return self
         
 
@@ -129,10 +130,10 @@ class FEM:
                 updates['p'] = p
             self._parent.params.update(**{'uspace': updates})
             if control:
-                self._parent.uspace = space
+                self._parent._uspace = space
             else:
                 sspace = self._parent._create_space('uspace')
-                self._parent.uspace = TensorFunctionSpace(sspace, (self._parent.mesh.GD,-1))
+                self._parent._uspace = TensorFunctionSpace(sspace, (self._parent.mesh.GD,-1))
             return self
 
         def pspace(self,

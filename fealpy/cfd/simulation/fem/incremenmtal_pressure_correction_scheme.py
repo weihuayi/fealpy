@@ -286,6 +286,7 @@ class ipcs_simulation(SimulationBase):
                 name = 'test_'+ str(i+1).zfill(10) + '.vtu'
                 self.output(name)
             print("max_u",bm.max(bm.abs(u0)))
+    
     def run_one_step(self, u0:TensorLike, p0:TensorLike, output:bool=False):
         """单步求解"""
         pde = self.equation.pde
@@ -376,13 +377,12 @@ class IPCSSimulationParameters(SimulationParameters):
 
     @property
     def timeline(self) :
-        """生成时间点序列：np.arange(T0, T1+dt, dt)"""
-        return self._params["output"].copy()
+        return self._params["output"]
 
     @property
     def output_params(self) :
         """获取输出参数（只读视图）"""
-        return self._params["output"].copy()
+        return self._params["output"]
 
     @property
     def solver_type(self):
