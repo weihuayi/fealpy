@@ -798,6 +798,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         return J
     
+    # 第一基本形式
     def first_fundamental_form(self, J: TensorLike) -> TensorLike:
         """
         @brief Compute the first fundamental form from the Jacobi matrix.
@@ -806,26 +807,40 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            for i in range(TD):
-                G[..., i, i] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
-                for j in range(i+1, TD):
-                    G[..., i, j] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
-                    G[..., j, i] = G[..., i, j]
+
+        for i in range(TD):
+            # 计算对角元素
+            diag_val = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
+            G = bm.set_at(G, (..., i, i), diag_val)
+            
+            for j in range(i+1, TD):
+                # 计算非对角元素
+                off_diag_val = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
+                G = bm.set_at(G, (..., i, j), off_diag_val)
+                G = bm.set_at(G, (..., j, i), off_diag_val)
+
+        return G  
+
+        # # TODO: Provide a unified implementation that is not backend-specific
+        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+        #     for i in range(TD):
+        #         G[..., i, i] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
+        #         for j in range(i+1, TD):
+        #             G[..., i, j] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
+        #             G[..., j, i] = G[..., i, j]
                     
-            return G
-        elif bm.backend_name == 'jax':
-            for i in range(TD):
-                G = G.at[..., i, i].set(bm.einsum('...d, ...d -> ...', 
-                                                J[..., i], J[..., i]))
-                for j in range(i + 1, TD):
-                    G = G.at[..., i, j].set(bm.einsum('...d, ...d -> ...', 
-                                                    J[..., i], J[..., j]))
-                    G = G.at[..., j, i].set(G[..., i, j])
-            return G
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        #     return G
+        # elif bm.backend_name == 'jax':
+        #     for i in range(TD):
+        #         G = G.at[..., i, i].set(bm.einsum('...d, ...d -> ...', 
+        #                                         J[..., i], J[..., i]))
+        #         for j in range(i + 1, TD):
+        #             G = G.at[..., i, j].set(bm.einsum('...d, ...d -> ...', 
+        #                                             J[..., i], J[..., j]))
+        #             G = G.at[..., j, i].set(G[..., i, j])
+        #     return G
+        # else:
+        #     raise NotImplementedError("Backend is not yet implemented.")
                
 
     # 其他方法

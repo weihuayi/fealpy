@@ -1,10 +1,75 @@
-
+from fealpy.backend import backend_manager as bm
 from scipy.optimize import minimize_scalar
 
 class LineSearch:
     def search(self, x, objective, direction):
         raise NotImplementedError("Subclasses should implement this method.")
 
+class StrongWolfeLineSearch(LineSearch):
+    def __init__(self):
+        pass
+
+    def zoom(self,x,s,d,objective,alpha_0,alpha_1,f0,fl,c1,c2):
+        iter_ = 0
+        while iter_ < 20:
+            alpha = (alpha_0 + alpha_1)/2
+            xc = x + alpha*d
+            fc, gc = objective(xc)
+            if (fc > f0 + c1*alpha*s)\
+            or (fc >= fl):
+                alpha_1 = alpha
+            else:
+                sc = bm.dot(gc,d)
+                if bm.abs(sc) <= -c2*s:
+                    return alpha, xc, fc, gc
+
+                if sc*(alpha_1 - alpha_0) >= 0:
+                    alpha_1 = alpha_0
+                    fl = fc
+                alpha_0 = alpha
+
+            iter_ += 1
+        return alpha, xc, fc, gc
+
+    def search(self,x0,f,s,d,objective,alpha0):
+        c1,c2 = 0.001,0.1
+        alpha = alpha0
+        alpha_0 = 0.0
+        alpha_1 = alpha
+
+        fx = f
+        f0 = f
+        iter_ = 0
+
+        while iter_ < 10:
+            xc = x0 + alpha_1*d
+            fc, gc = objective(xc)
+            sc = bm.dot(gc,d)
+
+            if (fc > f0 + c1*alpha_1*s)\
+            or (
+                (iter_ > 0) and (fc >= fx)
+            ):
+                alpha, xc, fc, gc = self.zoom(
+                    x0, s, d, objective, alpha_0, alpha_1, f0, fc, c1, c2
+                )
+                break
+
+            if bm.abs(sc) <= -c2*s:
+                alpha = alpha_1
+                break
+
+            if (sc >= 0):
+                alpha, xc, fc, gc = self.zoom(
+                    x0, s, d, objective, alpha_1, alpha_0, f0, fc, c1, c2
+                )
+                break
+
+            alpha_0 = alpha_1
+            alpha_1 = min(10, 3*alpha_1)
+            fx = fc
+            iter_ = iter_ + 1
+        return alpha, xc, fc, gc
 
 class ArmijoLineSearch(LineSearch):
     def __init__(self, beta=0.6, sigma=0.01):

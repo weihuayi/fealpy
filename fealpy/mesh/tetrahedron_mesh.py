@@ -482,16 +482,106 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             raise ValueError("The etype only support face, other etype is not implemented.")
 
 
-
-    def uniform_refine(self, n=1, returnim=False,returnrm=False):
+    def prolongation_matrix(self, p0: int, p1: int):
         """
-        Perform uniform refinement on the tetrahedral mesh.
+        Return the prolongation_matrix from p0 to p1: 0 < p0 < p1
 
-        @param n Number of refinement iterations (default: 1)
+        Parameters:
+            p0(int): The degree of the lowest-order space.
+            p1(int): The degree of the highest-order space.
+
+        Returns:
+            CSRTensor: the prolongation_matrix from p0 to p1
+        """
+        assert 0 < p0 < p1
+
+        TD = self.top_dimension()#Geometric Dimension
+        gdof0 = self.number_of_global_ipoints(p0)
+        gdof1 = self.number_of_global_ipoints(p1)
+        matrix_shape = (gdof1,gdof0)
+
+        # 1. Interpolation points on the mesh nodes: Inherit the original interpolation points
+        NN = self.number_of_nodes()
+        V_1 = bm.ones(NN)
+        I_1 = bm.arange(NN)
+        J_1 = bm.arange(NN)
+
+        # 2. Interpolation points within the mesh edges
+        NE = self.number_of_edges()
+        bcs = self.multi_index_matrix(p1, 1) / p1  
+        phi = self.edge_shape_function(bcs[1:-1], p=p0)  # (ldof1 - 2, ldof0)
+
+        e2p1 = self.edge_to_ipoint(p1)[:, 1:-1]
+        e2p0 = self.edge_to_ipoint(p0)
+        shape = (NE,) + phi.shape
+
+        I_2 = bm.broadcast_to(e2p1[:, :, None], shape=shape).flat
+        J_2 = bm.broadcast_to(e2p0[:, None, :], shape=shape).flat
+        V_2 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+
+        # 3. Interpolation points within the mesh faces
+        if p1 > 2:
+            NF = self.number_of_faces()
+            bcs = self.multi_index_matrix(p1, 2) / p1
+            flag = bm.sum(bcs > 0, axis=1) == 3
+            phi = self.face_shape_function(bcs[flag, :], p=p0)
+            f2p1 = self.face_to_ipoint(p1)[:, flag]
+            f2p0 = self.face_to_ipoint(p0)
+
+            shape = (NF,) + phi.shape
+
+            I_3 = bm.broadcast_to(f2p1[:, :, None], shape=shape).flat
+            J_3 = bm.broadcast_to(f2p0[:, None, :], shape=shape).flat
+            V_3 = bm.broadcast_to(phi[None, :, :], shape=shape).flat
+
+        # 4. Interpolation points within the mesh cells
+        if p1 > 3:
+            NC = self.number_of_cells()
+            bcs = self.multi_index_matrix(p1, 3)/p1
+            flag = bm.sum(bcs>0, axis=1) == 4
+            phi = self.shape_function(bcs[flag, :], p=p0)
+            c2p1 = self.cell_to_ipoint(p1)[:, flag]
+            c2p0 = self.cell_to_ipoint(p0)
+
+            shape = (NC, ) + phi.shape
+
+            I_4 = bm.broadcast_to(c2p1[:, :, None], shape=shape).flat
+            J_4 = bm.broadcast_to(c2p0[:, None, :], shape=shape).flat
+            V_4 = bm.broadcast_to( phi[None, :, :], shape=shape).flat
+        
+        # 5.concatenate
+        if p1 <=2:
+            V = bm.concatenate((V_1, V_2), axis=0) 
+            I = bm.concatenate((I_1, I_2), axis=0) 
+            J = bm.concatenate((J_1, J_2), axis=0) 
+            P = csr_matrix((V, (I, J)), matrix_shape)
+        elif p1 == 3:
+            V = bm.concatenate((V_1, V_2, V_3), axis=0) 
+            I = bm.concatenate((I_1, I_2, I_3), axis=0) 
+            J = bm.concatenate((J_1, J_2, J_3), axis=0) 
+            P = csr_matrix((V, (I, J)), matrix_shape)
+        else:
+            V = bm.concatenate((V_1, V_2, V_3,V_4), axis=0) 
+            I = bm.concatenate((I_1, I_2, I_3,I_4), axis=0) 
+            J = bm.concatenate((J_1, J_2, J_3,J_4), axis=0) 
+            P = csr_matrix((V, (I, J)), matrix_shape)
+
+        return P
+
+    def uniform_refine(self, n=1, returnim=False):
+        """
+        Uniform refine the tetrahedral mesh n times.
+
+        Parameters:
+            n (int): Times refine the triangle mesh.
+            returnirm (bool): Return the prolongation matrix list or not,from the finest to the the coarsest
+        
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest
         """
         if returnim:
-            nodeIMatrix = []
-            cellIMatrix = []
+            IM = []
 
         for i in range(n):
             NN = self.number_of_nodes()
@@ -503,20 +593,26 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             cell = self.entity('cell')
             cell2edge = self.cell_to_edge()
 
-            edge2newNode = bm.arange(NN, NN+NE)
+            kargs = bm.context(cell)
+            edge2newNode = bm.arange(NN, NN + NE, **kargs)
             newNode = (node[edge[:, 0], :]+node[edge[:, 1], :])/2.0
 
             self.node = bm.concatenate((node, newNode), axis=0)
 
-            if returnim:
-                A = coo_matrix((bm.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), **self.fkwargs)
-                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), **self.fkwargs)
-                A += coo_matrix((0.5*bm.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), **self.fkwargs)
-                nodeIMatrix.append(A.tocsr())
+            if returnim is True:
+                shape = (NN + NE, NN)
+                kargs = bm.context(node)
+                values = bm.ones(NN+2*NE, **kargs) 
+                values = bm.set_at(values, bm.arange(NN, NN+2*NE), 0.5)
 
-                B = eye(NC, **self.fkwargs)
-                B = bmat([[B], [B], [B], [B], [B], [B], [B], [B]])
-                cellIMatrix.append(B.tocsr())
+                kargs = bm.context(cell)
+                i0 = bm.arange(NN, **kargs) 
+                I = bm.concatenate((i0, edge2newNode, edge2newNode))
+                J = bm.concatenate((i0, edge[:, 0], edge[:, 1]))   
+
+                P = csr_matrix((values, (I, J)), shape)
+
+                IM.append(P)
 
             p = edge2newNode[cell2edge]
             newCell = bm.zeros((8*NC, 4), **self.ikwargs)
@@ -562,6 +658,10 @@ class TetrahedronMesh(SimplexMesh, Plotable):
             newCell = bm.set_at(newCell , (slice(7*NC , 8*NC),3) , p[bm.arange(NC), T[:, 5]])
             self.cell = newCell
             self.construct()
+
+        if returnim is True:
+            IM.reverse()
+            return IM
 
             #self.ds.reinit(NN+NE, newCell)
     def circumcenter(self, index=_S, returnradius=False):
@@ -1129,6 +1229,14 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         cell = bm.set_at(cell, flag, nidxmap[cell[flag]])
 
         node = bm.concatenate((node, node[nidx]), axis=0)
+        mesh = cls(node, cell)
+        return mesh
+    @classmethod
+    def from_vtu(cls,file):
+        import meshio
+        data = meshio.read(file)
+        node = data.points
+        cell = data.cells_dict['tetra']
         mesh = cls(node, cell)
         return mesh
 

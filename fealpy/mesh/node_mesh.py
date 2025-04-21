@@ -9,7 +9,7 @@ from .mesh_base import MeshDS
 
 import jax.numpy as jnp
 import jax
-from jax_md import space, partition
+from ..backend.jax.jax_md import space, partition
 from jax import vmap, lax
 
 class NodeMesh(MeshDS):
@@ -52,13 +52,11 @@ class NodeMesh(MeshDS):
     def from_tgv_domain(cls, box_size, dx=0.02):
         rho0 = 1.0 #参考密度
         eta0 = 0.01 #参考动态粘度
-        
-        #n = bm.tensor((box_size / dx).round(), dtype=int)
+
         n = bm.astype(box_size // dx, bm.int32)
-        grid = bm.meshgrid(bm.arange(n[0]), bm.arange(n[1]), indexing="xy")
+        grid = bm.meshgrid(bm.arange(n[0],dtype=bm.float64), bm.arange(n[1], dtype=bm.float64), indexing="xy")
         
         r = (bm.stack((grid[0].flatten(),grid[1].flatten()), 1) + 0.5) * dx
-        
         NN = r.shape[0]
         tag = bm.zeros(NN)
         mv = bm.zeros((NN, 2), dtype=bm.float64)
@@ -105,37 +103,32 @@ class NodeMesh(MeshDS):
         hot_wall_half_width = 0.25 #温度一半长
 
         #wall particles
-        dxn1 = dx * n_walls
-        n1 = bm.tensor((bm.tensor([L, dxn1]) / dx).round(), dtype=int)
+        dxn1 = bm.array(dx * n_walls, dtype=bm.float64)
+        n1 = bm.astype(bm.array([L, dxn1]) / dx, bm.int32)
         grid1 = bm.meshgrid(bm.arange(n1[0]), bm.arange(n1[1]), indexing="xy")
-        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
-        wall_b = r1.copy()
-        wall_t = r1.copy() + bm.tensor([0.0, H + dxn1])
+        r1 = (bm.stack((grid1[0].flatten(),grid1[1].flatten()), 1) + 0.5) * dx
+        wall_b = bm.copy(r1)
+        wall_t = bm.copy(r1) + bm.array([0.0, H + dxn1], dtype=bm.float64)
         r_w = bm.concatenate([wall_b, wall_t])
 
         #fuild particles
-        n2 = bm.tensor((bm.tensor([L, H]) / dx).round(), dtype=int)
+        n2 = bm.astype(bm.array([L, H]) / dx, bm.int32)
         grid2 = bm.meshgrid(bm.arange(n2[0]), bm.arange(n2[1]), indexing="xy")
-        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
-        r_f = bm.tensor([0.0, 1.0]) * n_walls * dx + r2
+        r2 = (bm.stack((grid2[0].flatten(),grid2[1].flatten()), 1) + 0.5) * dx
+        r_f = bm.astype(bm.array([0.0, 1.0]) * n_walls * dx + r2, bm.float64)
 
-        #tag
-        '''
-        0 fluid
-        1 solid wall
-        2 moving wall
-        3 dirchilet wall
-        '''
-        tag_f = jnp.full(len(r_f), 0, dtype=int)
-        tag_w = jnp.full(len(r_w), 1, dtype=int)
-        r = bm.tensor(bm.concatenate([r_w, r_f]))
+        #tag:0-fluid,1-solid wall,2-moving wall,3-dirchilet wall
+        tag_f = bm.full((r_f.shape[0],), 0, dtype=bm.int32)
+        tag_w = bm.full((r_w.shape[0],), 1, dtype=bm.int32)
+        
+        r = bm.concatenate([r_w, r_f])
         tag = bm.concatenate([tag_w, tag_f])
 
-        dx2n = dx * n_walls * 2
-        _box_size = bm.tensor([L, H + dx2n])
+        dx2n = bm.array(dx * n_walls * 2, dtype=bm.float64)
+        _box_size = bm.array([L, H + dx2n], dtype=bm.float64)
         mask_hot_wall = ((r[:, 1] < dx * n_walls) * (r[:, 0] < (_box_size[0] / 2) + \
                 hot_wall_half_width) * (r[:, 0] > (_box_size[0] / 2) - hot_wall_half_width))
-        tag = jnp.where(mask_hot_wall, 3, tag)
+        tag = bm.where(mask_hot_wall, 3, tag)
         
         NN_sum = r.shape[0]
         mv = bm.zeros_like(r)
@@ -178,40 +171,34 @@ class NodeMesh(MeshDS):
         velocity_wall = 0.3 #每段温度边界长度
 
         #wall particles
-        dxn1 = dx * n_walls
-        n1 = bm.tensor((bm.tensor([L, dxn1]) / dx).round(), dtype=int)
+        dxn1 = bm.array(dx * n_walls, dtype=bm.float64)
+        n1 = bm.astype(bm.array([L, dxn1]) / dx, bm.int32)
         grid1 = bm.meshgrid(bm.arange(n1[0]), bm.arange(n1[1]), indexing="xy")
-        r1 = (jnp.vstack(list(map(jnp.ravel, grid1))).T + 0.5) * dx
-        wall_b = r1.copy()
-        wall_t = r1.copy() + bm.tensor([0.0, H + dxn1])
+        r1 = (bm.stack((grid1[0].flatten(),grid1[1].flatten()), 1) + 0.5) * dx
+        wall_b = bm.copy(r1)
+        wall_t = bm.copy(r1) + bm.array([0.0, H + dxn1], dtype=bm.float64)
         r_w = bm.concatenate([wall_b, wall_t])
 
         #fuild particles
-        n2 = bm.array((bm.array([L, H]) / dx).round(), dtype=int)
+        n2 = bm.astype(bm.array([L, H]) / dx, bm.int32)
         grid2 = bm.meshgrid(bm.arange(n2[0]), bm.arange(n2[1]), indexing="xy")
-        r2 = (jnp.vstack(list(map(jnp.ravel, grid2))).T + 0.5) * dx
-        r_f = bm.tensor([0.0, 1.0]) * n_walls * dx + r2
+        r2 = (bm.stack((grid2[0].flatten(),grid2[1].flatten()), 1) + 0.5) * dx
+        r_f = bm.astype(bm.array([0.0, 1.0]) * n_walls * dx + r2, bm.float64)
 
-        #tag
-        '''
-        0 fluid
-        1 solid wall
-        2 moving wall
-        3 velocity wall
-        '''
-        r = bm.tensor(bm.concatenate([r_w, r_f])) 
-        tag_f = jnp.full(len(r_f), 0, dtype=int)
-        tag_w = jnp.full(len(r_w), 1, dtype=int)
-        r = bm.tensor(bm.concatenate([r_w, r_f]))
+        #tag:0-fluid,1-solid wall,2-moving wall,3-dirchilet wall
+        tag_f = bm.full((r_f.shape[0],), 0, dtype=bm.int32)
+        tag_w = bm.full((r_w.shape[0],), 1, dtype=bm.int32)
+
+        r = bm.concatenate([r_w, r_f])
         tag = bm.concatenate([tag_w, tag_f])
 
-        dx2n = dx * n_walls * 2
-        _box_size = bm.tensor([L, H + dx2n])
+        dx2n = bm.array(dx * n_walls * 2, dtype=bm.float64)
+        _box_size = bm.array([L, H + dx2n], dtype=bm.float64)
         mask_hot_wall = (
         ((r[:, 1] < dx * n_walls) | (r[:, 1] > H + dx * n_walls)) &
         (((r[:, 0] > 0.3) & (r[:, 0] < 0.6)) | ((r[:, 0] > 0.9) & (r[:, 0] < 1.2)))
     )
-        tag = jnp.where(mask_hot_wall, 3, tag)
+        tag = bm.where(mask_hot_wall, 3, tag)
 
         NN_sum = r.shape[0]
         mv = bm.zeros_like(r)
@@ -326,289 +313,128 @@ class NodeMesh(MeshDS):
         node = jnp.vstack((pp, boundaryp))
 
         return cls(node)
-'''
-class KDTree:
-    def __init__(self, points):
-        """
-        初始化KDTree,输入为一个N x D的NumPy数组,表示N个D维的点集。
-        """
-        self.points = points
-        self.tree = self._build_tree(points, depth=0)
 
-    def _build_tree(self, points, depth):
-        """
-        递归构建KD-Tree。points是当前节点的点集,depth是当前树的深度。
-        """
-        if len(points) == 0:
-            return None
+    @classmethod
+    def from_pipe_domain(cls, domain, init_domain, H, dx=1.25e-4):
+        u_in = bm.array([5.0, 0.0], dtype=bm.float64) 
+        rho_0 = 737.54
+
+        f_x = bm.arange(init_domain[0], init_domain[1], dx, dtype=bm.float64)
+        f_y = bm.arange(init_domain[2] + dx, init_domain[3], dx, dtype=bm.float64)
+        fy, fx = bm.meshgrid(f_y, f_x, indexing='xy')
+        fp = bm.stack((fx.ravel(), fy.ravel()), axis=1)
+        f_tag = bm.zeros(len(fp), dtype=bm.int64)
         
-        # 选择当前维度
-        k = points.shape[1]  # 点的维度
-        axis = depth % k  # 循环选择维度
+        x0 = bm.arange(domain[0], domain[1], dx, dtype=bm.float64)
+        bwp = bm.stack((x0, bm.full_like(x0, domain[2])), axis=1)
+        uwp = bm.stack((x0, bm.full_like(x0, domain[3])), axis=1)
+        wp = bm.concatenate((bwp, uwp), axis=0)
+        w_tag = bm.ones(len(wp), dtype=bm.int64)
         
-        # 排序并选择中位点作为根节点
-        points = points[points[:, axis].argsort()]
-        median_idx = len(points) // 2
-        median_point = points[median_idx]
+        d_xb = bm.arange(domain[0], domain[1], dx, dtype=bm.float64)
+        d_yb = bm.arange(domain[2] - dx, domain[2] - dx * 4, -dx, dtype=bm.float64)
+        dyb, dxb = bm.meshgrid(d_yb, d_xb, indexing='xy')
+        bdp = bm.stack((dxb.ravel(), dyb.ravel()), axis=1)
+        d_yu = bm.arange(domain[3] + dx, domain[3] + dx * 3, dx, dtype=bm.float64)
+        dyu, dxu = bm.meshgrid(d_yu, d_xb, indexing='xy')
+        udp = bm.stack((dxu.ravel(), dyu.ravel()), axis=1)
+        dp = bm.concatenate((bdp, udp), axis=0)
+        d_tag = bm.full((len(dp),), 2, dtype=bm.int64)
 
-        # 递归构建左子树和右子树
-        left_tree = self._build_tree(points[:median_idx], depth + 1)
-        right_tree = self._build_tree(points[median_idx + 1:], depth + 1)
+        g_x = bm.arange(-dx, -dx - 4 * H, -dx, dtype=bm.float64)
+        g_y = bm.arange(domain[2] + dx, domain[3], dx, dtype=bm.float64)
+        gy, gx = bm.meshgrid(g_y, g_x, indexing='xy')
+        gp = bm.stack((gx.ravel(), gy.ravel()), axis=1)
+        g_tag = bm.full((len(gp),), 3, dtype=bm.int64)
 
-        return {
-            'point': median_point,
-            'left': left_tree,
-            'right': right_tree,
-            'axis': axis
+        r = bm.concatenate((fp, wp, dp, gp), axis=0)
+        tag = bm.concatenate((f_tag, w_tag, d_tag, g_tag), axis=0)
+        u = bm.zeros((len(r), 2), dtype=bm.float64)
+        u = bm.set_at(u, (tag == 0)|(tag == 3), u_in)
+        rho = bm.full((len(r),), rho_0, dtype=bm.float64)
+        m0 = rho_0 * (init_domain[1] - init_domain[0]) * (init_domain[3] - init_domain[2]) / fp.shape[0]
+        m1 = rho_0 * 6 * dx * (domain[3] - domain[2]) / gp.shape[0]
+        mass0 = bm.full((len(r[tag != 3]),), m0, dtype=bm.float64)
+        mass1 = bm.full((len(r[tag == 3]),), m1, dtype=bm.float64)
+        mass = bm.concatenate((mass0, mass1), axis=0)
+        
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "u": u,
+            "dudt": bm.zeros_like(u),
+            "rho": rho,
+            "drhodt": bm.zeros_like(rho),
+            "p": bm.zeros_like(rho),
+            "sound": bm.zeros_like(rho),
+            "mass": mass,
+            "mu": bm.zeros_like(rho),
+            "drdt": bm.zeros_like(r),
         }
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_pipe_domain0(cls, domain, init_domain, H, dx=1.25e-4):
+        u_in = bm.array([5.0, 0.0], dtype=bm.float64) 
+        rho_0 = 737.54
+
+        f_x = bm.arange(init_domain[0], init_domain[1], dx, dtype=bm.float64)
+        f_y = bm.arange(init_domain[2] + dx, init_domain[3], dx, dtype=bm.float64)
+        fy, fx = bm.meshgrid(f_y, f_x, indexing='xy')
+        fp = bm.stack((fx.ravel(), fy.ravel()), axis=1)
+        f_tag = bm.zeros(len(fp), dtype=bm.int64)
         
-    #@staticmethod
-    #@bm.compile
-    def range_query(self, query_points, radius, include_self=False):
-        """
-        查找每个查询点距离为radius以内的所有邻居点,并返回邻居粒子的索引和自身粒子的索引。
-        query_points: (M, D) 形状的 NumPy 数组,表示M个查询点。
-        radius: 查找邻居的半径
-        include_self: 是否将查询点本身的索引加入到邻居结果中
-        """
-        neighbors_within_range = []
-        self_indices = []  # 存储查询点的索引
-        for i, query_point in enumerate(query_points):
-            neighbors = self._range_query(self.tree, query_point, radius, depth=0, query_idx=i, include_self=include_self)
-            neighbors_within_range.append(neighbors)
-            self_indices.append([i] * len(neighbors))  # 每个查询点的索引重复以匹配邻居数量
+        x0 = bm.arange(domain[0], domain[1]/2, dx, dtype=bm.float64)
+        bwp = bm.stack((x0, bm.full_like(x0, domain[2])), axis=1)
+        uwp = bm.stack((x0, bm.full_like(x0, domain[3])), axis=1)
+        y0 = bm.arange(domain[2] - dx * 3, domain[3] + dx * 4, dx, dtype=bm.float64)
+        rwp = bm.concatenate((bm.full((len(y0), 1), domain[1]/2), y0.reshape(-1, 1)), axis=1)
+        wp = bm.concatenate((bwp, uwp, rwp), axis=0)
+        w_tag = bm.ones(len(wp), dtype=bm.int64)
         
-        # 将查询点索引和邻居粒子的索引拆开，按索引顺序整理
-        neighbors = [item for sublist in neighbors_within_range for item in sublist]
-        indices = [item for sublist in self_indices for item in sublist]
+        d_xb = bm.arange(domain[0], domain[1]/2, dx, dtype=bm.float64)
+        d_yb = bm.arange(domain[2] - dx, domain[2] - dx * 4, -dx, dtype=bm.float64)
+        dyb, dxb = bm.meshgrid(d_yb, d_xb, indexing='xy')
+        bdp = bm.stack((dxb.ravel(), dyb.ravel()), axis=1)
+        d_yu = bm.arange(domain[3] + dx, domain[3] + dx * 3, dx, dtype=bm.float64)
+        dyu, dxu = bm.meshgrid(d_yu, d_xb, indexing='xy')
+        udp = bm.stack((dxu.ravel(), dyu.ravel()), axis=1)
+
+        x1 = bm.arange(domain[1]/2+dx, domain[1]/2 + 3*dx, dx, dtype=bm.float64)
+        dyr, dxr = bm.meshgrid(y0, x1, indexing='xy')
+        bdr = bm.stack((dxr.ravel(), dyr.ravel()), axis=1)
+
+        dp = bm.concatenate((bdp, udp, bdr), axis=0)
+        d_tag = bm.full((len(dp),), 2, dtype=bm.int64)
+
+        g_x = bm.arange(-dx, -dx - 4 * H, -dx, dtype=bm.float64)
+        g_y = bm.arange(domain[2] + dx, domain[3], dx, dtype=bm.float64)
+        gy, gx = bm.meshgrid(g_y, g_x, indexing='xy')
+        gp = bm.stack((gx.ravel(), gy.ravel()), axis=1)
+        g_tag = bm.full((len(gp),), 3, dtype=bm.int64)
+
+        r = bm.concatenate((fp, wp, dp, gp), axis=0)
+        tag = bm.concatenate((f_tag, w_tag, d_tag, g_tag), axis=0)
+        u = bm.zeros((len(r), 2), dtype=bm.float64)
+        u = bm.set_at(u, (tag == 0)|(tag == 3), u_in)
+        rho = bm.full((len(r),), rho_0, dtype=bm.float64)
+        m0 = rho_0 * (init_domain[1] - init_domain[0]) * (init_domain[3] - init_domain[2]) / fp.shape[0]
+        m1 = rho_0 * 6 * dx * (domain[3] - domain[2]) / gp.shape[0]
+        mass0 = bm.full((len(r[tag != 3]),), m0, dtype=bm.float64)
+        mass1 = bm.full((len(r[tag == 3]),), m1, dtype=bm.float64)
+        mass = bm.concatenate((mass0, mass1), axis=0)
         
-        return bm.array(neighbors), bm.array(indices)
-
-    #@staticmethod
-    #@bm.compile
-    def _range_query(self, node, query_point, radius, depth, query_idx, include_self):
-        if node is None:
-            return []
-
-        axis = node['axis']
-        neighbors = []
-        point = node['point']
-        dist = bm.linalg.norm(point - query_point)
-
-        # 剪枝策略：距离超过半径时，停止搜索
-        if dist <= radius:
-            if include_self or not (point==query_point).all():
-                neighbor_idx = bm.where(bm.all(self.points == point, axis=1))[0][0]
-                neighbors.append(neighbor_idx)
-
-        next_branch = None
-        opposite_branch = None
-        if query_point[axis] < point[axis]:
-            next_branch = node['left']
-            opposite_branch = node['right']
-        else:
-            next_branch = node['right']
-            opposite_branch = node['left']
-
-        # 递归查询
-        neighbors.extend(self._range_query(next_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        # 剪枝：如果查询点和当前节点的差异已经大于半径，停止递归查询对面子树
-        if abs(query_point[axis] - point[axis]) < radius:
-            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        return neighbors
-
-'''
-'''
-class KDTree:
-    def __init__(self, points, box_size):
-        """
-        初始化KDTree, 输入为一个N x D的NumPy数组，表示N个D维的点集，同时传入box_size用于周期边界处理。
-        """
-        self.points = points
-        self.box_size = box_size  # 储存周期边界的盒子尺寸
-        self.tree = self._build_tree(points, depth=0)
-        self.space = Space()  # 初始化周期边界空间
-
-    def _build_tree(self, points, depth):
-        """
-        递归构建KD-Tree。points是当前节点的点集，depth是当前树的深度。
-        """
-        if len(points) == 0:
-            return None
-        
-        # 选择当前维度
-        k = points.shape[1]  # 点的维度
-        axis = depth % k  # 循环选择维度
-        
-        # 排序并选择中位点作为根节点
-        points = points[points[:, axis].argsort()]
-        median_idx = len(points) // 2
-        median_point = points[median_idx]
-
-        # 递归构建左子树和右子树
-        left_tree = self._build_tree(points[:median_idx], depth + 1)
-        right_tree = self._build_tree(points[median_idx + 1:], depth + 1)
-
-        return {
-            'point': median_point,
-            'left': left_tree,
-            'right': right_tree,
-            'axis': axis
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "u": u,
+            "dudt": bm.zeros_like(u),
+            "rho": rho,
+            "drhodt": bm.zeros_like(rho),
+            "p": bm.zeros_like(rho),
+            "sound": bm.zeros_like(rho),
+            "mass": mass,
+            "mu": bm.zeros_like(rho),
+            "drdt": bm.zeros_like(r),
         }
-        
-    def range_query(self, query_points, radius, include_self=False):
-        """
-        查找每个查询点距离为radius以内的所有邻居点，并返回邻居粒子的索引和自身粒子的索引。
-        query_points: (M, D) 形状的NumPy数组，表示M个查询点。
-        radius: 查找邻居的半径
-        include_self: 是否将查询点本身的索引加入到邻居结果中
-        """
-        neighbors_within_range = []
-        self_indices = []  # 存储查询点的索引
-        for i, query_point in enumerate(query_points):
-            neighbors = self._range_query(self.tree, query_point, radius, depth=0, query_idx=i, include_self=include_self)
-            neighbors_within_range.append(neighbors)
-            self_indices.append([i] * len(neighbors))  # 每个查询点的索引重复以匹配邻居数量
-        
-        # 将查询点索引和邻居粒子的索引拆开，按索引顺序整理
-        neighbors = [item for sublist in neighbors_within_range for item in sublist]
-        indices = [item for sublist in self_indices for item in sublist]
-        
-        return bm.array(neighbors), bm.array(indices)
-
-    def _range_query(self, node, query_point, radius, depth, query_idx, include_self):
-        if node is None:
-            return []
-
-        axis = node['axis']
-        neighbors = []
-        point = node['point']
-
-        # 计算周期边界下的距离
-        dR = self.space.periodic_displacement(self.box_size, query_point - point)
-        dist = bm.linalg.norm(dR)
-
-        # 剪枝策略：距离超过半径时，停止搜索
-        if dist < radius:
-            if include_self or not (point == query_point).all():
-                neighbor_idx = bm.where(bm.all(self.points == point, axis=1))[0][0]
-                neighbors.append(neighbor_idx)
-
-        next_branch = None
-        opposite_branch = None
-        if query_point[axis] < point[axis]:
-            next_branch = node['left']
-            opposite_branch = node['right']
-        else:
-            next_branch = node['right']
-            opposite_branch = node['left']
-
-        # 递归查询
-        neighbors.extend(self._range_query(next_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        # 剪枝：如果查询点和当前节点的差异已经大于半径，停止递归查询对面子树
-        if abs(query_point[axis] - point[axis]) < radius:
-            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        # 对面子树的遍历应该也使用周期位移处理
-        if opposite_branch is not None:
-            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        return neighbors
-'''
-class KDTree:
-    def __init__(self, points, box_size):
-        """
-        初始化KDTree, 输入为一个N x D的NumPy数组，表示N个D维的点集，同时传入box_size用于周期边界处理。
-        """
-        self.points = points
-        self.box_size = box_size  # 储存周期边界的盒子尺寸
-        self.tree = self._build_tree(points, depth=0)
-        self.space = Space()  # 初始化周期边界空间
-
-    def _build_tree(self, points, depth):
-        """
-        递归构建KD-Tree。points是当前节点的点集，depth是当前树的深度。
-        """
-        if len(points) == 0:
-            return None
-        
-        # 选择当前维度
-        k = points.shape[1]  # 点的维度
-        axis = depth % k  # 循环选择维度
-        
-        # 排序并选择中位点作为根节点
-        points = points[points[:, axis].argsort()]
-        median_idx = len(points) // 2
-        median_point = points[median_idx]
-
-        # 递归构建左子树和右子树
-        left_tree = self._build_tree(points[:median_idx], depth + 1)
-        right_tree = self._build_tree(points[median_idx + 1:], depth + 1)
-
-        return {
-            'point': median_point,
-            'left': left_tree,
-            'right': right_tree,
-            'axis': axis
-        }
-        
-    def range_query(self, query_points, radius, include_self=False):
-        neighbors_within_range = []
-        self_indices = []  # 存储查询点的索引
-        for i, query_point in enumerate(query_points):
-            neighbors = self._range_query(self.tree, query_point, radius, depth=0, query_idx=i, include_self=include_self)
-            
-            # 确保邻居索引去重并转换为列表
-            unique_neighbors = sorted(set(map(int, neighbors)))  # 使用set去重，再排序，确保neighbors是整数索引
-            neighbors_within_range.append(unique_neighbors)
-            
-            self_indices.append([i] * len(unique_neighbors))  # 每个查询点的索引重复以匹配邻居数量
-            
-        # 将查询点索引和邻居粒子的索引拆开，按索引顺序整理
-        neighbors = [item for sublist in neighbors_within_range for item in sublist]
-        indices = [item for sublist in self_indices for item in sublist]
-        
-        return bm.array(neighbors), bm.array(indices)
-
-    def _range_query(self, node, query_point, radius, depth, query_idx, include_self):
-        if node is None:
-            return []
-
-        axis = node['axis']
-        neighbors = []
-        point = node['point']
-
-        # 计算周期边界下的距离
-        dR = self.space.periodic_displacement(self.box_size, query_point - point)
-        dist = bm.linalg.norm(dR)
-
-        # 剪枝策略：距离超过半径时，停止搜索
-        if dist < radius:
-            if include_self or not (point == query_point).all():
-                neighbor_idx = bm.where(bm.all(self.points == point, axis=1))[0][0]
-                neighbors.append(neighbor_idx)
-
-        next_branch = None
-        opposite_branch = None
-        if query_point[axis] < point[axis]:
-            next_branch = node['left']
-            opposite_branch = node['right']
-        else:
-            next_branch = node['right']
-            opposite_branch = node['left']
-
-        # 递归查询
-        neighbors.extend(self._range_query(next_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        # 剪枝：如果查询点和当前节点的差异已经大于半径，停止递归查询对面子树
-        if abs(query_point[axis] - point[axis]) < radius:
-            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        # 对面子树的遍历应该也使用周期位移处理
-        if opposite_branch is not None:
-            neighbors.extend(self._range_query(opposite_branch, query_point, radius, depth + 1, query_idx, include_self))
-
-        return neighbors
+        return cls(r, nodedata=nodedata)

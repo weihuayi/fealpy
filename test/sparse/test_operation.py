@@ -2,8 +2,10 @@
 import pytest
 
 from fealpy.backend import backend_manager as bm
-from fealpy.sparse.operation import spdiags 
+from fealpy.sparse.ops import spdiags
+
 ALL_BACKENDS = ['numpy', 'pytorch']
+
 
 class test_spdiags():
     @pytest.mark.parametrize("backend", ALL_BACKENDS)

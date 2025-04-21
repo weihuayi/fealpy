@@ -100,7 +100,7 @@ for i in range(maxit):
     A, F = DirichletBC(space, gd=pde.dirichlet, threshold=pde.is_dirichlet_boundary).apply(A, F)
     tmr.send(f'第{i}次边界处理时间')
 
-    uh[:] = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh[:] = cg(A, F, maxit=5000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh)

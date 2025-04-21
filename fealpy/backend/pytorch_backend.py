@@ -3,6 +3,7 @@ from typing import Union, Optional, Tuple, Any
 from itertools import combinations_with_replacement
 from functools import reduce, partial
 from math import factorial, prod
+from scipy.spatial import KDTree
 
 try:
     import torch
@@ -534,6 +535,120 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
         mat = torch.sparse_coo_tensor(indices, values, size=shape)
         mat = mat.to_sparse_csr()
         return mat.crow_indices(), mat.col_indices(), mat.values()
+
+    @staticmethod
+    def query_point(x, y, h, box_size, mask_self=True, periodic=[True, True, True]):
+        if not isinstance(periodic, list) or len(periodic) != 3 or not all(isinstance(p, bool) for p in periodic):
+            raise TypeError("periodic type is：[bool, bool, bool]")
+        def map_points(a, b, r, positions):
+            x, y = positions[:, 0], positions[:, 1]
+            cond_1 = (0 <= x) & (x <= r) & (r < y) & (y < b - r)  # 区域[(0, r), (r, b-r)]
+            cond_2 = (a - r <= x) & (x <= a) & (r < y) & (y < b - r)  # 区域[(a-r, a), (r, b-r)]
+            cond_3 = (r < x) & (x < a - r) & (0 <= y) & (y <= r)  # 区域[(r, a-r), (0, r)]
+            cond_4 = (r < x) & (x < a - r) & (b - r <= y) & (y <= b)  # 区域[(r, a-r), (b-r, b)]
+            cond_5 = (0 <= x) & (x <= r) & (0 <= y) & (y <= r)  # 角区域[(0, r), (0, r)]
+            cond_6 = (a - r <= x) & (x <= a) & (0 <= y) & (y <= r)  # 角区域[(a-r, a), (0, r)]
+            cond_7 = (0 <= x) & (x <= r) & (b - r <= y) & (y <= b)  # 角区域[(0, r), (b-r, b)]
+            cond_8 = (a - r <= x) & (x <= a) & (b - r <= y) & (y <= b)  # 角区域[(a-r, a), (b-r, b)]
+            cond_9 = ~(cond_1 | cond_2 | cond_3 | cond_4 | cond_5 | cond_6 | cond_7 | cond_8) # 其他区域
+            idx_positions = torch.arange(len(positions))
+            bool_positions = torch.ones(len(positions), dtype=bool)
+
+            cond_5_1 = torch.concatenate([(x[cond_5] + a).reshape(-1,1), (y[cond_5]).reshape(-1,1)], axis=-1) # 右侧映射
+            cond_5_2 = torch.concatenate([(x[cond_5]).reshape(-1,1), (y[cond_5] + b).reshape(-1,1)], axis=-1) # 上方映射 
+            cond_5_3 = torch.concatenate([(x[cond_5] + a).reshape(-1,1), (y[cond_5] + b).reshape(-1,1)], axis=-1) # 右上方映射
+            _cond_5 = torch.concatenate([cond_5_1, cond_5_2, cond_5_3], axis=0)
+            idx_cond_5_1 = torch.nonzero(cond_5).flatten()
+            idx_5 = torch.concatenate([idx_cond_5_1, idx_cond_5_1, idx_cond_5_1], axis=0)
+            bool_cond_5_1 = torch.zeros(len(cond_5_1), dtype=bool)
+            bool_5 = torch.concatenate([bool_cond_5_1, bool_cond_5_1, bool_cond_5_1], axis=0)
+
+            _cond_3 = torch.concatenate([(x[cond_3]).reshape(-1,1), (y[cond_3] + b).reshape(-1,1)], axis=-1) # 上侧映射 
+            idx_3 = torch.nonzero(cond_3).flatten()
+            bool_3 = torch.zeros(len(_cond_3), dtype=bool)
+
+            cond_6_1 = torch.concatenate([(x[cond_6] - a).reshape(-1,1), (y[cond_6]).reshape(-1,1)], axis=-1) # 左侧映射
+            cond_6_2 = torch.concatenate([(x[cond_6]).reshape(-1,1), (y[cond_6] + b).reshape(-1,1)], axis=-1) # 上方映射
+            cond_6_3 = torch.concatenate([(x[cond_6] - a).reshape(-1,1), (y[cond_6] + b).reshape(-1,1)], axis=-1) # 左上方映射
+            _cond_6 = torch.concatenate([cond_6_1, cond_6_2, cond_6_3], axis=0)
+            idx_cond_6_1 = torch.nonzero(cond_6).flatten()
+            idx_6 = torch.concatenate([idx_cond_6_1, idx_cond_6_1, idx_cond_6_1], axis=0)
+            bool_cond_6_1 = torch.zeros(len(cond_6_1), dtype=bool)
+            bool_6 = torch.concatenate([bool_cond_6_1, bool_cond_6_1, bool_cond_6_1], axis=0)
+
+            _cond_1 = torch.concatenate([(x[cond_1] + a).reshape(-1,1), y[cond_1].reshape(-1,1)], axis=-1) # 右侧映射
+            idx_1 = torch.nonzero(cond_1).flatten()
+            bool_1 = torch.zeros(len(_cond_1), dtype=bool)
+
+            _cond_2 = torch.concatenate([(x[cond_2] - a).reshape(-1,1), y[cond_2].reshape(-1,1)], axis=-1) # 左侧映射
+            idx_2 = torch.nonzero(cond_2).flatten()
+            bool_2 = torch.zeros(len(_cond_2), dtype=bool)
+
+            cond_7_1 = torch.concatenate([(x[cond_7] + a).reshape(-1,1), (y[cond_7]).reshape(-1,1)], axis=-1) # 右侧映射
+            cond_7_2 = torch.concatenate([(x[cond_7]).reshape(-1,1), (y[cond_7] - b).reshape(-1,1)], axis=-1) # 下方映射
+            cond_7_3 = torch.concatenate([(x[cond_7] + a).reshape(-1,1), (y[cond_7] - b).reshape(-1,1)], axis=-1) # 右下方映射
+            _cond_7 = torch.concatenate([cond_7_1, cond_7_2, cond_7_3], axis=0)
+            idx_cond_7_1 = torch.nonzero(cond_7).flatten()
+            idx_7 = torch.concatenate([idx_cond_7_1, idx_cond_7_1, idx_cond_7_1], axis=0)
+            bool_cond_7_1 = torch.zeros(len(cond_7_1), dtype=bool)
+            bool_7 = torch.concatenate([bool_cond_7_1, bool_cond_7_1, bool_cond_7_1], axis=0)
+
+            _cond_4 = torch.concatenate([(x[cond_4]).reshape(-1,1), (y[cond_4] - b).reshape(-1,1)], axis=-1) #下侧映射
+            idx_4 = torch.nonzero(cond_4).flatten()
+            bool_4 = torch.zeros(len(_cond_4), dtype=bool)
+
+            cond_8_1 = torch.concatenate([(x[cond_8] - a).reshape(-1,1), (y[cond_8]).reshape(-1,1)], axis=-1) # 左侧映射
+            cond_8_2 = torch.concatenate([(x[cond_8]).reshape(-1,1), (y[cond_8] - b).reshape(-1,1)], axis=-1) # 下侧映射
+            cond_8_3 = torch.concatenate([(x[cond_8] - a).reshape(-1,1), (y[cond_8] - b).reshape(-1,1)], axis=-1) # 左下方映射
+            _cond_8 = torch.concatenate([cond_8_1, cond_8_2, cond_8_3], axis=0)
+            idx_cond_8_1 = torch.nonzero(cond_8).flatten()
+            idx_8 = torch.concatenate([idx_cond_8_1, idx_cond_8_1, idx_cond_8_1], axis=0)
+            bool_cond_8_1 = torch.zeros(len(cond_8_1), dtype=bool)
+            bool_8 = torch.concatenate([bool_cond_8_1, bool_cond_8_1, bool_cond_8_1], axis=0)
+
+            mapped_positions = torch.concatenate([positions, _cond_5, _cond_3, _cond_6, _cond_1, _cond_2, _cond_7, _cond_4, _cond_8], axis=0)
+            mapped_indices = torch.concatenate([idx_positions, idx_5, idx_3, idx_6, idx_1, idx_2, idx_7, idx_4, idx_8], axis=0)
+            mapped_bool = torch.concatenate([bool_positions, bool_5, bool_3, bool_6, bool_1, bool_2, bool_7, bool_4, bool_8], axis=0)
+            return mapped_positions, mapped_indices, mapped_bool
+
+        if all(periodic):
+            map_x, map_idx_x, map_bool_x = map_points(box_size[0], box_size[1], h, x)
+            map_y, map_idx_y, map_bool_y= map_points(box_size[0], box_size[1], h, y)
+            map_x = map_x.to('cpu')
+            map_y = map_y.to('cpu')
+            tree = KDTree(map_x)
+            neighbors = tree.query_ball_point(map_y, h)
+            lengths = torch.tensor([len(sublist) for sublist in neighbors]) 
+            a = torch.arange(len(lengths))
+            node_self = torch.repeat_interleave(a, lengths)
+            neighbors = torch.concatenate([torch.tensor(c) for c in neighbors])
+            map_bool = map_bool_x[node_self]
+            neighbors = map_idx_x[neighbors]
+            neighbors = neighbors[map_bool]
+            node_self = node_self[node_self < x.shape[0]]
+            if not mask_self:
+                mask = node_self == neighbors
+                node_self = node_self[~mask]
+                neighbors = neighbors[~mask]
+            
+        elif not any(periodic):
+            tree = KDTree(x)
+            neighbors = tree.query_ball_point(y, h)
+            lengths = torch.tensor([len(sublist) for sublist in neighbors]) 
+            a = torch.arange(len(lengths))
+            node_self = torch.repeat_interleave(a, lengths)
+            neighbors = torch.concatenate([torch.tensor(c) for c in neighbors])
+            if not mask_self:
+                mask = node_self == neighbors
+                node_self = node_self[~mask]
+                neighbors = neighbors[~mask]
+
+        else:
+            for dim in range(3):
+                if not periodic[dim]:
+                    raise NotImplementedError(f"Single-side periodic boundary condition for dimension {dim} is not implemented yet.")
+                    pass
+        return node_self, neighbors
 
     ### FEALPy functionals ###
 
