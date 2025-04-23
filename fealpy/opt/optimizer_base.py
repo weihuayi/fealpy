@@ -142,8 +142,8 @@ class Optimizer():
             - Y-axis: Percentage (%).
             - Displays the average exploration and exploitation percentages in the legend.
         """
-        plt.plot(self.D_pl, label=(f'Exploration:{bm.round(bm.mean(self.D_pl), 2)}%'))
-        plt.plot(self.D_pt, label=(f'Exploitation:{bm.round(bm.mean(self.D_pt), 2)}%'))
+        plt.plot(self.D_pl, label=(f'Exploration:{round(bm.mean(self.D_pl).item(), 2)}%'))
+        plt.plot(self.D_pt, label=(f'Exploitation:{round(bm.mean(self.D_pt).item(), 2)}%'))
         plt.legend()
         plt.xlabel('Iteration')
         plt.ylabel('Percentage')
