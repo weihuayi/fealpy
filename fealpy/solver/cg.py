@@ -85,7 +85,7 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
     b_norm = bm.linalg.norm(b)
     sum_func = bm.sum
     sqrt_func = bm.sqrt
-    rTr = sum_func(r @ z, axis=0)
+    rTr = sum_func(r * z, axis=0)
     Ap = A @ p
     # iterate
     while True:
