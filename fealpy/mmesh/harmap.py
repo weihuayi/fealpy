@@ -417,8 +417,6 @@ class Harmap(MM_monitor,MM_Interpolater):
         self.mesh.node = moved_node
         self.space.mesh = self.mesh
         self.node = moved_node
-        self.cm = self.mesh.entity_measure('cell')
-        self.sm = self._get_star_measure()
         self.d = self._sqrt_det_G(self.bcs)
         self.update_matrix()
         self.mot()

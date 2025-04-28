@@ -10,12 +10,34 @@ class MM_PREProcessor:
         self.int_meth = config.int_meth
         self.mol_meth = config.mol_meth
 
-        self._data_and_device()
-        self._isinstance_mesh_type()
-        self._meshtop_preparation()
-        
-        self._geometry_preparation()
-        self._space_preparation()
+        self.prepare()
+
+    def prepare(self):
+        """
+        @brief prepare the basic information
+        """
+        if self.method == 'Harmap':
+            self._data_and_device()
+            self._isinstance_mesh_type()
+            self._meshtop_preparation()
+            self._geometry_preparation()
+            self._space_preparation()
+        elif self.method == 'PSMFEM':
+            self._data_and_device()
+            self._isinstance_mesh_type()
+            logic_node = bm.copy(self.mesh.node)
+            logic_cell = bm.copy(self.mesh.cell)
+            if self.mesh_type =="LagrangeTriangleMesh":
+                self.logic_mesh = self.mesh_class.from_triangle_mesh(self.linermesh,self.p)
+            elif self.mesh_type == "LagrangeQuadrangleMesh":
+                self.logic_mesh = self.mesh_class.from_quadrangle_mesh(self.linermesh,self.p)
+            else:
+                self.logic_mesh = self.mesh_class(logic_node,logic_cell)
+            self.logic_cm = self.logic_mesh.entity_measure('cell')
+            self._meshtop_preparation()
+            self._geometry_preparation()
+            self._space_preparation()
+            self._logic_space_preparation()
 
     def _meshtop_preparation(self):
         """
@@ -25,7 +47,7 @@ class MM_PREProcessor:
         self.node = mesh.entity('node')
         self.cell = mesh.entity('cell')
             
-        self.node2face = self.mesh.node_to_face()
+        self.node2face = self.mesh.node_to_face().tocsr()
         
         self.isBdNode = mesh.boundary_node_flag()
         self.BdNodeidx = mesh.boundary_node_index()
@@ -134,7 +156,17 @@ class MM_PREProcessor:
             self.b_val0 = bcollection[0]
             self.b_val1 = bcollection[1]
             self.b_val2 = bcollection[2]
-    
+
+    def _logic_space_preparation(self):
+        if self.mesh_type in ["LagrangeTriangleMesh" , "LagrangeQuadrangleMesh"]:
+            self.lspace = ParametricLagrangeFESpace(self.logic_mesh, p=self.p)
+        else:
+            self.lspace = LagrangeFESpace(self.logic_mesh, p=self.p)
+        SMI = ScalarMassIntegrator(q= self.q , method=self.assambly_method)
+        bform = BilinearForm(self.lspace)
+        bform.add_integrator(SMI)
+        self.logic_mass = bform.assembly()
+
     def _space_preparation(self):
         """
         @brief get the space information
@@ -211,32 +243,6 @@ class MM_PREProcessor:
         bm.index_add(star_measure , self.cell , self.cm[:,None])
         return star_measure
     
-    def _row_col_filter(self,m:COOTensor,r,c) -> TensorLike:
-        """
-        @brief filter the row and col of the matrix
-        @param m: sparse matrix
-        @param r: row index
-        @param c: col index
-        """
-        m = m.tocsr()
-        kwargs0 = self.kwargs0
-        kwargs1 = self.kwargs1
-        lr = len(r)
-        lc = len(c)
-        m0 = m.shape[0]
-        m1 = m.shape[1]  
-        bd_extracter = CSRTensor(crow=bm.arange(lr+1,**kwargs1),col= r, 
-                                 values = bm.ones(lr,**kwargs0),
-                                 spshape=(lr,m0))
-        bdface_extracter = CSRTensor(crow=bm.arange(lc+1,**kwargs1),col= c,
-                                     values = bm.ones(lc,**kwargs0),
-                                     spshape=(lc,m1))
-        bdnode2face = bd_extracter @ m @ bdface_extracter.T
-        bdnode2face = bdnode2face.tocoo()
-        i = bdnode2face.row
-        j = bdnode2face.col
-        return i,j
-    
     def _sort_bdnode_and_bdface(self,mesh:_U) -> TensorLike:
         """
         @brief sort the boundary node and boundary face
@@ -247,8 +253,10 @@ class MM_PREProcessor:
         node = mesh.node
         edge = mesh.edge
         
-        node2edge = mesh.node_to_edge()
-        i,j = self._row_col_filter(node2edge,BdNodeidx,BdEdgeidx)
+        node2edge = mesh.node_to_edge().tocsr()
+        NBB = node2edge[BdNodeidx][:,BdEdgeidx]
+        i = NBB.row
+        j = NBB.col
 
         bdnode2edge = j.reshape(-1,2)
         glob_bdnode2edge = bm.zeros_like(node,**self.kwargs1)
@@ -295,7 +303,10 @@ class MM_PREProcessor:
         BdNodeidx = mesh.boundary_node_index()
         BdFaceidx = mesh.boundary_face_index()
         TD = mesh.top_dimension()
-        i,j = self._row_col_filter(self.node2face,BdNodeidx,BdFaceidx)
+        node2face = self.node2face
+        NBB = node2face[BdNodeidx][:,BdFaceidx]
+        i = NBB.row
+        j = NBB.col
 
         bdfun = mesh.face_unit_normal(index=BdFaceidx[j])
         tolerance = 1e-8
@@ -360,7 +371,9 @@ class MM_PREProcessor:
         node2face = self.node2face
         if self.TD == 3:
             Arrisnode_idx = self.Arrisnode_idx
-            i0 , j0 = self._row_col_filter(node2face,Arrisnode_idx,BdFaceidx)
+            NAB = node2face[Arrisnode_idx][:,BdFaceidx]
+            i0 = NAB.row
+            j0 = NAB.col
             bdfun0 = mesh.face_unit_normal(index=BdFaceidx[j0])
             normal0,inverse0 = bm.unique(bdfun0,return_inverse=True ,axis = 0)
             _,index0,counts0 = bm.unique(i0,return_index=True,return_counts=True)   
@@ -389,7 +402,9 @@ class MM_PREProcessor:
             linear_mesh = mesh.linearmesh
             Bi_node_normal  = linear_mesh.face_unit_normal(index=LBdi_node2face[:,0])
         else:
-            i1 , j1 = self._row_col_filter(node2face,Bdinnernode_idx,BdFaceidx)
+            NBB = node2face[Bdinnernode_idx][:,BdFaceidx]
+            i1 = NBB.row
+            j1 = NBB.col
             bdfun1 = mesh.face_unit_normal(index=BdFaceidx[j1])
             _,index1 = bm.unique(i1,return_index=True)
             Bi_node_normal = bdfun1[index1]
@@ -596,9 +611,8 @@ class MM_monitor(MM_PREProcessor):
         """
         uh = self.uh
         space = self.space
-        multi_index = self.multi_index
         pcell = self.pcell
-        gphi = space.grad_basis(multi_index)
+        gphi = space.grad_basis(self.bcs) # change
         guh_incell = bm.einsum('cqid , ci -> cqd ',gphi,uh[pcell])
         return guh_incell
     
@@ -608,9 +622,8 @@ class MM_monitor(MM_PREProcessor):
         """
         uh = self.uh
         space = self.space
-        multi_index = self.multi_index
         pcell = self.pcell
-        gphi = space.grad_basis(multi_index)
+        gphi = space.grad_basis(self.bcs)
         guh_incell = bm.einsum('cqid , cil -> cqld ',gphi,uh[pcell])
         return guh_incell
 
@@ -618,50 +631,26 @@ class MM_monitor(MM_PREProcessor):
         """
         @brief arc length monitor
         """
-        NN = self.NN
-        cell = self.cell
-        cm = self.cm
-        sm = self.sm
         guh_incell = self._grad_uh()
-        M = bm.sqrt(1 +  self.beta * bm.sum(guh_incell**2,axis=-1))
-        M_innode = bm.zeros(NN,dtype=bm.float64)
-        bm.index_add(M_innode,cell,M*cm[:,None])
-        M_innode = M_innode/sm
-        self.M = M_innode
+        self.M = bm.sqrt(1 +  self.beta * bm.sum(guh_incell**2,axis=-1))
     
     def arc_length_norm(self):
         """
         @brief normalized arc length monitor
         """
-        NN = self.NN
-        cell = self.cell
-        cm = self.cm
-        sm = self.sm
-        guh_innode = self._grad_uh()
-        R = bm.max(bm.linalg.norm(guh_innode,axis=-1))
+        guh_incell = self._grad_uh()
+        R = bm.max(bm.linalg.norm(guh_incell,axis=-1))
         if R <= 1e-15:
             R = 1
-        M = bm.sqrt(1 + self.beta * bm.sum(guh_innode**2,axis=-1)/R**2)
-        M_innode = bm.zeros(NN,dtype=bm.float64)
-        bm.index_add(M_innode,cell,M*cm[:,None])
-        M_innode = M_innode/sm
-        self.M = M_innode
+        self.M = bm.sqrt(1 + self.beta * bm.sum(guh_incell**2,axis=-1)/R**2)
     
     def mp_arc_length(self):
         """
         @brief arc length monitor for multiphysics
         """
-        NN = self.NN
-        cell = self.cell
-        cm = self.cm
-        sm = self.sm
         guh_incell = self._mp_grad_uh()
-        M = bm.sqrt(1 + 1/self.dim*bm.sum(self.beta[None,None,:]*
+        self.M = bm.sqrt(1 + 1/self.dim*bm.sum(self.beta[None,None,:]*
                                    bm.sum(guh_incell**2,axis=-1),axis=-1))
-        M_innode = bm.zeros(NN,dtype=bm.float64)
-        bm.index_add(M_innode,cell,M*cm[:,None])
-        M_innode = M_innode/sm
-        self.M = M_innode
 
     def heatequ(self):
         """
@@ -683,14 +672,15 @@ class MM_monitor(MM_PREProcessor):
         lform.add_integrator(SSI)
         SDI.coef = h**2*R*dt
         SDI.clear()
-        M = space.function(M)
+        M_bar = space.function()
         A = bform.assembly() + mass
         for i in range(self.mol_times):
             SSI.source = M
             SSI.clear()
             b = lform.assembly()
-            M[:] = cg(A,b,atol=1e-5,returninfo=True)[0]
-        self.M = M(self.bcs)
+            M_bar[:] = cg(A,b,atol=1e-5,returninfo=True)[0]
+            M = M_bar(self.bcs)
+        self.M = M
 
     def projector(self):
         """
@@ -698,8 +688,8 @@ class MM_monitor(MM_PREProcessor):
         """
         M = self.M
         cell = self.cell
-        cm = self.cm
-        sm = self.sm
+        cm = self.mesh.entity_measure('cell')
+        sm = self._get_star_measure()
         for i in range(self.mol_times):
             M_incell = bm.mean(M[cell],axis=-1)
             M = bm.zeros(self.NN,**self.kwargs0)
@@ -768,6 +758,58 @@ class MM_Interpolater(MM_PREProcessor):
         sol = solve_ivp(ODEs,[0,1],y0=self.uh,method='RK23').y[:,-1]
         sol = bm.asarray(sol,**self.kwargs0)
         return sol
+    
+    # def comass(self,moved_node:TensorLike):
+    #     """
+    #     @brief conservation of mass interpolation method
+    #     """
+    #     delta_x = self.node - moved_node
+    #     space = self.space
+    #     # cell2dof = self.cell2dof
+        
+    #     # bcs = self.bcs
+    #     # ws = self.ws
+    #     # phi = space.basis(bcs)
+    #     # gphi = space.grad_basis(bcs)
+    #     # GDOF = space.number_of_global_dofs()
+    #     rm = self.rm
+    #     # cm = self.d * rm
+
+    #     M = self.mass
+    #     # P = bm.einsum('...,c...id,cid,c...j ,c... -> cij',ws, gphi,delta_x[cell2dof],phi,cm)
+    #     dx0 = space.function(delta_x[:,0])
+    #     dx1 = space.function(delta_x[:,1])
+    #     # I,J = self.I,self.J
+    #     # indices = bm.stack([I.ravel(), J.ravel()], axis=0)
+    #     # P = COOTensor(indices=indices, values=P.ravel(), spshape=(GDOF,GDOF))
+    #     # P.tocsr()
+    #     lform = LinearForm(space)
+    #     SSI = self.SSI
+    #     lform.add_integrator(SSI)
+
+        
+
+    #     def ODEs(t,y):
+    #         self.mesh.node = self.node - t*delta_x
+    #         space.mesh = self.mesh
+    #         self._mass_gererator()
+    #         M = self.mass
+    #         def coef(bcs,index):
+    #             y_func=  space.function(y)
+    #             y_grad = y_func.grad_value(bcs,index)
+    #             value = y_grad[...,0] * dx0(bcs) + y_grad[...,1] * dx1(bcs)
+    #             return value
+    #         y = bm.asarray(y,**self.kwargs0)
+    #         # f = spsolve(M, P @ y, solver=self.solver)
+    #         SSI.source = coef
+    #         SSI.clear()
+    #         b = lform.assembly()
+    #         f = cg(M, b, atol=1e-8,returninfo=True)[0]
+    #         return f
+        
+        # sol = solve_ivp(ODEs,[0,1],y0=self.uh,method='RK23').y[:,-1]
+        # sol = bm.asarray(sol,**self.kwargs0)
+        # return sol
     
     def mp_comass(self,moved_node:TensorLike):
         """
