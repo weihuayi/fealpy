@@ -4,9 +4,7 @@ from sympy import derive_by_array, eye, tensorcontraction
 
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
-
-from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
+from fealpy.decorator import cartesian
 
 class LinearElasticPDE():
     def __init__(self, u, lambda0, lambda1):
@@ -51,6 +49,7 @@ class LinearElasticPDE():
         sigma[..., 2] = self.sigmayy(x, y)
         return sigma
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]

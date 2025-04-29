@@ -7,14 +7,14 @@ from ..utils import process_coef_func
 from ..functional import bilinear_integral
 from .integrator import LinearInt, OpInt, CellInt, CoefLike, enable_cache
 from ..typing import TensorLike, Index, _S
+from ..functionspace.functional import symmetry_span_array, symmetry_index
 
 from ..mesh import TriangleMesh
-from ..functionspace import LagrangeFESpace, HuZhangFESpace
 
 from sympy import symbols, sin, cos, Matrix, lambdify
 
-class HuZhangMixIntegrator(LinearInt, OpInt, CellInt):
-    def __init__(self, q = None : int, lambda0 = 1.0 : float, lambda1 = 1.0 : float):
+class HuZhangStressIntegrator(LinearInt, OpInt, CellInt):
+    def __init__(self, q = None, lambda0 = 1.0, lambda1 = 1.0):
         super().__init__()
         self.q = q
         self.lambda0 = lambda0
@@ -45,13 +45,14 @@ class HuZhangMixIntegrator(LinearInt, OpInt, CellInt):
 
     def assembly(self, space: _FS) -> TensorLike:
         mesh = space.mesh 
+        TD = mesh.top_dimension()
         lambda0, lambda1 = self.lambda0, self.lambda1 
         cm, phi, trphi, ws = self.fetch(space) 
 
         _, num = symmetry_index(d=TD, r=2)
-        A  = lambda0*bm.einsum('q, c, cqld, cqmd, d->clm', ws, cellmeasure, phi, phi, num)
-        A -= lambda1*bm.einsum('q, c, cql, cqm->clm', ws, cellmeasure, trphi, trphi)
-        return res
+        A  = lambda0*bm.einsum('q, c, cqld, cqmd, d->clm', ws, cm, phi, phi, num)
+        A -= lambda1*bm.einsum('q, c, cql, cqm->clm', ws, cm, trphi, trphi)
+        return A
 
 
 

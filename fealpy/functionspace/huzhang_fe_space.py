@@ -484,7 +484,7 @@ class HuZhangFESpace(FunctionSpace):
 
         nsframe, esframe, csframe = self.basis_frame_of_S()
 
-        gphi_s = self.mesh.grad_shape_function(bc, self.p, index=index) # (NC, ldof, GD)
+        gphi_s = self.mesh.grad_shape_function(bc, self.p) # (NC, ldof, GD)
 
         NQ = bc.shape[0]
         dphi = bm.zeros((NC, NQ, ldof, 2), dtype=self.ftype)

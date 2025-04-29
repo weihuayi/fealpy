@@ -8,24 +8,21 @@ from ..utils import process_coef_func
 from ..functional import bilinear_integral
 from .integrator import LinearInt, OpInt, CellInt, CoefLike, enable_cache
 from ..typing import TensorLike, Index, _S
+from ..functionspace.functional import symmetry_span_array, symmetry_index
 
 from ..mesh import TriangleMesh
-from ..functionspace import LagrangeFESpace, HuZhangFESpace
 
 from sympy import symbols, sin, cos, Matrix, lambdify
 
 class HuZhangMixIntegrator(LinearInt, OpInt, CellInt):
-    def __init__(self, q = None : int): -> None:
+    def __init__(self, q = None): 
         super().__init__()
         self.q = q
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
-        TD = space[0].mesh.top_dimension()
-        GDOF1 = space[1].number_of_global_dofs()
-        c2d0  = space[0].cell_to_dof()
         c2d1  = space[1].cell_to_dof()
-        c2d1  = bm.concatenate([c2d1 + i*GDOF1 for i in range(TD)], axis=1)
+        c2d0  = space[0].cell_to_dof()
         return (c2d0, c2d1)
 
     @enable_cache
@@ -40,8 +37,8 @@ class HuZhangMixIntegrator(LinearInt, OpInt, CellInt):
         cm = mesh.entity_measure('cell')
 
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space0.div_basis(bcs)
-        psi = space1.basis(bcs)
+        phi = space1.div_basis(bcs)
+        psi = space0.basis(bcs)
         return cm, phi, psi, ws
 
     def assembly(self, space: _FS) -> TensorLike:
@@ -49,8 +46,9 @@ class HuZhangMixIntegrator(LinearInt, OpInt, CellInt):
 
         mesh = getattr(space[0], 'mesh', None)
         cm, phi, psi, ws = self.fetch(space)
-        res = bm.einsum('q, c, cqld, cqm->cldm', ws, cm, phi, psi)
-        res = res.reshape(res.shape[:-2], -1)
+        res = bm.einsum('q, c, cqld, cqmd->clm', ws, cm, phi, psi)
+        #res = res.reshape(res.shape[:-2]+(-1, ))
+        #res = bm.einsum("clm->cml", res)
         return res
 
 
