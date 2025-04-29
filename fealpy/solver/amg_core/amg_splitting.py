@@ -2,7 +2,100 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.sparse.ops import spdiags
 from fealpy.sparse import csr_matrix
-import time
+
+U_NODE = -1  # 未标记
+C_NODE = 1   # C-节点
+F_NODE = 0   # F-节点
+
+def rs_cf_splitting(Sp, Sj, Tp, Tj, n_nodes):
+
+    lambda_vals = Tp[1:] - Tp[:-1]
+    interval_ptr = bm.zeros(n_nodes + 1, dtype=int)
+    # 有bug，默认连接点不超过n个
+    interval_count = bm.zeros(n_nodes, dtype=int)
+
+    interval_count[:max(lambda_vals) + 1] = bm.bincount(lambda_vals)
+    interval_ptr[1:] = bm.cumsum(interval_count)
+
+    sorted_indices = bm.argsort(lambda_vals)
+    node_to_index = bm.arange(len(lambda_vals))
+    node_to_index[sorted_indices] = bm.arange(len(lambda_vals))
+    index_to_node = bm.argsort(node_to_index)
+
+    # 初始化 splitting 数组
+    splitting = bm.full(n_nodes, U_NODE, dtype=int)
+
+    # 将无邻接点的节点设为 F
+    for i in range(n_nodes):
+        if lambda_vals[i] == 0 or (lambda_vals[i] == 1 and Tj[Tp[i]] == i):
+            splitting[i] = F_NODE
+
+    # 逐步划分 C/F 点
+    for top_index in range(n_nodes - 1, -1, -1):
+        i = index_to_node[top_index]
+        lambda_i = lambda_vals[i]
+
+        # 从区间移除 i
+        interval_count[lambda_i] -= 1
+
+        if lambda_i <= 0:
+            break  # 退出循环
+
+        if splitting[i] == U_NODE:
+            splitting[i] = C_NODE
+
+            for jj in range(Tp[i], Tp[i+1]):
+                j = Tj[jj]
+                if splitting[j] == U_NODE:
+                    # 更新邻居 k 的 lambda 值
+                    for kk in range(Sp[j], Sp[j+1]):
+                        k = Sj[kk]
+                        if splitting[k] == U_NODE:
+                            if lambda_vals[k] >= n_nodes - 1:
+                                continue
+                            old_pos = node_to_index[k]
+                            new_pos = interval_ptr[lambda_vals[k]] + interval_count[lambda_vals[k]] - 1
+
+                            # 交换位置
+                            node_to_index[index_to_node[old_pos]] = new_pos
+                            node_to_index[index_to_node[new_pos]] = old_pos
+                            index_to_node[old_pos], index_to_node[new_pos] = index_to_node[new_pos], index_to_node[old_pos]
+
+                            # 更新间隔计数
+                            interval_count[lambda_vals[k]] -= 1
+                            interval_count[lambda_vals[k] + 1] += 1
+                            interval_ptr[lambda_vals[k] + 1] = new_pos
+
+                            # 增加 lambda 值
+                            lambda_vals[k] += 1
+
+            # 处理 S_i，降低邻居 j 的 lambda
+            for jj in range(Sp[i], Sp[i+1]):
+                j = Sj[jj]
+                if splitting[j] == U_NODE:
+                    if lambda_vals[j] == 0:
+                        continue
+                    old_pos = node_to_index[j]
+                    new_pos = interval_ptr[lambda_vals[j]]
+
+                    # 交换位置
+                    node_to_index[index_to_node[old_pos]] = new_pos
+                    node_to_index[index_to_node[new_pos]] = old_pos
+                    index_to_node[old_pos], index_to_node[new_pos] = index_to_node[new_pos], index_to_node[old_pos]
+
+                    # 更新间隔计数
+                    interval_count[lambda_vals[j]] -= 1
+                    interval_count[lambda_vals[j] - 1] += 1
+                    interval_ptr[lambda_vals[j]] += 1
+                    interval_ptr[lambda_vals[j] - 1] = interval_ptr[lambda_vals[j]] - interval_count[lambda_vals[j] - 1]
+
+                    # 减小 lambda 值
+                    lambda_vals[j] -= 1
+
+    # 将所有未标记的节点设为 F_NODE
+    splitting[splitting == U_NODE] = F_NODE
+
+    return splitting
 
 def ruge_stuben_coarsen(A, theta=0.025):
     

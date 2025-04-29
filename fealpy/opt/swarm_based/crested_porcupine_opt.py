@@ -1,11 +1,6 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
-"""
-Crested Porcupine Optimization
-
-
-"""
 class CrestedPorcupineOpt(Optimizer):
     """
     Crested Porcupine Optimization Algorithm (CPOA) for optimization.
