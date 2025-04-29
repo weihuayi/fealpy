@@ -34,10 +34,10 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         index = self.entity_selection(inidces)
         mesh = getattr(space, 'mesh', None)
 
-        if not isinstance(mesh, HomogeneousMesh):
-            raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
-                               f"homogeneous meshes, but {type(mesh).__name__} is"
-                               "not a subclass of HomoMesh.")
+        # if not isinstance(mesh, HomogeneousMesh):
+        #     raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
+        #                        f"homogeneous meshes, but {type(mesh).__name__} is"
+        #                        "not a subclass of HomoMesh.")
 
         cm = mesh.entity_measure('cell', index=index)
         q = space.p+3 if self.q is None else self.q
@@ -60,6 +60,8 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space)
+        NQ = len(ws)
+        NC = mesh.number_of_cells()
 
         rm = space.mesh.reference_cell_measure()
         J = space.mesh.jacobi_matrix(bcs)
@@ -67,5 +69,15 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         d = bm.sqrt(bm.linalg.det(G))
 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        M = bm.einsum('q, cq, cql, cq -> cl', ws*rm, val, phi, d)
-        return M
+        if val is None:
+            return bm.einsum('q, cql, cq -> cl ', ws*rm, phi, d) 
+
+        if isinstance(val, (int, float)):
+            return bm.einsum('q, cql, cq -> cl', ws*rm, phi, d)*val
+        elif isinstance(val, TensorLike):
+            if val.shape == (NC, ): # 分片常数
+                return bm.einsum('q, c, cql, cq -> cl', ws*rm, val, phi, d)
+            elif val.shape == (NC, NQ):
+                return bm.einsum('q, cq, cql, cq -> cl', ws*rm, val, phi, d)
+            else:
+                raise ValueError(f"I can not deal with {f.shape}!")

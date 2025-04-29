@@ -3,7 +3,7 @@ from typing import Optional, Tuple, Callable, Union, TypeVar
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike
-from ..sparse import SparseTensor, COOTensor, CSRTensor
+from ..sparse import SparseTensor, COOTensor, CSRTensor, spdiags
 from ..functionspace.space import FunctionSpace
 
 CoefLike = Union[float, int, TensorLike, Callable[..., TensorLike]]
@@ -131,43 +131,16 @@ class DirichletBC():
         Returns:
             SparseTensor: New adjusted left-hand-size matrix.
         """
-        # NOTE: Code in the numpy version:
-        # ```
-        # bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        # bdIdx[isDDof.reshape(-1)] = 1
-        # D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        # D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        # A = D0@A@D0 + D1
-        # ```
-        # Here the adjustment is done by operating the sparse structure directly.
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
-        if isinstance(A, COOTensor):
-            indices = A.indices
-            remove_flag = bm.logical_or(
-                isDDof[indices[0, :]], isDDof[indices[1, :]]
-            )
-            retain_flag = bm.logical_not(remove_flag)
-            new_indices = indices[:, retain_flag]
-            new_values = A.values[..., retain_flag]
-            A = COOTensor(new_indices, new_values, A.sparse_shape)
-
-            index = bm.nonzero(isDDof)[0]
-            shape = new_values.shape[:-1] + (len(index), )
-            one_values = bm.ones(shape, **kwargs)
-            one_indices = bm.stack([index, index], axis=0)
-            A1 = COOTensor(one_indices, one_values, A.sparse_shape)
-            return A.add(A1).coalesce()
-
-        elif isinstance(A, CSRTensor):
-            from ..sparse.ops import spdiags
-            isDDof = bm.astype(isDDof, A.ftype)
-            D0 = spdiags(1-isDDof, 0, A.shape[0], A.shape[0])
-            D1 = spdiags(isDDof, 0, A.shape[0], A.shape[0], format='coo')
-            A = (D0@A@D0).tocoo() + D1
-
-        return A.coalesce().tocsr()
+        bdIdx = bm.zeros(A.shape[0], **kwargs)
+        # bdIdx[isDDof.reshape(-1)] = 1
+        bdIdx = bm.set_at(bdIdx, isDDof.reshape(-1), 1)
+        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        A = D0@A@D0 + D1
+        return A
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
                      uh: Optional[TensorLike]=None,

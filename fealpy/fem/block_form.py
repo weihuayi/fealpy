@@ -15,15 +15,15 @@ class BlockForm(Form):
         self.sparse_shape = self._get_sparse_shape() 
          
     def _get_sparse_shape(self):
-         ## 检查能否拼接
-         ## batch 情况
-         block_shape = bm.array([[block.sparse_shape if block is not None else (0,0) for block in row] for row in self.blocks], dtype=bm.int32)
-         self.block_shape = block_shape
-         self.nrows = block_shape.shape[0]
-         self.ncols = block_shape.shape[1]
-         shape0 = bm.sum(bm.max(block_shape[..., 0], axis=1))
-         shape1 = bm.sum(bm.max(block_shape[..., 1], axis=0))
-         return (shape0, shape1)
+        ## 检查能否拼接
+        ## batch 情况
+        block_shape = bm.array([[block.sparse_shape if block is not None else (0,0) for block in row] for row in self.blocks], dtype=bm.int32)
+        self.block_shape = block_shape
+        self.nrows = block_shape.shape[0]
+        self.ncols = block_shape.shape[1]
+        shape0 = bm.sum(bm.max(block_shape[..., 0], axis=1))
+        shape1 = bm.sum(bm.max(block_shape[..., 1], axis=0))
+        return (shape0, shape1)
 
     @property
     def shape(self) -> Size:
@@ -50,8 +50,8 @@ class BlockForm(Form):
                 if block is None:
                     continue
                 block_matrix = block.assembly(format='coo')
-                block_indices = block_matrix.indices() + bm.array([[row_offset[i]], [col_offset[j]]])
-                block_values = block_matrix.values() 
+                block_indices = block_matrix.indices + bm.array([[row_offset[i]], [col_offset[j]]])
+                block_values = block_matrix.values 
                 indices = bm.concatenate((indices, block_indices), axis=1)
                 values = bm.concatenate((values, block_values))
         M = COOTensor(indices, values, sparse_shape) 

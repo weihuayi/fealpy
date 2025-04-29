@@ -153,9 +153,8 @@ class TensorFunctionSpace(FunctionSpace):
 
         return self.function(uI.reshape(-1))
     
-    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
+    def is_boundary_dof(self, threshold=None, method='interp') -> TensorLike:
         scalar_space = self.scalar_space
-        mesh = self.mesh
 
         scalar_gdof = scalar_space.number_of_global_dofs()
         if bm.is_tensor(threshold):
@@ -174,236 +173,101 @@ class TensorFunctionSpace(FunctionSpace):
                 is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
                 is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
         elif isinstance(threshold, tuple):
-            ## TODO:以后修修改centroid
-            if method=='centroid':
-                if mesh.geo_dimension() == 2:
-                    edge_threshold = threshold[0]
-                    node_threshold = threshold[1] if len(threshold) > 1 else None
-                    dof_threshold = threshold[2] if len(threshold) > 2 else None
-
-                    scalar_is_bd_dof = scalar_space.is_boundary_dof(edge_threshold, method=method)
-
-                    if node_threshold is not None:
-                        node_flags = node_threshold()
-                        scalar_is_bd_dof = scalar_is_bd_dof & node_flags
-                    
-                    if self.dof_priority:
-                        is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
-                        is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
-                    else:
-                        is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
-                        is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
-
-                    if dof_threshold is not None:
-                        dof_flags = dof_threshold()
-                        is_bd_dof = is_bd_dof & dof_flags
-
-                elif mesh.geo_dimension() == 3:
-                    face_threshold = threshold[0]
-                    edge_threshold = threshold[1] if len(threshold) > 2 else None
-                    node_threshold = threshold[2] if len(threshold) > 3 else None
-                    dof_threshold = threshold[3] if len(threshold) > 4 else None
-
-                    scalar_is_bd_dof = scalar_space.is_boundary_dof(face_threshold, method=method)
-                        
-                    if edge_threshold is not None:
-                        edge_flags = edge_threshold()
-                        scalar_is_bd_dof = scalar_is_bd_dof & edge_flags
-
-                    if node_threshold is not None:
-                        node_flags = node_threshold()
-                        scalar_is_bd_dof = scalar_is_bd_dof & node_flags
-                    
-                    if self.dof_priority:
-                        is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
-                        is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
-                    else:
-                        is_bd_dof = bm.reshape(scalar_is_bd_dof, (scalar_gdof,) + (-1,) * self.dof_ndim)
-                        is_bd_dof = bm.broadcast_to(is_bd_dof, (scalar_gdof,) + self.dof_shape)
-
-                    if dof_threshold is not None:
-                        dof_flags = dof_threshold()
-                        is_bd_dof = is_bd_dof & dof_flags
-            elif method == 'interp':
-                ### 只处理了向量型的tensorspace空间
-                assert self.dof_numel == len(threshold)
-                scalar_is_bd_dof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold] 
-                if self.dof_priority:
-                    return bm.concatenate(scalar_is_bd_dof)
-                else:
-                    return bm.concatenate([bm.array([j[i] for j in scalar_is_bd_dof]) for i in range(scalar_gdof)])
-                        
+            ### 只处理了向量型的tensorspace空间
+            assert self.dof_numel == len(threshold)
+            scalar_is_bd_dof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold] 
+            if self.dof_priority:
+                return bm.concatenate(scalar_is_bd_dof)
             else:
-                raise ValueError(f"Unknown method: {method}")
+                return bm.stack(scalar_is_bd_dof, axis=1).flatten()                        
         else:
             raise ValueError(f"Unknown type of threshold {type(threshold)}")
-        return is_bd_dof.reshape(-1)
-
-    
+        return is_bd_dof.reshape(-1)   
+   
     def boundary_interpolate(self,
         gd: Union[Callable, int, float, TensorLike],
         uh: Optional[TensorLike]=None,
         *,
         threshold: Union[Callable, TensorLike, None]=None, method=None) -> TensorLike:
-
         ipoints = self.interpolation_points()
         scalar_space = self.scalar_space
-        mesh = self.mesh
-        if isinstance(gd, (int, float)): 
+        if uh is None:
+            uh = self.function()
+        # 根据不同gd类型进行判断
+        if isinstance(gd, (int, float)):
             if bm.is_tensor(threshold):
                 assert len(threshold) == self.number_of_global_dofs()
                 isTensorBDof = threshold
-            else : #threshold callable None 
+            else : #threshold callable None
                 isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
-            if uh is None:
-                uh = self.function()
-            uh[threshold] = gd 
+            uh[threshold] = gd
             return uh, isTensorBDof
+
         elif (bm.is_tensor(gd)) or (isinstance(gd, Function)):
             assert len(gd[:]) == self.number_of_global_dofs()
             if bm.is_tensor(threshold):
                 assert len(threshold) == self.number_of_global_dofs()
                 isTensorBDof = threshold
-            else : #threshold callable None 
+            else : #threshold callable None
                 isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
-            if uh is None:
-                uh = self.function()
-            uh[isTensorBDof] = gd[isTensorBDof] 
+            uh[isTensorBDof] = gd[isTensorBDof]
             return uh, isTensorBDof
-        
+
         elif callable(gd):
-            if (threshold is None) | (callable(threshold)):
-                isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold, method=method) 
-                gd_tensor = gd(ipoints[isScalarBDof])
-                assert gd_tensor.shape[-1] == self.dof_numel
-                isTensorBDof = self.is_boundary_dof(threshold = threshold, method=method) 
-            
-            elif bm.is_tensor(threshold):
+            if bm.is_tensor(threshold):
                 assert len(threshold) == self.number_of_global_dofs()
-                isTensorBDof = threshold
                 gd_tensor = gd(ipoints)
                 assert gd_tensor.shape[-1] == self.dof_numel
-                if uh is None:
-                    uh = self.function()
-                if self.dof_priority:
-                    gd_tensor = gd_tensor.T.reshape(-1)
-                else:
-                    gd_tensor = gd_tensor.reshape(-1) 
-                uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor[isTensorBDof])
-                return uh, isTensorBDof
-                
+                isTensorBDof = threshold
+
+            elif (threshold is None) | (callable(threshold)):
+                isScalarBDof = scalar_space.is_boundary_dof(threshold=threshold, method=method)
+                gd_tensor = gd(ipoints[isScalarBDof])
+                assert gd_tensor.shape[-1] == self.dof_numel
+                isTensorBDof = self.is_boundary_dof(threshold = threshold, method=method)
+
             elif isinstance(threshold, tuple):
-                ## TODO:以后修修改centroid
-                if method=='centroid': 
-                    if mesh.geo_dimension() == 2:
-                        edge_threshold = threshold[0]
-                        node_threshold = threshold[1] if len(threshold) > 1 else None
-                        dof_threshold = threshold[2] if len(threshold) > 2 else None
-
-                        isScalarBDof = scalar_space.is_boundary_dof(threshold=edge_threshold)
-
-                        if node_threshold is not None:
-                            node_flags = node_threshold()
-                            isScalarBDof = isScalarBDof & node_flags
-
-                        if callable(gd):
-                            gd_scalar = gd(ipoints[isScalarBDof])
-                        else:
-                            gd_scalar = gd
-
-                        if dof_threshold is not None:
-                            dof_flags = dof_threshold()
-                            node_dof_flags = dof_flags[node_flags] 
-                            gd_vector = gd_scalar[node_dof_flags] 
-                        else:
-                            gd_vector = gd_scalar
-
-                        isTensorBDof = self.is_boundary_dof(threshold=(edge_threshold, 
-                                                                    node_threshold, 
-                                                                    dof_threshold))
-                    elif mesh.geo_dimension() == 3:
-                        face_threshold = threshold[0]
-                        edge_threshold = threshold[1] if len(threshold) > 1 else None
-                        node_threshold = threshold[2] if len(threshold) > 2 else None
-                        dof_threshold = threshold[3] if len(threshold) > 3 else None
-
-                        isScalarBDof = scalar_space.is_boundary_dof(threshold=face_threshold)
-
-                        if edge_threshold is not None:
-                            edge_flags = edge_threshold()
-                            isScalarBDof = isScalarBDof & edge_flags
-
-                        if node_threshold is not None:
-                            node_flags = node_threshold()
-                            isScalarBDof = isScalarBDof & node_flags
-
-                        if callable(gd):
-                            gd_scalar = gd(ipoints[isScalarBDof])
-                        else:
-                            gd_scalar = gd
-
-                        if dof_threshold is not None:
-                            dof_flags = dof_threshold()
-                            node_dof_flags = dof_flags[node_flags] 
-                            gd_vector = gd_scalar[node_dof_flags] 
-                        else:
-                            gd_vector = gd_scalar
-
-                        isTensorBDof = self.is_boundary_dof(threshold=(face_threshold,
-                                                                    edge_threshold, 
-                                                                    node_threshold, 
-                                                                    dof_threshold))
-                elif method == 'interp':
-                    assert len(threshold) == self.dof_numel 
-                    isScalarBDof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold]
-
-                    gd_tensor = [gd(ipoints[isScalarBDof[i]])[..., i] for i in range(self.dof_numel)]
-                    isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
-                    if uh is None:
-                        uh = self.function()
-                    if self.dof_priority:
-                        gd_tensor = bm.concatenate(gd_tensor)
-                    else:
-                        scalar_gdof = scalar_space.number_of_global_dofs()
-                        # 使用列表推导式重新排列数据
-                        gd_values = []
-                        for i in range(scalar_gdof):
-                            for j in range(self.dof_numel):
-                                # 从 gd_tensor[j] 中获取第 i 个标量基函数的值
-                                gd_values.append(gd_tensor[j][i] if i < len(gd_tensor[j]) else 0.0)
-                        gd_tensor = bm.array(gd_values)
-                        gd_tensor = gd_tensor[isTensorBDof]
-
-                    uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor)
-                    
-                    return uh, isTensorBDof
-
-                    # gd_tensor = [gd(ipoints[isScalarBDof[i]]) for i in range(self.dof_numel)]
-                    # gd_tensor = bm.concatenate(gd_tensor, axis=0)
-
-                    # isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
-                    # index = bm.where(isTensorBDof)
-                    # if uh is None:
-                    #     uh = self.function()
-                    # if self.dof_priority:
-                    #     gd_tensor = gd_tensor.T.reshape(-1)
-                    # else:
-                    #     gd_tensor = gd_tensor.reshape(-1)
-                    # uh[index] = gd_tensor[index]
-                    # return uh, isTensorBDof
+                assert len(threshold) == self.dof_numel
+                isScalarBDof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold]
+                gd_tensor = [gd(ipoints[isScalarBDof[i]])[..., i] for i in range(self.dof_numel)]
+                isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
+                if self.dof_priority:
+                    gd_tensor = bm.concatenate(gd_tensor)
                 else:
-                    raise ValueError(f"Unknown method: {method}")
+                    # ! 注意这里的效率没有 dof_priority 的高
+                    scalar_gdof = scalar_space.number_of_global_dofs()
+                    full_values = bm.zeros((scalar_gdof, self.dof_numel), 
+                                            dtype=bm.float64, device=self.device)
+                    
+                    for i in range(self.dof_numel):
+                        indices = bm.where(isScalarBDof[i])[0]
+                        full_values = bm.set_at(full_values, (indices, i), gd_tensor[i])
+                    
+                    gd_tensor = full_values.reshape(-1)
+                    gd_tensor = gd_tensor[isTensorBDof]
+
+                    # gd_tensor = bm.stack(gd_tensor, axis=1).flatten()
+                    # scalar_gdof = scalar_space.number_of_global_dofs()
+                    # # 使用列表推导式重新排列数据
+                    # gd_values = []
+                    # for i in range(scalar_gdof):
+                    #     for j in range(self.dof_numel):
+                    #         # 从 gd_tensor[j] 中获取第 i 个标量基函数的值
+                    #         gd_values.append(gd_tensor[j][i] if i < len(gd_tensor[j]) else 0.0)
+                    # gd_tensor = bm.array(gd_values, device=self.device)
+                    # gd_tensor = gd_tensor[isTensorBDof]
+
+                uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor)
+                return uh, isTensorBDof
             else:
                 raise ValueError(f"Unknown type of threshold {type(threshold)}")
-        else: 
+        else:
             raise ValueError(f"Unknown type of gd {type(gd)}")
-        if uh is None:
-            uh = self.function() 
         if self.dof_priority:
             uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.T.reshape(-1))
         else:
             uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.reshape(-1))
-            
+
         return uh, isTensorBDof
 
     

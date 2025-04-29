@@ -29,7 +29,8 @@ class DivIntegrator(LinearInt, OpInt, CellInt):
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
-        return space.cell_to_dof()[self.index]
+        return (space[0].cell_to_dof()[self.index],
+                space[1].cell_to_dof()[self.index])
 
     @enable_cache
     def fetch(self, space: _FS):

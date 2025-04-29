@@ -21,6 +21,13 @@ from .base import BackendProxy, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_
 Array = jax.Array
 _device = jax.Device
 
+def _remove_device(func):
+    def wrapper(*args, **kwargs):
+        if 'device' in kwargs:
+            kwargs.pop('device')
+        return func(*args, **kwargs)
+    return wrapper
+
 class JAXBackend(BackendProxy, backend_name='jax'):
     DATA_CLASS = Array
     linalg = jnp.linalg
@@ -43,9 +50,11 @@ class JAXBackend(BackendProxy, backend_name='jax'):
     @staticmethod
     def get_device(tensor_like: Array, /): return tensor_like.device
 
+    # TODO 
     @staticmethod
     def device_put(tensor_like: Array, /, device=None) -> Array:
-        return jax.device_put(tensor_like, device)
+        return tensor_like
+        # return jax.device_put(tensor_like, device)
 
     @staticmethod
     def to_numpy(jax_array: Array, /) -> Any:
@@ -73,6 +82,15 @@ class JAXBackend(BackendProxy, backend_name='jax'):
 
     ### Binary methods ###
     # NOTE: all copied
+
+    # NOTE 临时删除 device
+    arange = staticmethod(_remove_device(jnp.arange))
+    zeros = staticmethod(_remove_device(jnp.zeros))
+    linspace = staticmethod(_remove_device(jnp.linspace))
+    empty = staticmethod(_remove_device(jnp.empty))
+    array = staticmethod(_remove_device(jnp.array))
+    tensor = staticmethod(_remove_device(jnp.array))
+    ones = staticmethod(_remove_device(jnp.ones))
 
     @staticmethod
     def set_at(x: Array, indices, val, /):
@@ -109,7 +127,7 @@ class JAXBackend(BackendProxy, backend_name='jax'):
         if any_return:
             result = (b, )
         else:
-            retult = b
+            result = b
 
         if return_index:
             result += (index, )
@@ -146,6 +164,33 @@ class JAXBackend(BackendProxy, backend_name='jax'):
         idx = jnp.arange(inverse.shape[0], dtype=indices0.dtype)
         indices1 = indices1.at[inverse].set(idx)
         return b, indices0, indices1, inverse, counts
+
+    @staticmethod
+    def query_point(x, y, h, box_size, mask_self=True, periodic=[True, True, True]):
+        from .jax.jax_md import space
+        from .jax import partition
+        from .jax.jax_md.partition import Sparse
+
+        if not isinstance(periodic, list) or len(periodic) != 3 or not all(isinstance(p, bool) for p in periodic):
+            raise TypeError("periodic type is：[bool, bool, bool]")
+        displacement, shift = space.periodic(side=box_size)
+       
+        neighbor_fn = partition.neighbor_list(
+            displacement,
+            box_size,
+            r_cutoff = jnp.array(h, dtype=jnp.float64),
+            backend ="jaxmd_vmap",
+            capacity_multiplier = 1,
+            mask_self = not mask_self,
+            format = Sparse,
+            num_particles_max = x.shape[0],
+            num_partitions = x.shape[0],
+            pbc = periodic,
+            )
+        neighbor_list = neighbor_fn.allocate(x, num_particles=x.shape[0])
+        neighbors, node_self = neighbor_list.idx
+
+        return node_self, neighbors
 
     ### FEALPy functionals ###
     @staticmethod
@@ -391,7 +436,10 @@ class JAXBackend(BackendProxy, backend_name='jax'):
 
 JAXBackend.attach_attributes(ATTRIBUTE_MAPPING, jnp)
 function_mapping = FUNCTION_MAPPING.copy()
-function_mapping.update(tensor='array')
+function_mapping.update(
+    tensor='array',
+    concat='concatenate'
+    )
 JAXBackend.attach_methods(function_mapping, jnp)
 JAXBackend.attach_methods({'compile': 'jit'}, jax)
 JAXBackend.attach_methods(TRANSFORMS_MAPPING, jax)

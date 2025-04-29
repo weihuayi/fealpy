@@ -7,6 +7,7 @@ from .mesh_data_structure import MeshDS
 from .utils import estr2dim
 from .plot import Plotable
 from .mesh_base import SimplexMesh
+from fealpy.sparse import coo_matrix,csr_matrix
 
 
 class IntervalMeshDataStructure(MeshDS):
@@ -88,10 +89,11 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         return quad
 
-    def grad_lambda(self, index:Index=_S):
+    def grad_lambda(self, index:Index=_S, TD=1):
         """
         @brief 计算所有单元上重心坐标函数的导数
         """
+        assert TD == 1
         node = self.entity('node')
         cell = self.entity('cell', index=index)
         Dlambda = bm.interval_grad_lambda(cell, node)
@@ -186,10 +188,20 @@ class IntervalMesh(SimplexMesh,Plotable):
         w = bm.tensor([(0, -1),(1, 0)],dtype=bm.float64)
         return v@w
     
-    def uniform_refine(self, n=1, options={}):
+    def uniform_refine(self, n=1, options={},returnim = False):
         """
-        @brief 一致加密网格
+        Uniform refine the interval mesh n times.
+
+        Parameters:
+            n (int): Times refine the triangle mesh.
+            returnirm (bool): Return the prolongation matrix list or not,from the finest to the the coarsest
+        
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest
         """
+        if returnim is True:
+            IM = []
         for i in range(n):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
@@ -198,10 +210,29 @@ class IntervalMesh(SimplexMesh,Plotable):
             newNode = (node[cell[:, 0]] + self.node[cell[:, 1]])/2
             self.node = bm.concatenate((node, newNode),axis=0)
             
+            if returnim is True:
+                shape = (NN + NC, NN)
+                kargs = bm.context(node)
+                values = bm.ones(NN+2*NC, **kargs) 
+                values = bm.set_at(values, bm.arange(NN, NN+2*NC), 0.5)
+
+                kargs = bm.context(cell)
+                i0 = bm.arange(NN, **kargs) 
+                i1 = bm.arange(NN, NN + NC, **kargs)
+                I = bm.concatenate((i0, i1, i1))
+                J = bm.concatenate((i0, cell[:, 0], cell[:, 1]))   
+
+                P = csr_matrix((values, (I, J)), shape)
+
+                IM.append(P)            
+            
             part1 = bm.concatenate((cell[:,0],bm.arange(NN,NN+NC)),axis = 0)
             part2 = bm.concatenate((bm.arange(NN, NN+NC),cell[:, 1]),axis = 0)
             self.cell = bm.stack((part1,part2),axis=1)
             self.construct()
+        if returnim is True:
+            IM.reverse()
+            return IM
 
 
 

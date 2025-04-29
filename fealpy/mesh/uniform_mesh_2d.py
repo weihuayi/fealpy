@@ -86,11 +86,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         self.device = device
 
-        # Mesh properties
-        self.extent = [int(e) for e in extent]
-        self.h = [float(val) for val in h]
-        self.origin = [float(o) for o in origin]
-
+        self.extent = bm.array(extent, dtype=itype, device=device)
+        self.h = bm.array(h, dtype=ftype, device=device) 
+        self.origin = bm.array(origin, dtype=ftype, device=device)
+        self.shape = (
+                self.extent[1] - self.extent[0], 
+                self.extent[3] - self.extent[2]
+                )
         # Mesh dimensions
         self.nx = self.extent[1] - self.extent[0]
         self.ny = self.extent[3] - self.extent[2]
@@ -129,6 +131,48 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.localEdge = bm.array([(0, 2), (1, 3), 
                                    (0, 1), (2, 3)], dtype=self.itype, device=self.device)   
 
+    def interpolate(self, u, etype=0, keepdims=False) -> TensorLike:
+        """
+        Compute the interpolation of a function u on the mesh.
+
+        Parameters:
+            u: The function to be interpolated.
+            etype: The type of entity on which to interpolate.
+
+        Example:
+        ```
+            from fealpy.mesh import UniformMesh2d
+            mesh = UniformMesh2d(extent=[0, 10, 0, 10], h=(0.1, 0.1),
+                                origin=(0.0, 0.0))
+            u = mesh.interpolate(lambda x: x[..., 0]**2 + x[..., 1]**2)
+            print(u)
+        ```
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 0:
+            node = self.entity('node')
+            return u(node)
+        else:
+            raise ValueError(f"Unsupported entity type: {etype}")
+
+    def linear_index_map(self, etype: Union[int, str]=0):
+        """
+        Build and return the tensor mapping multi-dimensional 
+        indices to linear indices.
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 0:
+            return bm.arange(
+                    self.NN, 
+                    dtype=self.itype, 
+                    device=self.device).reshape(self.nx + 1, self.ny + 1)
+        elif etype == 2:
+            return bm.arange(
+                    self.NC, 
+                    dtype=self.itype, 
+                    device=self.device).reshape(self.nx, self.ny)
 
     # 实体生成方法
     @entitymethod(0)
@@ -136,15 +180,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the nodes in a structured mesh.
         """
-        device = self.device
-
         GD = 2
         nx, ny = self.nx, self.ny
         box = [self.origin[0], self.origin[0] + nx * self.h[0],
                self.origin[1], self.origin[1] + ny * self.h[1]]
 
-        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype, device=device)
-        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype, device=device)
+        x = bm.linspace(box[0], box[1], nx + 1, dtype=self.ftype, device=self.device)
+        y = bm.linspace(box[2], box[3], ny + 1, dtype=self.ftype, device=self.device)
         xx, yy = bm.meshgrid(x, y, indexing='ij')
 
         node = bm.concatenate((xx[..., None], yy[..., None]), axis=-1)
@@ -189,15 +231,13 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         """
         @berif Generate the cells in a structured mesh.
         """
-        device = self.device
-
         nx, ny = self.nx, self.ny
         NN = self.NN
         NC = self.NC
 
-        idx = bm.arange(NN, device=device).reshape(nx + 1, ny + 1)
+        idx = bm.arange(NN, device=self.device).reshape(nx + 1, ny + 1)
 
-        cell = bm.zeros((NC, 4), dtype=self.itype, device=device)
+        cell = bm.zeros((NC, 4), dtype=self.itype, device=self.device)
         c = idx[:-1, :-1]
         cell_0 = c.reshape(-1)
         cell_1 = cell_0 + 1
@@ -798,6 +838,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         return J
     
+    # 第一基本形式
     def first_fundamental_form(self, J: TensorLike) -> TensorLike:
         """
         @brief Compute the first fundamental form from the Jacobi matrix.
@@ -806,26 +847,40 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            for i in range(TD):
-                G[..., i, i] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
-                for j in range(i+1, TD):
-                    G[..., i, j] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
-                    G[..., j, i] = G[..., i, j]
+
+        for i in range(TD):
+            # 计算对角元素
+            diag_val = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
+            G = bm.set_at(G, (..., i, i), diag_val)
+            
+            for j in range(i+1, TD):
+                # 计算非对角元素
+                off_diag_val = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
+                G = bm.set_at(G, (..., i, j), off_diag_val)
+                G = bm.set_at(G, (..., j, i), off_diag_val)
+
+        return G  
+
+        # # TODO: Provide a unified implementation that is not backend-specific
+        # if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
+        #     for i in range(TD):
+        #         G[..., i, i] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., i])
+        #         for j in range(i+1, TD):
+        #             G[..., i, j] = bm.einsum('...d, ...d -> ...', J[..., i], J[..., j])
+        #             G[..., j, i] = G[..., i, j]
                     
-            return G
-        elif bm.backend_name == 'jax':
-            for i in range(TD):
-                G = G.at[..., i, i].set(bm.einsum('...d, ...d -> ...', 
-                                                J[..., i], J[..., i]))
-                for j in range(i + 1, TD):
-                    G = G.at[..., i, j].set(bm.einsum('...d, ...d -> ...', 
-                                                    J[..., i], J[..., j]))
-                    G = G.at[..., j, i].set(G[..., i, j])
-            return G
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        #     return G
+        # elif bm.backend_name == 'jax':
+        #     for i in range(TD):
+        #         G = G.at[..., i, i].set(bm.einsum('...d, ...d -> ...', 
+        #                                         J[..., i], J[..., i]))
+        #         for j in range(i + 1, TD):
+        #             G = G.at[..., i, j].set(bm.einsum('...d, ...d -> ...', 
+        #                                             J[..., i], J[..., j]))
+        #             G = G.at[..., j, i].set(G[..., i, j])
+        #     return G
+        # else:
+        #     raise NotImplementedError("Backend is not yet implemented.")
                
 
     # 其他方法
@@ -855,12 +910,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         Unstructured meshes do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
-            self.h = [h / 2.0 for h in self.h]
+            self.extent = 2*self.extent
+            self.h = self.h/2.0 
             self.nx = self.extent[1] - self.extent[0]
             self.ny = self.extent[3] - self.extent[2]
-            # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
-            # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
 
             self.NC = self.nx * self.ny
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)

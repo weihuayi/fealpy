@@ -109,7 +109,7 @@ for i in range(maxit):
     F = bcop.apply(F, u0)
     tmr.send(f'第{i}次边界处理时间')
 
-    uh[:] = cg(bcop, F, x0=u0, maxiter=5000, atol=1e-14, rtol=1e-14)
+    uh[:] = cg(bcop, F, x0=u0, maxit=5000, atol=1e-14, rtol=1e-14)
     tmr.send(f'第{i}次求解器时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh)
