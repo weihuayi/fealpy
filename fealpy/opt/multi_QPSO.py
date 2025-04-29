@@ -3,6 +3,7 @@ import itertools
 from fealpy.backend import backend_manager as bm
 from fealpy.opt import initialize
 from fealpy.opt.benchmark.multi_benchmark import multi_benchmark_data as data
+from fealpy.opt.benchmark.multi_benchmark import cal_spacing, cal_IGD
 import matplotlib.pyplot as plt
 
 class MOQPSO:
@@ -41,7 +42,7 @@ class MOQPSO:
         self.MaxIT = params['MaxIT']
         self.mut = params['mut']
         self.ngrid = params['ngrid']
-        self.fig, self.ax = plt.subplots(figsize=(8, 8))
+        
         self.REP = {}  # Repository to store non-dominated solutions
 
     def run(self):
@@ -59,7 +60,9 @@ class MOQPSO:
         self.REP['pos'] = self.x[Dominated == 0, :]
         self.REP['fit'] = self.fitness[Dominated == 0, :]
         self.updateGrid()
-        
+
+        self.set_fit()
+            
         self.plotting()
         print("Generation #0 - Repository size: ", self.REP['pos'].shape[0])
 
@@ -103,6 +106,13 @@ class MOQPSO:
 
         plt.ioff()
         plt.show()
+
+    def set_fit(self):
+        if self.REP['fit'].shape[1] == 2:
+            self.fig, self.ax = plt.subplots(figsize=(8, 8))
+        elif self.REP['fit'].shape[1] == 3:
+            self.fig = plt.figure()
+            self.ax = self.fig.add_subplot(111, projection='3d')
 
     def deleteFromRepository(self):
         """
@@ -204,6 +214,26 @@ class MOQPSO:
             plt.show()
             plt.pause(0.01)
             plt.draw()
+        
+        if self.REP['fit'].shape[1] == 3:
+            plt.ion()
+            self.ax.clear()
+            self.ax.set_xlabel('F1')
+            self.ax.set_ylabel('F2')
+            self.ax.set_zlabel('F3')
+            self.ax.set_xlim(bm.min(self.REP['fit'][:, 0]), bm.max(self.REP['fit'][:, 0]))
+            self.ax.set_ylim(bm.min(self.REP['fit'][:, 1]), bm.max(self.REP['fit'][:, 1]))
+            self.ax.set_zlim(bm.min(self.REP['fit'][:, 2]), bm.max(self.REP['fit'][:, 2]))
+            self.ax.plot(self.fitness[:, 0], self.fitness[:, 1], self.fitness[:, 2], 'o', markerfacecolor='none', markeredgecolor='red')
+            self.ax.plot(self.REP['fit'][:, 0], self.REP['fit'][:, 1], self.REP['fit'][:, 2], 'o', markerfacecolor='none', markeredgecolor='black')
+            self.ax.plot(self.PF[:, 0], self.PF[:, 1], self.PF[:, 2], '.', markeredgecolor='green')
+            self.ax.set_xticks(self.REP['hypercube_limits'][:, 0])
+            self.ax.set_yticks(self.REP['hypercube_limits'][:, 1])
+            self.ax.set_zticks(self.REP['hypercube_limits'][:, 2])
+            plt.show()
+            plt.pause(0.01)
+            plt.draw()
+
 
     def updateGrid(self):
         """
@@ -271,7 +301,7 @@ class MOQPSO:
 
 if __name__ == "__main__":
 
-    MultiObj = data[3]
+    MultiObj = data[8]
 
     params = {}
     params['N'] = 200
@@ -282,3 +312,5 @@ if __name__ == "__main__":
     
     test = MOQPSO(MultiObj, params)
     test.run()
+    print(cal_IGD(MultiObj['PF'], test.REP['fit']))
+    print(cal_spacing(test.REP['fit']))

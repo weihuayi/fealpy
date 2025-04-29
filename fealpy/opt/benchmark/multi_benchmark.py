@@ -202,6 +202,24 @@ def ZDT6_f2(x):
     
     return g(x) * h(x)
 
+def Viennet2_f1(x, y):
+    return 0.5 * (x - 2) ** 2 + (1/13) * (y + 1) ** 2 + 3
+
+def Viennet2_f2(x, y):
+    return (1/36) * (x + y - 3) ** 2 + (1/8) * (-x + y + 2) ** 2 - 17
+
+def Viennet2_f3(x, y):
+    return (1/175) * (x + 2 * y - 1) ** 2 + (1/17) * (2 * y - x) ** 2 - 13
+
+
+def Viennet3_f1(x, y):
+    return 0.5 * (x ** 2 + y ** 2) + bm.sin(x ** 2 + y ** 2)
+
+def Viennet3_f2(x, y):
+    return (1/8) * (3 * x - 2 * y + 4) ** 2 + (1/27) * (x - y + 1) ** 2 + 15
+
+def Viennet3_f3(x, y):
+    return (1 / (x ** 2 + y ** 2 + 1)) - 1.1 * bm.exp(-(x ** 2 + y ** 2))
 
 multi_benchmark_data = [
     {
@@ -253,4 +271,42 @@ multi_benchmark_data = [
         'ub': bm.ones((10,)),
         'PF': get_PF('ZDT6'),
     },
+    {
+        'fun': lambda x: bm.stack([
+            Viennet2_f1(x[:, 0], x[:, 1]), 
+            Viennet2_f2(x[:, 0], x[:, 1]), 
+            Viennet2_f3(x[:, 0], x[:, 1])
+        ], axis=1),
+        'ndim': 2,
+        'lb': -4 * bm.ones((2,)),
+        'ub': 4 * bm.ones((2,)),
+        'PF': get_PF('Viennet2'),
+    },
+    {
+        'fun': lambda x: bm.stack([
+            Viennet3_f1(x[:, 0], x[:, 1]), 
+            Viennet3_f2(x[:, 0], x[:, 1]), 
+            Viennet3_f3(x[:, 0], x[:, 1])
+        ], axis=1),
+        'ndim': 2,
+        'lb': bm.array([-3, -10]),
+        'ub': bm.array([10, 3]),
+        'PF': get_PF('Viennet3'),
+    },
 ]
+
+def cal_spacing(front):
+    sorted_id = bm.argsort(front[:, 0])
+    sorted_front = front[sorted_id]
+    distances = bm.linalg.norm(sorted_front[1:] - sorted_front[:-1], axis=1)
+    spacing_value = bm.std(distances)
+    return spacing_value
+    
+def cal_IGD(PF, front):
+    N = front.shape[0]
+    total = 0
+    for i in range(N):
+        dis = bm.sqrt(bm.sum((PF - front[i])**2, axis = 1))
+        min_dis = bm.min(dis)
+        total = total + min_dis
+    return total / N
