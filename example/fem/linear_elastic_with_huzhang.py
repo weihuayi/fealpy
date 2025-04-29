@@ -62,7 +62,6 @@ def solve(pde, N, p):
         return pde.source(x)
     lform1.add_integrator(VectorSourceIntegrator(source=source))
 
-    b = source_vector(space1, pde.source)
     b = lform1.assembly()
     #a = displacement_boundary_condition(space0, pde.displacement)
 
