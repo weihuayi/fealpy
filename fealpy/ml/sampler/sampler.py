@@ -167,19 +167,32 @@ class ISampler(Sampler):
 
 
 class BoxBoundarySampler(Sampler):
-    """Generate samples on the boundaries of a multidimensional rectangle."""
+    """
+    A sampler class that generates samples on the boundaries of a multidimensional rectangle.
+
+    This class provides functionality to sample points on all boundaries of a hyperrectangle
+    defined by two diagonal points, supporting both random and uniform sampling modes.
+
+    Parameters:
+        p1: Sequence of floats representing the first diagonal point coordinates.
+        p2: Sequence of floats representing the opposite diagonal point coordinates.
+        mode: Sampling mode ('random' or 'linspace'). Defaults to 'random'.
+        dtype: Data type for the samples('None'('cpu') or 'cuda'). Defaults to torch.float64.
+        device: Device to store the samples. Defaults to None.
+        requires_grad: Whether the samples require gradient computation. Defaults to False.
+    
+    Example:
+        >>> domain = (-1, 1, -1, 1, -1, 1)
+        >>> p1, p2 = (-1, -1, -1) , (1, 1, 1)
+        >>> bc_sampler = BoxBoundarySampler(p1=p1, p2=p2, mode='random', 
+                                dtype=bm.float64, device=None, 
+                                requires_grad=True) 
+        >>> bc_point = bc_sampler.run(2, 2, 2, bd_type=False)
+    """
     def __init__(self, p1: Sequence[float], p2: Sequence[float], mode: SampleMode='random',
                  dtype=float64, device: device=None,
                  requires_grad: bool=False, **kwargs) -> None:
-        """
-        @brief Generate samples on the boundaries of a multidimensional rectangle.
-
-        @param p1, p2: Object that can be converted to `torch.Tensor`.\
-               Points at both ends of the diagonal.
-        @param mode: 'random' or 'linspace'. Defaults to 'random'.
-        @param dtype: Data type of samples. Defaults to `torch.float64`.
-        @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
-        """
+    
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
         t1 = _as_tensor(p1, dtype=dtype, device=device)
@@ -210,17 +223,18 @@ class BoxBoundarySampler(Sampler):
 
     def run(self, *mb: int, bd_type=False) -> Tensor:
         """
-        @brief Generate samples on the boundaries of a multidimensional rectangle.
+            Generate samples on the boundaries of the multidimensional rectangle.
 
-        @param *mb: int. Number of `mb` must match the dimension. In 'random' mode,\
-               these are numbers of sample points on the boundary perpendicular\
-               to each dimension. In 'linspace' mode, these are numbers of steps\
-               in each dimension.
-        @param bd_type: bool. Separate samples in each boundary if `True`, and\
-               the output shape will be (#boundaries, #samples, #dims).\
-               Defaults to `False`.
+            Parameters:
+                *mb: Variable number of integers specifying sample counts per dimension,these integers must be equal.
+                    In 'random' mode: number of samples per boundary.
+                    In 'linspace' mode: number of steps per dimension.
+                bd_type: If True, returns samples separated by boundary type with shape
+                        (boundaries, samples, dims). If False, returns concatenated
+                        samples with shape (total_samples, dims). Defaults to False.
 
-        @return: Tensor.
+            Returns:
+                Tensor: The generated samples, either concatenated or separated by boundary.
         """
         assert len(mb) * 2 == len(self.subs)
         results: List[Tensor] = []
