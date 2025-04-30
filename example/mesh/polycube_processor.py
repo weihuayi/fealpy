@@ -1,5 +1,3 @@
-from sympy import false
-
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, TetrahedronMesh
 
@@ -69,7 +67,18 @@ def edge_sort(oriented_edge):
 
     return [sorted_edge, edge_idx]
 
+def closed_axis_projection(v):
+    # 六个轴方向
+    axes = bm.tensor([
+        [1, 0, 0], [-1, 0, 0],
+        [0, 1, 0], [0, -1, 0],
+        [0, 0, 1], [0, 0, -1]
+    ], dtype=bm.float64)
+    dots = bm.matmul(v, axes.T)
+    # 取最大点积对应的轴索引作为标签（0~5）
+    labels = bm.argmax(dots, dim=1)
 
+    return labels
 
 class PolyCubeProcessor:
 
@@ -87,11 +96,10 @@ class PolyCubeProcessor:
         self.face_center = None
         self.face_normal = None
         self.labels = None        # 每个面的轴方向标签（0~5对应±X,±Y,±Z）
-        self.charts = []          # 候选图册列表
-        self.charts_labels = None   # 图册标签
+        self.charts = []          # 候选图册列表，每个图册包含的面索引
+        self.charts_labels = None   # 图册标签，每个图册对应的标签
         self.face2chart = None    # 面到图册的映射
-        self.edges = defaultdict(list)  # 候选边 {(face1, face2): node_idx}
-        self.edges_idx = defaultdict(list)  # 候选边索引 {(face1, face2): edge_idx}
+        self.edges = defaultdict(list)  # 候选边 {(face1, face2): [[node_idx], [edge_idx]]}
         self.vertices = defaultdict(int)  # 候选顶点 {vertex_id: count}
 
     def assign_initial_labels(self):
@@ -104,24 +112,24 @@ class PolyCubeProcessor:
 
     def build_candidate_charts(self):
         """通过BFS聚类相邻且同标签的面"""
-        visited = set()
+        visited = bm.zeros(self.surface_mesh.number_of_cells(), dtype=bm.bool)
         face2face = self.surface_mesh.cell_to_cell()
         self.face2chart = bm.zeros(self.surface_mesh.number_of_cells(), dtype=bm.int32)
         charts_labels = []
         chat_idx = 0
         for face_id in range(self.surface_mesh.number_of_cells()):
-            if face_id not in visited:
+            if not visited[face_id]:
                 # BFS遍历邻接面
                 queue = [face_id]
                 current_label = self.labels[face_id]
                 chart = []
                 while queue:
                     f = queue.pop(0)
-                    if f not in visited and self.labels[f] == current_label:
-                        visited.add(f)
+                    if not visited[f] and self.labels[f] == current_label:
+                        visited[f] = True
                         chart.append(f)
                         self.face2chart[f] = chat_idx
-                        # 获取邻接面（假设mesh提供邻接信息）
+                        # 获取邻接面
                         neighbors = face2face[f].tolist()
                         queue.extend(neighbors)
                 charts_labels.append(current_label)
@@ -132,12 +140,12 @@ class PolyCubeProcessor:
     def extract_candidate_edges_vertices(self):
         """提取候选边和顶点"""
         self.edges.clear()
-        self.edges_idx.clear()
         self.vertices.clear()
         total_edge = self.surface_mesh.edge
-        node = self.surface_mesh.node
-        face2edge = self.surface_mesh.cell2edge
         edge2face = self.surface_mesh.edge_to_cell()
+        one_by_one_edges = defaultdict(list)
+        chart_edges_idx = defaultdict(list)
+
         is_bd_edge = ((self.face2chart[edge2face[:, 0]] != self.face2chart[edge2face[:, 1]])
                       | (edge2face[:, 0] == edge2face[:, 1]))
         # 遍历边，初步分类候选边界边
@@ -146,24 +154,26 @@ class PolyCubeProcessor:
                 continue
             left_chart = self.face2chart[edge_info[0]].item()
             right_chart = self.face2chart[edge_info[1]].item()
+            # 获取该边起点与终点
             start_idx = total_edge[edge_idx, 0]
             end_idx = total_edge[edge_idx, 1]
+            # 统一相同两个图的边界标识
             if left_chart > right_chart:
                 left_chart, right_chart = right_chart, left_chart
                 start_idx, end_idx = end_idx, start_idx
             edge_key = frozenset([left_chart, right_chart])
-            self.edges[edge_key].append([start_idx, end_idx])
-            self.edges_idx[edge_key].append(edge_idx)
-        # 对每条候选边界边的顶点进行排序，按照其目标轴向
-        for key in self.edges.keys():
-            sorted_edge = edge_sort(bm.array(self.edges[key], dtype=bm.int32))
-            sorted_edge[1] = bm.array(self.edges_idx[key], dtype=bm.int32)[sorted_edge[1]]
+            one_by_one_edges[edge_key].append([start_idx, end_idx])
+            chart_edges_idx[edge_key].append(edge_idx)
+        # 对每条候选边界边的顶点进行排序
+        for key in one_by_one_edges.keys():
+            sorted_edge = edge_sort(bm.array(one_by_one_edges[key], dtype=bm.int32))
+            sorted_edge[1] = bm.array(chart_edges_idx[key], dtype=bm.int32)[sorted_edge[1]].tolist()
             self.edges[key] = sorted_edge
             # 统计候选顶点
             for idx in sorted_edge[0]:
                 self.vertices[idx] += 1
         # 过滤掉小于3的顶点
-        self.vertices = {k: count for k, count in self.vertices.items() if count >= 3}
+        self.vertices = defaultdict(int, {k: count for k, count in self.vertices.items() if count >= 3})
 
     def straighten_edges(self, max_iter=5):
         """
@@ -176,7 +186,72 @@ class PolyCubeProcessor:
         -------
 
         """
-        pass
+        total_edge = self.surface_mesh.edge
+        edge2face = self.surface_mesh.edge_to_cell()
+        for j in range(max_iter):
+            chart_edge_node_idx = []
+            chart_edge_idx = []
+            chart_edge_flag = []
+            # 获取当前图册的边界边相关信息
+            for key, val in self.edges.items():
+                # {(face1, face2): [[node_idx], [edge_idx]]}
+                # 边界左右两侧图册索引
+                chart_edge_flag.append(sorted(key))
+                # 边界边的节点索引
+                chart_edge_node_idx.append(val[0])
+                # 边界包含的网格边的索引
+                chart_edge_idx.append(val[1])
+            # 遍历所有图册的边界边
+            for i, chart_flag in enumerate(chart_edge_flag):
+                # 遍历当前图册边包含的所有网格边
+                for e, edge in enumerate(chart_edge_idx[i]):
+                    if e == (len(chart_edge_flag[i])-1):
+                        # 如果是最后一条边，跳过
+                        break
+                    # 获取当前边的左右面索引，通过网格拓扑信息获取，因此可能与之前图册的边界方向相反
+                    current_edge_left_face = edge2face[edge, 0]
+                    current_edge_right_face = edge2face[edge, 1]
+                    # 获取图册边的起始点
+                    n = chart_edge_node_idx[i][e]
+                    # 获取网格边的起始点
+                    n_o = total_edge[edge, 0]
+                    if n != n_o:
+                        # 如果网格边与图册边起始点不一致，交换左右面索引
+                        current_edge_left_face, current_edge_right_face = current_edge_right_face, current_edge_left_face
+                    # 记录左右两侧面的图册索引
+                    left_chart_flag = self.face2chart[current_edge_left_face]
+                    right_chart_flag = self.face2chart[current_edge_right_face]
+                    # 下条边信息
+                    next_edge = chart_edge_idx[i][e+1]
+                    next_edge_left_face = edge2face[next_edge, 0]
+                    next_edge_right_face = edge2face[next_edge, 1]
+                    n = chart_edge_node_idx[i][e+1]
+                    n_o = total_edge[next_edge, 0]
+                    if n != n_o:
+                        # 如果网格边与图册边起始点不一致，交换左右面索引
+                        next_edge_left_face, next_edge_right_face = next_edge_right_face, next_edge_left_face
+                    if current_edge_left_face == next_edge_left_face:
+                        # 左侧出现锯齿
+                        # 更新左侧面标签，新标签为右侧面标签
+                        self.labels[current_edge_left_face] = self.labels[current_edge_right_face]
+                        # 将左侧面合并到右侧面所在的图册中
+                        self.face2chart[current_edge_left_face] = right_chart_flag
+                        # 更新图册信息
+                        self.charts[left_chart_flag].remove(current_edge_left_face)
+                        self.charts[right_chart_flag].append(current_edge_left_face)
+                        continue
+                    if current_edge_right_face == next_edge_right_face:
+                        # 右侧出现锯齿
+                        # 更新右侧面标签，新标签为左侧面标签
+                        self.labels[current_edge_right_face] = self.labels[current_edge_left_face]
+                        # 将右侧面合并到左侧面所在的图册中
+                        self.face2chart[current_edge_right_face] = left_chart_flag
+                        # 更新图册信息
+                        self.charts[right_chart_flag].remove(current_edge_right_face)
+                        self.charts[left_chart_flag].append(current_edge_right_face)
+                        continue
+            # 使用新的图册信息，更新候选边和顶点
+            self.extract_candidate_edges_vertices()
 
     def merge_small_charts(self, min_size=5):
         """
@@ -258,14 +333,37 @@ class PolyCubeProcessor:
 
 
 if __name__ == '__main__':
-    volume_mesh = TetrahedronMesh.from_box(nx=2, ny=2, nz=2)
+    volume_mesh = TetrahedronMesh.from_box(nx=3, ny=3, nz=3)
+    cell = volume_mesh.cell
+    node = volume_mesh.node
+    node[39, 0] = 2/ 3
+    node[39, 1] = 1 / 3
+    node[39, 2] = 7/6
+
+    node[35, 0] = 8/12
+    node[35, 1] = 0
+    node[35, 2] = 1
+
+    node[55, 0] = 1
+    node[55, 1] = 3/12
+    node[55, 2] = 5/6
+
+    node[59, 0] = 1
+    node[59, 1] = 2/3
+    node[59, 2] = 5/6
+    volume_mesh = TetrahedronMesh(node, cell)
+    # volume_mesh.to_vtk(fname='volume_mesh.vtu')
+
     bd_mesh = get_bd_mesh(volume_mesh)
+    bd_mesh.celldata['normal'] = closed_axis_projection(bd_mesh.cell_normal())
+    bd_mesh.to_vtk(fname='bd_mesh.vtu')
     # bd_mesh.to_vtk(fname='bd_mesh.vtu')
     processor = PolyCubeProcessor(volume_mesh)
     processor.face_normal = bd_mesh.cell_normal()
     processor.assign_initial_labels()
     processor.build_candidate_charts()
     processor.extract_candidate_edges_vertices()
+    processor.straighten_edges(max_iter=5)
     processor.merge_small_charts(min_size=5)
     is_valid = processor.validate_topology()
     print(f"Topology is valid: {is_valid}")
