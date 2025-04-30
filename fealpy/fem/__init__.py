@@ -57,3 +57,6 @@ from .poisson_lfem_solver import PoissonLFEMSolver
 from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver
 from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
 from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
+
+### computional model
+from .elliptic_rt_fem_model import EllipticRTFEMModel

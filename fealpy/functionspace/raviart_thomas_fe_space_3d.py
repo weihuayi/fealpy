@@ -111,7 +111,7 @@ class RTDof3d():
         return flag
 
 
-class RTFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
+class RaviartThomasFESpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
@@ -418,6 +418,12 @@ class RTFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
         return uh,isDDof
 
     boundary_interpolate = set_dirichlet_bc
+
+    def interpolate(self, u):
+        """
+
+        """
+        pass
 
     def show_basis(self, fig, index=0):
         """

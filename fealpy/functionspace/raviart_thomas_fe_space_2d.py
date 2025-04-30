@@ -93,7 +93,7 @@ class RTDof2d():
         flag[bddof] = True
         return flag
 
-class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
+class RaviartThomasFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
@@ -364,7 +364,10 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     def project(self, u):
         return self.interpolation(u)
 
-    def interpolation(self, u):
+    def interpolate(self, u):
+        """
+
+        """
         p = self.p
         mesh = self.mesh
 
