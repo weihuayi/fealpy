@@ -30,7 +30,9 @@ def bc_mask(
 def bc_value(
         p: TensorLike,
         bcs: Sequence[BoundaryCondition], 
-        kind: BCType) -> TensorLike:
+        kind: BCType, 
+        value_fn=None
+        ) -> TensorLike:
     """
     """
     context = bm.context(p)
@@ -38,7 +40,10 @@ def bc_value(
     for entry in bcs:
         if entry.kind == kind:
             m = entry.mask_fn(p)
-            v = entry.value_fn(p)
+            if value_fn is not None:
+                v = value_fn(p)
+            else:
+                v = entry.value_fn(p)
             val = bm.where(m, v, val)
     return val
 

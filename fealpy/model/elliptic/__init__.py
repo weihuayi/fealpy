@@ -29,6 +29,7 @@ EllipticPDEDataT = TypeVar('EllipticPDEDataT', bound=EllipticPDEDataProtocol)
 DATA_TABLE = {
     # example name: (file_name, class_name)
     "coscos": ("coscosdata", "CosCosData"),
+    "sinsin": ("sinsindata", "SinSinData"),
 }
 
 
