@@ -6,9 +6,12 @@ from ..mesh import TriangleMesh
 from ..functionspace import RaviartThomasFESpace2d
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
-from ..fem import ScalarMassIntegrator, SourceIntegrator
+from ..fem import ScalarMassIntegrator, ScalarSourceIntegrator,VectorMassIntegrator
 from ..fem import DivIntegrator
-
+from ..fem import BlockForm
+from ..backend import backend_manager as bm
+from ..solver import spsolve
+from ..fem import DirichletBC
 
 class EllipticRTFEMModel(ComputationalModel):
     """
@@ -31,12 +34,14 @@ class EllipticRTFEMModel(ComputationalModel):
         Initialize the mesh for the elliptic RT FEM model.
         """
         domain = self.pde.domain()
-        self.mesh = TriangleMesh.from_box(domain, nx=2, ny=2)
+        self.mesh = TriangleMesh.from_box(domain, nx=4, ny=4)
         return self.mesh
 
     def linear_system(self):
         """
         """
+        pde = self.pde
+        mesh = self.init_mesh()
         pspace = RaviartThomasFESpace2d(mesh, p=0)
         uspace = LagrangeFESpace(mesh, p=0, ctype='D') # discontinuous space
         ph = pspace.function()
@@ -45,19 +50,98 @@ class EllipticRTFEMModel(ComputationalModel):
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
         pgdof = pspace.number_of_global_dofs()
-        udgof = uspace.number_of_global_dofs()
+        ugdof = uspace.number_of_global_dofs()
 
         print(f"Number of edges: {NE}")
         print(f"Number of cells: {NC}")
         print(f"Number of global dofs for pspace: {pgdof}")
-        print(f"Number of global dofs for uspace: {udgof}")
-        pass
+        print(f"Number of global dofs for uspace: {ugdof}")
+        
+        bform1 = BilinearForm(pspace)
+        bform1.add_integrator(VectorMassIntegrator(coef=pde.diffusion_coef_inv, q=3))
 
+        bform2 = BilinearForm((uspace,pspace))
+        bform2.add_integrator(DivIntegrator(coef=-1, q=3))
+    
+        bform3 = BilinearForm((uspace,pspace))
+        bform3.add_integrator(DivIntegrator(coef=1, q=3))
+    
+        bform4 = BilinearForm(uspace)
+        bform4.add_integrator(ScalarMassIntegrator(coef=2, q=3))
+
+        M = BlockForm([[bform1,bform2],
+                       [bform3.T,bform4]])
+        A = M.assembly()
+        
+         # 组装右端
+        lform = LinearForm(uspace)
+        lform.add_integrator(ScalarSourceIntegrator(source=pde.source))
+        F = lform.assembly()
+        G = bm.zeros(pgdof)
+        b = bm.concatenate([G,F],axis=0)
+        return A, b
+
+    def boundary_apply(self):
+        """
+        Apply the boundary conditions to the linear system.
+        """
+        A, b = self.linear_system()
+        # 组装边界条件 
+        pde = self.pde
+        mesh = self.init_mesh()
+        pspace = RaviartThomasFESpace2d(mesh, p=0)
+        uspace = LagrangeFESpace(mesh, p=0, ctype='D') # discontinuous space
+        pgdof = pspace.number_of_global_dofs()
+        ugdof = uspace.number_of_global_dofs()
+        ispBdof = pspace.is_boundary_dof()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+        isyBdof = bm.zeros(ugdof, dtype=bm.bool)
+        isBdof = bm.concatenate([ispBdof,isyBdof],axis=0)
+        fun = pspace.function()
+        k,_ = pspace.set_dirichlet_bc(pde.grad_dirichlet,fun)
+        k1 = bm.zeros(ugdof, dtype=bm.float64)
+        k = bm.concatenate([k,k1],axis=0)
+        bc = DirichletBC(space=(pspace,uspace),gd=k, threshold=isBdof)
+        A, b = bc.apply(A, b)
+        
+        return A, b
+    
     def solve(self):
-        pass
-
-
-
+        """
+        Solve the linear system.
+        """
+        mesh = self.init_mesh()
+        pde = self.pde
+        pspace = RaviartThomasFESpace2d(mesh, p=0)
+        uspace = LagrangeFESpace(mesh, p=0, ctype='D') # discontinuous space
+        pgdof = pspace.number_of_global_dofs()
+        ugdof = uspace.number_of_global_dofs()
+        p = pspace.function()
+        u = uspace.function()
+        A, b = self.linear_system()
+        A, b = self.boundary_apply()
+        '''
+        # 添加约束条件
+        lform1 = LinearForm(uspace)
+        lform1.add_integrator(ScalarSourceIntegrator(pde.source1))
+        A3 = lform1.assembly()
+        o = bm.zeros(1, dtype=bm.float64)
+        G = bm.zeros(pgdof, dtype=bm.float64)
+        A1 = bm.concatenate([G,A3],axis=0)
+        pp = A1.shape[0]
+        A2 = A1.reshape(pp,1)
+        A1 = bm.concatenate([A1,o],axis=0).reshape(1,-1)
+        M1  = A.toarray()
+        M1 = bm.concatenate([M1,A2],axis=1)
+        M1 = bm.concatenate([M1,A1],axis=0)   
+        from scipy import sparse as sp
+        A = sp.coo_matrix(M1).tocsr()
+        b = bm.concatenate([b,o],axis=0)
+        from scipy.sparse.linalg import spsolve
+        '''
+        x = spsolve(A, b,'scipy')
+        p[:] = x[:pgdof]
+        u[:] = x[pgdof:pgdof+ugdof]
+        return p, u
 
     def show_mesh(self):
 
