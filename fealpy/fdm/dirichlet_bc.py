@@ -18,7 +18,7 @@ class DirichletBC():
 
         node = self.mesh.entity('node')
         bdFlag = self.mesh.boundary_node_flag()
-        uh = bm.set_at(uh, bdFlag, self.gd(node[bdFlag]))
+        uh = bm.set_at(uh, bdFlag, self.gd(node[bdFlag].flatten()))
         
         f = f - A @ uh 
         f = bm.set_at(f, bdFlag, uh[bdFlag])

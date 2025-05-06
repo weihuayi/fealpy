@@ -1,7 +1,12 @@
 from ..backend import backend_manager as bm  
 
-from typing import Union, Optional, Callable, Tuple
-from ..typing import TensorLike, Index, _S, Union, Tuple
+from ..typing import TensorLike, Index, _S
+
+from typing import Union, Optional, Callable, Tuple, List
+from types import ModuleType
+from matplotlib.pyplot import Figure
+from matplotlib.projections import Axes3D
+from matplotlib.axes import Axes
 
 from .utils import entitymethod, estr2dim
 
@@ -1054,5 +1059,168 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         auxNode = (node[scell[:, 0], :] + node[scell[:, 2], :]) / 2
 
         return iCellNodeIndex, cutNode, auxNode, isInterfaceCell
+
+    def function(self, etype='node', dim=None, dtype=None, ex=0):
+        """Return a discrete function (array) defined on nodes, mesh edges, or mesh cells with elements set to 0"""
+        nx = self.nx
+        ny = self.ny
+        dtype = self.ftype if dtype is None else dtype
+        if etype in {'node', 0}:
+            if dim is None:
+                uh = bm.zeros((nx + 1 + 2 * ex, ny + 1 + 2 * ex), dtype=dtype)
+            else:
+                uh = bm.zeros((nx + 1 + 2 * ex, ny + 1 + 2 * ex, dim), dtype=dtype)
+
+        elif etype in {'edge', 'face', 1}:
+            ex = bm.zeros((nx, ny + 1), dtype=dtype)
+            ey = bm.zeros((nx + 1, ny), dtype=dtype)
+            uh = (ex, ey)
+        elif etype in {'edgex'}:
+            uh = bm.zeros((nx, ny + 1), dtype=dtype)
+        elif etype in {'edgey'}:
+            uh = bm.zeros((nx + 1, ny), dtype=dtype)
+        elif etype in {'cell', 2}:
+            uh = bm.zeros((nx + 2 * ex, ny + 2 * ex), dtype=dtype)
+        else:
+            raise ValueError(f'the entity `{etype}` is not correct!')
+
+        return uh    
+
+    def error(self,
+            u: Callable,
+            uh: TensorLike,
+            errortype: str = 'all'
+        ) -> Union[float, Tuple[float, float, float]]:
+        """计算真实解和数值解之间的误差"""
+        hx = self.h[0]
+        hy = self.h[1]
+        nx = self.nx
+        ny = self.ny
+        node = self.node
+        uI = u(node)
+        e = uI - uh
+
+        if errortype == 'all':
+            emax = bm.max(bm.abs(e))
+            e0 = bm.sqrt(hx * hy * bm.sum(e ** 2))
+            el2 = bm.sqrt(1 / ((nx - 1) * (ny - 1)) * bm.sum(e ** 2))
+
+            return emax, e0, el2
+        elif errortype == 'max':
+            emax = bm.max(bm.abs(e))
+            return emax
+        elif errortype == 'L2':
+            e0 = bm.sqrt(hx * hy * bm.sum(e ** 2))
+            return e0
+        elif errortype == 'l2':
+            el2 = bm.sqrt(1 / ((nx - 1) * (ny - 1)) * bm.sum(e ** 2))
+            return el2
+        
+    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='rainbow'):
+        """显示一个定义在网格节点上的函数"""
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            axes = fig.add_subplot(111, projection='3d')
+        else:
+            axes = plot
+
+        axes.set_box_aspect(aspect)
+        axes.set_proj_type('ortho')
+
+        node = self.node  # 获取二维节点上的网格坐标
+        if uh.ndim == 1:
+            uh = uh.reshape(self.nx+1, self.ny+1)
+        return axes.plot_surface(node[..., 0].reshape(self.nx+1, self.ny+1), 
+                                node[..., 1].reshape(self.nx+1, self.ny+1), 
+                                uh, cmap=cmap)
+
+    def show_animation(self,
+                    fig: Figure,
+                    axes: Union[Axes, Axes3D],
+                    box: List[float],
+                    advance: Callable[[int], Tuple[TensorLike, float]],
+                    fname: str = 'test.mp4',
+                    init: Optional[Callable] = None,
+                    fargs: Optional[Callable] = None,
+                    frames: int = 1000,
+                    interval: int = 50,
+                    plot_type: str = 'imshow',
+                    cmap='rainbow') -> None:
+        """生成求解过程动画并保存为指定文件名的视频文件"""
+        # 创建动画所需的类和函数
+        import matplotlib.animation as animation
+        # 绘制颜色条的类
+        from matplotlib.contour import QuadContourSet
+
+        # 初始化二维网格数据
+        uh, _ = advance(0)
+        if isinstance(axes, Axes) and plot_type == 'imshow':
+            data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5],
+                               extent=box[0:4], interpolation='bicubic')
+        elif isinstance(axes, Axes3D) and plot_type == 'surface':
+            X = self.node[..., 0]
+            Y = self.node[..., 1]
+            data = axes.plot_surface(X, Y, uh, linewidth=0, cmap=cmap, vmin=box[4],
+                                     vmax=box[5], rstride=1, cstride=1)
+            axes.set_xlim(box[0], box[1])
+            axes.set_ylim(box[2], box[3])
+            axes.set_zlim(box[4], box[5])
+        elif plot_type == 'contourf':
+            X = self.node[..., 0]
+            Y = self.node[..., 1]
+            data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
+            # data 的值在每一帧更新时都会发生改变 颜色条会根据这些更改自动更新
+            # 后续的代码中无需对颜色条进行额外的更新操作
+            # cbar = fig.colorbar(data, ax=axes)
+
+        def func(n, *fargs):  # 根据当前帧序号计算数值解，更新图像对象的数值数组，显示当前帧序号和时刻
+            nonlocal data  # 声明 data 为非局部变量 这样在 func 函数内部对 data 进行的修改会影响到外部的 data 变量
+            uh, t = advance(n, *fargs)  # 计算当前时刻的数值解并返回，uh 是数值解，t 是当前时刻
+
+            if data is None:
+                if isinstance(axes, Axes) and plot_type == 'imshow':
+                    data = axes.imshow(uh, cmap=cmap, vmin=box[4], vmax=box[5],
+                                       extent=box[0:4], interpolation='bicubic')
+                elif isinstance(axes, Axes3D) and plot_type == 'surface':
+                    data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=box[4],
+                                             vmax=box[5], rstride=1, cstride=1)
+                elif plot_type == 'contourf':
+                    data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
+
+            if isinstance(axes, Axes) and plot_type == 'imshow':
+                data.set_array(uh)  # 更新 data 对象的数值数组。导致图像的颜色根据新的数值解 uh 更新
+                axes.set_aspect('equal')  # 设置坐标轴的长宽比。'equal' 选项使得 x 轴和 y 轴的单位尺寸相等
+
+            elif isinstance(axes, Axes3D) and plot_type == 'surface':
+                axes.clear()  # 清除当前帧的图像
+                data = axes.plot_surface(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
+                axes.set_xlim(box[0], box[1])
+                axes.set_ylim(box[2], box[3])
+                axes.set_zlim(box[4], box[5])
+            elif plot_type == 'contourf':
+                # 使用 contourf 时，每次更新图像时都会生成一个新的等高线填充层
+                # data.collections 保存了所有已经生成的等高线填充层
+                # 更新图像时 需要将旧的等高线填充层从图形中移除 以免遮挡住新的等高线填充层
+                if data is not None:
+                    if isinstance(data, QuadContourSet):
+                        for coll in data.collections:
+                            if coll in axes.collections:
+                                coll.remove()
+                data = axes.contourf(X, Y, uh, cmap=cmap, vmin=box[4], vmax=box[5])
+                axes.set_aspect('equal')
+
+            s = "frame=%05d, time=%0.8f" % (n, t)  # 创建一个格式化的字符串，显示当前帧序号 n 和当前时刻 t
+            print(s)
+            axes.set_title(s)  # 将格式化的字符串设置为坐标轴的标题
+            return data
+
+        # 创建一个 funcanimation 对象
+        # fig 作为画布，func 作为帧更新函数
+        # init_func 作为初始化函数，用于在动画开始之前设置图像的初始状态
+        # fargs 作为一个元组，包含要传递给 func 函数的额外参数
+        # frames 为帧数，interval 为动画间隔时间
+        ani = animation.FuncAnimation(fig, func, init_func=init, fargs=fargs, frames=frames, interval=interval)
+        ani.save('{}_{}'.format(plot_type, fname))
+
 
 UniformMesh2d.set_ploter('2d')
