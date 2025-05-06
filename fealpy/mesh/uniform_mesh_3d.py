@@ -1,4 +1,3 @@
-import numpy as np 
 from typing import Union, Optional, Sequence, Tuple, Any
 
 from .utils import entitymethod, estr2dim
@@ -1484,7 +1483,43 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         writer.Write()
 
         return filename
+    
+    def error(self, u, uh, errortype='all'):
+        """计算真实解和数值解之间的误差"""
+        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1) and (uh.shape[2] == self.nz+1)
+        hx = self.h[0]
+        hy = self.h[1]
+        hz = self.h[2]
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        node = self.node
+        uI = u(node)
+        e = uI - uh
 
+        if errortype == 'all':
+            emax = bm.max(bm.abs(e))
+            e0 = bm.sqrt(hx * hy * hz * bm.sum(e ** 2))
+            el2 = bm.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * bm.sum(e ** 2))
+            return emax, e0, el2
+        elif errortype == 'max':
+            emax = bm.max(bm.abs(e))
+            return emax
+        elif errortype == 'L2':
+            e0 = bm.sqrt(hx * hy * hz * bm.sum(e ** 2))
+            return e0
+        elif errortype == 'l2':
+            el2 = bm.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * bm.sum(e ** 2))
+            return el2
+
+    def show_function(self, plot, uh, cmap='jet'):
+        pass
+
+    ## @ingroup GeneralInterface
+    def show_animation(self, fig, axes, box,
+                       init, forward, fname='test.mp4',
+                       fargs=None, frames=1000, lw=2, interval=50):
+        pass
 
 
 UniformMesh3d.set_ploter('3d')

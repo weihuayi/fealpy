@@ -77,30 +77,9 @@ class LaplaceOperator(OpteratorBase):
 
         return A
 
-    @assemblymethod(call_name='fast')
+    @assemblymethod('fast')
     def fast_assembly(self) -> SparseTensor:
-        mesh = self.mesh
-        ftype = mesh.ftype  # Floating point data type for matrix entries
-        itype = mesh.itype  # Integer data type for indexing (not used directly)
-        device = mesh.device  # Device context (e.g., CPU, GPU)
-        GD = mesh.geo_dimension()  # Geometric dimension of the mesh
-
-        # spacing of the mesh in each dimension
-        h = mesh.h
-        # coefficient c = 1/h^2 per dimension
-        c = 1.0 / (h ** 2)
-
-        NN = mesh.number_of_nodes()  # Total number of grid nodes
-        K = mesh.linear_index_map('node')  # Multi-dimensional to linear index map
-        shape = K.shape  # Shape of the index map array
-
-        # Create diagonal entries with sum of c over dimensions times 2
-        diag_value = bm.full(NN, 2 * c.sum(), dtype=ftype)
-        I = K.flat  # Row indices for diagonal entries
-        J = K.flat  # Column indices for diagonal entries
-        A = csr_matrix((diag_value, (I, J)), shape=(NN+1, NN+1))
-
-        return A
+        pass
 
     def __matmul__(self, u: TensorLike) -> TensorLike:
         """

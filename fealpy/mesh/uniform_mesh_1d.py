@@ -1,4 +1,4 @@
-from typing import Union, Tuple, List
+from typing import Callable, Union, Tuple, List
 from types import ModuleType
 
 from .mesh_base import StructuredMesh, TensorMesh
@@ -375,20 +375,61 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
             etype = estr2dim(self, etype)
         qf = GaussLegendreQuadrature(q, dtype=self.ftype, device=self.device)
         return qf        
+    
+    def function(self, etype='node', dtype=None, ex=0, flat=False):
+        """Returns an array defined on nodes or cells with all elements set to 0"""
+        nx = self.nx
+        dtype = self.ftype if dtype is None else dtype
+        if etype in {'node', 'face', 0}:
+            uh = bm.zeros(nx + 1, dtype=dtype)
+        elif etype in {'cell', 1}:
+            uh = bm.zeros(nx, dtype=dtype)
+        else:
+            raise ValueError('the entity `{etype}` is not correct!')
+        if flat is False:
+            return uh
+        else:
+            return uh.flatten()
 
+    def error(self, 
+            u: Callable, 
+            uh: TensorLike, 
+            errortype: str = 'all'
+        ) -> Union[float, Tuple[float, float, float]]:
+        """计算真实解和数值解之间的误差"""
+        h = self.h
+        node = self.node
+        uI = u(node).flatten()
+        e = uI - uh
+
+        if errortype == 'all':
+            emax = bm.max(bm.abs(e))
+            e0 = bm.sqrt(h * bm.sum(e ** 2))
+
+            de = e[1:] - e[0:-1]
+            e1 = bm.sqrt(bm.sum(de ** 2) / h + e0 ** 2)
+            return emax, e0, e1
+        elif errortype == 'max':
+            emax = bm.max(bm.abs(e))
+            return emax
+        elif errortype == 'L2':
+            e0 = bm.sqrt(h * bm.sum(e ** 2))
+            return e0
+        elif errortype == 'H1':
+            e0 = bm.sqrt(h * bm.sum(e ** 2))
+            de = e[1:] - e[0:-1]
+            e1 = bm.sqrt(bm.sum(de ** 2) / h + e0 ** 2)
+            return e1
 
     def show_function(self, plot, uh, box=None):
-        """
-        @brief 画出定义在网格上的离散函数
-        """
+        """画出定义在网格上的离散函数"""
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
             axes = fig.gca()
         else:
             axes = plot
-
-        # 设置 x 轴和 y 轴的显示范围
+            
         if box is not None:
             axes.set_xlim(box[0], box[1])
             axes.set_ylim(box[2], box[3])
@@ -396,7 +437,6 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
         node = self.node
         line = axes.plot(node, uh)
         return line
-
 
     ## @ingroup GeneralInterface
     from matplotlib.figure import Figure
@@ -413,22 +453,7 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
                 frames: int = 1000, 
                 interval: int = 50,
                 **kwargs) -> None:
-        """
-        在一维一致网格中生成一个动画
-
-        @param fig: matplotlib的Figure对象，用于绘制动画
-        @param axes: matplotlib的Axes对象，用于设置坐标轴和画图
-        @param box: 一个四元组，分别表示x轴的最小值、最大值和y轴的最小值、最大值
-        @param advance: 一个函数，接受当前帧序号（和可选的其他参数），返回当前时间步的解和时间
-        @param fname: 字符串，保存的视频文件的名称，默认为'test.mp4'
-        @param init: 一个可选的函数，用于初始化线的数据，返回初始化的数据，默认为None
-        @param fargs: 一个可选的元组，包含传递给init和advance函数的额外参数，默认为None
-        @param frames: 整数，动画的帧数，默认为1000
-        @param interval: 整数，动画中每帧之间的间隔（以毫秒为单位），默认为50
-        @param kwargs: 其他的可选关键字参数，例如线的宽度（lw）、线的样式（linestyle）、线条上标记点的样式（marker）、线的颜色（color）等
-
-        @return: None
-        """
+        """在一维一致网格中生成一个动画"""
         import matplotlib.animation as animation
         
         x = self.node
