@@ -74,7 +74,10 @@ for i in range(maxit):
     em[0, i], em[1, i], em[2, i] = mesh.error(pde_ell2d.solution, uh)
 
     if i == maxit - 1:
-        mesh.show_function(plt, uh)
+        fig = plt.figure(4)
+        axes = fig.add_subplot(111, projection='3d')
+        NN = mesh.number_of_nodes()
+        mesh.show_function(axes, uh.reshape(mesh.nx+1, mesh.ny+1))
         plt.title(f"Iteration {i+1}")
         plt.show()
     if i < maxit:
@@ -93,7 +96,7 @@ print("------------")
 # A1 = L0.fast_assembly()
 
 # # method 和 call 方法只需要使用一种
-# L01 = LaplaceOperator(mesh, method='fast_assembly')
+# L01 = LaplaceOperator(mesh, method='fast')
 # A1 =L01()
 
 print("------------")

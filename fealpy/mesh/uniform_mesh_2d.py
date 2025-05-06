@@ -1092,7 +1092,6 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             errortype: str = 'all'
         ) -> Union[float, Tuple[float, float, float]]:
         """计算真实解和数值解之间的误差"""
-        assert (uh.shape[0] == self.nx + 1) and (uh.shape[1] == self.ny + 1)
         hx = self.h[0]
         hy = self.h[1]
         nx = self.nx
@@ -1131,7 +1130,9 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         node = self.node  # 获取二维节点上的网格坐标
         if uh.ndim == 1:
             uh = uh.reshape(self.nx+1, self.ny+1)
-        return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
+        return axes.plot_surface(node[..., 0].reshape(self.nx+1, self.ny+1), 
+                                node[..., 1].reshape(self.nx+1, self.ny+1), 
+                                uh, cmap=cmap)
 
     def show_animation(self,
                     fig: Figure,

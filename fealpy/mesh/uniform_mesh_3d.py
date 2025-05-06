@@ -1484,6 +1484,43 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         return filename
     
+    def function(self, etype='node', dtype=None, ex=0):
+        """返回定义在节点、网格边、或者网格单元上离散函数 (数组), 元素取值为 0"""
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        dtype = self.ftype if dtype is None else dtype
+        if etype in {'node', 0}:
+            uh = bm.zeros((nx+1+2*ex, ny+1+2*ex, nz+1+2*ex), dtype=dtype)
+        elif etype in {'facex'}: # 法线和 x 轴平行的面
+            uh = bm.zeros((nx+1, ny, nz), dtype=dtype)
+        elif etype in {'facey'}: # 法线和 y 轴平行的面
+            uh = bm.zeros((nx, ny+1, nz), dtype=dtype)
+        elif etype in {'facez'}: # 法线和 z 轴平行的面
+            uh = bm.zeros((nx, ny, nz+1), dtype=dtype)
+        elif etype in {'face', 2}: # 所有的面
+            ex = bm.zeros((nx+1, ny, nz), dtype=dtype)
+            ey = bm.zeros((nx, ny+1, nz), dtype=dtype)
+            ez = bm.zeros((nx, ny, nz+1), dtype=dtype)
+            uh = (ex, ey, ez)
+        elif etype in {'edgex'}: # 切向与 x 轴平行的边
+            uh = bm.zeros((nx, ny+1, nz+1), dtype=dtype)
+        elif etype in {'edgey'}: # 切向与 y 轴平行的边
+            uh = bm.zeros((nx+1, ny, nz+1), dtype=dtype)
+        elif etype in {'edgez'}: # 切向与 z 轴平行的边
+            uh = bm.zeros((nx+1, ny+1, nz), dtype=dtype)
+        elif etype in {'edge', 1}: # 所有的边
+            ex = bm.zeros((nx, ny+1, nz+1), dtype=dtype)
+            ey = bm.zeros((nx+1, ny, nz+1), dtype=dtype)
+            ez = bm.zeros((nx+1, ny+1, nz), dtype=dtype)
+            uh = (ex, ey, ez)
+        elif etype in {'cell', 3}:
+            uh = bm.zeros((nx+2*ex, ny+2*ex, nz+2*ex), dtype=dtype)
+        else:
+            raise ValueError(f'the entity `{etype}` is not correct!')
+
+        return uh
+    
     def error(self, u, uh, errortype='all'):
         """计算真实解和数值解之间的误差"""
         assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1) and (uh.shape[2] == self.nz+1)
