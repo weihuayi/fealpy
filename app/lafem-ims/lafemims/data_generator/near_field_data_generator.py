@@ -33,7 +33,7 @@ class NearFieldDataFEMGenerator2d:
                  levelset: Callable[[NDArray], NDArray],
                  d: Sequence[float],
                  k: Sequence[float],
-                 reciever_points: NDArray):
+                 receiver_points: NDArray):
 
         self.domain = domain
         self.nx = nx
@@ -63,7 +63,7 @@ class NearFieldDataFEMGenerator2d:
         
         self.d = d
         self.k = k
-        self.reciever_points = reciever_points
+        self.receiver_points = receiver_points
         qf = self.mesh.quadrature_formula(self.q, 'cell')
         self.bc, _ = qf.get_quadrature_points_and_weights()
 
@@ -157,28 +157,28 @@ class NearFieldDataFEMGenerator2d:
         返回:
         - data: DSM数据
         """
-        reciever_points = self.reciever_points
-        data_length = reciever_points.shape[0]
+        receiver_points = self.receiver_points
+        data_length = receiver_points.shape[0]
         data = bm.zeros((data_length,), dtype=bm.complex128)
         uh = self.get_nearfield_data(k=k, d=d)
 
         if self.meshtype == 'InterfaceMesh':
-            b = self.mesh.point_to_bc(reciever_points)
-            location = self.mesh.location(reciever_points)
+            b = self.mesh.point_to_bc(receiver_points)
+            location = self.mesh.location(receiver_points)
             for i in range(data_length):
                 data[i] = uh(b[i])[location[i]]
         elif self.meshtype == 'QuadrangleMesh':
             for i in range(data_length):
-                location, b = self.points_location_and_bc(reciever_points[i], self.domain, self.nx, self.ny)
+                location, b = self.points_location_and_bc(receiver_points[i], self.domain, self.nx, self.ny)
                 u = uh(b).reshape(-1)
                 data[i] = u[location]
         else:
             for i in range(data_length):
-                cell_location = self.mesh.cell_location(reciever_points[i])
+                cell_location = self.mesh.cell_location(receiver_points[i])
                 location_column = cell_location[0]
                 location_row = cell_location[1]
                 location = location_column * self.ny + location_row
-                b = self.mesh.point_to_bc(reciever_points[i])
+                b = self.mesh.point_to_bc(receiver_points[i])
                 u = uh(b).reshape(-1)
                 data[i] = u[location]
         return data
@@ -200,7 +200,7 @@ class NearFieldDataFEMGenerator2d:
                 d_name = d_values[j]
                 name = f"{k_name}, d={d_name}"
                 data_dict[name] = self.data_for_dsm(k=k_values[i], d=d_values[j])
-        filename = os.path.join(save_path, f"data_for_dsm_{scatterer_index}.npz")
+        filename = os.path.join(save_path, f"us_data_for_scatterer{scatterer_index}.npz")
         np.savez(filename, **data_dict)
 
     def visualization_of_nearfield_data(self, k: float, d: Sequence[float]):
