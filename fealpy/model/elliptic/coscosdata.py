@@ -34,13 +34,13 @@ class CosCosData():
 
     @cartesian
     def diffusion_coef(self, p: TensorLike) -> TensorLike:
-        val = bm.array([[10.0, 1.0], [1.0, 10.0]])
+        val = bm.array([[10.0, 0.0], [0.0, 10.0]])
         shape = p.shape[:-1] + val.shape
         return bm.broadcast_to(val, shape)
     
     @cartesian
     def diffusion_coef_inv(self, p: TensorLike) -> TensorLike:
-        val = bm.array([[0.1, -0.01], [-0.01, 0.1]])
+        val = bm.array([[0.1, 0], [0, 0.1]])
         shape = p.shape[:-1] + val.shape
         return bm.broadcast_to(val, shape)
 
@@ -77,12 +77,10 @@ class CosCosData():
     
     @cartesian
     def source(self, p: TensorLike, index=None) -> TensorLike:
-        print("Input p shape:", p.shape)  # Debugging line
         x = p[..., 0]
         y = p[..., 1]
         pi = bm.pi
-        val =  -8*pi**2*bm.sin(2*pi*x)*bm.sin(2*pi*y) + 2*bm.cos(2*pi*x)*bm.cos(2*pi*y) + 80*pi**2*bm.cos(2*pi*x)*bm.cos(2*pi*y)
-        print("Output val shape:", val.shape)  # Debugging line
+        val = 2*bm.cos(2*pi*x)*bm.cos(2*pi*y) + 80*pi**2*bm.cos(2*pi*x)*bm.cos(2*pi*y)
         return val
     
     @cartesian

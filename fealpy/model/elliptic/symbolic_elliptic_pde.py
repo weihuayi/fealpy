@@ -152,7 +152,7 @@ class SymbolicEllipticPDE:
 if __name__ == "__main__":
     model = SymbolicEllipticPDE(
         u_str="cos(2*pi*x)*cos(2*pi*y)",
-        A_str="[[10,1],[1,10]]",
+        A_str="[[10,0],[0,10]]",
         b_str="[0, 0]",
         c_str="2",
         var_names="x y"
