@@ -61,8 +61,11 @@ domain = [0.0, 1.0, 0.0, 1.0]
 extent = [0, 5, 0, 5]
 mesh = UniformMesh(domain, extent)
 
+L01 = LaplaceOperator(mesh)
+A1 =L01.fast_assembly()
+
 L01 = LaplaceOperator(mesh, method='fast')
-A1 =L01()
+A2 =L01()
 maxit = 5
 em = bm.zeros((3, maxit), dtype=bm.float64)
 for i in range(maxit):
