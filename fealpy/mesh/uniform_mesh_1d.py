@@ -1,4 +1,4 @@
-from typing import Callable, Union, Tuple, List
+from typing import Callable, Union, Tuple, List, Any, Optional
 from types import ModuleType
 
 from .mesh_base import StructuredMesh, TensorMesh

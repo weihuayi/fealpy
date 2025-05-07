@@ -1089,7 +1089,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
     def update_dirichlet_bc(self, 
             gD: Callable[[TensorLike], Any], 
             uh: TensorLike
-        ) -> None:
+            ) -> None:
         """更新网格函数 uh 的 Dirichlet 边界值"""
         node = self.node
         isBdNode = self.boundary_node_flag().reshape(uh.shape)
@@ -1172,16 +1172,16 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             data = axes.imshow(uh_2d, cmap=cmap, vmin=box[4], vmax=box[5],
                                extent=box[0:4], interpolation='bicubic')
         elif isinstance(axes, Axes3D) and plot_type == 'surface':
-            X = self.node[..., 0]
-            Y = self.node[..., 1]
+            X = self.node[..., 0].reshape(nx+1, ny+1)
+            Y = self.node[..., 1].reshape(nx+1, ny+1)
             data = axes.plot_surface(X, Y, uh_2d, linewidth=0, cmap=cmap, vmin=box[4],
-                                     vmax=box[5], rstride=1, cstride=1)
+                                    vmax=box[5], rstride=1, cstride=1)
             axes.set_xlim(box[0], box[1])
             axes.set_ylim(box[2], box[3])
             axes.set_zlim(box[4], box[5])
         elif plot_type == 'contourf':
-            X = self.node[..., 0]
-            Y = self.node[..., 1]
+            X = self.node[..., 0].reshape(nx+1, ny+1)
+            Y = self.node[..., 1].reshape(nx+1, ny+1)
             data = axes.contourf(X, Y, uh_2d, cmap=cmap, vmin=box[4], vmax=box[5])
             # data 的值在每一帧更新时都会发生改变 颜色条会根据这些更改自动更新
             # 后续的代码中无需对颜色条进行额外的更新操作
@@ -1208,6 +1208,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
             elif isinstance(axes, Axes3D) and plot_type == 'surface':
                 axes.clear()  # 清除当前帧的图像
+                X = self.node[..., 0].reshape(nx+1, ny+1)
+                Y = self.node[..., 1].reshape(nx+1, ny+1)
                 data = axes.plot_surface(X, Y, uh_2d, cmap=cmap, vmin=box[4], vmax=box[5])
                 axes.set_xlim(box[0], box[1])
                 axes.set_ylim(box[2], box[3])
@@ -1216,6 +1218,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
                 # 使用 contourf 时，每次更新图像时都会生成一个新的等高线填充层
                 # data.collections 保存了所有已经生成的等高线填充层
                 # 更新图像时 需要将旧的等高线填充层从图形中移除 以免遮挡住新的等高线填充层
+                X = self.node[..., 0].reshape(nx+1, ny+1)
+                Y = self.node[..., 1].reshape(nx+1, ny+1)
                 if data is not None:
                     if isinstance(data, QuadContourSet):
                         for coll in data.collections:
