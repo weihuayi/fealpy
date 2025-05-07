@@ -1,7 +1,5 @@
 from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
-import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from fealpy.mesh import UniformMesh
 from fealpy.solver import spsolve
