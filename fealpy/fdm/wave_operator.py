@@ -135,7 +135,7 @@ class WaveOperator(OpteratorBase):
             A2 += csr_matrix((off_value2, (I, J)), shape=(NN, NN))
             A2 += csr_matrix((off_value2, (J, I)), shape=(NN, NN))
         
-        return A0, A1, A2
+        return A0, (A1, A2)
 
     def __matmul__(self, u: TensorLike) -> TensorLike:
         """
