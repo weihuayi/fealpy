@@ -1092,11 +1092,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             ) -> None:
         """更新网格函数 uh 的 Dirichlet 边界值"""
         node = self.node
-        #isBdNode = self.boundary_node_flag().reshape(uh.shape)
-        #uh[isBdNode] = gD(node[isBdNode, :])
-        isBdNode = self.boundary_node_flag().reshape(-1)
-        uh = uh.reshape(-1)
-        uh[isBdNode] = gD(node[isBdNode])
+        isBdNode = self.boundary_node_flag().reshape(uh.shape)
+        uh[isBdNode] = gD(node[isBdNode, :])
 
     def error(self,
             u: Callable,
