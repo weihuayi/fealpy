@@ -2,7 +2,7 @@ from ..backend import backend_manager as bm
 
 from ..typing import TensorLike, Index, _S
 
-from typing import Union, Optional, Callable, Tuple, List
+from typing import Union, Optional, Callable, Tuple, List, Any
 from types import ModuleType
 from matplotlib.pyplot import Figure
 from matplotlib.projections import Axes3D
@@ -1085,6 +1085,15 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
             raise ValueError(f'the entity `{etype}` is not correct!')
 
         return uh    
+    
+    def update_dirichlet_bc(self, 
+            gD: Callable[[TensorLike], Any], 
+            uh: TensorLike
+        ) -> None:
+        """更新网格函数 uh 的 Dirichlet 边界值"""
+        node = self.node
+        isBdNode = self.boundary_node_flag().reshape(uh.shape)
+        uh[isBdNode] = gD(node[isBdNode, :])
 
     def error(self,
             u: Callable,
