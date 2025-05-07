@@ -67,9 +67,9 @@ for i in range(maxit):
     fixed_time_step = int((fixed_time - duration[0]) / tau)
     
     # 准备初值
-    uh0 = mesh.interpolate(pde.init_solution, 'node')
-    vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
-    uh1 = mesh.function('node').reshape(-1,1)
+    uh0 = mesh.interpolate(pde.init_solution, 'node').flatten()
+    vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node').flatten()
+    uh1 = mesh.function('node').flatten()
 
     for n in range(fixed_time_step + 1):
         uh, t = advance_explicit(n)
