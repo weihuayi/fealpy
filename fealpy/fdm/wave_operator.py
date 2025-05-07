@@ -5,14 +5,14 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..sparse import csr_matrix, SparseTensor
 from ..mesh import UniformMesh
-from .operator_base import assemblymethod
+from .operator_base import assemblymethod, OpteratorBase
 
-class WaveOperator():
+class WaveOperator(OpteratorBase):
     """
     WaveOperator constructs and assembles the discrete Wave operator 
     on a structured mesh for finite difference approximation.
     """
-    def _init_(self, mesh: UniformMesh, method: Optional[str]=None):
+    def __init__(self, mesh: UniformMesh, method: Optional[str]=None):
         """
         Initialize the Wave operator with a given structured mesh.
 
