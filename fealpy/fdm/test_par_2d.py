@@ -45,14 +45,22 @@ def advance_backward(n):
 
         A, f = bc.apply(A, f)
         uh0.flat = spsolve(A, f,solver='scipy')
-         
+            
         solution = lambda p: pde.solution(mesh.node, t + tau)
         # em[0, 0], em[1, 0], em[2, 0] = mesh.error(pde.solution, uh0)
         return uh0, t
 
-fig, axes = plt.subplots()
+# fig, axes = plt.subplots()
+# box = [0, 1, 0, 1, -1, 1] # 图像显示的范围 0 <= x <= 1, 0 <= y <= 1, -1 <= uh <= 1
+# mesh.show_animation(fig, axes, box, advance_backward, fname='parabolic_af.mp4', plot_type='imshow', frames=nt + 1)
+# plt.show()
+
+fig = plt.figure()
 box = [0, 1, 0, 1, -1, 1] # 图像显示的范围 0 <= x <= 1, 0 <= y <= 1, -1 <= uh <= 1
-mesh.show_animation(fig, axes, box, advance_backward, fname='parabolic_af.mp4', plot_type='imshow', frames=nt + 1)
+axes = fig.add_subplot(111, projection='3d')
+mesh.show_animation(fig, axes, box, advance_backward, 
+                    fname='parabolic_ab.mp4', plot_type='surface', frames=nt + 1)
 plt.show()
+
 
     
