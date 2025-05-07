@@ -1,5 +1,5 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import TriangleMesh, TetrahedronMesh
+from fealpy.mesh import TriangleMesh, TetrahedronMesh, IntervalMesh
 
 from collections import defaultdict
 import matplotlib.pyplot as plt
@@ -94,7 +94,7 @@ class PolyCubeProcessor:
         self.surface_mesh:TriangleMesh = get_bd_mesh(mesh)
         self.face_area = None
         self.face_center = None
-        self.face_normal = None
+        self.face_normal = self.surface_mesh.cell_normal()
         self.labels = None        # 每个面的轴方向标签（0~5对应±X,±Y,±Z）
         self.charts = []          # 候选图册列表，每个图册包含的面索引
         self.charts_labels = None   # 图册标签，每个图册对应的标签
@@ -146,6 +146,7 @@ class PolyCubeProcessor:
         one_by_one_edges = defaultdict(list)
         chart_edges_idx = defaultdict(list)
 
+        # 根据网格边两侧的面所属的 chart 筛选图册边
         is_bd_edge = ((self.face2chart[edge2face[:, 0]] != self.face2chart[edge2face[:, 1]])
                       | (edge2face[:, 0] == edge2face[:, 1]))
         # 遍历边，初步分类候选边界边
@@ -205,7 +206,7 @@ class PolyCubeProcessor:
             for i, chart_flag in enumerate(chart_edge_flag):
                 # 遍历当前图册边包含的所有网格边
                 for e, edge in enumerate(chart_edge_idx[i]):
-                    if e == (len(chart_edge_flag[i])-1):
+                    if e == (len(chart_edge_idx[i])-1):
                         # 如果是最后一条边，跳过
                         break
                     # 获取当前边的左右面索引，通过网格拓扑信息获取，因此可能与之前图册的边界方向相反
@@ -219,8 +220,8 @@ class PolyCubeProcessor:
                         # 如果网格边与图册边起始点不一致，交换左右面索引
                         current_edge_left_face, current_edge_right_face = current_edge_right_face, current_edge_left_face
                     # 记录左右两侧面的图册索引
-                    left_chart_flag = self.face2chart[current_edge_left_face]
-                    right_chart_flag = self.face2chart[current_edge_right_face]
+                    left_chart_flag = self.face2chart[current_edge_left_face].item()
+                    right_chart_flag = self.face2chart[current_edge_right_face].item()
                     # 下条边信息
                     next_edge = chart_edge_idx[i][e+1]
                     next_edge_left_face = edge2face[next_edge, 0]
@@ -266,32 +267,38 @@ class PolyCubeProcessor:
 
         """
         # TODO: Test, 合并之后更新相关属性
-        chart_num = len(self.charts)
-        chart_adjacency = bm.zeros((chart_num, chart_num), dtype=bm.bool)
-        for edge_key in self.edges.keys():
-            chart1, chart2 = edge_key
-            chart_adjacency[chart1, chart2] = True
-            chart_adjacency[chart2, chart1] = True
-        chart_neighbors = []
-        chart_neighbors_num = bm.sum(chart_adjacency, axis=1)
-        chart_face_num = bm.zeros(chart_num, dtype=bm.int32)
-        for idx, c in enumerate(self.charts):
-            chart_face_num[idx] = len(c)
-            neighbors = bm.nonzero(chart_adjacency[idx])
-            chart_neighbors.append(neighbors[0].tolist())
-        for idx, c in enumerate(self.charts):
-            if (chart_neighbors_num[idx] < 4) or (chart_face_num[idx] < min_size):
-                # 合并到邻接的图册中
-                neighbors = chart_neighbors[idx]
-                max_face_neighbor = neighbors[0]
-                for n in neighbors:
-                    if chart_face_num[n] > chart_face_num[max_face_neighbor]:
-                        max_face_neighbor = n
-                self.charts[max_face_neighbor].extend(c)
-                self.charts.pop(idx)
-                for f in c:
-                    self.face2chart[f] = max_face_neighbor
-                    self.labels[f] = self.charts_labels[max_face_neighbor]
+        while True:
+            chart_num = len(self.charts)
+            # TODO: 考虑改成稀疏矩阵，或者其他更紧凑的数据结构
+            chart_adjacency = bm.zeros((chart_num, chart_num), dtype=bm.bool)
+            for edge_key in self.edges.keys():
+                chart1, chart2 = edge_key
+                chart_adjacency[chart1, chart2] = True
+                chart_adjacency[chart2, chart1] = True
+            chart_neighbors = []
+            chart_neighbors_num = bm.sum(chart_adjacency, axis=1)
+            chart_face_num = bm.zeros(chart_num, dtype=bm.int32)
+            for idx, c in enumerate(self.charts):
+                chart_face_num[idx] = len(c)
+                neighbors = bm.nonzero(chart_adjacency[idx])[0]
+                chart_neighbors.append(neighbors.tolist())
+            for idx, c in enumerate(self.charts):
+                if (chart_neighbors_num[idx] < 4) or (chart_face_num[idx] < min_size):
+                    # 合并到邻接的图册中
+                    neighbors = chart_neighbors[idx]
+                    max_face_neighbor = neighbors[0]
+                    for n in neighbors[1:]:
+                        if chart_face_num[n] > chart_face_num[max_face_neighbor]:
+                            max_face_neighbor = n
+                    self.charts[max_face_neighbor].extend(c)
+                    self.charts.pop(idx)
+                    for f in c:
+                        self.face2chart[f] = max_face_neighbor
+                        self.labels[f] = self.charts_labels[max_face_neighbor]
+                    # 使用新的图册信息，更新候选边和顶点
+                    self.extract_candidate_edges_vertices()
+                    continue
+            break
 
     def validate_topology(self):
         """检查PolyCube拓扑有效性"""
@@ -331,6 +338,70 @@ class PolyCubeProcessor:
 
         return valid
 
+    def laplacian_smooth(self, alpha=0.3, max_iter=5):
+        """
+        拉普拉斯平滑
+        Parameters
+        ----------
+        alpha : float
+            平滑系数
+        max_iter : int
+            最大迭代次数
+
+        Returns
+        -------
+
+        """
+        origin_node = self.surface_mesh.node
+        for i in range(max_iter):
+            for e in self.edges.values():
+                node_id = bm.array(e[0], dtype=bm.int32)
+                edge_node = origin_node[node_id]
+                for n in range(1, len(edge_node)-1):
+                    # 计算拉普拉斯平滑
+                    edge_node[n] = (1-alpha)*edge_node[n] + alpha*(edge_node[n-1] + edge_node[n+1]) / 2
+                # edge_node[0] = (1 - alpha) * edge_node[0] + alpha * edge_node[1]
+                # edge_node[-1] = (1 - alpha) * edge_node[-1] + alpha * edge_node[-2]
+                origin_node[node_id] = edge_node
+        self.surface_mesh.node = origin_node
+
+    def edge_projection(self):
+        # 将边界边投影到最近的轴方向
+        origin_node = self.surface_mesh.node
+        for key, val in self.edges.items():
+            left_chart, right_chart = sorted(key)
+            node_id = bm.array(val[0], dtype=bm.int32)
+            edge_node = origin_node[node_id]
+            first_node = bm.copy(edge_node[0])
+            left_normal = self.axes[self.charts_labels[left_chart]]
+            right_normal = self.axes[self.charts_labels[right_chart]]
+            normal_direction = bm.cross(left_normal, right_normal)
+            new_node = first_node + bm.einsum('nv, v, d->nd', edge_node-first_node, normal_direction, normal_direction)
+            origin_node[node_id] = new_node
+        self.surface_mesh.node = origin_node
+
+    def detect_turning_points(self):
+        origin_node = self.surface_mesh.node
+        turning_points = []
+        for key, val in self.edges.items():
+            left_chart, right_chart = sorted(key)
+            node_id = bm.array(val[0], dtype=bm.int32)
+            edge_node = origin_node[node_id]
+            first_node = bm.copy(edge_node[0])
+            left_normal = self.axes[self.charts_labels[left_chart]]
+            right_normal = self.axes[self.charts_labels[right_chart]]
+            normal_direction = bm.cross(left_normal, right_normal)
+            t = bm.einsum('nd, d->n', edge_node - first_node, normal_direction)
+            t0 = t[0]
+            for n in range(1, len(t)):
+                t_now = t[n]
+                if t_now < t0:
+                    # 反向
+                    turning_points.append(val[0][n])
+                t0 = t_now
+        return turning_points
+
+
 
 if __name__ == '__main__':
     volume_mesh = TetrahedronMesh.from_box(nx=3, ny=3, nz=3)
@@ -355,18 +426,62 @@ if __name__ == '__main__':
     # volume_mesh.to_vtk(fname='volume_mesh.vtu')
 
     bd_mesh = get_bd_mesh(volume_mesh)
-    bd_mesh.celldata['normal'] = closed_axis_projection(bd_mesh.cell_normal())
-    bd_mesh.to_vtk(fname='bd_mesh.vtu')
     # bd_mesh.to_vtk(fname='bd_mesh.vtu')
     processor = PolyCubeProcessor(volume_mesh)
-    processor.face_normal = bd_mesh.cell_normal()
     processor.assign_initial_labels()
+    bd_mesh.celldata['initial_labels'] = bm.copy(processor.labels)
     processor.build_candidate_charts()
+    bd_mesh.celldata['charts'] = bm.copy(processor.face2chart)
+    # bd_mesh.to_vtk(fname='bd_mesh.vtu')
+
     processor.extract_candidate_edges_vertices()
+    # 提取图册边界网格
+    edge = bd_mesh.edge
+    node = bd_mesh.node
+    edge_mesh = IntervalMesh(node, edge)
+
+    edge_date = bm.zeros(len(edge), dtype=bm.float64)
+    node_date = bm.zeros(len(node), dtype=bm.float64)
+    for i, v in enumerate(processor.edges.items()):
+        for e in v[1][1]:
+            edge_date[e] = (i + 1)*100
+    for i, v in enumerate(processor.vertices.items()):
+        node_date[v[0]] = (i + 1)*100
+    edge_mesh.celldata['edge_date'] = edge_date
+    edge_mesh.nodedata['node_date'] = node_date
+
+    # 边拉直
     processor.straighten_edges(max_iter=5)
+
+    edge_date_after = bm.zeros(len(edge), dtype=bm.float64)
+    node_date_after = bm.zeros(len(node), dtype=bm.float64)
+    for i, v in enumerate(processor.edges.items()):
+        for e in v[1][1]:
+            edge_date_after[e] = (i + 1) * 100
+    for i, v in enumerate(processor.vertices.items()):
+        node_date_after[v[0]] = (i + 1) * 100
+    edge_mesh.celldata['edge_date_after'] = edge_date_after
+    edge_mesh.nodedata['node_date_after'] = node_date_after
+    # edge_mesh.to_vtk(fname='edge_mesh.vtu')
+    bd_mesh.celldata['charts_after'] = processor.face2chart
+    # bd_mesh.to_vtk(fname='bd_mesh.vtu')
+
+
     processor.merge_small_charts(min_size=5)
     is_valid = processor.validate_topology()
     print(f"Topology is valid: {is_valid}")
+
+    processor.laplacian_smooth(alpha=0.3, max_iter=5)
+    # bd_mesh_smooth = processor.surface_mesh
+    # bd_mesh_smooth.to_vtk(fname='bd_mesh_smooth.vtu')
+
+    processor.edge_projection()
+    # bd_mesh_project = processor.surface_mesh
+    # bd_mesh_project.to_vtk(fname='bd_mesh_project.vtu')
+
+    turning_points = processor.detect_turning_points()
+    print("turning points:", turning_points)
+
 
     print("candidate charts:")
     for idx, chart in enumerate(processor.charts):
