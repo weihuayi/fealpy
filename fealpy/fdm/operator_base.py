@@ -110,8 +110,10 @@ class OpteratorBase(metaclass=OperatorMeta):
         Raises:
             KeyError: If no method is registered under the given call_name and api_name.
         """
-        method_name = self._api_registry[api_name][call_name]
-        return getattr(self, method_name)
+        # method_name = self._api_registry[api_name][call_name]
+        # return getattr(self, method_name)
+        method_obj = self._api_registry[api_name][call_name]
+        return getattr(self, method_obj.__name__)
     
     def __call__(self):
         """
