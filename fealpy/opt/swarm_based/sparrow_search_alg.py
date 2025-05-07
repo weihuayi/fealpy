@@ -1,6 +1,6 @@
-from fealpy.opt.opt_function import levy
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ..opt_function import levy
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 """
 Sparrow Search Algorithm  

@@ -43,15 +43,15 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
     def interpolation_points(self) -> TensorLike:
         return self.dof.interpolation_points()
 
-    def cell_to_dof(self) -> TensorLike:
-        return self.dof.cell_to_dof()
+    def cell_to_dof(self, index: Index = _S) -> TensorLike:
+        return self.dof.cell_to_dof(index=index)
 
-    def face_to_dof(self) -> TensorLike:
-        return self.dof.face_to_dof()
+    def face_to_dof(self, index: Index = _S) -> TensorLike:
+        return self.dof.face_to_dof(index=index)
 
-    def is_boundary_dof(self, threshold=None) -> TensorLike:
+    def is_boundary_dof(self, threshold=None, method=None) -> TensorLike:
         if self.ctype == 'C':
-            return self.dof.is_boundary_dof(threshold)
+            return self.dof.is_boundary_dof(threshold, method=method)
         else:
             raise RuntimeError("boundary dof is not supported by discontinuous spaces.")
 
@@ -101,7 +101,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         return phi[None, :]
 
     @barycentric
-    def grad_basis(self, bcs: TensorLike, index: Index=_S, variable='u',p=None):
+    def grad_basis(self, bcs: TensorLike, index: Index=_S, variable='x',p=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -154,9 +154,12 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
             idx = bm.array(idx,device=self.device, dtype=self.itype)
             # R[..., i] = bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]]
             R = bm.set_at(R,(...,i),bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]])
-        Dlambda = self.mesh.grad_lambda()
-        gphi = P[0, -1, 0]*bm.einsum("qlm, cmd->cqld", R, Dlambda)# TODO: optimize
-        return gphi[:, index]
+        if variable == 'lambda':
+            return P[0, -1, 0]*R
+        elif variable == 'x':
+            Dlambda = self.mesh.grad_lambda()
+            gphi = P[0, -1, 0]*bm.einsum("qlm, cmd->cqld", R, Dlambda)# TODO: optimize
+            return gphi[:, index]
 
     @barycentric
     def hess_basis(self, bcs: TensorLike, index: Index=_S, variable='u'):
@@ -328,8 +331,8 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         uI = bm.set_at(uI,(c2d),bm.einsum('ij, cj->ci', l2b, uI[c2d]))
         return uI
 
-    def boundary_interpolate(self, gD: Union[Callable, int, float],
-            uh: TensorLike, threshold) -> TensorLike:
+    def boundary_interpolate(self, gd: Union[Callable, int, float],
+            uh: TensorLike, threshold=None, method=None) -> TensorLike:
         """
         @brief Interpolates the Dirichlet boundary condition.
         """
@@ -341,16 +344,16 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         isDDof = bm.zeros(gdof, device=self.device, dtype=bm.bool)
         # isDDof[f2d] = True
         isDDof = bm.set_at(isDDof,(f2d),True)
-        if callable(gD):
+        if callable(gd):
             ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
-            gD = gD(ipoints[isDDof])
+            gd = gd(ipoints[isDDof])
 
         # uh[isDDof] = gD
-        uh = bm.set_at(uh,(isDDof),gD)
+        uh = bm.set_at(uh,(isDDof), gd)
         l2b = self.bernstein_to_lagrange(self.p, self.TD - 1) 
         # uh[f2d] = bm.einsum('ij, fj->fi', l2b, uh[f2d])
         uh = bm.set_at(uh,(f2d),bm.einsum('ij, fj->fi', l2b, uh[f2d])) 
-        return isDDof
+        return self.function(uh), isDDof
 
     set_dirichlet_bc = boundary_interpolate
 

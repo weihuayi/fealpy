@@ -94,7 +94,7 @@ class Options:
             else:
                 raise ValueError(f"Unknown parameter: {key}")
 
-class LevelSetLFEModel():
+class LevelSetLFEMModel():
     """
     A finite element solver for the level set evolution equation, which tracks
     the evolution of an interface driven by a velocity field and reinitialize 
@@ -147,6 +147,17 @@ class LevelSetLFEModel():
             
             self.output(phi0, self.u, i, output)
         return phi0
+    
+    def linear_system(self, return_matrix=False):
+        Bform = self.Bform()
+        Lform = self.Lform()
+        A = Bform.assembly()
+        b = Lform.assembly()
+        if return_matrix:
+            return A, b
+        else:
+            return Bform, Lform
+
 
     def Bform(self, method=None):
         if method is None:
@@ -260,8 +271,19 @@ class LevelSetLFEModel():
     ### SUPG method ###
     
     ### Reinitialization ###
-    def reinit_run(self, phi0):
+class LevelSetReinitModel():
+    def __init__(self, phi0, q:int = None):
+        
+        self.space = phi0.space
         self.phi0 = phi0
+        self.options = Options()
+        if q is None:
+            self.q = self.space.p + 3
+        else:
+            self.q = q
+    
+    def reinit_run(self):
+        phi0 = self.phi0
         
         if self.options._re_alpha is None:
             cellscale = bm.max(self.space.mesh.entity_measure('cell'))

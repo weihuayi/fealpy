@@ -15,7 +15,6 @@ from .integrator import (
     CoefLike
 )
 
-
 class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
     r"""The biharmonic integrator for function spaces based on homogeneous meshes."""
     def __init__(self, coef: Optional[CoefLike] = None, q: Optional[int] = None, *,

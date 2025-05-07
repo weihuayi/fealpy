@@ -4,7 +4,7 @@ from fealpy.ml.sampler import CircleCollocator
 from fealpy.typing import TensorLike
 
 from lafemims.data_generator import NearFieldDataFEMGenerator2d
-from functional import levelset_fourier, generate_scatterers_fourier
+from lafemims.functional import levelset_fourier, generate_scatterers_fourier
 
 
 # 设置随机种子
@@ -26,8 +26,8 @@ origin = bm.array([0.0, 0.0])
 num_of_scatterers = 40000
 
 #确定外层接收点
-num_of_reciever_points = 50
-reciever_points = CircleCollocator(0, 0, 5).run(num_of_reciever_points).detach().numpy()
+num_of_receiver_points = 50
+receiver_points = CircleCollocator(0, 0, 5).run(num_of_receiver_points).detach().numpy()
 
 #选择某个散射体
 coefficients = generate_scatterers_fourier(M, num_of_scatterers, SEED)          # shape == [2 * M + 1]
@@ -49,7 +49,7 @@ def main(idx: int, complexity: int, coefficient: TensorLike, origin:TensorLike, 
         levelset=ind_func,
         d=d,
         k=k,
-        reciever_points=reciever_points
+        receiver_points=receiver_points
     )
     if test_type == "save":
         generator.save(save_path, idx)
@@ -62,7 +62,7 @@ def main(idx: int, complexity: int, coefficient: TensorLike, origin:TensorLike, 
 if __name__ == '__main__':
 
     SAVE_PATH = 'D:/ims_problem/test'
-    TEST_TYPE = 'save'
+    TEST_TYPE = 'visualization'
 
     if TEST_TYPE == 'save':
         from multiprocessing import Pool

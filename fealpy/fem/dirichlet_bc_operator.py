@@ -39,7 +39,7 @@ class DirichletBCOperator():
         """
         uh = bm.zeros(self.shape[1], dtype=self.form._spaces[0].ftype)
         self.form._spaces[0].boundary_interpolate(self.gd, uh,
-                self.is_boundary_dof)
+                threshold=self.is_boundary_dof)
         return uh
 
     def apply(self, F, uh):

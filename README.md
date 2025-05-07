@@ -7,16 +7,16 @@
 While beginning with the finite element algorithm, FEALPy's sights are set on
 exploring vast horizons.
 
-We hope FEALPy will be an open-source library for intelligent CAE simulation
-algorithms, integrating CAE fundamentals with AI to support advanced algorithm
+We hope FEALPy will be an open-source library for intelligent CAX 
+algorithms, integrating CAX fundamentals with AI to support advanced algorithm
 research and the cultivation of versatile talent.
 
 We also hope FEALPy can accelerate the creation and testing of next-gen
-intelligent CAE apps, paving the way for advanced algorithms in industrial
+intelligent CAX apps, paving the way for advanced algorithms in industrial
 applications.
 
-So FEALPy's development goal is to become the next generation intelligent CAE
-simulation computing engine.
+So FEALPy's development goal is to become the next generation intelligent CAX
+computing engine.
 
 The word "FEAL" is an archaic or poetic term in English, meaning faithful or
 loyal. Though not commonly used in modern English, it carries strong
@@ -24,10 +24,10 @@ connotations of unwavering dedication and reliability.
 
 The name "FEALPy" embodies this essence of loyalty and faithfulness. It
 signifies the software's commitment to being a dependable and trustworthy tool
-in the field of intelligent CAE simulation. Just as "FEAL" suggests
+in the field of intelligent CAX computation. Just as "FEAL" suggests
 steadfastness, FEALPy aims to provide consistent, reliable support for
 researchers, engineers, and developers in their pursuit of innovative solutions
-and advancements in CAE simulations. The name reflects the software's mission to
+and advancements in CAX computation. The name reflects the software's mission to
 be a loyal companion in the journey toward groundbreaking discoveries and
 industrial applications.
 
