@@ -62,7 +62,7 @@ def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
         else:
             raise ValueError(f'number of diagonals data: {data.shape[0]} does not match the number of diags: 1')
 
-    diags_inds = bm.arange(len_diags, device=data.device, dtype=bm.int64)
+    diags_inds = bm.arange(len_diags, device=bm.get_device(data), dtype=bm.int64)
     row = diags_inds - diags
 
     mask = (row >= 0)
