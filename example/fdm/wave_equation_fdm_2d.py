@@ -9,30 +9,11 @@ from fealpy.fdm.dirichlet_bc import DirichletBC
 
 pde = MembraneOscillationPDEData()
 
-# 空间离散
-domain = pde.domain()
-nx = 100
-ny = 100
-hx = (domain[1] - domain[0])/nx
-hy = (domain[3] - domain[2])/ny
-extent = [0, nx, 0, ny]
-mesh = UniformMesh(domain, extent)
-
-# 时间离散
-duration = pde.duration()
-nt = 1000
-tau = (duration[1] - duration[0])/nt
-
-# 准备初值
-uh0 = mesh.interpolate(pde.init_solution, 'node')
-vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
-uh1 = mesh.function('node').flatten()
-
 def advance_explicit(n, *frags):
-    """
-    @brief 时间步进为显格式
+    """时间步进为显格式
 
-    @param[in] n int, 表示第 n 个时间步
+    Parameters:
+    - n: 表示第 n 个时间步
     """
     t = duration[0] + n*tau
     if n == 0:
@@ -56,9 +37,6 @@ def advance_explicit(n, *frags):
     else:
         wave_operator = WaveOperator(mesh)
         A = wave_operator.assembly(tau=tau)
-        source = lambda p: pde.source(p, t + tau)
-        f = mesh.interpolate(source)
-        f *= tau**2
         uh2 = A @ uh1 - uh0
         gD = lambda p: pde.dirichlet(p, t + tau)
 
@@ -67,11 +45,69 @@ def advance_explicit(n, *frags):
         uh0[:] = uh1
         uh1[:] = uh2
 
-        solution = lambda p: pde.solution(p, t + tau)
-        e = mesh.error(solution, uh1.flatten(), errortype='l2')
-        #print(f"the error is {e}")
-
         return uh1, t
+'''
+# 空间离散
+domain = pde.domain()
+nx = 10
+ny = 10
+hx = (domain[1] - domain[0])/nx
+hy = (domain[3] - domain[2])/ny
+extent = [0, nx, 0, ny]
+mesh = UniformMesh(domain, extent)
+
+# 时间离散
+duration = pde.duration()
+nt_init = 100
+tau_init = (duration[1] - duration[0]) / nt_init
+fixed_time = 0.7
+
+maxit = 5
+em = bm.zeros((3, maxit), dtype=bm.float64)
+h_sizes = bm.zeros(maxit, dtype=bm.float64)
+for i in range(maxit):
+    hx = (domain[1] - domain[0]) / mesh.nx
+    hy = (domain[3] - domain[2]) / mesh.ny
+    h_sizes[i] = max(hx, hy)
+
+    tau = tau_init * (h_sizes[i] / h_sizes[0])
+
+    nt = int((duration[1] - duration[0]) / tau)
+    fixed_time_step = int((fixed_time - duration[0]) / tau)
+
+    uh0 = mesh.interpolate(pde.init_solution, 'node')
+    vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
+    uh1 = mesh.function('node').flatten()
+
+    for n in range(fixed_time_step + 1):
+        uh, t = advance_explicit(n)
+
+    solution = lambda p: pde.solution(p, fixed_time)
+    em[0, i], em[1, i], em[2, i] = mesh.error(solution, uh1)
+
+    if i < maxit:
+        mesh.uniform_refine()
+
+print("em_ratio:\n", em[:, 0:-1]/em[:, 1:])
+'''
+'''
+# 显格式二维画图
+box = [0, 1, 0, 1, -1, 1]
+fig, axes = plt.subplots()
+mesh.show_animation(fig, axes, box, advance_explicit, 
+                    fname='explicit.mp4', plot_type='imshow', frames=nt+1)
+plt.show()
+
+# 显格式三维画图
+box = [0, 1, 0, 1, -1, 1]
+from mpl_toolkits.mplot3d import Axes3D
+
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh.show_animation(fig, axes, box, advance_explicit, 
+                    fname='explicit.mp4', plot_type='surface', frames=nt+1)
+plt.show()
+'''
 
 def advance_implicit(n, *frags):
     """
@@ -111,15 +147,55 @@ def advance_implicit(n, *frags):
         gD = lambda p: pde.dirichlet(p, t + tau)
 
         dirichlet_bc = DirichletBC(mesh, gD)
-        A0, f = dirichlet_bc.apply(A0, f, uh0)
+        A0, f = dirichlet_bc.apply(A0, f)
         uh1 = spsolve(A0, f, solver='scipy')
-
-        solution = lambda p: pde.solution(p, t + tau)
-        e = mesh.error(solution, uh1, errortype='all')
-        print(f"the error is {e}")
 
         return uh1, t
 
+'''
+# 空间离散
+domain = pde.domain()
+nx = 10
+ny = 10
+hx = (domain[1] - domain[0])/nx
+hy = (domain[3] - domain[2])/ny
+extent = [0, nx, 0, ny]
+mesh = UniformMesh(domain, extent)
+
+# 时间离散
+duration = pde.duration()
+nt_init = 100
+tau_init = (duration[1] - duration[0]) / nt_init
+fixed_time = 0.7
+
+maxit = 4
+em = bm.zeros((3, maxit), dtype=bm.float64)
+h_sizes = bm.zeros(maxit, dtype=bm.float64)
+for i in range(maxit):
+    hx = (domain[1] - domain[0]) / mesh.nx
+    hy = (domain[3] - domain[2]) / mesh.ny
+    h_sizes[i] = max(hx, hy)
+
+    tau = tau_init * (h_sizes[i] / h_sizes[0])
+
+    nt = int((duration[1] - duration[0]) / tau)
+    fixed_time_step = int((fixed_time - duration[0]) / tau)
+
+    uh0 = mesh.interpolate(pde.init_solution, 'node')
+    vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
+    uh1 = mesh.function('node').flatten()
+
+    for n in range(fixed_time_step + 1):
+        uh, t = advance_implicit(n)
+
+    solution = lambda p: pde.solution(p, fixed_time)
+    em[0, i], em[1, i], em[2, i] = mesh.error(solution, uh1)
+
+    if i < maxit:
+        mesh.uniform_refine()
+
+print("em_ratio:\n", em[:, 0:-1]/em[:, 1:])
+'''
 '''
 # 隐格式二维动画
 box = [0, 1, 0, 1, -1, 1]
@@ -135,24 +211,5 @@ fig = plt.figure()
 axes = fig.add_subplot(111, projection='3d')
 mesh.show_animation(fig, axes, box, advance_implicit,
                     fname='implicit.mp4', plot_type='surface', frames=nt+1)
-plt.show()
-'''
-
-'''
-# 显格式二维画图
-box = [0, 1, 0, 1, -1, 1]
-fig, axes = plt.subplots()
-mesh.show_animation(fig, axes, box, advance_explicit, 
-                    fname='explicit.mp4', plot_type='imshow', frames=nt+1)
-plt.show()
-
-# 显格式三维画图
-box = [0, 1, 0, 1, -1, 1]
-from mpl_toolkits.mplot3d import Axes3D
-
-fig = plt.figure()
-axes = fig.add_subplot(111, projection='3d')
-mesh.show_animation(fig, axes, box, advance_explicit, 
-                    fname='explicit.mp4', plot_type='surface', frames=nt+1)
 plt.show()
 '''
