@@ -45,7 +45,7 @@ def advance_backward(n):
 
         A, f = bc.apply(A, f)
         uh0.flat = spsolve(A, f,solver='scipy')
-         
+            
         solution = lambda p: pde.solution(mesh.node, t + tau)
         # em[0, 0], em[1, 0], em[2, 0] = mesh.error(pde.solution, uh0)
         return uh0, t

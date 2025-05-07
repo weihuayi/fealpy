@@ -1,35 +1,33 @@
+from typing import Literal
+from .operator_base import OpteratorBase, assemblymethod
 import math
-
-from typing import Optional
-
 from ..backend import backend_manager as bm
-from ..backend import TensorLike
 from ..sparse import csr_matrix, SparseTensor
 from ..mesh import UniformMesh
 
-from .operator_base import OpteratorBase, assemblymethod
 
-import math
-from ..backend import backend_manager as bm
-from ..backend import TensorLike
-from ..sparse import csr_matrix, SparseTensor
-from ..mesh import UniformMesh
-from .operator_base import OpteratorBase, assemblymethod
-
-class HyperbolicOperator():
+class HyperbolicOperator(OpteratorBase):
     """
     HyperbolicOperator constructs and assembles the discrete hyperbolic operator
     on a structured mesh for finite difference approximation.
     """
-    def __init__(self, mesh: UniformMesh, tau: float, a:float):
+    def __init__(self, mesh: UniformMesh, 
+                 tau: float, 
+                 a:float,
+                 method: Literal['lax_friedrichs', 
+                                 'central', 
+                                 'explicity_upwind_viscous', None] = None):
         """
         Initialize the Hyperbolic operator with a given structured mesh.
         Parameters:
             mesh (UniformMesh): Structured mesh object providing grid metadata.
         """
+        method = 'assembly' if (method is None) else method
+        super().__init__(method=method)
         self.mesh = mesh  # Store the mesh for later assembly
         self.tau = tau  # Time step size
         self.a = a  # Smoothing parameter
+        
     def assembly(self) -> SparseTensor:
         """
         Assemble the global sparse matrix representing the Hyperbolic operator.
@@ -155,7 +153,7 @@ class HyperbolicOperator():
                 A += csr_matrix((off_value2, (I, J)), shape=(NN, NN))
                 A += csr_matrix((off_value3, (J, I)), shape=(NN, NN))
         return A
-    # TODO: implement the central_assembly method
+    
     @assemblymethod(call_name='central')
     def central_assembly(self) -> SparseTensor:
         """
