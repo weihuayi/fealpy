@@ -3,8 +3,8 @@ bm.set_backend('numpy')
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from fealpy.mesh import UniformMesh2d
-from scipy.sparse.linalg import spsolve
+from fealpy.mesh import UniformMesh
+from fealpy.solver import spsolve
 from fealpy.pde.wave_2d  import MembraneOscillationPDEData
 from fealpy.fdm.wave_operator import WaveOperator
 from fealpy.fdm.dirichlet_bc import DirichletBC
@@ -17,7 +17,8 @@ nx = 100
 ny = 100
 hx = (domain[1] - domain[0])/nx
 hy = (domain[3] - domain[2])/ny
-mesh = UniformMesh2d([0, nx, 0, ny], h=(hx, hy), origin=(domain[0], domain[2]))
+extent = [0, nx, 0, ny]
+mesh = UniformMesh(domain, extent)
 
 # 时间离散
 duration = pde.duration()
@@ -103,7 +104,6 @@ def advance_implicit(n, *frags):
     else:
         wave_operator = WaveOperator(mesh)
         A0, (A1, A2) = wave_operator.implicit_assembly(tau=tau)
-        
         source = lambda p: pde.source(p, t + tau)
         f = mesh.interpolate(source)
         f *= tau**2
@@ -111,25 +111,34 @@ def advance_implicit(n, *frags):
 
         uh0[:] = uh1[:]
         gD = lambda p: pde.dirichlet(p, t + tau)
-        #A0, f = mesh.apply_dirichlet_bc(gD, A0, f)
 
         dirichlet_bc = DirichletBC(mesh, gD)
         A0, f = dirichlet_bc.apply(A0, f, uh0)
-        print("A0:", A0.shape)
-        uh1 = spsolve(A0, f)
+        uh1 = spsolve(A0, f, solver='scipy')
 
         solution = lambda p: pde.solution(p, t + tau)
-        e = mesh.error(solution, uh1, errortype='max')
-        print(f"the max error is {e}")
+        e = mesh.error(solution, uh1, errortype='all')
+        print(f"the error is {e}")
 
         return uh1, t
 
+'''
+# 隐格式二维动画
 box = [0, 1, 0, 1, -1, 1]
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, advance_implicit,
                     fname='implicit.mp4', plot_type='imshow', frames=nt+1)
 plt.show()
 
+# 隐格式三维动画
+box = [0, 1, 0, 1, -1, 1]
+
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+mesh.show_animation(fig, axes, box, advance_implicit,
+                    fname='implicit.mp4', plot_type='surface', frames=nt+1)
+plt.show()
+'''
 
 '''
 # 显格式二维画图
