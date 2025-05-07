@@ -47,7 +47,7 @@ class StringOscillationPDEData:
         @param[in] t float, 时间点
         @return 方程右端函数值
         """
-        return bm.zeros_like(p)
+        return bm.zeros_like(p).flatten()
 
     def dirichlet(self, p, t):
         """
@@ -56,7 +56,7 @@ class StringOscillationPDEData:
         @param[in] t float, 时间点
         @return 边界值函数值
         """
-        return bm.zeros_like(p)
+        return bm.zeros_like(p).flatten()
 
     def solution(self, p, t):
         """
