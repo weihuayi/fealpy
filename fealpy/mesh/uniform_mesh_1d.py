@@ -1,4 +1,4 @@
-from typing import Callable, Union, Tuple, List
+from typing import Callable, Union, Tuple, List, Any, Optional
 from types import ModuleType
 
 from .mesh_base import StructuredMesh, TensorMesh
@@ -390,6 +390,21 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
             return uh
         else:
             return uh.flatten()
+        
+    def update_dirichlet_bc(self, 
+        gD: Callable[[TensorLike], Any], 
+        uh: TensorLike, 
+        threshold: Optional[Union[int, Callable[[TensorLike], float]]] = None) -> None:
+        """更新网格函数 uh 的 Dirichlet 边界值"""
+        node = self.node
+        if threshold is None:
+            isBdNode = self.boundary_node_flag()
+            uh[isBdNode]  = gD(node[isBdNode])
+        elif isinstance(threshold, int):
+            uh[threshold] = gD(node[threshold])
+        elif callable(threshold):
+            isBdNode = threshold(node)
+            uh[isBdNode]  = gD(node[isBdNode])
 
     def error(self, 
             u: Callable, 
