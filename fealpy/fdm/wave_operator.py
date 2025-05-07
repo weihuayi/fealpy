@@ -5,7 +5,7 @@ from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..sparse import csr_matrix, SparseTensor
 from ..mesh import UniformMesh
-from .integrator import assemblymethod
+from .operator_base import assemblymethod
 
 class WaveOperator():
     """
@@ -46,7 +46,7 @@ class WaveOperator():
         K = mesh.linear_index_map('node')  # Multi-dimensional to linear index map
         shape = K.shape  # Shape of the index map array
 
-        diag_value = bm.full(NN, 2 - 2*r**2.sum(), dtype=ftype)
+        diag_value = bm.full(NN, 2 - 2*(r**2).sum(), dtype=ftype)
         I = K.flat  # Row indices for diagonal entries
         J = K.flat  # Column indices for diagonal entries
         A = csr_matrix((diag_value, (I, J)), shape=(NN, NN))
@@ -61,7 +61,7 @@ class WaveOperator():
                 count for dim_idx, count in enumerate(shape) if dim_idx != i
             )
             # Off-diagonal value for neighbor entries
-            off_value = bm.full(NN - n_shift, r**2[i], dtype=ftype)
+            off_value = bm.full(NN - n_shift, (r[i])**2, dtype=ftype)
             # Create slice objects to select neighbor index arrays
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
@@ -97,9 +97,9 @@ class WaveOperator():
         K = mesh.linear_index_map('node')  # Multi-dimensional to linear index map
         shape = K.shape  # Shape of the index map array
 
-        diag_value0 = bm.full(NN, 1 + 2 * theta * r**2.sum(), dtype=ftype)
-        diag_value1 = bm.full(NN, 2 - 2 * (1 - 2 * theta) * r**2.sum(), dtype=ftype)
-        diag_value2 = bm.full(NN, -1 - 2 * theta * r**2.sum(), dtype=ftype)
+        diag_value0 = bm.full(NN, 1 + 2 * theta * (r**2).sum(), dtype=ftype)
+        diag_value1 = bm.full(NN, 2 - 2 * (1 - 2 * theta) * (r**2).sum(), dtype=ftype)
+        diag_value2 = bm.full(NN, -1 - 2 * theta * (r**2).sum(), dtype=ftype)
         I = K.flat  # Row indices for diagonal entries
         J = K.flat  # Column indices for diagonal entries
         A0 = csr_matrix((diag_value0, (I, J)), shape=(NN, NN))
@@ -116,9 +116,9 @@ class WaveOperator():
                 count for dim_idx, count in enumerate(shape) if dim_idx != i
             )
             # Off-diagonal value for neighbor entries
-            off_value0 = bm.full(NN - n_shift, -theta * r**2[i], dtype=ftype)
-            off_value1 = bm.full(NN - n_shift, (1 - 2 * theta) * r**2[i], dtype=ftype)
-            off_value2 = bm.full(NN - n_shift, theta * r**2[i], dtype=ftype)
+            off_value0 = bm.full(NN - n_shift, -theta * (r[i])**2, dtype=ftype)
+            off_value1 = bm.full(NN - n_shift, (1 - 2 * theta) * (r[i])**2, dtype=ftype)
+            off_value2 = bm.full(NN - n_shift, theta * (r[i])**2, dtype=ftype)
             # Create slice objects to select neighbor index arrays
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
