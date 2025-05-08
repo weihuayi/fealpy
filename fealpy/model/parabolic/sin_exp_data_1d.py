@@ -6,13 +6,14 @@ class SinExpData1D:
     """
     1D parabolic problem:
 
-        ∂u/∂t - ∂²u/∂x² = -10·exp(-10t)·sin(4πx) + 16π²·exp(-10t)·sin(4πx),  for x in (0, 1), t > 0
-        u(0, t) = u(1, t) = 0,                                                for t > 0
-        u(x, 0) = sin(4πx),                                                  for x in (0, 1)
+        ∂u/∂t - ∂²u/∂x² = f,   for x in (0, 1), t > 0
+        u(0, t) = u(1, t) = 0, for t > 0
+        u(x, 0) = sin(4πx),    for x in (0, 1)
 
     Exact solution:
 
         u(x, t) = sin(4πx)·exp(-10t)
+        f(x, t) = -10·exp(-10t)·sin(4πx) + 16π²·exp(-10t)·sin(4πx)
 
     This example imposes homogeneous Dirichlet boundary conditions at both ends.
     It is useful for testing time-dependent solvers.
@@ -24,7 +25,7 @@ class SinExpData1D:
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0]
 
-    def duaration(self) -> Sequence[float]:
+    def duration(self) -> Sequence[float]:
         return [0.0, 1.0]
 
     def init_solution(self, p: TensorLike) -> TensorLike:

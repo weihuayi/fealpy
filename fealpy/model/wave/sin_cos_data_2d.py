@@ -25,7 +25,7 @@ class SinCosData2D:
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0, 0.0, 1.0]  # [x0, x1, y0, y1]
 
-    def duaration(self) -> Sequence[float]:
+    def duration(self) -> Sequence[float]:
         return [0.0, 1.4]  # Time interval [t0, t1]
 
     def init_solution(self, p: TensorLike) -> TensorLike:

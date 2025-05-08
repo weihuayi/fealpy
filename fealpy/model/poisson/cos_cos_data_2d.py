@@ -1,31 +1,26 @@
 
-from ...backend import TensorLike as _DT
+from typing import Sequence
 from ...backend import backend_manager as bm
+from ...backend import TensorLike
 
 
-class CosCosData():
+class CosCosData2D():
     description = ""
 
     def geo_dimension(self) -> int:
         return 2
 
-    def domain(self):
+    def domain(self) -> Sequence[float]:
         return [-1., 1., -1., 1.]
 
-    def init_mesh(self):
-        from ...mesh import TriangleMesh
-        return TriangleMesh.from_box(self.domain())
-
-    def solution(self, p: _DT) -> _DT:
-        x = p[..., 0]
-        y = p[..., 1]
+    def solution(self, p: TensorLike) -> TensorLike:
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
         val = bm.cos(pi*x)*bm.cos(pi*y)
         return val # val.shape == x.shape
 
-    def gradient(self, p: _DT) -> _DT:
-        x = p[..., 0]
-        y = p[..., 1]
+    def gradient(self, p: TensorLike) -> TensorLike:
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
         val = bm.stack((
             -pi*bm.sin(pi*x)*bm.cos(pi*y),
@@ -33,8 +28,7 @@ class CosCosData():
         return val # val.shape == p.shape
 
     def source(self, p: _DT) -> _DT:
-        x = p[..., 0]
-        y = p[..., 1]
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
         val = 2*pi*pi*bm.cos(pi*x)*bm.cos(pi*y)
         return val

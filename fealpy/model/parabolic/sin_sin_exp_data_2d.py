@@ -6,16 +6,17 @@ class SinSinExpData2D:
     """
     2D parabolic problem:
 
-        ∂u/∂t - k·(∂²u/∂x² + ∂²u/∂y²) = -20·exp(-20t)·sin(4πx)·sin(4πy)
-                                         + 32π²·exp(-20t)·sin(4πx)·sin(4πy),   for (x, y) in (0, 1) × (0, 1), t > 0
+        ∂u/∂t - k·(∂²u/∂x² + ∂²u/∂y²) = f  for (x, y) in (0, 1) × (0, 1), t > 0
 
-        u(x, 0, t) = u(x, 1, t) = 0,                                            for x in (0, 1), t > 0
-        u(0, y, t) = u(1, y, t) = 0,                                            for y in (0, 1), t > 0
-        u(x, y, 0) = sin(4πx)·sin(4πy),                                        for (x, y) in (0, 1) × (0, 1)
+        u(x, 0, t) = u(x, 1, t) = 0,       for x in (0, 1), t > 0
+        u(0, y, t) = u(1, y, t) = 0,       for y in (0, 1), t > 0
+        u(x, y, 0) = sin(4πx)·sin(4πy),    for (x, y) in (0, 1) × (0, 1)
 
     Exact solution:
 
         u(x, y, t) = sin(4πx)·sin(4πy)·exp(-20t)
+        f(x, y, t) = -20·exp(-20t)·sin(4πx)·sin(4πy)
+                    + 32π²·exp(-20t)·sin(4πx)·sin(4πy),  
 
     This example imposes homogeneous Dirichlet boundary conditions on all four edges.
     It is useful for verifying time-dependent solvers in 2D.
@@ -27,7 +28,7 @@ class SinSinExpData2D:
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0, 0.0, 1.0]  # [x0, x1, y0, y1]
 
-    def duaration(self) -> Sequence[float]:
+    def duration(self) -> Sequence[float]:
         return [0.0, 1.0]
 
     def init_solution(self, p: TensorLike) -> TensorLike:

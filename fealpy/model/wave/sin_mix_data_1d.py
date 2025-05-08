@@ -25,7 +25,7 @@ class SinMixData1D:
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0]
 
-    def duaration(self) -> Sequence[float]:
+    def duration(self) -> Sequence[float]:
         return [0.0, 1.0]  # Time domain: [t0, t1]
 
     def init_solution(self, p: TensorLike) -> TensorLike:
