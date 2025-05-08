@@ -62,10 +62,12 @@ class ParabolicOperator(OpteratorBase):
         shape = K.shape  # Shape of the index map array
 
         # Create diagonal entries with sum of c over dimensions times 2
-        diag_value = bm.full(NN,1-2 * c.sum(), dtype=ftype)
+        A_diag_value = bm.full(NN, 1, dtype=ftype)
+        B_diag_value = bm.full(NN,1-2 * c.sum(), dtype=ftype)
         I = K.flat  # Row indices for diagonal entries
         J = K.flat  # Column indices for diagonal entries
-        A = csr_matrix((diag_value, (I, J)), shape=(NN, NN))
+        A = csr_matrix((A_diag_value, (I, J)), shape=(NN, NN))
+        B = csr_matrix((B_diag_value, (I, J)), shape=(NN, NN))
 
         # Slices tuple for indexing all dimensions
         full_slice = (slice(None),) * GD
@@ -85,10 +87,10 @@ class ParabolicOperator(OpteratorBase):
             I = K[s1].flat
             J = K[s2].flat
             # Add entries for coupling in both directions
-            A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
-            A += csr_matrix((off_value, (J, I)), shape=(NN, NN))
+            B += csr_matrix((off_value, (I, J)), shape=(NN, NN))
+            B += csr_matrix((off_value, (J, I)), shape=(NN, NN))
 
-        return A
+        return A, (B,tau)
     
     @assemblymethod(call_name='backward')
     def backward_assembly(self) -> SparseTensor:
@@ -115,11 +117,12 @@ class ParabolicOperator(OpteratorBase):
         shape = K.shape  # Shape of the index map array
 
         # Create diagonal entries with sum of c over dimensions times 2
-        diag_value = bm.full(NN, 1+ 2 * c.sum(), dtype=ftype)
+        A_diag_value = bm.full(NN, 1+ 2 * c.sum(), dtype=ftype)
+        B_diag_value = bm.full(NN, 1, dtype=ftype)
         I = K.flat  # Row indices for diagonal entries
         J = K.flat  # Column indices for diagonal entries
-        A = csr_matrix((diag_value, (I, J)), shape=(NN, NN))
-
+        A = csr_matrix((A_diag_value, (I, J)), shape=(NN, NN))
+        B = csr_matrix((B_diag_value, (I, J)), shape=(NN, NN))
         # Slices tuple for indexing all dimensions
         full_slice = (slice(None),) * GD
 
@@ -141,7 +144,7 @@ class ParabolicOperator(OpteratorBase):
             A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
             A += csr_matrix((off_value, (J, I)), shape=(NN, NN))
 
-        return A
+        return A,(B,tau)
     
     @assemblymethod(call_name='cn')
     def cn_assembly(self) -> SparseTensor:
@@ -204,7 +207,7 @@ class ParabolicOperator(OpteratorBase):
             B += csr_matrix((B_off_value, (I, J)), shape=(NN, NN))
             B += csr_matrix((B_off_value, (J, I)), shape=(NN, NN))
         
-        return A, B
+        return A, (B,tau)
 
     def __matmul__(self, u: TensorLike) -> TensorLike:
         """
