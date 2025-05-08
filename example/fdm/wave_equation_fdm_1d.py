@@ -24,9 +24,9 @@ nt = 500
 tau = (duration[1] - duration[0])/nt
 
 # 准备初值
-uh0 = mesh.interpolate(pde.init_solution, 'node')
-vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node')
-uh1 = mesh.function('node').reshape(-1,1)
+uh0 = mesh.interpolate(pde.init_solution, 'node').flatten()
+vh0 = mesh.interpolate(pde.init_solution_diff_t, 'node').flatten()
+uh1 = mesh.function('node').flatten()
 
 # 显格式
 def advance_explicit(n, *frags):
@@ -57,7 +57,7 @@ def advance_explicit(n, *frags):
         
         return uh1, t
 '''
-box = [0, 1, -2, 2]
+box = [0, 1, -1.5, 1.5]
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, advance_explicit, fname='explicit.mp4', frames=nt+1)
 plt.show()
@@ -99,7 +99,7 @@ def advance_implicit(n, theta=0.25, *frags):
 
 advance_implicit_theta = partial(advance_implicit, theta=0.25)
 
-box = [0, 1, -2, 2]
+box = [0, 1, -1.5, 1.5]
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, advance_implicit_theta, fname='implicit.mp4', frames=nt+1)
 plt.show()
