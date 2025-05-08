@@ -52,7 +52,12 @@ class Optimizer():
         self.D_pl = bm.zeros((self.MaxIT,))
         self.D_pt = bm.zeros((self.MaxIT,))
         self.Div = bm.zeros((1, self.MaxIT))
-
+        if options["PF"] is not None:
+            self.PF = options["PF"]
+        if options["NR"] is not None:
+            self.Nr = options["NR"]
+            self.ngrid = options["ngrid"]
+            self.REP = {}  # Repository to store non-dominated solutions
     @property
     def NF(self) -> int:
         """
@@ -168,12 +173,31 @@ class Optimizer():
         plt.legend()
         plt.show()
 
+    def cal_spacing(self):
+        sorted_id = bm.argsort(self.REP['fit'][:, 0])
+        sorted_front = self.REP['fit'][sorted_id]
+        distances = bm.linalg.norm(sorted_front[1:] - sorted_front[:-1], axis=1)
+        spacing_value = bm.std(distances)
+        return spacing_value    
+    
+    def cal_IGD(self):
+        N = self.REP['fit'].shape[0]
+        total = 0
+        for i in range(N):
+            dis = bm.sqrt(bm.sum((self.PF - self.REP['fit'][i])**2, axis = 1))
+            min_dis = bm.min(dis)
+            total = total + min_dis
+        return total / N
+
 
 def opt_alg_options(
     x0: TensorLike,
     objective,
     domain = None,
     NP: int = 1, # the number of solution points
+    NR = None,
+    ngrid = None,
+    PF = None,
     Preconditioner = None,
     MaxIters: int = 1000,
     MaxFunEvals: int = 10000,
@@ -214,6 +238,9 @@ def opt_alg_options(
             "ndim": x0.shape[-1],
             "domain": domain,
             "Preconditioner": Preconditioner,
+            "NR": NR,
+            "PF": PF,
+            "ngrid": ngrid,
             "MaxIters": MaxIters,
             "MaxFunEvals": MaxFunEvals,
             "NormGradTol": NormGradTol,
