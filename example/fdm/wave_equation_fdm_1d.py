@@ -102,7 +102,7 @@ def wave_1d_run(nx: int, nt: int, time_step: str='explicit', mode: str='animatio
 
             dirichlet_bc = DirichletBC(mesh, gD)
             A0, f = dirichlet_bc.apply(A0, f)
-            uh1[:] = spsolve(A0, f)
+            uh1[:] = spsolve(A0, f, solver='scipy')
                 
             return uh1, t
 
@@ -198,5 +198,5 @@ if __name__ == "__main__":
     # fig, ax = wave_1d_run(nx=400, nt=500, time_step='explicit', mode='animation')
     
     # 示例2：收敛性分析
-    em, rates = wave_1d_run(nx=50, nt=100, time_step='implicit', mode='convergence', 
+    em, rates = wave_1d_run(nx=50, nt=100, time_step='explicit', mode='convergence', 
                             theta=0.25, fixed_time=0.5, maxit=5)
