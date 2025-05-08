@@ -3,27 +3,19 @@ from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
 class SinExpData1D:
-    r"""
-    One-dimensional parabolic equation:
+    """
+    1D parabolic problem:
 
-        \underbrace{\frac{\partial u}{\partial t}}_{\text{Time derivative}}
-        - \underbrace{\frac{\partial^2 u}{\partial x^2}}_{\text{Diffusion term}} 
-        = \underbrace{-10 e^{-10t} \sin(4\pi x) + 16\pi^2 e^{-10t} \sin(4\pi x)}_{\text{Source term}}, 
-        \quad x \in (0, 1),\ t > 0
-
-        \underbrace{u(0,t) = u(1,t) = 0}_{\text{Dirichlet boundary conditions}}, 
-        \quad t > 0
-
-        \underbrace{u(x,0) = \sin(4\pi x)}_{\text{Initial condition}}
+        ∂u/∂t - ∂²u/∂x² = -10·exp(-10t)·sin(4πx) + 16π²·exp(-10t)·sin(4πx),  for x in (0, 1), t > 0
+        u(0, t) = u(1, t) = 0,                                                for t > 0
+        u(x, 0) = sin(4πx),                                                  for x in (0, 1)
 
     Exact solution:
-        u(x, t) = sin(4πx) · e^{-10t}
 
-    Problem summary:
-        - Geometry dimension: 1D
-        - Domain: (0, 1)
-        - Dirichlet BC at both ends
-        - Suitable for verifying time-dependent solvers
+        u(x, t) = sin(4πx)·exp(-10t)
+
+    This example imposes homogeneous Dirichlet boundary conditions at both ends.
+    It is useful for testing time-dependent solvers.
     """
 
     def geo_dimension(self) -> int:
@@ -31,6 +23,17 @@ class SinExpData1D:
 
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0]
+
+    def duaration(self) -> Sequence[float]:
+        return [0.0, 1.0]
+
+    def init_solution(self, p: TensorLike) -> TensorLike:
+        """
+        Initial condition at t = 0:
+            u(x, 0) = sin(4πx)
+        """
+        x = p
+        return bm.sin(4 * bm.pi * x)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
         x = p
