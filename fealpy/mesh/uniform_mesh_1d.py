@@ -59,9 +59,12 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
             h = (h, )
 
         # Mesh properties
-        self.extent = bm.array(extent, dtype=itype, device=device)
-        self.h = bm.array(h, dtype=ftype, device=device) 
-        self.origin = bm.array(origin, dtype=ftype, device=device)
+        self.extent = extent
+        self.h = h
+        self.origin = origin
+        # self.extent = bm.array(extent, dtype=itype, device=device)
+        # self.h = bm.array(h, dtype=ftype, device=device) 
+        # self.origin = bm.array(origin, dtype=ftype, device=device)
         self.shape = (self.extent[1] - self.extent[0], )
 
         # Mesh dimensions
