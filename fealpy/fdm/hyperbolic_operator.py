@@ -137,8 +137,8 @@ class HyperbolicOperator(OpteratorBase):
             # Off-diagonal value for neighbor entries
             off_value0 = bm.full(NN - n_shift, 1/2 *(1 + r[i]), dtype=ftype)
             off_value1 = bm.full(NN - n_shift, 1/2 *(1 - r[i]), dtype=ftype)            
-            off_value2 = bm.full(NN - n_shift, 1/2 + r[i], dtype=ftype)
-            off_value3 = bm.full(NN - n_shift, 1/2 - r[i], dtype=ftype)
+            off_value2 = bm.full(NN - n_shift, 1/4 + 1/2*r[i], dtype=ftype)
+            off_value3 = bm.full(NN - n_shift, 1/4 - 1/2*r[i], dtype=ftype)
             # Create slice objects to select neighbor index arrays
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
@@ -187,8 +187,6 @@ class HyperbolicOperator(OpteratorBase):
             # Off-diagonal value for neighbor entries
             off_value0 = bm.full(NN - n_shift, r[i]/2, dtype=ftype)
             off_value1 = bm.full(NN - n_shift, -r[i]/2, dtype=ftype)            
-            off_value2 = bm.full(NN - n_shift, r[i]/2+abs(r[i]/2), dtype=ftype) 
-            off_value3 = bm.full(NN - n_shift, abs(r[i]/2)-r[i]/2, dtype=ftype)
             # Create slice objects to select neighbor index arrays
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
@@ -196,12 +194,10 @@ class HyperbolicOperator(OpteratorBase):
             I = K[s1].flat
             J = K[s2].flat
             # Add entries for coupling in both directions
-            if GD == 1:
-                A += csr_matrix((off_value0, (I, J)), shape=(NN, NN))
-                A += csr_matrix((off_value1, (J, I)), shape=(NN, NN))
-            else:
-                A += csr_matrix((off_value2, (I, J)), shape=(NN, NN))
-                A += csr_matrix((off_value3, (J, I)), shape=(NN, NN))
+       
+            A += csr_matrix((off_value0, (I, J)), shape=(NN, NN))
+            A += csr_matrix((off_value1, (J, I)), shape=(NN, NN))
+
         return A
     
     @assemblymethod(call_name='explicity_upwind_viscous')
