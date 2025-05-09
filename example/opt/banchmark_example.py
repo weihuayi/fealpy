@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.opt import *
 from fealpy.opt.optimizer_base import opt_alg_options
-from fealpy.opt.benchmark import iopt_benchmark_data as iopt_data
+from fealpy.opt.benchmark.single_benchmark import single_benchmark_data as iopt_data
 # device = 'cpu'
 
 # 定义后端
@@ -20,7 +20,7 @@ MaxIters = 1000
 dim = 30
 x0 = initialize(NP, dim, ub, lb, method=None)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
-optimizer = ExponentialTrigonometricOptAlg(option)
+optimizer = GeneticAlg(option)
 optimizer.run()
 optimizer.plot_curve()
 optimizer.plot_plpt_percen()
