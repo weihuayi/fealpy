@@ -74,7 +74,7 @@ class HyperbolicOperator(OpteratorBase):
                     A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
                 else:
                     A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
-                    A += csr_matrix((off_value, (J, I)), shape=(NN, NN))
+                    #A += csr_matrix((off_value, (J, I)), shape=(NN, NN))
         else:
             diag_value = bm.full(NN, 1 + r.sum(), dtype=ftype)
             I = K.flat  # Row indices for diagonal entries
@@ -99,9 +99,10 @@ class HyperbolicOperator(OpteratorBase):
                 if GD == 1:
                     A += csr_matrix((off_value, (J, I)), shape=(NN, NN))
                 else:
-                    A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
+                    #A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
                     A += csr_matrix((off_value, (J, I)), shape=(NN, NN))
         return A
+        
     @assemblymethod(call_name='lax_friedrichs')
     def lax_friedrichs_assembly(self) -> SparseTensor:
         """
@@ -249,6 +250,7 @@ class HyperbolicOperator(OpteratorBase):
             else:
                 A += csr_matrix((off_value0, (I, J)), shape=(NN, NN))
                 A += csr_matrix((off_value1, (J, I)), shape=(NN, NN))
+                
         return A
 
 
