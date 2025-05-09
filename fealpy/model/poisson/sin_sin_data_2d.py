@@ -1,9 +1,14 @@
 
+from typing import Sequence
+from ...backend import backend_manager as bm
+from ...backend import TensorLike
+
+
 class SinSinData2D:
     """
     2D Poisson problem:
-
-        -Δu(x, y) = f(x, y),  (x, y) ∈ (0, 1) × (0, 1)
+    
+        -Δu(x, y) = f(x, y),  (x, y) ∈ (0, 1) x (0, 1)
          u(x, y) = 0,         on ∂Ω
 
     with the exact solution:

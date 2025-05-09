@@ -27,19 +27,19 @@ class SinData1D:
         return [0.0, 1.0]
 
     def solution(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         pi = bm.pi
         val = bm.sin(pi * x)
         return val
 
     def gradient(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         pi = bm.pi
         val = pi * bm.cos(pi * x)
         return val
 
     def source(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         pi = bm.pi
         val = pi**2 * bm.sin(pi * x)
         return val
