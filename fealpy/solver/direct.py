@@ -23,7 +23,6 @@ def _mumps_solve(A, b):
         ```
     """
     from mumps import DMumpsContext
-    from scipy.sparse import coo_matrix
     A = A.to_scipy()
     x = bm.to_numpy(b).copy()
 
