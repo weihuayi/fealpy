@@ -16,7 +16,7 @@ domain = pde.domain()
 extent = [0, 10]
 mesh = UniformMesh(domain=domain, extent=extent)
 
-maxit = 1   # 网格加密次数
+maxit = 5   # 网格加密次数
 em = bm.zeros((3, maxit), dtype=bm.float64)
 
 for i in range(maxit):
@@ -26,6 +26,9 @@ for i in range(maxit):
 
     bc = DirichletBC(mesh=mesh, gd=pde.dirichlet)
     A, F = bc.apply(A, F)
+
+    NN = mesh.number_of_nodes()
+    print(i, NN)
 
     uh = spsolve(A, F, solver='scipy')
 
@@ -38,14 +41,6 @@ em_ratio = em[:, 0:-1] / em[:, 1:]
 print("误差: ", em, "误差比: ",em_ratio,sep='\n')
 
 
-fig = plt.figure()
-axes = fig.gca()
-# node = mesh.entity('node')
-# u = pde.solution(node)    
-mesh.show_function(axes, uh, box=[0, 1, -1.1, 1.1])
-plt.show()
-
-exit()
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))  
 
 # 绘制误差曲线（左图）

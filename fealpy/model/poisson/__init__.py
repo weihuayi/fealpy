@@ -32,7 +32,7 @@ DATA_TABLE = {
 # def get_example(key: str) -> PoissonPDEDataProtocol:
 #     return example_import_util("poisson", key, DATA_TABLE)()
 
-def get_example(key:str = "" , flag = False) -> PoissonPDEDataProtocol:
+def get_example(key:str ="" , flag=False) -> PoissonPDEDataProtocol:
     """
     
     """
@@ -40,9 +40,22 @@ def get_example(key:str = "" , flag = False) -> PoissonPDEDataProtocol:
         print("Available examples name: (file_name, class_name)")
         for key in DATA_TABLE.keys():
             print(f"- {key}:{DATA_TABLE[key]}")
-        print("You can obtain the examples you need in this way:\n   pde = get_example('The example name you need')")
+        print("\nYou can obtain the examples you need in this way:\n   pde = get_example('The example name you need')\n")
     
     if key not in DATA_TABLE:
-        raise ValueError(f"example {key} not found, please check the name you input.")
+        raise ValueError(f"example '{key}' not found, please check the name you input.")
     
     return example_import_util("poisson", key, DATA_TABLE)()
+
+
+class Example:
+    def show_examples(self) -> None:
+        print("\nAvailable examples name: (file_name, class_name)")
+        for key in DATA_TABLE.keys():
+            print(f"- {key}:{DATA_TABLE[key]}")    
+        print("\nYou can obtain the examples you need in this way:\n   pde = get_example('The example name you need')\n")
+        
+    def get_example(self, key: str) -> PoissonPDEDataProtocol:
+        if key not in DATA_TABLE:
+            raise ValueError(f"example '{key}' not found, please check the name you input.")
+        return example_import_util("poisson", key, DATA_TABLE)()
