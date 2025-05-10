@@ -23,7 +23,7 @@ class Channel:
     def velocity(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = bm.zeros(p.shape)
+        value = bm.zeros(p.shape, dtype=bm.float64)
         value[...,0] = 4*y*(1-y)
         return value
     

@@ -21,8 +21,8 @@ class BlockForm(Form):
         self.block_shape = block_shape
         self.nrows = block_shape.shape[0]
         self.ncols = block_shape.shape[1]
-        shape0 = bm.sum(bm.max(block_shape[..., 0], axis=1))
-        shape1 = bm.sum(bm.max(block_shape[..., 1], axis=0))
+        shape0 = int(bm.sum(bm.max(block_shape[..., 0], axis=1)))
+        shape1 = int(bm.sum(bm.max(block_shape[..., 1], axis=0)))
         return (shape0, shape1)
 
     @property

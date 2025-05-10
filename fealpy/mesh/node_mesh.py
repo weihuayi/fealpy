@@ -3,22 +3,15 @@ from typing import Union, Optional, Sequence, Tuple, Any, Dict
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
-from fealpy.cfd.sph.particle_solver_new import Space
-
 from .mesh_base import MeshDS 
+from fealpy.backend import TensorLike
 
-import jax.numpy as jnp
-import jax
-from ..backend.jax.jax_md import space, partition
-from jax import vmap, lax
+# Types
+Box = TensorLike
 
 class NodeMesh(MeshDS):
     def __init__(self, node: TensorLike, nodedata: Optional[Dict] = None, itype: str = 'default_itype', ftype: str = 'default_ftype') -> None: 
         super().__init__(TD=0, itype=itype, ftype=ftype)
-        '''
-        note : Currently using jax's own jax_md, vmap, lax, vstack , ravel,
-               full, where, mgrid, column_stack, full_like, hstack.
-        '''
         self.node = node
 
         if nodedata is None:
@@ -87,6 +80,7 @@ class NodeMesh(MeshDS):
             "rho": rho,
             "mass": mass,
             "eta": eta,
+            "dx": dx,
         }
         
         return cls(r, nodedata=nodedata)
@@ -230,91 +224,6 @@ class NodeMesh(MeshDS):
         return cls(r, nodedata=nodedata)
 
     @classmethod
-    def from_long_rectangular_cavity_domain(cls, init_domain=bm.tensor([0.0,0.005,0,0.005]), domain=bm.tensor([0,0.05,0,0.005]), uin=bm.tensor([5.0, 0.0]), dx=1.25e-4):
-        H = 1.5 * dx
-        dy = dx
-        rho0 = 737.54
-
-        #fluid particles
-        fp = jnp.mgrid[init_domain[0]:init_domain[1]:dx, \
-            init_domain[2]+dx:init_domain[3]:dx].reshape(2,-1).T
-
-        #wall particles
-        x0 = bm.arange(domain[0],domain[1],dx)
-
-        bwp = jnp.column_stack((x0,jnp.full_like(x0,domain[2])))
-        uwp = jnp.column_stack((x0,jnp.full_like(x0,domain[3])))
-        wp = jnp.vstack((bwp,uwp))
-
-        #dummy particles
-        bdp = jnp.mgrid[domain[0]:domain[1]:dx, \
-                domain[2]-dx:domain[2]-dx*4:-dx].reshape(2,-1).T
-        udp = jnp.mgrid[domain[0]:domain[1]:dx, \
-                domain[3]+dx:domain[3]+dx*3:dx].reshape(2,-1).T
-        dp = jnp.vstack((bdp,udp))
-
-        #gate particles
-        gp = jnp.mgrid[-dx:-dx-4*H:-dx, \
-                domain[2]+dx:domain[3]:dx].reshape(2,-1).T
-
-        #tag
-        '''
-        fluid particles: 0 
-        wall particles: 1 
-        dummy particles: 2
-        gate particles: 3
-        '''
-        tag_f = jnp.full((fp.shape[0],), 0, dtype=int)
-        tag_w = jnp.full((wp.shape[0],), 1, dtype=int)
-        tag_d = jnp.full((dp.shape[0],), 2,dtype=int)
-        tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
-
-        r = jnp.vstack((fp, gp, wp, dp))
-        NN = r.shape[0]
-        tag = jnp.hstack((tag_f, tag_g, tag_w, tag_d))
-        fg_v =  bm.ones_like(jnp.vstack((fp, gp))) * uin
-        wd_v =  bm.zeros_like(jnp.vstack((wp, dp)))
-        v = jnp.vstack((fg_v, wd_v))
-        rho = bm.ones(NN) * rho0
-        mass = bm.ones(NN) * dx * dy * rho0
-
-        nodedata = {
-            "position": r,
-            "tag": tag,
-            "v": v,
-            "rho": rho,
-            "p": bm.zeros_like(rho),
-            "sound": bm.zeros_like(rho),
-            "mass": mass, 
-        } 
-        
-        return cls(r, nodedata=nodedata)
-
-    @classmethod
-    def from_dam_break_domain(cls, dx=0.02, dy=0.02):
-        pp = jnp.mgrid[dx:1+dx:dx, dy:2+dy:dy].reshape(2, -1).T
-
-        #down
-        bp0 = jnp.mgrid[0:4+dx:dx, 0:dy:dy].reshape(2, -1).T
-        bp1 = jnp.mgrid[-dx/2:4+dx/2:dx, -dy/2:dy/2:dy].reshape(2, -1).T
-        bp = jnp.vstack((bp0, bp1))
-
-        #left
-        lp0 = jnp.mgrid[0:dx:dx, dy:4+dy:dy].reshape(2, -1).T
-        lp1 = jnp.mgrid[-dx/2:dx/2:dx, dy-dy/2:4+dy/2:dy].reshape(2, -1).T
-        lp = jnp.vstack((lp0, lp1))
-
-        #right
-        rp0 = jnp.mgrid[4:4+dx/2:dx, dy:4+dy:dy].reshape(2, -1).T
-        rp1 = jnp.mgrid[4+dx/2:4+dx:dx, dy-dy/2:4+dy/2:dy].reshape(2, -1).T
-        rp = jnp.vstack((rp0, rp1))
-
-        boundaryp = jnp.vstack((bp, lp, rp))
-        node = jnp.vstack((pp, boundaryp))
-
-        return cls(node)
-
-    @classmethod
     def from_pipe_domain(cls, domain, init_domain, H, dx=1.25e-4):
         u_in = bm.array([5.0, 0.0], dtype=bm.float64) 
         rho_0 = 737.54
@@ -438,3 +347,100 @@ class NodeMesh(MeshDS):
             "drdt": bm.zeros_like(r),
         }
         return cls(r, nodedata=nodedata)
+
+class Space:
+    def raw_transform(self, box:Box, R:TensorLike):
+        if box.ndim == 0 or box.size == 1:
+            
+            return R * box
+        elif box.ndim == 1:
+            indices = self._get_free_indices(R.ndim - 1) + "i"
+            
+            return bm.einsum(f"i,{indices}->{indices}", box, R)
+        elif box.ndim == 2:
+            free_indices = self._get_free_indices(R.ndim - 1)
+            left_indices = free_indices + "j"
+            right_indices = free_indices + "i"
+            
+            return bm.einsum(f"ij,{left_indices}->{right_indices}", box, R)
+        raise ValueError(
+            ("Box must be either: a scalar, a vector, or a matrix. " f"Found {box}.")
+        )
+
+    def _get_free_indices(self, n: int):
+        
+        return "".join([chr(ord("a") + i) for i in range(n)])
+
+    def pairwise_displacement(self, Ra: TensorLike, Rb: TensorLike):
+        if len(Ra.shape) != 1:
+            msg = (
+				"Can only compute displacements between vectors. To compute "
+				"displacements between sets of vectors use vmap or TODO."
+				)
+            raise ValueError(msg)
+
+        if Ra.shape != Rb.shape:
+            msg = "Can only compute displacement between vectors of equal dimension."
+            raise ValueError(msg)
+
+        return Ra - Rb
+
+    def periodic_displacement(self, side: Box, dR: TensorLike):
+        _dR = ((dR + side * 0.5) % side) - 0.5 * side
+        return _dR
+
+    def periodic_shift(self, side: Box, R: TensorLike, dR: TensorLike):
+
+        return (R + dR) % side
+
+    def periodic(self, side: Box, wrapped: bool = True):
+        def displacement_fn( Ra: TensorLike, Rb: TensorLike, perturbation = None, **unused_kwargs):
+            if "box" in unused_kwargs:
+                raise UnexpectedBoxException(
+                    (
+                        "`space.periodic` does not accept a box "
+                        "argument. Perhaps you meant to use "
+                        "`space.periodic_general`?"
+                    )
+                )
+            dR = self.periodic_displacement(side, self.pairwise_displacement(Ra, Rb))
+            if perturbation is not None:
+                dR = self.raw_transform(perturbation, dR)
+            
+            return dR
+        if wrapped:
+            def shift_fn(R: TensorLike, dR: TensorLike, **unused_kwargs):
+                if "box" in unused_kwargs:
+                    raise UnexpectedBoxException(
+                        (
+                            "`space.periodic` does not accept a box "
+                            "argument. Perhaps you meant to use "
+                            "`space.periodic_general`?"
+                        )
+                    )
+
+                return self.periodic_shift(side, R, dR)
+        else:
+                def shift_fn(R: TensorLike, dR: TensorLike, **unused_kwargs):
+                    if "box" in unused_kwargs:
+                        raise UnexpectedBoxException(
+                            (
+                                "`space.periodic` does not accept a box "
+                                "argument. Perhaps you meant to use "
+                                "`space.periodic_general`?"
+                            )
+                        )
+                    return R + dR
+
+        return displacement_fn, shift_fn
+
+    def distance(self, dR: TensorLike):
+        dr = self.square_distance(dR)
+        return self.safe_mask(dr > 0, bm.sqrt, dr)
+
+    def square_distance(self, dR: TensorLike):
+        return bm.sum(dR**2, axis=-1)
+
+    def safe_mask(self, mask, fn, operand, placeholder=0):
+        masked = bm.where(mask, operand, 0)
+        return bm.where(mask, fn(masked), placeholder)
