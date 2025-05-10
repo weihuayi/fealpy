@@ -106,7 +106,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.device = device
 
         # Mesh properties
-        self.extent = bm.array(extent, dtype=itype, device=device)
+        # self.extent = bm.array(extent, dtype=itype, device=device)
+        self.extent = extent
         self.h = bm.array(h, dtype=ftype, device=device) 
         self.origin = bm.array(origin, dtype=ftype, device=device)
         self.shape = (
@@ -264,7 +265,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (ny + 1) * (nz + 1))
         
         NE0 = NE1
-        NE1 = bm.copy(NE0)
         NE1 += (nx + 1) * ny * (nz + 1)
         # c = bm.transpose(idx, (0, 1, 2))[:, :-1, :]
         c = bm.permute_dims(idx, axes=(0, 1, 2))[:, :-1, :]
@@ -272,7 +272,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         edge = bm.set_at(edge, (slice(NE0, NE1), 1), edge[NE0:NE1, 0] + (nz + 1))
 
         NE0 = NE1
-        NE1 = bm.copy(NE0)
         NE1 += (nx + 1) * (ny + 1) * nz
         # c = bm.transpose(idx, (0, 1, 2))[:, :, :-1]
         c = bm.permute_dims(idx, axes=(0, 1, 2))[:, :, :-1]
@@ -303,7 +302,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
 
         NF0 = NF1
-        NF1 = bm.copy(NF0)
         NF1 += nx * (ny + 1) * nz
         # c = bm.transpose(idx, (0, 1, 2))[:-1, :, :-1]
         c = bm.permute_dims(idx, axes=(0, 1, 2))[:-1, :, :-1]
@@ -319,7 +317,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         idx1 = idx1.flatten()
 
         NF0 = NF1
-        NF1 = bm.copy(NF0)
         NF1 += nx * ny * (nz + 1)
         # c = bm.transpose(idx, (0, 1, 2))[:-1, :-1, :]
         c = bm.permute_dims(idx, axes=(0, 1, 2))[:-1, :-1, :]
@@ -474,7 +471,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         # y direction
         NE0 = NE1
-        NE1 = bm.copy(NE0)
         NE1 += nx * (ny + 1) * nz
         idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
         face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :, :-1].flatten())
@@ -490,7 +486,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         # z direction
         NE0 = NE1
-        NE1 = bm.copy(NE0)
         NE1 += nx * ny * (nz + 1)
         idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
         face2edge = bm.set_at(face2edge, (slice(NE0, NE1), 0), idx0[:, :-1, :].flatten())
@@ -531,49 +526,31 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face2cell = bm.set_at(face2cell, (slice(NF0 + ny * nz, NF1), 1), idx.flatten())
         face2cell = bm.set_at(face2cell, (slice(NF0, NF1 - ny * nz), 2), 0)
         face2cell = bm.set_at(face2cell, (slice(NF0, NF1 - ny * nz), 3), 1)
-        # face2cell[NF0:NF1-ny*nz, 0] = idx.flatten()
-        # face2cell[NF0+ny*nz:NF1, 1] = idx.flatten()
-        # face2cell[NF0:NF1-ny*nz, 2] = 0
-        # face2cell[NF0:NF1-ny*nz, 3] = 1
 
         face2cell = bm.set_at(face2cell, (slice(NF1 - ny * nz, NF1), 0), idx[-1].flatten())
         face2cell = bm.set_at(face2cell, (slice(NF0, NF0 + ny * nz), 1), idx[0].flatten())
         face2cell = bm.set_at(face2cell, (slice(NF1 - ny * nz, NF1), 2), 1)
         face2cell = bm.set_at(face2cell, (slice(NF0, NF0 + ny * nz), 3), 0)
-        # face2cell[NF1-ny*nz:NF1, 0] = idx[-1].flatten()
-        # face2cell[NF0:NF0+ny*nz, 1] = idx[0].flatten()
-        # face2cell[NF1-ny*nz:NF1, 2] = 1
-        # face2cell[NF0:NF0+ny*nz, 3] = 0
 
         # y direction
         idy = bm.astype(bm.swapaxes(idx, 1, 0), face2cell.dtype)
         NF0 = NF1
-        NF1 = bm.copy(NF0)
         NF1 += nx * (ny + 1) * nz
         fidy = bm.arange(NF0, NF1, dtype=face2cell.dtype).reshape(nx, ny+1, nz).swapaxes(0, 1)
         face2cell = bm.set_at(face2cell, (fidy[:-1], 0), idy)
         face2cell = bm.set_at(face2cell, (fidy[1:], 1), idy)
         face2cell = bm.set_at(face2cell, (fidy[:-1], 2), 0)
         face2cell = bm.set_at(face2cell, (fidy[1:], 3), 1)
-        # face2cell[fidy[:-1], 0] = idy
-        # face2cell[fidy[1:], 1] = idy
-        # face2cell[fidy[:-1], 2] = 0
-        # face2cell[fidy[1:], 3] = 1
 
         face2cell = bm.set_at(face2cell, (fidy[-1], 0), idy[-1])
         face2cell = bm.set_at(face2cell, (fidy[0], 1), idy[0])
         face2cell = bm.set_at(face2cell, (fidy[-1], 2), 1)
         face2cell = bm.set_at(face2cell, (fidy[0], 3), 0)
-        # face2cell[fidy[-1], 0] = idy[-1]
-        # face2cell[fidy[0], 1] = idy[0]
-        # face2cell[fidy[-1], 2] = 1
-        # face2cell[fidy[0], 3] = 0
 
         # z direction
         # idz = bm.astype(bm.transpose(idx, (2, 0, 1)), face2cell.dtype)
         idz = bm.astype(bm.permute_dims(idx, axes=(2, 0, 1)), face2cell.dtype)
         NF0 = NF1
-        NF1 = bm.copy(NF0)
         NF1 += nx * ny * (nz + 1)
         # NOTE 2021/09/07: The following line is incorrect. The correct line is the next one. 
         # transpose 只接受两个参数
@@ -583,19 +560,11 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face2cell = bm.set_at(face2cell, (fidz[1:], 1), idz)
         face2cell = bm.set_at(face2cell, (fidz[:-1], 2), 0)
         face2cell = bm.set_at(face2cell, (fidz[1:], 3), 1)
-        # face2cell[fidz[:-1], 0] = idz
-        # face2cell[fidz[1:], 1] = idz
-        # face2cell[fidz[:-1], 2] = 0
-        # face2cell[fidz[1:], 3] = 1
 
         face2cell = bm.set_at(face2cell, (fidz[-1], 0), idz[-1])
         face2cell = bm.set_at(face2cell, (fidz[0], 1), idz[0])
         face2cell = bm.set_at(face2cell, (fidz[-1], 2), 1)
         face2cell = bm.set_at(face2cell, (fidz[0], 3), 0)
-        # face2cell[fidz[-1], 0] = idz[-1]
-        # face2cell[fidz[0], 1] = idz[0]
-        # face2cell[fidz[-1], 2] = 1
-        # face2cell[fidz[0], 3] = 0
 
         return face2cell
         
@@ -887,7 +856,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         # Adjust faces in yz-plane
         NF0 = NF1
-        NF1 = bm.copy(NF0)
         NF1 += nx * (ny + 1) * nz
         NF2 = NF0 + ny * nz
         N = nz * (ny + 1)
@@ -898,7 +866,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
 
         # Adjust faces in xz-plane
         NF0 = NF1
-        NF1 = bm.copy(NF0)
         NF1 += nx * ny * (nz + 1)
         N = ny * (nz + 1)
         idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
