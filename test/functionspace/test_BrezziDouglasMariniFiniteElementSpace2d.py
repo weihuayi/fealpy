@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from fealpy.functionspace.BrezziDouglasMariniFiniteElementSpace2d import BDMDof
-from fealpy.functionspace.BrezziDouglasMariniFiniteElementSpace2d import BDMFiniteElementSpace2d
+from fealpy.functionspace.brezzi_douglas_marini_fe_space_2d import BDMDof
+from fealpy.functionspace.brezzi_douglas_marini_fe_space_2d import BDMFiniteElementSpace2d
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.triangle_mesh import TriangleMesh
 

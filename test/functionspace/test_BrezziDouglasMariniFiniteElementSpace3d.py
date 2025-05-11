@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from fealpy.functionspace.BrezziDouglasMariniFiniteElementSpace3d import BDMDof
-from fealpy.functionspace.BrezziDouglasMariniFiniteElementSpace3d import BDMFiniteElementSpace3d
+from fealpy.functionspace.brezzi_douglas_marini_fe_space_3d import BDMDof
+from fealpy.functionspace.brezzi_douglas_marini_fe_space_3d import BDMFiniteElementSpace3d
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TetrahedronMesh
 

@@ -10,8 +10,8 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import spsolve
 
 from fealpy.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.functionspace import FirstNedelecFiniteElementSpace2d
-from fealpy.functionspace import FirstNedelecFiniteElementSpace3d
+from fealpy.functionspace import FirstNedelecFiniteElementSpace
+
 from fealpy import logger
 logger.setLevel('WARNING')
 
@@ -95,10 +95,10 @@ for j, p in enumerate(ps):
 
         if dim == 2:
             mesh = TriangleMesh.from_box(pde.domain(), nx=2**i, ny=2**i) 
-            space = FirstNedelecFiniteElementSpace2d(mesh, p=p)
+            space = FirstNedelecFiniteElementSpace(mesh, p=p)
         else:
             mesh = TetrahedronMesh.from_box(pde.domain(), nx=2**i, ny=2**i, nz=2**i)
-            space = FirstNedelecFiniteElementSpace3d(mesh, p=p)
+            space = FirstNedelecFiniteElementSpace(mesh, p=p)
         tmr.send(f'第{i}次网格和pde生成时间')
 
         gdof = space.dof.number_of_global_dofs()

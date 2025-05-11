@@ -10,8 +10,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import spsolve
 
 from fealpy.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.functionspace import SecondNedelecFiniteElementSpace2d
-from fealpy.functionspace import SecondNedelecFiniteElementSpace3d
+from fealpy.functionspace import SecondNedelecFiniteElementSpace
 from fealpy import logger
 logger.setLevel('WARNING')
 
@@ -65,9 +64,7 @@ parser.add_argument('--maxit',
 args = parser.parse_args()
 p = args.degree
 maxit = args.maxit
-maxit = 3
 dim = args.dim
-dim = 3
 backend = args.backend
 bm.set_backend(backend)
 if dim == 2:
@@ -95,10 +92,10 @@ for j, p in enumerate(ps):
 
         if dim == 2:
             mesh = TriangleMesh.from_box(pde.domain(), nx=2**i, ny=2**i) 
-            space = SecondNedelecFiniteElementSpace2d(mesh, p=p)
+            space = SecondNedelecFiniteElementSpace(mesh, p=p)
         else:
             mesh = TetrahedronMesh.from_box(pde.domain(), nx=2**i, ny=2**i, nz=2**i)
-            space = SecondNedelecFiniteElementSpace3d(mesh, p=p)
+            space = SecondNedelecFiniteElementSpace(mesh, p=p)
         tmr.send(f'第{i}次网格和pde生成时间')
 
         gdof = space.dof.number_of_global_dofs()

@@ -25,7 +25,6 @@ class FirstNedelecDof2d():
         self.ftype = mesh.ftype
         self.itype = mesh.itype
 
-
     def number_of_local_dofs(self,doftype ='all'):
         p = self.p
         if doftype == 'all':
@@ -44,7 +43,7 @@ class FirstNedelecDof2d():
         cdof = self.number_of_local_dofs("cell")
         return NE*edof + NC*cdof
 
-    def edge_to_dof(self,index = _S):
+    def face_to_dof(self,index = _S):
         NE = self.mesh.number_of_edges()
         edof = self.number_of_local_dofs("edge") 
         return bm.arange(NE*edof).reshape(NE,edof)[index]
@@ -55,7 +54,7 @@ class FirstNedelecDof2d():
         eldof = self.number_of_local_dofs('edge')
         ldof = self.number_of_local_dofs()
         gdof = self.number_of_global_dofs()
-        e2dof = self.edge_to_dof()
+        e2dof = self.face_to_dof()
 
         NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
@@ -78,7 +77,7 @@ class FirstNedelecDof2d():
 
     def boundary_dof(self):
         eidx = self.mesh.boundary_face_index()
-        e2d = self.edge_to_dof(index=eidx)
+        e2d = self.face_to_dof(index=eidx)
         return e2d.reshape(-1)
 
     def is_boundary_dof(self):
@@ -90,7 +89,6 @@ class FirstNedelecDof2d():
         flag = bm.set_at(flag,(bddof),True)
         return flag
     
-
 
 class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
@@ -189,7 +187,6 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
             phi = self.bspace.basis(bcs, p=p-1)
             gphi = self.bspace.grad_basis(bcs, p=p-1)
 
-
             w0 = l[0]*glambda[:,None, 1, None] - l[1]*glambda[:,None, 0, None]
             w1 = l[1]*glambda[:,None, 2, None] - l[2]*glambda[:,None, 1, None]
             cw0 = 2*self.cross2d(glambda[:,None, 0, None], glambda[:,None, 1, None]) 
@@ -204,7 +201,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
             val = bm.set_at(val,(...,slice(eldof*3+cldof//2,None)),self.cross2d(gphi, v1) + phi*cv1 )
         return val
     
-    def edge_basis(self,bcs,index=_S):
+    def face_basis(self,bcs,index=_S):
         p = self.p
         mesh = self.mesh
         bspace = self.bspace
@@ -217,9 +214,11 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         return val
         
 
-
     def is_boundary_dof(self, threshold=None, method=None):
         return self.dof.is_boundary_dof()
+    
+    def face_to_dof(self, index=_S):
+        return self.dof.face_to_dof()[index]
 
     def cell_to_dof(self):
         return self.dof.cell2dof
@@ -338,7 +337,7 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         mesh = self.mesh
         bspace = self.bspace
         isbdFace = mesh.boundary_face_flag()
-        edge2dof = self.dof.edge_to_dof()[isbdFace]
+        edge2dof = self.dof.face_to_dof()[isbdFace]
         fm = mesh.entity_measure('face')[isbdFace]
         gdof = self.number_of_global_dofs()
         t = mesh.edge_unit_tangent()[isbdFace]
@@ -349,16 +348,20 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         M = bm.einsum("cql, cqm, q->lm", bphi, bphi, ws)
         Minv = bm.linalg.inv(M)
         Minv = Minv*fm[:,None,None]
-
         points = mesh.bc_to_point(bcs)[isbdFace]
-        gDval = gd(points, t) 
-        g = bm.einsum('cql, cq,q->cl', bphi, gDval,ws)
-        
-        #uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
-        uh = bm.set_at(uh,(edge2dof),bm.einsum('cl, clm->cm', g, Minv))
-        # 边界自由度
         isDDof = bm.zeros(gdof, dtype=bm.bool)
         isDDof[edge2dof] = True
+        if bm.is_tensor(gd):
+            assert len(gd) == self.number_of_global_dofs()
+            if uh is None:
+                uh = bm.zeros_like(gd)
+            uh[isDDof] = gd[isDDof]
+        else:
+            gDval = gd(points, t) 
+            g = bm.einsum('cql, cq,q->cl', bphi, gDval,ws)
+            #uh[edge2dof] = bm.einsum('cl, clm->cm', g, Minv) # (NC, ldof)
+            uh = bm.set_at(uh,(edge2dof),bm.einsum('cl, clm->cm', g, Minv))
+            # 边界自由度
         return uh,isDDof
 
     boundary_interpolate = set_dirichlet_bc
@@ -367,14 +370,14 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         p = self.p
         mesh = self.mesh
         isbdFace = mesh.boundary_face_flag()
-        edge2dof = self.dof.edge_to_dof()[isbdFace]
+        edge2dof = self.dof.face_to_dof()[isbdFace]
         fm = mesh.entity_measure('face')[isbdFace]
         gdof = self.number_of_global_dofs()
 
         # Bernstein 空间的单位质量矩阵
         qf = self.mesh.quadrature_formula(p+3, 'face')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        bphi = self.edge_basis(bcs,index=isbdFace)
+        bphi = self.face_basis(bcs,index=isbdFace)
         points = mesh.bc_to_point(bcs)[isbdFace]
         t = mesh.edge_unit_tangent()[isbdFace]
         hval = gD(points,t)
@@ -389,7 +392,6 @@ class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     #     b = self.source_vector(f)
     #     x = spsolve(M, b)
     #     return self.function(array=x)
-
 
     # def interplation(self, f):
     #     """
