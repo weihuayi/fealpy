@@ -65,16 +65,10 @@ class DirectSolverManager:
             A: COOTensor or CSRTensor representing the system matrix.
             matrix_type: 'G' for general, 'L' for lower triangular, 'U' for upper triangular, 'SP' for symmetric positive definite.
         """
+        self.A = A
         self._matrix_type = matrix_type
         self.device = A.indices.device
-
-        if isinstance(A, COOTensor):
-            self.A = A.to_scipy().tocsr()
-        elif isinstance(A, CSRTensor):
-            self.A = A.to_scipy()
-        else:
-            raise ValueError(f"Unsupported tensor type: {type(A)}")
-
+        
         # Clear thread-local solver cache
         for attr in ('solver', 'solver_name'):
             if hasattr(self._solver_cache, attr):
@@ -115,34 +109,34 @@ class DirectSolverManager:
         """
         # Filter out any matrix_type passed by mistake
         self.raw_kwargs = {k: v for k, v in kwargs.items() if k != 'matrix_type'}
-        name = solver_name or self.solver_name
-        if name in (None, 'auto'):
-            name = self._auto_select()
+        self.solver_name = solver_name if solver_name is not None else self.solver_name
+        if self.solver_name in ('auto'):
+            self.solver_name = self._auto_select()
 
-        if name not in self._SOLVER_MAPPING:
-            raise SolverNotAvailableError(f"Solver '{name}' not available; candidates: {self._available}")
+        if self.solver_name not in self._SOLVER_MAPPING:
+            raise SolverNotAvailableError(f"Solver '{self.solver_name}' not available; candidates: {self._available}")
 
         # Clear old instance if switching solver
         old = getattr(self._solver_cache, 'solver_name', None)
-        if old != name and hasattr(self._solver_cache, 'solver'):
+        if old != self.solver_name and hasattr(self._solver_cache, 'solver'):
             delattr(self._solver_cache, 'solver')
 
         # Use cached solver if unchanged
-        if hasattr(self._solver_cache, 'solver') and old == name:
-            logger.debug(f"Using cached solver '{name}'")
+        if hasattr(self._solver_cache, 'solver') and old == self.solver_name:
+            logger.debug(f"Using cached solver '{self.solver_name}'")
             return
 
         # Instantiate new solver
-        solver_cls = self._SOLVER_MAPPING[name]
+        solver_cls = self._SOLVER_MAPPING[self.solver_name]
         sig = inspect.signature(solver_cls.__init__)
         valid = {p for p in sig.parameters if p not in ('self', 'kwargs')}
         init_kwargs = {k: v for k, v in self.raw_kwargs.items() if k in valid}
         unused = set(self.raw_kwargs) - valid
         if unused:
-            logger.warning(f"Parameters {unused} ignored by solver '{name}'")
+            logger.warning(f"Parameters {unused} ignored by solver '{self.solver_name}'")
         solver = solver_cls(**init_kwargs)
         self._solver_cache.solver = solver
-        self._solver_cache.solver_name = name
+        self._solver_cache.solver_name = self.solver_name
 
     def get_solver(self) -> Any:
         """Get the current solver instance, instantiating it if needed."""
@@ -156,7 +150,7 @@ class DirectSolverManager:
             if hasattr(self._solver_cache, attr):
                 delattr(self._solver_cache, attr)
 
-    def solve(self, b: Any) -> np.ndarray:
+    def solve(self, b: Any):
         """
         Synchronously solve A x = b, then clear the solver cache.
 
@@ -165,11 +159,10 @@ class DirectSolverManager:
         Returns:
             x: solution as a NumPy ndarray.
         """
-        arr = bm.to_numpy(b) if not isinstance(b, np.ndarray) else b
         if self.A is None:
             raise ValueError("Matrix not set, call set_matrix() first.")
         solver = self.get_solver()
-        x = solver.solve(self.A, arr, matrix_type=self._matrix_type)
+        x = solver.solve(self.A, b, matrix_type=self._matrix_type)
         self._clear_cache()
         return x
 
@@ -204,7 +197,7 @@ class BaseSolver(ABC):
         self.kwargs = kwargs
 
     @abstractmethod
-    def solve(self, A: Any, b: np.ndarray, matrix_type: str = 'G') -> np.ndarray:
+    def solve(self, A: Any, b: np.ndarray, matrix_type: str = 'G') :
         """Solve the linear system A x = b."""
         pass
 
@@ -212,19 +205,31 @@ class BaseSolver(ABC):
 class ScipySolver(BaseSolver):
     """Solver using scipy.sparse.linalg."""
 
-    def solve(self, A, b: np.ndarray, matrix_type: str = 'G') -> np.ndarray:
+    def solve(self, A, b, matrix_type: str = 'G') :
+        if isinstance(A, COOTensor):
+            A = A.to_scipy().tocsr()
+        elif isinstance(A, CSRTensor):
+            A = A.to_scipy()
+        b = bm.to_numpy(b) if not isinstance(b, np.ndarray) else b
         from scipy.sparse.linalg import spsolve, spsolve_triangular
         if matrix_type == 'U':
-            return spsolve_triangular(A, b, lower=False, **self.kwargs)
+            return bm.tensor(spsolve_triangular(A, b, lower=False, **self.kwargs))
         if matrix_type == 'L':
-            return spsolve_triangular(A, b, lower=True, **self.kwargs)
-        return spsolve(A, b, **self.kwargs)
+            return bm.tensor(spsolve_triangular(A, b, lower=True, **self.kwargs))
+        else:
+            return bm.tensor(spsolve(A, b, **self.kwargs))
 
 @DirectSolverManager.register('mumps')
 class MumpsSolver(BaseSolver):
     """Solver using MUMPS (via pymumps)."""
+    
 
-    def solve(self, A, b: np.ndarray, matrix_type: str = 'G') -> np.ndarray:
+    def solve(self, A, b, matrix_type: str = 'G') :
+        if isinstance(A, COOTensor):
+            A = A.to_scipy().tocsr()
+        elif isinstance(A, CSRTensor):
+            A = A.to_scipy()
+        b = bm.to_numpy(b) if not isinstance(b, np.ndarray) else b
         from mumps import DMumpsContext
         sym_map = {'G': 0, 'SP': 1, 'S': 2}
         ctx = DMumpsContext(par=1, sym=sym_map.get(matrix_type, 0), comm=None)
@@ -234,13 +239,18 @@ class MumpsSolver(BaseSolver):
         ctx.set_silent()
         ctx.run(job=6)
         ctx.destroy()
-        return x
+        return bm.tensor(x)
 
 @DirectSolverManager.register('pardiso')
 class PardisoSolver(BaseSolver):
     """Solver using pypardiso."""
 
-    def solve(self, A, b: np.ndarray, matrix_type: str = 'G') -> np.ndarray:
+    def solve(self, A, b: np.ndarray, matrix_type: str = 'G') :
+        if isinstance(A, COOTensor):
+            A = A.to_scipy().tocsr()
+        elif isinstance(A, CSRTensor):
+            A = A.to_scipy()
+        b = bm.to_numpy(b) if not isinstance(b, np.ndarray) else b
         from pypardiso import PyPardisoSolver
         mapping = {'G': 11, 'SP': 1, 'S': 1}
         solver = PyPardisoSolver()
@@ -248,33 +258,61 @@ class PardisoSolver(BaseSolver):
         solver.factorize(A)
         x = solver.solve(A, b)
         solver.free_memory(everything=True)
-        return x
+        return bm.tensor(x)
 
 @DirectSolverManager.register('cholmod')
 class CholmodSolver(BaseSolver):
     """Solver using scikit-sparse Cholmod."""
 
-    def solve(self, A, b: np.ndarray, matrix_type: str = 'G') -> np.ndarray:
+    def solve(self, A, b, matrix_type: str = 'G') -> np.ndarray:
         if matrix_type != 'SP':
             raise ValueError("CholmodSolver only supports SP type")
+        if isinstance(A, COOTensor):
+            A = A.to_scipy().tocsr()
+        elif isinstance(A, CSRTensor):
+            A = A.to_scipy()
+        b = bm.to_numpy(b) if not isinstance(b, np.ndarray) else b
         from sksparse.cholmod import cholesky
         factor = cholesky(A)
-        return factor(b)
+        return bm.tensor(factor(b))
 
 @DirectSolverManager.register('cupy')
 class CupySolver(BaseSolver):
     """Solver using CuPy for GPU-based sparse solutions."""
-
-    def solve(self, A, b: np.ndarray, matrix_type: str = 'G') -> np.ndarray:
+    
+    def _to_cupy_data(self, A, b):
         import cupy as cp
-        A_gpu = cp.sparse.csr_matrix(A)
-        b_gpu = cp.array(b)
+        if isinstance(A.indices, np.ndarray): # numpy backend
+            A =  A.to_scipy() 
+            A = cp.sparse.csr_matrix(A.astype(cp.float64))
+        elif A.indices.device.type == "cpu": # torch backend
+            A = A.device_put("cuda")
+            indices = cp.from_dlpack(A.indices)
+            data = cp.from_dlpack(A.values)
+            A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
+        else:
+            indices = cp.from_dlpack(A.indices)
+            data = cp.from_dlpack(A.values)
+            A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
+
+        if isinstance(b, np.ndarray) or b.device.type == "cpu":
+            b = bm.to_numpy(b)
+            b = cp.array(b)
+        else:
+            b = cp.from_dlpack(b)
+        return A, b
+
+    def solve(self, A, b, matrix_type: str = 'G') -> np.ndarray:
+        import cupy as cp
+        A_gpu, b_gpu = self._to_cupy_data(A, b)
         if matrix_type == 'U':
             from cupyx.scipy.sparse.linalg import spsolve_triangular
-            return spsolve_triangular(A_gpu, b_gpu, lower=False, **self.kwargs)
+            x = spsolve_triangular(A_gpu, b_gpu, lower=False, **self.kwargs)
         elif matrix_type == 'L':
             from cupyx.scipy.sparse.linalg import spsolve_triangular
-            return spsolve_triangular(A_gpu, b_gpu, lower=True, **self.kwargs)
+            x = spsolve_triangular(A_gpu, b_gpu, lower=True, **self.kwargs)
         else:
             from cupyx.scipy.sparse.linalg import spsolve
-            return spsolve(A_gpu, b_gpu, **self.kwargs)
+            x = spsolve(A_gpu, b_gpu, **self.kwargs)
+
+        return bm.tensor(x)
