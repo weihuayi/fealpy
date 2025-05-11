@@ -1,4 +1,4 @@
-class FirstNedelecFiniteElementSpace:
+class FirstNedelecFESpace:
     """
     Factory for creating first-kind Nédélec finite element space objects in 2D or 3D,
     with automatic dimension detection and appropriate class selection.
@@ -27,12 +27,12 @@ class FirstNedelecFiniteElementSpace:
             raise ValueError(
                 f"Unsupported dimension: {GD}. Only 2, or 3 are supported.")
         
-        from .first_nedelec_fe_space_2d import FirstNedelecFiniteElementSpace2d
-        from .first_nedelec_fe_space_3d import FirstNedelecFiniteElementSpace3d
+        from .first_nedelec_fe_space_2d import FirstNedelecFESpace2d
+        from .first_nedelec_fe_space_3d import FirstNedelecFESpace3d
 
         dim2class = {
-            2: FirstNedelecFiniteElementSpace2d,
-            3: FirstNedelecFiniteElementSpace3d
+            2: FirstNedelecFESpace2d,
+            3: FirstNedelecFESpace3d          
         }
         
         SpaceClass = dim2class.get(GD)

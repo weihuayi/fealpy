@@ -111,7 +111,7 @@ class RTDof3d():
         return flag
 
 
-class RaviartThomasFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
+class RaviartThomasFESpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh

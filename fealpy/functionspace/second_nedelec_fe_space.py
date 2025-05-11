@@ -1,4 +1,4 @@
-class SecondNedelecFiniteElementSpace:
+class SecondNedelecFESpace:
     """
     Factory for creating second-kind Nédélec finite element space objects in 2D or 3D,
     with automatic dimension detection and appropriate class selection.
@@ -27,12 +27,12 @@ class SecondNedelecFiniteElementSpace:
             raise ValueError(
                 f"Unsupported dimension: {GD}. Only 2, or 3 are supported.")
         
-        from .second_nedelec_fe_space_2d import SecondNedelecFiniteElementSpace2d
-        from .second_nedelec_fe_space_3d import SecondNedelecFiniteElementSpace3d
+        from .second_nedelec_fe_space_2d import SecondNedelecFESpace2d
+        from .second_nedelec_fe_space_3d import SecondNedelecFESpace3d
 
         dim2class = {
-            2: SecondNedelecFiniteElementSpace2d,
-            3: SecondNedelecFiniteElementSpace3d
+            2: SecondNedelecFESpace2d,
+            3: SecondNedelecFESpace3d
         }
         
         SpaceClass = dim2class.get(GD)

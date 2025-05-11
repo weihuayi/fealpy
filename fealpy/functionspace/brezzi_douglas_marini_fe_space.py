@@ -1,4 +1,4 @@
-class BrezziDouglasMariniFiniteElementSpace:
+class BrezziDouglasMariniFESpace:
     """
     Factory for creating BrezziDouglasMariniFiniteElementSpace finite element space objects in 2D or 3D,
     with automatic dimension detection and appropriate class selection.
@@ -27,12 +27,12 @@ class BrezziDouglasMariniFiniteElementSpace:
             raise ValueError(
                 f"Unsupported dimension: {GD}. Only 2, or 3 are supported.")
         
-        from .brezzi_douglas_marini_fe_space_2d import BrezziDouglasMariniFiniteElementSpace2d
-        from .brezzi_douglas_marini_fe_space_3d import BrezziDouglasMariniFiniteElementSpace3d
+        from .brezzi_douglas_marini_fe_space_2d import BrezziDouglasMariniFESpace2d
+        from .brezzi_douglas_marini_fe_space_3d import BrezziDouglasMariniFESpace3d
 
         dim2class = {
-            2: BrezziDouglasMariniFiniteElementSpace2d,
-            3: BrezziDouglasMariniFiniteElementSpace3d
+            2: BrezziDouglasMariniFESpace2d,
+            3: BrezziDouglasMariniFESpace3d
         }
         
         SpaceClass = dim2class.get(GD)

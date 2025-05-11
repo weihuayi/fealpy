@@ -125,7 +125,7 @@ class NedelecDof():
         flag[bddof] = True
         return flag
 
-class SecondNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
+class SecondNedelecFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh : Mesh, p: int):
         self.p = p
         self.mesh = mesh

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from fealpy.functionspace.brezzi_douglas_marini_fe_space_2d import BDMDof
-from fealpy.functionspace.brezzi_douglas_marini_fe_space_2d import BDMFiniteElementSpace2d
+from fealpy.functionspace.brezzi_douglas_marini_fe_space_2d import BrezziDouglasMariniFESpace2d
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.triangle_mesh import TriangleMesh
 
@@ -33,7 +33,7 @@ class TestBDMFiniteElementSpace2d:
 
         mesh = TriangleMesh.from_box(nx = 1,ny =1)
         p =  3
-        a = BDMFiniteElementSpace2d(mesh,p)
+        a = BrezziDouglasMariniFESpace2d(mesh,p)
         
         basis_vector = a.basis_vector()
         np.testing.assert_allclose(bm.to_numpy(basis_vector), meshdata["basis_vector"],1e-8)
@@ -45,7 +45,7 @@ class TestBDMFiniteElementSpace2d:
 
         mesh = TriangleMesh.from_box(nx = 1,ny =1)
         p =  3
-        a = BDMFiniteElementSpace2d(mesh,p)
+        a = BrezziDouglasMariniFESpace2d(mesh,p)
         bcs = bm.array([[0.1,0.2,0.7],
                 [0.5,0.2,0.3],
                 [0.1,0.4,0.5]])
@@ -59,7 +59,7 @@ class TestBDMFiniteElementSpace2d:
 
         mesh = TriangleMesh.from_box(nx = 1,ny =1)
         p =  3
-        a = BDMFiniteElementSpace2d(mesh,p)
+        a = BrezziDouglasMariniFESpace2d(mesh,p)
         bcs = bm.array([[0.1,0.2,0.7],
                 [0.5,0.2,0.3],
                 [0.1,0.4,0.5]],dtype=bm.float64)

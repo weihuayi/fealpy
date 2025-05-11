@@ -1,4 +1,4 @@
-class RaviartThomasFiniteElementSpace:
+class RaviartThomasFESpace:
     """
     Factory for creating RavartThomasFiniteElementSpace finite element space objects in 2D or 3D,
     with automatic dimension detection and appropriate class selection.
@@ -27,12 +27,12 @@ class RaviartThomasFiniteElementSpace:
             raise ValueError(
                 f"Unsupported dimension: {GD}. Only 2, or 3 are supported.")
         
-        from .raviart_thomas_fe_space_2d import RaviartThomasFiniteElementSpace2d
-        from .raviart_thomas_fe_space_3d import RaviartThomasFiniteElementSpace3d
+        from .raviart_thomas_fe_space_2d import RaviartThomasFESpace2d
+        from .raviart_thomas_fe_space_3d import RaviartThomasFESpace3d
 
         dim2class = {
-            2: RaviartThomasFiniteElementSpace2d,
-            3: RaviartThomasFiniteElementSpace3d
+            2: RaviartThomasFESpace2d,
+            3: RaviartThomasFESpace3d
         }
         
         SpaceClass = dim2class.get(GD)

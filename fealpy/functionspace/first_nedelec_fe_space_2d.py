@@ -90,7 +90,7 @@ class FirstNedelecDof2d():
         return flag
     
 
-class FirstNedelecFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
+class FirstNedelecFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh

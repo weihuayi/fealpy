@@ -144,7 +144,7 @@ class BDMDof():
         isDDof[face2dof] = True
         return isDDof
 
-class BrezziDouglasMariniFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
+class BrezziDouglasMariniFESpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p, space=None, q = None):
         
         self.p = p

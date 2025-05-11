@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from fealpy.functionspace.brezzi_douglas_marini_fe_space_3d import BDMDof
-from fealpy.functionspace.brezzi_douglas_marini_fe_space_3d import BDMFiniteElementSpace3d
+from fealpy.functionspace.brezzi_douglas_marini_fe_space_3d import BrezziDouglasMariniFESpace3d
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TetrahedronMesh
 
@@ -32,7 +32,7 @@ class TestBDMFiniteElementSpace3d:
 
         mesh = TetrahedronMesh.from_box(nx = 1,ny =1,nz=1)
         p =  2
-        a = BDMFiniteElementSpace3d(mesh,p)
+        a = BrezziDouglasMariniFESpace3d(mesh,p)
         
         basis_vector = a.basis_vector()
         np.testing.assert_allclose(bm.to_numpy(basis_vector), meshdata["basis_vector"],1e-8)
@@ -44,7 +44,7 @@ class TestBDMFiniteElementSpace3d:
 
         mesh = TetrahedronMesh.from_box(nx = 1,ny =1,nz=1)
         p =  1
-        a = BDMFiniteElementSpace3d(mesh,p)
+        a = BrezziDouglasMariniFESpace3d(mesh,p)
         bcs = bm.tensor([[0.1,0.3,0.1,0.5],
                  [0.2,0.2,0.2,0.4]])
         basis = a.basis(bcs)
@@ -57,7 +57,7 @@ class TestBDMFiniteElementSpace3d:
 
         mesh = TetrahedronMesh.from_box(nx = 1,ny =1,nz=1)
         p =  1
-        a = BDMFiniteElementSpace3d(mesh,p)
+        a = BrezziDouglasMariniFESpace3d(mesh,p)
         bcs = bm.tensor([[0.1,0.3,0.1,0.5],
                  [0.2,0.2,0.2,0.4]],dtype=bm.float64)
         div_basis = a.div_basis(bcs)

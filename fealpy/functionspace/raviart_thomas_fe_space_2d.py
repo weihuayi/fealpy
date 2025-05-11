@@ -93,7 +93,7 @@ class RTDof2d():
         flag[bddof] = True
         return flag
 
-class RaviartThomasFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
+class RaviartThomasFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
