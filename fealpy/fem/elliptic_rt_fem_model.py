@@ -28,13 +28,17 @@ class EllipticRTFEMModel(ComputationalModel):
     def run(self, maxit=4):
         pde = self.pde 
         mesh = self.init_mesh()
+        A,b = self.linear_system()
+        A,b = self.boundary_apply()
+        p,u = self.solve()
+        return p, u
 
     def init_mesh(self):
         """
         Initialize the mesh for the elliptic RT FEM model.
         """
         domain = self.pde.domain()
-        self.mesh = TriangleMesh.from_box(domain, nx=4, ny=4)
+        self.mesh = TriangleMesh.from_box(domain, nx=32, ny=32)
         return self.mesh
 
     def linear_system(self):
@@ -51,14 +55,10 @@ class EllipticRTFEMModel(ComputationalModel):
         NC = mesh.number_of_cells()
         pgdof = pspace.number_of_global_dofs()
         ugdof = uspace.number_of_global_dofs()
-
-        print(f"Number of edges: {NE}")
-        print(f"Number of cells: {NC}")
-        print(f"Number of global dofs for pspace: {pgdof}")
-        print(f"Number of global dofs for uspace: {ugdof}")
         
         bform1 = BilinearForm(pspace)
-        bform1.add_integrator(VectorMassIntegrator(coef=pde.diffusion_coef_inv, q=3))
+        bform1.add_integrator(ScalarMassIntegrator(coef=pde.diffusion_coef_inv, q=3))
+        #bform1.add_integrator(VectorMassIntegrator(coef=1, q=3))
 
         bform2 = BilinearForm((uspace,pspace))
         bform2.add_integrator(DivIntegrator(coef=-1, q=3))
@@ -151,6 +151,21 @@ class EllipticRTFEMModel(ComputationalModel):
         axes = fig.add_subplot(111)
         self.mesh.add_plot(axes)
         plt.show()
+        
+    def error(self):
+        """
+        Calculate the error of the solution.
+        """
+        p,u = self.solve()
+        mesh = self.init_mesh()
+        pde = self.pde
+        pspace = RaviartThomasFESpace2d(mesh, p=0)
+        uspace = LagrangeFESpace(mesh, p=0, ctype='D')
+        p_solution = pspace.interpolate(pde.flux)
+        error_p= mesh.error(p, p_solution)
+        u_solution = uspace.interpolate(pde.solution)
+        error_u = mesh.error(u, u_solution)
+        return error_p, error_u
 
 
 
