@@ -65,7 +65,7 @@ y = sp.symbols('y')
 #u = (sp.sin(2*y)*sp.sin(2*x))
 #u = x**3*y**4
 #u = x**2*(x-1)**5*y+2*x*y**2*(y-1)**5
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))
 pde = TripleLaplacePDE(u) 
 ulist = get_flist(u, device=device)
 mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)

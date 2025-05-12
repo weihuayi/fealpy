@@ -63,6 +63,7 @@ class PolygonMesh(Mesh, Plotable):
         """
         cell, cellLocation = self.cell
         kwargs = bm.context(cell)
+        itype = cell.dtype
         totalEdge = self.total_edge()
         j0, i0, i1, j,j1 = bm.unique_all_(bm.sort(totalEdge, axis=1), axis=0)
 
@@ -75,9 +76,10 @@ class PolygonMesh(Mesh, Plotable):
         NV = self.number_of_vertices_of_cells() # (NC, )
          
         cellIdx = bm.repeat(bm.arange(NC), NV)
-        shifts = bm.cumsum(NV,axis=0)
+        shifts = bm.cumsum(NV,axis=0, dtype=itype)
         id_arr = bm.ones(shifts[-1], **kwargs)
-        id_arr = bm.set_at(id_arr, (shifts[:-1]), -bm.asarray(NV[:-1])+1)
+        id_arr = bm.set_at(id_arr, (shifts[:-1]), -bm.asarray(NV[:-1],
+                                                              dtype=itype)+1)
         id_arr = bm.set_at(id_arr, 0, 0)
         localIdx = bm.cumsum(id_arr,axis=0)
 
@@ -105,7 +107,7 @@ class PolygonMesh(Mesh, Plotable):
             bc = bm.mean(node[edge, :], axis=1).reshape(-1, GD)
         elif etype == 0:
             bc = node
-        return bc
+        return bc[index]
 
     def entity_measure(self,etype:Union[int,str],index:Index=_S) ->TensorLike:
         node = self.node
@@ -480,6 +482,14 @@ class PolygonMesh(Mesh, Plotable):
             return cell2node
         else:
             return self.cell
+
+    def number_of_vertices_of_cells(self):
+        cellLocation = self.cell[1]
+        return cellLocation[1:] - cellLocation[0:-1]
+
+    number_of_edges_of_cells = number_of_vertices_of_cells
+    number_of_faces_of_cells = number_of_vertices_of_cells
+
 
     @classmethod
     def from_triangle_mesh_by_dual(cls, mesh, bc=True):
