@@ -59,3 +59,5 @@ class Example:
         if key not in DATA_TABLE:
             raise ValueError(f"example '{key}' not found, please check the name you input.")
         return example_import_util("poisson", key, DATA_TABLE)()
+    
+example = Example()

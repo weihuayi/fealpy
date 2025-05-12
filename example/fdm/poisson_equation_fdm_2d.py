@@ -5,14 +5,16 @@ from fealpy.mesh import UniformMesh
 from fealpy.fdm import DirichletBC
 from fealpy.solver import spsolve
 import matplotlib.pyplot as plt
-from fealpy.model.poisson import get_example, Example
+from fealpy.model.poisson import get_example, example
 
 example = Example()
-# example.show_examples()
+example.show_examples()
 pde = example.get_example('coscos')
+
 # pde = get_example('sinsin', flag=True)
+
 print(pde.domain())
-# exit()
+exit()
 
 
 domain = pde.domain()
