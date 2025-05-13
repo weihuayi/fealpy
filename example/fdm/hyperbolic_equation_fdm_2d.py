@@ -8,7 +8,7 @@ from fealpy.pde.hyperbolic_2d import Hyperbolic2dPDEData
 from fealpy.pde.hyperbolic_2d_sympy import Hyperbolic2dData
 
 domain = [0, 1, 0, 1]
-extent = [0, 40, 0, 40]
+extent = [0, 20, 0, 20]
 mesh = UniformMesh(domain,extent)
 duration = [0,1]
 #pde = Hyperbolic2dPDEData()
@@ -18,7 +18,7 @@ tau = (duration[1] - duration[0]) / nt
 
 uh0 = mesh.interpolate(pde.init_solution)
 a = pde.a
-H0 = HyperbolicOperator(mesh,tau,a,method='explicity_upwind_viscous')
+H0 = HyperbolicOperator(mesh,tau,a, method='explicity_upwind_viscous')
 em = bm.zeros((3, 1), dtype=bm.float64)
 
 def hyperbolic_windward(n):
@@ -49,5 +49,5 @@ fig = plt.figure()
 box = [0, 1, 0, 1, -1, 1] # 图像显示的范围 0 <= x <= 1, 0 <= y <= 1, -1 <= uh <= 1
 axes = fig.add_subplot(111, projection='3d')
 mesh.show_animation(fig, axes, box, hyperbolic_windward, 
-                    fname='hyperbolic_explicity_upwind_viscous.mp4', plot_type='surface', frames=nt + 1)
+                    fname='wind.mp4', plot_type='surface', frames=nt + 1)
 plt.show()
