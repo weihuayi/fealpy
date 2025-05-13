@@ -22,6 +22,8 @@ from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
+from .optimal_control_integrator import OPCIntegrator
+from .optimal_control_source_integrator import OPCSIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -60,3 +62,4 @@ from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
 
 ### computional model
 from .elliptic_rt_fem_model import EllipticRTFEMModel
+from .optimal_control_fem_model import OPCRTFEMModel
