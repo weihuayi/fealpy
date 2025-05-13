@@ -20,8 +20,8 @@ MaxIters = 1000
 dim = 30
 x0 = initialize(NP, dim, ub, lb, method=None)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
-optimizer = GeneticAlg(option)
-optimizer.run()
+optimizer = DifferentialEvolution(option)
+optimizer.run(mutation_strategy="rand/1")
 optimizer.plot_curve()
 optimizer.plot_plpt_percen()
 optimizer.print_optimal_result()
