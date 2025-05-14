@@ -1,25 +1,22 @@
 from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
+
+from fealpy.model import PDEDataManager
+
 from fealpy.fdm.laplace_operator import LaplaceOperator
 from fealpy.mesh import UniformMesh
 from fealpy.fdm import DirichletBC
 from fealpy.solver import spsolve
 import matplotlib.pyplot as plt
-from fealpy.model.poisson import get_example, example
 
-example = Example()
-example.show_examples()
-pde = example.get_example('coscos')
 
-# pde = get_example('sinsin', flag=True)
-
-print(pde.domain())
-exit()
-
+pde = PDEDataManager('poisson').get_example('sinsin')
+# print(pde.__doc__)
 
 domain = pde.domain()
 extent = [0, 10, 0, 10]
 mesh = UniformMesh(domain,extent)
+
 maxit = 5
 em = bm.zeros((3, maxit), dtype=bm.float64)
 for i in range(maxit):
@@ -31,22 +28,36 @@ for i in range(maxit):
     em[0, i], em[1, i], em[2, i] = mesh.error(pde.solution, uh)
     if i < maxit-1:
         mesh.uniform_refine()
-print("em:\n", em)
-print("em_ratio:\n", em[:, 0:-1]/em[:, 1:])
 
+em_ratio = em[:, 0:-1] / em[:, 1:]
+print("误差: ", em, "误差比: ",em_ratio,sep='\n')
+
+# 绘制网格最后一次加密的数值解图像
 fig = plt.figure(1)
 axes = fig.add_subplot(111, projection='3d')
 mesh.show_function(axes, uh.reshape(mesh.nx+1, mesh.ny+1))
-plt.title(f"Iteration {i+1}")
-fig, axes = plt.subplots()
-error_names = ['max', 'L2', 'l2']  # 定义误差名称
-markers = ['o-', 's--', '^:']      # 定义不同线条样式
+plt.title(f"The numerical solution of the final mesh refinement")
+
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))  
+error_names = ['max', 'L2', 'H1']
+markers = ['o-', 's--', '^:']
+
+# 绘制误差曲线（左图）
 for i in range(3):
-    axes.plot(em[i, :], markers[i], label=error_names[i])
-axes.set_xlabel('Refinement Level')
-axes.set_ylabel('Error')
-axes.set_xticks(bm.arange(maxit))  # 设置 x 轴刻度
-axes.legend()  # 显示图例
-plt.grid(True)  # 显示网格
-plt.title('Error Convergence')
+    ax1.plot(em[i, :], markers[i], label=error_names[i], linewidth=4) 
+ax1.set_xlabel('Refinement Level', fontsize=24) 
+ax1.legend(fontsize=20)  
+ax1.grid(True)
+ax1.set_title(' Error ', fontsize=28)  
+
+# 绘制误差比的曲线（右图）
+for i in range(3):
+    ax2.plot(em_ratio[i, :], markers[i], label=f'{error_names[i]} ratio', linewidth=4)
+ax2.axhline(y=4, color='r', linestyle='-', label='y=4 (expected ratio)', linewidth=4)
+ax2.set_xlabel('Refinement Level', fontsize=24)
+ax2.legend(fontsize=20)  
+ax2.grid(True)
+ax2.set_title('Error Ratio', fontsize=28)
+
 plt.show()

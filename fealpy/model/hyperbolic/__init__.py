@@ -1,7 +1,7 @@
 from typing import Protocol, Sequence, TypeVar
 from ...backend import TensorLike
 
-class ParabolicPDEDataProtocol(Protocol):
+class HyperbolicPDEDataProtocol(Protocol):
     def geo_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
     def duration(self) -> Sequence[float]: ...
@@ -12,14 +12,11 @@ class ParabolicPDEDataProtocol(Protocol):
     def dirichlet(self, p: TensorLike, t:float) -> TensorLike: ...
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike: ...
 
-ParabolicPDEDataT = TypeVar('ParabolicPDEDataT', bound=ParabolicPDEDataProtocol)
+PDEDataT = TypeVar('HyperbolicPDEDataT', bound=HyperbolicPDEDataProtocol)
 
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "sinexp": ("sin_exp_data_1d", "SinExpData1D"),
-    "sinsinexp": ("sin_sin_exp_data_2d", "SinSinExpData2D"),
-
+    "piecewise": ("piecewise_data_1d", "PiecewiseData1d"),
+    "sinsincos": ("sin_sin_cos_data_2d", "SinSinCosData2d"),
 }
-
-

@@ -47,3 +47,19 @@ class SinData1D:
     def dirichlet(self, p: TensorLike) -> TensorLike:
         return self.solution(p)
 
+    def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """
+        Check if a point is on the Dirichlet boundary (x = 0 or x =1)
+        Args:
+            p (TensorLike): Input points, shape (n_points, ).
+        
+        Returns:
+            TensorLike: Boolean tensor indicating whether each point is on the boundary.
+        """
+        x = p
+        atol = 1e-12  # 绝对误差容限
+    
+        # 检查是否接近 x=±1 或 y=±1
+        on_boundary = ((bm.abs(x - 1.) < atol) | (bm.abs(x) < atol) )
+        return on_boundary 
+

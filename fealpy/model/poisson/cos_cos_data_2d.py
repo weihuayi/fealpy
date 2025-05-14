@@ -49,3 +49,24 @@ class CosCosData2D():
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
         return self.solution(p)
+    
+    def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """
+        Check if a point is on the Dirichlet boundary (x = ±1 or y = ±1).
+        
+        Args:
+            p (TensorLike): Input points, shape (n_points, 2).
+        
+        Returns:
+            TensorLike: Boolean tensor indicating whether each point is on the boundary.
+        """
+        x, y = p[..., 0], p[..., 1]
+        atol = 1e-12  # 绝对误差容限
+    
+        # 检查是否接近 x=±1 或 y=±1
+        on_boundary = (
+            (bm.abs(x - 1.) < atol) | (bm.abs(x + 1.) < atol) |
+            (bm.abs(y - 1.) < atol) | (bm.abs(y + 1.) < atol)
+        )
+        return on_boundary 
+

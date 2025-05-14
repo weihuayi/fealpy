@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
 
-from fealpy.model.poisson import get_example
+from fealpy.model import PDEDataManager
 
 from fealpy.mesh import UniformMesh
 from fealpy.fdm import LaplaceOperator
@@ -9,8 +9,8 @@ from fealpy.fdm import DirichletBC
 from fealpy.solver import spsolve
 import matplotlib.pyplot as plt
 
-
-pde = get_example('sin') # 获取 PDE 模型
+pde = PDEDataManager('poisson').get_example('sin')
+# print(pde.__doc__)
 domain = pde.domain()
 
 extent = [0, 10]
@@ -40,13 +40,16 @@ for i in range(maxit):
 em_ratio = em[:, 0:-1] / em[:, 1:]
 print("误差: ", em, "误差比: ",em_ratio,sep='\n')
 
+fig = plt.figure(1)
+axes = fig.add_subplot()
+mesh.show_function(axes, uh)
+plt.title(f"The numerical solution of the final mesh refinement")
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))  
-
-# 绘制误差曲线（左图）
 error_names = ['max', 'L2', 'H1']
 markers = ['o-', 's--', '^:']
 
+# 绘制误差曲线（左图）
 for i in range(3):
     ax1.plot(em[i, :], markers[i], label=error_names[i], linewidth=4) 
 ax1.set_xlabel('Refinement Level', fontsize=24) 
