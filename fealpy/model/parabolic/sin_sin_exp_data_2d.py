@@ -6,11 +6,11 @@ class SinSinExpData2D:
     """
     2D parabolic problem:
 
-        ∂u/∂t - k·(∂²u/∂x² + ∂²u/∂y²) = f  for (x, y) in (0, 1) × (0, 1), t > 0
+        ∂u/∂t - k·(∂²u/∂x² + ∂²u/∂y²) = f   (x, y) ∈ (0, 1) x (0, 1), t > 0
 
-        u(x, 0, t) = u(x, 1, t) = 0,       for x in (0, 1), t > 0
-        u(0, y, t) = u(1, y, t) = 0,       for y in (0, 1), t > 0
-        u(x, y, 0) = sin(4πx)·sin(4πy),    for (x, y) in (0, 1) × (0, 1)
+        u(x, 0, t) = u(x, 1, t) = 0,         x ∈ (0, 1), t > 0
+        u(0, y, t) = u(1, y, t) = 0,         y ∈ (0, 1), t > 0
+        u(x, y, 0) = sin(4πx)·sin(4πy),     (x, y) ∈ (0, 1) x (0, 1)
 
     Exact solution:
 

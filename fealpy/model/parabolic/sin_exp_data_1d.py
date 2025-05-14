@@ -6,9 +6,9 @@ class SinExpData1D:
     """
     1D parabolic problem:
 
-        ∂u/∂t - ∂²u/∂x² = f,   for x in (0, 1), t > 0
-        u(0, t) = u(1, t) = 0, for t > 0
-        u(x, 0) = sin(4πx),    for x in (0, 1)
+        ∂u/∂t - ∂²u/∂x² = f,     x ∈ (0, 1), t > 0
+        u(0, t) = u(1, t) = 0,   t > 0
+        u(x, 0) = sin(4πx),      x ∈ (0, 1)
 
     Exact solution:
 

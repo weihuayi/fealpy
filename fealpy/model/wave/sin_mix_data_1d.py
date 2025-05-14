@@ -6,10 +6,10 @@ class SinMixData1D:
     """
     1D wave equation problem:
 
-        ∂²u/∂t² - ∂²u/∂x² = 0,                     for x in (0, 1), t > 0
-        u(0, t) = u(1, t) = 0,                     for t > 0
-        u(x, 0) = sin(4πx),                        for x in (0, 1)
-        ∂u/∂t(x, 0) = sin(8πx),                    for x in (0, 1)
+        ∂²u/∂t² - ∂²u/∂x² = 0,    x ∈ (0, 1), t > 0
+        u(0, t) = u(1, t) = 0,    t > 0
+        u(x, 0) = sin(4πx),       x ∈ (0, 1)
+        ∂u/∂t(x, 0) = sin(8πx),   x ∈ (0, 1)
 
     Exact solution:
 

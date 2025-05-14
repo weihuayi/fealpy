@@ -6,10 +6,10 @@ class SinCosData2D:
     """
     2D wave equation problem:
 
-        ∂²u/∂t² - Δu(x, y) = 0,       for (x, y) in (0, 1) × (0, 1), t in (0, 1.4)
+        ∂²u/∂t² - Δu(x, y) = 0,      (x, y) ∈ (0, 1) x (0, 1), t on (0, 1.4)
         u(x, y, 0) = sin(πx)·sin(πy), initial solution 
         ∂u/∂t(x, y, 0) = 0,           initial velocity
-        u = 0,                                        on all four edges
+        u = 0,                        on all four edges
 
     Exact solution:
 

@@ -27,23 +27,39 @@ class SinData1D:
         return [0.0, 1.0]
 
     def solution(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         pi = bm.pi
         val = bm.sin(pi * x)
         return val
 
     def gradient(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         pi = bm.pi
         val = pi * bm.cos(pi * x)
         return val
 
     def source(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         pi = bm.pi
         val = pi**2 * bm.sin(pi * x)
         return val
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
         return self.solution(p)
+
+    def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """
+        Check if a point is on the Dirichlet boundary (x = 0 or x =1)
+        Args:
+            p (TensorLike): Input points, shape (n_points, ).
+        
+        Returns:
+            TensorLike: Boolean tensor indicating whether each point is on the boundary.
+        """
+        x = p
+        atol = 1e-12  # 绝对误差容限
+    
+        # 检查是否接近 x=±1 或 y=±1
+        on_boundary = ((bm.abs(x - 1.) < atol) | (bm.abs(x) < atol) )
+        return on_boundary 
 

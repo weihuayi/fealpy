@@ -1,8 +1,5 @@
 from typing import Protocol, Sequence, TypeVar
-
 from ...backend import TensorLike
-from ...mesh.mesh_base import Mesh
-from ..utils import example_import_util
 
 
 class WavePDEDataProtocol(Protocol):
@@ -22,10 +19,7 @@ WavePDEDataT = TypeVar('WavePDEDataT', bound=WavePDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    # "coscos": ("coscosdata", "CosCosData"),
+    "sincos": ("sin_cos_data_2d", "SinCosData2D"),
+    "sinmix": ("sin_mix_data_1d", "SinMixData1D")
 
 }
-
-
-def get_example(key: str) -> WavePDEDataProtocol:
-    return example_import_util("wave", key, DATA_TABLE)
