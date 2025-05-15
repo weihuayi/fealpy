@@ -31,17 +31,17 @@ class PDEDataManager:
             Instantiate and return a PDE model based on its example key.
 
     Examples
-        >>> DataModelManager.show_types()
-        >>> manager = DataModelManager('poisson')
+        >>> PDEDataManager.show_types()
+        >>> manager = PDEDataManager('poisson')
         >>> manager.show_examples()
         >>> pde = manager.get_example('coscos')
     """
 
     _registry = {
         "poisson": "fealpy.model.poisson",
+        "elliptic": "fealpy.model.elliptic",
         "parabolic": "fealpy.model.parabolic",
         "wave": "fealpy.model.wave",
-        "elliptic": "fealpy.model.elliptic",
         "hyperbolic":"fealpy.model.hyperbolic"
     }
 
@@ -79,7 +79,7 @@ class PDEDataManager:
             None
 
         Examples
-            >>> DataModelManager.show_types()
+            >>> PDEDataManager.show_types()
         """
         print("Available PDE types:")
         for key in cls._registry:
@@ -97,7 +97,7 @@ class PDEDataManager:
             None
 
         Examples
-            >>> manager = DataModelManager("poisson")
+            >>> manager = PDEDataManager("poisson")
             >>> manager.show_examples()
         """
         if not self.pde_type or not self.data_table:
@@ -106,7 +106,7 @@ class PDEDataManager:
         print("\n examples name: (file_name, class_name)")
         for key, (file_name, class_name) in self.data_table.items():
             print(f" - {key}: ({file_name}, {class_name})")
-        print(f"\nExample usage:\n   pde = DataModelManager('{self.pde_type}').get_example('example name')")
+        print(f"\nExample usage:\n   pde = PDEDataManager('{self.pde_type}').get_example('example name')")
 
     def get_example(self, key: str = None):
         """
@@ -121,7 +121,7 @@ class PDEDataManager:
                 An instance of the selected PDE model class.
 
         Examples
-            >>> pde = DataModelManager("poisson").get_example("coscos")
+            >>> pde = PDEDataManager("poisson").get_example("coscos")
         """
         if not self.pde_type or not self.data_table:
             raise RuntimeError("PDE type not set. Please initialize with a valid pde_type.")
@@ -130,7 +130,7 @@ class PDEDataManager:
             raise ValueError(
                 f"[Error] No model name provided.\n"
                 f"Please pass a valid example key, like:\n"
-                f"    DataModelManager('{self.pde_type}').get_example('coscos')\n"
+                f"    PDEDataManager('{self.pde_type}').get_example('coscos')\n"
                 f"Use .show_examples() to see all available models."
             )
 

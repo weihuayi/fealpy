@@ -33,19 +33,19 @@ class SinExpData1D:
         Initial condition at t = 0:
             u(x, 0) = sin(4πx)
         """
-        x = p
+        x = p[..., 0]
         return bm.sin(4 * bm.pi * x)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
-        x = p
+        x = p[..., 0]
         return bm.sin(4 * bm.pi * x) * bm.exp(-10 * t)
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
-        x = p
+        x = p[..., 0]
         return 4 * bm.pi * bm.cos(4 * bm.pi * x) * bm.exp(-10 * t)
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
-        x = p
+        x = p[..., 0]
         term1 = -10 * bm.exp(-10 * t) * bm.sin(4 * bm.pi * x)
         term2 = 16 * bm.pi ** 2 * bm.exp(-10 * t) * bm.sin(4 * bm.pi * x)
         return term1 + term2
@@ -54,5 +54,6 @@ class SinExpData1D:
         return self.solution(p, t)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        return (bm.abs(p - 0.0) < 1e-12) | (bm.abs(p - 1.0) < 1e-12)
+        x = p[..., 0]
+        return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 1.0) < 1e-12)
 

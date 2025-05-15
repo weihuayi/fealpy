@@ -29,32 +29,35 @@ class SinMixData1D:
         return [0.0, 1.0]  # Time domain: [t0, t1]
 
     def init_solution(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         return bm.sin(4 * bm.pi * x)
 
     def init_solution_t(self, p: TensorLike) -> TensorLike:
-        x = p
+        x = p[..., 0]
         return bm.sin(8 * bm.pi * x)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
-        x = p
+        x = p[..., 0]
         term1 = bm.cos(4 * bm.pi * t) * bm.sin(4 * bm.pi * x)
         term2 = (1 / (8 * bm.pi)) * bm.sin(8 * bm.pi * t) * bm.sin(8 * bm.pi * x)
         return term1 + term2
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
-        x = p
+        x = p[..., 0]
         term1 = bm.cos(4 * bm.pi * t) * 4 * bm.pi * bm.cos(4 * bm.pi * x)
         term2 = (1 / (8 * bm.pi)) * bm.sin(8 * bm.pi * t) * 8 * bm.pi * bm.cos(8 * bm.pi * x)
         return term1 + term2  # du/dx
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
         # Homogeneous wave equation: source term is zero
-        return bm.zeros_like(p)
+        x = p[..., 0]
+        return bm.zeros_like(x)
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
-        return bm.zeros_like(p)
+        x = p[..., 0]
+        return bm.zeros_like(x)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        return (bm.abs(p - 0.0) < 1e-12) | (bm.abs(p - 1.0) < 1e-12)
+        x = p[..., 0]
+        return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 1.0) < 1e-12)
 

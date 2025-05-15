@@ -1,5 +1,4 @@
 from typing import Sequence
-from fealpy.decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
@@ -27,24 +26,26 @@ class PiecewiseData1d:
     def duration(self) -> Sequence[float]:
         return [0.0, 4.0]
 
-    @cartesian
     def init_solution(self, p: TensorLike) -> TensorLike:
-        return bm.abs(p - 1)
+        x = p[..., 0]
+        return bm.abs(x - 1)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
-        val = bm.zeros_like(p)
-        flag1 = p <= t
-        flag2 = p > t + 1
+        x = p[..., 0]
+        val = bm.zeros_like(x)
+        flag1 = x <= t
+        flag2 = x > t + 1
         flag3 = ~flag1 & ~flag2
         val[flag1] = 1
-        val[flag3] = 1 - p[flag3] + t
-        val[flag2] = p[flag2] - t - 1
+        val[flag3] = 1 - x[flag3] + t
+        val[flag2] = x[flag2] - t - 1
         return val
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
-        grad = bm.zeros_like(p)
-        flag1 = p <= t
-        flag2 = p > t + 1
+        x = p[..., 0]
+        grad = bm.zeros_like(x)
+        flag1 = x <= t
+        flag2 = x > t + 1
         flag3 = ~flag1 & ~flag2
         grad[flag1] = 0
         grad[flag3] = -1
@@ -52,13 +53,16 @@ class PiecewiseData1d:
         return grad
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
-        return bm.zeros_like(p)
+        x = p[..., 0]
+        return bm.zeros_like(x)
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
-        return bm.ones_like(p)
+        x = p[..., 0]
+        return bm.ones_like(x)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        return (bm.abs(p - 0.0) < 1e-12) | (bm.abs(p - 2.0) < 1e-12)
+        x = p[..., 0]
+        return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 2.0) < 1e-12)
     
     def a(self) -> float:
         """
