@@ -11,7 +11,7 @@ from .operator_base import OpteratorBase, assemblymethod
 
 class LaplaceOperator(OpteratorBase):
     """
-    LaplaceOperator constructs and assembles the discrete Laplace operator
+    LaplaceOperator constructs and assembles the discrete minus Laplace operator
     on a structured mesh for finite difference approximation.
     """
     def __init__(self, mesh: UniformMesh, method: Optional[str]=None):
@@ -50,9 +50,8 @@ class LaplaceOperator(OpteratorBase):
 
         # Create diagonal entries with sum of c over dimensions times 2
         diag_value = bm.full(NN, 2 * c.sum(), dtype=ftype)
-        I = K.flat  # Row indices for diagonal entries
-        J = K.flat  # Column indices for diagonal entries
-        A = csr_matrix((diag_value, (I, J)), shape=(NN, NN))
+        I = K.ravel()  # Row indices for diagonal entries
+        A = csr_matrix((diag_value, (I, I)), shape=(NN, NN))
 
         # Slices tuple for indexing all dimensions
         full_slice = (slice(None),) * GD
@@ -69,8 +68,8 @@ class LaplaceOperator(OpteratorBase):
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
             # Row indices for off-diagonal
-            I = K[s1].flat
-            J = K[s2].flat
+            I = K[s1].ravel()
+            J = K[s2].ravel()
             # Add entries for coupling in both directions
             A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
             A += csr_matrix((off_value, (J, I)), shape=(NN, NN))

@@ -1,6 +1,5 @@
 import math
-
-from typing import Optional
+from typing import Optional, Callable
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
@@ -9,63 +8,157 @@ from ..mesh import UniformMesh
 
 from .operator_base import OpteratorBase, assemblymethod
 
+
 class ConvectionOperator(OpteratorBase):
     """
+    Discrete approximation of the first-order differential operator:
+
+        b(x) · ∇u(x)
+
+    on structured (uniform Cartesian) meshes using finite difference methods.
+
+    This operator appears in many classes of PDEs, including but not limited to:
+        - pure transport (hyperbolic) equations
+        - convection-diffusion-reaction problems
+        - advection-dominated elliptic equations
+        - adjoint equations in PDE-constrained optimization
+
+    -------------------------------------------------------------------------------
+    Method extensibility:
+        Different finite difference schemes are supported via the `assemblymethod`
+        decorator mechanism. Users may switch between schemes by specifying the
+        `method` parameter in the constructor.
+
+    -------------------------------------------------------------------------------
+    Naming convention for registered methods:
+
+        <scheme>_<velocity>_<order>
+
+    where:
+        - <scheme>   ∈ {'upwind', 'central', 'nonupwind', ...}
+        - <velocity> ∈ {'const', 'func'}
+              'const' → constant vector field b
+              'func'  → general spatially-varying vector field b(x)
+        - <order>    ∈ {'1', '2', '3', ...} indicating formal order of accuracy
+
+    Examples:
+        - 'upwind_const_1'   : first-order upwind, constant velocity
+        - 'central_func_2'   : second-order central, function-valued b(x)
+        - 'nonupwind_func_3' : third-order non-upwind scheme, function-valued b(x)
+
+    Default method is 'upwind_const_1' if not specified.
+
+    -------------------------------------------------------------------------------
+    Attributes:
+        mesh            : UniformMesh object
+        convection_coef : Callable returning velocity b (constant or function-valued)
     """
-    def __init__(self, mesh: UniformMesh, 
-                 convection_coef,
-                 method: Optional[str]=None):
-        method = 'assembly' if (method is None) else method
+
+    def __init__(self,
+                 mesh: UniformMesh,
+                 convection_coef: Callable[[TensorLike], TensorLike],
+                 method: Optional[str] = None):
+        """
+        Initialize the convection operator.
+
+        Parameters:
+            mesh           : The structured mesh over which the operator is defined.
+            convection_coef: Function taking spatial coordinates and returning velocity vector b.
+                             If velocity is constant, this can return a constant tensor of shape (GD,)
+            method         : Optional string key identifying which discretization scheme to use.
+                             If not provided, defaults to 'assembly', which is bound to first-order upwind.
+        """
+        method = 'assembly' if method is None else method
         super().__init__(method=method)
 
-        self.mesh = mesh  # Store the mesh for later assembly
+        self.mesh = mesh
         self.convection_coef = convection_coef
 
     def assembly(self) -> SparseTensor:
         """
+        Assemble the convection matrix using first‐order upwind differences
+        for constant velocity vector b (scheme: 'upwind_const_1').
+
+        This is the default implementation if no method is specified.
+
+        Returns:
+            SparseTensor: the discrete convection operator matrix.
         """
         mesh = self.mesh
-        ftype = mesh.ftype  # Floating point data type for matrix entries
-        itype = mesh.itype  # Integer data type for indexing (not used directly)
-        device = mesh.device  # Device context (e.g., CPU, GPU)
-        GD = mesh.geo_dimension()  # Geometric dimension of the mesh
+        GD = mesh.geo_dimension()
+        node = mesh.entity('node')
+        context = bm.context(node)
+        b = self.convection_coef(node)            # shape == (GD,), constant vector
+        h = mesh.h                                # uniform spacing in each dimension
+        NN = mesh.number_of_nodes()
+        K = mesh.linear_index_map('node')         # multi-index map
+        shape = K.shape
+        full = (slice(None),) * GD                # full slicing tuple
 
-        node = self.mesh.entity('node')
-        b = self.convection_coef(node) # shape == (GD, )
+        c = bm.abs(b / h)                         # component-wise |b_i|/h_i
+        diag = bm.full(NN, bm.sum(c), **context)  # diagonal term: sum_i |b_i|/h_i
+        A = spdiags(diag, 0, NN, NN, format='csr')
 
-        # spacing of the mesh in each dimension
-        h = mesh.h
-        c = b / h / 2.0 
-
-        NN = mesh.number_of_nodes()  # Total number of grid nodes
-        K = mesh.linear_index_map('node')  # Multi-dimensional to linear index map
-        shape = K.shape  # Shape of the index map array
-
-        # Slices tuple for indexing all dimensions
-        full_slice = (slice(None),) * GD
-
-        val = bm.zeros(NN, dtype=ftype)
-        A = spdiags(val, 0, NN, NN, format='csr') 
-        
-        # Off-diagonal contributions for each dimension
         for i in range(GD):
-            # Number of nodes shifted along dimension i
-            n_shift = math.prod(
-                count for dim_idx, count in enumerate(shape) if dim_idx != i
-            )
-            # Off-diagonal value for neighbor entries
-            off_value = bm.full(NN - n_shift, c[i], dtype=ftype)
-            # Create slice objects to select neighbor index arrays
-            s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
-            s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
-            # Row indices for off-diagonal
-            I = K[s1].flat
-            J = K[s2].flat
-            # Add entries for coupling in both directions
-            A += csr_matrix((-off_value, (I, J)), shape=(NN, NN))
-            A += csr_matrix(( off_value, (J, I)), shape=(NN, NN))
+            n_shift = math.prod(cnt for idx, cnt in enumerate(shape) if idx != i)
+            off = bm.full(NN - n_shift, -c[i], **context)
+
+            s1 = full[:i] + (slice(1, None),) + full[i+1:]
+            s2 = full[:i] + (slice(None, -1),) + full[i+1:]
+            I = K[s1].ravel()
+            J = K[s2].ravel()
+
+            if b[i] > 0:
+                A += csr_matrix((off, (I, J)), shape=(NN, NN))  # backward difference
+            else:
+                A += csr_matrix((off, (J, I)), shape=(NN, NN))  # forward difference
+
         return A
 
-    @assemblymethod('wind')
-    def assembly_const_wind(self) -> SparseTensor:
-        pass
+    @assemblymethod('central_const_2')
+    def assembly_central_const(self) -> SparseTensor:
+        """
+        Assemble the convection matrix using second-order central differences
+        for constant velocity vector b (scheme: 'central_const_2').
+
+        Stencil: (u_{j+1} - u_{j-1}) / (2 h)
+
+        Returns:
+            SparseTensor: the discrete convection operator matrix.
+        """
+        mesh = self.mesh
+        context = {'dtype': mesh.ftype, 'device': mesh.device}
+        GD = mesh.geo_dimension()
+        NN = mesh.number_of_nodes()
+        K = mesh.linear_index_map('node')
+        shape = K.shape
+        full = (slice(None),) * GD
+
+        if callable(self.convection_coef):
+            b = self.convection_coef()
+        else:
+            b = self.convection_coef
+
+        if bm.ndim(b) != 1 or b.shape[0] != GD:
+            raise ValueError(
+                f"Expected constant vector of shape ({GD},), "
+                f"but got {b.shape}. Ensure you pass a constant vector or zero-arg function."
+            ) 
+
+        c = b / mesh.h / 2.0                            # central difference coefficient
+
+        A = csr_matrix((NN, NN), **context)
+        for i in range(GD):
+            n_shift = math.prod(cnt for idx, cnt in enumerate(shape) if idx != i)
+            off = bm.full(NN - n_shift, c[i], **context)
+
+            s1 = full[:i] + (slice(1, None),) + full[i+1:]   # 1:
+            s0 = full[:i] + (slice(None, -1),) + full[i+1:]  # 0:-1
+            I = K[s1].ravel()
+            J = K[s0].ravel()
+
+            A += csr_matrix((-off, (I, J)), shape=(NN, NN))
+            A += csr_matrix(( off, (J, I)), shape=(NN, NN))
+
+        return A
+
