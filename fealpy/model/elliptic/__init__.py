@@ -2,14 +2,12 @@ from typing import Protocol, Sequence, TypeVar
 
 from ...backend import TensorLike
 from ...mesh.mesh_base import Mesh
-from ..utils import example_import_util
-
 
 class EllipticPDEDataProtocol(Protocol):
-    description : str
     def geo_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
     def diffusion_coef(self, p: TensorLike) -> TensorLike: ...
+    def diffusion_coef_inv(self, p: TensorLike) -> TensorLike: ...
     def advection_coef(self, p: TensorLike) -> TensorLike: ...
     def reaction_coef(self, p: TensorLike) -> TensorLike: ...
     def solution(self, p: TensorLike) -> TensorLike: ...
@@ -28,10 +26,6 @@ EllipticPDEDataT = TypeVar('EllipticPDEDataT', bound=EllipticPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "coscos": ("coscosdata", "CosCosData"),
-    "sinsin": ("sinsindata", "SinSinData"),
+    "coscos": ("cos_cos_data_2d", "CosCosData2D"),
+    "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
 }
-
-
-def get_example(key: str) -> EllipticPDEDataProtocol:
-    return example_import_util("elliptic", key, DATA_TABLE)

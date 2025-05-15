@@ -1,4 +1,3 @@
-
 from typing import Callable, Dict, Literal, Sequence
 
 from ...backend import TensorLike 
@@ -7,9 +6,8 @@ from ...backend import backend_manager as bm
 from ..boundary_condition import BoundaryCondition, bc_mask, bc_value
 
 
-class CosCosData():
-    description = ""
 
+class SinSinData2D():
     def __init__(self, bcs: Sequence[BoundaryCondition]=None):
         if bcs is None:
             bcs = [
@@ -33,49 +31,58 @@ class CosCosData():
         return [0., 1., 0., 1.]
 
     def diffusion_coef(self, p: TensorLike) -> TensorLike:
-        val = bm.array([[10.0, 1.0], [1.0, 10.0]])
-        shape = p.shape[:-1] + val.shape
-        return bm.broadcast_to(val, shape)
-
-    def diffusion_coef_inv(self, p: TensorLike) -> TensorLike:
-        val = bm.array([[0.1, -0.01], [-0.01, 0.1]])
+        """
+        Diffusion coefficient
+        """
+        val = bm.array([[1.0, 0.0], [0.0, 1.0]], **bm.context(p))
         shape = p.shape[:-1] + val.shape
         return bm.broadcast_to(val, shape)
 
     def reaction_coef(self, p: TensorLike) -> TensorLike:
-        val = bm.array([2.0])
+        """
+        Reaction coefficient
+        """
+        val = bm.array([1.0], **bm.cotext(p))
         shape = p.shape[:-1] + val.shape
         return bm.broadcast_to(val, shape)
 
-
     def solution(self, p: TensorLike) -> TensorLike:
+        """
+        Analytical solution
+        """
         x = p[..., 0]
         y = p[..., 1]
         pi = bm.pi
-        val = bm.cos(2*pi*x)*bm.cos(2*pi*y)
+        val = bm.sin(pi*x)*bm.sin(pi*y)
         return val # val.shape == x.shape
 
     def gradient(self, p: TensorLike) -> TensorLike:
+        """
+        Gradient of the solution
+        """
         x = p[..., 0]
         y = p[..., 1]
         pi = bm.pi
         val = bm.stack((
-            -2*pi*bm.sin(2*pi*x)*bm.cos(2*pi*y),
-            -2*pi*bm.cos(2*pi*x)*bm.sin(2*pi*y)), axis=-1)
+            pi*bm.cos(pi*x)*bm.sin(pi*y),
+            pi*bm.sin(pi*x)*bm.cos(pi*y)), axis=-1)
         return val # val.shape == p.shape
 
     def flux(self, p: TensorLike) -> TensorLike:
+        """
+        Flux of the solution
+        """
         grad = self.gradient(p)
         val = self.diffusion_coef(p) 
         val = bm.einsum('...ij, ...j->...i', val, -grad)
         return val
 
     def source(self, p: TensorLike) -> TensorLike:
-        x = p[..., 0]
-        y = p[..., 1]
+        """
+        Source term
+        """
         pi = bm.pi
-        val = -8*pi**2*sin(2*pi*x)*sin(2*pi*y) - 2*pi*sin(2*pi*x)*cos(2*pi*y) \
-                - 1.0*pi*sin(2*pi*y)*cos(2*pi*x) + (80*pi**2+2)*cos(2*pi*x)*cos(2*pi*y)
+        val = (2*pi**2 + 1.0)*self.solution(p)
         return val
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
