@@ -1,98 +1,94 @@
-from typing import Callable, Dict, Literal, Sequence
-
-from ...backend import TensorLike 
+from typing import Optional, Sequence
+from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
-from ..boundary_condition import BoundaryCondition, bc_mask, bc_value
+class SinSinData2D:
+    """
+    2D Elliptic equation with constant diagonal diffusion, advection, and reaction:
 
+        -∇·(A ∇u(x, y)) + b·∇u(x, y) + c u(x, y) = f(x, y),  (x, y) ∈ (0, 1) x (0, 1)
+                                  u(x, y) = g(x, y),          on ∂Ω
 
+    Exact solution:
+        u(x, y) = sin(πx) * sin(πy)
 
-class SinSinData2D():
-    def __init__(self, bcs: Sequence[BoundaryCondition]=None):
-        if bcs is None:
-            bcs = [
-                    BoundaryCondition(
-                        mask_fn = lambda p: bm.logical_or(
-                            bm.abs(p[:, 0] - 0.0) < 1e-12,
-                            bm.abs(p[:, 0] - 1.0) < 1e-12,
-                            bm.abs(p[:, 1] - 0.0) < 1e-12,
-                            bm.abs(p[:, 1] - 1.0) < 1e-12,
-                        ),
-                        kind = 'dirichlet',
-                        value_fn = self.solution
-                        )
-                    ]
-        self.bcs = bcs
+    Coefficients:
+        A = [[2, 0], [0, 3]]  (diagonal diffusion matrix)
+        b = [1, -1]           (constant advection vector)
+        c = 4                 (constant reaction coefficient)
+        f(x, y) = (5π² + 4)sin(πx)sin(πy) + πcos(πx)sin(πy) - πsin(πx)cos(πy)
+        g(x, y) = 0           (Dirichlet boundary condition)
+    """
 
     def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
         return 2
 
-    def domain(self):
-        return [0., 1., 0., 1.]
+    def domain(self) -> Sequence[float]:
+        """Return the computational domain [xmin, xmax, ymin, ymax]."""
+        return [0.0, 1.0, 0.0, 1.0]
 
-    def diffusion_coef(self, p: TensorLike) -> TensorLike:
-        """
-        Diffusion coefficient
-        """
-        val = bm.array([[1.0, 0.0], [0.0, 1.0]], **bm.context(p))
-        shape = p.shape[:-1] + val.shape
-        return bm.broadcast_to(val, shape)
+    def diffusion_coef(self) -> TensorLike:
+        """Constant diagonal diffusion tensor (shape: (2, 2)."""
+        A = bm.array([[2.0, 0.0], [0.0, 3.0]])
+        return A 
 
-    def reaction_coef(self, p: TensorLike) -> TensorLike:
-        """
-        Reaction coefficient
-        """
-        val = bm.array([1.0], **bm.cotext(p))
-        shape = p.shape[:-1] + val.shape
-        return bm.broadcast_to(val, shape)
+    def diffusion_coef_inv(self, p: Optional[TensorLike] = None) -> TensorLike:
+        """Inverse of diffusion tensor (shape: (2, 2) ."""
+        A_inv = bm.array([[0.5, 0.0], [0.0, 1.0/3.0]])
+        return A_inv 
+
+    def convection_coef(self) -> TensorLike:
+        """Constant advection vector (shape: (2,))."""
+        b = bm.array([1.0, -1.0])
+        return b
+
+    def reaction_coef(self) -> TensorLike:
+        """Constant reaction coefficient."""
+        return 4.0
 
     def solution(self, p: TensorLike) -> TensorLike:
-        """
-        Analytical solution
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = bm.pi
-        val = bm.sin(pi*x)*bm.sin(pi*y)
-        return val # val.shape == x.shape
+        """Exact solution: u(x, y) = sin(πx) sin(πy)."""
+        x, y = p[..., 0], p[..., 1]
+        return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
     def gradient(self, p: TensorLike) -> TensorLike:
-        """
-        Gradient of the solution
-        """
-        x = p[..., 0]
-        y = p[..., 1]
+        """Gradient of exact solution (shape: (..., 2))."""
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
-        val = bm.stack((
-            pi*bm.cos(pi*x)*bm.sin(pi*y),
-            pi*bm.sin(pi*x)*bm.cos(pi*y)), axis=-1)
-        return val # val.shape == p.shape
+        return bm.stack([
+            pi * bm.cos(pi * x) * bm.sin(pi * y),  # ∂u/∂x
+            pi * bm.sin(pi * x) * bm.cos(pi * y)   # ∂u/∂y
+        ], axis=-1)
 
     def flux(self, p: TensorLike) -> TensorLike:
-        """
-        Flux of the solution
-        """
+        """Flux vector: -A ∇u (shape: (..., 2))."""
         grad = self.gradient(p)
-        val = self.diffusion_coef(p) 
-        val = bm.einsum('...ij, ...j->...i', val, -grad)
-        return val
+        A = self.diffusion_coef()
+        return -bm.einsum('...ij,...j->...i', A, grad)
 
     def source(self, p: TensorLike) -> TensorLike:
-        """
-        Source term
-        """
+        """Source term f(x, y) derived from PDE (shape: (...,1))."""
+        
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
-        val = (2*pi**2 + 1.0)*self.solution(p)
-        return val
+        sin = bm.sin
+        cos = bm.cos
+        term1 = (5*pi**2 + 4) * sin(pi*x) * sin(pi*y)
+        term2 = pi * cos(pi*x) * sin(pi*y)
+        term3 = -pi * sin(pi*x) * cos(pi*y)
+        return term1 + term2 + term3
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
-        return bc_value(p, self.bcs, 'dirichlet')
+        """Dirichlet boundary condition."""
+        return self.solution(p)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        return bc_mask(p, self.bcs, 'dirichlet')
+        """Check if point is on boundary."""
+        x, y = p[..., 0], p[..., 1]
+        atol = 1e-12
+        return (
+            (bm.abs(x) < atol) | (bm.abs(x - 1) < atol) |
+            (bm.abs(y) < atol) | (bm.abs(y - 1) < atol)
+        )
 
-    def neumann(self, p: TensorLike) -> TensorLike:
-        return bc_value(p, self.bcs, 'neumann')
-
-    def is_neumann_boundary(self, p: TensorLike) -> TensorLike:
-        return bc_mask(p, self.bcs, 'neumann')

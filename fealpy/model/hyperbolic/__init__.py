@@ -17,6 +17,6 @@ PDEDataT = TypeVar('HyperbolicPDEDataT', bound=HyperbolicPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "piecewise": ("piecewise_data_1d", "PiecewiseData1d"),
-    "sinsincos": ("sin_sin_cos_data_2d", "SinSinCosData2d"),
+    "piecewise": ("piecewise_data_1d", "PiecewiseData1D"),
+    "sinsincos": ("sin_sin_cos_data_2d", "SinSinCosData2D"),
 }

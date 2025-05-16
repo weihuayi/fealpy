@@ -2,7 +2,7 @@ from typing import Sequence
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
-class SinSinCosData2d:
+class SinSinCosData2D:
     """
     2D hyperbolic problem with sinusoidal solution:
 

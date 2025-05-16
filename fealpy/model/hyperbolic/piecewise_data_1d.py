@@ -2,7 +2,7 @@ from typing import Sequence
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
-class PiecewiseData1d:
+class PiecewiseData1D:
     """
     1D hyperbolic problem with piecewise linear solution:
 
