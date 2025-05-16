@@ -8,6 +8,7 @@ class DirichletBC():
     def __init__(self, mesh, gd, threshold=None):
         self.mesh = mesh
         self.gd = gd
+        self.bctype = 'Dirichlet'
         self.threshold = threshold
 
     def apply(self, A, f, uh=None):
@@ -27,3 +28,12 @@ class DirichletBC():
         D1 = spdiags(bdFlag, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
         return A, f
+
+    def apply_solution(self, uh):
+        """
+        Apply the Dirichlet boundary condition to the solution vector.
+        """
+        node = self.mesh.entity('node')
+        bdFlag = self.mesh.boundary_node_flag()
+        uh = bm.set_at(uh, bdFlag, self.gd(node[bdFlag]))
+        return uh
