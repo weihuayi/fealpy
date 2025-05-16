@@ -4,6 +4,7 @@ from fealpy.mesh import TriangleMesh, TetrahedronMesh, IntervalMesh
 from collections import defaultdict
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import pickle
 
 bm.set_backend('pytorch')
 
@@ -424,6 +425,8 @@ if __name__ == '__main__':
     node[59, 2] = 5/6
     volume_mesh = TetrahedronMesh(node, cell)
     # volume_mesh.to_vtk(fname='volume_mesh.vtu')
+    # volume_mesh = pickle.load(open("optimized_mesh.pkl", "rb"))
+    # volume_mesh.to_vtk(fname='volume_mesh_origin.vtu')
 
     bd_mesh = get_bd_mesh(volume_mesh)
     # bd_mesh.to_vtk(fname='bd_mesh.vtu')
@@ -476,8 +479,9 @@ if __name__ == '__main__':
     # bd_mesh_smooth.to_vtk(fname='bd_mesh_smooth.vtu')
 
     processor.edge_projection()
-    # bd_mesh_project = processor.surface_mesh
-    # bd_mesh_project.to_vtk(fname='bd_mesh_project.vtu')
+    bd_mesh_project = processor.surface_mesh
+    bd_mesh_project.celldata['charts'] = bm.copy(processor.face2chart)
+    bd_mesh_project.to_vtk(fname='bd_mesh_project.vtu')
 
     turning_points = processor.detect_turning_points()
     print("turning points:", turning_points)

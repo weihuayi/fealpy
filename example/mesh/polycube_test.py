@@ -206,6 +206,7 @@ def update(origin_mesh:TetrahedronMesh, sigma=0.1, s=1, alpha=0.5):
     new_node = bm.zeros_like(origin_node, dtype=bm.float64, requires_grad=True)
     new_node.data = origin_node.data
     old_node = origin_node
+    # TODO: 旋转矩阵是否需要改成每个面独立，而不是当前的所有面统一旋转矩阵
     rotate_matrix = bm.eye(3, dtype=bm.float64, requires_grad=True)
 
     lr = 0.001  # 学习率
@@ -248,12 +249,14 @@ def update(origin_mesh:TetrahedronMesh, sigma=0.1, s=1, alpha=0.5):
 
         if (step==max_num_epochs-1) or (bm.linalg.norm(new_node - old_node) < error and (energy_ns > pre_energy)):
             print(face_normal)
-            print(bm.einsum('ij,nj->ni', rotate_matrix, face_normal))
+            t = bm.einsum('ij,nj->ni', rotate_matrix, face_normal)
+            print(t / bm.linalg.norm(t, axis=1).reshape(-1, 1))
             break
         else:
             pre_energy = energy_ns
 
     optimized_mesh = TetrahedronMesh(new_node, cell)
+    # pickle.dump(optimized_mesh, open("optimized_mesh.pkl", "wb"))
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     optimized_mesh.add_plot(ax)
