@@ -23,7 +23,12 @@ class SinSinCosData2D:
 
     def duration(self) -> Sequence[float]:
         return [0.0, 1.0]  # Typical time range for wave problems
-
+    
+    def convection_coef(self) -> TensorLike:
+        """
+        Wave speed
+        """
+        return bm.tensor([1.0, 1.0])  
 
     def init_solution(self, p: TensorLike) -> TensorLike:
         x, y = p[..., 0], p[..., 1]
@@ -56,8 +61,4 @@ class SinSinCosData2D:
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 2.0) < 1e-12) | \
                (bm.abs(y - 0.0) < 1e-12) | (bm.abs(y - 2.0) < 1e-12)
 
-    def a(self) -> float:
-        """
-        Wave speed parameter
-        """
-        return 1.0
+ 

@@ -6,7 +6,7 @@ class SinSinExpData2D:
     """
     2D parabolic problem:
 
-        ∂u/∂t - k·(∂²u/∂x² + ∂²u/∂y²) = f   (x, y) ∈ (0, 1) x (0, 1), t > 0
+        ∂u/∂t - (∂²u/∂x² + ∂²u/∂y²) = f   (x, y) ∈ (0, 1) x (0, 1), t > 0
 
         u(x, 0, t) = u(x, 1, t) = 0,         x ∈ (0, 1), t > 0
         u(0, y, t) = u(1, y, t) = 0,         y ∈ (0, 1), t > 0

@@ -45,7 +45,7 @@ class SinSinData2D:
 
     def reaction_coef(self) -> TensorLike:
         """Constant reaction coefficient."""
-        return 4.0
+        return bm.tensor([4.0])
 
     def solution(self, p: TensorLike) -> TensorLike:
         """Exact solution: u(x, y) = sin(πx) sin(πy)."""

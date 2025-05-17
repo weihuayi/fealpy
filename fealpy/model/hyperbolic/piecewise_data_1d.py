@@ -9,12 +9,12 @@ class PiecewiseData1D:
         ∂u/∂t + a·∂u/∂x = 0,     x ∈ (0, 2), t ∈ (0, 4)
         u(x, 0) = |x - 1|,        x ∈ (0, 2)
         u(0, t) = 1,              t ∈ (0, 4)
-
+        a = 1.0
     Exact solution is a piecewise linear function with three regions:
-        - u = 1 for x ≤ t
-        - u = 1 - x + t for t < x ≤ t+1
-        - u = x - t - 1 for x > t+1
-    This represents a wave propagating with speed a=1.
+        u = 1 for x ≤ t
+        u = 1 - x + t for t < x ≤ t+1
+        u = x - t - 1 for x > t+1
+    This represents a wave propagating with speed a = 1.0.
     """
 
     def geo_dimension(self) -> int:
@@ -26,6 +26,12 @@ class PiecewiseData1D:
     def duration(self) -> Sequence[float]:
         return [0.0, 4.0]
 
+    def convection_coef(self) -> TensorLike:
+        """
+        Wave speed
+        """
+        return bm.tensor([1.0])
+    
     def init_solution(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         return bm.abs(x - 1)
@@ -63,9 +69,4 @@ class PiecewiseData1D:
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 2.0) < 1e-12)
-    
-    def a(self) -> float:
-        """
-        Wave speed
-        """
-        return 1.0
+

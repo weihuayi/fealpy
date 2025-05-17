@@ -44,11 +44,11 @@ class CosCosData2D:
         val = bm.array([[0.1, 0.0], [0.0, 0.1]])  # Approximate inverse
         return val 
 
-    def reaction_coef(self) -> float:
+    def reaction_coef(self) -> TensorLike:
         """
         Return reaction coefficient c(x,y), constant in this case.
         """
-        return 2.0
+        return bm.tensor([2.0])
 
     def solution(self, p: TensorLike) -> TensorLike:
         """
