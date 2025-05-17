@@ -38,4 +38,5 @@ DATA_TABLE = {
     # example name: (file_name, class_name)
     "coscos": ("cos_cos_data_2d", "CosCosData2D"),
     "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
+    # "exp":("exp_data_2d", "ExpDate2D")
 }

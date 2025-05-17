@@ -1,7 +1,7 @@
-from typing import Callable, Dict, Literal, Sequence
+from typing import Sequence
 from ...backend import TensorLike 
 from ...backend import backend_manager as bm
-from ..boundary_condition import BoundaryCondition, bc_mask, bc_value
+
 
 class CosCosData2D:
     """
@@ -14,9 +14,8 @@ class CosCosData2D:
         u(x, y) = cos(2πx) * cos(2πy)
 
     where:
-        A(x, y) = [[10, 0], [0, 10]]  (diffusion tensor)
-        c(x, y) = 2                  (reaction coefficient)
-        f(x, y) = (80π² + 2) cos(2πx)cos(2πy)
+        A(x, y) = [[10, 1], [1, 10]]  (diffusion tensor)
+        f(x, y) = 80π²cos(2πx)cos(2πy)-8π²sin(2πx)sin(2πy)
     """
 
 
@@ -33,7 +32,7 @@ class CosCosData2D:
         Return diffusion tensor A(x, y), constant in this example.
         Shape: (..., 2, 2)
         """
-        val = bm.array([[10.0, 0.0], [0.0, 10.0]])
+        val = bm.array([[10.0, 1.0], [1.0, 10.0]])
         return val 
 
     def diffusion_coef_inv(self) -> TensorLike:
@@ -41,14 +40,9 @@ class CosCosData2D:
         Return inverse of diffusion tensor A(x, y), constant.
         Shape: (..., 2, 2)
         """
-        val = bm.array([[0.1, 0.0], [0.0, 0.1]])  # Approximate inverse
+        val = bm.array([[10, -1.0], [-1.0, 10]]) / 99.0  # Approximate inverse
         return val 
 
-    def reaction_coef(self) -> TensorLike:
-        """
-        Return reaction coefficient c(x,y), constant in this case.
-        """
-        return bm.tensor([2.0])
 
     def solution(self, p: TensorLike) -> TensorLike:
         """
@@ -78,20 +72,14 @@ class CosCosData2D:
         """
         grad = self.gradient(p)                  # (..., 2)
         A = self.diffusion_coef()               # (..., 2, 2)
-        return bm.einsum('...ij,...j->...i', A, -grad)
-
+        return -bm.einsum('...ij,...j->...i', A, -grad)
+    
     def source(self, p: TensorLike) -> TensorLike:
-        """
-        Return the source term f(x, y), computed from -div(A∇u) + c·u
-        Shape: (...,)
-        """
+        """Return the source term f(x, y)"""
         x, y = p[..., 0], p[..., 1]
-        pi = bm.pi
-        cos = bm.cos
-        sin = bm.sin
-        # Compute f(x, y) manually
-        val = (80*pi**2 + 2)*cos(2*pi*x)*cos(2*pi*y)
-        return val
+        term1 = 80 * (bm.pi**2) * bm.cos(2 * bm.pi * x) * bm.cos(2 * bm.pi * y)
+        term2 = -8 * (bm.pi**2) * bm.sin(2 * bm.pi * x) * bm.sin(2 * bm.pi * y)
+        return term1 + term2
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition."""
@@ -105,5 +93,4 @@ class CosCosData2D:
             (bm.abs(x) < atol) | (bm.abs(x - 1) < atol) |
             (bm.abs(y) < atol) | (bm.abs(y - 1) < atol)
         )
-
 

@@ -18,9 +18,11 @@ class PiecewiseData1D:
     """
 
     def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
         return 1
 
     def domain(self) -> Sequence[float]:
+        """Return the computational domain [xmin, xmax]."""
         return [0.0, 2.0]
 
     def duration(self) -> Sequence[float]:

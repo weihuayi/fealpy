@@ -16,10 +16,12 @@ class SinSinCosData2D:
     """
 
     def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
-        return [0.0, 2.0, 0.0, 2.0]  # [x_min, x_max, y_min, y_max]
+        """Return the computational domain [xmin, xmax, ymin, ymax]."""
+        return [0.0, 2.0, 0.0, 2.0]  
 
     def duration(self) -> Sequence[float]:
         return [0.0, 1.0]  # Typical time range for wave problems

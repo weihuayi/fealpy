@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from typing import Sequence
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
@@ -33,7 +33,7 @@ class SinSinData2D:
         A = bm.array([[2.0, 0.0], [0.0, 3.0]])
         return A 
 
-    def diffusion_coef_inv(self, p: Optional[TensorLike] = None) -> TensorLike:
+    def diffusion_coef_inv(self) -> TensorLike:
         """Inverse of diffusion tensor (shape: (2, 2) ."""
         A_inv = bm.array([[0.5, 0.0], [0.0, 1.0/3.0]])
         return A_inv 

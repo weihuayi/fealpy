@@ -23,10 +23,12 @@ class SinSinExpData2D:
     """
 
     def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
-        return [0.0, 1.0, 0.0, 1.0]  # [x0, x1, y0, y1]
+        """Return the computational domain [xmin, xmax, ymin, ymax]."""
+        return [0.0, 1.0, 0.0, 1.0]  
 
     def duration(self) -> Sequence[float]:
         return [0.0, 1.0]
