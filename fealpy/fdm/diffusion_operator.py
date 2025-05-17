@@ -52,11 +52,15 @@ class DiffusionOperator(OpteratorBase):
         
     def assembly(self) -> SparseTensor:
         """
-        Assemble the global sparse matrix representing the diffusion operator
-        using second‐order central differences.
+        Assemble the global sparse matrix for the diffusion operator with constant
+        coefficient tensor A, including both pure and mixed second‐derivative terms.
 
-        The discrete stencil in each dimension i contributes:
-            −(1/h_i^2) * [ u_{i+1} − 2 u_i + u_{i−1} ]
+        Pure terms: A_{ii} ∂²u/∂x_i² discretized by three‐point central differences:
+            −A_{ii} * (u_{i+1} − 2 u_i + u_{i−1}) / h_i²
+
+        Mixed terms: (A_{ij}+A_{ji}) ∂²u/(∂x_i∂x_j) discretized by four‐point central differences:
+            −(A_{ij}+A_{ji}) * [u_{i+1,j+1} − u_{i−1,j+1} − u_{i+1,j−1} + u_{i−1,j−1}]
+               / (4 h_i h_j)
 
         Returns:
             SparseTensor: CSR-format matrix of size (NN, NN), where NN is total nodes.
@@ -134,7 +138,7 @@ class DiffusionOperator(OpteratorBase):
                     I_im_jp = K[s_im_jp].ravel();  J_im_jp = K[s_c_im_jp].ravel()
                     I_ip_jm = K[s_ip_jm].ravel();  J_ip_jm = K[s_c_ip_jm].ravel()
                     I_im_jm = K[s_im_jm].ravel();  J_im_jm = K[s_c_im_jm].ravel()
-                    coeff = (D[i, j] + D[j, i])/(h[i]*h[j])
+                    coeff = (D[i, j] + D[j, i])/(4*h[i]*h[j])
                     A += csr_matrix(( +coeff*bm.ones_like(I_ip_jp), (J_ip_jp, I_ip_jp)), shape=(NN,NN))
                     A += csr_matrix(( -coeff*bm.ones_like(I_im_jp), (J_im_jp, I_im_jp)), shape=(NN,NN))
                     A += csr_matrix(( -coeff*bm.ones_like(I_ip_jm), (J_ip_jm, I_ip_jm)), shape=(NN,NN))
