@@ -1,5 +1,4 @@
-from typing import Protocol, Sequence, TypeVar, overload
-
+from typing import Protocol, Sequence, TypeVar, overload, Optional
 from ...backend import TensorLike
 from ...mesh.mesh_base import Mesh
 

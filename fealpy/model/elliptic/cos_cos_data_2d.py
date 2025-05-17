@@ -50,7 +50,7 @@ class CosCosData2D:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [0.0, 1.0, 0.0, 1.0]
 
-    def diffusion_coef(self, p: TensorLike) -> TensorLike:
+    def diffusion_coef(self) -> TensorLike:
         """
         Return diffusion tensor A(x, y), constant in this example.
         Shape: (..., 2, 2)
