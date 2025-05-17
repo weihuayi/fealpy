@@ -97,6 +97,7 @@ class PolyCubeProcessor:
         self.face_center = None
         self.face_normal = self.surface_mesh.cell_normal()
         self.labels = None        # 每个面的轴方向标签（0~5对应±X,±Y,±Z）
+        self.assign_initial_labels()
         self.charts = []          # 候选图册列表，每个图册包含的面索引
         self.charts_labels = None   # 图册标签，每个图册对应的标签
         self.face2chart = None    # 面到图册的映射
@@ -431,7 +432,6 @@ if __name__ == '__main__':
     bd_mesh = get_bd_mesh(volume_mesh)
     # bd_mesh.to_vtk(fname='bd_mesh.vtu')
     processor = PolyCubeProcessor(volume_mesh)
-    processor.assign_initial_labels()
     bd_mesh.celldata['initial_labels'] = bm.copy(processor.labels)
     processor.build_candidate_charts()
     bd_mesh.celldata['charts'] = bm.copy(processor.face2chart)

@@ -354,8 +354,12 @@ class MeshBallDeformation(MeshOptimizationBase):
 if __name__ == "__main__":
     origin_mesh = pickle.load(open("unit_sphere_mesh_torch.pkl", "rb"))
     weights = {"node": 1.0, "rotate_matrix": 0.0}
-    # deformer = MeshNormalSmoothDeformation(origin_mesh, sigma=0.1, s=1, alpha=0.5, max_epochs=100000, weights=weights)
-    deformer = MeshNormalAlignmentDeformation(origin_mesh, gamma=1e3, s=1, alpha=0.5, max_epochs=100000, weights=weights)
+    deformer = MeshNormalSmoothDeformation(origin_mesh,
+                                           sigma=0.1, s=1, alpha=0.5, max_epochs=100000,
+                                           error_threshold=1e-3, weights=weights)
+    # deformer = MeshNormalAlignmentDeformation(origin_mesh,
+    #                                           gamma=1e3, s=1, alpha=0.5, max_epochs=100000,
+    #                                           error_threshold=1e-3, weights=weights)
     optimized_mesh = deformer.optimize()
     deformer.plot_mesh(optimized_mesh, title="Optimized Mesh")
 # if __name__ == "__main__":
