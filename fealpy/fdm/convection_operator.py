@@ -8,7 +8,6 @@ from ..mesh import UniformMesh
 
 from .operator_base import OpteratorBase, assemblymethod
 
-
 class ConvectionOperator(OpteratorBase):
     """
     Discrete approximation of the first-order differential operator:
@@ -88,7 +87,10 @@ class ConvectionOperator(OpteratorBase):
         GD = mesh.geo_dimension()
         node = mesh.entity('node')
         context = bm.context(node)
-        b = self.convection_coef(node)            # shape == (GD,), constant vector
+        if callable(self.convection_coef):
+            b = self.convection_coef(node)
+        else:
+            b = self.convection_coef         # shape == (GD,), constant vector
         h = mesh.h                                # uniform spacing in each dimension
         NN = mesh.number_of_nodes()
         K = mesh.linear_index_map('node')         # multi-index map
@@ -127,7 +129,8 @@ class ConvectionOperator(OpteratorBase):
             SparseTensor: the discrete convection operator matrix.
         """
         mesh = self.mesh
-        context = {'dtype': mesh.ftype, 'device': mesh.device}
+        node = mesh.entity('node')
+        context = bm.context(node)
         GD = mesh.geo_dimension()
         NN = mesh.number_of_nodes()
         K = mesh.linear_index_map('node')
@@ -139,7 +142,7 @@ class ConvectionOperator(OpteratorBase):
         else:
             b = self.convection_coef
 
-        if bm.ndim(b) != 1 or b.shape[0] != GD:
+        if len(b.shape) != 1 or b.shape[0] != GD:
             raise ValueError(
                 f"Expected constant vector of shape ({GD},), "
                 f"but got {b.shape}. Ensure you pass a constant vector or zero-arg function."
@@ -147,7 +150,8 @@ class ConvectionOperator(OpteratorBase):
 
         c = b / mesh.h / 2.0                            # central difference coefficient
 
-        A = csr_matrix((NN, NN), **context)
+        zero_diag = bm.zeros(NN, dtype=bm.float64) 
+        A = spdiags(zero_diag, 0, NN, NN, format='csr')
         for i in range(GD):
             n_shift = math.prod(cnt for idx, cnt in enumerate(shape) if idx != i)
             off = bm.full(NN - n_shift, c[i], **context)

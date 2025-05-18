@@ -8,7 +8,6 @@ from ..sparse import csr_matrix, spdiags, SparseTensor
 from ..mesh import UniformMesh
 
 from .operator_base import OpteratorBase, assemblymethod
-
 class DiffusionOperator(OpteratorBase):
     """
     """
@@ -34,7 +33,10 @@ class DiffusionOperator(OpteratorBase):
         GD = mesh.geo_dimension()  # Geometric dimension of the mesh
 
         node = self.mesh.entity('node')
-        D = self.diffusion_coef(node) # shape == (GD, GD)
+        if callable(self.diffusion_coef):
+            D = self.diffusion_coef(node) # shape == (GD, GD)
+        else:
+            D = self.diffusion_coef
 
         # spacing of the mesh in each dimension
         h = mesh.h
@@ -47,9 +49,9 @@ class DiffusionOperator(OpteratorBase):
         shape = K.shape  # Shape of the index map array
 
         # Create diagonal entries with sum of c over dimensions times 2
-        diag_value = bm.full(NN, 2 * c.sum(), dtype=ftype)
-        I = K.flat  # Row indices for diagonal entries
-        J = K.flat  # Column indices for diagonal entries
+        diag_value = bm.full((NN,), 2 * c.sum(), dtype=ftype)
+        I = K.ravel() # Row indices for diagonal entries
+        J = K.ravel() # Column indices for diagonal entries
         A = csr_matrix((diag_value, (I, J)), shape=(NN, NN))
 
         # Slices tuple for indexing all dimensions
@@ -62,13 +64,13 @@ class DiffusionOperator(OpteratorBase):
                 count for dim_idx, count in enumerate(shape) if dim_idx != i
             )
             # Off-diagonal value for neighbor entries
-            off_value = bm.full(NN - n_shift, -c[i], dtype=ftype)
+            off_value = bm.full((NN - n_shift,), -c[i], dtype=ftype)
             # Create slice objects to select neighbor index arrays
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
             # Row indices for off-diagonal
-            I = K[s1].flat
-            J = K[s2].flat
+            I = K[s1].ravel()
+            J = K[s2].ravel()
             # Add entries for coupling in both directions
             A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
             A += csr_matrix((off_value, (J, I)), shape=(NN, NN))

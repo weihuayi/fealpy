@@ -26,6 +26,6 @@ class ReactionOperator(OpteratorBase):
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         c = self.reaction_coef(mesh.entity('node'))
-        val = bm.full(NN, c, dtype=mesh.ftype)
+        val = bm.full((NN,), c[:,0], dtype=mesh.ftype)
         D = spdiags(val, 0, NN, NN, format='csr')
         return D
