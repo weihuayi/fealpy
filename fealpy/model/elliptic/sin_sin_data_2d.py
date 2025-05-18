@@ -68,7 +68,7 @@ class SinSinData2D:
         return -bm.einsum('...ij,...j->...i', A, grad)
 
     def source(self, p: TensorLike) -> TensorLike:
-        """Source term f(x, y) derived from PDE (shape: (...,1))."""
+        """Source term f(x, y) derived from PDE (shape: (...,))."""
         
         x, y = p[..., 0], p[..., 1]
         pi = bm.pi

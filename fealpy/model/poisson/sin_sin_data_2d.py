@@ -31,12 +31,14 @@ class SinSinData2D:
         return [0.0, 1.0, 0.0, 1.0]
 
     def solution(self, p: TensorLike) -> TensorLike:
+        """Compute exact solution"""
         x = p[..., 0]
         y = p[..., 1]
         pi = bm.pi
         return bm.sin(pi * x) * bm.sin(pi * y)
 
     def gradient(self, p: TensorLike) -> TensorLike:
+        """Compute gradient of solution."""
         x = p[..., 0]
         y = p[..., 1]
         pi = bm.pi
@@ -45,24 +47,18 @@ class SinSinData2D:
         return bm.stack([du_dx, du_dy], axis=-1)
 
     def source(self, p: TensorLike) -> TensorLike:
+        """Compute exact source """
         x = p[..., 0]
         y = p[..., 1]
         pi = bm.pi
         return 2 * pi**2 * bm.sin(pi * x) * bm.sin(pi * y)
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
+        """Dirichlet boundary condition"""
         return self.solution(p)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        """
-        Check if a point is on the Dirichlet boundary (x = 0 or 1) or (y = 0 or 1).
-        
-        Args:
-            p (TensorLike): Input points, shape (n_points, 2).
-        
-        Returns:
-            TensorLike: Boolean tensor indicating whether each point is on the boundary.
-        """
+        """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]
         atol = 1e-12  # 绝对误差容限
     

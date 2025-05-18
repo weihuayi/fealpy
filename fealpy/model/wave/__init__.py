@@ -3,6 +3,21 @@ from ...backend import TensorLike
 
 
 class WavePDEDataProtocol(Protocol):
+    """Protocol interface for wave PDE data components.
+    
+    Defines the recommended protocol interface for wave partial differential equation solvers.
+
+    This protocol suggests four main categories of methods that implementing classes may provide:
+        1. Domain specification methods (geometry ,computational domain, duration)
+        2. Equation terms methods (exact solution, grdient, init_solution, init_solution_t and source terms)
+        4. Boundary condition methods (Dirichlet, Neumann, Robin types)
+
+    Notes:  
+        This protocol serves as a development guideline - implementing classes are encouraged to:
+        - Provide implementations for the declared methods
+        - Maintain consistent method signatures and return types
+        - Implement methods relevant to their use case
+    """
     def geo_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
     def duration(self) -> Sequence[float]: ...
@@ -16,7 +31,10 @@ class WavePDEDataProtocol(Protocol):
 
 WavePDEDataT = TypeVar('WavePDEDataT', bound=WavePDEDataProtocol)
 
-
+"""
+DATA_TABLE is a registry, when adding new PDE models, 
+follow the existing examples to register them in the registry.
+"""
 DATA_TABLE = {
     # example name: (file_name, class_name)
     "sincos": ("sin_cos_data_2d", "SinCosData2D"),

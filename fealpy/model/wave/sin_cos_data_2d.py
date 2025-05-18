@@ -28,21 +28,25 @@ class SinCosData2D:
         return [0.0, 1.0, 0.0, 1.0]  
 
     def duration(self) -> Sequence[float]:
-        return [0.0, 1.4]  # Time interval [t0, t1]
+        """the time interval [t0, t1]."""
+        return [0.0, 1.4]  
 
     def init_solution(self, p: TensorLike) -> TensorLike:
+        """Compute initial condition u(x, y, 0) = sin(πx)·sin(πy)."""
         x, y = p[..., 0], p[..., 1]
         return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
     def init_solution_t(self, p: TensorLike) -> TensorLike:
-        # Initial velocity is zero everywhere
+        """Compute initial condition ∂u/∂t(x, y, 0) = 0. """
         return bm.zeros_like(p[..., 0])
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
         return bm.cos(bm.sqrt(2.0) * bm.pi * t) * bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute spatial gradient of solution at time t."""
         x, y = p[..., 0], p[..., 1]
         factor = bm.cos(bm.sqrt(2.0) * bm.pi * t)
         dx = bm.pi * bm.cos(bm.pi * x) * bm.sin(bm.pi * y) * factor
@@ -50,13 +54,15 @@ class SinCosData2D:
         return bm.stack([dx, dy], axis=-1)
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
-        # Homogeneous wave equation: source term is zero
+        """Compute exact source at time t. """
         return bm.zeros_like(p[..., 0])
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
+        """Dirichlet boundary condition. """
         return bm.zeros_like(p[..., 0])
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 1.0) < 1e-12) | \
                (bm.abs(y - 0.0) < 1e-12) | (bm.abs(y - 1.0) < 1e-12)

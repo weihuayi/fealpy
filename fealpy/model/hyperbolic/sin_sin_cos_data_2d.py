@@ -24,23 +24,25 @@ class SinSinCosData2D:
         return [0.0, 2.0, 0.0, 2.0]  
 
     def duration(self) -> Sequence[float]:
-        return [0.0, 1.0]  # Typical time range for wave problems
+        """the time interval [t0, t1]."""
+        return [0.0, 1.0]  
     
     def convection_coef(self) -> TensorLike:
-        """
-        Wave speed
-        """
+        """ Get the convection coefficient (wave speed)."""
         return bm.tensor([1.0, 1.0])  
 
     def init_solution(self, p: TensorLike) -> TensorLike:
+        """Compute initial condition ."""
         x, y = p[..., 0], p[..., 1]
         return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
         return bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * bm.cos(bm.pi * t)
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute spatial gradient of solution at time t."""
         x, y = p[..., 0], p[..., 1]
         cos_πt = bm.cos(bm.pi * t)
         du_dx = bm.pi * bm.cos(bm.pi * x) * bm.sin(bm.pi * y) * cos_πt
@@ -48,6 +50,7 @@ class SinSinCosData2D:
         return bm.stack([du_dx, du_dy], axis=-1)  # Returns a vector field
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
         sin_πt = bm.sin(bm.pi * t)
         term1 = -bm.pi * bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * sin_πt  # ∂u/∂t
@@ -56,9 +59,11 @@ class SinSinCosData2D:
         return term1 + self.a() * (term2 + term3)
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
-        return bm.zeros(p.shape[:-1])  # Scalar value for each point
+        """Dirichlet boundary condition."""
+        return bm.zeros(p.shape[:-1])  
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 2.0) < 1e-12) | \
                (bm.abs(y - 0.0) < 1e-12) | (bm.abs(y - 2.0) < 1e-12)

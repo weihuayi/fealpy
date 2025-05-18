@@ -28,38 +28,45 @@ class SinMixData1D:
         return [0.0, 1.0]
 
     def duration(self) -> Sequence[float]:
-        return [0.0, 1.0]  # Time domain: [t0, t1]
+        """the time interval [t0, t1]."""
+        return [0.0, 1.0]  
 
     def init_solution(self, p: TensorLike) -> TensorLike:
+        """Compute initial condition u(x, 0) = sin(4πx)."""
         x = p[..., 0]
         return bm.sin(4 * bm.pi * x)
 
     def init_solution_t(self, p: TensorLike) -> TensorLike:
+        """Compute initial condition ∂u/∂t(x, 0) = sin(8πx). """
         x = p[..., 0]
         return bm.sin(8 * bm.pi * x)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute exact solution at time t. """
         x = p[..., 0]
         term1 = bm.cos(4 * bm.pi * t) * bm.sin(4 * bm.pi * x)
         term2 = (1 / (8 * bm.pi)) * bm.sin(8 * bm.pi * t) * bm.sin(8 * bm.pi * x)
         return term1 + term2
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute spatial gradient of solution at time t."""
         x = p[..., 0]
         term1 = bm.cos(4 * bm.pi * t) * 4 * bm.pi * bm.cos(4 * bm.pi * x)
         term2 = (1 / (8 * bm.pi)) * bm.sin(8 * bm.pi * t) * 8 * bm.pi * bm.cos(8 * bm.pi * x)
         return term1 + term2  # du/dx
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
-        # Homogeneous wave equation: source term is zero
+        "" "Compute exact source at time t. """    
         x = p[..., 0]
         return bm.zeros_like(x)
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
+        """Dirichlet boundary condition. """
         x = p[..., 0]
         return bm.zeros_like(x)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """Check if point is on boundary."""
         x = p[..., 0]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 1.0) < 1e-12)
 

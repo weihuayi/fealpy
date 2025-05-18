@@ -29,16 +29,14 @@ class CosCosData2D:
 
     def diffusion_coef(self) -> TensorLike:
         """
-        Return diffusion tensor A(x, y), constant in this example.
-        Shape: (..., 2, 2)
+        Return diffusion tensor A(x, y), constant in this example, Shape: (2, 2).
         """
         val = bm.array([[10.0, 1.0], [1.0, 10.0]])
         return val 
 
     def diffusion_coef_inv(self) -> TensorLike:
         """
-        Return inverse of diffusion tensor A(x, y), constant.
-        Shape: (..., 2, 2)
+        Return inverse of diffusion tensor A(x, y), constant, Shape: (2, 2).
         """
         val = bm.array([[10, -1.0], [-1.0, 10]]) / 99.0  # Approximate inverse
         return val 
@@ -46,8 +44,7 @@ class CosCosData2D:
 
     def solution(self, p: TensorLike) -> TensorLike:
         """
-        Return the exact solution u(x, y) = cos(2πx) * cos(2πy)
-        Shape: (...,)
+        Return the exact solution u(x, y) = cos(2πx) * cos(2πy), Shape: (..., ).
         """
         x, y = p[..., 0], p[..., 1]
         pi = bm.pi
@@ -55,8 +52,7 @@ class CosCosData2D:
 
     def gradient(self, p: TensorLike) -> TensorLike:
         """
-        Return the gradient of the exact solution ∇u(x, y)
-        Shape: (..., 2)
+        Return the gradient of the exact solution ∇u(x, y), Shape: (..., 2).
         """
         x, y = p[..., 0], p[..., 1]
         pi = bm.pi
@@ -67,8 +63,7 @@ class CosCosData2D:
 
     def flux(self, p: TensorLike) -> TensorLike:
         """
-        Return the flux vector -A ∇u
-        Shape: (..., 2)
+        Return the flux vector -A ∇u,  Shape: (..., 2).
         """
         grad = self.gradient(p)                  # (..., 2)
         A = self.diffusion_coef()               # (..., 2, 2)

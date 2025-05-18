@@ -30,12 +30,14 @@ class CosCosData2D():
         return [-1., 1., -1., 1.]
 
     def solution(self, p: TensorLike) -> TensorLike:
+        """Compute exact solution"""
         x, y = p[..., 0], p[..., 1]
         pi = bm.pi
         val = bm.cos(pi*x)*bm.cos(pi*y)
         return val # val.shape == x.shape
 
     def gradient(self, p: TensorLike) -> TensorLike:
+        """Compute gradient of solution."""
         x, y = p[..., 0], p[..., 1]
         pi = bm.pi
         val = bm.stack((
@@ -44,24 +46,18 @@ class CosCosData2D():
         return val # val.shape == p.shape
 
     def source(self, p: TensorLike) -> TensorLike:
+        """Compute exact source """
         x, y = p[..., 0], p[..., 1]
         pi = bm.pi
         val = 2*pi*pi*bm.cos(pi*x)*bm.cos(pi*y)
         return val
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
+        """Dirichlet boundary condition"""
         return self.solution(p)
     
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        """
-        Check if a point is on the Dirichlet boundary (x = ±1 or y = ±1).
-        
-        Args:
-            p (TensorLike): Input points, shape (n_points, 2).
-        
-        Returns:
-            TensorLike: Boolean tensor indicating whether each point is on the boundary.
-        """
+        """Check if point is on boundary."""        
         x, y = p[..., 0], p[..., 1]
         atol = 1e-12  # 绝对误差容限
     
