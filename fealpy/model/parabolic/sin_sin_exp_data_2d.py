@@ -6,7 +6,7 @@ class SinSinExpData2D:
     """
     2D parabolic problem:
 
-        ∂u/∂t - k·(∂²u/∂x² + ∂²u/∂y²) = f   (x, y) ∈ (0, 1) x (0, 1), t > 0
+        ∂u/∂t - (∂²u/∂x² + ∂²u/∂y²) = f   (x, y) ∈ (0, 1) x (0, 1), t > 0
 
         u(x, 0, t) = u(x, 1, t) = 0,         x ∈ (0, 1), t > 0
         u(0, y, t) = u(1, y, t) = 0,         y ∈ (0, 1), t > 0
@@ -23,10 +23,12 @@ class SinSinExpData2D:
     """
 
     def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
-        return [0.0, 1.0, 0.0, 1.0]  # [x0, x1, y0, y1]
+        """Return the computational domain [xmin, xmax, ymin, ymax]."""
+        return [0.0, 1.0, 0.0, 1.0]  
 
     def duration(self) -> Sequence[float]:
         return [0.0, 1.0]

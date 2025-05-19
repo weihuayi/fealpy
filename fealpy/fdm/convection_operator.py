@@ -1,6 +1,6 @@
 import math
 from typing import Optional, Callable
-
+import inspect
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..sparse import csr_matrix, spdiags, SparseTensor
@@ -87,17 +87,18 @@ class ConvectionOperator(OpteratorBase):
         GD = mesh.geo_dimension()
         node = mesh.entity('node')
         context = bm.context(node)
-        if callable(self.convection_coef):
-            b = self.convection_coef(node)
+        n = len(inspect.signature(self.convection_coef).parameters) 
+        if n == 0:
+            b = self.convection_coef()     
         else:
-            b = self.convection_coef         # shape == (GD,), constant vector
+            b = self.convection_coef(node)            
         h = mesh.h                                # uniform spacing in each dimension
         NN = mesh.number_of_nodes()
         K = mesh.linear_index_map('node')         # multi-index map
         shape = K.shape
         full = (slice(None),) * GD                # full slicing tuple
 
-        c = bm.abs(b / h)                         # component-wise |b_i|/h_i
+        c = bm.abs(b / h)   # component-wise |b_i|/h_i
         diag = bm.full(NN, bm.sum(c), **context)  # diagonal term: sum_i |b_i|/h_i
         A = spdiags(diag, 0, NN, NN, format='csr')
 

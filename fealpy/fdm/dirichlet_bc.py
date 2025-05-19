@@ -86,8 +86,6 @@ class DirichletBC:
                 uh = bm.zeros(A.shape[0], **A.values_context())
             else:
                 uh = bm.zeros(A.shape[0], dtype=A.dtype)
-    # ... rest of the method unchanged ...
-
         # Get all node coordinates
         node = self.mesh.entity('node')
 
@@ -115,5 +113,5 @@ class DirichletBC:
 
         # Apply boundary conditions to the matrix
         A = D0 @ A @ D0 + D1
-
         return A, f
+

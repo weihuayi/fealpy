@@ -22,9 +22,11 @@ class CosCosData2D():
     """
 
     def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
+        """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [-1., 1., -1., 1.]
 
     def solution(self, p: TensorLike) -> TensorLike:
