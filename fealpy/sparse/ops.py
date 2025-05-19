@@ -84,3 +84,40 @@ def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
         return diag_tensor
 
     return diag_tensor.tocsr()
+
+@overload
+def speye(M: int, N: Optional[int] = None, diags: Union[TensorLike, int] = 0, dtype=None,
+          device = None) -> CSRTensor:...
+@overload
+def speye(M: int, N: Optional[int] = None, diags: Union[TensorLike, int] = 0, dtype=None,
+          device = None, *, format: Literal['csr']) -> CSRTensor: ... 
+@overload
+def speye(M: int, N: Optional[int] = None, diags: Union[TensorLike, int] = 0, dtype=None,
+          device = None, *, format: Literal['coo']) -> COOTensor: ... 
+def speye(M: int, N: Optional[int] = None, diags: Union[TensorLike, int] = 0, dtype=None,
+          device = None, *, format: Optional[str] = 'csr'):
+    """Return a sparse matrix with ones on diagonal
+
+    Parameters:  
+        M (int): The number of rows of the resulting sparse tensor.
+        N (int | None): The number of columns of the resulting sparse tensor.
+        diags (Tensor | int): The index or indices of the diagonals to place ones on.
+            k = 0: the main diagonal.
+            k > 0: the k-th upper diagonal.
+            k < 0: the k-th lower diagonal.
+
+        dtype: The data type of the sparse tensor elements (the ones). Defaults to bm.int64.
+        device: The device where the sparse tensor will be created (e.g., 'cpu', 'cuda').
+
+        format (str | None): The format of the resulting sparse tensor.
+    """
+    if N is None:
+        N = M
+
+    if isinstance(diags, TensorLike):
+        nd = len(diags)
+    else:
+        nd = 1
+
+    values = bm.ones((nd, M), dtype=dtype, device=device)
+    return spdiags(values, diags=diags, M=M, N=N, format=format)
