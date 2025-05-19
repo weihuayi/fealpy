@@ -31,6 +31,7 @@ class SinSinExpData2D:
         return [0.0, 1.0, 0.0, 1.0]  
 
     def duration(self) -> Sequence[float]:
+        """the time interval [t0, t1]."""
         return [0.0, 1.0]
 
     def init_solution(self, p: TensorLike) -> TensorLike:
@@ -38,10 +39,12 @@ class SinSinExpData2D:
         return bm.sin(4 * bm.pi * x) * bm.sin(4 * bm.pi * y)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
         return bm.sin(4 * bm.pi * x) * bm.sin(4 * bm.pi * y) * bm.exp(-20 * t)
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute spatial gradient of solution at time t."""
         x, y = p[..., 0], p[..., 1]
         factor = bm.exp(-20 * t)
         gx = 4 * bm.pi * bm.cos(4 * bm.pi * x) * bm.sin(4 * bm.pi * y) * factor
@@ -49,14 +52,17 @@ class SinSinExpData2D:
         return bm.stack([gx, gy], axis=-1)  # shape (..., 2)
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
         factor = bm.exp(-20 * t) * bm.sin(4 * bm.pi * x) * bm.sin(4 * bm.pi * y)
         return (-20 + 32 * bm.pi ** 2) * factor
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
+        """Check if point is on boundary."""
         return self.solution(p, t)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 1.0) < 1e-12) | \
                (bm.abs(y - 0.0) < 1e-12) | (bm.abs(y - 1.0) < 1e-12)

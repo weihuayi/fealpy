@@ -26,19 +26,20 @@ class PiecewiseData1D:
         return [0.0, 2.0]
 
     def duration(self) -> Sequence[float]:
+        """the time interval [t0, t1]."""
         return [0.0, 4.0]
 
     def convection_coef(self) -> TensorLike:
-        """
-        Wave speed
-        """
+        """ Get the convection coefficient (wave speed)."""
         return bm.tensor([1.0])
     
     def init_solution(self, p: TensorLike) -> TensorLike:
+        """Compute initial condition u(x,0) = |x - 1|."""
         x = p[..., 0]
         return bm.abs(x - 1)
 
     def solution(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute exact solution at time t. """
         x = p[..., 0]
         val = bm.zeros_like(x)
         flag1 = x <= t
@@ -50,6 +51,7 @@ class PiecewiseData1D:
         return val
 
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute spatial gradient of solution at time t."""
         x = p[..., 0]
         grad = bm.zeros_like(x)
         flag1 = x <= t
@@ -61,14 +63,17 @@ class PiecewiseData1D:
         return grad
 
     def source(self, p: TensorLike, t: float) -> TensorLike:
+        """Compute source term (always zero for this problem)."""
         x = p[..., 0]
         return bm.zeros_like(x)
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
+        """Dirichlet boundary condition u(0,t)=1"""
         x = p[..., 0]
         return bm.ones_like(x)
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+        """Check if point is on boundary."""
         x = p[..., 0]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 2.0) < 1e-12)
 
