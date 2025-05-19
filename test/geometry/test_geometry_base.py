@@ -2,6 +2,7 @@ import pytest
 
 from fealpy.backend import backend_manager as bm
 from fealpy.geometry import geometry_kernel_manager as gkm
+from fealpy.utils import timer
 
 from geometry_base_data import *
 
@@ -169,7 +170,6 @@ class TestGeometryKernelBase:
         gkm.set_adapter(kernel)
 
         box = gkm.add_sphere(0, 0, 0, 5)
-        # gkm.display(box)
 
         mesh = gkm.shape_discrete(box, deflection=0.1)
         node = mesh[0]
@@ -189,22 +189,16 @@ class TestGeometryKernelBase:
     def test_example_metalenses(self, input_data, kernel):
         gkm.set_adapter(kernel)
 
-        # ori = gkm.add_point(0, 0, 0)
-        # box_base = gkm.add_box(-12.5, -12.5, -0.1, 25, 25, 0.1)
-        #
-        # box1 = gkm.add_box(-0.12, -0.06, 0.0, 0.24, 0.12, 0.6)
-        # box2 = gkm.translate(box1, (0.4, 0, 0))
-        # box3 = gkm.translate(gkm.rotate(box1, (0, 0, 0), (0, 0, 1), 3.14/4), (0, 0.4, 0))
+        ori = gkm.add_point(0, 0, 0)
+        box_base = gkm.add_box(-12.5, -12.5, -0.1, 25, 25, 0.1)
 
-        N = 100
-        total_shape = gkm.add_box(-12.5, -12.5, -0.1, 25, 25, 0.1)
-        for i in range(N):
-            # box = gkm.rotate(gkm.add_box(-0.12+i*0.1, -0.06+i*0.1, 0.0, 0.24, 0.12, 0.6), (0, 0, 0), (0, 0, 1), 3.14/100*i)
-            box = gkm.add_box(-0.12+i*0.1, -0.06+i*0.1, 0.0, 0.24, 0.12, 0.6)
-            total_shape = gkm.boolean_union(total_shape, box)
+        box1 = gkm.add_box(-0.12, -0.06, 0.0, 0.24, 0.12, 0.6)
+        box2 = gkm.translate(box1, (0.4, 0, 0))
+        box3 = gkm.translate(gkm.rotate(box1, (0, 0, 0), (0, 0, 1), 3.14/4), (0, 0.4, 0))
 
+        total_shape = gkm.boolean_union(box_base, box1, box2, box3)
 
-        gkm.display(total_shape)
+        gkm.display(ori, total_shape)
 
     @pytest.mark.parametrize("kernel", ['occ'])
     @pytest.mark.parametrize("input_data", geometry_data)

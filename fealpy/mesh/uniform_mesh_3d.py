@@ -106,7 +106,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         self.device = device
 
         # Mesh properties
-        self.extent = bm.array(extent, dtype=itype, device=device)
+        # self.extent = bm.array(extent, dtype=itype, device=device)
+        self.extent = extent
         self.h = bm.array(h, dtype=ftype, device=device) 
         self.origin = bm.array(origin, dtype=ftype, device=device)
         self.shape = (
@@ -253,8 +254,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         ny = self.ny
         nz = self.nz
 
-        idx = bm.arange(NN, dtype=self.itype).reshape(nx + 1, ny + 1, nz + 1)
-        edge = bm.zeros((NE, 2), dtype=self.itype)
+        idx = bm.arange(NN, dtype=self.itype, device=self.device).reshape(nx + 1, ny + 1, nz + 1)
+        edge = bm.zeros((NE, 2), dtype=self.itype, device=self.device)
 
         NE0 = 0
         NE1 = nx * (ny + 1) * (nz + 1)
@@ -289,19 +290,16 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        idx = bm.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
-        face = bm.zeros((NF, 4), dtype=self.itype)
+        idx = bm.arange(NN, device=self.device).reshape(nx + 1, ny + 1, nz + 1)
+        face = bm.zeros((NF, 4), dtype=self.itype, device=self.device)
 
         NF0 = 0
         NF1 = (nx + 1) * ny * nz
         c = idx[:, :-1, :-1]
-        # face[NF0:NF1, 0] = c.flatten()
         face = bm.set_at(face, (slice(NF0, NF1), 0), c.flatten())
         face = bm.set_at(face, (slice(NF0, NF1), 1), face[NF0:NF1, 0] + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 2), face[NF0:NF1, 0] + nz + 1)
         face = bm.set_at(face, (slice(NF0, NF1), 3), face[NF0:NF1, 2] + 1)
-        # face = bm.set_at(face, (slice(NF0, NF0 + ny * nz), slice(None)), 
-        #              face[NF0:NF0 + ny * nz, [1, 0, 3, 2]])
 
         NF0 = NF1
         NF1 += nx * (ny + 1) * nz
@@ -317,7 +315,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         idx1 = bm.arange(NF2, NF2 + nz)
         idx1 = idx1 + bm.arange(0, N * nx, N).reshape(nx, 1)
         idx1 = idx1.flatten()
-        # face = bm.set_at(face, (idx1, slice(None)), face[idx1][:, [1, 0, 3, 2]])
 
         NF0 = NF1
         NF1 += nx * ny * (nz + 1)
@@ -332,7 +329,6 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         idx2 = bm.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
         idx2 = idx2 + bm.arange(0, N * nx, N).reshape(nx, 1)
         idx2 = idx2.flatten()
-        # face = bm.set_at(face, (idx2, slice(None)), face[idx2][:, [1, 0, 3, 2]])
 
         return face
 
@@ -381,64 +377,39 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         return 6
     
     def cell_to_edge(self) -> TensorLike:
-        """
-        @brief 单元和边的邻接关系, 储存每个单元相邻的 12 条边的编号
-        """
+        """储存每个单元相邻的 12 条边的编号"""
         NC = self.NC
 
         nx = self.nx
         ny = self.ny
         nz = self.nz
 
-        cell2edge = bm.zeros((NC, 12), dtype=self.itype)
+        cell2edge = bm.zeros((NC, 12), dtype=self.itype, device=self.device)
 
-        # TODO: Provide a unified implementation that is not backend-specific
-        if bm.backend_name == 'numpy' or bm.backend_name == 'pytorch':
-            idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
-            cell2edge[:, 0] = idx0[:, :-1, :-1].flatten()
-            cell2edge[:, 1] = idx0[:, :-1, 1:].flatten()
-            cell2edge[:, 2] = idx0[:, 1:, :-1].flatten()
-            cell2edge[:, 3] = idx0[:, 1:, 1:].flatten()
+        # x direction
+        idx0 = bm.arange(nx * (ny + 1) * (nz + 1), device=self.device).reshape(nx, ny + 1, nz + 1)
+        cell2edge = bm.set_at(cell2edge, (slice(None), 0), idx0[:, :-1, :-1].flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 1), idx0[:, :-1, 1:].flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 2), idx0[:, 1:, :-1].flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 3), idx0[:, 1:, 1:].flatten())
 
-            NE0 = nx * (ny + 1) * (nz + 1)
-            idx1 = bm.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)  
-            cell2edge[:, 4] = (NE0 + idx1[:-1, :, :-1]).flatten()
-            cell2edge[:, 5] = (NE0 + idx1[:-1, :, 1:]).flatten()
-            cell2edge[:, 6] = (NE0 + idx1[1:, :, :-1]).flatten()
-            cell2edge[:, 7] = (NE0 + idx1[1:, :, 1:]).flatten()
+        # y direction
+        NE0 = nx * (ny + 1) * (nz + 1)
+        idx1 = bm.arange((nx + 1) * ny * (nz + 1), device=self.device).reshape(nx + 1, ny, nz + 1) 
+        cell2edge = bm.set_at(cell2edge, (slice(None), 4), (NE0 + idx1[:-1, :, :-1]).flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 5), (NE0 + idx1[:-1, :, 1:]).flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 6), (NE0 + idx1[1:, :, :-1]).flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 7), (NE0 + idx1[1:, :, 1:]).flatten())
 
-            NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
-            idx2 = bm.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
-            cell2edge[:, 8] = (NE1 + idx2[:-1, :-1, :]).flatten()
-            cell2edge[:, 9] = (NE1 + idx2[:-1, 1:, :]).flatten()
-            cell2edge[:, 10] = (NE1 + idx2[1:, :-1, :]).flatten()
-            cell2edge[:, 11] = (NE1 + idx2[1:, 1:, :]).flatten()
+        # z direction
+        NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
+        idx2 = bm.arange((nx + 1) * (ny + 1) * nz, device=self.device).reshape(nx + 1, ny + 1, nz)
+        cell2edge = bm.set_at(cell2edge, (slice(None), 8), (NE1 + idx2[:-1, :-1, :]).flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 9), (NE1 + idx2[:-1, 1:, :]).flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 10), (NE1 + idx2[1:, :-1, :]).flatten())
+        cell2edge = bm.set_at(cell2edge, (slice(None), 11), (NE1 + idx2[1:, 1:, :]).flatten())
 
-            return cell2edge
-        elif bm.backend_name == 'jax':
-            idx0 = bm.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
-            cell2edge = cell2edge.at[:, 0].set(idx0[:, :-1, :-1].flatten())
-            cell2edge = cell2edge.at[:, 1].set(idx0[:, :-1, 1:].flatten())
-            cell2edge = cell2edge.at[:, 2].set(idx0[:, 1:, :-1].flatten())
-            cell2edge = cell2edge.at[:, 3].set(idx0[:, 1:, 1:].flatten())
-
-            NE0 = nx * (ny + 1) * (nz + 1)
-            idx1 = bm.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)  
-            cell2edge = cell2edge.at[:, 4].set((NE0 + idx1[:-1, :, :-1]).flatten())
-            cell2edge = cell2edge.at[:, 5].set((NE0 + idx1[:-1, :, 1:]).flatten())
-            cell2edge = cell2edge.at[:, 6].set((NE0 + idx1[1:, :, :-1]).flatten())
-            cell2edge = cell2edge.at[:, 7].set((NE0 + idx1[1:, :, 1:]).flatten())
-
-            NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
-            idx2 = bm.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
-            cell2edge = cell2edge.at[:, 8].set((NE1 + idx2[:-1, :-1, :]).flatten())
-            cell2edge = cell2edge.at[:, 9].set((NE1 + idx2[:-1, 1:, :]).flatten())
-            cell2edge = cell2edge.at[:, 10].set((NE1 + idx2[1:, :-1, :]).flatten())
-            cell2edge = cell2edge.at[:, 11].set((NE1 + idx2[1:, 1:, :]).flatten())
-
-            return cell2edge
-        else:
-            raise NotImplementedError("Backend is not yet implemented.")
+        return cell2edge
         
     def cell_to_face(self, index: Index=_S) -> TensorLike:
         """
@@ -449,30 +420,24 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         ny = self.ny
         nz = self.nz
 
-        cell2face = bm.zeros((NC, 6), dtype=self.itype)
+        cell2face = bm.zeros((NC, 6), dtype=self.itype, device=self.device)
 
         # x direction
-        idx0 = bm.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
+        idx0 = bm.arange((nx + 1) * ny * nz, device=self.device).reshape(nx + 1, ny, nz)
         cell2face = bm.set_at(cell2face, (slice(None), 0), idx0[:-1, :, :].flatten())
         cell2face = bm.set_at(cell2face, (slice(None), 1), idx0[1:, :, :].flatten())    
-        # cell2face[:, 0] = idx0[:-1, :, :].flatten()
-        # cell2face[:, 1] = idx0[1:, :, :].flatten()
 
         # y direction
         NE0 = (nx + 1) * ny * nz
-        idx1 = bm.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
-        # cell2face[:, 2] = (NE0 + idx1[:, :-1, :]).flatten()
-        # cell2face[:, 3] = (NE0 + idx1[:, 1:, :]).flatten()
+        idx1 = bm.arange(nx * (ny + 1) * nz, device=self.device).reshape(nx, ny + 1, nz)
         cell2face = bm.set_at(cell2face, (slice(None), 2), (NE0 + idx1[:, :-1, :]).flatten())
         cell2face = bm.set_at(cell2face, (slice(None), 3), (NE0 + idx1[:, 1:, :]).flatten())
 
         # z direction
         NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
-        idx2 = bm.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
+        idx2 = bm.arange(nx * ny * (nz + 1), device=self.device).reshape(nx, ny, nz + 1)
         cell2face = bm.set_at(cell2face, (slice(None), 4), (NE1 + idx2[:, :, :-1]).flatten())
         cell2face = bm.set_at(cell2face, (slice(None), 5), (NE1 + idx2[:, :, 1:]).flatten())
-        # cell2face[:, 4] = (NE1 + idx2[:, :, :-1]).flatten()
-        # cell2face[:, 5] = (NE1 + idx2[:, :, 1:]).flatten()
         
         return cell2face[index]
         
@@ -561,42 +526,26 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face2cell = bm.set_at(face2cell, (slice(NF0 + ny * nz, NF1), 1), idx.flatten())
         face2cell = bm.set_at(face2cell, (slice(NF0, NF1 - ny * nz), 2), 0)
         face2cell = bm.set_at(face2cell, (slice(NF0, NF1 - ny * nz), 3), 1)
-        # face2cell[NF0:NF1-ny*nz, 0] = idx.flatten()
-        # face2cell[NF0+ny*nz:NF1, 1] = idx.flatten()
-        # face2cell[NF0:NF1-ny*nz, 2] = 0
-        # face2cell[NF0:NF1-ny*nz, 3] = 1
 
         face2cell = bm.set_at(face2cell, (slice(NF1 - ny * nz, NF1), 0), idx[-1].flatten())
         face2cell = bm.set_at(face2cell, (slice(NF0, NF0 + ny * nz), 1), idx[0].flatten())
         face2cell = bm.set_at(face2cell, (slice(NF1 - ny * nz, NF1), 2), 1)
         face2cell = bm.set_at(face2cell, (slice(NF0, NF0 + ny * nz), 3), 0)
-        # face2cell[NF1-ny*nz:NF1, 0] = idx[-1].flatten()
-        # face2cell[NF0:NF0+ny*nz, 1] = idx[0].flatten()
-        # face2cell[NF1-ny*nz:NF1, 2] = 1
-        # face2cell[NF0:NF0+ny*nz, 3] = 0
 
         # y direction
         idy = bm.astype(bm.swapaxes(idx, 1, 0), face2cell.dtype)
         NF0 = NF1
-        NF1 += nx * (ny+1) * nz
+        NF1 += nx * (ny + 1) * nz
         fidy = bm.arange(NF0, NF1, dtype=face2cell.dtype).reshape(nx, ny+1, nz).swapaxes(0, 1)
         face2cell = bm.set_at(face2cell, (fidy[:-1], 0), idy)
         face2cell = bm.set_at(face2cell, (fidy[1:], 1), idy)
         face2cell = bm.set_at(face2cell, (fidy[:-1], 2), 0)
         face2cell = bm.set_at(face2cell, (fidy[1:], 3), 1)
-        # face2cell[fidy[:-1], 0] = idy
-        # face2cell[fidy[1:], 1] = idy
-        # face2cell[fidy[:-1], 2] = 0
-        # face2cell[fidy[1:], 3] = 1
 
         face2cell = bm.set_at(face2cell, (fidy[-1], 0), idy[-1])
         face2cell = bm.set_at(face2cell, (fidy[0], 1), idy[0])
         face2cell = bm.set_at(face2cell, (fidy[-1], 2), 1)
         face2cell = bm.set_at(face2cell, (fidy[0], 3), 0)
-        # face2cell[fidy[-1], 0] = idy[-1]
-        # face2cell[fidy[0], 1] = idy[0]
-        # face2cell[fidy[-1], 2] = 1
-        # face2cell[fidy[0], 3] = 0
 
         # z direction
         # idz = bm.astype(bm.transpose(idx, (2, 0, 1)), face2cell.dtype)
@@ -611,19 +560,11 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         face2cell = bm.set_at(face2cell, (fidz[1:], 1), idz)
         face2cell = bm.set_at(face2cell, (fidz[:-1], 2), 0)
         face2cell = bm.set_at(face2cell, (fidz[1:], 3), 1)
-        # face2cell[fidz[:-1], 0] = idz
-        # face2cell[fidz[1:], 1] = idz
-        # face2cell[fidz[:-1], 2] = 0
-        # face2cell[fidz[1:], 3] = 1
 
         face2cell = bm.set_at(face2cell, (fidz[-1], 0), idz[-1])
         face2cell = bm.set_at(face2cell, (fidz[0], 1), idz[0])
         face2cell = bm.set_at(face2cell, (fidz[-1], 2), 1)
         face2cell = bm.set_at(face2cell, (fidz[0], 3), 0)
-        # face2cell[fidz[-1], 0] = idz[-1]
-        # face2cell[fidz[0], 1] = idz[0]
-        # face2cell[fidz[-1], 2] = 1
-        # face2cell[fidz[0], 3] = 0
 
         return face2cell
         

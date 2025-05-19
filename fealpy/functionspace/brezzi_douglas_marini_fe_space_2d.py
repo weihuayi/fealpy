@@ -126,7 +126,7 @@ class BDMDof():
         flag[bddof] = True
         return flag
     
-class BDMFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
+class BrezziDouglasMariniFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p, space=None):
         self.p = p
         self.mesh = mesh

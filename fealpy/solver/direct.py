@@ -23,7 +23,6 @@ def _mumps_solve(A, b):
         ```
     """
     from mumps import DMumpsContext
-    from scipy.sparse import coo_matrix
     A = A.to_scipy()
     x = bm.to_numpy(b).copy()
 
@@ -64,17 +63,17 @@ def _to_cupy_data(A, b):
         Tuple: The converted tensors.
     """
     import cupy as cp
-    if isinstance(A.indices(), np.ndarray): # numpy backend
+    if isinstance(A.indices, np.ndarray): # numpy backend
         A =  A.to_scipy() 
         A = cp.sparse.csr_matrix(A.astype(cp.float64))
-    elif A.indices().device.type == "cpu": # torch backend
+    elif A.indices.device.type == "cpu": # torch backend
         A = A.device_put("cuda")
-        indices = cp.from_dlpack(A.indices())
-        data = cp.from_dlpack(A.values())
+        indices = cp.from_dlpack(A.indices)
+        data = cp.from_dlpack(A.values)
         A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
     else:
-        indices = cp.from_dlpack(A.indices())
-        data = cp.from_dlpack(A.values())
+        indices = cp.from_dlpack(A.indices)
+        data = cp.from_dlpack(A.values)
         A = cp.sparse.csr_matrix((data, (indices[0], indices[1])), shape=A.shape)
 
     if isinstance(b, np.ndarray) or b.device.type == "cpu":
