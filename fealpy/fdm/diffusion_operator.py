@@ -6,8 +6,6 @@ from ..backend import TensorLike
 from ..sparse import csr_matrix, spdiags, SparseTensor
 from ..mesh import UniformMesh
 from .operator_base import OpteratorBase, assemblymethod
-
-
 class DiffusionOperator(OpteratorBase):
     """
     Discrete approximation of the second‐order diffusion operator:
@@ -105,7 +103,6 @@ class DiffusionOperator(OpteratorBase):
             s_minus = full[:i] + (slice(None, -1),) + full[i+1:]
             I_idx = K[s_plus].flat
             J_idx = K[s_minus].flat
-
             # add coupling to both directions
             A += csr_matrix((off_val, (I_idx, J_idx)), shape=(NN, NN))
             A += csr_matrix((off_val, (J_idx, I_idx)), shape=(NN, NN))

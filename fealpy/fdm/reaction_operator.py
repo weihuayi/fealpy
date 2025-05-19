@@ -64,7 +64,6 @@ class ReactionOperator(OpteratorBase):
         """
         mesh = self.mesh
         NN = mesh.number_of_nodes()
-
         # Evaluate reaction coefficient at each node
         
         n = len(inspect.signature(self.reaction_coef).parameters) 

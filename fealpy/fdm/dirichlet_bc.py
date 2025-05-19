@@ -81,9 +81,11 @@ class DirichletBC:
         >>> A_bc, f_bc = bc.apply(A, f)
         """
         if uh is None:
-            # Initialize uh as a zero vector if not provided
-            uh = bm.zeros(A.shape[0], **A.values_context())
-
+        # Initialize uh as a zero vector if not provided
+            if hasattr(A, 'values_context'):
+                uh = bm.zeros(A.shape[0], **A.values_context())
+            else:
+                uh = bm.zeros(A.shape[0], dtype=A.dtype)
         # Get all node coordinates
         node = self.mesh.entity('node')
 
@@ -111,5 +113,5 @@ class DirichletBC:
 
         # Apply boundary conditions to the matrix
         A = D0 @ A @ D0 + D1
-
         return A, f
+

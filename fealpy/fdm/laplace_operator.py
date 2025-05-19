@@ -49,7 +49,7 @@ class LaplaceOperator(OpteratorBase):
         shape = K.shape  # Shape of the index map array
 
         # Create diagonal entries with sum of c over dimensions times 2
-        diag_value = bm.full(NN, 2 * c.sum(), dtype=ftype)
+        diag_value = bm.full((NN,), 2 * c.sum().item(), dtype=ftype)
         I = K.ravel()  # Row indices for diagonal entries
         A = csr_matrix((diag_value, (I, I)), shape=(NN, NN))
 
@@ -63,7 +63,7 @@ class LaplaceOperator(OpteratorBase):
                 count for dim_idx, count in enumerate(shape) if dim_idx != i
             )
             # Off-diagonal value for neighbor entries
-            off_value = bm.full(NN - n_shift, -c[i], dtype=ftype)
+            off_value = bm.full((NN - n_shift,), -c[i].item(), dtype=ftype)
             # Create slice objects to select neighbor index arrays
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
