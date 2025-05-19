@@ -14,7 +14,7 @@ class CosCosData2D:
         u(x, y) = cos(2πx) * cos(2πy)
 
     where:
-        A(x, y) = [[10, 1], [1, 10]]  (diffusion tensor)
+        A(x, y) = [[10, 0], [0, 10]]  (diffusion tensor)
         f(x, y) = 80π²cos(2πx)cos(2πy)-8π²sin(2πx)sin(2πy)
     """
 
@@ -31,14 +31,14 @@ class CosCosData2D:
         """
         Return diffusion tensor A(x, y), constant in this example, Shape: (2, 2).
         """
-        val = bm.array([[10.0, 1.0], [1.0, 10.0]])
+        val = bm.array([[10.0, 0], [0, 10.0]])
         return val 
 
     def diffusion_coef_inv(self) -> TensorLike:
         """
         Return inverse of diffusion tensor A(x, y), constant, Shape: (2, 2).
         """
-        val = bm.array([[10, -1.0], [-1.0, 10]]) / 99.0  # Approximate inverse
+        val = bm.array([[10, 0.0], [0, 10]]) / 100  # Approximate inverse
         return val 
 
 
@@ -73,8 +73,8 @@ class CosCosData2D:
         """Return the source term f(x, y)"""
         x, y = p[..., 0], p[..., 1]
         term1 = 80 * (bm.pi**2) * bm.cos(2 * bm.pi * x) * bm.cos(2 * bm.pi * y)
-        term2 = -8 * (bm.pi**2) * bm.sin(2 * bm.pi * x) * bm.sin(2 * bm.pi * y)
-        return term1 + term2
+    
+        return term1
 
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition."""
