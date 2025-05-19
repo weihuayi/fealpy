@@ -16,7 +16,7 @@ def get_PF(function_name):
     script_dir = os.path.dirname(os.path.abspath(__file__))  
     mat_file_path = os.path.join(script_dir, function_name)
     pf = sio.loadmat(mat_file_path)
-    PF = pf['PF']
+    PF = bm.array(pf['PF'])
     return PF
 
 def Kursawe_F1(x):
@@ -294,19 +294,3 @@ multi_benchmark_data = [
         'PF': get_PF('Viennet3'),
     },
 ]
-
-def cal_spacing(front):
-    sorted_id = bm.argsort(front[:, 0])
-    sorted_front = front[sorted_id]
-    distances = bm.linalg.norm(sorted_front[1:] - sorted_front[:-1], axis=1)
-    spacing_value = bm.std(distances)
-    return spacing_value
-    
-def cal_IGD(PF, front):
-    N = front.shape[0]
-    total = 0
-    for i in range(N):
-        dis = bm.sqrt(bm.sum((PF - front[i])**2, axis = 1))
-        min_dis = bm.min(dis)
-        total = total + min_dis
-    return total / N

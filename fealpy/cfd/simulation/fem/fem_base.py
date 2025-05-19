@@ -1,7 +1,7 @@
 from typing import Union, Dict
 from fealpy.backend import backend_manager as bm
-from ...functionspace.space import FunctionSpace
-from ...functionspace import LagrangeFESpace, TensorFunctionSpace
+from ....functionspace.space import FunctionSpace
+from ....functionspace import LagrangeFESpace, TensorFunctionSpace
 
 class FEMParameters:
     """全局有限元默认参数基类"""
@@ -52,6 +52,7 @@ class FEM:
     def __init__(self, equation, params: FEMParameters = None):
         self.equation = equation
         self.mesh = equation.pde.mesh
+
         self.params = params if params else FEMParameters()         
         self.set = self.Set(self)
         
@@ -100,16 +101,22 @@ class FEM:
             if isinstance(space, str):
                 updates['type'] = space
             elif isinstance(space, FunctionSpace):
-                updates['space_obj'] = space
+                if isinstance(space, TensorFunctionSpace):
+                    updates['type'] = space.scalar_space.__str__().split()[0]
+                    updates['p'] = space.scalar_space.p
+                else:
+                    updates['type'] = space.__str__().split()[0]
+                    updates['p'] = space.p
 
             if p is not None:
                 updates['p'] = p
             updates.update(kwargs)
 
             self._parent.params.update(**{space_name: updates})
-
+            
+            property_name = '_' + space_name
             # 重新创建空间（会自动更新__str__）
-            setattr(self._parent, space_name, self._parent._create_space(space_name))
+            setattr(self._parent, property_name, self._parent._create_space(space_name))
             return self
         
 
@@ -129,10 +136,10 @@ class FEM:
                 updates['p'] = p
             self._parent.params.update(**{'uspace': updates})
             if control:
-                self._parent.uspace = space
+                self._parent._uspace = space
             else:
                 sspace = self._parent._create_space('uspace')
-                self._parent.uspace = TensorFunctionSpace(sspace, (self._parent.mesh.GD,-1))
+                self._parent._uspace = TensorFunctionSpace(sspace, (self._parent.mesh.GD,-1))
             return self
 
         def pspace(self,

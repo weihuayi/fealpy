@@ -6,7 +6,7 @@ import pytest
 from diffusion_operator_data import A_1d, A_2d, A_3d
 
 class TestDiffusionOperator:
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_1d_operator(self, backend):
         bm.set_backend(backend)
         diffusion_coef = bm.array([[1.0]], dtype=bm.float64)
@@ -18,7 +18,7 @@ class TestDiffusionOperator:
         A_test = bm.to_numpy(A.toarray())
         np.testing.assert_allclose(A_test, A_1d, atol=1e-10)
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_2d_operator(self, backend):
         bm.set_backend(backend)
         diffusion_coef = bm.array([[1.0, -1.0], [-2.0, 3.0]], dtype=bm.float64)
@@ -31,7 +31,7 @@ class TestDiffusionOperator:
         A_test = bm.to_numpy(A.toarray())
         np.testing.assert_allclose(A_test, A_2d, atol=1e-10)
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_3d_operator(self, backend):
         bm.set_backend(backend)
         diffusion_coef = bm.array([[1.0, -1.0, 0.0], [-2.0, 3.0, 0.0], [0.0, 2.0, 4.0]], dtype=bm.float64)

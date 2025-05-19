@@ -68,11 +68,10 @@ class DiffusionOperator(OpteratorBase):
         node = mesh.entity('node')
         # Evaluate diffusion tensor at all nodes (if function) or take constant
         # D = self.diffusion_coef(node)    # shape == (GD, GD) or broadcastable
-        n = len(inspect.signature(self.diffusion_coef).parameters) 
-        if n == 0:
-            D = self.diffusion_coef()       
+        if callable(self.diffusion_coef):
+            D = self.diffusion_coef(node)  # shape == (GD, GD) or broadcastable
         else:
-            D =self.diffusion_coef(node) # shape == (GD, GD) or broadcastable
+            D =self.diffusion_coef
         
         # Mesh spacing and coefficient vector per dimension
         h = mesh.h                       # tuple of length GD
@@ -84,9 +83,9 @@ class DiffusionOperator(OpteratorBase):
         shape = K.shape                  # multi-index grid shape
 
         # Main diagonal: sum over dims of 2c_i
-        diag_val = bm.full(NN, 2 * bm.sum(c.diagonal()), dtype=mesh.ftype)
-        I = K.flat
-        J = K.flat
+        diag_val = bm.full((NN,), 2 * bm.sum(c.diagonal()), dtype=mesh.ftype)
+        I = K.ravel()
+        J = K.ravel()
         A = csr_matrix((diag_val, (I, J)), shape=(NN, NN))
 
         # Prepare slicing for neighbor access
@@ -96,13 +95,13 @@ class DiffusionOperator(OpteratorBase):
         # Off-diagonal contributions in each dimension
         for i in range(GD):
             # shift between nodes in dim i
-            off_val = bm.full(NN - shifts[i], -c[i, i], dtype=mesh.ftype)
+            off_val = bm.full((NN - shifts[i],), -c[i, i], dtype=mesh.ftype)
 
             # build slices for forward/backward neighbors
             s_plus  = full[:i] + (slice(1, None),) + full[i+1:]
             s_minus = full[:i] + (slice(None, -1),) + full[i+1:]
-            I_idx = K[s_plus].flat
-            J_idx = K[s_minus].flat
+            I_idx = K[s_plus].ravel()
+            J_idx = K[s_minus].ravel()
             # add coupling to both directions
             A += csr_matrix((off_val, (I_idx, J_idx)), shape=(NN, NN))
             A += csr_matrix((off_val, (J_idx, I_idx)), shape=(NN, NN))
