@@ -58,9 +58,9 @@ class CubicSplineKernel(KernelFunctionBase):
         if dim == 1:
             self.alpha = 2.0/3.0 * self.h_derivative
         elif dim == 2:
-            self.alpha = 10.0/7.0/jnp.pi * self.h_derivative**2
+            self.alpha = 10.0/7.0/bm.pi * self.h_derivative**2
         elif dim == 3:
-            self.alpha = 1.0/jnp.pi * self.h_derivative**3
+            self.alpha = 1.0/bm.pi * self.h_derivative**3
 
     def value(self,r):
         q = r * self.h_derivative
@@ -92,9 +92,9 @@ class QuadraticKernel(KernelFunctionBase):
         if dim == 1:
             self.alpha = 2.0/3.0 * self.h_derivative
         elif dim == 2:
-            self.alpha = 2.0/jnp.pi * self.h_derivative**2
+            self.alpha = 2.0/bm.pi * self.h_derivative**2
         elif dim == 3:
-            self.alpha = 5.0/4.0/jnp.pi * self.h_derivative**3
+            self.alpha = 5.0/4.0/bm.pi * self.h_derivative**3
     
     def value(self,r):
         q = r * self.h_derivative

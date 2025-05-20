@@ -22,8 +22,7 @@ from .integrator import (
 )
 '''
 @brief
-(coef \\nabla u \\cdot n, v)_{\\partial \\Omega}
-epsion(u) = 1/2*(\\nabla u+ (\\nabla u).T)
+(coef \\nabla^T u \\cdot n, v)_{\\partial \\Omega}
 @param[in] mu 
 '''
 class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):

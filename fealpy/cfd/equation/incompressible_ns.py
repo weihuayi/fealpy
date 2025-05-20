@@ -3,7 +3,7 @@ from typing import Union, Callable, Dict
 CoefType = Union[int, float, Callable]
 
 class IncompressibleNS(BaseEquation):
-    def __init__(self, pde):
+    def __init__(self, pde, init_variables=True):
         super().__init__(pde)
         self._coefs = {
             'time_derivative': 1,  # 时间导数项系数
@@ -16,7 +16,9 @@ class IncompressibleNS(BaseEquation):
             'velocity': None,     # 速度变量
             'pressure': None     # 压力变量
         }
-        self.initialize_from_pde(pde) 
+        self.pde = pde
+        if init_variables:
+            self.initialize_from_pde(pde) 
     
     def initialize_from_pde(self, pde):
         """
@@ -164,7 +166,7 @@ class IncompressibleNS(BaseEquation):
             ns.set_coefs(viscosity=0.1, body_force=lambda x: x[0])
         """
         for term, value in kwargs.items():
-            self.set_term(term, value)
+            self.set_coefficient(term, value)
 
     def set_variables(self, **kwargs) -> None:
         """

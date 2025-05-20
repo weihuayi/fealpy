@@ -6,7 +6,7 @@ import pytest
 from reaction_operator_data import A_1d, A_2d, A_3d
 
 class TestReactionOperator:
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_1d_operator(self, backend):
         bm.set_backend(backend)
         def reaction_coef(p):
@@ -19,7 +19,7 @@ class TestReactionOperator:
         A_test = bm.to_numpy(A.toarray())
         np.testing.assert_allclose(A_test, A_1d, atol=1e-1)
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_2d_operator(self, backend):
         bm.set_backend(backend)
         def reaction_coef(p):
@@ -33,7 +33,7 @@ class TestReactionOperator:
         A_test = bm.to_numpy(A.toarray())
         np.testing.assert_allclose(A_test, A_2d, atol=1e-10)
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_3d_operator(self, backend):
         bm.set_backend(backend)
         def reaction_coef(p):

@@ -8,7 +8,7 @@ from .sparse_tensor import SparseTensor
 from .coo_tensor import COOTensor
 from .csr_tensor import CSRTensor
 
-from .ops import spdiags
+from .ops import spdiags, speye
 
 
 
@@ -127,6 +127,9 @@ def csr_matrix(arg1,
         ftype (dtype | None, optional): Scalar type of data
         device (str | device | None, optional): _description_
     """
+    if itype is None:
+        itype = bm.int64
+
     if isinstance(arg1, _DT): # From a dense tensor
         indices_tuple = bm.nonzero(arg1)
         indices = bm.stack(indices_tuple, axis=0)

@@ -87,11 +87,10 @@ class ConvectionOperator(OpteratorBase):
         GD = mesh.geo_dimension()
         node = mesh.entity('node')
         context = bm.context(node)
-        n = len(inspect.signature(self.convection_coef).parameters) 
-        if n == 0:
-            b = self.convection_coef()     
+        if callable(self.convection_coef):
+            b = self.convection_coef(node)     
         else:
-            b = self.convection_coef(node)            
+            b = self.convection_coef           
         h = mesh.h                                # uniform spacing in each dimension
         NN = mesh.number_of_nodes()
         K = mesh.linear_index_map('node')         # multi-index map
@@ -99,12 +98,12 @@ class ConvectionOperator(OpteratorBase):
         full = (slice(None),) * GD                # full slicing tuple
 
         c = bm.abs(b / h)   # component-wise |b_i|/h_i
-        diag = bm.full(NN, bm.sum(c), **context)  # diagonal term: sum_i |b_i|/h_i
+        diag = bm.full((NN,), bm.sum(c), **context)  # diagonal term: sum_i |b_i|/h_i
         A = spdiags(diag, 0, NN, NN, format='csr')
 
         for i in range(GD):
             n_shift = math.prod(cnt for idx, cnt in enumerate(shape) if idx != i)
-            off = bm.full(NN - n_shift, -c[i], **context)
+            off = bm.full((NN - n_shift,), -c[i], **context)
 
             s1 = full[:i] + (slice(1, None),) + full[i+1:]
             s2 = full[:i] + (slice(None, -1),) + full[i+1:]
@@ -155,7 +154,7 @@ class ConvectionOperator(OpteratorBase):
         A = spdiags(zero_diag, 0, NN, NN, format='csr')
         for i in range(GD):
             n_shift = math.prod(cnt for idx, cnt in enumerate(shape) if idx != i)
-            off = bm.full(NN - n_shift, c[i], **context)
+            off = bm.full((NN - n_shift,), c[i], **context)
 
             s1 = full[:i] + (slice(1, None),) + full[i+1:]   # 1:
             s0 = full[:i] + (slice(None, -1),) + full[i+1:]  # 0:-1

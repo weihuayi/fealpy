@@ -409,8 +409,6 @@ class LevelSetReinitModel():
 
         return area
 
-
-
     def level_x(self, phi, y):
         '''
         计算界面与水平直线y交点的x值

@@ -91,7 +91,8 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         self.device = device
 
-        self.extent = bm.array(extent, dtype=itype, device=device)
+        # self.extent = bm.array(extent, dtype=itype, device=device)
+        self.extent = extent
         self.h = bm.array(h, dtype=ftype, device=device) 
         self.origin = bm.array(origin, dtype=ftype, device=device)
         self.shape = (
@@ -277,7 +278,7 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         ny = self.ny
         NC = self.NC
         NE = self.NE
-
+        
         edge2cell = bm.zeros((NE, 4), dtype=self.itype)
 
         idx = bm.arange(NC, dtype=self.itype).reshape(nx, ny).T
