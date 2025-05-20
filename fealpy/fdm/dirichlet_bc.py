@@ -1,6 +1,6 @@
 from ..backend import backend_manager as bm
 from ..typing import TensorLike
-from ..sparse import spdiags
+from ..sparse import spdiags, COOTensor, CSRTensor
 
 class DirichletBC:
     """Class for applying Dirichlet boundary conditions
@@ -80,25 +80,25 @@ class DirichletBC:
         >>> bc = DirichletBC(mesh, gd=exact_solution, threshold=bd_diag)
         >>> A_bc, f_bc = bc.apply(A, f)
         """
+
         if uh is None:
-        # Initialize uh as a zero vector if not provided
+            # Initialize uh as a zero vector if not provided
+            #uh = bm.zeros(A.shape[0], **A.values_context())
             if hasattr(A, 'values_context'):
                 uh = bm.zeros(A.shape[0], **A.values_context())
             else:
                 uh = bm.zeros(A.shape[0], dtype=A.dtype)
         # Get all node coordinates
         node = self.mesh.entity('node')
-
         if self.threshold is None:
-            # If no threshold function is provided, apply BCs to all boundary nodes
             bdFlag = self.mesh.boundary_node_flag()
         else:
-            # Apply BCs only to selected boundary nodes based on threshold
-            total_bd_idx = self.mesh.boundary_node_index()   # Indices of all boundary nodes
-            bd_node = self.mesh.node[total_bd_idx]           # Coordinates of boundary nodes
-            mark = self.threshold(bd_node)                   # Boolean array indicating selected nodes
-            bdFlag = bm.zeros(self.mesh.number_of_nodes(), dtype=bool)
-            bdFlag[total_bd_idx[mark]] = True                # Mark selected boundary nodes as True
+            total_bd_idx = self.mesh.boundary_node_index()
+            bd_node = self.mesh.node[total_bd_idx]
+            mark = self.threshold(bd_node)
+            mark = bm.array(mark, dtype=bm.bool)
+            bdFlag = bm.zeros(self.mesh.number_of_nodes(), dtype=bm.bool)
+            bdFlag = bm.set_at(bdFlag,total_bd_idx[mark],True)              # Mark selected boundary nodes as True
 
         # Assign boundary values at selected nodes
         uh = bm.set_at(uh, bdFlag, self.gd(node[bdFlag]))
@@ -107,11 +107,62 @@ class DirichletBC:
         f = f - A @ uh
         f = bm.set_at(f, bdFlag, uh[bdFlag])
 
+        
         # Construct projection matrices
-        D0 = spdiags(1 - bdFlag, 0, A.shape[0], A.shape[0])  # Keeps interior equations
-        D1 = spdiags(bdFlag, 0, A.shape[0], A.shape[0])      # Identity on boundary nodes
-
+        # D0 = spdiags(1 - bdFlag, 0, A.shape[0], A.shape[0])  # Keeps interior equations
+        # D1 = spdiags(bdFlag, 0, A.shape[0], A.shape[0])      # Identity on boundary nodes
+        
         # Apply boundary conditions to the matrix
+        '''
         A = D0 @ A @ D0 + D1
-        return A, f
+        '''
+        isDDof = bdFlag
+        boundary_dof_index = bm.nonzero(isDDof)[0] # Get the indices of Dirichlet boundary nodes
+        kwargs = A.values_context()
+        if isinstance(A, COOTensor):
+            indices = A.indices()
+            remove_flag = bm.logical_or(
+                isDDof[indices[0, :]], isDDof[indices[1, :]]
+            )
+            retain_flag = bm.logical_not(remove_flag)
+            new_indices = indices[:, retain_flag]
+            new_values = A.values()[..., retain_flag]
+            A = COOTensor(new_indices, new_values, A.sparse_shape)
 
+            index = bm.nonzero(isDDof)[0]
+            shape = new_values.shape[:-1] + (len(index), )
+            one_values = bm.ones(shape, **kwargs)
+            one_indices = bm.stack([index, index], axis=0)
+            A1 = COOTensor(one_indices, one_values, A.sparse_shape)
+            A = A.add(A1).coalesce()
+
+        elif isinstance(A, CSRTensor):
+            isIDof = bm.logical_not(isDDof)
+            crow = A.crow
+            col = A.col
+            indices_context = bm.context(col)
+            ZERO = bm.array([0], **indices_context)
+
+            nnz_per_row = crow[1:] - crow[:-1]
+            remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
+            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
+            nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
+
+            new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
+
+            NNZ = new_crow[-1]
+            non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
+            loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
+            non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
+
+            new_col = bm.empty((NNZ,), **indices_context)
+            new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], boundary_dof_index)
+            new_col = bm.set_at(new_col, non_diag, col[remain_flag])
+
+            new_values = bm.empty((NNZ,), **kwargs)
+            new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
+            new_values = bm.set_at(new_values, non_diag, A.values[remain_flag])
+
+            A = CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
+        
+        return A, f

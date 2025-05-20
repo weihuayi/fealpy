@@ -6,7 +6,7 @@ import pytest
 from convection_operator_data import A0_1d, A1_1d, A0_2d, A1_2d, A0_3d, A1_3d
 
 class TestConvectionOperator:
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_1d_operator(self, backend):
         bm.set_backend(backend)
         domain = [0, 1]
@@ -21,7 +21,7 @@ class TestConvectionOperator:
         np.testing.assert_allclose(A0_test, A0_1d, atol=1e-1)
         np.testing.assert_allclose(A1_test, A1_1d, atol=1e-1)
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_2d_operator(self, backend):
         bm.set_backend(backend)
         domain = [0, 1, 0, 1]
@@ -37,7 +37,7 @@ class TestConvectionOperator:
         np.testing.assert_allclose(A0_test, A0_2d, atol=1e-10)
         np.testing.assert_allclose(A1_test, A1_2d, atol=1e-10)
 
-    @pytest.mark.parametrize("backend", ['numpy'])
+    @pytest.mark.parametrize("backend", ['numpy', 'jax', 'pytorch'])
     def test_3d_operator(self, backend):
         bm.set_backend(backend)
         domain = [0, 1, 0, 1, 0, 1]
