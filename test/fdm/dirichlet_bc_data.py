@@ -1,5 +1,4 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh import UniformMesh
 from fealpy.model import PDEDataManager
 from fealpy.sparse import CSRTensor 
 from scipy import sparse
@@ -7,7 +6,6 @@ from scipy import sparse
 pde = PDEDataManager('poisson').get_example('coscos')
 domain = pde.domain()  # [-1, 1, -1, 1]
 extent = [0, 2, 0, 2]
-mesh = UniformMesh(domain, extent)
 
 def bd_1(node):
     x = node[:, 0]
@@ -19,8 +17,6 @@ def dirichlet_bc(threshold, mesh):
     bd_node = mesh.node[total_bd_idx]
     bd_idx = threshold(bd_node)
     return bd_idx
-
-x = dirichlet_bc(bd_1, mesh)
 
 A_before_scipy = sparse.csr_matrix(bm.array(
     [[ 4., -1.,  0., -1.,  0.,  0.,  0.,  0.,  0.],

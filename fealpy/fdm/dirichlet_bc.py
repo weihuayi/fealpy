@@ -109,8 +109,8 @@ class DirichletBC:
 
         
         # Construct projection matrices
-        D0 = spdiags(1 - bdFlag, 0, A.shape[0], A.shape[0])  # Keeps interior equations
-        D1 = spdiags(bdFlag, 0, A.shape[0], A.shape[0])      # Identity on boundary nodes
+        # D0 = spdiags(1 - bdFlag, 0, A.shape[0], A.shape[0])  # Keeps interior equations
+        # D1 = spdiags(bdFlag, 0, A.shape[0], A.shape[0])      # Identity on boundary nodes
         
         # Apply boundary conditions to the matrix
         '''
