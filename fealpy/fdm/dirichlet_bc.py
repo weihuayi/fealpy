@@ -1,5 +1,6 @@
 from ..backend import backend_manager as bm
 from ..typing import TensorLike
+import numpy as np
 from ..sparse import spdiags, COOTensor, CSRTensor
 
 class DirichletBC:
@@ -109,12 +110,11 @@ class DirichletBC:
 
         
         # Construct projection matrices
-        # D0 = spdiags(1 - bdFlag, 0, A.shape[0], A.shape[0])  # Keeps interior equations
-        # D1 = spdiags(bdFlag, 0, A.shape[0], A.shape[0])      # Identity on boundary nodes
-        
-        # Apply boundary conditions to the matrix
         '''
-        A = D0 @ A @ D0 + D1
+        D0 = spdiags(1 - bdFlag, 0, A.shape[0], A.shape[0])  # Keeps interior equations
+        D1 = spdiags(bdFlag, 0, A.shape[0], A.shape[0])      # Identity on boundary nodes
+        # Apply boundary conditions to the matrix
+        A = D0.matmul(A.matmul(D0)) + D1
         '''
         isDDof = bdFlag
         boundary_dof_index = bm.nonzero(isDDof)[0] # Get the indices of Dirichlet boundary nodes
@@ -141,17 +141,18 @@ class DirichletBC:
             crow = A.crow
             col = A.col
             indices_context = bm.context(col)
+            indices_context['dtype'] = bm.int64
             ZERO = bm.array([0], **indices_context)
 
             nnz_per_row = crow[1:] - crow[:-1]
-            remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
-            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
-            nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
+            remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col]
+            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0)
+            nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof
 
             new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
 
             NNZ = new_crow[-1]
-            non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
+            non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof))
             loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
             non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
 
@@ -159,10 +160,12 @@ class DirichletBC:
             new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], boundary_dof_index)
             new_col = bm.set_at(new_col, non_diag, col[remain_flag])
 
+            kwargs = A.values_context()
+            kwargs['dtype'] = bm.float64
             new_values = bm.empty((NNZ,), **kwargs)
             new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
             new_values = bm.set_at(new_values, non_diag, A.values[remain_flag])
 
             A = CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
-        
+           
         return A, f
