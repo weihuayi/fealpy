@@ -10,21 +10,26 @@ from .cm_conforming_fe_space import CmConformingFESpace2d
 from .cm_conforming_fe_space3d import CmConformingFESpace3d
 from .bernstein_fe_space import BernsteinFESpace
 
-from .first_nedelec_fe_space_2d import FirstNedelecFiniteElementSpace2d
-from .first_nedelec_fe_space_3d import FirstNedelecFiniteElementSpace3d
+from .first_nedelec_fe_space import FirstNedelecFESpace
+from .first_nedelec_fe_space_2d import FirstNedelecFESpace2d
+from .first_nedelec_fe_space_3d import FirstNedelecFESpace3d
 
-from .second_nedelec_fe_space_2d import SecondNedelecFiniteElementSpace2d
-from .second_nedelec_fe_space_3d import SecondNedelecFiniteElementSpace3d
+from .second_nedelec_fe_space import SecondNedelecFESpace
+from .second_nedelec_fe_space_2d import SecondNedelecFESpace2d
+from .second_nedelec_fe_space_3d import SecondNedelecFESpace3d
 
-from .raviart_thomas_fe_space_2d import RaviartThomasFESpace2d 
-from .raviart_thomas_fe_space_3d import RaviartThomasFESpace3d 
+from .raviart_thomas_fe_space import RaviartThomasFESpace
+from .raviart_thomas_fe_space_2d import  RaviartThomasFESpace2d
+from .raviart_thomas_fe_space_3d import  RaviartThomasFESpace3d
 
 from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
 
 from .huzhang_fe_space_2d import HuZhangFESpace2D
 
-from .BrezziDouglasMariniFiniteElementSpace2d import BDMFiniteElementSpace2d
-from .BrezziDouglasMariniFiniteElementSpace3d import BDMFiniteElementSpace3d
+from .brezzi_douglas_marini_fe_space import BrezziDouglasMariniFESpace
+from .brezzi_douglas_marini_fe_space_2d import BrezziDouglasMariniFESpace2d
+from .brezzi_douglas_marini_fe_space_3d import BrezziDouglasMariniFESpace3d
+
 
 from .interior_penalty_fe_space_2d import InteriorPenaltyFESpace2d
 

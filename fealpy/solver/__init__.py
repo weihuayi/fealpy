@@ -8,3 +8,4 @@ from .cg import cg
 from .minres import minres
 from .gmres import gmres
 from .lgmres import lgmres
+from .directsolvermanger import DirectSolverManager

@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 
 from ..backend import backend_manager as bm
@@ -8,48 +7,80 @@ from ..sparse import spdiags
 from ..solver import spsolve
 
 from ..model import PDEDataManager
-from ..mesh import UniformMesh 
-from ..fdm import LaplaceOperator   
-from ..fdm import DirichletBC
-from .diffusion_operator import DiffusionOperator
+from ..mesh import UniformMesh  
+from . import LaplaceOperator   
+from . import DirichletBC
 from .convection_operator import ConvectionOperator
-from .reaction_operator import ReactionOperator
 
 
 class HyperbolicFDMModel:
-    """
-    Finite Difference solver for parabolic PDEs on uniform grids.
+    """Finite Difference solver for parabolic PDEs on uniform grids.
+    
     This class implements time integration using Forward Euler, Backward Euler
     or Crank–Nicolson schemes, supports uniform mesh refinement, error
     analysis across time and space refinements, as well as solution and
     error visualization.
+    
     Parameters
     ----------
-    pde : PDEData object
-        Provides domain, initial conditions, source term, Dirichlet BC, exact solution, etc.
-    scheme : str, optional
-        Time-stepping scheme: 'forward', 'backward', or 'cn' (default 'backward').
+        pde : PDEData object
+            Provides problem data (initial conditions, source, dirichlet, solution).
+        tau : float
+            Time step size for marching.
+        maxit : int, optional, default=4
+            Number of uniform mesh refinements.
+        ns : int or list of int, optional, default=20
+            Initial number of segments per dimension.
+        nt : int, optional, default=400
+            Number of time steps.
+        scheme : {'forward','backward','cn'}, optional, default='backward'
+            Time-stepping scheme: forward Euler, backward Euler,
+            or Crank–Nicolson.
+    
+    Attributes
+    ----------
+        pde : PDEData object
+            Provides domain, initial conditions, source term, Dirichlet BC, exact solution, etc.
+        maxit : int
+            Number of uniform mesh refinements.
+        ns : int or list of int
+            Initial number of segments per dimension.
+        solver : function
+            Solver function for linear systems.
+        scheme : str
+            Time-stepping scheme.
+        nt : int
+            Number of time steps.
+        mesh : UniformMesh object
+            The computational mesh.
+        t0, t1 : float
+            Start and end times of the simulation.
+        final_solutions : ndarray
+            Array of solutions at the final time step for each refinement level.
+        final_errors : ndarray
+            Array of errors at the final time step for each refinement level.
     """
     
     def __init__(self, example: str = 'sinsin', maxit: int = 4, 
                  ns: int = 20, solver=spsolve, nt: int = 400,  scheme: str='backward'):
         """
         Initialize the ParabolicFDMModel.
+        
         Parameters
         ----------
-        pde : PDEData object
-            Provides problem data (initial conditions, source, dirichlet, solution).
-        tau : float
-            Time step size for marching.
-        maxit : int, optional
-            Number of uniform mesh refinements (default 4).
-        ns : int or list of int, optional
-            Initial number of segments per dimension (default 10).
-        nt : int, optional
-            Number of time steps (default 400).
-        scheme : {'forward','backward','cn'}, optional
-            Time-stepping scheme: forward Euler, backward Euler,
-            or Crank–Nicolson (default 'backward').
+            pde : PDEData object
+                Provides problem data (initial conditions, source, dirichlet, solution).
+            tau : float
+                Time step size for marching.
+            maxit : int, optional, default=4
+                Number of uniform mesh refinements.
+            ns : int or list of int, optional, default=20
+                Initial number of segments per dimension.
+            nt : int, optional, default=400
+                Number of time steps.
+            scheme : {'forward','backward','cn'}, optional, default='backward'
+                Time-stepping scheme: forward Euler, backward Euler,
+                or Crank–Nicolson.
         """
         self.pde = PDEDataManager('hyperbolic').get_example(example) 
         self.maxit = maxit
@@ -60,18 +91,17 @@ class HyperbolicFDMModel:
         self.maxit = maxit
         self.mesh = None
         self.t0, self.t1 = self.pde.duration()
-        self.all_solutions = {}
-        self.all_errors    = {}
+        self.final_solutions = None
+        self.final_errors    = None
 
-    
         
     def _generate_mesh(self, n):
-        """Generate initial uniform mesh
+        """Generate initial uniform mesh.
         
         Parameters
         ----------
-        n : int
-            Number of segments per dimension
+            n : int
+                Number of segments per dimension.
         """
         domain = self.pde.domain()
         extent = [0, n] * self.pde.geo_dimension()
@@ -81,27 +111,28 @@ class HyperbolicFDMModel:
         mesh = self.mesh
         pde = self.pde
 
-        if hasattr(pde, 'diffusion_coef'): 
-            A = DiffusionOperator(mesh=mesh, diffusion_coef=pde.diffusion_coef).assembly()
-        else:
-            A = LaplaceOperator(mesh).assembly()
-
+        A = ConvectionOperator(mesh=mesh, convection_coef=pde.convection_coef).assembly()
         I = spdiags(bm.ones(A.shape[0], dtype=mesh.ftype), 0, A.shape[0], A.shape[1])
         self.A = A
         self.I = I
 
-        if hasattr(pde, 'convection_coef'): 
-            A += ConvectionOperator(mesh=mesh, convection_coef=pde.convection_coef).assembly()
-        if hasattr(pde, 'reaction_coef'):  
-            A += ReactionOperator(mesh=mesh, reaction_coef=pde.reaction_coef).assembly()
-
 
     def init_solution(self):
+        """Initialize the solution at the initial time step."""
         uh0 = self.mesh.interpolate(self.pde.init_solution, etype='node').reshape(-1)
         self.uh = uh0.copy()
 
 
     def step(self, n, tau):
+        """Perform a single time step.
+        
+        Parameters
+        ----------
+            n : int
+                Current time step index.
+            tau : float
+                Time step size.
+        """
         mesh = self.mesh
         A    = self.A
         I    = self.I
@@ -134,104 +165,144 @@ class HyperbolicFDMModel:
             raise ValueError(f"Unknown scheme {self.scheme}")
         
     def run(self):
-        """
-        Execute time-stepping on successively refined meshes.
-        1. Generate initial mesh with n0 segments/direction.
-        2. For each refinement level:
-           - Assemble matrices, init solution
-           - March forward for nt steps
-           - Record solution/time and errors
-           - Uniformly refine mesh for next level
-        3. Print final-time errors and error ratios.
+        """Execute time-stepping on successively refined meshes.
+            
+            1. Generate initial mesh with n0 segments/direction.
+            2. For each refinement level:
+                - Assemble matrices, init solution
+                - March forward for nt steps
+                - Record solution/time and errors
+                - Uniformly refine mesh for next level
+            3. Print final-time errors and error ratios.
         """
         t0, t1 = self.t0, self.t1
         self.tau = (t1 - t0) / self.nt
-        self.generate_mesh()
-        prev_err_end = None
-        
+        self._generate_mesh(n=self.ns)
+
+        em = bm.zeros((1, self.nt+1))
+        error = bm.zeros((3, self.maxit))
+
         for level in range(self.maxit):
             self._linear_system()
             self.init_solution()
             sols = [self.uh.copy()]
-            em = bm.zeros((3, self.nt+1), dtype=float)
-            em[:, 0] = self.mesh.error(lambda p: self.pde.solution(p, t0),self.uh,errortype='all')
-            for n in range(1, self.nt+1):
+
+            if level == self.maxit:
+                em[0, 0] = self.mesh.error(lambda p: self.pde.solution(p, t0), self.uh, errortype='max')
+                
+            for n in range(1,self.nt+1):
                 t_n = t0 + n * self.tau
                 self.step(n, self.tau)
                 sols.append(self.uh.copy())
-                em[:, n] = self.mesh.error(
-                    lambda p: self.pde.solution(p, t_n),
-                    self.uh,
-                    errortype='all'
-                )
-            self.all_solutions[level] = sols
-            self.all_errors[level]    = em
-            err_end = em[0, -1]  # max-norm at final time
-            if prev_err_end is not None:
-                ratio = prev_err_end / err_end
-                print(f"refinement {level}:  final error={err_end:.2e}, ratio={ratio:.2f}")
-            else:
-                print(f"refinement {level}:  final error={err_end:.2e}")
-            prev_err_end = err_end
+
+                if level == self.maxit-1:
+                    em[0, n] = self.mesh.error(lambda p: self.pde.solution(p, t_n), self.uh, errortype='max')
+            
+            error[0, level], error[1, level], error[2, level] = self.mesh.error(
+                lambda p: self.pde.solution(p, t_n), self.uh, errortype='all')
+
+            if level == self.maxit-1:            
+                self.final_solutions =  sols
+ 
+
             if level < self.maxit - 1:
                 self.mesh.uniform_refine()
 
+        self.final_errors = em
+        print("最后时间步的误差(max,L2, H1/l1): ", error, "收敛阶: ", error[:, 0:-1] / error[:, 1:], sep='\n')
+
     def show_solution(self, zlim=None, interval=100):
+        """Display numerical solution visualization.
+        
+        Note
+        ----
+            Only supports 1D and 2D problems. For 1D: plots solution curve.
+            For 2D: shows 3D surface plot. Higher dimensions will print warning.
         """
-        Animate the 2D surface of u(x,y) over time for a given refinement level.
-        Parameters:
-        - level: refinement level key in self.all_solutions
-        - tau: time step size (if None, uses stored self.tau)
-        - zlim: tuple (zmin, zmax) for vertical axis limits
-        - interval: delay between frames in ms
-        """
-        import matplotlib.pyplot as plt
+        
+        GD = self.pde.geo_dimension()
+        
+        if GD > 2:
+            print("Warning: Only 1D and 2D function visualization is supported. Current problem dimension is ", GD)
+            return
+        
         from matplotlib import animation
+
         mesh = self.mesh
-        sol = self.all_solutions[self.maxit - 1]  # Get the last refinement level solution
-        # time step
-        dt = self.tau if self.tau is not None else (self.pde.duration()[1] - self.t0) / len(sol)
-        # prepare coords
+        sol = self.final_solutions  # Ensure sol is [n_time_steps, n_nodes] array
+        n_sol = len(sol)
         node = mesh.entity('node')
-        x, y = node[:, 0], node[:, 1]
-        tri = mesh.entity('cell')
-        # create figure
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        if zlim:
-            ax.set_zlim(*zlim)
-        # initial plot
-        surf = ax.plot_trisurf(x, y, sol[0], triangles=tri, cmap='viridis')
-        def update(frame):
-            # update only Z data by reassigning collection
-            ax.clear()
-            t = self.t0 + frame * dt
-            ax.set_title(f"Time = {t:.2f}")
-            ax.plot_trisurf(x, y, sol[frame], triangles=tri, cmap='viridis')
-            return ax.collections
-        ani = animation.FuncAnimation(
-            fig, update, frames=len(sol), interval=interval, blit=False
-        )
-        plt.show()
-    def show_error(self, level=0, error_type=0):
+        dim = node.shape[1]  # Mesh dimension (1, 2, or 3)
+
+        # Time step size
+        dt = self.tau if self.tau is not None else (self.pde.duration()[1] - self.t0) / n_sol
+
+        # Create figure
+        fig = plt.figure(figsize=(10, 10))
+        
+        # ===== 1D Case =====
+        if GD == 1:
+            ax = fig.add_subplot(111)
+            x = node[:, 0]
+            line, = ax.plot(x, sol[0], 'b-', linewidth=2)
+            ax.set_xlabel('x')
+            ax.set_ylabel('u(x)')
+            ax.set_title(f"Time = {self.t0:.2f}")
+
+            def update(frame):
+                t = self.t0 + frame * dt
+                line.set_ydata(sol[frame])
+                ax.set_title(f"Time = {t:.2f}")
+                return line
+            ani = animation.FuncAnimation(fig, update, frames=len(sol), interval=interval)
+
+
+        # ===== 2D Case =====
+        elif GD == 2:
+            ax = fig.add_subplot(111, projection='3d')
+            x, y = node[:, 0], node[:, 1]
+            tri = mesh.entity('cell')  # Triangle mesh (only for 2D)
+            surf = ax.plot_trisurf(x, y, sol[0], triangles=tri, cmap='viridis')
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_zlabel('u(x,y)')
+            
+            if zlim:
+                ax.set_zlim(*zlim)
+
+            def update_2d(frame):
+                ax.clear()
+                t = self.t0 + frame * dt
+                ax.plot_trisurf(x, y, sol[frame], triangles=tri, cmap='viridis')
+                ax.set_title(f"Time = {t:.2f}")
+                if zlim:
+                    ax.set_zlim(*zlim)
+                return ax.collections
+
+        # Create animation
+            ani = animation.FuncAnimation(fig, update_2d, frames=n_sol, interval=interval) 
+        
+        plt.show()            
+
+    def show_error(self, error_type=0):
+        """Plot a single error metric over time for a given refinement level.
+        
+        Parameters
+        ----------
+            error_type : int, optional, default=0
+                Index of error to plot (0:max, 1:L2, 2:H1).
         """
-        Plot a single error metric over time for a given refinement level.
-        Parameters:
-        - level: refinement level key in self.all_errors
-        - error_type: index of error to plot (0:max, 1:L2, 2:H1)
-        """
-        import matplotlib.pyplot as plt
-        em = self.all_errors[level]  # shape (3, nt+1)
-        # time array
+        em = self.final_errors  # shape (1, nt+1)
+        # Time array
         nt = em.shape[1] - 1
         t0, t1 = self.pde.duration()
         times = [t0 + i*(t1 - t0)/nt for i in range(nt+1)]
-        # select error sequence
+        # Select error sequence
         errs = em[error_type, :]
-        labels = ['Max norm', 'L2 norm', 'H1 norm']
-        plt.figure()
+        labels = ['Max norm']
+        plt.figure(figsize=(10, 10))
         plt.plot(times, errs, '-o', label=labels[error_type])
-        plt.title(f'{labels[error_type]} vs Time (level={level})')
+        plt.title(f'Error(Max norm) of the final mesh refinement')
         plt.xlabel('Time')
         plt.ylabel('Error')
         plt.grid(True)

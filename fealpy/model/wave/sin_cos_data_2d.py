@@ -26,6 +26,11 @@ class SinCosData2D:
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [0.0, 1.0, 0.0, 1.0]  
+    
+    def speed(self) -> float:
+        """Return propagation speed a."""
+        a = 1.0
+        return a
 
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""

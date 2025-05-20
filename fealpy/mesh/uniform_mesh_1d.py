@@ -59,7 +59,8 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
             h = (h, )
 
         # Mesh properties
-        self.extent = bm.array(extent, dtype=itype, device=device)
+        # self.extent = bm.array(extent, dtype=itype, device=device)
+        self.extent = extent
         self.h = bm.array(h, dtype=ftype, device=device) 
         self.origin = bm.array(origin, dtype=ftype, device=device)
         self.shape = (self.extent[1] - self.extent[0], )
@@ -354,13 +355,21 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
         Structured meshes have their own entity generation methods, so the cache needs to be manually cleared.
         Unstructured meshes do not require this because they do not have entity generation methods.
         """
+        # for i in range(n):
+
+        #     self.extent = (0, 2*self.extent[1]) 
+        #     self.h = self.h/2
+        #     self.nx = self.extent[1] - self.extent[0]
+        #     self.NC = self.nx
+        #     self.NE = self.NC
+        #     self.NC = self.NC
+        #     self.NN = self.NC + 1
+        
         for i in range(n):
-            self.extent = 2*self.extent 
+            self.extent = [i * 2 for i in self.extent]
             self.h = self.h/2
             self.nx = self.extent[1] - self.extent[0]
             self.NC = self.nx
-            self.NE = self.NC
-            self.NC = self.NC
             self.NN = self.NC + 1
 
         self.clear()

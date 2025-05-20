@@ -5,8 +5,11 @@ from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
 
 from fealpy.solver import spsolve
-from fealpy.fdm.poisson_fdm_model import PoissonFDMModel
+from fealpy.fdm import PoissonFDMModel
+from fealpy.utils import timer
 
+tmr = timer()
+next(tmr)
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -24,8 +27,8 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 parser.add_argument('--ns',
-        default=20, type=int,
-        help='初始网格在每个方向剖分段数, 默认 20 段.')
+        default=10, type=int,
+        help='初始网格在每个方向剖分段数, 默认 10 段.')
 
 parser.add_argument('--solver',
         default=spsolve,
@@ -39,6 +42,8 @@ solver = args.solver
 
 model = PoissonFDMModel(example=example, maxit=maxit, ns=ns, solver=solver)
 model.run()   # 加密求解过程
+tmr.send('Total time')
+next(tmr)
 model.show_error()  # 误差、误差比的图示
 model.show_solution()  # 数值解的图像
 plt.show()

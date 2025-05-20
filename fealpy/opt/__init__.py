@@ -1,6 +1,6 @@
 
 from .objective import Objective
-from .A_star import AStar, GridMap
+# from .A_star import AStar, GridMap
 from .ANT_TSP import calD, Ant_TSP
 from .optimizer_base import opt_alg_options, Optimizer
 from .swarm_based import (AntColonyOptAlg, ArtificialRabbitsOpt, BlackwingedKiteAlg, ButterflyOptAlg, 
@@ -22,3 +22,4 @@ from .evolutionary_based import (GeneticAlg, DifferentialEvolution)
 from .PLBFGSAlg import PLBFGS
 from .PNLCGAlg import PNLCG
 from .GradientDescentAlg import GradientDescent
+from .multi_quantum_particle_swarm_opt import MO_QuantumParticleSwarmOpt

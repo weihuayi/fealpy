@@ -1,222 +1,308 @@
 import matplotlib.pyplot as plt
-from fealpy.backend import backend_manager as bm
-bm.set_backend('numpy')
 
-from fealpy.mesh import UniformMesh 
-from fealpy.fdm import LaplaceOperator   
-from fealpy.fdm import DirichletBC
-from fealpy.sparse import spdiags
-from fealpy.solver import spsolve
+from ..backend import backend_manager as bm
+from ..mesh import UniformMesh
+from ..fdm import LaplaceOperator
+from ..fdm import DirichletBC
+from ..sparse import spdiags
+from ..solver import spsolve
+from ..model import PDEDataManager
 
 class WaveFDMModel:
-    """
-    Finite Difference solver for wave equations on uniform grids.
-    This class implements both explicit and implicit time integration schemes,
-    supports uniform mesh refinement, error analysis, and solution visualization.
+    """Finite Difference solver for second-order wave equations using theta-scheme
+    
+    Solves the second-order wave equation:
+        d^2 u / dt^2 + a^2 A u = 0
+    using a three-level theta-scheme in time. Supports mesh refinement studies
+    and provides visualization capabilities for 1D and 2D problems.
     
     Parameters
     ----------
-    pde : PDEData object
-        Provides domain, initial conditions, source term, Dirichlet BC, exact solution, etc.
-    scheme : str, optional
-        Time-stepping scheme: 'explicit' or 'implicit' (default 'explicit').
+        example : str, optional, default='sincos'
+            Name of the example problem to solve (must be available in PDEDataManager)
+        maxit : int, optional, default=4
+            Number of mesh refinement levels to perform
+        ns : int, optional, default=20
+            Initial number of segments per dimension
+        solver : callable, optional, default=spsolve
+            Linear system solver function (must have same interface as spsolve)
+        theta : float, optional, default=0.5
+            Weight parameter in [0,1] controlling implicitness:
+            - 0: explicit scheme
+            - 0.5: symmetric scheme (Crank-Nicolson type)
+            - 1: fully implicit scheme
+        nt : int, optional, default=400
+            Number of time steps to use in the simulation
+        
+    Attributes
+    ----------
+        pde : PDEDataManager
+            Manages PDE problem data including domain, initial/boundary conditions
+        a : float
+            Wave speed constant from the PDE
+        mesh : UniformMesh
+            Current computational mesh
+        t0, t1 : float
+            Start and end times of the simulation
+        final_solutions : list
+            Stores all time-step solutions for the final refinement level
+        final_errors : ndarray
+            Error metrics for each time step in the final refinement level
+        u_nm1, u_nm2 : ndarray
+            Solution vectors at previous time steps (n-1 and n-2)
+        A, I : sparse matrix
+            Discrete Laplace operator and identity matrix
+    
+    Methods
+    -------
+        run()
+            Execute the full simulation with mesh refinement study
+        show_solution(interval=100)
+            Visualize the numerical solution animation
+        show_error()
+            Plot error evolution over time for the final refinement level
     """
-    def __init__(self, pde, nt=400, maxit=4, ns=10, scheme='explicit'):
-        """
-        Initialize the WaveFDMModel.
+
+    def __init__(self, example: str = 'sincos', maxit: int = 4, 
+                 ns: int = 20, solver=spsolve, theta: float=0.5, nt: int = 400):
+        """Initialize wave equation solver with problem parameters
         
         Parameters
         ----------
-        pde : PDEData object
-            Provides problem data (initial conditions, source, dirichlet, solution).
-        nt : int, optional
-            Number of time steps (default 400).
-        maxit : int, optional
-            Number of uniform mesh refinements (default 4).
-        ns : int or list of int, optional
-            Initial number of segments per dimension (default 10).
-        scheme : {'explicit', 'implicit'}, optional
-            Time-stepping scheme (default 'explicit').
+            example : str, optional, default='sincos'
+                Name of pre-defined example problem
+            maxit : int, optional, default=4
+                Maximum number of mesh refinement iterations
+            ns : int, optional, default=20
+                Initial number of mesh segments per dimension
+            solver : callable, optional, default=spsolve
+                Linear system solver function
+            theta : float, optional, default=0.5
+                Time discretization parameter (0=explicit, 0.5=Crank-Nicolson, 1=implicit)
+            nt : int, optional, default=400
+                Number of time steps
         """
-        self.pde = pde
-        self.scheme = scheme.lower()
+        self.pde = PDEDataManager('wave').get_example(example) 
+        self.a = self.pde.speed()
+        self.theta = theta
         self.nt = nt
-        self.maxit = maxit
         self.ns = ns
+        self.maxit = maxit
         self.mesh = None
-        self.t0, self.t1 = pde.duration()
-        self.all_solutions = {}
-        self.all_errors = {}
-        
+        self.t0, self.t1 = self.pde.duration()
+        self.final_solutions = None
+        self.final_errors = None
+
     def _generate_mesh(self, n):
-        """Generate initial uniform mesh
+        """Generate initial uniform mesh for the problem domain
         
-        Parameters
+            Parameters
+            ----------
             n : int
-                Number of segments per dimension
+                Number of segments per dimension in the initial mesh
         """
         domain = self.pde.domain()
         extent = [0, n] * self.pde.geo_dimension()
         self.mesh = UniformMesh(domain, extent)
+    
+    def _linear_system(self):
+        """Assemble discrete Laplace operator and identity matrix
         
-    def assemble_matrices(self):
+        Constructs the finite difference discretization of the Laplace operator
+        and corresponding identity matrix for the current mesh.
+        Results stored in self.A and self.I.
+        """
         mesh = self.mesh
-        self.A = LaplaceOperator(mesh).assembly()
-        self.I = spdiags(bm.ones(self.A.shape[0], dtype=mesh.ftype), 0, 
-                        self.A.shape[0], self.A.shape[1])
+        A = LaplaceOperator(mesh).assembly()
+        I = spdiags(bm.ones(A.shape[0], dtype=mesh.ftype), 0, *A.shape)
+        self.A = A
+        self.I = I
+
+    def init_solutions(self):
+        """Initialize solution vectors u^0 and u^1 using initial conditions
         
-    def init_solution(self):
+        Computes:
+            u1 = (I - a^2 tau^2/2 A) u0 + tau * phi1
+        where:
+            - u0 is the initial condition u(x,0)
+            - phi1 is the initial velocity du/dt(x,0)
+            - tau is the time step size
+        
+        Applies Dirichlet boundary conditions at both initial time steps.
+        """
         mesh = self.mesh
-        # Initial displacement
-        self.u0 = mesh.interpolate(self.pde.init_displacement, etype='node').reshape(-1)
-        # Initial velocity
-        self.v0 = mesh.interpolate(self.pde.init_velocity, etype='node').reshape(-1)
-        # First time step for explicit scheme
-        if self.scheme == 'explicit':
-            self.u1 = self.u0 + self.tau * self.v0 + 0.5 * self.tau**2 * (
-                self.A @ self.u0 + mesh.interpolate(
-                    lambda p: self.pde.source(p, self.t0), etype='node').reshape(-1))
-        
-    def explicit_step(self, n, tau):
-        mesh = self.mesh
-        t = self.t0 + n * tau
-        F = mesh.interpolate(lambda p: self.pde.source(p, t), etype='node').reshape(-1)
-        
-        # Central difference scheme
-        u_new = 2 * self.u1 - self.u0 + tau**2 * (self.A @ self.u1 + F)
-        
-        # Apply boundary conditions
+        # nodal values
+        u0 = mesh.interpolate(self.pde.init_solution, etype='node').reshape(-1)
+        # initial velocity phi1(x)
+        phi1 = mesh.interpolate(self.pde.init_solution_t, etype='node').reshape(-1)
+        # compute u1
+        tau = (self.t1 - self.t0) / self.nt
+        A = self.A
+        I = self.I
+        u1 = (I - 0.5 * tau**2 * self.a**2 * A) @ u0 + tau * phi1
+        # apply Dirichlet BC at t0 and t1
         bd = mesh.boundary_node_flag()
         nodes = mesh.entity('node')
-        u_new[bd] = self.pde.dirichlet(nodes[bd], t)
-        
-        # Update solutions
-        self.u0, self.u1 = self.u1, u_new
-        
-    def implicit_step(self, n, tau):
-        mesh = self.mesh
-        t = self.t0 + n * tau
-        F = mesh.interpolate(lambda p: self.pde.source(p, t), etype='node').reshape(-1)
-        
-        # Implicit scheme matrix
-        S = self.I - tau**2 * self.A
-        b = 2 * self.u1 - self.u0 + tau**2 * F
-        
-        # Apply boundary conditions
-        S, b = DirichletBC(mesh, lambda p: self.pde.dirichlet(p, t)).apply(S, b)
-        
-        # Solve system
-        u_new = spsolve(S, b, solver='scipy')
-        
-        # Update solutions
-        self.u0, self.u1 = self.u1, u_new
-        
+        u0[bd] = self.pde.dirichlet(nodes[bd], self.t0)
+        u1[bd] = self.pde.dirichlet(nodes[bd], self.t0 + tau)
+        self.u_nm2 = u0.copy()  # u^{n-2}
+        self.u_nm1 = u1.copy()  # u^{n-1}
+
     def step(self, n, tau):
-        if self.scheme == 'explicit':
-            self.explicit_step(n, tau)
-        else:
-            self.implicit_step(n, tau)
+        """Advance solution one time step using theta-scheme
+        
+        Parameters
+        ----------
+            n : int
+                Current time step index
+            tau : float
+                Time step size
             
+        Solves the system:
+            A0 u^n = A1 u^{n-1} + A2 u^{n-2}
+        where coefficient matrices depend on theta scheme parameter.
+        """
+        A = self.A
+        I = self.I
+        theta = self.theta
+        a2tau2 = self.a**2 * tau**2
+        # define coefficient matrices
+        A0 = I + theta * a2tau2 * A
+        A1 = 2*I - (1 - 2*theta) * a2tau2 * A
+        A2 = -(I + theta * a2tau2 * A)
+        # right-hand side
+        rhs = A1 @ self.u_nm1 + A2 @ self.u_nm2  # careful: use u^{n-1} & u^{n-2}
+        # apply Dirichlet BC
+        mesh = self.mesh
+        t_n = self.t0 + n * tau
+        A0, rhs = DirichletBC(mesh, lambda p: self.pde.dirichlet(p, t_n)).apply(A0, rhs)
+        # solve linear system
+        u_n = spsolve(A0, rhs, solver='scipy')
+        # update history
+        self.u_nm2, self.u_nm1 = self.u_nm1, u_n.copy()
+
     def run(self):
+        """Execute full simulation with mesh refinement study
+        
+        Performs:
+            1. Initial mesh generation
+            2. For each refinement level:
+            - Matrix assembly and solution initialization
+            - Time stepping through all time steps
+            - Error computation and storage
+            - Mesh refinement for next level
+            3. Outputs final error statistics and convergence rates
         """
-        Execute time-stepping on successively refined meshes.
-        """
-        t0, t1 = self.pde.duration()
+        t0, t1 = self.t0, self.t1
         self.tau = (t1 - t0) / self.nt
+        self._generate_mesh(self.ns)
         
-        self.generate_mesh()
-        prev_err_end = None
-        
+        em = bm.zeros((1, self.nt+1))
+        error = bm.zeros((3, self.maxit))
+
         for level in range(self.maxit):
-            self.assemble_matrices()
-            self.init_solution()
-            
-            sols = [self.u0.copy(), self.u1.copy()]  # Store initial two steps
-            em = bm.zeros((3, self.nt+1), dtype=float)
-            
-            # Compute initial errors
-            em[:, 0] = self.mesh.error(lambda p: self.pde.solution(p, t0), 
-                                     self.u0, errortype='all')
-            em[:, 1] = self.mesh.error(lambda p: self.pde.solution(p, t0+self.tau), 
-                                     self.u1, errortype='all')
-            
+            self._linear_system()
+            self.init_solutions()
+            sols = [self.u_nm2.copy()]
+            sols.append(self.u_nm1.copy())
+
+            if level == self.maxit:
+                em[0, 0] = self.mesh.error(lambda p: self.pde.solution(p, t0),self.u_nm2,errortype='max')
+                em[0, 1] = self.mesh.error(lambda p: self.pde.solution(p, t0+self.tau),self.u_nm1,errortype='max')
+           
             for n in range(2, self.nt+1):
                 t_n = t0 + n * self.tau
                 self.step(n, self.tau)
-                sols.append(self.u1.copy())
-                em[:, n] = self.mesh.error(
-                    lambda p: self.pde.solution(p, t_n),
-                    self.u1,
-                    errortype='all'
-                )
+                sols.append(self.u_nm1.copy())
                 
-            self.all_solutions[level] = sols
-            self.all_errors[level] = em
+                if level == self.maxit-1:
+                    em[0, n] = self.mesh.error(lambda p: self.pde.solution(p, t_n), self.u_nm1, errortype='max')
             
-            err_end = em[0, -1]  # max-norm at final time
-            if prev_err_end is not None:
-                ratio = prev_err_end / err_end
-                print(f"refinement {level}: final error={err_end:.2e}, ratio={ratio:.2f}")
-            else:
-                print(f"refinement {level}: final error={err_end:.2e}")
-                
-            prev_err_end = err_end
+            error[0, level], error[1, level], error[2, level] = self.mesh.error(
+                lambda p: self.pde.solution(p, t_n), self.u_nm1, errortype='all')
+
+            self.final_errors = em
+
+            if level == self.maxit-1:            
+                self.final_solutions = sols
+
             if level < self.maxit - 1:
                 self.mesh.uniform_refine()
-                
-    def show_solution(self, zlim=None, interval=100):
+
+        self.final_errors = em
+        print("最后时间步的误差(max,L2, H1/l1) ", error, "收敛阶: ", error[:, 0:-1] / error[:, 1:], sep='\n')
+
+    def show_solution(self, interval=100):
+        """Visualize numerical solution animation
+        
+        Displays an animated plot of the solution over time. Supports:
+            - 1D: Line plot animation
+            - 2D: Surface plot animation
+        
+        Parameters
+        ----------
+            interval : int, optional, default=100
+                Delay between frames in milliseconds
+            
+        Note
+        ----
+            For dimensions > 2, prints a warning message as visualization
+            is not supported.
         """
-        Animate the 2D surface of u(x,y) over time.
-        """
-        import matplotlib.pyplot as plt
+        GD = self.pde.geo_dimension()
+        
+        if GD > 2:
+            print("Warning: Only 1D and 2D function visualization is supported. Current problem dimension is ", GD)
+            return
+        
         from matplotlib import animation
-        
         mesh = self.mesh
-        sol = self.all_solutions[self.maxit - 1]
-        dt = self.tau
-        
-        node = mesh.entity('node')
-        x, y = node[:, 0], node[:, 1]
-        tri = mesh.entity('cell')
-        
+        sol = self.final_solutions
+        coords = mesh.entity('node')
+        tau = (self.t1 - self.t0) / self.nt
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        if zlim:
-            ax.set_zlim(*zlim)
-            
-        surf = ax.plot_trisurf(x, y, sol[0], triangles=tri, cmap='viridis')
-        
-        def update(frame):
-            ax.clear()
-            t = self.t0 + frame * dt
-            ax.set_title(f"Time = {t:.2f}")
-            ax.plot_trisurf(x, y, sol[frame], triangles=tri, cmap='viridis')
-            if zlim:
-                ax.set_zlim(*zlim)
-            return ax.collections
-            
-        ani = animation.FuncAnimation(
-            fig, update, frames=len(sol), interval=interval, blit=False
-        )
+
+        if GD == 1:
+            ax = fig.add_subplot(111)
+            def update_1d(n):
+                ax.clear()
+                x = coords[:,0]
+                ax.plot(x, sol[n])
+                ax.set_ylim(sol[0].min(), sol[0].max())
+                ax.set_title(f"t = {self.t0 + n*tau:.3f}")
+                ax.set_xlabel('x')
+                ax.set_ylabel('u')
+            ani = animation.FuncAnimation(fig, update_1d, frames=len(sol), interval=interval)
+        elif GD == 2:
+            from mpl_toolkits.mplot3d import Axes3D  # noqa
+            ax = fig.add_subplot(111, projection='3d')
+            tri = mesh.entity('cell')
+            x, y = coords[:,0], coords[:,1]
+            def update_2d(n):
+                ax.clear()
+                ax.plot_trisurf(x, y, sol[n], triangles=tri, cmap='viridis')
+                ax.set_title(f"t = {self.t0 + n*tau:.3f}")
+            ani = animation.FuncAnimation(fig, update_2d, frames=len(sol), interval=interval)
+
         plt.show()
+
+    def show_error(self):
+        """Plot error evolution over time for final refinement level
         
-    def show_error(self, level=0, error_type=0):
+        Creates a plot showing the maximum norm error versus time
+        for the finest mesh resolution.
         """
-        Plot a single error metric over time.
-        """
-        import matplotlib.pyplot as plt
-        
-        em = self.all_errors[level]
+        em = self.final_errors  # shape (1, nt+1)
+        # time array
         nt = em.shape[1] - 1
         t0, t1 = self.pde.duration()
         times = [t0 + i*(t1 - t0)/nt for i in range(nt+1)]
-        errs = em[error_type, :]
-        
-        labels = ['Max norm', 'L2 norm', 'H1 norm']
+        # select error sequence
+        errs = em[0, :]
+        labels = ['Max norm']
         plt.figure()
-        plt.plot(times, errs, '-o', label=labels[error_type])
-        plt.title(f'{labels[error_type]} vs Time (level={level})')
-        plt.xlabel('Time')
+        plt.plot(times, errs, '-o', label=labels[0])
+        plt.title(f'Error(Max norm) of the final mesh refinement')
         plt.ylabel('Error')
         plt.grid(True)
         plt.legend()

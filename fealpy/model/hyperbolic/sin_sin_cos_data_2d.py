@@ -56,11 +56,11 @@ class SinSinCosData2D:
         term1 = -bm.pi * bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * sin_πt  # ∂u/∂t
         term2 = bm.pi * bm.cos(bm.pi * x) * bm.sin(bm.pi * y) * bm.cos(bm.pi * t)  # ∂u/∂x
         term3 = bm.pi * bm.sin(bm.pi * x) * bm.cos(bm.pi * y) * bm.cos(bm.pi * t)  # ∂u/∂y
-        return term1 + self.a() * (term2 + term3)
+        return term1 + self.convection_coef()[1] * (term2 + term3)
 
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
         """Dirichlet boundary condition."""
-        return bm.zeros(p.shape[:-1])  
+        return self.solution(p=p, t=t) 
 
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
