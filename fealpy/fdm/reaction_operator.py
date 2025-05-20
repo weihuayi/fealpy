@@ -65,11 +65,19 @@ class ReactionOperator(OpteratorBase):
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         # Evaluate reaction coefficient at each node
-        
-        if callable(self.reaction_coef):
-            c = self.reaction_coef(mesh.entity('node'))     
+        f = self.reaction_coef
+        l = len(inspect.signature(f).parameters)
+        if callable(self.reaction_coef) :
+            if l == 2:
+                c = self.reaction_coef(mesh.entity('node')) # shape:(NN,)
+                data = c    
+            else:
+                c = self.reaction_coef() # shape:(1,)
+                data = bm.full(NN, c)
+                
         else:
-            c = self.reaction_coef
-        # Assemble diagonal matrix
-        D = spdiags(c[:,0], 0, NN, NN, format='csr')
+            c = self.reaction_coef 
+            data = bm.full(NN, c)
+            
+        D = spdiags(data, 0, NN, NN, format='csr')
         return D

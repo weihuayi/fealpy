@@ -1,11 +1,12 @@
 import math
-from typing import Optional
+from typing import Optional, Callable, Union
 import inspect
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
-from ..sparse import csr_matrix, spdiags, SparseTensor
+from ..sparse import csr_matrix, SparseTensor
 from ..mesh import UniformMesh
 from .operator_base import OpteratorBase, assemblymethod
+
 class DiffusionOperator(OpteratorBase):
     """
     Discrete approximation of the second‐order diffusion operator:
@@ -18,7 +19,12 @@ class DiffusionOperator(OpteratorBase):
         - heat equation
         - reaction–diffusion systems
         - diffusion‐dominated convection–diffusion equations
-
+    ---------------------------------------------
+    Parameters:
+        mesh            : The structured mesh over which the operator is defined.
+        diffusion_coef  : Can be either a tensor(shape: (GD, GD)) or a function that returns a tensor.
+        method          : Optional string key identifying which assembly
+                          implementation to use. Defaults to 'assembly'.
     -------------------------------------------------------------------------------
     Method extensibility:
         Different coefficient types or optimizations can be supported via the
@@ -30,18 +36,10 @@ class DiffusionOperator(OpteratorBase):
         mesh           : UniformMesh object
         diffusion_coef : Function or constant tensor D(x) of shape (GD, GD)
     """
-    def __init__(self, mesh: UniformMesh, diffusion_coef,
+    def __init__(self, mesh: UniformMesh, 
+                 diffusion_coef: Union[Callable, TensorLike],
                  method: Optional[str]=None):
-        """
-        Initialize the diffusion operator.
-
-        Parameters:
-            mesh            : The structured mesh over which the operator is defined.
-            diffusion_coef  : Either a constant tensor D of shape (GD,GD),
-                              or a function taking node coordinates p and returning D(p).
-            method          : Optional string key identifying which assembly
-                              implementation to use. Defaults to 'assembly'.
-        """
+        
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
@@ -67,12 +65,20 @@ class DiffusionOperator(OpteratorBase):
         GD = mesh.geo_dimension()
         node = mesh.entity('node')
         # Evaluate diffusion tensor at all nodes (if function) or take constant
-        # D = self.diffusion_coef(node)    # shape == (GD, GD) or broadcastable
-        if callable(self.diffusion_coef):
-            D = self.diffusion_coef(node)  # shape == (GD, GD) or broadcastable
+
+        f = self.diffusion_coef
+        if callable(f):
+        # 处理函数情况
+            sig = inspect.signature(f)
+            l = len(sig.parameters)
+            if l == 2:
+                D = f(node)
+            else:
+                D = f()
+      
         else:
-            D =self.diffusion_coef
-        
+            D = f
+
         # Mesh spacing and coefficient vector per dimension
         h = mesh.h                       # tuple of length GD
         c = 1.0 / (h ** 2) # 1/h_i^2

@@ -148,7 +148,7 @@ class EllipticFDMModel(ComputationalModel):
         em_ratio = self.em[:, 0:-1] / self.em[:, 1:]
         for i in range(3):
             ax2.plot(em_ratio[i, :], markers[i], label=f'{error_names[i]} ratio', linewidth=4)
-        ax2.axhline(y=4, color='r', linestyle='-', label='y=4 (expected ratio)', linewidth=4)
+        # ax2.axhline(y=4, color='r', linestyle='-', label='y=4 (expected ratio)', linewidth=4)
         ax2.set_xlabel('Refinement Level', fontsize=24)
         ax2.legend(fontsize=20)
         ax2.grid(True)
