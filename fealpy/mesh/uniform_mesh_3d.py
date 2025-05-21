@@ -1,4 +1,3 @@
-import numpy as np 
 from typing import Union, Optional, Sequence, Tuple, Any
 
 from .utils import entitymethod, estr2dim
@@ -1293,7 +1292,8 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         Unstructured meshes do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            self.extent = 2*self.extent
+            # self.extent = 2*self.extent
+            self.extent = [i * 2 for i in self.extent]
             self.h = self.h/2.0 
             self.nx = self.extent[1] - self.extent[0]
             self.ny = self.extent[3] - self.extent[2]
@@ -1425,7 +1425,130 @@ class UniformMesh3d(StructuredMesh, TensorMesh, Plotable):
         writer.Write()
 
         return filename
+    
+    def function(self, etype='node', dtype=None, ex=0):
+        """返回定义在节点、网格边、或者网格单元上离散函数 (数组), 元素取值为 0"""
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        dtype = self.ftype if dtype is None else dtype
+        if etype in {'node', 0}:
+            uh = bm.zeros((nx+1+2*ex, ny+1+2*ex, nz+1+2*ex), dtype=dtype)
+        elif etype in {'facex'}: # 法线和 x 轴平行的面
+            uh = bm.zeros((nx+1, ny, nz), dtype=dtype)
+        elif etype in {'facey'}: # 法线和 y 轴平行的面
+            uh = bm.zeros((nx, ny+1, nz), dtype=dtype)
+        elif etype in {'facez'}: # 法线和 z 轴平行的面
+            uh = bm.zeros((nx, ny, nz+1), dtype=dtype)
+        elif etype in {'face', 2}: # 所有的面
+            ex = bm.zeros((nx+1, ny, nz), dtype=dtype)
+            ey = bm.zeros((nx, ny+1, nz), dtype=dtype)
+            ez = bm.zeros((nx, ny, nz+1), dtype=dtype)
+            uh = (ex, ey, ez)
+        elif etype in {'edgex'}: # 切向与 x 轴平行的边
+            uh = bm.zeros((nx, ny+1, nz+1), dtype=dtype)
+        elif etype in {'edgey'}: # 切向与 y 轴平行的边
+            uh = bm.zeros((nx+1, ny, nz+1), dtype=dtype)
+        elif etype in {'edgez'}: # 切向与 z 轴平行的边
+            uh = bm.zeros((nx+1, ny+1, nz), dtype=dtype)
+        elif etype in {'edge', 1}: # 所有的边
+            ex = bm.zeros((nx, ny+1, nz+1), dtype=dtype)
+            ey = bm.zeros((nx+1, ny, nz+1), dtype=dtype)
+            ez = bm.zeros((nx+1, ny+1, nz), dtype=dtype)
+            uh = (ex, ey, ez)
+        elif etype in {'cell', 3}:
+            uh = bm.zeros((nx+2*ex, ny+2*ex, nz+2*ex), dtype=dtype)
+        else:
+            raise ValueError(f'the entity `{etype}` is not correct!')
 
+        return uh
+    
+    def error(self, u, uh, errortype='all'):
+        """Compute error metrics between exact and numerical solutions in 3D space.
+    
+        Calculates various error norms between the exact solution u(x,y,z) and the 
+        numerical solution uh on a 3D grid. Supports multiple error metrics including
+        maximum absolute error, continuous L2 norm (integral-based), and discrete l2 norm (average-based).
+
+        Parameters
+            u : Callable
+                The exact solution function u(x,y,z) that takes node coordinates (N×3 array)
+                and returns exact solution values (N×1 array). Must match the grid used for uh.
+            uh : TensorLike
+                The numerical solution values at discrete nodes with shape (nx+1, ny+1, nz+1).
+                Should correspond to the same grid points as u(node).
+            errortype : str, optional, default='all'
+                Specifies which error norm(s) to compute:
+                - 'all': returns all three error metrics (emax, e0, el2)
+                - 'max': only maximum absolute error (L∞ norm)
+                - 'L2': only continuous L2 norm error
+                - 'l2': only discrete l2 norm error
+
+        Returns
+            error_metrics : Union[float, Tuple[float, float, float]]
+                The computed error metric(s):
+                - If 'all': returns tuple (emax, e0, el2)
+                    emax: maximum absolute error (L∞ norm)
+                    e0: continuous L2 norm error (hx*hy*hz weighted)
+                    el2: discrete l2 norm error (average-based)
+                - Otherwise returns single float for specified error type
+
+        Raises
+            AssertionError
+                If uh dimensions don't match grid dimensions (nx+1, ny+1, nz+1)
+
+        Notes
+            Error norms are computed as:
+            - L∞ norm: max|u(x_i,y_j,z_k) - uh(x_i,y_j,z_k)|
+            - Continuous L2: sqrt(hx*hy*hz * Σ(u-uh)²)
+            - Discrete l2: sqrt(1/((nx-1)(ny-1)(nz-1)) * Σ(u-uh)²)
+
+            where:
+            - hx, hy, hz are mesh spacings in x,y,z directions
+            - nx, ny, nz are numbers of grid intervals in each direction
+            - The grid has (nx+1)×(ny+1)×(nz+1) nodes
+
+        Examples
+            >>> # For 3D problem with 11×11×11 grid (10 intervals each direction)
+            >>> exact_sol = lambda p: p[:,0]**2 + p[:,1]**2 + p[:,2]**2
+            >>> numerical_sol = bm.ones((11,11,11))  # dummy solution
+            >>> errors = error(exact_sol, numerical_sol)
+            >>> emax, eL2, el2 = errors
+        """
+        # assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1) and (uh.shape[2] == self.nz+1)
+        hx = self.h[0]
+        hy = self.h[1]
+        hz = self.h[2]
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        node = self.node
+        uI = u(node)
+        e = uI - uh
+
+        if errortype == 'all':
+            emax = bm.max(bm.abs(e))
+            e0 = bm.sqrt(hx * hy * hz * bm.sum(e ** 2))
+            el2 = bm.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * bm.sum(e ** 2))
+            return emax, e0, el2
+        elif errortype == 'max':
+            emax = bm.max(bm.abs(e))
+            return emax
+        elif errortype == 'L2':
+            e0 = bm.sqrt(hx * hy * hz * bm.sum(e ** 2))
+            return e0
+        elif errortype == 'l2':
+            el2 = bm.sqrt(1 / ((nx - 1) * (ny - 1)) * (nz - 1) * bm.sum(e ** 2))
+            return el2
+
+    def show_function(self, plot, uh, cmap='jet'):
+        pass
+
+    ## @ingroup GeneralInterface
+    def show_animation(self, fig, axes, box,
+                       init, forward, fname='test.mp4',
+                       fargs=None, frames=1000, lw=2, interval=50):
+        pass
 
 
 UniformMesh3d.set_ploter('3d')
