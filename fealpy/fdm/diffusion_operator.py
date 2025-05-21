@@ -22,7 +22,9 @@ class DiffusionOperator(OpteratorBase):
     ---------------------------------------------
     Parameters:
         mesh            : The structured mesh over which the operator is defined.
-        diffusion_coef  : Can be either a tensor(shape: (GD, GD)) or a function that returns a tensor.
+        diffusion_coef  : Can be either a tensor(shape: (GD, GD)), 
+                          or a function that returns a tensor,
+                          or a int or float.
         method          : Optional string key identifying which assembly
                           implementation to use. Defaults to 'assembly'.
     -------------------------------------------------------------------------------
@@ -37,7 +39,7 @@ class DiffusionOperator(OpteratorBase):
         diffusion_coef : Function or constant tensor D(x) of shape (GD, GD)
     """
     def __init__(self, mesh: UniformMesh, 
-                 diffusion_coef: Union[Callable, TensorLike],
+                 diffusion_coef: Union[Callable, TensorLike, int, float],
                  method: Optional[str]=None):
         
         method = 'assembly' if (method is None) else method
@@ -75,9 +77,13 @@ class DiffusionOperator(OpteratorBase):
                 D = f(node)
             else:
                 D = f()
-      
-        else:
+        elif isinstance(f, (int, float)):
+            D = bm.eye(GD) * f
+        elif isinstance(f, (bm.ndarray, bm.Tensor)):
             D = f
+        else:
+            raise ValueError(f"Invalid data type: diffusion_coef must be an int, float, tensor, or callable(e.g. function). \
+                             Now is {type(self.diffusion_coef)}.")
 
         # Mesh spacing and coefficient vector per dimension
         h = mesh.h                       # tuple of length GD

@@ -1,5 +1,6 @@
 import math
 from typing import Optional
+from typing import Optional, Callable, Union
 import inspect
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
@@ -21,6 +22,12 @@ class ReactionOperator(OpteratorBase):
         - reaction-diffusion equations
         - source terms in parabolic/elliptic equations
         - penalization or damping terms
+    ----------------------------
+    Parameters:
+            mesh           : The structured mesh where the operator is defined.
+            reaction_coef  : Can be a Callable, constant tensor, int, float defining the reaction term R(x).
+                             Should return a 1D tensor of shape (NN,) evaluated at all nodes.
+            method         : Optional string key for choosing implementation method.
 
     -------------------------------------------------------------------------------
     Method extensibility:
@@ -34,17 +41,9 @@ class ReactionOperator(OpteratorBase):
 
     def __init__(self,
                  mesh: UniformMesh,
-                 reaction_coef,
+                 reaction_coef:  Union[Callable, TensorLike, int, float],
                  method: Optional[str] = None):
-        """
-        Initialize the reaction operator.
 
-        Parameters:
-            mesh           : The structured mesh where the operator is defined.
-            reaction_coef  : Callable or constant tensor defining the reaction term R(x).
-                             Should return a 1D tensor of shape (NN,) evaluated at all nodes.
-            method         : Optional string key for choosing implementation method.
-        """
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
@@ -66,8 +65,9 @@ class ReactionOperator(OpteratorBase):
         NN = mesh.number_of_nodes()
         # Evaluate reaction coefficient at each node
         f = self.reaction_coef
-        l = len(inspect.signature(f).parameters)
+        
         if callable(self.reaction_coef) :
+            l = len(inspect.signature(f).parameters)
             if l == 2:
                 c = self.reaction_coef(mesh.entity('node')) # shape:(NN,)
                 data = c    
@@ -75,9 +75,13 @@ class ReactionOperator(OpteratorBase):
                 c = self.reaction_coef() # shape:(1,)
                 data = bm.full(NN, c)
                 
-        else:
+        elif isinstance(f, (int, float, bm.array, bm.Tensor)):
             c = self.reaction_coef 
             data = bm.full(NN, c)
+
+        else:
+            raise ValueError(f"Invalid data type: reaction_coef must be an int, float, tensor, or callable(e.g. function). \
+                             Now is {type(self.reaction_coef)}.")
             
         D = spdiags(data, 0, NN, NN, format='csr')
         return D

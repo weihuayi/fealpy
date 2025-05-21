@@ -24,9 +24,12 @@ class ConvectionOperator(OpteratorBase):
     -----------------------------------
     Parameters:
         mesh           : The structured mesh over which the operator is defined.
-        convection_coef: Can be  a tensor(shape:(GD,)) or a function that returns a tensor, or a int and float.
-        method         : Optional string key identifying which discretization scheme to use.
-                        If not provided, defaults to 'assembly', which is bound to first-order upwind.
+        convection_coef: Can be  a tensor(shape:(GD,)) 
+                         or a function that returns a tensor, 
+                         or a int and float,
+                         or a tuple or list of length GD.
+
+        method         : Optional string: 'central_const_2' or 'upwind_const_1'.
 
     -------------------------------------------------------------------------------
     Method extensibility:
@@ -35,16 +38,6 @@ class ConvectionOperator(OpteratorBase):
         `method` parameter in the constructor.
 
     -------------------------------------------------------------------------------
-    Naming convention for registered methods:
-
-        <scheme>_<velocity>_<order>
-
-    where:
-        - <scheme>   ∈ {'upwind', 'central', 'nonupwind', ...}
-        - <velocity> ∈ {'const', 'func'}
-              'const' → constant vector field b
-              'func'  → general spatially-varying vector field b(x)
-        - <order>    ∈ {'1', '2', '3', ...} indicating formal order of accuracy
 
     Examples:
         - 'upwind_const_1'   : first-order upwind, constant velocity
@@ -61,7 +54,7 @@ class ConvectionOperator(OpteratorBase):
 
     def __init__(self,
                  mesh: UniformMesh,
-                 convection_coef: Union[Callable, TensorLike],
+                 convection_coef: Union[Callable, TensorLike, int, float],
                  method: Optional[str] = None):
 
         method = 'assembly' if method is None else method
@@ -95,20 +88,17 @@ class ConvectionOperator(OpteratorBase):
                 b = self.convection_coef()
         elif isinstance(self.convection_coef, (int, float)):
             # 处理单个数值情况
-            b = bm.array([float(self.convection_coef)])
+            data = [float(self.convection_coef)] * GD
+            b = bm.array(data)
         elif isinstance(self.convection_coef, (list, tuple)):
             # 处理列表或元组情况
             b = bm.array(self.convection_coef, dtype=bm.float64)
+        elif isinstance(self.convection_coef, (bm.ndarray, bm.Tensor)):
+            D = self.convection_coef
         else:
-            b = self.convection_coef
-        # if callable(self.convection_coef):
-        #     l = len(inspect.signature(self.convection_coef).parameters)
-        #     if l == 2 :
-        #         b = self.convection_coef(node)     
-        #     else:
-        #         b = self.convection_coef()
-        # else:
-        #         b = self.convection_coef     
+            raise ValueError(f"Invalid data type: convection_coef must be an int, float, list, tuple, tensor, or callable(e.g. function). \
+                             Now is {type(self.convection_coef)}.")
+            
         h = mesh.h                                # uniform spacing in each dimension
         NN = mesh.number_of_nodes()
         K = mesh.linear_index_map('node')         # multi-index map
@@ -154,6 +144,8 @@ class ConvectionOperator(OpteratorBase):
         K = mesh.linear_index_map('node')
         shape = K.shape
         full = (slice(None),) * GD
+
+         
         if callable(self.convection_coef):
         # 处理函数情况
             sig = inspect.signature(self.convection_coef)
@@ -164,22 +156,17 @@ class ConvectionOperator(OpteratorBase):
                 b = self.convection_coef()
         elif isinstance(self.convection_coef, (int, float)):
             # 处理单个数值情况
-            b = bm.array([float(self.convection_coef)])
+            data = [float(self.convection_coef)] * GD
+            b = bm.array(data)
         elif isinstance(self.convection_coef, (list, tuple)):
             # 处理列表或元组情况
             b = bm.array(self.convection_coef, dtype=bm.float64)
+        elif isinstance(self.convection_coef, (bm.ndarray, bm.Tensor)):
+            D = self.convection_coef
         else:
-            b = self.convection_coef
-        # if callable(self.convection_coef):
-        #     b = self.convection_coef()
-        # else:
-        #     b = self.convection_coef
-
-        # if len(b.shape) != 1 or b.shape[0] != GD:
-        #     raise ValueError(
-        #         f"Expected constant vector of shape ({GD},), "
-        #         f"but got {b.shape}. Ensure you pass a constant vector or zero-arg function."
-        #     ) 
+            raise ValueError(f"Invalid data type: convection_coef must be an int, float, list, tuple, tensor, or callable(e.g. function). \
+                             Now is {type(self.convection_coef)}.")
+        
 
         c = b / mesh.h / 2.0                            # central difference coefficient
 
