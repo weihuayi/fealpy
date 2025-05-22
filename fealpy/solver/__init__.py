@@ -8,5 +8,7 @@ from .cg import cg
 from .minres import minres
 from .gmres import gmres
 from .lgmres import lgmres
-from .directsolvermanger import DirectSolverManager
-from .iterativesolvermanger import IterativeSolverManager
+from .direct_solver_manger import DirectSolverManager
+from .iterative_solver_manger import IterativeSolverManager
+from .bicgstab import bicgstab
+from .bicg import bicg
