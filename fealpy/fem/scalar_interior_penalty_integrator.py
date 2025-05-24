@@ -1,20 +1,15 @@
 
 from typing import Optional, Literal
 
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from scipy.sparse import csr_matrix
 
+from ..backend import backend_manager as bm
+from ..typing import TensorLike, Index, _S, CoefLike
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
-from .integrator import (
-    LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
-from scipy.sparse import csr_matrix
+from ..decorator.variantmethod import variantmethod
+from .integrator import LinearInt, OpInt, CellInt, enable_cache
 
 
 class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
@@ -23,7 +18,7 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
                  index: Index = _S,
                  batched: bool = False,
                  method: Literal['fast', 'nonlinear', 'isopara', None] = None) -> None:
-        super().__init__(method=method if method else 'assembly')
+        super().__init__(method=method)
         self.coef = coef
         self.q = q
         self.gamma = gamma
@@ -70,6 +65,7 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
         bcs = self.fetch(space)[0]
         return space.boundary_edge_grad_grad_normal_jump_basis(bcs)
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
@@ -126,10 +122,14 @@ class ScalarInteriorPenaltyIntegrator(LinearInt, OpInt, CellInt):
 
 
     
-    @assemblymethod('fast')
+    @assembly.register('fast')
     def fast_assembly(self, space: _FS) -> TensorLike:
         """
         限制：常系数、单纯形网格
         TODO: 加入 assert
         """
         pass
+
+    @assembly.selector
+    def assembly(self):
+        return self.method

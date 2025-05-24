@@ -10,7 +10,7 @@
 from typing import Optional, Literal
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -18,9 +18,7 @@ from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
     LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
+    enable_cache
 )
 
 
@@ -33,7 +31,7 @@ class ViscousWorkIntegrator(LinearInt, OpInt, CellInt):
                  region: Optional[TensorLike] = None,
                  batched: bool = False,
                  method: Optional[str]=None) -> None:
-        super().__init__(method=method if method else 'assembly')
+        super().__init__(method=method)
         self.coef = coef
         self.q = q
         self.set_region(region)
