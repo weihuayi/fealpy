@@ -28,6 +28,7 @@ class EdgeMesh(SimplexMesh, Plotable):
     
     def cell_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
         return self.edge_to_ipoint(p, index)
+    
 
     def ref_cell_measure(self):
         return 1.0
@@ -252,6 +253,5 @@ class EdgeMesh(SimplexMesh, Plotable):
                          [0, 1], [0, 2], [0, 4], [0, 5], [5, 7], [5, 8],
                          [5, 1], [5, 2], [0, 7], [0, 8], [1, 9], [2, 9],
                          [3, 9], [4, 9]])
-
 
 EdgeMesh.set_ploter('1d')

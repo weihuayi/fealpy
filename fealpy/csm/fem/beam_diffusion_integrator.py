@@ -138,8 +138,6 @@ from fealpy.typing import TensorLike, Index, _S
 from fealpy.fem.integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,
-    assemblymethod,
-    CoefLike
 )
 from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
 from typing import Optional, Literal

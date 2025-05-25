@@ -22,7 +22,7 @@ class BeamData2D:
     This class constructs a 1D mesh and provides the source term.
     """
 
-    def __init__(self, E=29e6, I=510, A=10.3, f=1000, L=10, n=1):
+    def __init__(self, E=200e9, I=118.6e-6, A=10.3, f=-25000, L=10):
         """
         Initialize beam parameters.
 
@@ -39,7 +39,6 @@ class BeamData2D:
         self.A = A
         self.f = f
         self.L = L
-        self.n = n
 
         self.mesh = self.init_mesh()
 
@@ -58,8 +57,8 @@ class BeamData2D:
         Returns:
             EdgeMesh: 1D mesh from x=0 to x=L.
         """
-        node = bm.array([[0], [self.L]], dtype=bm.float64)
-        cell = bm.array([[0, 1]], dtype=bm.int16)
+        node = bm.array([[0], [5],[7.5]], dtype=bm.float64)
+        cell = bm.array([[0, 1],[1,2]] , dtype=bm.int32)
         return EdgeMesh(node, cell)
     
     @cartesian

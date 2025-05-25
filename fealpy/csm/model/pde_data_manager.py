@@ -38,11 +38,7 @@ class PDEDataManager:
     """
 
     _registry = {
-        "poisson": "fealpy.model.poisson",
-        "elliptic": "fealpy.model.elliptic",
-        "parabolic": "fealpy.model.parabolic",
-        "wave": "fealpy.model.wave",
-        "hyperbolic":"fealpy.model.hyperbolic"
+        "beam": "fealpy.csm.model.beam",
     }
 
     def __init__(self, pde_type: str = None):
