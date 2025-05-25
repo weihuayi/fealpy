@@ -3,7 +3,7 @@ from scipy.special import factorial, comb
 from fealpy.functionspace.functional import symmetry_index, symmetry_span_array
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -12,8 +12,6 @@ from ..functional import bilinear_integral
 from .integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,
-    assemblymethod,
-    CoefLike
 )
 
 class MLaplaceBernsteinIntegrator(LinearInt, OpInt, CellInt):
@@ -26,7 +24,6 @@ class MLaplaceBernsteinIntegrator(LinearInt, OpInt, CellInt):
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
-        method = 'assembly' if (method is None) else method
         super().__init__(method=method)
         self.m = m
         self.coef = coef

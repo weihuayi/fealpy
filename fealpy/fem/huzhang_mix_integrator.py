@@ -6,7 +6,7 @@ from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
-from .integrator import LinearInt, OpInt, CellInt, CoefLike, enable_cache
+from .integrator import LinearInt, OpInt, CellInt, enable_cache
 from ..typing import TensorLike, Index, _S
 from ..functionspace.functional import symmetry_span_array, symmetry_index
 

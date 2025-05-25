@@ -1,13 +1,12 @@
 from typing import Optional
-from ..typing import TensorLike, Index, _S
 
+from ..typing import TensorLike, Index, _S, CoefLike
 from ..backend import backend_manager as bm
-
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
-from ..utils import is_scalar, is_tensor, process_coef_func
+from ..utils import process_coef_func
 from ..functional import linear_integral
-from .integrator import LinearInt, SrcInt, CellInt, CoefLike, enable_cache
+from .integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
 class VectorSourceIntegrator(LinearInt, SrcInt, CellInt):

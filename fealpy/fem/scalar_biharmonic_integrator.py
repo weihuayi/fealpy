@@ -2,17 +2,16 @@
 from typing import Optional, Literal
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
+from ..decorator.variantmethod import variantmethod
 from .integrator import (
     LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
+    enable_cache
 )
 
 class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
@@ -21,7 +20,7 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
                  index: Index = _S,
                  batched: bool = False,
                  method: Literal['fast', 'nonlinear', 'isopara', None] = None) -> None:
-        super().__init__(method=method if method else 'assembly')
+        super().__init__(method=method)
         self.coef = coef
         self.q = q
         self.index = index
@@ -57,6 +56,7 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
         bcs = self.fetch(space)[0]
         return space.hess_basis(bcs, index=self.index, variable='u')
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
@@ -66,10 +66,14 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
         
         return bilinear_integral(hphi, hphi, ws, cm, coef, batched=self.batched)
     
-    @assemblymethod('fast')
-    def fast_assembly(self, space: _FS) -> TensorLike:
+    @assembly.register('fast')
+    def assembly(self, space: _FS) -> TensorLike:
         """
         限制：常系数、单纯形网格
         TODO: 加入 assert
         """
         pass
+
+    @assembly.selector
+    def assembly(self):
+        return self.method

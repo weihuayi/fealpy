@@ -15,7 +15,6 @@ class NonlinearWrapperInt(NonlinearInt):
     A wrapper class that converts a LinearInt into a NonlinearInt by extracting and passing parameters."""
 
     def __init__(self, linear_int: LinearInt, method: Optional[str]=None):
-        method = 'assembly' if (method is None) else method
         super().__init__(method=method)
         self.linear_int = linear_int
 

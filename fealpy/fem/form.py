@@ -146,10 +146,10 @@ class Form(Generic[_I], ABC):
     def _assembly_kernel(self, group: str, /, indices=None):
         integrator = self.integrators[group]
         if indices is None:
-            value = integrator(self.space)
+            value = integrator.assembly(self.space)
             etg = integrator.to_global_dof(self.space)
         else:
-            value = integrator(self.space, indices=indices)
+            value = integrator.assembly(self.space, indices=indices)
             etg = integrator.to_global_dof(self.space, indices=indices)
         if not isinstance(etg, (tuple, list)):
             etg = (etg, )

@@ -1,6 +1,5 @@
 from .crayfish_opt_alg import CrayfishOptAlg
 from .honeybadger_alg import HoneybadgerAlg
-from .quantum_particle_swarm_opt import QuantumParticleSwarmOpt
 from .grey_wolf_optimizer import GreyWolfOpt
 from .particle_swarm_opt import ParticleSwarmOpt
 from .hippopotamus_opt_alg import HippopotamusOptAlg

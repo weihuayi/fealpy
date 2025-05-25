@@ -1,17 +1,15 @@
 from typing import Optional
 
-from fealpy.backend import backend_manager as bm
-from fealpy.typing import TensorLike, Index, _S
+from ..backend import backend_manager as bm
+from ..typing import TensorLike, Index, _S
 
-from fealpy.mesh import HomogeneousMesh, SimplexMesh, TensorMesh, StructuredMesh
-from fealpy.functionspace.space import FunctionSpace as _FS
-from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
-from .integrator import (
-                        LinearInt, OpInt, CellInt,
-                        enable_cache,
-                        assemblymethod
-                        )
-from fealpy.fem.utils import LinearSymbolicIntegration
+from ..mesh import HomogeneousMesh, SimplexMesh, StructuredMesh
+from ..functionspace.space import FunctionSpace as _FS
+from ..functionspace.tensor_space import TensorFunctionSpace as _TS
+from ..fem.utils import LinearSymbolicIntegration
+from ..decorator.variantmethod import variantmethod
+from .integrator import LinearInt, OpInt, CellInt, enable_cache
+
 
 class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
     """
@@ -22,7 +20,6 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                  q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
-        method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
         self.material = material
@@ -60,6 +57,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return cm, bcs, ws, gphi, detJ
     
     # 标准组装方法
+    @variantmethod
     def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
@@ -213,8 +211,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         return cm, ws, detJ, D, B
             
 
-    @assemblymethod('voigt')
-    def voigt_assembly(self, space: _TS) -> TensorLike:
+    @assembly.register('voigt')
+    def assembly(self, space: _TS) -> TensorLike:
         mesh = getattr(space, 'mesh', None)
         cm, ws, detJ, D, B = self.fetch_voigt_assembly(space)
 
@@ -264,8 +262,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             S = bm.einsum('qim, qjn, q -> ijmnq', gphi_lambda, gphi_lambda, ws)  # (LDOF, LDOF, GD, GD, NQ)
             return cm, bcs, detJ, JG, S
 
-    @assemblymethod('fast')
-    def fast_assembly(self, space: _TS) -> TensorLike:
+    @assembly.register('fast')
+    def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
 
@@ -432,8 +430,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
         else:
             raise NotImplementedError("symbolic assembly for general meshes is not implemented yet.")
 
-    @assemblymethod('symbolic')
-    def symbolic_assembly(self, space: _TS) -> TensorLike:
+    @assembly.register('symbolic')
+    def assembly(self, space: _TS) -> TensorLike:
         scalar_space = space.scalar_space
         mesh = getattr(scalar_space, 'mesh', None)
         
@@ -588,8 +586,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
             
         return ws, detJ, D, B
 
-    @assemblymethod('C3D8_BBar')
-    def c3d8_bbar_assembly(self, space: _TS) -> TensorLike:
+    @assembly.register('C3D8_BBar')
+    def assembly(self, space: _TS) -> TensorLike:
         '''ABAQUS'''
         ws, detJ, D, B  = self.fetch_c3d8_bbar_assembly(space)
         
@@ -597,3 +595,7 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                         ws, detJ, B, D, B)
 
         return KK
+    
+    @assembly.selector
+    def assembly(self):
+        return self.method

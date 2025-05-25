@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import Optional
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S, SourceLike
@@ -6,8 +6,7 @@ from ..typing import TensorLike, Index, _S, SourceLike
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import linear_integral
-from .integrator import LinearInt, SrcInt, CellInt, enable_cache, assemblymethod
+from .integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
 class GradSourceIntegrator(LinearInt, SrcInt, CellInt):
@@ -16,7 +15,7 @@ class GradSourceIntegrator(LinearInt, SrcInt, CellInt):
                  region: Optional[TensorLike] = None,
                  batched: bool=False,
                  method=None) -> None:
-        super().__init__(method=method if method else 'assembly')
+        super().__init__(method=method)
         self.source = source
         self.q = q
         self.set_region(region)

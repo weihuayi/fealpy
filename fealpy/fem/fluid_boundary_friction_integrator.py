@@ -9,17 +9,13 @@
 '''  
 from typing import Optional
 from fealpy.backend import backend_manager as bm
-from ..typing import TensorLike, SourceLike, Threshold
+from ..typing import TensorLike, CoefLike, Threshold
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
-from .integrator import (
-    LinearInt, OpInt, FaceInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
+from .integrator import LinearInt, OpInt, FaceInt, enable_cache
+
 '''
 @brief
 (coef \\nabla^T u \\cdot n, v)_{\\partial \\Omega}
