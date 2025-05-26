@@ -17,3 +17,5 @@ from .uniform_mesh_3d import UniformMesh3d
 
 from .lagrange_triangle_mesh import LagrangeTriangleMesh
 from .lagrange_quadrangle_mesh import LagrangeQuadrangleMesh
+
+from .edge_mesh import EdgeMesh
