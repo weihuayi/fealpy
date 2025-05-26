@@ -1627,6 +1627,24 @@ class TriangleMesh(SimplexMesh, Plotable):
             mesh.add_plot(ax)
             plt.show()
         return mesh
+    
+    @classmethod
+    def from_medit(cls,file):
+        '''
+        Read medit format file (.mesh) to create triangle mesh.
+        Parameters:
+            file (str): Path to the medit format file.
+        Returns:
+            TriangleMesh: An instance of TriangleMesh created from the medit
+            file.
+        '''
+        import meshio
+        data = meshio.read(file)
+        node = bm.from_numpy(data.points)
+        cell = bm.from_numpy(data.cells_dict['triangle'])
+
+        mesh = cls(node, cell)
+        return mesh
 
     @classmethod
     def from_domain_distmesh(cls, domain, maxit=100, output=False, itype=None, ftype=None, device=None):
