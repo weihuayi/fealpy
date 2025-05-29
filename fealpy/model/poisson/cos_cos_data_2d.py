@@ -1,4 +1,3 @@
-
 from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
