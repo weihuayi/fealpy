@@ -1,5 +1,5 @@
+
 from typing import Sequence
-from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
@@ -30,7 +30,6 @@ class SinSinData2D:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [0.0, 1.0, 0.0, 1.0]
 
-    @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
         x = p[..., 0]
@@ -38,7 +37,6 @@ class SinSinData2D:
         pi = bm.pi
         return bm.sin(pi * x) * bm.sin(pi * y)
 
-    @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute gradient of solution."""
         x = p[..., 0]
@@ -48,7 +46,6 @@ class SinSinData2D:
         du_dy = pi * bm.sin(pi * x) * bm.cos(pi * y)
         return bm.stack([du_dx, du_dy], axis=-1)
 
-    @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
         x = p[..., 0]
@@ -56,12 +53,10 @@ class SinSinData2D:
         pi = bm.pi
         return 2 * pi**2 * bm.sin(pi * x) * bm.sin(pi * y)
 
-    @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition"""
         return self.solution(p)
 
-    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]

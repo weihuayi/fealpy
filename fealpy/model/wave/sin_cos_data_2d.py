@@ -1,5 +1,4 @@
 from typing import Sequence
-from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
@@ -37,24 +36,20 @@ class SinCosData2D:
         """the time interval [t0, t1]."""
         return [0.0, 1.4]  
 
-    @cartesian
     def init_solution(self, p: TensorLike) -> TensorLike:
         """Compute initial condition u(x, y, 0) = sin(πx)·sin(πy)."""
         x, y = p[..., 0], p[..., 1]
         return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
-    @cartesian
     def init_solution_t(self, p: TensorLike) -> TensorLike:
         """Compute initial condition ∂u/∂t(x, y, 0) = 0. """
         return bm.zeros_like(p[..., 0])
 
-    @cartesian
     def solution(self, p: TensorLike, t: float) -> TensorLike:
         """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
         return bm.cos(bm.sqrt(2.0) * bm.pi * t) * bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
-    @cartesian
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
         """Compute spatial gradient of solution at time t."""
         x, y = p[..., 0], p[..., 1]
@@ -63,17 +58,14 @@ class SinCosData2D:
         dy = bm.pi * bm.sin(bm.pi * x) * bm.cos(bm.pi * y) * factor
         return bm.stack([dx, dy], axis=-1)
 
-    @cartesian
     def source(self, p: TensorLike, t: float) -> TensorLike:
         """Compute exact source at time t. """
         return bm.zeros_like(p[..., 0])
 
-    @cartesian
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
         """Dirichlet boundary condition. """
         return bm.zeros_like(p[..., 0])
 
-    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]

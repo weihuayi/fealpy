@@ -1,5 +1,4 @@
 from typing import Sequence
-from ...decorator import cartesian
 from ...backend import TensorLike 
 from ...backend import backend_manager as bm
 
@@ -8,7 +7,7 @@ class CosCosData2D:
     """
     2D Elliptic equation:
 
-        -∇·(A ∇u(x, y)) = f(x, y),  (x, y) ∈ Ω = (0, 1) x (0, 1)
+        -∇·(A ∇u(x, y)) + c u(x, y) = f(x, y),  (x, y) ∈ Ω = (0, 1) x (0, 1)
                                   u(x, y) = g(x, y),  on ∂Ω
 
     with the exact solution:
@@ -42,7 +41,7 @@ class CosCosData2D:
         val = bm.array([[10, 0.0], [0, 10]]) / 100  # Approximate inverse
         return val 
 
-    @cartesian
+
     def solution(self, p: TensorLike) -> TensorLike:
         """
         Return the exact solution u(x, y) = cos(2πx) * cos(2πy), Shape: (..., ).
@@ -50,8 +49,7 @@ class CosCosData2D:
         x, y = p[..., 0], p[..., 1]
         pi = bm.pi
         return bm.cos(2*pi*x) * bm.cos(2*pi*y)
-    
-    @cartesian
+
     def gradient(self, p: TensorLike) -> TensorLike:
         """
         Return the gradient of the exact solution ∇u(x, y), Shape: (..., 2).
@@ -63,7 +61,6 @@ class CosCosData2D:
             -2*pi * bm.cos(2*pi*x) * bm.sin(2*pi*y)
         ), axis=-1)
 
-    @cartesian
     def flux(self, p: TensorLike) -> TensorLike:
         """
         Return the flux vector -A ∇u,  Shape: (..., 2).
@@ -72,7 +69,6 @@ class CosCosData2D:
         A = self.diffusion_coef()               # (..., 2, 2)
         return -bm.einsum('...ij,...j->...i', A, -grad)
     
-    @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Return the source term f(x, y)"""
         x, y = p[..., 0], p[..., 1]
@@ -80,12 +76,10 @@ class CosCosData2D:
     
         return term1
 
-    @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition."""
         return self.solution(p)
 
-    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]
