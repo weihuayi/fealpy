@@ -1,4 +1,5 @@
 from typing import Sequence
+from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
@@ -47,11 +48,13 @@ class SinSinData2D:
         """Constant reaction coefficient."""
         return bm.tensor([4.0])
 
+    @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Exact solution: u(x, y) = sin(πx) sin(πy)."""
         x, y = p[..., 0], p[..., 1]
         return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
+    @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Gradient of exact solution (shape: (..., 2))."""
         x, y = p[..., 0], p[..., 1]
@@ -61,12 +64,14 @@ class SinSinData2D:
             pi * bm.sin(pi * x) * bm.cos(pi * y)   # ∂u/∂y
         ], axis=-1)
 
+    @cartesian
     def flux(self, p: TensorLike) -> TensorLike:
         """Flux vector: -A ∇u (shape: (..., 2))."""
         grad = self.gradient(p)
         A = self.diffusion_coef()
         return -bm.einsum('...ij,...j->...i', A, grad)
 
+    @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Source term f(x, y) derived from PDE (shape: (...,))."""
         
@@ -79,10 +84,12 @@ class SinSinData2D:
         term3 = -pi * sin(pi*x) * cos(pi*y)
         return term1 + term2 + term3
 
+    @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition."""
         return self.solution(p)
 
+    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]

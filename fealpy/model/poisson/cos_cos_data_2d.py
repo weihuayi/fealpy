@@ -1,4 +1,3 @@
-
 from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
@@ -29,6 +28,7 @@ class CosCosData2D():
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [-1., 1., -1., 1.]
+    
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
