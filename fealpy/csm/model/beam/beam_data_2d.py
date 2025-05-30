@@ -78,15 +78,15 @@ class BeamData2D:
     
     def dirichlet_dof_index(self) -> TensorLike:
         """
-        返回需要进行 Dirichlet 边界处理的自由度索引
-        例如固定第一个节点的所有自由度（如前两个）
+        Return the indices of degrees of freedom (DOFs) where Dirichlet boundary conditions are applied.
+        For example, fix all DOFs (such as the first two) at the first node.
 
         Parameters:
             total_dof : int
-                全局自由度总数
+            Total number of global degrees of freedom.
 
         Returns:
-            Tensor[int] ：边界自由度编号
+            Tensor[int]: Indices of boundary DOFs.
         """
         return bm.array([0, 1, 2])  
     
