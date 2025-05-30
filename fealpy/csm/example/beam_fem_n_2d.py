@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+from fealpy.backend import backend_manager as bm
 import matplotlib.pyplot as plt
 from fealpy.mesh import EdgeMesh
 from scipy.sparse import csr_matrix
@@ -52,7 +53,7 @@ I = args.inertia
 #     [0], [5],[7.5]], dtype=np.float64)
 # cell = np.array([
 #     [0, 1],[1,2]] , dtype=np.int_)
-# mesh = EdgeMesh(node, cell)
+#mesh = EdgeMesh(node, cell)
 mesh = pde.init_mesh()
 
 GD = mesh.geo_dimension()
@@ -119,11 +120,15 @@ D_1=np.array([[1,0,0,0,0,0],
         [0,0,0,0,0,0]])
 K=D_0@K_1@D_0+D_1
 F=D_0@F
-print(K)
-print(F)
 # TODO: 处理Dirichlet边界条件
-#bc = DirichletBC(tensor_space, gd=pde.dirichlet, threshold=pde.is_dirichlet_boundary)
-#K_2,F_source = bc.apply(K, F_source)
+gdof = tensor_space.number_of_global_dofs()
+threshold = bm.zeros(gdof, dtype=bool)
+threshold[pde.dirichlet_dof_index()] = True
+print(threshold)
+uh = tensor_space.function()
+print(uh.shape)
+bc = DirichletBC(tensor_space, gd=pde.dirichlet, threshold=threshold)
+K_2,F_source = bc.apply(K_2, F_source)
 print(K_2)
 print(F_source)
 # 将矩阵转换为CSR格式

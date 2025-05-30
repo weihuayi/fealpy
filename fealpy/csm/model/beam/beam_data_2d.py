@@ -1,6 +1,7 @@
 from fealpy.mesh import EdgeMesh
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
+from fealpy.backend import TensorLike
 
 class BeamData2D:
     """
@@ -74,19 +75,20 @@ class BeamData2D:
         """
         return bm.ones_like(x) * self.f
     
-    @cartesian
-    def is_dirichlet_boundary(self, p):
+    
+    def dirichlet_dof_index(self) -> TensorLike:
         """
-        @brief Dirichlet 边界的判断函数
-        固定左端：x = 0 处固定
-        参数:
-            p: ndarray, shape (..., geo_dim)
-               坐标点数组
-        返回:
-            is_dirichlet: ndarray[bool]
+        返回需要进行 Dirichlet 边界处理的自由度索引
+        例如固定第一个节点的所有自由度（如前两个）
+
+        Parameters:
+            total_dof : int
+                全局自由度总数
+
+        Returns:
+            Tensor[int] ：边界自由度编号
         """
-        x = p[..., 0]
-        return bm.abs(x - 0.0) < 1e-12
+        return bm.array([0, 1, 2])  
     
     @cartesian
     def dirichlet(self, x):
@@ -99,4 +101,5 @@ class BeamData2D:
         Returns:
             Tensor: Dirichlet boundary condition at x.
         """
-        return bm.zeros_like(x)
+        return bm.zeros((x.shape[0], 2))
+

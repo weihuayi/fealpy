@@ -25,10 +25,18 @@ class EdgeMesh(SimplexMesh, Plotable):
         self.cell_length = self.edge_length
         self.cell_tangent = self.edge_tangent
         
+        
+        
+        
     
     def cell_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
         return self.edge_to_ipoint(p, index)
     
+
+    @property
+    def face2cell(self):
+        return self.node_to_cell()
+
 
     def ref_cell_measure(self):
         return 1.0
