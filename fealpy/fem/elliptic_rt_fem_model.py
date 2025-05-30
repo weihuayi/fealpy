@@ -15,7 +15,54 @@ from ..fem import DirichletBC
 
 class EllipticRTFEMModel(ComputationalModel):
     """
-    Class for the elliptic RT FEM model.
+    EllipticRTFEMModel: Elliptic Raviart-Thomas Finite Element Model
+
+    This class implements a 2D elliptic PDE solver based on the Raviart-Thomas finite element method (RT FEM).
+    It is suitable for elliptic problems requiring accurate flux approximation. The model supports custom PDE data,
+    automatic mesh generation, linear system assembly, boundary condition handling, solution, and error analysis.
+
+    Parameters
+    ----------
+    pde : EllipticPDEDataT, optional, default=None
+        The elliptic PDE data object, including coefficients, source terms, and boundary conditions.
+        If None, a built-in example problem ('coscos') is used.
+
+    Attributes
+    ----------
+    pde : EllipticPDEDataT
+        The current elliptic PDE data object, including coefficients, source terms, and boundary conditions.
+    mesh : TriangleMesh
+        The current 2D triangle mesh object used for finite element discretization.
+
+    Methods
+    -------
+    run(maxit=4)
+        Execute the complete FEM solution process and return the numerical solutions of the primary and auxiliary variables.
+    init_mesh()
+        Initialize and generate the 2D triangle mesh.
+    linear_system()
+        Assemble the linear system (stiffness matrix and right-hand side) for the elliptic RT FEM.
+    boundary_apply()
+        Apply boundary conditions to the linear system.
+    solve()
+        Solve the linear system and return the FEM solutions of the primary and auxiliary variables.
+    show_mesh()
+        Visualize the current mesh structure.
+    error()
+        Compute the error between the numerical and exact solutions.
+
+    Notes
+    -----
+    This class uses a mixed finite element method (Raviart-Thomas space and piecewise constant space),
+    suitable for elliptic problems with flux continuity requirements.
+    It supports automatic boundary condition handling and error evaluation for algorithm verification and numerical experiments.
+
+    Examples
+    --------
+    >>> model = EllipticRTFEMModel()
+    >>> p, u = model.run()
+    >>> error_p, error_u = model.error()
+    >>> model.show_mesh()
     """
 
     def __init__(self, pde: Optional[EllipticPDEDataT] = None):
@@ -43,6 +90,7 @@ class EllipticRTFEMModel(ComputationalModel):
 
     def linear_system(self):
         """
+        Assemble the linear system for the elliptic RT FEM model.
         """
         pde = self.pde
         mesh = self.init_mesh()
@@ -73,7 +121,7 @@ class EllipticRTFEMModel(ComputationalModel):
                        [bform3.T,bform4]])
         A = M.assembly()
         
-         # 组装右端
+        # Assemble the right-hand side
         lform = LinearForm(uspace)
         lform.add_integrator(ScalarSourceIntegrator(source=pde.source))
         F = lform.assembly()
@@ -86,14 +134,14 @@ class EllipticRTFEMModel(ComputationalModel):
         Apply the boundary conditions to the linear system.
         """
         A, b = self.linear_system()
-        # 组装边界条件 
+        # Assemble boundary conditions 
         pde = self.pde
         mesh = self.init_mesh()
         pspace = RaviartThomasFESpace2d(mesh, p=0)
         uspace = LagrangeFESpace(mesh, p=0, ctype='D') # discontinuous space
         pgdof = pspace.number_of_global_dofs()
         ugdof = uspace.number_of_global_dofs()
-        ispBdof = pspace.is_boundary_dof()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+        ispBdof = pspace.is_boundary_dof()
         isyBdof = bm.zeros(ugdof, dtype=bm.bool)
         isBdof = bm.concatenate([ispBdof,isyBdof],axis=0)
         fun = pspace.function()
