@@ -18,11 +18,12 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
-        super().__init__(method=method)
+        super().__init__()
         self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -77,7 +78,3 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         else:
             raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
         return result
-    
-    @assembly.selector
-    def assembly(self):
-        return self.method

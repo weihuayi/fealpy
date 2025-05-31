@@ -29,9 +29,8 @@ class ViscousWorkIntegrator(LinearInt, OpInt, CellInt):
     """
     def __init__(self, coef: Optional[CoefLike] = None, q: Optional[int] = None, *,
                  region: Optional[TensorLike] = None,
-                 batched: bool = False,
-                 method: Optional[str]=None) -> None:
-        super().__init__(method=method)
+                 batched: bool = False) -> None:
+        super().__init__()
         self.coef = coef
         self.q = q
         self.set_region(region)

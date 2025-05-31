@@ -13,9 +13,8 @@ class GradSourceIntegrator(LinearInt, SrcInt, CellInt):
     r"""<f, grad v>"""
     def __init__(self, source: Optional[SourceLike]=None, q: int=None, *,
                  region: Optional[TensorLike] = None,
-                 batched: bool=False,
-                 method=None) -> None:
-        super().__init__(method=method)
+                 batched: bool=False) -> None:
+        super().__init__()
         self.source = source
         self.q = q
         self.set_region(region)

@@ -14,8 +14,8 @@ class NonlinearWrapperInt(NonlinearInt):
     """### Nonlinear Wrapper Integrator
     A wrapper class that converts a LinearInt into a NonlinearInt by extracting and passing parameters."""
 
-    def __init__(self, linear_int: LinearInt, method: Optional[str]=None):
-        super().__init__(method=method)
+    def __init__(self, linear_int: LinearInt):
+        super().__init__()
         self.linear_int = linear_int
 
     @enable_cache

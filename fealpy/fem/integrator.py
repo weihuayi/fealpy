@@ -108,8 +108,7 @@ class Integrator(metaclass=VariantMeta):
     _region: _Region = None
     etype: str
 
-    def __init__(self, method=None, keep_data=False, *args, **kwds) -> None:
-        self.method = method
+    def __init__(self, keep_data=False, *args, **kwds) -> None:
         self._cache: Dict[Tuple[str, int], Any] = {}
         self.keep_data(keep_data)
 

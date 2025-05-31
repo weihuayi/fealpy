@@ -18,9 +18,8 @@ class NonlinearElasticIntegrator(NonlinearInt, OpInt, CellInt):
     r"""The nonlinear elastic integrator for function spaces based on homogeneous meshes."""
     def __init__(self, coef, material, q: Optional[int]=None, *,
                  index: Index=_S,
-                 batched: bool=False,
-                 method: Optional[str]=None) -> None:
-        super().__init__(method=method)
+                 batched: bool=False) -> None:
+        super().__init__()
         self.material = material
         self.coef = coef
 
