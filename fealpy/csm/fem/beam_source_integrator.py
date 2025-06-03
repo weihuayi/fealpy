@@ -45,6 +45,22 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
         return space.cell_to_dof()
 
     def assembly(self, space: _FS) -> TensorLike:
+        """
+        Assemble the source term vector.
+        Depending on the beam type ('pure', '2d', or '3d'), calls the corresponding source assembly method and returns the assembled source vector.
+        Parameters
+            space : _FS
+            Finite element space object used to define the assembly environment.
+        Returns
+            source_vector : TensorLike
+            Assembled source vector of type TensorLike, representing the source term for the corresponding beam type.
+        Raises
+            ValueError
+            Raised if self.type is not 'pure', '2d', or '3d', indicating an unknown beam type.
+        Notes
+            This method automatically selects the appropriate source assembly implementation based on the beam type, making it easy to extend and maintain.
+        """
+    
         if self.type == 'pure':
             return self._source_pure()
         elif self.type == '2d':
@@ -56,7 +72,13 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
 
     def _source_pure(self) -> TensorLike:
         """
-        Pure Bending Beam (2 DOFs per node: [w, theta])
+        Pure bending beam (2 DOFs per node: [w, theta])
+        Uniform distributed load q = [f], where f is the bending load.
+        The source term is computed as:
+        f1 = q * l / 2
+        f2 = q * l**2 / 12
+        Returns:
+            TensorLike: Assembled source vector of shape (NC, 4) for pure bending beam.
         """
         l = self.l[:, None]  # shape (NC, 1)
         q = self.ft  
@@ -67,7 +89,13 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
     def _source_2d(self) -> TensorLike:
         """
         2D Beam (3 DOFs per node: [u, w, theta])
-        Uniform distributed load q = [fx, fy], where fx is the axial load and fy is the vertical load.
+        Uniform distributed load q = [fx, fy], where fx is the load in the x direction and fy is the load in the y direction.
+        The source term is computed as:
+        fx1 = fx * l / 2
+        fy1 = fy * l / 2
+        fy2 = fy * l**2 / 12
+        Returns:
+            TensorLike: Assembled source vector of shape (NC, 6) for 2D beam.
         """
         l = self.l[:, None]
         q = self.ft  
@@ -86,8 +114,16 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
 
     def _source_3d(self) -> TensorLike:
         """
-        3D Beam (6 DOFs per node: [u, v, w, theta_x, theta_y, theta_z])
-        Uniform distributed load q = [fx, fy, fz], where fx, fy, fz are the distributed loads in the local x, y, z directions, respectively.
+        3D Beam (6 DOFs per node: [u, v, w, θx, θy, θz])
+        Uniform distributed load q = [fx, fy, fz], where fx, fy, fz are the loads in the x, y, and z directions respectively.
+        The source term is computed as:
+        fx1 = fx * l / 2
+        fy1 = fy * l / 2
+        fy2 = fy * l**2 / 12
+        fz1 = fz * l / 2
+        fz2 = fz * l**2 / 12
+        Returns:
+            TensorLike: Assembled source vector of shape (NC, 12) for 3D beam.
         """
         l = self.l[:, None]
         q = self.ft  
