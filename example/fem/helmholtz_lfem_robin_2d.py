@@ -42,8 +42,8 @@ parser.add_argument('--backend',
         help='默认后端为numpy')
 
 parser.add_argument('--device',
-        default='cuda', type=str,
-        help='默认gpu上运行')
+        default='cpu', type=str,
+        help='默认cpu上运行')
 
 args = parser.parse_args()
 # args.backend = 'pytorch'

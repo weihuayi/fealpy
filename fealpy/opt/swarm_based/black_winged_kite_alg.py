@@ -1,11 +1,6 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
-"""
-Black_winged Kite Algorithm
-
-
-"""
 class BlackwingedKiteAlg(Optimizer):
     """
     Black-winged Kite Algorithm (BWKA) for optimization problems.
@@ -39,7 +34,7 @@ class BlackwingedKiteAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, p=0.9):
+    def run(self, params={'p':0.9}):
         """
         Executes the Black-winged Kite optimization algorithm for optimization.
 
@@ -49,6 +44,7 @@ class BlackwingedKiteAlg(Optimizer):
             p (float): Probability factor for controlling attacking behavior.
         """
         # Evaluate initial fitness for all solutions
+        p = params.get('p')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]

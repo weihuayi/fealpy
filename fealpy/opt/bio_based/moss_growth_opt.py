@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class MossGrowthOpt(Optimizer):
     """
@@ -29,13 +29,16 @@ class MossGrowthOpt(Optimizer):
         super().__init__(option)
 
 
-    def run(self, w=2, d1=0.2, rec_num=10):
+    def run(self, params={'w':2, 'd1':0.2, 'rec_num':10}):
         """
         Runs the Moss Growth Optimization (MGO) algorithm.
 
         This method performs the main optimization loop, adjusting the population based on fitness, diversity,
         and movement strategies, and tracking the global best solution over iterations.
         """
+        w = params.get('w')
+        d1 = params.get('d1')
+        rec_num = params.get('rec_num')
         options = self.options
         x = options["x0"]
         N = options["NP"]

@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class HoneybadgerAlg(Optimizer):
     """
@@ -27,7 +27,7 @@ class HoneybadgerAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, c=2, beta=6):
+    def run(self, params={'c':2, 'beta':6}):
         """
         Runs the Honey Badger Algorithm.
 
@@ -36,6 +36,8 @@ class HoneybadgerAlg(Optimizer):
             beta (float): A control parameter for the exploitation phase, default is 6.
         """
         # Initialize fitness values and find the best solution in the initial population
+        c = params.get('c')
+        beta = params.get('beta')
         fit = self.fun(self.x)
         gbest_idx = bm.argmin(fit)
         self.gbest_f = fit[gbest_idx]

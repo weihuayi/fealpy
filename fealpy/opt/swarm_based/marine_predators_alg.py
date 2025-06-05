@@ -1,16 +1,7 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-from fealpy.opt.opt_function import levy
-"""
-Marine Predators Algorithm
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
+from ..opt_function import levy
 
-Reference:
-~~~~~~~~~~
-Faramarzi A, Heidarinejad M, Mirjalili S, et al. 
-Marine Predators Algorithm: A nature-inspired metaheuristic. 
-Expert systems with applications, 2020, 152: 113377.
-
-"""
 class MarinePredatorsAlg(Optimizer):
     """
     A class implementing the Marine Predators Algorithm (MPA) for optimization tasks.
@@ -47,7 +38,7 @@ class MarinePredatorsAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, P=0.5, FADs=0.2):
+    def run(self, params={'P':0.5, 'FADs':0.2}):
         """
         Runs the Marine Predators Algorithm to find the optimal solution.
 
@@ -60,6 +51,8 @@ class MarinePredatorsAlg(Optimizer):
         """
         
         # Initial fitness and global best solution
+        P = params.get('P')
+        FADs = params.get('FADs')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]

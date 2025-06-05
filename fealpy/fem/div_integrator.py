@@ -1,20 +1,13 @@
 
 from typing import Optional
-from functools import partial
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
-
+from ..typing import TensorLike, Index, _S, CoefLike
 from ..mesh import HomogeneousMesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func, is_scalar, is_tensor, fill_axis
-from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
-from .integrator import (
-    LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
+from ..functionspace import FunctionSpace as _FS
+from ..utils import process_coef_func
+from ..functional import bilinear_integral
+from .integrator import LinearInt, OpInt, CellInt, enable_cache
 
 
 class DivIntegrator(LinearInt, OpInt, CellInt):
@@ -29,7 +22,8 @@ class DivIntegrator(LinearInt, OpInt, CellInt):
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
-        return space.cell_to_dof()[self.index]
+        return (space[0].cell_to_dof()[self.index],
+                space[1].cell_to_dof()[self.index])
 
     @enable_cache
     def fetch(self, space: _FS):

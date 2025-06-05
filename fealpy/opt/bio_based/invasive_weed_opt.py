@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class InvasiveWeedOpt(Optimizer):
     """
@@ -24,7 +24,7 @@ class InvasiveWeedOpt(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, n_max=100, s_min=0, s_max=5, n=3, sigma_initial=3, sigma_final=0.001):
+    def run(self, params={'n_max':100, 's_min':0, 's_max':5, 'n':3, 'sigma_initial':3, 'sigma_final':0.001}):
         """
         Runs the Invasive Weed Optimization (IWO) algorithm.
 
@@ -40,17 +40,23 @@ class InvasiveWeedOpt(Optimizer):
             sigma_final (float): Final standard deviation for Gaussian perturbation (default: 0.001).
         """
         # Evaluate the fitness of the initial population
+        n_max = params.get('n_max')
+        s_min = params.get('s_min')
+        s_max = params.get('s_max')
+        n = params.get('n')
+        sigma_final = params.get('sigma_final')
+        sigma_initial = params.get('sigma_initial')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]
         self.gbest_f = fit[gbest_index]
 
         # Main optimization loop
-        for it in range(self.maxit):
-            self.d_pl_pt(it)  # Calculate exploration and exploitation percentages
+        for it in range(self.MaxIT):
+            self.D_pl_pt(it)  # Calculate exploration and exploitation percentages
 
             # Update sigma based on the iteration number
-            sigma = ((self.maxit - it) / self.maxit) ** n * (sigma_initial - sigma_final) + sigma_final
+            sigma = ((self.MaxIT - it) / self.MaxIT) ** n * (sigma_initial - sigma_final) + sigma_final
             
             # Calculate the number of seeds for each solution
             seed_num = bm.floor((s_max - s_min) * (fit - bm.min(fit)) / (bm.max(fit) - bm.min(fit)) + s_min)

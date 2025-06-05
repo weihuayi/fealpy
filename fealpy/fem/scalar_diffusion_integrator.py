@@ -2,18 +2,13 @@ from typing import Optional, Literal
 from ..mesh.mesh_base import SimplexMesh
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 
-from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
-from .integrator import (
-    LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
+from ..decorator.variantmethod import variantmethod
+from .integrator import LinearInt, OpInt, CellInt, enable_cache
 
 
 class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
@@ -22,11 +17,12 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
                  region: Optional[TensorLike] = None,
                  batched: bool = False,
                  method: Literal['fast', 'nonlinear', 'isopara', None] = None) -> None:
-        super().__init__(method=method if method else 'assembly')
+        super().__init__()
         self.coef = coef
         self.q = q
         self.set_region(region)
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS, /, indices=None) -> TensorLike:
@@ -55,6 +51,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         bcs = self.fetch_qf(space)[0]
         return space.grad_basis(bcs, index=self.entity_selection(indices), variable='u')
 
+    @variantmethod
     def assembly(self, space: _FS, /, indices=None) -> TensorLike:
         coef = self.coef
         mesh = space.mesh
@@ -65,8 +62,8 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         gphi = self.fetch_gphix(space, indices)
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched)
 
-    @assemblymethod('fast')
-    def fast_assembly(self, space: _FS, /, indices=None) -> TensorLike:
+    @assembly.register('fast')
+    def assembly(self, space: _FS, /, indices=None) -> TensorLike:
         """
         限制：常系数、单纯形网格
         TODO: 加入 assert
@@ -97,8 +94,8 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
             result = bm.einsum('cqkn, qijmn, cqkm, c -> cij', JG, M, JG, cm) # (NC, NQ, ldof, GD)
         return result
 
-    @assemblymethod('nonlinear')
-    def nonlinear_assembly(self, space: _FS, /, indices=None) -> TensorLike:
+    @assembly.register('nonlinear')
+    def assembly(self, space: _FS, /, indices=None) -> TensorLike:
         uh = self.uh
         coef = self.coef
         mesh = space.mesh
@@ -112,8 +109,8 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         return bilinear_integral(gphi, gphi, ws, cm, coef, batched=self.batched),\
                linear_integral(gphi, ws, cm, coef_F, batched=self.batched)
 
-    @assemblymethod('isopara')
-    def isopara_assembly(self, space: _FS, /, indices=None) -> TensorLike:
+    @assembly.register('isopara')
+    def assembly(self, space: _FS, /, indices=None) -> TensorLike:
         """
         曲面等参有限元积分子组装
         """

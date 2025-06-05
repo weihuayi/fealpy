@@ -1,11 +1,6 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
-"""
-Crested Porcupine Optimization
-
-
-"""
 class CrestedPorcupineOpt(Optimizer):
     """
     Crested Porcupine Optimization Algorithm (CPOA) for optimization.
@@ -39,7 +34,7 @@ class CrestedPorcupineOpt(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, N_min=120, T=2, alpha=0.2, Tf=0.8):
+    def run(self, params={'N_min':120, 'T':2, 'alpha':0.2, 'Tf':0.8}):
         """
         Executes the Crested Porcupine optimization algorithm.
         
@@ -50,6 +45,10 @@ class CrestedPorcupineOpt(Optimizer):
             Tf (float): Threshold for switching between exploration and exploitation.
         """
         # Evaluate initial fitness for all solutions
+        N_min = params.get('N_min')
+        T = params.get('T')
+        alpha = params.get('alpha')
+        Tf = params.get('Tf')
         fit = self.fun(self.x)
 
         # Initialize the global best solution

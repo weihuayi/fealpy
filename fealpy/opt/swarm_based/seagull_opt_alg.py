@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class SeagullOptAlg(Optimizer):
     """
@@ -40,7 +40,7 @@ class SeagullOptAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, fc=2, u=1, v=1):
+    def run(self, params={'fc':2, 'u':1, 'v':1}):
         """
         Runs the Seagull Optimization Algorithm.
 
@@ -55,6 +55,9 @@ class SeagullOptAlg(Optimizer):
             4. Track the global best solution and update it if a better solution is found.
         """
         # Initial fitness evaluation
+        fc = params.get('fc')
+        u = params.get('u')
+        v = params.get('v')
         fit = self.fun(self.x)
         
         # Identify the global best solution and its fitness

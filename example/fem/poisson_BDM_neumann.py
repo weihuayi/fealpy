@@ -4,7 +4,7 @@ import argparse
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.functionspace import BDMFiniteElementSpace2d,BDMFiniteElementSpace3d
+from fealpy.functionspace import BrezziDouglasMariniFESpace
 from fealpy.functionspace import LagrangeFESpace
 from fealpy import logger
 logger.setLevel('WARNING')
@@ -79,11 +79,11 @@ for j, p in enumerate(ps):
         if dim == 2:
             mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=2**i, ny=2**i)
             space1 = LagrangeFESpace(mesh,p=p-1,ctype="D")
-            space2 = BDMFiniteElementSpace2d(mesh, p=p)
+            space2 = BrezziDouglasMariniFESpace(mesh, p=p)
         else:
             mesh = TetrahedronMesh.from_box([0, 1, 0, 1, 0, 1], nx=2**i, ny=2**i, nz=2**i)
             space1 = LagrangeFESpace(mesh,p=p-1,ctype="D")
-            space2 = BDMFiniteElementSpace3d(mesh, p=p)
+            space2 = BrezziDouglasMariniFESpace(mesh, p=p)
         tmr.send(f'第{i}次网格和pde生成时间')
 
         pdof = space1.dof.number_of_global_dofs()

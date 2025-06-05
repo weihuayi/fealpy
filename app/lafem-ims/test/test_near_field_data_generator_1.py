@@ -4,7 +4,7 @@ from fealpy.ml.sampler import CircleCollocator
 from fealpy.typing import TensorLike
 
 from lafemims.data_generator import NearFieldDataFEMGenerator2d
-from functional import levelset_circles, generate_scatterers_circles
+from lafemims.functional import levelset_circles, generate_scatterers_circles
 
 
 # 设置随机种子
@@ -24,8 +24,8 @@ k = [2 * bm.pi]
 num_of_scatterers = 40000
 
 # 生成接收点
-num_of_reciever_points = 50
-reciever_points = CircleCollocator(0, 0, 5).run(num_of_reciever_points).detach().numpy()
+num_of_receiver_points = 50
+receiver_points = CircleCollocator(0, 0, 5).run(num_of_receiver_points).detach().numpy()
 
 #获取散射体数据
 centers, radius = generate_scatterers_circles(num_of_scatterers, SEED)
@@ -47,7 +47,7 @@ def main(idx: int, ctr: TensorLike, rad:TensorLike, save_path: str, test_type: s
         levelset=ind_func,
         d=d,
         k=k,
-        reciever_points=reciever_points
+        receiver_points=receiver_points
     )
     if test_type == "save":
         generator.save(save_path, idx)
@@ -68,7 +68,7 @@ if __name__ == '__main__':
         import time
 
         NUM_OF_POOL = 8         # 并行进程数
-        AMOUNT_OF_DATA = 100    # 生成数据数量
+        AMOUNT_OF_DATA = 500    # 生成数据数量
 
         def update_progress_bar(*_):
             progress_bar.update()

@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class ButterflyOptAlg(Optimizer):
     """
@@ -29,7 +29,7 @@ class ButterflyOptAlg(Optimizer):
         """
         super().__init__(option)
     
-    def run(self, a=0.1, c=0.01, p=0.8):
+    def run(self, params={'a':0.1, 'c':0.01, 'p':0.8}):
         """
         Executes the Butterfly optimization algorithm for optimization.
 
@@ -43,6 +43,9 @@ class ButterflyOptAlg(Optimizer):
             p (float): Probability for choosing between global and local search strategies.
         """
         # Evaluate initial fitness for all solutions
+        a = params.get('a')
+        c = params.get('c')
+        p =params.get('p')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]

@@ -1,15 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-
-"""
-Sand Cat Swarm Optimization  
-
-Reference:
-~~~~~~~~~~
-Amir Seyyedabbasi, Farzad Kiani.
-Sand Cat swarm optimization: a nature-inspired algorithm to solve global optimization problems.
-Engineering with Computers, 2023, 39: 2627-2651.
-"""
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class SandCatSwarmOpt(Optimizer):
     """

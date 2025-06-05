@@ -1,14 +1,15 @@
 
-from typing import Union, Optional, Any, TypeVar, Tuple, List, Dict, Callable
-from typing import Generic
-import logging
+from typing import (
+    Union, Optional, Any, TypeVar, Tuple, List, Dict, Callable,
+    Generic, Protocol
+)
 
 from .. import logger
-from ..typing import TensorLike, Index, CoefLike
+from ..typing import Index
+from ..backend import TensorLike
 from ..backend import backend_manager as bm
-from ..mesh import Mesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import ftype_memory_size
+from ..decorator.variantmethod import VariantMeta
+
 
 __all__ = [
     'Integrator',
@@ -22,61 +23,15 @@ __all__ = [
     'GroupIntegrator'
 ]
 
+class Mesh(Protocol):
+    def count(self, etype: Union[int, str]) -> int: ...
+
 Self = TypeVar('Self')
-_SpaceGroup = Union[_FS, Tuple[_FS, ...]]
+Space = TypeVar("Space")
+INdex = Union[int, slice, Tuple[int, ...], TensorLike]
+_SpaceGroup = Union[Space, Tuple[Space, ...]]
 _OpIndex = Optional[Index]
 _Region = Union[Callable[[Mesh], TensorLike], TensorLike, None]
-
-
-class IntegratorMeta(type):
-    def __init__(self, name: str, bases: Tuple[type, ...], dict: Dict[str, Any], /, **kwds: Any):
-        if not hasattr(self, '_assembly_name_map'):
-            self._assembly_name_map = {}
-
-        for meth_name, meth in dict.items():
-            if callable(meth) and hasattr(meth, '__call_name__'):
-                call_name = getattr(meth, '__call_name__')
-                if call_name is None:
-                    call_name = meth_name
-                self._assembly_name_map[call_name] = meth_name
-
-        return type.__init__(self, name, bases, dict, **kwds)
-
-
-def assemblymethod(call_name: Optional[str]=None):
-    """A decorator registering the method as an assembly method.
-
-    Requires that the metaclass is IntegratorMeta or derived from it.
-
-    Parameters:
-        call_name (str, optional): The name for the users to choose the assembly method.
-            Use the name of the method if None. Defaults to None.
-
-    Example:
-    ```
-        class MyIntegrator(Integrator):
-            def assembly(self, space: _FS, /, indices=None) -> Tensor:
-                # 'assembly' is the default assembly method,
-                # naturally registered to name 'assembly'.
-                return integral
-
-            @assemblymethod('my')
-            def my_assembly(self, space: _FS, /, indices=None) -> Tensor:
-                # code for getting local integral tensor
-                return integral
-    ```
-    Then in the initialization of an integrator instance, use
-    ```
-        integrator = MyIntegrator(method='my')
-    ```
-    to specify the 'my_assembly' as the assembly method called in the __call__.
-    """
-    if call_name in {'__call__',}:
-        raise ValueError(f"Can not use assembly method name '{call_name}'.")
-    def decorator(meth: Self) -> Self:
-        meth.__call_name__ = call_name
-        return meth
-    return decorator
 
 
 def enable_cache(func: Self) -> Self:
@@ -109,7 +64,7 @@ def enable_cache(func: Self) -> Self:
     return wrapper
 
 
-class Integrator(metaclass=IntegratorMeta):
+class Integrator(metaclass=VariantMeta):
     """The base class for integrators.
 
     ## Introduction
@@ -144,30 +99,16 @@ class Integrator(metaclass=IntegratorMeta):
 
     ## Features
 
-    ### Multiple Assembly Methods
-
-    Users can develop multiple assembly implementation for a single integrator
-    by applying the `assemblymethod` decorator.
-    They can be chosen by the `method` parameter when initializing an integrator object.
-    See `integrator.assemblymethod` for details.
-
     ### Using Cache
 
     The `enable_cache` decorator is a simple tool provided to cache some integral materials.
     This may be useful for unchanged integrators in an iteration algorithm.
     See `integrator.enable_cache` for details.
     """
-    _assembly_name_map: Dict[str, str] = {}
     _region: _Region = None
     etype: str
 
-    def __init__(self, method='assembly', keep_data=False, *args, **kwds) -> None:
-        if method not in self._assembly_name_map:
-            raise ValueError(f"No assembly method is registered as '{method}'. "
-                             f"For {self.__class__.__name__}, only the following options are available: "
-                             f"{', '.join(self._assembly_name_map.keys())}.")
-
-        self._method = method
+    def __init__(self, keep_data=False, *args, **kwds) -> None:
         self._cache: Dict[Tuple[str, int], Any] = {}
         self.keep_data(keep_data)
 
@@ -246,30 +187,21 @@ class Integrator(metaclass=IntegratorMeta):
     ### END: Region of Integration ###
 
     def const(self, space: _SpaceGroup, /):
-        value = self(space)
+        value = self.assembly(space)
         to_gdof = self.to_global_dof(space)
         return ConstIntegrator(value, to_gdof)
 
-    def __call__(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
-        logger.debug(f"(INTEGRATOR RUN) {self.__class__.__name__}, on {space.__class__.__name__}")
-        meth = getattr(self, self._assembly_name_map[self._method], None)
-        if indices is None:
-            val = meth(space) # Old API
-        else:
-            val = meth(space, indices=indices)
-        if logger.level <= logging._nameToLevel['INFO']:
-            logger.info(f"Local tensor sized {ftype_memory_size(val)} Mb.")
-        return val
-
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self._method})"
+        return f"{self.__class__.__name__}({self.method})"
+
+    def __call__(self, *args, **kwargs):
+        return self.assembly(*args, **kwargs)
 
     def to_global_dof(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> Union[TensorLike, Tuple[TensorLike, ...]]:
         """Return the relationship between the integral entities
         and the global dofs."""
         raise NotImplementedError
 
-    @assemblymethod('assembly') # The default assemply method
     def assembly(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
         """The default method of integration on entities."""
         raise NotImplementedError
@@ -424,7 +356,7 @@ class GroupIntegrator(Integrator):
         ct = self.ints[0](space, indices=indices)
 
         for int_ in self.ints[1:]:
-            new_ct = int_(space, indices=indices)
+            new_ct = int_.assembly(space, indices=indices)
             fdim = min(ct.ndim, new_ct.ndim)
             if ct.shape[:fdim] != new_ct.shape[:fdim]:
                 raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "

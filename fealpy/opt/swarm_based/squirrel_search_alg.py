@@ -1,17 +1,6 @@
-from fealpy.opt.opt_function import levy
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-
-"""
-Squirrel Search Algorithm  
-
-Reference:
-~~~~~~~~~~
-Mohit Jain, Vijander Singh, Asha Rani.
-A novel nature-inspired algorithm for optimization: Squirrel search algorithm.
-Swarm and Evolutionary Computation, 2019, 44: 148-175
-"""
-
+from ..opt_function import levy
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class SquirrelSearchAlg(Optimizer):
     """
@@ -52,7 +41,7 @@ class SquirrelSearchAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, g_c=1.9, p_dp=0.1):
+    def run(self, params={'g_c':1.9, 'p_dp':0.1}):
         """
         Runs the Squirrel Search Algorithm.
 
@@ -68,6 +57,8 @@ class SquirrelSearchAlg(Optimizer):
             5. Track the fitness of the global best solution over iterations.
         """
         # Initial fitness evaluation
+        g_c = params.get('g_c')
+        p_dp = params.get('p_dp')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest_f = fit[gbest_index]

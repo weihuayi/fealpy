@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class GeneticAlg(Optimizer):
     """
@@ -32,7 +32,7 @@ class GeneticAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, pc=0.7, pm=0.01):
+    def run(self, params={'pc':0.7, 'pm':0.01}):
         """
         Runs the Genetic Algorithm.
 
@@ -41,6 +41,8 @@ class GeneticAlg(Optimizer):
             pm (float): The mutation probability, default is 0.01.
         """
         # Initialize fitness values and find the best solution in the initial population
+        pc = params.get('pc')
+        pm = params.get('pm')
         fit = self.fun(self.x)
         gbest_index = bm.argmin(fit)
         self.gbest = self.x[gbest_index]

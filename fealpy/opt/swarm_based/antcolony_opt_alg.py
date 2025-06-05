@@ -1,7 +1,7 @@
 import random
 
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class AntColonyOptAlg(Optimizer):
     """
@@ -23,13 +23,9 @@ class AntColonyOptAlg(Optimizer):
             D (Tensor): Distance matrix for the problem (e.g., for TSP).
         """
         super().__init__(option)
-        self.alpha = 1  # Influence of pheromone
-        self.beta = 5   # Influence of heuristic (distance)
-        self.rho = 0.5  # Pheromone evaporation rate
-        self.Q = 1      # Constant for pheromone update
-        self.D = D      # Distance matrix
 
-    def run(self):
+
+    def run(self, params={'alpha':1, 'beta':5, 'rho':0.5, 'Q':1}):
         """
         Runs the Ant Colony Optimization algorithm for optimization.
 
@@ -40,6 +36,10 @@ class AntColonyOptAlg(Optimizer):
             gbest_f (float): The fitness (cost) of the best solution.
         """
         # Get the algorithm options
+        alpha = params.gat('alpha')
+        beta = params.gat('beta')
+        rho = params.gat('rho')
+        Q = params.gat('Q')
         option = self.options
         x = option["x0"]
         N = option["NP"]  # Number of ants
@@ -80,8 +80,8 @@ class AntColonyOptAlg(Optimizer):
                 allow = bm.array(w)
 
                 # Compute transition probabilities based on pheromone and heuristic information
-                P = (Tau[tabu[:, -1].reshape(-1, 1), allow] ** self.alpha) * \
-                    (Eta[tabu[:, -1].reshape(-1, 1), allow] ** self.beta)
+                P = (Tau[tabu[:, -1].reshape(-1, 1), allow] ** alpha) * \
+                    (Eta[tabu[:, -1].reshape(-1, 1), allow] ** beta)
                 P /= P.sum(axis=1, keepdims=True)  # Normalize probabilities
                 Pc = bm.cumsum(P, axis=1)  # Cumulative probability
                 rand_vals = bm.random.rand(N, 1)  # Random numbers to decide the next city
@@ -104,9 +104,9 @@ class AntColonyOptAlg(Optimizer):
 
             # Update pheromone matrix based on the ants' solutions
             Delta_Tau = bm.zeros((dim, dim))
-            Delta_Tau[Table[:, :-1], Table[:, 1:]] += (self.Q / fit).reshape(-1, 1)
-            Delta_Tau[Table[:, -1], Table[:, 0]] += self.Q / fit
-            Tau = (1 - self.rho) * Tau + Delta_Tau  # Evaporate pheromones and add new pheromones
+            Delta_Tau[Table[:, :-1], Table[:, 1:]] += (Q / fit).reshape(-1, 1)
+            Delta_Tau[Table[:, -1], Table[:, 0]] += Q / fit
+            Tau = (1 - rho) * Tau + Delta_Tau  # Evaporate pheromones and add new pheromones
 
         # Return the best solution found and its fitness value
         return gbest, gbest_f

@@ -1,6 +1,6 @@
-from fealpy.opt.opt_function import levy
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ..opt_function import levy
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 """
 Sparrow Search Algorithm  
@@ -51,7 +51,7 @@ class SparrowSearchAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, st=0.6, pd=0.7, sd=0.2):
+    def run(self, params={'st':0.6, 'pd':0.7, 'sd':0.2}):
         """
         Runs the Sparrow Search Algorithm.
 
@@ -67,6 +67,9 @@ class SparrowSearchAlg(Optimizer):
             5. Keep track of the global best solution and update it if a better solution is found.
         """
         # Initial fitness evaluation
+        st = params.get('st')
+        pd = params.get('pd')
+        sd = params.get('sd')
         fit = self.fun(self.x)
         
         # Identify the global best solution and its fitness

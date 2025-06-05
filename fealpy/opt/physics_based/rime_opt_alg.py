@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class RimeOptAlg(Optimizer):
     """
@@ -46,7 +46,7 @@ class RimeOptAlg(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, w=5):
+    def run(self, params={'w':5}):
         """
         Runs the Rime Optimization algorithm.
 
@@ -68,6 +68,7 @@ class RimeOptAlg(Optimizer):
             6. If the fitness of a new solution is better, update the current population and global best solution.
             7. Track the fitness of the global best solution over iterations.
         """
+        w = params.get('w')
         fit = self.fun(self.x)  # Evaluate fitness for the current population
         gbest_index = bm.argmin(fit)  # Find index of the best solution
         self.gbest = self.x[gbest_index]  # Set global best solution

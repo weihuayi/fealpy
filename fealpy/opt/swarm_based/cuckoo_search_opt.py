@@ -1,6 +1,6 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-from fealpy.opt.opt_function import levy
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
+from ..opt_function import levy
 
 class CuckooSearchOpt(Optimizer):
     """
@@ -31,7 +31,7 @@ class CuckooSearchOpt(Optimizer):
         """
         super().__init__(option)
 
-    def run(self, alpha=0.01, p=0.25):
+    def run(self, params={'alpha':0.01, 'p':0.25}):
         """
         Executes the Cuckoo Search optimization algorithm to find the optimal solution.
         
@@ -40,6 +40,8 @@ class CuckooSearchOpt(Optimizer):
             p (float): The probability of a nest being replaced by a new cuckoo egg (local search probability).
         """
         # Evaluate initial fitness for all solutions
+        alpha = params.get('alpha')
+        p = params.get('p')
         fit = self.fun(self.x)
         
         # Initialize the global best solution
