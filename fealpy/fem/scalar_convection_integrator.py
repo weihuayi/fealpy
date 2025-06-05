@@ -1,19 +1,16 @@
 from typing import Optional
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 from ..utils import is_tensor
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
-from .integrator import (
-    LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
+from ..decorator.variantmethod import variantmethod
+from .integrator import LinearInt, OpInt, CellInt, enable_cache
+
 
 class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
     r"""The convection integrator for function spaces based on homogeneous meshes."""
@@ -21,12 +18,12 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
-        method = 'assembly' if (method is None) else method
-        super().__init__(method=method)
+        super().__init__()
         self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -50,6 +47,7 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         phi = space.basis(bcs, index=index)
         return bcs, ws, phi, gphi, cm, index
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
@@ -62,8 +60,8 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
             raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
         return result
     
-    @assemblymethod('isopara')
-    def isopara_assembly(self, space: _FS) -> TensorLike:
+    @assembly.register('isopara')
+    def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, gphi, cm, index = self.fetch(space)

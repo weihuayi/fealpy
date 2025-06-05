@@ -36,6 +36,7 @@ from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
 from .face_mass_integrator import BoundaryFaceMassIntegrator, InterFaceMassIntegrator
 from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegrator
 from .scalar_interior_penalty_integrator import ScalarInteriorPenaltyIntegrator
+from .press_work_integrator import BoundaryPressWorkIntegrator
 
 ### Face Source
 from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator, ScalarRobinSourceIntegrator
@@ -55,4 +56,5 @@ from .nonlinear_wrapper import NonlinearWrapperInt
 ### solver
 from .poisson_lfem_solver import PoissonLFEMSolver
 from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver
-from .level_set_lfem_model import LevelSetLFEMModel
+from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
+from .interface_poisson_lfem_model import InterfacePoissonLFEMModel

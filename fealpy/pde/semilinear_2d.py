@@ -4,11 +4,11 @@ from ..decorator import cartesian
 from typing import Sequence
 
 PI = bm.pi
-class SemilinearData():
-    def __init__(self, domain:Sequence[float]):
-
-        self.domain = domain
-
+class SinSinData():
+    def __init__(self):
+        pass
+    def domain(self):
+        return [0, 1, 0, 2]
     #扩散项系数
     @cartesian
     def diffusion_coefficient(self, p):
@@ -65,5 +65,13 @@ class SemilinearData():
 
     #边界条件
     @cartesian                       
-    def dirichlet(self,p):
+    def dirichlet(self, p):
         return self.solution(p)
+    
+    #非线性项
+    def kernel_func_reaction(self, u):
+        return u**3
+    
+    #非线性项的梯度
+    def grad_kernel_func_reaction(self, u):
+        return 3*u**2

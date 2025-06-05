@@ -272,16 +272,18 @@ class LevelSetLFEMModel():
     
     ### Reinitialization ###
 class LevelSetReinitModel():
-    def __init__(self, space, q:int = None):
+    def __init__(self, phi0, q:int = None):
         
-        self.space = space
+        self.space = phi0.space
+        self.phi0 = phi0
+        self.options = Options()
         if q is None:
-            self.q = space.p + 3
+            self.q = self.space.p + 3
         else:
             self.q = q
     
-    def reinit_run(self, phi0):
-        self.phi0 = phi0
+    def reinit_run(self):
+        phi0 = self.phi0
         
         if self.options._re_alpha is None:
             cellscale = bm.max(self.space.mesh.entity_measure('cell'))
@@ -406,8 +408,6 @@ class LevelSetReinitModel():
         area = bm.einsum('i, ji, j ->', ws, measure(bcs), cellmeasure)
 
         return area
-
-
 
     def level_x(self, phi, y):
         '''

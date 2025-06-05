@@ -101,7 +101,7 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         return phi[None, :]
 
     @barycentric
-    def grad_basis(self, bcs: TensorLike, index: Index=_S, variable='u',p=None):
+    def grad_basis(self, bcs: TensorLike, index: Index=_S, variable='x',p=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -154,9 +154,12 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
             idx = bm.array(idx,device=self.device, dtype=self.itype)
             # R[..., i] = bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]]
             R = bm.set_at(R,(...,i),bm.prod(B[..., multiIndex[:, idx], idx.reshape(1, -1)],axis=-1)*F[..., multiIndex[:, i], [i]])
-        Dlambda = self.mesh.grad_lambda()
-        gphi = P[0, -1, 0]*bm.einsum("qlm, cmd->cqld", R, Dlambda)# TODO: optimize
-        return gphi[:, index]
+        if variable == 'lambda':
+            return P[0, -1, 0]*R
+        elif variable == 'x':
+            Dlambda = self.mesh.grad_lambda()
+            gphi = P[0, -1, 0]*bm.einsum("qlm, cmd->cqld", R, Dlambda)# TODO: optimize
+            return gphi[:, index]
 
     @barycentric
     def hess_basis(self, bcs: TensorLike, index: Index=_S, variable='u'):

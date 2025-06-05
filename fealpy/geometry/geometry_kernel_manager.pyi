@@ -70,7 +70,7 @@ class GeometryKernelManager:
     # 创建球体（中心坐标 + 半径）
     def add_sphere(self, xc, yc, zc, radius) -> Any: ...
     # 创建圆柱体（底面中心坐标 + 半径 + 高度 + 轴向）
-    def add_cylinder(self, xc, yc, zc, r, height, axis=(0, 0, 1)) -> Any: ...
+    def add_cylinder(self, xc, yc, zc, r, height, *, axis=(0, 0, 1)) -> Any: ...
     # 创建圆锥/圆台体（底面中心坐标 + 底/顶半径 + 高度）
     # def add_cone(self, xc, yc, zc, r_bottom, r_top, height) -> Any: ...
     # 创建棱锥体（底面形状 + 顶点坐标）
@@ -78,17 +78,18 @@ class GeometryKernelManager:
     # 创建圆环体（中心坐标 + 主半径 + 截面半径）
     def add_torus(self, xc, yc, zc, major_r, minor_r) -> Any: ...
     # 创建空心圆柱体（底面中心坐标 + 外/内半径 + 高度 + 轴向）
-    def add_hollow_cylinder(self, xc, yc, zc,outer_radius, inner_radius, height, axis=(0, 0, 1)) -> Any: ...
+    def add_hollow_cylinder(self, xc, yc, zc,outer_radius, inner_radius, height, *, axis=(0, 0, 1)) -> Any: ...
 
     # shape discrete
     def shape_discrete(self, shape, deflection: float = 0.1) -> Any: ...  # 离散化（网格化）
 
-    # # file io
-    # def import_step(self, filename) -> Any: ...  # 导入STEP
-    # def export_step(self, shape, filename) -> None: ...  # 导出STEP（已部分实现）
-    # def export_stl(self, shape, filename, resolution=0.1) -> None: ...  # 导出STL（网格化）
-    # def export_brep(self, shape, filename) -> None: ...  # 原生BREP格式
-    # def export_gltf(self, shape, filename) -> None: ...  # 可视化友好格式
+    # file io
+    def import_step(self, filename) -> Any: ...  # 导入STEP
+    def import_stl(self, filename) -> Any: ...  # 导入STL
+    def import_brep(self, filename) -> Any: ...  # 导入BREP
+    def export_step(self, *shape, filename) -> None: ...  # 导出STEP
+    def export_stl(self, *shape, filename, resolution=0.1) -> None: ...  # 导出STL（网格化）
+    def export_brep(self, *shape, filename) -> None: ...  # 原生BREP格式
 
     # display
     def display(self,

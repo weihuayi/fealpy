@@ -123,11 +123,15 @@ class CSRTensor(SparseTensor):
                          self._spshape)
 
     ### 3. Format Conversion ###
-    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
-        if self._values is None:
-            context = dict(dtype=bm.float64, device=bm.get_device(self._crow))
+    def to_dense(self, *, fill_value: Union[Number, bool] = 1, dtype=None) -> TensorLike:
+        if self.values is None:
+            dtype = bm.float64 if (dtype is None) else dtype
+            context = {"dtype": dtype, "device": bm.get_device(self.indices)}
+            src = bm.full((1,) * (self.dense_ndim + 1), fill_value, **context)
+            src = bm.broadcast_to(src, self.dense_shape + (self.nnz,))
         else:
-            context = self.values_context()
+            src = self.values if (dtype is None) else bm.astype(self.values, dtype)
+            context = {"dtype": src.dtype, "device": bm.get_device(src)}
 
         index_context = {'dtype': self._crow.dtype, 'device': bm.get_device(self._crow)}
 
@@ -138,12 +142,6 @@ class CSRTensor(SparseTensor):
 
         dense_tensor = bm.zeros(self.dense_shape + (prod(self._spshape),), **context)
         flattened = flatten_indices(indices, self._spshape)[0]
-
-        if self._values is None:
-            src = bm.full((1,) * (self.dense_ndim + 1), fill_value, **context)
-            src = bm.broadcast_to(src, self.dense_shape + (self.nnz,))
-        else:
-            src = self._values
         dense_tensor = bm.index_add(dense_tensor, flattened, src, axis=-1)
 
         return dense_tensor.reshape(self.shape)

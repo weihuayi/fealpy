@@ -1,16 +1,5 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
-
-"""
-Crayfish Optimization Algorithm
-
-Reference
-~~~~~~~~~
-Heming Jia, Honghua Rao, Changsheng Wen, Seyedali Mirjalili. 
-Crayfish optimization algorithm. 
-Artificial Intelligence Review, 2023, 56: S1919-S1979.
-
-"""
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class CrayfishOptAlg(Optimizer):
     """
