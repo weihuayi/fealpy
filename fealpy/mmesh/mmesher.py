@@ -301,4 +301,4 @@ class MMesher:
         else:
             linear_surfploter(ax,mesh,uh,
                               scat_node = scat_node, scat_index = index)
-        ax.clear()
+        # ax.clear()

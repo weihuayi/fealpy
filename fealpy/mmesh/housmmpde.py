@@ -1,17 +1,15 @@
 from .base import *
 from .tool import quad_equ_solver,cubic_equ_solver
 
-
-class PSMFEM(MM_monitor,MM_Interpolater):
+class HousMMPDE(MM_monitor,MM_Interpolater):
     def __init__(self,mesh,beta,vertices,r, config:Config):
-        MM_monitor.__init__(self,mesh,beta,vertices,r,config)
+        MM_monitor.__init__(self,mesh,beta,vertices,r,config=config)
         MM_Interpolater.__init__(self,mesh,vertices,config)
         self.alpha = config.alpha
         self.tol = config.tol
         self.maxit = config.maxit
         self.pre_steps = config.pre_steps
-        self.kappa = config.kappa
-        self.U_bd = None
+        self.tau = config.tau
 
         self.initialize()
 
@@ -42,7 +40,7 @@ class PSMFEM(MM_monitor,MM_Interpolater):
             self.tol = self._caculate_tol()
         print(f"tolerance: {self.tol}")
         self._clear_unused_attributes()
-        self._bilinear_assambly()
+        # self._bilinear_assambly()
 
     def _caculate_tol(self):
         """
@@ -82,7 +80,7 @@ class PSMFEM(MM_monitor,MM_Interpolater):
                 e0 = bm.linalg.norm(con0 - con1,axis=1)
                 e1 = bm.linalg.norm(con2 - con3,axis=1)
                 d = bm.min(bm.concat([e0, e1])).item()
-        return d*0.03
+        return d*0.1
     
     def _clear_unused_attributes(self):
         """
@@ -103,6 +101,7 @@ class PSMFEM(MM_monitor,MM_Interpolater):
         """
         @brief construct the linear constraint
         """
+        logic_Vertices = self.logic_Vertices
         BdNodeidx = self.BdNodeidx
         Vertices_idx = self.Vertices_idx
         Bdinnernode_idx = self.Bdinnernode_idx
@@ -112,10 +111,15 @@ class PSMFEM(MM_monitor,MM_Interpolater):
         BDNN = self.BDNN
         VNN = len(Vertices_idx)
 
+        b = bm.zeros(NN, **self.kwargs0)
+        b_val0 = self.b_val0
+        b = bm.set_at(b , Bdinnernode_idx , b_val0)
         A_diag = bm.zeros((self.TD , NN)  , **self.kwargs0)
         A_diag = bm.set_at(A_diag , (...,Bdinnernode_idx) , Binnorm.T)
         A_diag = bm.set_at(A_diag , (0,Vertices_idx) , 1)
         if self.TD == 2:
+            b = bm.set_at(b , Vertices_idx , logic_Vertices[:,0])
+            b = bm.concat([b[BdNodeidx],logic_Vertices[:,1]])
             A_diag = A_diag[:,BdNodeidx]
 
             R = CSRTensor(crow=bm.arange(VNN+1,**self.kwargs1) , col=Vertices_idx, 
@@ -123,17 +127,26 @@ class PSMFEM(MM_monitor,MM_Interpolater):
             A = bmat([[spdiags(A_diag[0], 0, BDNN, BDNN, format='csr'),
                        spdiags(A_diag[1], 0, BDNN, BDNN, format='csr')],
                       [None,R[:,BdNodeidx]]],format='csr')
+
         elif self.TD == 3:
             Arrisnode_idx = self.Arrisnode_idx
             Arnnorm = self.Ar_Lnode_normal
-            ArNN = len(Arrisnode_idx)    
+            ArNN = len(Arrisnode_idx)
+            b_val1 = self.b_val1
+            b_val2 = self.b_val2
+            b = bm.set_at(b , Arrisnode_idx , b_val1)
+            b = bm.set_at(b , Vertices_idx , logic_Vertices[:,0])[BdNodeidx]
+            b = bm.concat([b,b_val2,logic_Vertices[:,1],logic_Vertices[:,2]])       
+
             A_diag = bm.set_at(A_diag , (...,Arrisnode_idx) , Arnnorm[:,0,:].T)
             A_diag = A_diag[:,BdNodeidx]
+            
             index1 = NN * bm.arange(self.TD) + Arrisnode_idx[:,None]
             index2 = NN * bm.arange(self.TD) + BdNodeidx[:,None]
             rol_Ar = bm.repeat(bm.arange(ArNN)[None,:],3,axis=0).flatten()
             cow_Ar = index1.T.flatten()
             data_Ar = Arnnorm[:,1,:].T.flatten()
+            
             index = bm.stack([rol_Ar,cow_Ar],axis=0)
             Ar_constraint = COOTensor(index,data_Ar,spshape=(ArNN,3*NN))
             Ar_constraint = Ar_constraint.tocsr()
@@ -141,10 +154,12 @@ class PSMFEM(MM_monitor,MM_Interpolater):
                                           values=bm.ones(VNN,**self.kwargs0),spshape=(VNN,3*NN))
             Vertices_constraint2 = CSRTensor(crow=bm.arange(VNN+1) , col=Vertices_idx + 2 * NN,
                                           values=bm.ones(VNN,**self.kwargs0),spshape=(VNN,3*NN))
+            
             mask_matrix = CSRTensor(crow=bm.arange(len(index2.flatten())+1), 
                                 col=index2.T.flatten(), 
                                 values=bm.ones(len(index2.flatten()), **self.kwargs0), 
                                 spshape=(len(index2.flatten()), 3*NN))
+
             Ar_constraint = Ar_constraint @ mask_matrix.T
             Vertices_constraint1 = Vertices_constraint1 @ mask_matrix.T
             Vertices_constraint2 = Vertices_constraint2 @ mask_matrix.T
@@ -152,29 +167,8 @@ class PSMFEM(MM_monitor,MM_Interpolater):
                             spdiags(A_diag[1], 0, BDNN, BDNN, format='csr'),
                             spdiags(A_diag[2], 0, BDNN, BDNN, format='csr')])
             A = vstack([A_part,Ar_constraint,Vertices_constraint1,Vertices_constraint2])
-        b = bm.zeros(A.shape[0],**self.kwargs0)
         return A,b
     
-    def _bilinear_assambly(self):
-        h = self.hmin
-        r = self.r
-        R = r*(1+r)
-        logic_mass = self.logic_mass
-        SDI = self.SDI
-        bform = BilinearForm(self.lspace)
-        bform.add_integrator(SDI)
-        SDI.coef = h**2*R
-        SDI.clear()
-        A = bform.assembly()
-        A += logic_mass
-        K = bm.arange(self.NN,**self.kwargs1)
-        BdNodeidx = self.BdNodeidx
-        InnerNodeidx = K[~self.isBdNode]
-        self.H00 = A[InnerNodeidx][:,InnerNodeidx]
-        self.H01 = A[InnerNodeidx][:,BdNodeidx]
-        self.H10 = A[BdNodeidx][:,InnerNodeidx]
-        self.H11 = A[BdNodeidx][:,BdNodeidx]
-
     def _compute_coef_lagrange(self, delta_x):
         """
         @brief compute the coefficient of the quadratic equation
@@ -259,80 +253,63 @@ class PSMFEM(MM_monitor,MM_Interpolater):
         C = bm.permute_dims((delta_x[scell[:,1:]] - delta_x[scell[:,0,None]]),axes=(0,2,1))
         return A,C
     
+    def _bilinear_assambly(self):
+        SDI = self.SDI
+        a = bm.max(self.M)
+        bform = BilinearForm(self.lspace)
+        bform.add_integrator(SDI)
+        SDI.coef = self.tau*(a + self.M)
+        SDI.clear()
+        self.stiff = bform.assembly()
+    
+    def _matrix_split(self,A):
+        K = bm.arange(self.NN,**self.kwargs1)
+        BdNodeidx = self.BdNodeidx
+        InnerNodeidx = K[~self.isBdNode]
+        A00 = A[InnerNodeidx][:,InnerNodeidx]
+        A01 = A[InnerNodeidx][:,BdNodeidx]
+        A10 = A[BdNodeidx][:,InnerNodeidx]
+        A11 = A[BdNodeidx][:,BdNodeidx]
+        return A00,A01,A10,A11
+    
     def _linear_assambly(self):
         """
-        @brief calculate the b value of the quadratic equation
-        G cqmm
+        @brief assemble the linear system
         """
+        tau = self.tau
+        node = self.node
+        M = self.M
         lspace = self.lspace
-        I = bm.eye(self.TD,**self.kwargs0)
-        G = 1/self.M
-        G = G[...,None,None]*I[None,...] # cq il
-        logic_node = self.logic_mesh.node
-        space = self.space
-        bcs = self.bcs
+        lphi = lspace.basis(self.bcs)
+        lgphi = lspace.grad_basis(self.bcs)
+        a =  bm.max(M)
+
         ws = self.ws
-        gphi = space.grad_basis(bcs)
-        pcell = self.pcell
-        J = bm.einsum('cin, cqim -> cqnm',logic_node[pcell], gphi)# cq delta i
-        lgphi = lspace.grad_basis(self.bcs) # cqi gamma cqj k
-        stiff = (bm.linalg.det(J))**self.kappa
-        J *= stiff[..., None, None]
-        lgphi = lgphi@J@G
-        K = bm.einsum('q,cqjl-> cjl',ws,lgphi)* self.logic_cm[:,None,None]
- 
-        F = bm.zeros((self.NN,2),**self.kwargs0)
-        F = bm.index_add(F,pcell,K)
-        b0 =  F[:,0]
-        b1 =  F[:,1]
-        return b0,b1
-    
-    def _func_solver(self,U_bd = None):
-        """
-        @brief solve the quadratic equation
-        """
+        Fp = bm.einsum('cqi,cqj,cjd,q-> cid',lphi , 
+                        lphi , node[self.pcell],ws)* self.logic_cm[:,None,None]
+        grad = bm.einsum('cqjd , cjm -> cqdm',lgphi, node[self.pcell])
+        Fq = bm.einsum('cqir,cqrd, q -> cid',lgphi,grad,ws)* self.logic_cm[:,None,None]*tau*a
+        
         isBdNode = self.isBdNode
-        TD = self.TD
-        NN = self.NN
-        BDNN = self.BDNN
-        H00,H01,H10,H11 = self.H00,self.H01,self.H10,self.H11
-        A = self.A
-        v0 = bm.zeros(A.shape[0],**self.kwargs0) 
-        b0,b1 = self._linear_assambly()
-        b0_inner = b0[~isBdNode]
-        b1_inner = b1[~isBdNode]
-        b0_bd = b0[isBdNode]
-        b1_bd = b1[isBdNode]
+        F = bm.zeros((self.NN,self.TD),**self.kwargs0)
+        F = bm.index_add(F, self.pcell , Fp + Fq)
+        F_inner = F[~isBdNode]
+        F_Bd = F[isBdNode]
+        F_total = bm.concat([F_inner[:,0],F_Bd[:,0],F_inner[:,1],F_Bd[:,1]],axis=0)
+        return F_total
 
-        if U_bd is None:
-            U_bd = bm.zeros((BDNN,TD),**self.kwargs0)
-
-        U0_inner = cg(H00, b0_inner - H01@U_bd[:,0], atol=1e-6,returninfo=True)[0]
-        U1_inner = cg(H00, b1_inner - H01@U_bd[:,1], atol=1e-6,returninfo=True)[0]
-        U_inner = bm.concat([U0_inner[:,None],U1_inner[:,None]],axis=1)
-        b_0 = -H10 @ U0_inner + b0_bd
-        b_1 = -H10 @ U1_inner + b1_bd
-        b = bm.concat([b_0,b_1,v0])
-        blocks = [[None] * TD for _ in range(TD)] 
-        for i in range(TD):
-            blocks[i][i] = H11
-        A1 = bmat(blocks, format='csr')
-        A0 = bmat([[A1,A.T],[A,None]],format='csr')
-        U_bd = spsolve(A0,b,solver='scipy')
-        U_bd = U_bd[:TD*BDNN].reshape((TD,BDNN)).T
-        move_vector = bm.zeros((NN,TD),**self.kwargs0)
-        move_vector = bm.set_at(move_vector,~isBdNode,U_inner)
-        move_vector = bm.set_at(move_vector,isBdNode,U_bd)
-        return move_vector
-    
-    def func_solver_bd(self):
-        isBdNode = self.isBdNode
-        TD = self.TD
-        NN = self.NN
+    def _func_solver(self):
         BDNN = self.BDNN
-        INN = NN - BDNN
-        H00,H01,H10,H11 = self.H00,self.H01,self.H10,self.H11
+        stiff = self.stiff
+        logic_mass = self.logic_mass
+        H = logic_mass + stiff
         A = self.A
+        b = self.b
+
+        H00,H01,H10,H11 = self._matrix_split(H)
+        F = self._linear_assambly()
+        F = bm.concat([F,b],axis=0)
+
         A_part0 = A[:,:BDNN]
         A_part1 = A[:,BDNN:]
 
@@ -341,26 +318,17 @@ class PSMFEM(MM_monitor,MM_Interpolater):
                   [None , None , H00 , H01 , None],
                   [None , None , H10 , H11 , A_part1.T],
                   [None , A_part0 , None , A_part1 , None]], format='csr')
-        b0,b1 = self._linear_assambly()
-        b0_inner = b0[~isBdNode]
-        b1_inner = b1[~isBdNode]
-        b0_bd = b0[isBdNode]
-        b1_bd = b1[isBdNode]
-
-        b = bm.zeros(H.shape[0],**self.kwargs0)
-        b[:INN] = b0_inner
-        b[INN:NN] = b0_bd
-        b[NN:NN+INN] = b1_inner
-        b[NN+INN:2*NN] = b1_bd
-
-        U = cg(H,b,atol=1e-8,returninfo=True)[0]
-        U = U[:NN*TD].reshape((TD,NN)).T
-
-        move_vector = bm.zeros((NN,TD),**self.kwargs0)
-        move_vector = bm.set_at(move_vector,~isBdNode,U[:INN])
-        move_vector = bm.set_at(move_vector,isBdNode,U[INN:NN])
+        
+        NN = self.NN
+        INN = NN - BDNN
+        X = spsolve(H, F, solver = 'scipy')
+        X = X[:2*self.NN].reshape(2,-1).T
+        aim_x = bm.zeros((NN, self.TD), **self.kwargs0)
+        aim_x[~self.isBdNode] = X[:INN]
+        aim_x[self.isBdNode] = X[INN:]
+        move_vector = aim_x - self.node
         return move_vector
-    
+
     def _get_physical_node(self,move_vertor_field):
         """
         @brief calculate the physical node to avoid the mesh tangling
@@ -377,48 +345,52 @@ class PSMFEM(MM_monitor,MM_Interpolater):
         return node
     
     def _construct(self,node):
-
-        self.interpolate(node)
+        # self.interpolate(node)
         self.mesh.node = node
         self.node = node
         self.d = self._sqrt_det_G(self.bcs)
         self.update_matrix()
 
-    def mesh_redistributor(self):
+    def redistribute(self,uh,pde= None,t=None):
         """
-        @brief redistribute the mesh
+        @brief redistribute the solution to the new mesh
         """
+        self.uh = uh
+        
         for i in range(self.maxit):
             self.arc_length()
-            v = self._func_solver(U_bd=self.U_bd)
-            self.U_bd = v[self.isBdNode]
+            self.heatequ()
+            self._bilinear_assambly()   
+            v = self._func_solver()
             node = self._get_physical_node(v)
             error = bm.max(bm.linalg.norm(node - self.node,axis=1))
             print(f"iteration {i} , error: {error}")
-            if i >= 2 and error < self.tol:
+            if i>=2 and error < self.tol:
                 break
+            # self.uh = pde.solution(node,t)
+            self.interpolate(node)
             self._construct(node)
-        else:
-            print('exceed the maximum iteration')
-
-    def preprocessor(self,fun_solver =None):
+        return self.mesh, self.uh
+        
+    def preprocessor(self,uh,fun_solver =None):
         """
         @brief preprocessor: linear transition initialization
         @param steps: fake time steps
         """
+        self.uh = uh
         pde = self.pde
         steps = self.pre_steps
         if fun_solver is None:
             if pde is None:
                 self.uh = self.uh/steps
                 for i in range(steps):
-                    self.mesh_redistributor()
+                    self.redistribute(self.uh)
                     self.uh *= 1+1/(i+1)
             else:
                 for i in range(steps):
                     t = (i+1)/steps
                     self.uh = t * self.uh
-                    self.mesh_redistributor()
+                    self.redistribute()
                     self.uh = pde.init_solution(self.mesh.node)
         else:
             for i in range(steps):
@@ -426,3 +398,4 @@ class PSMFEM(MM_monitor,MM_Interpolater):
                 self.uh *= t
                 self.mesh_redistributor()
                 self.uh = fun_solver(self.mesh)
+    

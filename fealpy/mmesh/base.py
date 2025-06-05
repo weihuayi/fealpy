@@ -22,7 +22,7 @@ class MM_PREProcessor:
             self._meshtop_preparation()
             self._geometry_preparation()
             self._space_preparation()
-        elif self.method == 'PSMFEM':
+        elif self.method == 'PSMFEM' or self.method == 'HousMMPDE':
             self._data_and_device()
             self._isinstance_mesh_type()
             logic_node = bm.copy(self.mesh.node)
@@ -38,6 +38,7 @@ class MM_PREProcessor:
             self._geometry_preparation()
             self._space_preparation()
             self._logic_space_preparation()
+        
 
     def _meshtop_preparation(self):
         """

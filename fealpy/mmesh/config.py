@@ -46,11 +46,13 @@ class Config:
                  beta:Union[float, list] = 0.5,
                  r:Union[float, list] = 0.15,
                  alpha = 0.5,
+                 kappa = 0.5,
                  mol_times = 1,
                  active_method:str = 'Harmap',
                  pde = None,
                  logic_domain = None,
                  tol = None,
+                 tau = None,
                  maxit = 500,
                  is_pre = True,
                  pre_steps = 5,
@@ -87,11 +89,13 @@ class Config:
         self.maxit = maxit
         self.is_pre = is_pre
         self.pre_steps = pre_steps
+        self.tau = tau
         self.fun_solver = fun_solver
         self.monitor = monitor
         self.mol_meth = mol_meth
         self.int_meth = int_meth
         self.parallel_mode = 'none'
+        self.kappa = kappa
         self._check()
 
     def _check(self):

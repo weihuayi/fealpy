@@ -89,7 +89,7 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         return quad
 
-    def grad_lambda(self, index:Index=_S):
+    def grad_lambda(self, index:Index=_S,TD = 1):
         """
         @brief 计算所有单元上重心坐标函数的导数
         """
