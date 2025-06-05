@@ -22,7 +22,7 @@ from .integrator import (
 )
 '''
 @brief
-(coef \\nabla u \\cdot n, v)_{\\partial \\Omega}
+(coef \\nabla^T u \\cdot n, v)_{\\partial \\Omega}
 @param[in] mu 
 '''
 class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
@@ -80,7 +80,9 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, gphi, fm, index, n = self.fetch(space)
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
+        sym_gphi = 0.5*(bm.swapaxes(gphi, -2, -1) + gphi)
         gphin = bm.einsum('e...i, eql...ij->eql...j', n, gphi)
+        #gphin = bm.einsum('e...i, eql...ij->eql...j', n, sym_gphi)
         result =  bilinear_integral(phi, gphin, ws, fm, val, batched=self.batched)
         return result
 

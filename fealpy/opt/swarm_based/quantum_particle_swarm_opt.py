@@ -1,10 +1,6 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
-"""
-Quantum Particle Swarm Optimization
-
-"""
 class QuantumParticleSwarmOpt(Optimizer):
     """
     Quantum Particle Swarm Optimization (QPSO) Algorithm.

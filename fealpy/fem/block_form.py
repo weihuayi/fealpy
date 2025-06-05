@@ -15,15 +15,15 @@ class BlockForm(Form):
         self.sparse_shape = self._get_sparse_shape() 
          
     def _get_sparse_shape(self):
-         ## 检查能否拼接
-         ## batch 情况
-         block_shape = bm.array([[block.sparse_shape if block is not None else (0,0) for block in row] for row in self.blocks], dtype=bm.int32)
-         self.block_shape = block_shape
-         self.nrows = block_shape.shape[0]
-         self.ncols = block_shape.shape[1]
-         shape0 = bm.sum(bm.max(block_shape[..., 0], axis=1))
-         shape1 = bm.sum(bm.max(block_shape[..., 1], axis=0))
-         return (shape0, shape1)
+        ## 检查能否拼接
+        ## batch 情况
+        block_shape = bm.array([[block.sparse_shape if block is not None else (0,0) for block in row] for row in self.blocks], dtype=bm.int32)
+        self.block_shape = block_shape
+        self.nrows = block_shape.shape[0]
+        self.ncols = block_shape.shape[1]
+        shape0 = int(bm.sum(bm.max(block_shape[..., 0], axis=1)))
+        shape1 = int(bm.sum(bm.max(block_shape[..., 1], axis=0)))
+        return (shape0, shape1)
 
     @property
     def shape(self) -> Size:

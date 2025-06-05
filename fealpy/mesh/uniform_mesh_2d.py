@@ -86,11 +86,14 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
         self.device = device
 
-        # Mesh properties
-        self.extent = [int(e) for e in extent]
-        self.h = [float(val) for val in h]
-        self.origin = [float(o) for o in origin]
-
+        # self.extent = bm.array(extent, dtype=itype, device=device)
+        self.extent = extent
+        self.h = bm.array(h, dtype=ftype, device=device) 
+        self.origin = bm.array(origin, dtype=ftype, device=device)
+        self.shape = (
+                self.extent[1] - self.extent[0], 
+                self.extent[3] - self.extent[2]
+                )
         # Mesh dimensions
         self.nx = self.extent[1] - self.extent[0]
         self.ny = self.extent[3] - self.extent[2]
@@ -129,6 +132,48 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         self.localEdge = bm.array([(0, 2), (1, 3), 
                                    (0, 1), (2, 3)], dtype=self.itype, device=self.device)   
 
+    def interpolate(self, u, etype=0, keepdims=False) -> TensorLike:
+        """
+        Compute the interpolation of a function u on the mesh.
+
+        Parameters:
+            u: The function to be interpolated.
+            etype: The type of entity on which to interpolate.
+
+        Example:
+        ```
+            from fealpy.mesh import UniformMesh2d
+            mesh = UniformMesh2d(extent=[0, 10, 0, 10], h=(0.1, 0.1),
+                                origin=(0.0, 0.0))
+            u = mesh.interpolate(lambda x: x[..., 0]**2 + x[..., 1]**2)
+            print(u)
+        ```
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 0:
+            node = self.entity('node')
+            return u(node)
+        else:
+            raise ValueError(f"Unsupported entity type: {etype}")
+
+    def linear_index_map(self, etype: Union[int, str]=0):
+        """
+        Build and return the tensor mapping multi-dimensional 
+        indices to linear indices.
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 0:
+            return bm.arange(
+                    self.NN, 
+                    dtype=self.itype, 
+                    device=self.device).reshape(self.nx + 1, self.ny + 1)
+        elif etype == 2:
+            return bm.arange(
+                    self.NC, 
+                    dtype=self.itype, 
+                    device=self.device).reshape(self.nx, self.ny)
 
     # 实体生成方法
     @entitymethod(0)
@@ -866,12 +911,10 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
         Unstructured meshes do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
-            self.h = [h / 2.0 for h in self.h]
+            self.extent = 2*self.extent
+            self.h = self.h/2.0 
             self.nx = self.extent[1] - self.extent[0]
             self.ny = self.extent[3] - self.extent[2]
-            # self.nx = int((self.extent[1] - self.extent[0]) / self.h[0])
-            # self.ny = int((self.extent[3] - self.extent[2]) / self.h[1])
 
             self.NC = self.nx * self.ny
             self.NE = self.ny * (self.nx + 1) + self.nx * (self.ny + 1)

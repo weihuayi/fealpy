@@ -402,7 +402,7 @@ def F26(x):
     return -20 * bm.exp(-0.2 * bm.sqrt(y1 / n)) - bm.exp(y2 / n) + 20 + bm.exp(bm.array(1))
 
 
-iopt_benchmark_data = [
+single_benchmark_data = [
     {   
         "objective": F1, #Step
         "ndim": 30,

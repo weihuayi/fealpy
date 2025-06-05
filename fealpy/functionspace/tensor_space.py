@@ -155,7 +155,6 @@ class TensorFunctionSpace(FunctionSpace):
     
     def is_boundary_dof(self, threshold=None, method='interp') -> TensorLike:
         scalar_space = self.scalar_space
-        mesh = self.mesh
 
         scalar_gdof = scalar_space.number_of_global_dofs()
         if bm.is_tensor(threshold):
@@ -180,8 +179,7 @@ class TensorFunctionSpace(FunctionSpace):
             if self.dof_priority:
                 return bm.concatenate(scalar_is_bd_dof)
             else:
-                return bm.concatenate([bm.array([j[i] for j in scalar_is_bd_dof], device=self.device) for i in range(scalar_gdof)])
-                        
+                return bm.stack(scalar_is_bd_dof, axis=1).flatten()                        
         else:
             raise ValueError(f"Unknown type of threshold {type(threshold)}")
         return is_bd_dof.reshape(-1)   
@@ -191,13 +189,10 @@ class TensorFunctionSpace(FunctionSpace):
         uh: Optional[TensorLike]=None,
         *,
         threshold: Union[Callable, TensorLike, None]=None, method=None) -> TensorLike:
-
         ipoints = self.interpolation_points()
         scalar_space = self.scalar_space
-        mesh = self.mesh
         if uh is None:
             uh = self.function()
-
         # 根据不同gd类型进行判断
         if isinstance(gd, (int, float)):
             if bm.is_tensor(threshold):
@@ -234,21 +229,33 @@ class TensorFunctionSpace(FunctionSpace):
             elif isinstance(threshold, tuple):
                 assert len(threshold) == self.dof_numel
                 isScalarBDof = [scalar_space.is_boundary_dof(i, method=method) for i in threshold]
-
                 gd_tensor = [gd(ipoints[isScalarBDof[i]])[..., i] for i in range(self.dof_numel)]
                 isTensorBDof = self.is_boundary_dof(threshold=threshold, method=method)
                 if self.dof_priority:
                     gd_tensor = bm.concatenate(gd_tensor)
                 else:
+                    # ! 注意这里的效率没有 dof_priority 的高
                     scalar_gdof = scalar_space.number_of_global_dofs()
-                    # 使用列表推导式重新排列数据
-                    gd_values = []
-                    for i in range(scalar_gdof):
-                        for j in range(self.dof_numel):
-                            # 从 gd_tensor[j] 中获取第 i 个标量基函数的值
-                            gd_values.append(gd_tensor[j][i] if i < len(gd_tensor[j]) else 0.0)
-                    gd_tensor = bm.array(gd_values, device=self.device)
+                    full_values = bm.zeros((scalar_gdof, self.dof_numel), 
+                                            dtype=bm.float64, device=self.device)
+                    
+                    for i in range(self.dof_numel):
+                        indices = bm.where(isScalarBDof[i])[0]
+                        full_values = bm.set_at(full_values, (indices, i), gd_tensor[i])
+                    
+                    gd_tensor = full_values.reshape(-1)
                     gd_tensor = gd_tensor[isTensorBDof]
+
+                    # gd_tensor = bm.stack(gd_tensor, axis=1).flatten()
+                    # scalar_gdof = scalar_space.number_of_global_dofs()
+                    # # 使用列表推导式重新排列数据
+                    # gd_values = []
+                    # for i in range(scalar_gdof):
+                    #     for j in range(self.dof_numel):
+                    #         # 从 gd_tensor[j] 中获取第 i 个标量基函数的值
+                    #         gd_values.append(gd_tensor[j][i] if i < len(gd_tensor[j]) else 0.0)
+                    # gd_tensor = bm.array(gd_values, device=self.device)
+                    # gd_tensor = gd_tensor[isTensorBDof]
 
                 uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor)
                 return uh, isTensorBDof
@@ -256,7 +263,6 @@ class TensorFunctionSpace(FunctionSpace):
                 raise ValueError(f"Unknown type of threshold {type(threshold)}")
         else:
             raise ValueError(f"Unknown type of gd {type(gd)}")
-
         if self.dof_priority:
             uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.T.reshape(-1))
         else:

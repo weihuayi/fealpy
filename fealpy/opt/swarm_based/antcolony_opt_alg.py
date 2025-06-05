@@ -1,7 +1,7 @@
 import random
 
-from fealpy.backend import backend_manager as bm
-from fealpy.opt.optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..optimizer_base import Optimizer
 
 class AntColonyOptAlg(Optimizer):
     """

@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, Tuple, List
 from types import ModuleType
 
 from .mesh_base import StructuredMesh, TensorMesh
@@ -14,7 +14,7 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
     @brief    A class for representing a uniformly partitioned one-dimensional mesh.
     """
     def __init__(self, extent: Tuple[int, int] = (0, 1),
-            h: float = 1.0,
+            h: Union[float, Tuple[float], List[float]] = 1.0,
             origin: float = 0.0,
             itype= None, ftype= None, device=None):
         """
@@ -55,10 +55,15 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
 
         self.device = device
 
+        if isinstance(h, float):
+            h = (h, )
+
         # Mesh properties
+        # self.extent = bm.array(extent, dtype=itype, device=device)
         self.extent = extent
-        self.h = h
-        self.origin = origin
+        self.h = bm.array(h, dtype=ftype, device=device) 
+        self.origin = bm.array(origin, dtype=ftype, device=device)
+        self.shape = (self.extent[1] - self.extent[0], )
 
         # Mesh dimensions
         self.nx = self.extent[1] - self.extent[0]
@@ -77,6 +82,49 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
 
         self.meshtype = 'UniformMesh1d'
 
+    def interpolate(self, u, etype=0, keepdims=False) -> TensorLike:
+        """
+        Compute the interpolation of a function u on the mesh.
+
+        Parameters:
+            u: The function to be interpolated.
+            etype: The type of entity on which to interpolate.
+
+        Example:
+        ```
+            from fealpy.mesh import UniformMesh1d
+            mesh = UniformMesh1d(extent=[0, 10], h=0.1, origin=0.0)
+            u = mesh.interpolate(lambda x: x**2)
+            print(u)
+        ```
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 0:
+            node = self.entity('node')
+            return u(node)
+        else:
+            raise ValueError(f"Unsupported entity type: {etype}")
+
+    def linear_index_map(self, etype: Union[int, str]=0):
+        """
+        Build and return the tensor mapping multi-dimensional 
+        indices to linear indices.
+        """
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+        if etype == 0:
+            return bm.arange(self.NN, dtype=self.itype, device=self.device)
+        elif etype == 1:
+            return bm.arange(self.NC, dtype=self.itype, device=self.device)
+
+    def linear_to_multi_index(self, linear_indices):
+        """
+        Given linear indices, return the corresponding multi-dimensional indices.
+        """
+        pass
+
+
     # 实体生成方法
     @entitymethod(0)
     def _get_node(self) -> TensorLike:
@@ -87,7 +135,7 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
 
         GD = 1
         nx = self.nx
-        node = bm.linspace(self.origin, self.origin + nx * self.h, nx+1, dtype=self.ftype, device=device)
+        node = bm.linspace(self.origin, self.origin + nx * self.h[0], nx+1, dtype=self.ftype, device=device)
         return node.reshape(-1, 1)
 
     #未测试
@@ -128,17 +176,13 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
         return 1
 
     def boundary_node_flag(self):
-        """
-        @brief Determine if a point is a boundary point.
+        """ Determine if a point is a boundary point.
         """
         device = self.device
-
-        NN = self.NN  # 节点总数 = nx + 1
-        isBdPoint = bm.zeros((NN,), dtype=bool, device=device)
-        # isBdPoint[[0, NN - 1]] = True
-        isBdPoint = bm.set_at(isBdPoint, [0, NN - 1], True)
+        isBdNode = bm.zeros((self.NN,), dtype=bm.bool, device=device)
+        isBdNode = bm.set_at(isBdNode, [0, -1], True)
         
-        return isBdPoint
+        return isBdNode
 
     def boundary_cell_flag(self):
         """
@@ -151,8 +195,7 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
 
         NC = self.number_of_cells()
         isBdCell = bm.zeros((NC,), dtype=bm.bool, device=device)
-        isBdCell[0] = True
-        isBdCell[-1] = True
+        isBdCell = bm.set_at(isBdCell, [0, -1], True)
         return isBdCell
     
     def boundary_edge_flag(self):
@@ -313,7 +356,7 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
         Unstructured meshes do not require this because they do not have entity generation methods.
         """
         for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
+            self.extent = 2*self.extent 
             self.h = self.h/2
             self.nx = self.extent[1] - self.extent[0]
             self.NC = self.nx
