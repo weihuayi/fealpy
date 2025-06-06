@@ -159,8 +159,8 @@ class MeshDS(metaclass=MeshMeta):
 
         assert cell2face.dtype == arange_tensor.dtype, f"Data type mismatch: cell2face is {cell2face.dtype}, arange_tensor is {arange_tensor.dtype}"
 
-        cell2face[face2cell[:, 0], face2cell[:, 2]] = arange_tensor
-        cell2face[face2cell[:, 1], face2cell[:, 3]] = arange_tensor
+        cell2face = bm.set_at(cell2face, (face2cell[:, 0], face2cell[:, 2]), arange_tensor)
+        cell2face = bm.set_at(cell2face, (face2cell[:, 1], face2cell[:, 3]), arange_tensor)
         return cell2face[index]
 
     def edge_to_cell(self, index: Index=_S) -> TensorLike:
@@ -178,8 +178,8 @@ class MeshDS(metaclass=MeshMeta):
         face2cell = self.face2cell
         NFC = self.number_of_faces_of_cells()
         cell2cell = bm.zeros((NC, NFC), dtype=self.itype)
-        cell2cell[face2cell[:, 0], face2cell[:, 2]] = face2cell[:, 1]
-        cell2cell[face2cell[:, 1], face2cell[:, 3]] = face2cell[:, 0]
+        cell2cell = bm.set_at(cell2cell, (face2cell[:, 0], face2cell[:, 2]), face2cell[:, 1])
+        cell2cell = bm.set_at(cell2cell, (face2cell[:, 1], face2cell[:, 3]), face2cell[:, 0])
         return cell2cell
     
     def node_to_node(self):
