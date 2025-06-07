@@ -420,19 +420,20 @@ class GroupIntegrator(Integrator):
 
     def assembly(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
         ct = self.ints[0](space, indices=indices)
+        f = lambda x: x[0] + x[1]
 
         for int_ in self.ints[1:]:
             new_ct = int_(space, indices=indices)
-            fdim = min(ct.ndim, new_ct.ndim)
-            if ct.shape[:fdim] != new_ct.shape[:fdim]:
+            fdim = min(ct[0].ndim, new_ct[0].ndim)
+            if ct[0].shape[:fdim] != new_ct[0].shape[:fdim]:
                 raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "
                                    f"has an incompatible shape {tuple(new_ct.shape)} "
                                    f"with the previous {tuple(ct.shape)}.")
-            if new_ct.ndim > ct.ndim:
-                ct = new_ct + ct[None, ...]
-            elif new_ct.ndim < ct.ndim:
-                ct = ct + new_ct[None, ...]
+            if new_ct[0].ndim > ct[0].ndim:
+                ct = list(map(f, zip(new_ct ,ct[None, ...])))
+            elif new_ct[0].ndim < ct[0].ndim:
+                ct = list(map(f, zip(ct ,new_ct[None, ...])))
             else:
-                ct = ct + new_ct
+                ct = list(map(f, zip(ct, new_ct)))
 
         return ct

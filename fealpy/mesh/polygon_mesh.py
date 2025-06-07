@@ -369,7 +369,7 @@ class PolygonMesh(Mesh, Plotable):
     def uniform_refine(self, n: int=1) -> None:
         raise NotImplementedError
 
-    def integral(self, u, q=3, celltype=False):
+    def integral(self, u, q=None, celltype=False):
         """
         @brief 多边形网格上的数值积分
 
@@ -397,7 +397,7 @@ class PolygonMesh(Mesh, Plotable):
         v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]]
         a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
     
-        pp = bm.einsum('ij, jkm->kim', bcs, tri)
+        pp = bm.einsum('ij, jkm->kim', bcs, tri) #(NQ, 3) (3, NE, 2) 
         val = u(pp, edge2cell[:, 0])
 
         shape = (NC, ) + val.shape[2:]

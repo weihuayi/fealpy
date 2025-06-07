@@ -121,7 +121,7 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
             gdof += NE*(p-1) + NC*(p-1)*p//2
         return gdof
 
-    def number_of_local_dofs(self):
+    def number_of_local_dofs(self, doftype='cell'):
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
         ldofs = NV
@@ -141,8 +141,9 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
             NN = mesh.number_of_nodes()
             GD = mesh.geo_dimension()
             NE = mesh.number_of_edges()
+            NC = mesh.number_of_cells()
 
-            ipoint = bm.zeros((NN+(p-1)*NE, GD), **self.fkwargs)
+            ipoint = bm.zeros((NN+(p-1)*NE+p*(p-1)//2*NC, GD), **self.fkwargs)
             ipoint[:NN, :] = node
             edge = mesh.entity('edge')
 
@@ -389,8 +390,9 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
         B = list(bm.split(BB, cell2doflocation[1:-1], axis=-1))                       
         Px, Py = smspace.partial_matrix()                                       
         L = Px@Px + Py@Py           
+        cellmeasure = mesh.entity_measure('cell') 
         for i in range(NC):                                                     
-            B[i][:(p-1)*p//2, NV[i]*p:] = bm.eye( (p-1)*p//2, **mesh.fkwargs)   
+            B[i][:(p-1)*p//2, NV[i]*p:] = cellmeasure[i]*bm.eye( (p-1)*p//2, **mesh.fkwargs)   
             #B[i] = bm.einsum('ij,ik->jk', L[i], B[i])                          
             B[i] = -L[i].T @ B[i]                                               
             flag = edge2cell[:, 0]==i                                           
@@ -413,7 +415,7 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
                 cedge[0] = cell2edge[i][-1]                                     
                 B[i][0,:] = (edge_measure[cedge[:-1]] + edge_measure[cedge[1:]])/2
             else:                                                               
-                B[i][0, NV[i]*p] = 1   
+                B[i][0, NV[i]*p] = 1*cellmeasure[i]   
 
         ## 投影矩阵
         g = lambda x: bm.linalg.inv(x[0])@x[1]                                  
@@ -448,7 +450,8 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
         #M = Integrator.homogeneous_assembly(smspace)                            
         ildof = (p-1)*p//2                                                      
         idx = cell2doflocation[1:][:, None] + bm.arange(-ildof, 0)              
-        D[idx, :] = self.SM[:, :ildof, :]                                             
+        cellmeasure = mesh.entity_measure('cell')
+        D[idx, :] = self.SM[:, :ildof, :]/cellmeasure.reshape(-1, 1,1)                                             
         return list(bm.split(D, cell2doflocation[1:-1], axis=0))        
     
     def L2_project_matrix(self):                                         
@@ -464,6 +467,7 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
         smldof = smspace.number_of_local_dofs(p=p)                        
         Q = bm.zeros((smldof, cell2doflocation[-1]), **mesh.fkwargs)      
         Q = list(bm.split(Q, cell2doflocation[1:-1], axis=-1))                       
+        cellmeasure = mesh.entity_measure('cell')
         if p==1:                                                                
             return self.PI1                                                          
         else:                                                                   
@@ -475,7 +479,7 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
             for i in range(NC):                                                 
                 I = bm.zeros((smldof2, ldof[i]), **mesh.fkwargs)          
                 idx = NV[i]*p                                                   
-                I[:, idx:] = bm.eye(smldof2, **mesh.fkwargs)              
+                I[:, idx:] = bm.eye(smldof2, **mesh.fkwargs)*cellmeasure[i]              
                                                                                 
                 Q2 = bm.linalg.inv(M2[i]) @ I                                   
                 Q2 = bm.concatenate([Q2, bm.zeros((smldof-smldof2, ldof[i]), **mesh.fkwargs)], axis=0)
@@ -540,7 +544,7 @@ class ConformingScalarVESpace2d(FunctionSpace, Generic[_MT]):
                     return bm.einsum(
                             'ij, ij...->ij...',
                             u(x), phi(x, index=index, p=p-2))
-                bb = self.mesh.integral(f, celltype=True)/self.smspace.cellmeasure[..., bm.newaxis]
+                bb = self.mesh.integral(f, q=p+3, celltype=True)/self.smspace.cellmeasure[..., bm.newaxis]
                 uI[NN+(p-1)*NE:] = bb.reshape(-1)
             return uI
         else:

@@ -1129,7 +1129,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
                 index, = args
                 return bm.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index))
 
-        b = self.mesh.integral(u)
+        b = self.mesh.integral(u, q=q)
         M = self.cell_mass_matrix()
         F = inv(M)@b[:, :, None]
         F = self.function(array=F.reshape(-1))

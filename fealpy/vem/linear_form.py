@@ -50,9 +50,9 @@ class LinearForm(Form[LinearInt]):
         for group_tensor, e2dofs_tuple in self.assembly_local_iterative():
             if (batch_size > 0) and (group_tensor.ndim == 2):
                 group_tensor = bm.stack([group_tensor]*batch_size, axis=0)
-
             indices = e2dofs_tuple[0].reshape(1, -1)
-            group_tensor = bm.reshape(group_tensor, self._values_ravel_shape)
+            f1 = lambda x: x.reshape(-1, order='F') 
+            group_tensor = bm.concatenate(list(map(f1, group_tensor)))
             M = M.add(COOTensor(indices, group_tensor, sparse_shape))
 
         return M
