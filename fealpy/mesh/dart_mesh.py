@@ -13,9 +13,11 @@ class DartMesh(Mesh, Plotable):
     node : TensorLike
         Node coordinates of the mesh.
     dart : TensorLike
-        用 dart 的顶点 v, 所属的边 e, 面 f, 单元 c 组成的元组 (v, e, f, c) 表示这个 dart，
-        以及附加的三个映射：下条边 b1，同单元对边 b2，不同单元对边 b3，
-        因此总体为 (v, e, f, c, b1, b2, b3) 的 dart 数据结构。
+        A dart is represented as a tuple (v, e, f, c) consisting of the dart's vertex v,
+        its associated edge e, face f, and cell c.
+        Additionally, three mappings are included: next edge b1, opposite edge in the same cell b2,
+        and opposite edge in a different cell b3.
+        Therefore, the overall dart data structure is (v, e, f, c, b1, b2, b3).
     """
 
     def __init__(self, node: TensorLike, dart: TensorLike):
@@ -42,7 +44,6 @@ class DartMesh(Mesh, Plotable):
 
         self.meshtype = 'dart3d'
 
-        # TODO: construct
         self.construct()
         # ==============================================
 
@@ -54,6 +55,12 @@ class DartMesh(Mesh, Plotable):
         self.meshdata = {}
 
     def construct(self):
+        """
+        Construct the dart mesh by creating mappings between different entities.
+        Returns
+        -------
+
+        """
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NF = self.number_of_faces()
