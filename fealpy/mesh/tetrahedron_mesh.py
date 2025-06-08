@@ -1237,22 +1237,24 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                              itype=None, ftype=None, device=None) -> 'TetrahedronMesh':
         """
         Generate a tetrahedral mesh for a spherical shell.
+
         Parameters
-        ----------
-        r1: float
-            Inner radius of the spherical shell.
-        r2: float
-            Outer radius of the spherical shell.
-        h: float
-            Mesh size parameter.
-        itype: int type for indices, default is bm.int32
-        ftype: float type for coordinates, default is bm.float64
-        device: str, optional
+            r1: float
+                Inner radius of the spherical shell.
+            r2: float
+                Outer radius of the spherical shell.
+            h: float
+                Mesh size parameter.
+            itype: bm.dtype
+                int type for indices, default is bm.int32
+            ftype: bm.dtype
+                float type for coordinates, default is bm.float64
+            device: str
+                Device to use for the mesh data, default is None (CPU).
 
         Returns
-        -------
-        TetrahedronMesh
-            An instance of TetrahedronMesh containing the mesh data.
+            TetrahedronMesh
+                An instance of TetrahedronMesh containing the mesh data.
         """
         try:
             import gmsh
