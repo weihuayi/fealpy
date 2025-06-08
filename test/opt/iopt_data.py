@@ -1,2 +1,2 @@
 
-from fealpy.opt.benchmark import iopt_benchmark_data as iopt_data
+from fealpy.opt.benchmark.single_benchmark import single_benchmark_data as iopt_data

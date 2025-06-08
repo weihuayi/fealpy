@@ -7,10 +7,10 @@
 	@bref 
 	@ref 
 '''  
-from ..backend import backend_manager as bm
-from ..decorator import cartesian,barycentric
-from ..fem import BilinearForm, LinearForm, BlockForm, LinearBlockForm
-from ..fem import (ScalarConvectionIntegrator, 
+from ...backend import backend_manager as bm
+from ...decorator import cartesian,barycentric
+from ...fem import BilinearForm, LinearForm, BlockForm, LinearBlockForm
+from ...fem import (ScalarConvectionIntegrator, 
                         ScalarDiffusionIntegrator, 
                         ScalarMassIntegrator,
                         SourceIntegrator,
@@ -18,7 +18,7 @@ from ..fem import (ScalarConvectionIntegrator,
                         FluidBoundaryFrictionIntegrator,
                         ViscousWorkIntegrator,
                         GradSourceIntegrator)
-from ..fem import (BoundaryFaceMassIntegrator,
+from ...fem import (BoundaryFaceMassIntegrator,
                         BoundaryFaceSourceIntegrator)
 
 class NSFEMSolver():

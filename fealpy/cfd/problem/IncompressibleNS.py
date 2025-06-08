@@ -23,7 +23,7 @@ class Channel:
     def velocity(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = bm.zeros(p.shape)
+        value = bm.zeros(p.shape, dtype=bm.float64)
         value[...,0] = 4*y*(1-y)
         return value
     
@@ -35,7 +35,7 @@ class Channel:
     
     @cartesian
     def is_p_boundary(self, p):
-        tag_left = bm.abs(p[..., 0]) < self.eps
+        tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
         tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
         return tag_left | tag_right
 

@@ -2,17 +2,15 @@ from typing import Optional
 from scipy.special import factorial
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import bilinear_integral
+from ..decorator.variantmethod import variantmethod
 from .integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,
-    assemblymethod,
-    CoefLike
 )
 
 
@@ -23,13 +21,13 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
-        method = 'assembly' if (method is None) else method
-        super().__init__(method=method)
+        super().__init__()
         self.m = m
         self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -56,6 +54,7 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
             gmphi = space.grad_m_basis(bcs, m=m)
         return bcs, ws, gmphi, cm, index
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         m = self.m
         coef = self.coef
@@ -77,8 +76,8 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
     #return bilinear_integral(gmphi1, gmphi, ws, cm, coef,
     #                             batched=self.batched)
 
-    @assemblymethod('without_numerical_integration')
-    def assembly_without_numerical_integration(self, space: _FS):
+    @assembly.register('without_numerical_integration')
+    def assembly(self, space: _FS):
         from .bilinear_form import BilinearForm
         from .mlaplace_bernstein_integrator import MLaplaceBernsteinIntegrator
         m = self.m
@@ -90,5 +89,3 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         #import numpy as np
         #np.save('Mcn8.npy', M)
         return M
-
-        

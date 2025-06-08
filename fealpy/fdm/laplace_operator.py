@@ -1,23 +1,29 @@
 import math
 
+from typing import Optional
+
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..sparse import csr_matrix, SparseTensor
 from ..mesh import UniformMesh
 
+from .operator_base import OpteratorBase, assemblymethod
 
-class LaplaceOperator():
+class LaplaceOperator(OpteratorBase):
     """
-    LaplaceOperator constructs and assembles the discrete Laplace operator
+    LaplaceOperator constructs and assembles the discrete minus Laplace operator
     on a structured mesh for finite difference approximation.
     """
-    def __init__(self, mesh: UniformMesh):
+    def __init__(self, mesh: UniformMesh, method: Optional[str]=None):
         """
         Initialize the Laplace operator with a given structured mesh.
 
         Parameters:
             mesh (UniformMesh): Structured mesh object providing grid metadata.
         """
+        method = 'assembly' if (method is None) else method
+        super().__init__(method=method)
+
         self.mesh = mesh  # Store the mesh for later assembly
 
     def assembly(self) -> SparseTensor:
@@ -43,10 +49,9 @@ class LaplaceOperator():
         shape = K.shape  # Shape of the index map array
 
         # Create diagonal entries with sum of c over dimensions times 2
-        diag_value = bm.full(NN, 2 * c.sum(), dtype=ftype)
-        I = K.flat  # Row indices for diagonal entries
-        J = K.flat  # Column indices for diagonal entries
-        A = csr_matrix((diag_value, (I, J)), shape=(NN, NN))
+        diag_value = bm.full((NN,), 2 * c.sum().item(), dtype=ftype)
+        I = K.ravel()  # Row indices for diagonal entries
+        A = csr_matrix((diag_value, (I, I)), shape=(NN, NN))
 
         # Slices tuple for indexing all dimensions
         full_slice = (slice(None),) * GD
@@ -58,18 +63,22 @@ class LaplaceOperator():
                 count for dim_idx, count in enumerate(shape) if dim_idx != i
             )
             # Off-diagonal value for neighbor entries
-            off_value = bm.full(NN - n_shift, -c[i], dtype=ftype)
+            off_value = bm.full((NN - n_shift,), -c[i].item(), dtype=ftype)
             # Create slice objects to select neighbor index arrays
             s1 = full_slice[:i] + (slice(1, None),) + full_slice[i+1:]
             s2 = full_slice[:i] + (slice(None, -1),) + full_slice[i+1:]
             # Row indices for off-diagonal
-            I = K[s1].flat
-            J = K[s2].flat
+            I = K[s1].ravel()
+            J = K[s2].ravel()
             # Add entries for coupling in both directions
             A += csr_matrix((off_value, (I, J)), shape=(NN, NN))
             A += csr_matrix((off_value, (J, I)), shape=(NN, NN))
 
         return A
+
+    @assemblymethod('fast')
+    def fast_assembly(self) -> SparseTensor:
+        pass
 
     def __matmul__(self, u: TensorLike) -> TensorLike:
         """

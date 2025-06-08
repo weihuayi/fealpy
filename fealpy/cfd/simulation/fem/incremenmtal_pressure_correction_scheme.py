@@ -6,11 +6,12 @@ from ....fem import LinearForm, BilinearForm
 from ....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator, 
                      ViscousWorkIntegrator, SourceIntegrator, GradSourceIntegrator, 
                      BoundaryFaceSourceIntegrator, ScalarDiffusionIntegrator)
-from ..fem_base import FEM
+from .fem_base import FEM
 from .project_method import ProjectionMethod
 from ....fem import DirichletBC
 from ..simulation_base import SimulationBase, SimulationParameters
 from ....functionspace import Function
+from ....decorator import barycentric
 
 class IPCS(ProjectionMethod, FEM):
     """IPCS分裂投影法"""
@@ -114,7 +115,8 @@ class IPCS(ProjectionMethod, FEM):
         self.predict_BM.coef = ctd/dt
         self.predict_BF.coef = -cv
         self.predict_BVW.coef = 2*cv
-         
+        
+        @barycentric
         def LS_coef(bcs, index):
             masscoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             result = 1/dt*masscoef*u0(bcs, index)
@@ -125,6 +127,7 @@ class IPCS(ProjectionMethod, FEM):
             return result
         self.predict_LS.source = LS_coef
 
+        @barycentric
         def LGS_coef(bcs, index):
             I = bm.eye(self.mesh.GD)
             result = bm.repeat(p0(bcs,index)[...,bm.newaxis], self.mesh.GD, axis=-1)
@@ -133,6 +136,7 @@ class IPCS(ProjectionMethod, FEM):
             return result
         self.predict_LGS.source = LGS_coef
         
+        @barycentric
         def LBFS_coef(bcs, index):
             result = -bm.einsum('...i, ...j->...ij', p0(bcs, index), self.mesh.face_unit_normal(index=index))
             result *= pc(bcs, index) if callable(pc) else pc
@@ -171,12 +175,14 @@ class IPCS(ProjectionMethod, FEM):
         
         self.pressure_BD.coef = pc
 
+        @barycentric
         def LS_coef(bcs, index=None):
             result = -1/dt*bm.trace(us.grad_value(bcs, index), axis1=-2, axis2=-1)
             result *= ctd(bcs, index) if callable(ctd) else ctd
             return result
         self.pressure_LS.source = LS_coef
         
+        @barycentric
         def LGS_coef(bcs, index=None):
             result = p0.grad_value(bcs, index)
             result *= pc(bcs, index) if callable(pc) else pc
@@ -211,6 +217,7 @@ class IPCS(ProjectionMethod, FEM):
 
 
         self.correct_BM.coef = ctd
+        @barycentric
         def BM_coef(bcs, index):
             masscoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             result = masscoef * us(bcs, index)
@@ -252,7 +259,7 @@ class ipcs_simulation(SimulationBase):
         solver_type = self.params._params["solver"]["type"]
         if solver_type == "direct":
             from fealpy.solver import spsolve
-            return spsolve(A, b, self.params._params["solver"]['params']['solver'])
+            return spsolve(A, b, self.params._params["solver"]['params'])
         elif solver_type == "custom":
             solver = self.params._params["solver"]['params']
             return solver(A, b)
@@ -285,7 +292,7 @@ class ipcs_simulation(SimulationBase):
             if self.params._params["output"]["onoff"]:
                 name = 'test_'+ str(i+1).zfill(10) + '.vtu'
                 self.output(name)
-            print("max_u",bm.max(bm.abs(u0)))
+    
     def run_one_step(self, u0:TensorLike, p0:TensorLike, output:bool=False):
         """单步求解"""
         pde = self.equation.pde
@@ -361,7 +368,7 @@ class IPCSSimulationParameters(SimulationParameters):
                 "T0": 0.0,                  # 初始时间
                 "T1": 1.0,                  # 终止时间
                 "dt": 0.01,                 # 时间步长
-                "nt": 100                   # 时间层
+                "nt": 100                  # 时间层
             },
             "output": {
                 "path": "./",            # 路径
@@ -370,19 +377,18 @@ class IPCSSimulationParameters(SimulationParameters):
             },
             "solver": {
                 "type": 'direct',  # 求解器类型
-                "params": {"solver":'mumps'},       # 接口类型
+                "params": 'mumps',       # 接口类型
             },
         }
 
     @property
     def timeline(self) :
-        """生成时间点序列：np.arange(T0, T1+dt, dt)"""
-        return self._params["output"].copy()
+        return self._params["output"]
 
     @property
     def output_params(self) :
         """获取输出参数（只读视图）"""
-        return self._params["output"].copy()
+        return self._params["output"]
 
     @property
     def solver_type(self):
@@ -400,15 +406,15 @@ class IPCSSimulationParameters(SimulationParameters):
         if onoff is not None:
             self._params["output"]["onoff"] = bool(onoff)
     
-    def set_solver(self, solver_type, interface: str = None):
+    def set_solver(self, solver_type, api: str = None):
         """设置求解器参数，支持自定义求解器"""
         VALID_SOLVER_TYPES = {"direct", "iterative"}
         if isinstance(solver_type, str):
             if solver_type not in VALID_SOLVER_TYPES:
                 raise ValueError(f"求解器类型必须是 {VALID_SOLVER_TYPES} 或非字符串的自定义对象，得到 {solver_type}")
             self._params["solver"]["type"] = solver_type
-            if interface:
-                self._params["solver"]["params"]["solver"] = interface.lower()
+            if api:
+                self._params["solver"]["params"] = api.lower()
         else:
             if not callable(solver_type):
                 raise TypeError(f"自定义求解器必须是可调用对象，得到 {type(solver_type)}")
@@ -442,17 +448,16 @@ class IPCSSimulationParameters(SimulationParameters):
             if not isinstance(nt, int) or nt <= 0:
                 raise ValueError(f"nt must be a positive integer, got {nt}")
             time["nt"] = nt
+        
+        if time["nt"] is None and time["dt"] is not None:
+            time["nt"] = int((time["T1"] - time["T0"]) / time["dt"]) + 1
+
 
         # 验证时间参数的合理性
         if T0 is not None or T1 is not None:
             if time["T0"] >= time["T1"]:
                 raise ValueError(f"T0 ({time['T0']}) must be less than T1 ({time['T1']})")
 
-        # 如果 dt 和 nt 都被设置，检查一致性
-        if dt is not None or nt is not None:
-            expected_nt = int((time["T1"] - time["T0"]) / time["dt"]) + 1
-            if time["nt"] != expected_nt:
-                print(f"Warning: nt ({time['nt']}) does not match expected value ({expected_nt}) based on T0, T1, and dt")
 
 
 

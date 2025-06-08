@@ -1,55 +1,26 @@
 import itertools
 
-from fealpy.backend import backend_manager as bm
-from fealpy.opt import initialize
-from fealpy.opt.benchmark.multi_benchmark import multi_benchmark_data as data
+from ..backend import backend_manager as bm
+from .opt_function import initialize
+from .optimizer_base import Optimizer
 import matplotlib.pyplot as plt
 
-class MOQPSO:
+
+class MO_QuantumParticleSwarmOpt(Optimizer):
     """
     MOQPSO: Multi-Objective Quantum-behaved Particle Swarm Optimization.
 
     This class implements a multi-objective version of QPSO, maintaining a repository 
     of non-dominated solutions and utilizing a grid-based leader selection mechanism.
     """
+    def __init__(self, options) -> None:
+        super().__init__(options)
 
-    def __init__(self, MultiObj, params):
-        """
-        Initialize the MOQPSO optimizer.
-        
-        Args:
-            MultiObj (dict): Dictionary containing objective function info, including:
-                             - 'fun': Objective function
-                             - 'ndim': Dimension of solution
-                             - 'lb': Lower bounds
-                             - 'ub': Upper bounds
-                             - 'PF': True Pareto Front (for plotting)
-            params (dict): Dictionary containing algorithm parameters:
-                           - 'N': Population size
-                           - 'NR': Repository size
-                           - 'MaxIT': Maximum number of iterations
-                           - 'mut': Mutation rate
-                           - 'ngrid': Number of grids for hypercube
-        """
-        self.fun = MultiObj['fun']
-        self.dim = MultiObj['ndim']
-        self.lb = MultiObj['lb']
-        self.ub = MultiObj['ub']
-        self.PF = MultiObj['PF']
-        self.N = params['N']
-        self.Nr = params['NR']
-        self.MaxIT = params['MaxIT']
-        self.mut = params['mut']
-        self.ngrid = params['ngrid']
-        self.fig, self.ax = plt.subplots(figsize=(8, 8))
-        self.REP = {}  # Repository to store non-dominated solutions
-
-    def run(self):
+    def run(self, params={'mut':0.5}):
         """
         Main optimization loop.
         """
-        # Initialization
-        self.x = initialize(self.N, self.dim, self.ub, self.lb)
+        self.mut = params.get('mut')
         self.fitness = self.fun(self.x)
         pbest = bm.copy(self.x)
         pbest_f = bm.copy(self.fitness)
@@ -59,12 +30,14 @@ class MOQPSO:
         self.REP['pos'] = self.x[Dominated == 0, :]
         self.REP['fit'] = self.fitness[Dominated == 0, :]
         self.updateGrid()
-        
+
+        self.set_fit()
+            
         self.plotting()
         print("Generation #0 - Repository size: ", self.REP['pos'].shape[0])
 
         # Main iteration loop
-        for self.it in range(self.MaxIT):
+        for self.it in range(1, self.MaxIT):
             alpha = 0.9 - 0.5 * (self.it / self.MaxIT)
             mbest = bm.sum(pbest, axis=0) / self.N
             phi = bm.random.rand(self.N, self.dim)
@@ -104,6 +77,13 @@ class MOQPSO:
         plt.ioff()
         plt.show()
 
+    def set_fit(self):
+        if self.REP['fit'].shape[1] == 2:
+            self.fig, self.ax = plt.subplots(figsize=(8, 8))
+        elif self.REP['fit'].shape[1] == 3:
+            self.fig = plt.figure()
+            self.ax = self.fig.add_subplot(111, projection='3d')
+
     def deleteFromRepository(self):
         """
         Delete crowded solutions from the repository to maintain the repository size.
@@ -112,10 +92,11 @@ class MOQPSO:
         for m in range(self.REP['fit'].shape[1]):
             m_fit = bm.sort(self.REP['fit'][:, m])
             idx = bm.argsort(self.REP['fit'][:, m])
-            m_up = bm.concatenate([m_fit[1:], [bm.inf]])
-            m_down = bm.concatenate([[bm.inf], m_fit[:-1]])
+            m_up = bm.concatenate([m_fit[1:], bm.array([bm.inf])])
+            m_down = bm.concatenate([bm.array([bm.inf]), m_fit[:-1]])
             distance = ((m_up - m_down) / (bm.max(m_fit) - bm.min(m_fit)))
             idx = bm.argsort(idx)
+            distance[distance == -bm.inf] = bm.inf
             crowding = crowding + distance[idx][:, None]
         crowding[bm.isnan(crowding)] = bm.inf
         del_idx = bm.argsort(crowding, axis=0)
@@ -151,37 +132,37 @@ class MOQPSO:
         """
         Apply mutation operations to enhance exploration.
         """
-        fract = self.N / 3 - bm.floor(self.N / 3)
+        fract = self.N / 3 - bm.floor(bm.array(self.N) / 3)
         if fract < 0.5:
-            sub_sizes = bm.array([int(bm.ceil(self.N / 3)), int(bm.round(self.N / 3)), int(bm.round(self.N / 3))])
+            sub_sizes = bm.array([int(bm.ceil(bm.array(self.N) / 3)), int(bm.round(bm.array(self.N) / 3)), int(bm.round(bm.array(self.N) / 3))])
         else:
-            sub_sizes = bm.array([int(bm.round(self.N / 3)), int(bm.round(self.N / 3)), int(bm.floor(self.N / 3))])
-        cum_sizes = bm.cumsum(sub_sizes)
+            sub_sizes = bm.array([int(bm.round(bm.array(self.N) / 3)), int(bm.round(bm.array(self.N) / 3)), int(bm.floor(bm.array(self.N) / 3))])
+        cum_sizes = bm.cumsum(sub_sizes, axis=0)
 
         # First type of mutation
         nmut = bm.round(self.mut * sub_sizes[1])
         if nmut > 0:
-            idx = cum_sizes[0] + bm.unique(bm.random.randint(0, sub_sizes[1], int(nmut)))
+            idx = cum_sizes[0] + bm.unique(bm.random.randint(0, sub_sizes[1], (int(nmut),)))
             self.x[idx] = initialize(idx.shape[0], self.dim, self.ub, self.lb)
 
         # Second type of mutation
         per_mut = (1 - self.it / self.MaxIT) ** (5 * self.dim)
         nmut = bm.round(per_mut * sub_sizes[2])
         if nmut > 0:
-            idx = cum_sizes[1] + bm.unique(bm.random.randint(0, sub_sizes[2], int(nmut)))
+            idx = cum_sizes[1] + bm.unique(bm.random.randint(0, sub_sizes[2], (int(nmut),)))
             self.x[idx] = initialize(idx.shape[0], self.dim, self.ub, self.lb)
 
     def selectLeader(self):
         """
         Select a leader (guiding solution) from the repository based on crowding information.
         """
-        prob = bm.cumsum(self.REP['quality'][:, 1])
-        rand_val = bm.random.rand() * bm.max(prob)
+        prob = bm.cumsum(self.REP['quality'][:, 1], axis=0)
+        rand_val = bm.random.rand(1) * bm.max(prob)
         selected_idx = bm.where(rand_val <= prob)[0][0]
         sel_hyp = self.REP['quality'][selected_idx, 0]
         idx = bm.arange(0, self.REP['grid_idx'].shape[0])[:, None]
         selected = idx[self.REP['grid_idx'] == sel_hyp]
-        selected = selected[bm.random.randint(selected.shape[0])]
+        selected = selected[bm.random.randint(0, selected.shape[0], (1,))]
         return selected
 
     def plotting(self):
@@ -204,6 +185,26 @@ class MOQPSO:
             plt.show()
             plt.pause(0.01)
             plt.draw()
+        
+        if self.REP['fit'].shape[1] == 3:
+            plt.ion()
+            self.ax.clear()
+            self.ax.set_xlabel('F1')
+            self.ax.set_ylabel('F2')
+            self.ax.set_zlabel('F3')
+            self.ax.set_xlim(bm.min(self.REP['fit'][:, 0]), bm.max(self.REP['fit'][:, 0]))
+            self.ax.set_ylim(bm.min(self.REP['fit'][:, 1]), bm.max(self.REP['fit'][:, 1]))
+            self.ax.set_zlim(bm.min(self.REP['fit'][:, 2]), bm.max(self.REP['fit'][:, 2]))
+            self.ax.plot(self.fitness[:, 0], self.fitness[:, 1], self.fitness[:, 2], 'o', markerfacecolor='none', markeredgecolor='red')
+            self.ax.plot(self.REP['fit'][:, 0], self.REP['fit'][:, 1], self.REP['fit'][:, 2], 'o', markerfacecolor='none', markeredgecolor='black')
+            self.ax.plot(self.PF[:, 0], self.PF[:, 1], self.PF[:, 2], '.', markeredgecolor='green')
+            self.ax.set_xticks(self.REP['hypercube_limits'][:, 0])
+            self.ax.set_yticks(self.REP['hypercube_limits'][:, 1])
+            self.ax.set_zticks(self.REP['hypercube_limits'][:, 2])
+            plt.show()
+            plt.pause(0.01)
+            plt.draw()
+
 
     def updateGrid(self):
         """
@@ -220,7 +221,7 @@ class MOQPSO:
 
         for n in range(npar):
             for d in range(ndim):
-                condition = self.REP['fit'][n, d] <= self.REP['hypercube_limits'][:, d]
+                condition = (self.REP['fit'][n, d] <= self.REP['hypercube_limits'][:, d]) * 1
                 self.REP['grid_subid'][n, d] = bm.argmax(condition) if bm.any(condition) else None
                 self.REP['grid_subid'][n, d] -= 1
                 if self.REP['grid_subid'][n, d] == -1:
@@ -270,8 +271,8 @@ class MOQPSO:
 
 
 if __name__ == "__main__":
-
-    MultiObj = data[3]
+    from fealpy.opt.benchmark.multi_benchmark import multi_benchmark_data as data
+    MultiObj = data[5]
 
     params = {}
     params['N'] = 200
@@ -280,5 +281,5 @@ if __name__ == "__main__":
     params['mut'] = 0.5
     params['ngrid'] = 20
     
-    test = MOQPSO(MultiObj, params)
+    test = MO_QuantumParticleSwarmOpt(MultiObj, params)
     test.run()

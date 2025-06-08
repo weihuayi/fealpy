@@ -182,7 +182,7 @@ class FirstNedelecDof3d():
 
         return isDDof
 
-class FirstNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
+class FirstNedelecFESpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh

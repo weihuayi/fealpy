@@ -1,9 +1,6 @@
-from .amg_core.amg_connection import classical_strength_of_connection, symmetric_strength_of_connection
-from .amg_core.amg_splitting import rs_cf_splitting,ruge_stuben_coarsen,ruge_stuben_chen_coarsen
-from .amg_core.amg_interpolation import rs_direct_interpolation,two_points_interpolation
+from .amg_core import classical_strength_of_connection, rs_cf_splitting,rs_direct_interpolation
 from ..sparse import csr_matrix
 from ..backend import backend_manager as bm
-
 
 def ruge_stuben_amg(A,theta = 0.25):
     
@@ -17,9 +14,7 @@ def ruge_stuben_amg(A,theta = 0.25):
     p,r = rs_direct_interpolation(Ap, Aj, Ax,Sp, Sj, Sx, splitting)
     return p,r
 
-def ruge_stuben_coarse(A,theta = 0.025):
-    isC,Am = ruge_stuben_chen_coarsen(A,theta)
-    p,r = two_points_interpolation(A,isC)
-    return p,r
-
-
+# def ruge_stuben_coarse(A,theta = 0.025):
+#     isC,Am = ruge_stuben_chen_coarsen(A,theta)
+#     p,r = two_points_interpolation(A,isC)
+#     return p,r
