@@ -108,8 +108,7 @@ class Integrator(metaclass=VariantMeta):
     _region: _Region = None
     etype: str
 
-    def __init__(self, method=None, keep_data=False, *args, **kwds) -> None:
-        self.method = method
+    def __init__(self, keep_data=False, *args, **kwds) -> None:
         self._cache: Dict[Tuple[str, int], Any] = {}
         self.keep_data(keep_data)
 
@@ -193,7 +192,7 @@ class Integrator(metaclass=VariantMeta):
         return ConstIntegrator(value, to_gdof)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.method})"
+        return f"{self.__class__.__name__}"
 
     def __call__(self, *args, **kwargs):
         return self.assembly(*args, **kwargs)

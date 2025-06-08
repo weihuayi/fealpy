@@ -61,20 +61,22 @@ class SparseTensor():
         raise NotImplementedError
 
     ### 3. Format Conversion ###
-    def to_dense(self, *, fill_value: Number=1.0) -> TensorLike:
+    def to_dense(self, *, fill_value: Union[Number, bool] = 1, dtype=None) -> TensorLike:
         """Convert to a dense tensor and return as a new object.
 
         Parameters:
             fill_value (int | float, optional): The value to fill the dense tensor with
                 when `self.values()` is None.
+            dtype (dtype, optional): The scalar type of elements. This is useful
+                when `self.values()` is None. Defaults to float64.
 
         Returns:
             Tensor: The dense tensor.
         """
         raise NotImplementedError
 
-    def toarray(self, *, fill_value: Number=1.0) -> TensorLike:
-        return self.to_dense(fill_value=fill_value)
+    def toarray(self, *, fill_value: Union[Number, bool] = 1, dtype=None) -> TensorLike:
+        return self.to_dense(fill_value=fill_value, dtype=dtype)
 
     def tocoo(self, *, copy=False):
         raise NotImplementedError

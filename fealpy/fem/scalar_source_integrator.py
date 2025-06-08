@@ -16,11 +16,12 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
                  region: Optional[TensorLike] = None,
                  batched: bool=False,
                  method: Literal['isopara', None] = None) -> None:
-        super().__init__(method=method)
+        super().__init__()
         self.source = source
         self.q = q
         self.set_region(region)
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS, /, indices=None) -> TensorLike:
@@ -82,7 +83,3 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
                 return bm.einsum('q, cq, cql, cq -> cl', ws*rm, val, phi, d)
             else:
                 raise ValueError(f"I can not deal with {f.shape}!")
-
-    @assembly.selector
-    def assembly(self):
-        return self.method

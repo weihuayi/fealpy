@@ -14,7 +14,7 @@ from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
 from .integrator import LinearInt, OpInt, CellInt, FaceInt, enable_cache
-from ..typing import Threshold, TensorLike, Index, _S, CoefLike
+from ..typing import Threshold, TensorLike, Index, _S, CoefLike 
 from ..backend import backend_manager as bm
 from ..functionspace import TensorFunctionSpace
 
