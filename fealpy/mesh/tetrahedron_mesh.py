@@ -1232,6 +1232,114 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         mesh = cls(node, cell)
         return mesh
 
+    @classmethod
+    def from_spherical_shell(cls, r1=0.05, r2=0.5, h=0.04,
+                             itype=None, ftype=None, device=None) -> 'TetrahedronMesh':
+        """
+        Generate a tetrahedral mesh for a spherical shell.
+        Parameters
+        ----------
+        r1: float
+            Inner radius of the spherical shell.
+        r2: float
+            Outer radius of the spherical shell.
+        h: float
+            Mesh size parameter.
+        itype: int type for indices, default is bm.int32
+        ftype: float type for coordinates, default is bm.float64
+        device: str, optional
+
+        Returns
+        -------
+        TetrahedronMesh
+            An instance of TetrahedronMesh containing the mesh data.
+        """
+        try:
+            import gmsh
+        except ImportError:
+            raise ImportError("Please install gmsh to use this function.")
+
+        if itype is None:
+            itype = bm.int32
+        if ftype is None:
+            ftype = bm.float64
+
+        # 1. Initialize GMSH and create spherical shell geometry
+        gmsh.initialize()
+        gmsh.model.add("spherical_shell")
+        outer = gmsh.model.occ.addSphere(0, 0, 0, r2)
+        inner = gmsh.model.occ.addSphere(0, 0, 0, r1)
+        shell, _ = gmsh.model.occ.cut([(3, outer)], [(3, inner)],
+                                      removeObject=True, removeTool=False)
+        gmsh.model.occ.synchronize()
+
+        # 2. Get the boundary faces of the shell
+        faces = gmsh.model.getBoundary(shell, oriented=False, recursive=False)
+        # Get inner sphere's face tags
+        inner_faces = gmsh.model.getBoundary([(3, inner)], oriented=False, recursive=False)
+        inner_face_tags = [f[1] for f in inner_faces]
+        # Match shell faces that belong to inner sphere
+        inner_face_tags_in_shell = [f[1] for f in faces if f[0] == 2 and f[1] in inner_face_tags]
+
+        gmsh.model.occ.remove([(3, inner)])
+        gmsh.model.occ.synchronize()
+
+        # 3.  Create mesh fields for size control  Distance + Threshold
+        h_min, h_max = h, 10.0 * h
+        # （a）Distance field
+        gmsh.model.mesh.field.add("Distance", 1)
+        gmsh.model.mesh.field.setNumbers(1, "FacesList", inner_face_tags_in_shell)
+        gmsh.model.mesh.field.setNumber(1, "Sampling", 100)  # the number of sampling points
+        # （b）Threshold field
+        gmsh.model.mesh.field.add("Threshold", 2)
+        gmsh.model.mesh.field.setNumber(2, "InField", 1)
+        gmsh.model.mesh.field.setNumber(2, "SizeMin", h_min)
+        gmsh.model.mesh.field.setNumber(2, "SizeMax", h_max)
+        gmsh.model.mesh.field.setNumber(2, "DistMin", r1/1000)
+        gmsh.model.mesh.field.setNumber(2, "DistMax", r2 - r1)
+        gmsh.model.mesh.field.setAsBackgroundMesh(2)
+
+        # 4. generate the mesh
+        gmsh.model.mesh.generate(3)
+
+        # Extract mesh data: nodes and elements
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = bm.array(node_coords, dtype=ftype, device=device).reshape(-1, 3)
+
+        elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(dim=3)
+
+        cell = bm.array(elem_node_tags[0], dtype=itype, device=device).reshape(-1, 4) - 1  # Convert to 0-based index
+
+        gmsh.finalize()
+
+        return cls(node, cell)
+
+    @classmethod
+    def from_vtu(cls,file):
+        import meshio
+        data = meshio.read(file)
+        node = data.points
+        cell = data.cells_dict['tetra']
+        mesh = cls(node, cell)
+        return mesh
+    
+    @classmethod
+    def from_medit(cls,file):
+        '''
+        Read medit format file (.mesh) to create tetrahedral mesh.
+        Parameters:
+            file (str): Path to the medit file.
+        Returns:
+            TetrahedronMesh: An instance of TetrahedronMesh containing the mesh
+            data.
+        '''
+        import meshio
+        data = meshio.read(file)
+        node = bm.from_numpy(data.points)
+        cell = bm.from_numpy(data.cells_dict['tetra'])
+        mesh = cls(node, cell)
+        return mesh
+
     def to_vtk(self, fname=None, etype='cell', index:Index=_S):
         from .vtk_extent import  write_to_vtu
 

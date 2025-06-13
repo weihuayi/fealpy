@@ -9,20 +9,16 @@
 '''  
 from typing import Optional
 from fealpy.backend import backend_manager as bm
-from ..typing import TensorLike, SourceLike, Threshold
+from ..typing import TensorLike, CoefLike, Threshold
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
-from .integrator import (
-    LinearInt, OpInt, FaceInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
+from .integrator import LinearInt, OpInt, FaceInt, enable_cache
+
 '''
 @brief
-(coef \\nabla u \\cdot n, v)_{\\partial \\Omega}
+(coef \\nabla^T u \\cdot n, v)_{\\partial \\Omega}
 @param[in] mu 
 '''
 class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
@@ -50,7 +46,6 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
         index = self.make_index(space)
-        result1 = space.face_to_dof(index=index) 
         tag = space.mesh.face2cell[index,0]
         result2 = space.cell_to_dof()[tag]
         return (result2, result2) 
@@ -80,7 +75,9 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, gphi, fm, index, n = self.fetch(space)
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='face', index=index)
+        sym_gphi = 0.5*(bm.swapaxes(gphi, -2, -1) + gphi)
         gphin = bm.einsum('e...i, eql...ij->eql...j', n, gphi)
+        #gphin = bm.einsum('e...i, eql...ij->eql...j', n, sym_gphi)
         result =  bilinear_integral(phi, gphin, ws, fm, val, batched=self.batched)
         return result
 

@@ -93,7 +93,7 @@ class RTDof2d():
         flag[bddof] = True
         return flag
 
-class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
+class RaviartThomasFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
@@ -289,8 +289,6 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
     def face_value(self, uh, bcs, index=_S):
         pass
 
-    def interplation(self, f):
-        pass
 
     def L2_error(self, u, uh):
         '''@
@@ -363,7 +361,41 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
         return uh,isDDof
 
     boundary_interpolate = set_dirichlet_bc
+    def project(self, u):
+        return self.interpolation(u)
 
+    def interpolation(self, u):
+        p = self.p
+        mesh = self.mesh
+
+        uh = self.function()
+        edge2dof = self.dof.edge_to_dof() 
+        en = mesh.edge_unit_normal()
+        fm = mesh.entity_measure('face')
+        qf = mesh.quadrature_formula(p+3, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        def f0(bc):
+            ps = mesh.bc_to_point(bc)
+            return -bm.einsum('ijk, ik->ij', u(ps), en)
+        uh[edge2dof.reshape(-1)] = bm.einsum('c, i, ci->c', fm, ws, f0(bcs))
+
+        if p >= 1:
+            NE = mesh.number_of_edges()
+            NC = mesh.number_of_cells()
+            edof = self.number_of_local_dofs('edge')
+            idof = self.number_of_local_dofs('cell') # dofs inside the cell 
+            cell2dof = NE*edof+ bm.arange(NC*idof).reshape(NC, idof)
+            def f1(bc):
+                ps = mesh.bc_to_point(bc)
+                return u(ps)
+            fm = mesh.entity_measure('face')
+            qf = mesh.quadrature_formula(p+3, 'face')
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            val = bm.einsum('c, i, ci->c', fm, ws, f1(bcs))
+            uh[cell2dof[:, 0:idof//2]] = val[:, 0, :] 
+            uh[cell2dof[:, idof//2:]] = val[:, 1, :]
+        return uh
+    
     def show_basis(self, fig, index=0, box=None):
         """
         Plot quvier graph for every basis in a fig object
@@ -394,3 +426,4 @@ class RTFiniteElementSpace2d(FunctionSpace, Generic[_MT]):
             uv = phi[:, index, i, :]
             axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1], 
                     units='xy')
+

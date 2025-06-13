@@ -3,7 +3,7 @@ from typing import Optional
 from functools import partial
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -11,18 +11,15 @@ from ..utils import process_coef_func, is_scalar, is_tensor, fill_axis
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
     NonlinearInt, OpInt, CellInt,
-    enable_cache,
-    CoefLike
+    enable_cache
 )
 
 
 class ScalarNonlinearConvectionIntegrator(NonlinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
-                 batched: bool=False,
-                 method: Optional[str]=None) -> None:
-        method = 'assembly' if (method is None) else method
-        super().__init__(method=method)
+                 batched: bool=False) -> None:
+        super().__init__()
         self.coef = coef
         if hasattr(coef, 'uh'):
             self.uh = coef.uh

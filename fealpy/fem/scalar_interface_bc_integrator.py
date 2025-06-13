@@ -4,7 +4,7 @@ from ..typing import TensorLike, SourceLike, Threshold
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..functional import linear_integral
-from .integrator import LinearInt, SrcInt, FaceInt, enable_cache, assemblymethod
+from .integrator import LinearInt, SrcInt, FaceInt, enable_cache
 
 
 class ScalarInterfaceBCIntegrator(LinearInt, SrcInt, FaceInt):

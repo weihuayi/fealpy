@@ -2,7 +2,7 @@
 from typing import Optional
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
+from ..typing import TensorLike, Index, _S, CoefLike
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
@@ -10,9 +10,7 @@ from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
 from .integrator import (
     LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
+    enable_cache
 )
 
 class VectorMassIntegrator(LinearInt, OpInt, CellInt):

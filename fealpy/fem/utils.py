@@ -57,10 +57,6 @@ class LinearSymbolicIntegration:
         
         # 双线性形函数 (在 [0, 1]² 上), 先 y 后 x 的顺序
         self.N = [
-            # self.xi * self.eta,           # (0, 0) 节点
-            # self.xi * (1-self.eta),       # (0, 1) 节点
-            # (1-self.xi) * self.eta,       # (1, 0) 节点
-            # (1-self.xi) * (1-self.eta)    # (1, 1) 节点
             (1 - self.xi) * (1 - self.eta), # (0, 0) 节点
             (1 - self.xi) * self.eta,       # (0, 1) 节点
             self.xi * (1 - self.eta),       # (1, 0) 节点
@@ -74,22 +70,14 @@ class LinearSymbolicIntegration:
         
         # 三线性形函数 (在[0,1]³上), 先 z 再 y 最后 x 的顺序
         self.N = [
-            # self.xi * self.eta * self.zeta,                    # (0,0,0)
-            # self.xi * self.eta * (1-self.zeta),                # (0,0,1)
-            # self.xi * (1-self.eta) * self.zeta,                # (0,1,0)
-            # self.xi * (1-self.eta) * (1-self.zeta),            # (0,1,1)
-            # (1-self.xi) * self.eta * self.zeta,                # (1,0,0)
-            # (1-self.xi) * self.eta * (1-self.zeta),            # (1,0,1)
-            # (1-self.xi) * (1-self.eta) * self.zeta,            # (1,1,0)
-            # (1-self.xi) * (1-self.eta) * (1-self.zeta)         # (1,1,1)
-            (1 - self.xi) * (1 - self.eta) * (1 - self.zeta),  # (0,0,0)
-            (1 - self.xi) * (1 - self.eta) * self.zeta,        # (0,0,1)
-            (1 - self.xi) * self.eta * (1 - self.zeta),        # (0,1,0)
-            (1 - self.xi) * self.eta * self.zeta,              # (0,1,1)
-            self.xi * (1 - self.eta) * (1 - self.zeta),        # (1,0,0)
-            self.xi * (1 - self.eta) * self.zeta,              # (1,0,1)
-            self.xi * self.eta * (1 - self.zeta),              # (1,1,0)
-            self.xi * self.eta * self.zeta                     # (1,1,1)
+            (1 - self.xi) * (1 - self.eta) * (1 - self.zeta),  # (0, 0, 0)
+            (1 - self.xi) * (1 - self.eta) * self.zeta,        # (0, 0, 1)
+            (1 - self.xi) * self.eta * (1 - self.zeta),        # (0, 1, 0)
+            (1 - self.xi) * self.eta * self.zeta,              # (0, 1, 1)
+            self.xi * (1 - self.eta) * (1 - self.zeta),        # (1, 0, 0)
+            self.xi * (1 - self.eta) * self.zeta,              # (1, 0, 1)
+            self.xi * self.eta * (1 - self.zeta),              # (1, 1, 0)
+            self.xi * self.eta * self.zeta                     # (1, 1, 1)
         ]
     
     def compute_mapping(self, vertices: TensorLike) -> sp.tensor.array.MutableDenseNDimArray:
@@ -101,89 +89,103 @@ class LinearSymbolicIntegration:
 
     def compute_structured_2d_mapping(self, vertices):
         """计算二维结构单元的映射"""
-        NC = vertices.shape[0]
-        NCN = vertices.shape[1]
+        # NC = vertices.shape[0]
+        # NCN = vertices.shape[1]
 
-        JG_inv_array = sp.tensor.array.MutableDenseNDimArray(
-                                            sp.zeros(NC * self.GD * self.GD),
-                                            (NC, self.GD, self.GD)
-                                        )
+        # JG_inv_array = sp.tensor.array.MutableDenseNDimArray(
+        #                                     sp.zeros(NC * self.GD * self.GD),
+        #                                     (NC, self.GD, self.GD)
+        #                                 )
         
-        # 对每个单元计算 JG^(-1) 符号表达式
-        for cell_idx in range(NC):
-            # 提取单元顶点
-            cell_vertices = vertices[cell_idx]
-            x_coords = cell_vertices[:, 0]
-            y_coords = cell_vertices[:, 1]
+        # # 对每个单元计算 JG^(-1) 符号表达式
+        # for cell_idx in range(NC):
+        #     # 提取单元顶点
+        #     cell_vertices = vertices[cell_idx]
+        #     x_coords = cell_vertices[:, 0]
+        #     y_coords = cell_vertices[:, 1]
             
-            # 构建映射函数
-            x_map = sum(self.N[i] * float(x_coords[i]) for i in range(NCN))
-            y_map = sum(self.N[i] * float(y_coords[i]) for i in range(NCN))
+        #     # 构建映射函数
+        #     x_map = sum(self.N[i] * float(x_coords[i]) for i in range(NCN))
+        #     y_map = sum(self.N[i] * float(y_coords[i]) for i in range(NCN))
             
-            J = sp.Matrix([
-                [sp.diff(x_map, self.xi), sp.diff(x_map, self.eta)],
-                [sp.diff(y_map, self.xi), sp.diff(y_map, self.eta)]
-            ])
-            # 逐元素简化
-            for i in range(J.shape[0]):
-                for j in range(J.shape[1]):
-                    if J[i, j] != 0:  
-                        J[i, j] = sp.expand(J[i, j])
-                        J[i, j] = sp.simplify(J[i, j])
-            # 计算第一基本形式 G = J^T·J
-            G = J.transpose() * J
-            G_inv = G.inv()
-            JG_inv = J * G_inv
+        #     J = sp.Matrix([
+        #         [sp.diff(x_map, self.xi), sp.diff(x_map, self.eta)],
+        #         [sp.diff(y_map, self.xi), sp.diff(y_map, self.eta)]
+        #     ])
+        #     # 逐元素简化
+        #     for i in range(J.shape[0]):
+        #         for j in range(J.shape[1]):
+        #             if J[i, j] != 0:  
+        #                 J[i, j] = sp.expand(J[i, j])
+        #                 J[i, j] = sp.simplify(J[i, j])
+        #     # 计算第一基本形式 G = J^T·J
+        #     G = J.transpose() * J
+        #     G_inv = G.inv()
+        #     JG_inv = J * G_inv
             
-            for i in range(self.GD):
-                for j in range(self.GD):
-                    JG_inv_array[cell_idx, i, j] = JG_inv[i, j]
+        #     for i in range(self.GD):
+        #         for j in range(self.GD):
+        #             JG_inv_array[cell_idx, i, j] = JG_inv[i, j]
+
+        NC = vertices.shape[0]
+        JG_inv_array = bm.zeros((NC, self.GD, self.GD), dtype=bm.float64, device=self.mesh.device)
+        
+        inv_h = bm.array([1/h for h in self.mesh.h])
+        i = bm.arange(self.GD)
+        JG_inv_array = bm.set_at(JG_inv_array, (..., i, i), inv_h)
         
         return JG_inv_array
     
     def compute_structured_3d_mapping(self, vertices: TensorLike) -> sp.tensor.array.MutableDenseNDimArray:
         """计算三维结构单元的映射"""
+        # NC = vertices.shape[0]
+        # NCN = vertices.shape[1]
+        
+        # JG_inv_array = sp.tensor.array.MutableDenseNDimArray(
+        #                                     sp.zeros(NC * self.GD * self.GD),
+        #                                     (NC, self.GD, self.GD)
+        #                                 )
+        
+        # for cell_idx in range(NC):
+        #     # 提取单元顶点
+        #     cell_vertices = vertices[cell_idx]
+        #     x_coords = cell_vertices[:, 0]
+        #     y_coords = cell_vertices[:, 1]
+        #     z_coords = cell_vertices[:, 2]
+        #     # 映射函数
+        #     x_map = sum(self.N[i] * float(x_coords[i]) for i in range(NCN))
+        #     y_map = sum(self.N[i] * float(y_coords[i]) for i in range(NCN))
+        #     z_map = sum(self.N[i] * float(z_coords[i]) for i in range(NCN))
+        #     # 雅可比矩阵
+        #     J = sp.Matrix([
+        #         [sp.diff(x_map, self.xi), sp.diff(x_map, self.eta), sp.diff(x_map, self.zeta)],
+        #         [sp.diff(y_map, self.xi), sp.diff(y_map, self.eta), sp.diff(y_map, self.zeta)],
+        #         [sp.diff(z_map, self.xi), sp.diff(z_map, self.eta), sp.diff(z_map, self.zeta)]
+        #     ])
+        #     # 逐元素简化
+        #     for i in range(J.shape[0]):
+        #         for j in range(J.shape[1]):
+        #             if J[i,j] != 0:  
+        #                 J[i,j] = sp.expand(J[i,j])
+        #                 J[i,j] = sp.simplify(J[i,j])
+        #     # 计算第一基本形式 G = J^T·J
+        #     G = J.transpose() * J
+        #     # 计算 G 的逆矩阵
+        #     G_inv = G.inv()
+        #     # 计算 JG^(-1), 表示参考坐标关于物理坐标的导数
+        #     JG_inv = J * G_inv
+        #     # 存储结果
+        #     for i in range(self.GD):
+        #         for j in range(self.GD):
+        #             JG_inv_array[cell_idx, i, j] = JG_inv[i, j]
+
         NC = vertices.shape[0]
-        NCN = vertices.shape[1]
+        JG_inv_array = bm.zeros((NC, self.GD, self.GD), dtype=bm.float64, device=self.mesh.device)
         
-        JG_inv_array = sp.tensor.array.MutableDenseNDimArray(
-                                            sp.zeros(NC * self.GD * self.GD),
-                                            (NC, self.GD, self.GD)
-                                        )
-        
-        for cell_idx in range(NC):
-            # 提取单元顶点
-            cell_vertices = vertices[cell_idx]
-            x_coords = cell_vertices[:, 0]
-            y_coords = cell_vertices[:, 1]
-            z_coords = cell_vertices[:, 2]
-            # 映射函数
-            x_map = sum(self.N[i] * float(x_coords[i]) for i in range(NCN))
-            y_map = sum(self.N[i] * float(y_coords[i]) for i in range(NCN))
-            z_map = sum(self.N[i] * float(z_coords[i]) for i in range(NCN))
-            # 雅可比矩阵
-            J = sp.Matrix([
-                [sp.diff(x_map, self.xi), sp.diff(x_map, self.eta), sp.diff(x_map, self.zeta)],
-                [sp.diff(y_map, self.xi), sp.diff(y_map, self.eta), sp.diff(y_map, self.zeta)],
-                [sp.diff(z_map, self.xi), sp.diff(z_map, self.eta), sp.diff(z_map, self.zeta)]
-            ])
-            # 逐元素简化
-            for i in range(J.shape[0]):
-                for j in range(J.shape[1]):
-                    if J[i,j] != 0:  
-                        J[i,j] = sp.expand(J[i,j])
-                        J[i,j] = sp.simplify(J[i,j])
-            # 计算第一基本形式 G = J^T·J
-            G = J.transpose() * J
-            # 计算 G 的逆矩阵
-            G_inv = G.inv()
-            # 计算 JG^(-1), 表示参考坐标关于物理坐标的导数
-            JG_inv = J * G_inv
-            # 存储结果
-            for i in range(self.GD):
-                for j in range(self.GD):
-                    JG_inv_array[cell_idx, i, j] = JG_inv[i, j]
-        
+        inv_h = bm.array([1/h for h in self.mesh.h])
+        i = bm.arange(self.GD)
+        JG_inv_array = bm.set_at(JG_inv_array, (..., i, i), inv_h)
+
         return JG_inv_array
 
     def basis(self, p: int, mi: Optional[TensorLike]=None) -> List[sp.Expr]:
@@ -461,13 +463,31 @@ class LinearSymbolicIntegration:
                                 (self.ldof1, self.ldof2, dim, dim)
                             )
         
+        # for i in range(self.ldof1):
+        #     for j in range(self.ldof2):
+        #         for m in range(dim):
+        #             for n in range(dim):
+        #                 integrand = gphi1[i][m] * gphi2[j][n]
+        #                 S[i, j, m, n] = self.integrate(integrand)
+
+        integral_cache = {}  # 缓存已计算的积分结果
+        
         for i in range(self.ldof1):
             for j in range(self.ldof2):
                 for m in range(dim):
                     for n in range(dim):
-                        integrand = gphi1[i][m] * gphi2[j][n]
-                        S[i, j, m, n] = self.integrate(integrand)
-                    
+                        # 构建积分表达式的哈希键
+                        expr = gphi1[i][m] * gphi2[j][n]
+                        expr_key = str(expr)
+                        
+                        # 检查缓存中是否已有结果
+                        if expr_key in integral_cache:
+                            S[i, j, m, n] = integral_cache[expr_key]
+                        else:
+                            result = self.integrate(expr)
+                            integral_cache[expr_key] = result
+                            S[i, j, m, n] = result
+
         return S
 
 class NonlinearSymbolicIntegration:

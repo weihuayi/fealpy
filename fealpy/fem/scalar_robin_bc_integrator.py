@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 
 from typing import Optional
-from ..typing import TensorLike, SourceLike, Threshold
+from ..typing import TensorLike, CoefLike, Threshold
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
@@ -9,9 +9,7 @@ from ..functional import bilinear_integral
 
 from .integrator import (
     LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
+    enable_cache
 )
 class ScalarRobinBCIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,

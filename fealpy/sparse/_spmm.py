@@ -63,7 +63,9 @@ def spmm_csr(crow: _DT, col: _DT, values: _DT, spshape: _Size, x: _DT) -> _DT:
         start = crow[i]
         end = crow[i + 1]
         r = bm.einsum('...i, ...ij -> ...j', values[..., start:end], x[..., col[start:end], :])
-        result[..., i, :] = r
+        # result[..., i, :] = r
+        result = bm.set_at(result, (Ellipsis, i, slice(None)), r)
+
 
     if unsqueezed:
         result = result[..., 0]

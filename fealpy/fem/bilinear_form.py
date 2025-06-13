@@ -148,10 +148,9 @@ class BilinearForm(Form[LinearInt]):
         gt_subs = 'bcij' if (self.batch_size > 0) else 'cij'
         gu_subs = 'bcj' if (u.ndim >= 2) else 'cj'
 
-        for group in self.integrators.keys():
-            group_tensor, e2dofs = self._assembly_group(group, True)
-            ue2dof = e2dofs[0]
-            ve2dof = e2dofs[1] if (len(e2dofs) > 1) else ue2dof
+        for group_tensor, e2dofs_tuple in self.assembly_local_iterative():
+            ue2dof = e2dofs_tuple[0]
+            ve2dof = e2dofs_tuple[1] if (len(e2dofs_tuple) > 1) else ue2dof
             gu = u[..., ue2dof] # (..., NC, uldof)
             gv = bm.einsum(f'{gt_subs}, {gu_subs} -> {out_subs}', group_tensor, gu)
             v = bm.index_add(v, ve2dof.reshape(-1), gv.reshape(gv_reshape))
