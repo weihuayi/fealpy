@@ -1,8 +1,7 @@
 from functools import partial
-from typing import Union, Callable, Optional, Any, TypeVar, Tuple, Dict
 
 from ..mesh import HomogeneousMesh
-from ..typing import TensorLike, CoefLike
+from ..typing import TensorLike
 from ..functionspace.space import FunctionSpace as _FS
 from .integrator import NonlinearInt, LinearInt, enable_cache
 from ..functional import linear_integral, get_semilinear_coef
@@ -18,9 +17,12 @@ class NonlinearWrapperInt(NonlinearInt):
         super().__init__()
         self.linear_int = linear_int
 
+    def to_global_dof(self, space, /, indices = None):
+        return self.linear_int.to_global_dof(space, indices)
+
     @enable_cache
-    def fetch(self, space: _FS):
-        index = self.linear_int.index
+    def fetch(self, space: _FS, indices=None):
+        index = self.linear_int.entity_selection(indices)
         mesh = getattr(space, 'mesh', None)
 
         if not isinstance(mesh, HomogeneousMesh):
@@ -28,36 +30,42 @@ class NonlinearWrapperInt(NonlinearInt):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
 
-        cm = mesh.entity_measure('cell', index=self.linear_int.index)
+        cm = mesh.entity_measure('cell', index=index)
         q = space.p+3 if self.linear_int.q is None else self.linear_int.q
         qf = mesh.quadrature_formula(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         return bcs, ws, cm
 
     @enable_cache
-    def fetch_gphix(self, space: _FS):
+    def fetch_gphix(self, space: _FS, indices=None):
         bcs = self.fetch(space)[0]
-        return space.grad_basis(bcs, index=self.linear_int.index, variable='x')
+        index = self.linear_int.entity_selection(indices)
+        return space.grad_basis(bcs, index=index, variable='x')
 
     @enable_cache
-    def fetch_gphiu(self, space: _FS):
+    def fetch_gphiu(self, space: _FS, indices=None):
         bcs = self.fetch(space)[0]
-        return space.grad_basis(bcs, index=self.linear_int.index, variable='u')
+        index = self.linear_int.entity_selection(indices)
+        return space.grad_basis(bcs, index=index, variable='u')
 
-    def assembly(self, space):
+    def assembly(self, space, indices=None):
         uh = self.linear_int.coef.uh
         coef = self.linear_int.coef 
         mesh = getattr(space, 'mesh', None)
         bcs, ws, cm = self.fetch(space)
-        gphi = self.fetch_gphix(space)
-        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=self.linear_int.index)
+        gphi = self.fetch_gphix(space, indices)
+        index = self.linear_int.entity_selection(indices)
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        batched = getattr(self.linear_int, "batched", False)
+
         if bm.backend_name == 'numpy':
             val_F = -uh.grad_value(bcs)   # [NC, NQ, dof_numel]
             coef_F = get_semilinear_coef(val_F, coef)
-            F = linear_integral(gphi, ws, cm, coef_F, batched=self.linear_int.batched)
+            F = linear_integral(gphi, ws, cm, coef_F, batched=batched)
         else:
             uh_ = uh[space.cell_to_dof()]
-            F = self.auto_grad(space, uh_, coef, batched=self.linear_int.batched)
+            F = self.auto_grad(space, uh_, coef, batched=batched)
+
         return self.linear_int.assembly(space), F
 
     def cell_integral(self, u, gphi, cm, ws, coef, batched) -> TensorLike:
