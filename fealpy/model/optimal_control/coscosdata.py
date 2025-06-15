@@ -46,7 +46,7 @@ class CosCosData():
 
     @cartesian
     def reaction_coef(self, p: TensorLike) -> TensorLike:
-        val = bm.array([2.0])
+        val = bm.array([0.0])
         shape = p.shape[:-1] + val.shape
         return bm.broadcast_to(val, shape)
 
@@ -80,7 +80,8 @@ class CosCosData():
         x = p[..., 0]
         y = p[..., 1]
         pi = bm.pi
-        val = 2*bm.cos(2*pi*x)*bm.cos(2*pi*y) + 80*pi**2*bm.cos(2*pi*x)*bm.cos(2*pi*y)
+        val =  80*pi**2*bm.cos(2*pi*x)*bm.cos(2*pi*y)
+        #val = 2*bm.cos(2*pi*x)*bm.cos(2*pi*y) + 80*pi**2*bm.cos(2*pi*x)*bm.cos(2*pi*y)
         return val
     
     @cartesian

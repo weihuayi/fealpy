@@ -13,6 +13,7 @@ from ..backend import backend_manager as bm
 from ..solver import spsolve
 from ..fem import DirichletBC
 
+
 class EllipticRTFEMModel(ComputationalModel):
     """
     EllipticRTFEMModel: Elliptic Raviart-Thomas Finite Element Model
@@ -80,12 +81,12 @@ class EllipticRTFEMModel(ComputationalModel):
         p,u = self.solve()
         return p, u
 
-    def init_mesh(self):
+    def init_mesh(self,n=64):
         """
         Initialize the mesh for the elliptic RT FEM model.
         """
         domain = self.pde.domain()
-        self.mesh = TriangleMesh.from_box(domain, nx=32, ny=32)
+        self.mesh = TriangleMesh.from_box(domain, nx=n, ny=n)
         return self.mesh
 
     def linear_system(self):
