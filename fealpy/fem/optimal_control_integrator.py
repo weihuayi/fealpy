@@ -23,15 +23,16 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         """
-        Initialize an instance of the class.
+        OPCIntegrator: Optimal Control Problem Cell Integrator
 
-        This constructor sets up the initial state of the object, including 
-        coefficients, quadrature order, index, batching mode, and method of operation.
+        This class implements a cell integrator for optimal control problems in the finite element method (FEM).
+        It is designed to assemble local matrices or vectors on mesh cells, supporting custom coefficients,
+        quadrature order, and batched processing for efficient numerical integration.
 
         Parameters
         ----------
         coef : Optional[CoefLike], optional
-            Coefficients used in the computation, by default None.
+            Coefficient(s) used in the integrand, by default None.
         q : Optional[int], optional
             Quadrature order for numerical integration, by default None.
         index : Index, optional, default=_S
@@ -44,7 +45,7 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
         Attributes
         ----------
         coef : Optional[CoefLike]
-            Coefficients used in the computation.
+            Coefficient(s) used in the computation.
         q : Optional[int]
             Quadrature order for numerical integration.
         index : Index
@@ -57,8 +58,8 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
         Notes
         -----
         The `method` parameter defaults to 'assembly' if not explicitly specified.
-        This class is designed to handle numerical integration tasks with optional
-        batching for performance optimization.
+        This class is intended for use in optimal control FEM assembly routines,
+        supporting flexible integration strategies and efficient batched computation.
         """
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
@@ -179,33 +180,8 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
         phi_M3 = space.basis(global_points[2], index=index)
         phi = bm.stack([phi_M1, phi_M2, phi_M3])
         return global_points, ws, phi, 2*phi_dual, cm, index
-    '''
-    def assembly(self, space: _FS) -> TensorLike:
-        """
-        Perform the assembly operation for the given function space.
-        This method computes the integral using the specified coefficients and
-        quadrature points, and returns the result as a tensor.
-        Parameters
-        ----------
-        space : _FS
-            The function space on which to perform the assembly.
-        Returns
-        -------
-        TensorLike
-            The result of the assembly operation.
-        """
-        
-        coef = self.coef
-        mesh = getattr(space, 'mesh', None)
-        global_points, ws, phi,phi_dual, cm, index = self.fetch(space)
-        val = process_coef_func(coef, bcs=global_points, mesh=mesh, etype='cell', index=index)
-        val_phi = bm.einsum('icqlk, ciqdk -> icqld',  phi, val)
-       
-        result = bm.einsum('q, c, icqlk, cqik -> cil', ws, 1/3*cm, val_phi, phi_dual)
-        return result
-        #return bilinear_integral(phi, phi_new, ws, 1/3*cm, val, batched=self.batched)
-    
-    '''
+
+
     def assembly(self, space: _FS) -> TensorLike:
         """
         Perform the assembly operation for the given function space.

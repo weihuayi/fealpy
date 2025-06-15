@@ -135,5 +135,8 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
         val1 = process_coef_func(f, bcs=global_points[1], mesh=mesh, etype='cell', index=index)
         val2 = process_coef_func(f, bcs=global_points[2], mesh=mesh, etype='cell', index=index)
         val = bm.stack([val0, val1, val2])
-        result = bm.einsum('q, c, icqk, cqik -> ci', ws, 1/3*cm, val, phi_dual)
+        if isinstance(f, int):
+            result = bm.einsum('q,c,i,cqik->ci', ws, 1/3*cm, val, phi_dual)
+        else:
+            result = bm.einsum('q, c, icqk, cqik -> ci', ws, 1/3*cm, val, phi_dual)
         return result
