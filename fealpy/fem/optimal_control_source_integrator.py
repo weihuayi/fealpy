@@ -17,6 +17,47 @@ from fealpy.fem.integrator import (
 
 
 class OPCSIntegrator(LinearInt, OpInt, CellInt):
+    '''
+    OPCRTFEMModel: Optimal Control Problem Raviart-Thomas Finite Element Model
+
+    This integrator is designed for assembling the source term in optimal control problems
+    using the Raviart-Thomas finite element method (RT FEM) on 2D triangular meshes.
+    It supports custom source functions, quadrature order selection, and efficient
+    integration over sub-triangles for accurate flux and state-control coupling.
+
+    Parameters
+    ----------
+    source : CoefLike, optional
+        The source term function or tensor for the optimal control problem.
+    q : int, optional
+        The quadrature order for numerical integration. If None, a default based on
+        the polynomial degree is used.
+    index : Index, optional
+        The cell indices to assemble over. Default is all cells.
+    batched : bool, optional
+        Whether to use batched assembly for performance.
+    method : str, optional
+        The assembly method. Default is 'assembly'.
+
+    Methods
+    -------
+    to_global_dof(space)
+        Map local cell degrees of freedom to global degrees of freedom.
+    find_min_component_indices(coords)
+        Find indices of minimum components in coordinate arrays.
+    transform_subtriangle_points(quad_points)
+        Transform quadrature points from sub-triangles to the global triangle.
+    fetch(space)
+        Prepare quadrature points, weights, basis functions, and cell measures.
+    assembly(space)
+        Assemble the global source vector for the optimal control problem.
+
+    Notes
+    -----
+    This integrator is intended for use in optimal control PDE solvers that require
+    accurate source term integration in mixed FEM settings, particularly with
+    Raviart-Thomas elements.
+    '''
     def __init__(self, source: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
@@ -31,26 +72,6 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
-    
-    def find_min_component_indices(self,coords):
-        indices = []
-        for coord in coords:
-            # 找到最小值及其索引
-            min_val = bm.min(coord)
-            min_indices = bm.where(coord == min_val)[0]
-            
-            if len(min_indices) == 1:
-                # 如果只有一个最小值，直接使用其索引
-                index = min_indices[0]
-            else:
-                # 找到最大值及其索引
-                max_val_index = bm.argmax(coord)
-                
-                # 计算下一个索引（循环）
-                index = (max_val_index + 1) % len(coord)
-            
-            indices.append(index)
-        return indices
     
     def transform_subtriangle_points(self, quad_points):
         """
