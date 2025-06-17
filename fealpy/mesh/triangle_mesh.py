@@ -760,14 +760,14 @@ class TriangleMesh(SimplexMesh, Plotable):
             ridx = bm.concatenate((t1, t3, t5))
             for key, value in options['data'].items():
                 ldof = value.shape[1]
-                p = int((bm.sqrt(8 * ldof + 1) - 3) / 2)
+                p = int((bm.sqrt(bm.tensor(8 * ldof + 1)) - 3) / 2)
                 bc = self.multi_index_matrix(p=p, etype=2) / p
-                bcl = bm.zeros_like(bc)
+                bcl = bm.zeros_like(bc, dtype=self.ftype, device=self.device)
                 bcl = bm.set_at(bcl , (slice(None), 0) , 2 * bc[:, 2])
                 bcl = bm.set_at(bcl , (slice(None), 1) , bc[:, 0])
                 bcl = bm.set_at(bcl , (slice(None), 2) , bc[:, 1] - bc[:, 2])
  
-                bcr = bm.zeros_like(bc)
+                bcr = bm.zeros_like(bc,dtype=self.ftype, device=self.device)
                 bar = bm.set_at(bcr , (slice(None), 0) , 2 * bc[:, 1])
                 bar = bm.set_at(bcr , (slice(None), 1) , bc[:, 2] - bc[:, 1])
                 bar = bm.set_at(bcr , (slice(None), 2) , bc[:, 0])
@@ -777,7 +777,7 @@ class TriangleMesh(SimplexMesh, Plotable):
 
                 phi = self.shape_function(bcr, p=p)  # (NQ, ldof)
 
-                value = bm.add_at(value , lidx , bm.einsum('ci, qi->cq', value[ridx, :], phi))
+                value = bm.index_add(value , lidx , bm.einsum('ci, qi->cq', value[ridx, :], phi))
                 value = bm.set_at(value , lidx , 0.5 * value[lidx])
                 options['data'] = bm.set_at(options['data'],key , value[isKeepCell])
 
@@ -788,7 +788,8 @@ class TriangleMesh(SimplexMesh, Plotable):
         self.node = node[~isGoodNode]
 
         NN = self.node.shape[0]
-        idxMap = bm.set_at(idxMap , ~isGoodNode , bm.arange(NN))
+        arange = bm.arange(NN, dtype=self.itype, device=self.device)
+        idxMap = bm.set_at(idxMap , ~isGoodNode , arange)
         cell = idxMap[cell]
 
         self.cell = cell
@@ -1629,6 +1630,24 @@ class TriangleMesh(SimplexMesh, Plotable):
             ax = fig.add_subplot(111, projection='3d')
             mesh.add_plot(ax)
             plt.show()
+        return mesh
+    
+    @classmethod
+    def from_medit(cls,file):
+        '''
+        Read medit format file (.mesh) to create triangle mesh.
+        Parameters:
+            file (str): Path to the medit format file.
+        Returns:
+            TriangleMesh: An instance of TriangleMesh created from the medit
+            file.
+        '''
+        import meshio
+        data = meshio.read(file)
+        node = bm.from_numpy(data.points)
+        cell = bm.from_numpy(data.cells_dict['triangle'])
+
+        mesh = cls(node, cell)
         return mesh
 
     @classmethod

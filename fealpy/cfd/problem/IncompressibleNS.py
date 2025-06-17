@@ -35,7 +35,7 @@ class Channel:
     
     @cartesian
     def is_p_boundary(self, p):
-        tag_left = bm.abs(p[..., 0]) < self.eps
+        tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
         tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
         return tag_left | tag_right
 

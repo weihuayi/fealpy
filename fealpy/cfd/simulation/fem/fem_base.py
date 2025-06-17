@@ -158,7 +158,7 @@ class FEM:
             if quadrature_order is not None:
                 updates['quadrature_order'] = quadrature_order
             self._parent.params.update(assembly=updates)
-            self.q = self._parent.params.assembly['quadrature_order']
+            self._parent._q = self._parent.params.assembly['quadrature_order']
             return self
 
 

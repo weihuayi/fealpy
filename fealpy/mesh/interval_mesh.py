@@ -1,13 +1,13 @@
-from typing import Union, Optional, Sequence, Tuple, Any
-from ..backend import backend_manager as bm
-from ..typing import TensorLike , Index, _S,_int_func
+from typing import Union
+
 from .. import logger
-from scipy.sparse import coo_matrix
+from ..backend import backend_manager as bm
+from ..typing import TensorLike , Index, _S
+from ..sparse import coo_matrix, csr_matrix
 from .mesh_data_structure import MeshDS
 from .utils import estr2dim
 from .plot import Plotable
 from .mesh_base import SimplexMesh
-from fealpy.sparse import coo_matrix,csr_matrix
 
 
 class IntervalMeshDataStructure(MeshDS):
@@ -48,9 +48,6 @@ class IntervalMesh(SimplexMesh,Plotable):
 
         self.construct()
         self.face2cell = self.face_to_cell()
-
-
-
 
     def ref_cell_measure(self):
         return 1.0
@@ -103,7 +100,6 @@ class IntervalMesh(SimplexMesh,Plotable):
         """
         @brief 生成从 p0 元到 p1 元的延拓矩阵，假定 0 < p0 < p1
         """
-        
         assert 0 < p0 < p1
 
         TD = self.top_dimension()
@@ -633,7 +629,6 @@ class IntervalMesh(SimplexMesh,Plotable):
         logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
                     f"faces, {NN} nodes "
                     f"on device ?")
-
+'''
 
 IntervalMesh.set_ploter('1d')
-'''

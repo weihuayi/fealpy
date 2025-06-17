@@ -8,7 +8,7 @@ from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import linear_integral
-from .integrator import LinearInt, SrcInt, CellInt, enable_cache, assemblymethod
+from .integrator import LinearInt, enable_cache
 
 class HuZhangDisplacementBoundaryConditionIntegrator(LinearInt): 
     r"""The domain source integrator for function spaces based on homogeneous meshes."""

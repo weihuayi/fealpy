@@ -9,3 +9,4 @@ from .manager import BackendManager
 from .base import TensorLike, Size, Number
 
 backend_manager = BackendManager(default_backend='numpy')
+bm = backend_manager

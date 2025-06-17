@@ -1,5 +1,5 @@
 from fealpy.backend import backend_manager as bm
-from .sph.particle_kernel_function_new import QuinticKernel, CubicSplineKernel, QuadraticKernel, WendlandC2Kernel, QuinticWendlandKernel
+from .particle_kernel_function_new import QuinticKernel, CubicSplineKernel, QuadraticKernel, WendlandC2Kernel, QuinticWendlandKernel
 from fealpy.mesh.node_mesh import Space
 
 class SPHParameters:
@@ -69,45 +69,6 @@ class Kernel:
             raise ValueError(f"未知的核函数类型: {self.ktype}")
         self.kernel_func = self._registry[self.ktype](self.h, self.dim)
 
-    def compute_kernel(self, node_self, neighbors, r, box_size):
-        """
-        计算核函数值和梯度
-        参数:
-            node_self: 自身节点的索引
-            neighbors: 邻居节点的索引
-            r: 所有节点的坐标
-            box_size: 模拟区域的尺寸
-        返回:
-            w_dist: 核函数值
-            grad_w_dist: 核函数梯度
-        """
-        EPS = bm.finfo(float).eps
-
-        if self.use_space and self.space is not None:
-            # 当 space=True 时，使用周期边界计算距离
-            displacement, shift = self.space.periodic(side=box_size)
-
-            r_i_s, r_j_s = r[neighbors], r[node_self]
-            dr_i_j = bm.vmap(displacement)(r_i_s, r_j_s)
-            dist = self.space.distance(dr_i_j)
-            w_dist = bm.vmap(self.kernel_func.value)(dist)
-
-            e_s = dr_i_j / (dist[:, None] + EPS)  # 单位向量 (dr/dx, dr/dy)
-            grad_w_dist_norm = bm.vmap(self.kernel_func.grad_value)(dist)
-            grad_w_dist = grad_w_dist_norm[:, None] * e_s
-        else:
-            # 当 space=False 时，使用欧几里得距离
-            r_i_s, r_j_s = r[node_self], r[neighbors]
-            dr_i_j = r_i_s - r_j_s
-            dist = bm.linalg.norm(dr_i_j, axis=1)
-            w_dist = bm.vmap(self.kernel_func.value)(dist)
-
-            e_s = dr_i_j / (dist[:, None] + EPS)
-            grad_w_dist_norm = bm.vmap(self.kernel_func.grad_value)(dist)
-            grad_w_dist = grad_w_dist_norm[:, None] * e_s
-
-        return w_dist, grad_w_dist, dr_i_j, dist, grad_w_dist_norm
-
     @classmethod
     def create(cls, kinfo):
         """根据参数字典创建核函数实例"""
@@ -117,42 +78,52 @@ class Kernel:
             raise ValueError(f"Unknown kernel type: {ktype}")
         return cls._registry[ktype](h)
 
-class QueryPoint:
-    """封装的邻近搜索功能类"""
-    def __init__(self, mesh, radius=None, box_size=None, mask_self=True, periodic=[False, False, False]):
-        if mesh is None:
-            raise ValueError("Mesh must be provided")
-    
-        self.mesh = mesh
-        self.pos = mesh.nodedata["position"]
-        self.dim = self.pos.shape[1]
-        self.dx = mesh.nodedata["dx"]
+    def compute_displacement(self, node_self, neighbors, r, box_size):
+        """计算位移差向量"""
+        if self.use_space and self.space is not None:
+            displacement, shift = self.space.periodic(side=box_size)
+            r_i_s, r_j_s = r[neighbors], r[node_self]
+            dr = bm.vmap(displacement)(r_i_s, r_j_s)
+        else:
+            r_i_s, r_j_s = r[node_self], r[neighbors]
+            dr = r_i_s - r_j_s
+        return dr
 
-        self.radius = radius if radius is not None else 3 * self.dx
-        self.box_size = box_size if box_size is not None else self.pos.max(axis=0)
-        #self.periodic = self._check_periodic(periodic)
-        self.periodic = periodic
-        self.mask_self = mask_self
+    def compute_distance(self, node_self, neighbors, r, box_size):
+        """计算节点间的距离"""
+        dr = self.compute_displacement(node_self, neighbors, r, box_size)
+        
+        if self.use_space and self.space is not None:
+            return self.space.distance(dr)
+        else:
+            return bm.linalg.norm(dr, axis=1)
 
-    def query_point(self, other_pos=None):
-        """执行邻近搜索，返回 node_self 和 neighbors"""
-        if other_pos is None:
-            other_pos = self.pos
-        return bm.query_point(self.pos, other_pos, self.radius, self.box_size, self.mask_self, self.periodic)
+    def compute_kernel_value(self, node_self, neighbors, r, box_size):
+        """计算核函数值"""
+        dist = self.compute_distance(node_self, neighbors, r, box_size)
+        return bm.vmap(self.kernel_func.value)(dist)
 
-
+    def compute_kernel_gradient(self, node_self, neighbors, r, box_size):
+        """计算核函数梯度"""
+        dist = self.compute_distance(node_self, neighbors, r, box_size)
+        dr = self.compute_displacement(node_self, neighbors, r, box_size)
+        
+        EPS = bm.finfo(float).eps
+        e = dr / (dist[:, None] + EPS)  # 单位向量
+        grad_norm = bm.vmap(self.kernel_func.grad_value)(dist)
+        grad = grad_norm[:, None] * e
+        return grad, grad_norm
 
 class SPHQueryKernel:
-    """整合邻近搜索和核函数计算的功能类"""
-    def __init__(self, mesh, radius=None, box_size=None, kernel_info=None, periodic=[False, False, False]):
+    def __init__(self, mesh, radius=None, box_size=None, mask_self=True, kernel_info=None, periodic=[False, False, False]):
         """
-        初始化邻近搜索和核函数计算
         参数:
             mesh: 网格对象
             radius: 邻近搜索半径，默认为3*dx
             box_size: 模拟区域尺寸，默认为坐标最大值
             kernel_info: 核函数参数字典，默认为quintic核
             periodic: 周期性边界条件，默认为[False, False, False]
+            mask_self: 是否屏蔽自身节点，默认为True
         """
         if mesh is None:
             raise ValueError("Mesh object must be provided.")
@@ -161,36 +132,48 @@ class SPHQueryKernel:
         self.dx = mesh.nodedata["dx"]
         self.pos = mesh.nodedata["position"]
         self.dim = self.pos.shape[1]
-
-        # 初始化邻近搜索
-        self.query = QueryPoint(
-            mesh=mesh,
-            radius=radius if radius is not None else 3 * self.dx,
-            box_size=box_size if box_size is not None else self.pos.max(axis=0),
-            mask_self=True,
-            periodic=periodic
-        )
+        self.radius = radius if radius is not None else 3 * self.dx
+        self.box_size = box_size if box_size is not None else self.pos.max(axis=0)
+        self.periodic = periodic
+        self.mask_self = mask_self
 
         # 初始化核函数
         if kernel_info is None:
             kernel_info = {'type': 'quintic', 'h': self.dx, 'space': True}
         self.kernel = Kernel(kernel_info, dim=self.dim)
 
-    def compute(self):
-        """
-        执行邻近搜索并计算核函数值和梯度
-        返回:
-            node_self: 自身节点索引
-            neighbors: 邻居节点索引
-            w_dist: 核函数值
-            grad_w_dist: 核函数梯度
-        """
+    def find_node(self, other_pos=None, device=None):
+        """执行邻近搜索，返回 node_self 和 neighbors"""
+        pos_cpu = self.pos
+        other_cpu = other_pos if other_pos is not None else self.pos
+
+        # 保存原始 GPU 数据
+        pos_gpu = self.pos
+        other_gpu = other_pos
+
+        if device == 'gpu':
+            # 转为 CPU 数据类型
+            pos_cpu = pos_gpu.cpu().numpy() if hasattr(pos_gpu, "cpu") else pos_gpu
+            other_cpu = other_gpu.cpu().numpy() if (other_gpu is not None and hasattr(other_gpu, "cpu")) else other_cpu
+
+        elif device not in {None, 'cpu'}:
+            raise NotImplementedError("Unsupported device: only 'cpu' and 'gpu' are supported.")
+
         # 执行邻近搜索
-        node_self, neighbors = self.query.query_point()
+        node_self, neighbors = bm.query_point(pos_cpu, other_cpu, self.radius, self.box_size, self.mask_self, self.periodic)
 
-        # 计算核函数值和梯度
-        w_dist, grad_w_dist, dr_i_j, dist, dw_norm = self.kernel.compute_kernel(
-            node_self, neighbors, self.pos, self.query.box_size
-        )
+        # 恢复 self.pos 和 other_pos 为 GPU
+        if device == 'gpu':
+            self.pos = pos_gpu
+            if other_pos is not None:
+                other_pos = other_gpu
 
-        return node_self, neighbors, w_dist, grad_w_dist, dr_i_j, dist, dw_norm
+        return node_self, neighbors
+
+    def compute_kernel_value(self, node_self, neighbors):
+        """计算核函数值"""
+        return self.kernel.compute_kernel_value(node_self, neighbors, self.pos, self.box_size)
+
+    def compute_kernel_gradient(self, node_self, neighbors):
+        """计算核函数梯度"""
+        return self.kernel.compute_kernel_gradient(node_self, neighbors, self.pos, self.box_size)
