@@ -46,8 +46,12 @@ class SinExpData1D:
 
     @cartesian
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
-        """Compute spatial gradient of solution at time t."""
-        x = p[..., 0]
+        """
+        Compute the gradient of the solution.
+        Note: If the PDE model is one-dimensional, the tensor returned by 
+        the gradient computation should match the shape of the input tensor p.
+        """
+        x = p
         return 4 * bm.pi * bm.cos(4 * bm.pi * x) * bm.exp(-10 * t)
 
     @cartesian

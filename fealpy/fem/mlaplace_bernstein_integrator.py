@@ -22,9 +22,8 @@ class MLaplaceBernsteinIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, m: int=2,coef: Optional[CoefLike]=None, q:
             Optional[int]=None, *,
                  index: Index=_S,
-                 batched: bool=False,
-                 method: Optional[str]=None) -> None:
-        super().__init__(method=method)
+                 batched: bool=False) -> None:
+        super().__init__()
         self.m = m
         self.coef = coef
         self.q = q

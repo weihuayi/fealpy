@@ -17,11 +17,12 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
                  region: Optional[TensorLike] = None,
                  batched: bool = False,
                  method: Literal['fast', 'nonlinear', 'isopara', None] = None) -> None:
-        super().__init__(method=method)
+        super().__init__()
         self.coef = coef
         self.q = q
         self.set_region(region)
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS, /, indices=None) -> TensorLike:
@@ -129,7 +130,3 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         gphi = space.grad_basis(bcs, index=index, variable='x')
         A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d) * coef
         return A
-
-    @assembly.selector
-    def assembly(self):
-        return self.method

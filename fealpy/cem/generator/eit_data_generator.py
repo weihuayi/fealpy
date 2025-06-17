@@ -105,18 +105,23 @@ class EITDataGenerator():
         # NOTE: The value measured on the node is actually 'current', not the
         # 'current density'. We assume the the current measured by the electric
         # node is the integral of the current density function.
-        lform = LinearForm(self.space, batch_size=batch_size)
-        self._bsi.gn = gn_source
-        self._bsi.batched = (batch_size > 0)
-        self._bsi.clear()
-        lform.add_integrator(self._bsi)
-        b_ = lform.assembly()
+        if callable(gn_source):
+            lform = LinearForm(self.space, batch_size=batch_size)
+            self._bsi.gn = gn_source
+            self._bsi.batched = (batch_size > 0)
+            self._bsi.clear()
+            lform.add_integrator(self._bsi)
+            b_ = lform.assembly()
+            kwargs = bm.context(b_)
+            current = b_[..., self._bd_node_index]
+        else:
+            current = gn_source
+            kwargs = bm.context(current)
+            b_ = bm.zeros((gn_source.shape[0], self.gdof))
+            b_ = bm.set_at(b_, (slice(None), self._bd_node_index), current)
 
         if zero_integral:
             b_ = b_ - bm.mean(b_, axis=0)
-
-        current = b_[..., self._bd_node_index]
-        kwargs = bm.context(b_)
 
         if b_.ndim == 1:
             ZERO = bm.zeros((1,), **kwargs)

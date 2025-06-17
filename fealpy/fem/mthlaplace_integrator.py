@@ -21,12 +21,13 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
-        super().__init__(method=method)
+        super().__init__()
         self.m = m
         self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -88,8 +89,3 @@ class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
         #import numpy as np
         #np.save('Mcn8.npy', M)
         return M
-
-    @assembly.selector
-    def assembly(self):
-        return self.method
-

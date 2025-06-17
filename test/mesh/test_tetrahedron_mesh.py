@@ -338,6 +338,17 @@ class TestTetrahedronMeshInterfaces:
         cell = mesh.cell
         np.testing.assert_array_equal(bm.to_numpy(cell), data["cell"])
 
+    @pytest.mark.parametrize("backend", ["numpy", "pytorch", "jax"])
+    def test_class_method(self, backend):
+        bm.set_backend(backend)
+
+        r1 = 0.05
+        r2 = 0.5
+        h = 0.04
+        mesh = TetrahedronMesh.from_spherical_shell(r1, r2, h)
+
+        # mesh.to_vtk(f"test_spherical_shell_{h}.vtu")
+
 if __name__ == "__main__":
     #pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_init"])
     pytest.main(["./test_tetrahedron_mesh.py", "-k", "test_from_one_tetrahedron"])
