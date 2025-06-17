@@ -39,31 +39,28 @@ class EllipticMixedFEMModel(ComputationalModel):
     -------
     run(maxit=4)
         Execute the complete FEM solution process and return the numerical solutions of the primary and auxiliary variables.
-    init_mesh()
+    set_init_mesh()
         Initialize and generate the 2D triangle mesh.
     linear_system()
-        Assemble the linear system (stiffness matrix and right-hand side) for the elliptic RT FEM.
-    boundary_apply()
+        Assemble the linear system (stiffness matrix and right-hand side) for the elliptic mixed FEM.
+    apply_bc()
         Apply boundary conditions to the linear system.
     solve()
         Solve the linear system and return the FEM solutions of the primary and auxiliary variables.
-    show_mesh()
-        Visualize the current mesh structure.
-    error()
+    postprocess()
         Compute the error between the numerical and exact solutions.
 
     Notes
     -----
-    This class uses a mixed finite element method (Raviart-Thomas space and piecewise constant space),
+    This class uses a mixed finite element method (Raviart-Thomas space and Lagrange space),
     suitable for elliptic problems with flux continuity requirements.
     It supports automatic boundary condition handling and error evaluation for algorithm verification and numerical experiments.
 
     Examples
     --------
-    >>> model = EllipticRTFEMModel()
-    >>> p, u = model.run()
-    >>> error_p, error_u = model.error()
-    >>> model.show_mesh()
+    >>> model = EllipticMixedFEMModel()
+    >>> model.run()
+    >>> error_u, error_p = model.postprocess()
     """
 
     def __init__(self):
