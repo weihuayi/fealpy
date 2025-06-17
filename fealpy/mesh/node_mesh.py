@@ -5,6 +5,7 @@ from ..typing import TensorLike, Index, _S
 from .. import logger
 from .mesh_base import MeshDS 
 from fealpy.backend import TensorLike
+from scipy.spatial import cKDTree
 
 # Types
 Box = TensorLike
@@ -149,6 +150,8 @@ class NodeMesh(MeshDS):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
+            "dx": dx,
+            
         }
 
         return cls(r, nodedata=nodedata) 
@@ -219,6 +222,7 @@ class NodeMesh(MeshDS):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
+            "dx": dx,
         }
 
         return cls(r, nodedata=nodedata)
@@ -279,6 +283,7 @@ class NodeMesh(MeshDS):
             "mass": mass,
             "mu": bm.zeros_like(rho),
             "drdt": bm.zeros_like(r),
+            "dx": dx,
         }
         return cls(r, nodedata=nodedata)
 
@@ -345,6 +350,7 @@ class NodeMesh(MeshDS):
             "mass": mass,
             "mu": bm.zeros_like(rho),
             "drdt": bm.zeros_like(r),
+            "dx": dx,
         }
         return cls(r, nodedata=nodedata)
 
@@ -444,3 +450,54 @@ class Space:
     def safe_mask(self, mask, fn, operand, placeholder=0):
         masked = bm.where(mask, operand, 0)
         return bm.where(mask, fn(masked), placeholder)
+
+class NeighborManager():
+    @staticmethod
+    def wall_virtual(position, tag):
+        """Neighbor relationship between solid wall particles and virtual particles"""
+        vir_r = position[tag == 2]
+        wall_r = position[tag == 1]
+        tree = cKDTree(wall_r)
+        distance, neighbors = tree.query(vir_r, k=1)
+        
+        fuild_len = len(position[tag == 0]) 
+        neighbors = neighbors + fuild_len
+        node_self = bm.where(tag == 2)[0]
+        return node_self, neighbors
+
+    @staticmethod
+    def fuild_fwvg(state, node_self, neighbors, dr_i_j, dist, w_dist, grad_w_dist):
+        """Neighbor relations among fluid particles, solid wall particles, and virtual particles"""
+        tag = state["tag"]
+        wvg_tag = bm.where((tag == 1) | (tag == 2) | (tag == 3))[0]
+        wvg_indx = bm.where(bm.isin(node_self, wvg_tag))[0] 
+        wvg_mask = bm.ones(len(node_self), dtype=bm.bool)
+        wvg_mask = bm.set_at(wvg_mask, wvg_indx, False)
+        f_node = node_self[wvg_mask]
+        neighbors = neighbors[wvg_mask]
+        dr_i_j = dr_i_j[wvg_mask]
+        dist = dist[wvg_mask]
+        w_dist = w_dist[wvg_mask]
+        grad_w_dist = grad_w_dist[wvg_mask]
+        return f_node, neighbors, dr_i_j, dist, w_dist, grad_w_dist
+
+    @staticmethod
+    def wall_fg(state, node_self, neighbors, w_dist):
+        """Neighbor relationship between fluid particles and solid wall particles"""
+        tag = state["tag"]
+        fvg_tag = bm.where((tag == 0) | (tag == 2) | (tag == 3))[0]
+        fvg_indx = bm.where(bm.isin(node_self, fvg_tag))[0]
+        fvg_mask = bm.ones(len(node_self), dtype=bm.bool)
+        fvg_mask = bm.set_at(fvg_mask, fvg_indx, False)
+        w_node = node_self[fvg_mask]
+        fwvg_neighbors = neighbors[fvg_mask]
+        w_dist = w_dist[fvg_mask]
+
+        wv_tag = bm.where((tag == 1) | (tag == 2))[0]
+        wv_indx = bm.where(bm.isin(fwvg_neighbors, wv_tag))[0]
+        wv_mask = bm.ones(len(fwvg_neighbors), dtype=bm.bool)
+        wv_mask = bm.set_at(wv_mask, wv_indx, False)
+        w_node = w_node[wv_mask]
+        fg_neighbors = fwvg_neighbors[wv_mask]
+        w_dist = w_dist[wv_mask]
+        return w_node, fg_neighbors, w_dist

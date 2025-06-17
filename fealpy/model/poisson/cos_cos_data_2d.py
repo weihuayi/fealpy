@@ -1,5 +1,5 @@
-
 from typing import Sequence
+from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
@@ -28,7 +28,8 @@ class CosCosData2D():
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [-1., 1., -1., 1.]
-
+    
+    @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
         x, y = p[..., 0], p[..., 1]
@@ -36,6 +37,7 @@ class CosCosData2D():
         val = bm.cos(pi*x)*bm.cos(pi*y)
         return val # val.shape == x.shape
 
+    @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute gradient of solution."""
         x, y = p[..., 0], p[..., 1]
@@ -45,6 +47,7 @@ class CosCosData2D():
             -pi*bm.cos(pi*x)*bm.sin(pi*y)), axis=-1)
         return val # val.shape == p.shape
 
+    @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
         x, y = p[..., 0], p[..., 1]
@@ -52,10 +55,12 @@ class CosCosData2D():
         val = 2*pi*pi*bm.cos(pi*x)*bm.cos(pi*y)
         return val
 
+    @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition"""
         return self.solution(p)
     
+    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""        
         x, y = p[..., 0], p[..., 1]
