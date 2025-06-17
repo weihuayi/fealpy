@@ -10,9 +10,11 @@ from .plot import Plotable
 
 class EdgeMesh(SimplexMesh, Plotable):
     """
-    One-dimensional edge element mesh class for representing and manipulating simple element meshes composed of nodes and edges.
-    EdgeMesh is mainly used for 1D structures (such as trusses, beams, etc.) in finite element analysis, providing geometric information, interpolation point generation, edge length and tangent calculation, etc.
-    This class inherits from SimplexMesh and Plotable, supporting visualization and basic mesh operations.
+    A class for 1D edge element meshes in finite element analysis.
+
+    EdgeMesh represents and manipulates simple element meshes composed of nodes and edges, primarily used for 1D structures like trusses and beams. 
+    It provides geometric information, interpolation point generation, edge length and tangent calculations, and supports visualization and basic mesh operations. 
+    This class inherits from SimplexMesh and Plotable, enabling advanced mesh functionalities and visualization capabilities.
 
     Parameters
     node : TensorLike

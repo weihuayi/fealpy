@@ -13,8 +13,15 @@ import matplotlib.pyplot as plt
 
 class BeamFEMModel(ComputationalModel):
     """
-    1D beam finite element model for solving static problems of beam structures.
-    This class implements a finite element method (FEM) solver for the static analysis of 1D beams, suitable for force and deformation analysis. By specifying material parameters, section properties, and loads, it automatically constructs the finite element mesh, assembles the stiffness matrix and load vector, and solves for the displacement field. It relies on PDEDataManager for physical parameters and boundary conditions, making it suitable for teaching, research, and preliminary engineering analysis.
+    BeamFEMModel is a finite element model for solving static problems of beam structures.
+
+    This class implements a finite element method (FEM) solver for the static analysis of beams, 
+    suitable for force and deformation analysis. By specifying material parameters, 
+    section properties, and loads, it automatically constructs the finite element mesh, 
+    assembles the stiffness matrix and load vector, and solves for the displacement field. 
+    It relies on PDEDataManager for physical parameters and boundary conditions, 
+    making it suitable for teaching, research, and preliminary engineering analysis.
+    
     Parameters
         example : str, optional, default='beam2d'
             Selects a preset beam problem example for initializing PDE parameters and mesh.
@@ -45,7 +52,7 @@ class BeamFEMModel(ComputationalModel):
         Supports custom loads and boundary conditions for various beam problems.
         Depends on external finite element spaces, integrators, and linear solvers.
     Examples
-        >>> model = PoissonFDMModel(example='beam2d')
+        >>> model = BeamFEMModel(example='beam2d')
         >>> displacement = model.run()
         >>> print(displacement)
         [0.0, 0.0012, 0.0023, ...]
