@@ -1,128 +1,127 @@
-from typing import Any, Dict, Tuple, TypeVar, Callable
+from typing import List, Optional
+import inspect
+import logging
 
-_F = TypeVar('_F', bound=Callable[..., Any])
+from fealpy.logs import TqdmLoggingHandler
+from fealpy.decorator.variantmethod import Variantmethod
 
 
-class CMMeta(type):
-    """
-    Metaclass that automatically registers methods decorated with @register decorator.
+__all__ = ['ComputationalModel', ]
+_PK = inspect._ParameterKind
 
-    When a new class inheriting from ComputationalModel is defined,
-    methods marked with the @register decorator are automatically registered
-    under specified API namespaces.
 
-    Attributes:
-        _api_registry (Dict[str, Dict[str, Any]]): 
-            A dictionary mapping API namespaces to their registered methods.
+class ComputationalModel:
+    def __init__(self, pbar_log=False, log_level="WARNING"):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.propagate = False
+        self.logger.setLevel(log_level)
 
-    Parameters:
-        name (str):
-            The name of the class being created.
-        bases (Tuple[type, ...]):
-            Base classes of the new class.
-        mdict (Dict[str, Any]):
-            Class namespace dictionary.
-
-    Returns:
-        type: The newly created class.
-
-    Raises:
-        ValueError: If a method with the same call_name is already registered in the given api_name.
-    """
-    def __init__(
-        self, 
-        name: str, 
-        bases: Tuple[type, ...], 
-        mdict: Dict[str, Any], /,
-        **kwds: Any
-    ):
-        super().__init__(name, bases, mdict, **kwds)
-        self._api_registry: Dict[str, Dict[str, Any]] = {}
-
-        for meth_name, meth in mdict.items():
-            if self.is_valid_callable(meth):
-                api_name = getattr(meth, '__api_name__')
-                call_name = getattr(meth, '__call_name__')
-
-                if api_name not in self._api_registry:
-                    self._api_registry[api_name] = {}
-
-                api_map = self._api_registry[api_name]
-
-                if call_name in api_map:
-                    raise ValueError(
-                        f"Method '{call_name}' already registered under API '{api_name}'."
-                    )
-
-                api_map[call_name] = meth
+        if pbar_log:
+            self.logger.addHandler(TqdmLoggingHandler())
+        else:
+            from fealpy.logs import handler
+            self.logger.addHandler(handler)
 
     @staticmethod
-    def is_valid_callable(meth: Any) -> bool:
-        """
-        Determine if a method is valid for registration.
+    def _get_func_params(func):
+        """Make function signature"""
+        sig = inspect.signature(func)
+        params = []
+        prev_kind = None
 
-        A valid method must:
-            - be callable.
-            - have '__call_name__' and '__api_name__' attributes.
+        for name, param in sig.parameters.items():
+            kind = param.kind
+            # Insert '/' for positional-only, '*' for keyword-only
+            if prev_kind is not None:
+                if prev_kind == _PK.POSITIONAL_ONLY and kind != _PK.POSITIONAL_ONLY:
+                    params.append('/')
+                if prev_kind != _PK.KEYWORD_ONLY and kind == _PK.KEYWORD_ONLY:
+                    params.append('*')
+            elif kind == _PK.KEYWORD_ONLY:
+                params.append('*')
+            # Format parameter
+            if param.default is param.empty:
+                if kind == _PK.VAR_POSITIONAL:
+                    params.append(f'*{name}')
+                elif kind == _PK.VAR_KEYWORD:
+                    params.append(f'**{name}')
+                else:
+                    params.append(name)
+            else:
+                params.append(f"{name}={param.default!r}")
+            prev_kind = kind
+        # Add '/' if the last parameter is positional-only
+        if params and list(sig.parameters.values())[-1].kind == _PK.POSITIONAL_ONLY:
+            params.append('/')
+        # Remove duplicate '/' or '*' if present
+        result = []
+        for i, p in enumerate(params):
+            if i > 0 and p in ('/', '*') and params[i-1] == p:
+                continue
+            result.append(p)
+        return '(' + ', '.join(result) + ')'
+
+    @classmethod
+    def _help_impl(cls, attr_name: str, show_docs=True, full_docs=False, show_params=True):
+        attr = getattr(cls, attr_name, None)
+
+        if isinstance(attr, Variantmethod):
+            var_list = []
+            default_key = attr.default_key
+            func = attr.__func__
+
+            for var in attr.virtual_table.keys():
+                if var == default_key:
+                    var_list.append(str(var) + '*')
+                else:
+                    var_list.append(str(var))
+
+            header = f'{attr_name} [{" | ".join(var_list)}]'
+        elif callable(attr):
+            func = attr
+            header = attr_name
+        else:
+            return None
+
+        if show_params:
+            header += " " + cls._get_func_params(func)
+
+        if show_docs:
+            doc = func.__doc__
+            if doc is None:
+                doc = 'No description'
+            elif full_docs:
+                doc = doc.strip()
+            else:
+                doc = doc.split('\n')[0].strip()
+
+            return header + '\n    ' + doc
+        else:
+            return header + '\n'
+
+    @classmethod
+    def help(cls, name: Optional[str] = None, /, show_docs=True, full_docs=False, show_params=True):
+        """Return a help string for the class.
 
         Parameters:
-            meth (Any): Method to be checked.
+            name (str | None, optional): The name of the attribute to get help for.
+                If None, returns help for all attributes.
+            show_docs (bool, optional): Whether to include the documentation in the help string.
+            full_docs (bool, optional): If True, shows the full documentation;
+                otherwise, shows a brief description (the first line).
+            show_params (bool, optional): Whether to include function parameters in the help string.
 
         Returns:
-            bool: True if valid, False otherwise.
+            A string containing the help information for the class or the specified attribute.
         """
-        return (
-            callable(meth) and
-            hasattr(meth, '__call_name__') and
-            hasattr(meth, '__api_name__')
-        )
+        if name is None:
+            attr_info: List[str] = []
 
+            for attr_name in (s for s in dir(cls) if not s.startswith('_')):
+                info = cls._help_impl(attr_name, show_docs, full_docs, show_params)
+                if info is not None:
+                    attr_info.append(info)
 
-class CModelBase(metaclass=CMMeta):
-    """
-    Base class for computational models.
-
-    Inherit from this class to enable automatic registration of methods
-    using the @mregister decorator.
-    """
-
-    def get_registered_method(self, api_name: str, call_name: str) -> Callable:
-        """
-        Retrieve a registered method by API namespace and call name.
-
-        Parameters:
-            api_name (str): API namespace of the method.
-            call_name (str): Call name of the method.
-
-        Returns:
-            Callable: The registered method.
-
-        Raises:
-            KeyError: If no method is registered under the given api_name and call_name.
-        """
-        method_name = self._api_registry[api_name][call_name]
-        return getattr(self, method_name)
-
-
-def mregister(call_name: str, api_name: str) -> Callable[[_F], _F]:
-    """
-    Decorator to mark methods for automatic registration by the ComputationalModel metaclass.
-
-    Parameters:
-        call_name (str): Unique identifier for the method.
-        api_name (str): API namespace under which the method is registered.
-
-    Example:
-        @mregister(call_name='solve', api_name='solver')
-        def solve_method(self):
-            pass
-    """
-    def decorator(meth: _F) -> _F:
-        meth.__call_name__ = call_name
-        meth.__api_name__ = api_name
-        return meth
-    return decorator
-
-
-class ComputationalModel(CModelBase):
-    pass
+            return '\n\n'.join(attr_info)
+        else:
+            return cls._help_impl(name, show_docs, full_docs, show_params)
