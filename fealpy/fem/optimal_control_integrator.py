@@ -24,13 +24,11 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
                  method: Optional[str]=None) -> None:
         """
         OPCIntegrator: Optimal Control Problem Cell Integrator
-
         This class implements a cell integrator for optimal control problems in the finite element method (FEM).
         It is designed to assemble local matrices or vectors on mesh cells, supporting custom coefficients,
         quadrature order, and batched processing for efficient numerical integration.
 
         Parameters
-        ----------
         coef : Optional[CoefLike], optional
             Coefficient(s) used in the integrand, by default None.
         q : Optional[int], optional
@@ -43,7 +41,6 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
             Method of operation, defaults to 'assembly' if not provided.
 
         Attributes
-        ----------
         coef : Optional[CoefLike]
             Coefficient(s) used in the computation.
         q : Optional[int]
@@ -56,7 +53,6 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
             Method of operation, either provided or defaulted to 'assembly'.
 
         Notes
-        -----
         The `method` parameter defaults to 'assembly' if not explicitly specified.
         This class is intended for use in optimal control FEM assembly routines,
         supporting flexible integration strategies and efficient batched computation.
@@ -74,18 +70,32 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
     
     
     def transform_subtriangle_points(self, quad_points):
-        """
-        将每个小三角形的积分点转换到原大三角形的全局坐标中。
-        
-        参数:
-            quad_points (ndarray): 小三角形的积分点数组，形状为(NQ, 3)，使用重心坐标。
-            
-        返回:
-            global_quad_points (ndarray): 大三角形中的全局积分点数组，形状为(3*NQ, 3)。
-            subtri1 (ndarray): 第一个小三角形的全局积分点，形状为(NQ, 3)。
-            subtri2 (ndarray): 第二个小三角形的全局积分点，形状为(NQ, 3)。
-            subtri3 (ndarray): 第三个小三角形的全局积分点，形状为(NQ, 3)。
-        """
+        '''
+        Transform quadrature points from subtriangles to the global coordinates of the original triangle.
+        This function maps the quadrature points defined in the barycentric coordinates of each subtriangle
+        (obtained by subdividing the original triangle) to the barycentric coordinates of the original triangle.
+        It applies a specific affine transformation for each subtriangle and returns the transformed points.
+        Parameters
+        quad_points : ndarray
+            Quadrature points in the barycentric coordinates of the subtriangle, shape (NQ, 3).
+        Returns
+        global_quad_points : ndarray
+            Quadrature points in the barycentric coordinates of the original triangle, shape (3*NQ, 3).
+        subtri1 : ndarray
+            Transformed quadrature points for the first subtriangle, shape (NQ, 3).
+        subtri2 : ndarray
+            Transformed quadrature points for the second subtriangle, shape (NQ, 3).
+        subtri3 : ndarray
+            Transformed quadrature points for the third subtriangle, shape (NQ, 3).
+        Notes
+        The transformation is performed using predefined matrices for each subtriangle, corresponding to
+        the subdivision of the original triangle along its edges.
+        Examples
+        >>> quad_points = np.array([[1/3, 1/3, 1/3]])
+        >>> global_quad_points, subtri1, subtri2, subtri3 = transform_subtriangle_points(quad_points)
+        >>> print(global_quad_points.shape)
+        (3, 3)
+        '''
         # 定义变换矩阵
         # 第0条边
         M0 = bm.array([

@@ -11,12 +11,10 @@ class OptimalControlData():
     The exact solution is constructed to satisfy homogeneous Neumann boundary conditions.
 
     Parameters
-    ----------
     c : float, optional, default=1
         Problem parameter used in the source term and expected state.
 
     Attributes
-    ----------
     c : float
         Problem parameter.
     manager : object
@@ -37,7 +35,6 @@ class OptimalControlData():
         Divergence of flux and adjoint flux.
 
     Methods
-    -------
     domain()
         Return the computational domain.
     y_solution(space)
@@ -56,12 +53,10 @@ class OptimalControlData():
         Evaluate the desired state at given points.
 
     Notes
-    -----
     The problem is defined on [0, 1] x [0, 1] with variable coefficients and homogeneous Neumann boundary conditions.
     The class is designed for use with the FEALPy finite element library.
 
     Examples
-    --------
     >>> example = Example1(c=1)
     >>> import numpy as np
     >>> pts = np.array([[0.5, 0.5]])
@@ -78,16 +73,13 @@ class OptimalControlData():
         and precomputes the source term and desired state for the PDE optimal control problem.
 
         Parameters
-        ----------
         c : float, optional, default=1
             Problem parameter used in the source term and expected state.
 
         Returns
-        -------
         None
 
         Notes
-        -----
         The symbolic expressions are constructed using sympy for later numerical evaluation.
         """
         '''

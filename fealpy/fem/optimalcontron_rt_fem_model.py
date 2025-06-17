@@ -24,7 +24,6 @@ class OPCRTFEMModel(ComputationalModel):
     solution routines, and error analysis.
 
     Parameters
-    ----------
     mesh : TriangleMesh
         The 2D triangle mesh object used for finite element discretization.
     c : float
@@ -34,14 +33,12 @@ class OPCRTFEMModel(ComputationalModel):
         If None, a built-in example problem is used.
 
     Attributes
-    ----------
     pde : OPCPDEDataT
         The current optimal control PDE data object, including coefficients, source terms, and boundary conditions.
     mesh : TriangleMesh
         The current 2D triangle mesh object used for finite element discretization.
 
     Methods
-    -------
     run()
         Execute the FEM solution process and return the numerical solutions of the state and control variables.
     space()
@@ -60,13 +57,11 @@ class OPCRTFEMModel(ComputationalModel):
         Compute the maximum error between the numerical and exact solutions.
 
     Notes
-    -----
     This class uses a mixed finite element method (Raviart-Thomas space and piecewise constant space),
     suitable for optimal control problems with flux continuity and state-control coupling.
     It supports automatic boundary condition handling and error evaluation for algorithm verification and numerical experiments.
 
     Examples
-    --------
     >>> model = OPCRTFEMModel(mesh, c)
     >>> p, u = model.run()
     >>> error_y, error_p = model.L2_error(y, p, exact_y, exact_p)

@@ -17,47 +17,43 @@ from fealpy.fem.integrator import (
 
 
 class OPCSIntegrator(LinearInt, OpInt, CellInt):
-    '''
-    OPCRTFEMModel: Optimal Control Problem Raviart-Thomas Finite Element Model
+    """
+    OPCSIntegrator: Optimal Control Source Integrator
 
-    This integrator is designed for assembling the source term in optimal control problems
-    using the Raviart-Thomas finite element method (RT FEM) on 2D triangular meshes.
-    It supports custom source functions, quadrature order selection, and efficient
-    integration over sub-triangles for accurate flux and state-control coupling.
+    Assembles the source term for optimal control problems on 2D triangular meshes,
+    suitable for finite element methods such as Raviart-Thomas elements.
+    Supports custom source functions, selectable quadrature order, and achieves
+    high-accuracy source assembly via integration over sub-triangles.
 
     Parameters
     ----------
     source : CoefLike, optional
-        The source term function or tensor for the optimal control problem.
+        The source function or tensor for the optimal control problem.
     q : int, optional
-        The quadrature order for numerical integration. If None, a default based on
-        the polynomial degree is used.
+        Quadrature order. If None, it is automatically chosen based on the polynomial degree.
     index : Index, optional
-        The cell indices to assemble over. Default is all cells.
+        Indices of the cells to assemble. Defaults to all cells.
     batched : bool, optional
         Whether to use batched assembly for performance.
     method : str, optional
-        The assembly method. Default is 'assembly'.
+        Assembly method, default is 'assembly'.
 
     Methods
     -------
     to_global_dof(space)
-        Map local cell degrees of freedom to global degrees of freedom.
-    find_min_component_indices(coords)
-        Find indices of minimum components in coordinate arrays.
+        Maps local cell degrees of freedom to global degrees of freedom.
     transform_subtriangle_points(quad_points)
-        Transform quadrature points from sub-triangles to the global triangle.
+        Transforms barycentric quadrature points of sub-triangles to global coordinates of the original triangle.
     fetch(space)
-        Prepare quadrature points, weights, basis functions, and cell measures.
+        Generates quadrature points, weights, basis functions, and cell measures for assembly.
     assembly(space)
-        Assemble the global source vector for the optimal control problem.
+        Assembles the global source vector for the optimal control problem.
 
     Notes
     -----
-    This integrator is intended for use in optimal control PDE solvers that require
-    accurate source term integration in mixed FEM settings, particularly with
-    Raviart-Thomas elements.
-    '''
+    This integrator is suitable for high-accuracy source integration in optimal control PDE finite element solvers,
+    especially for mixed elements such as Raviart-Thomas.
+    """
     def __init__(self, source: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
@@ -74,18 +70,32 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
         return space.cell_to_dof()[self.index]
     
     def transform_subtriangle_points(self, quad_points):
-        """
-        将每个小三角形的积分点转换到原大三角形的全局坐标中。
-        
-        参数:
-            quad_points (ndarray): 小三角形的积分点数组，形状为(NQ, 3)，使用重心坐标。
-            
-        返回:
-            global_quad_points (ndarray): 大三角形中的全局积分点数组，形状为(3*NQ, 3)。
-            subtri1 (ndarray): 第一个小三角形的全局积分点，形状为(NQ, 3)。
-            subtri2 (ndarray): 第二个小三角形的全局积分点，形状为(NQ, 3)。
-            subtri3 (ndarray): 第三个小三角形的全局积分点，形状为(NQ, 3)。
-        """
+        '''
+        Transform quadrature points from subtriangles to the global coordinates of the original triangle.
+        This function maps the quadrature points defined in the barycentric coordinates of each subtriangle
+        (obtained by subdividing the original triangle) to the barycentric coordinates of the original triangle.
+        It applies a specific affine transformation for each subtriangle and returns the transformed points.
+        Parameters
+        quad_points : ndarray
+            Quadrature points in the barycentric coordinates of the subtriangle, shape (NQ, 3).
+        Returns
+        global_quad_points : ndarray
+            Quadrature points in the barycentric coordinates of the original triangle, shape (3*NQ, 3).
+        subtri1 : ndarray
+            Transformed quadrature points for the first subtriangle, shape (NQ, 3).
+        subtri2 : ndarray
+            Transformed quadrature points for the second subtriangle, shape (NQ, 3).
+        subtri3 : ndarray
+            Transformed quadrature points for the third subtriangle, shape (NQ, 3).
+        Notes
+        The transformation is performed using predefined matrices for each subtriangle, corresponding to
+        the subdivision of the original triangle along its edges.
+        Examples
+        >>> quad_points = np.array([[1/3, 1/3, 1/3]])
+        >>> global_quad_points, subtri1, subtri2, subtri3 = transform_subtriangle_points(quad_points)
+        >>> print(global_quad_points.shape)
+        (3, 3)
+        '''
         # 定义变换矩阵
         # 第0条边
         M0 = bm.array([
@@ -120,6 +130,37 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
     
     @enable_cache
     def fetch(self, space: _FS):
+        '''
+        Fetch the necessary data for assembly, including quadrature points, weights,
+        basis functions, and cell measures.
+        Parameters
+        space : _FS
+            The function space on which the integrator operates.
+        Returns
+        bcs : TensorLike
+            Barycentric coordinates of the quadrature points.
+        global_points : TensorLike     
+            Global coordinates of the quadrature points transformed from subtriangles.
+        ws : TensorLike
+            Weights of the quadrature points.
+        phi_dual : TensorLike   
+            Basis functions evaluated at the quadrature points.
+        cm : TensorLike 
+            Cell measures for the integration.
+        index : Index   
+            Indices of the cells to assemble.
+        Notes   
+        This method retrieves the quadrature points, weights, and basis functions
+        for the given function space, specifically designed for optimal control problems
+        on homogeneous meshes. It supports high-order quadrature and transforms
+        barycentric coordinates of sub-triangles to the global coordinates of the original triangle.
+        Raises
+        RuntimeError
+        If the mesh is not homogeneous, as this integrator is designed for homogeneous meshes only.
+        Examples
+        >>> integrator = OPCSIntegrator(source=my_source, q=4)
+        >>> bcs, global_points, ws, phi_dual, cm, index = integrator.fetch(my_function_space)
+        '''
         q = self.q
         index = self.index
         mesh = getattr(space, 'mesh', None)
@@ -149,6 +190,24 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
     
     
     def assembly(self,  space: _FS) -> TensorLike:
+        '''
+        Assemble the global source vector for the optimal control problem.
+        Parameters
+        space : _FS
+            The function space on which the integrator operates.
+        Returns
+        result : TensorLike
+            The assembled source vector, shape (number_of_global_dofs,).
+        Notes
+        This method computes the source term for optimal control problems by integrating
+        the source function over the mesh using the quadrature points and weights.
+        It supports both scalar and tensor source functions, and handles the assembly
+        using the dual basis functions for Raviart-Thomas elements.
+        If the source function is a scalar, it computes the integral over the mesh
+        using the dual basis functions and the cell measures. If the source function
+        is a tensor, it computes the integral using the dual basis functions and
+        the cell measures, applying the appropriate tensor operations.
+        '''
         f = self.source
         mesh = getattr(space, 'mesh', None)
         bcs, global_points, ws, phi_dual, cm, index = self.fetch(space)
