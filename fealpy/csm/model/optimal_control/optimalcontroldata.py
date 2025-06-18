@@ -1,5 +1,7 @@
+from typing import Sequence
+from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
-from fealpy.decorator import cartesian
+from fealpy.backend import TensorLike
 import sympy as sp
 
 class OptimalControlData():
@@ -149,28 +151,57 @@ class OptimalControlData():
         
         # 计算期望状态 y_d
         self.y_d = self.y-self.c*self.z - self.div_q
+        
+    def geo_dimension(self) -> int:
+        """
+        Return the geometric dimension of the problem.
+
+        Returns
+        -------
+        int
+            The geometric dimension, which is 2 for this problem.
+        """
+        return 2
 
     @cartesian
     def domain(self):
         return [0, 1, 0, 1]
     
+    @variantmethod('tri')
+    def init_mesh(self, nx=10, ny=10):
+        from fealpy.mesh import TriangleMesh
+        d = self.domain()
+        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
+        return mesh
+    
+    @init_mesh.register('quad')
+    def init_mesh(self, nx=10, ny=10):
+        from fealpy.mesh import QuadrangleMesh
+        d = self.domain()
+        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
+        return mesh
+    
     @cartesian
     def y_solution(self, space):
+        """ Compute the exact solution y at given points in space."""
         result = sp.lambdify([self.x1, self.x2], self.y, self.manager)
         return result(space[...,0], space[...,1])
     
     @cartesian
     def z_solution(self, space):
+        """ Compute the exact solution z at given points in space."""
         result = sp.lambdify([self.x1, self.x2], self.z, self.manager)
         return result(space[...,0], space[...,1])
     
     @cartesian
     def u_solution(self, space):
+        """ Compute the control u at given points in space."""
         result = sp.lambdify([self.x1, self.x2], self.u, self.manager)
         return result(space[...,0], space[...,1])
     
     @cartesian
     def p_solution(self, space):
+        """ Compute the flux p at given points in space."""
         x = space[..., 0]
         y = space[..., 1]
         result = bm.zeros_like(space)
@@ -182,6 +213,7 @@ class OptimalControlData():
     
     @cartesian
     def q_solution(self, space):
+        """ Compute the adjoint flux q at given points in space."""
         # q = -p
         return -self.p_solution(space)
     
@@ -192,6 +224,7 @@ class OptimalControlData():
     
     @cartesian
     def A_matirx(self, space): 
+        """ Compute the coefficient matrix A at given points in space."""
         x = space[..., 0]
         y = space[..., 1]
         result = bm.zeros(space.shape[:-1]+(2,2)) 
@@ -201,6 +234,7 @@ class OptimalControlData():
     
     @cartesian
     def A_inverse(self, space):
+        """ Compute the inverse of the coefficient matrix A at given points in space."""
         x = space[..., 0]
         y = space[..., 1]
         result = bm.zeros(space.shape[:-1]+(2,2)) 
@@ -209,12 +243,8 @@ class OptimalControlData():
         return result 
     
     @cartesian
-    def f_u(self, space, u, index=None):
-        f_fun = self.f_fun(space, index)
-        return f_fun + u
-    
-    @cartesian
     def f_fun(self, space, index=None):
+        """ Compute the source term f at given points in space."""
         result = sp.lambdify([self.x1, self.x2], self.f, self.manager) 
         return result(space[...,0], space[...,1])
     
@@ -228,7 +258,7 @@ class OptimalControlData():
         return result(space[...,0], space[...,1])
     
     @cartesian
-    def y_d_fun(self, space):
+    def yd_fun(self, space):
         result = sp.lambdify([self.x1, self.x2], self.y_d, self.manager) 
         return result(space[...,0], space[...,1])
     

@@ -33,6 +33,14 @@ class CosCosData():
         mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
         return mesh
     
+    @init_mesh.register('dis')
+    def init_mesh(self):
+        from fealpy.mesh import TriangleMesh
+        vertices = [[0, 0], [1, 0], [1, 1], [0, 1]]
+        h= 0.1
+        mesh = TriangleMesh.from_polygon_gmsh(vertices=vertices, h=h)
+        return mesh
+    
     @init_mesh.register('quad')
     def init_mesh(self, nx=10, ny=10):
         from fealpy.mesh import QuadrangleMesh

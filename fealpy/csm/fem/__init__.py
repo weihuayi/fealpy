@@ -8,4 +8,4 @@ from .optimal_control_integrator import OPCIntegrator
 ### Model Operator
 from .beam_fem_model import BeamFEMModel
 from .elliptic_rt_mfem_model import EllipticMixedFEMModel
-from .optimalcontron_rt_fem_model import OPCRTFEMModel
+from .optimal_contron_rt_mfem_model import OPCMixedFEMModel

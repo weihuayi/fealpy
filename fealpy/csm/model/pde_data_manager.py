@@ -38,7 +38,7 @@ class PDEDataManager:
     """
 
     _registry = {
-        "opc": "fealpy.csm.model.optimal_control",
+        "optimal_control": "fealpy.csm.model.optimal_control",
         "elliptic": "fealpy.csm.model.elliptic",
         
     }

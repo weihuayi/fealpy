@@ -75,6 +75,7 @@ class EllipticMixedFEMModel(ComputationalModel):
         else:
             self.pde = pde
             
+    @variantmethod("tri")
     def set_init_mesh(self, meshtype: str = "tri", **kwargs):
         self.mesh = self.pde.init_mesh[meshtype](**kwargs)
 
@@ -83,6 +84,17 @@ class EllipticMixedFEMModel(ComputationalModel):
         NF = self.mesh.number_of_faces()
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+        
+    @set_init_mesh.register("dis")
+    def set_init_mesh(self,meshtype: str = "dis", **kwargs):
+        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+        
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        NF = self.mesh.number_of_faces()
+        NC = self.mesh.number_of_cells()
+        self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+        
         
     def set_order(self, p: int = 1):    
         self.p = p
