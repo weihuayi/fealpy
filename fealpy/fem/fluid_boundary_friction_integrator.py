@@ -46,7 +46,6 @@ class FluidBoundaryFrictionIntegrator(LinearInt, OpInt, FaceInt):
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
         index = self.make_index(space)
-        result1 = space.face_to_dof(index=index) 
         tag = space.mesh.face2cell[index,0]
         result2 = space.cell_to_dof()[tag]
         return (result2, result2) 

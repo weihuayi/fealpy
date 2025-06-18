@@ -11,15 +11,12 @@ from fealpy.functionspace.space import FunctionSpace as _FS
 class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     """
     Short Description
-    -----------------
     BeamDiffusionIntegrator assembles and manages the diffusion (stiffness) matrix for beam elements in a finite element space.
 
     Detailed Description
-    --------------------
     This class supports different types of beam elements ('pure', '2d', '3d') and precomputes relevant stiffness coefficients for efficient finite element analysis. It is designed for structural mechanics applications involving beam modeling and analysis.
 
     Parameters
-    ----------
     space : object
         The finite element space object defining element DOFs and interpolation functions.
     beam_type : str
@@ -44,7 +41,6 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         Assembly method, default is 'assembly'.
 
     Attributes
-    ----------
     space : object
         The finite element space object.
     type : str
@@ -69,18 +65,15 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         Torsional stiffness (for 3d beams).
 
     Methods
-    -------
     to_global_dof(space)
         Maps local DOFs to global DOFs.
     assembly(space)
         Assembles the element stiffness matrix for the specified beam type.
 
     Notes
-    -----
     Required parameters depend on the beam type. The class automatically checks and computes necessary stiffness coefficients during initialization.
 
     Examples
-    --------
     >>> integrator = BeamDiffusionIntegrator(space, '2d', E=210e9, l=[1.0, 1.0], A=0.01, I=1e-6)
     >>> print(integrator.EA)
     >>> print(integrator.EI)
@@ -146,23 +139,19 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         matrices for all elements using block matrix operations.
 
         Parameters
-        ----------
         self : object
             The object containing beam element parameters, with attributes E (Young's modulus),
             I (moment of inertia), and l (element length), all as 1D arrays of shape (NC,), where NC is the number of elements.
 
         Returns
-        -------
         Ke : ndarray
             The pure bending beam element stiffness matrix, shape (NC, 4, 4), with each element corresponding to a (4, 4) matrix.
 
         Raises
-        ------
         AssertionError
             Raised if self.I is None, indicating that moment of inertia I must be provided for pure bending beams.
 
         Notes
-        -----
         The stiffness matrix is derived from Euler-Bernoulli beam theory and is suitable for small deformation linear elastic analysis.
         """
         assert self.I is not None, "纯弯梁需要提供 I"
@@ -205,20 +194,16 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         beam elements and efficiently assembles the stiffness matrices for all elements
         using block matrix operations.
         Parameters
-        ----------
         self : object
             The object containing beam element parameters, with attributes E (Young's modulus),
             A (cross-sectional area), I (moment of inertia), and l (element length), all as 1D arrays of shape (NC,), where NC is the number of elements.
         Returns
-        -------
         Ke : ndarray
             The 2D beam element stiffness matrix, shape (NC, 6, 6), with each element corresponding to a (6, 6) matrix.
         Raises
-        ------
         AssertionError
             Raised if self.A or self.I is None, indicating that cross-sectional area A and moment of inertia I must be provided for 2D beams.
         Notes
-        -----
         The stiffness matrix is derived from Euler-Bernoulli beam theory and is suitable for small deformation linear elastic analysis.
         """
         assert self.A is not None and self.I is not None, "二维梁需要提供 A 和 I"
@@ -248,22 +233,18 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         and efficiently assembles the stiffness matrices for all elements
         using block matrix operations.
         Parameters
-        ----------
         self : object
             The object containing beam element parameters, with attributes E (Young's modulus),
             A (cross-sectional area), Iy (moment of inertia about y-axis), Iz (moment of inertia about z-axis),
             G (shear modulus), J (torsional constant), and l (element length), all as 1D arrays of shape (NC,), where NC is the number of elements.
         Returns
-        -------
         Ke : ndarray
             The 3D beam element stiffness matrix, shape (NC, 12, 12), with each element corresponding to a (12, 12) matrix.
         Raises
-        ------
         AssertionError
             Raised if self.A, self.Iy, self.Iz, self.G, or self.J is None, indicating that cross-sectional area A,
             moments of inertia Iy and Iz, shear modulus G, and torsional constant J must be provided for 3D beams.
         Notes
-        -----
         The stiffness matrix is derived from Euler-Bernoulli beam theory and is suitable for small deformation linear elastic analysis.
         """
         assert all(v is not None for v in [self.A, self.Iy, self.Iz, self.G, self.J]), "三维梁需要提供 A, Iy, Iz, G, J"

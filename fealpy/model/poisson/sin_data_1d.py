@@ -1,4 +1,5 @@
 from typing import Sequence
+from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
@@ -28,6 +29,7 @@ class SinData1D:
         """Return the computational domain [xmin, xmax]."""
         return [0.0, 1.0]
 
+    @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
         x = p[..., 0]
@@ -35,13 +37,19 @@ class SinData1D:
         val = bm.sin(pi * x)
         return val
 
+    @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
-        """Compute gradient of solution."""
-        x = p[..., 0]
+        """
+        Compute the gradient of the solution.
+        Note: If the PDE model is one-dimensional, the tensor returned by 
+        the gradient computation should match the shape of the input tensor p.
+        """
+        x = p
         pi = bm.pi
         val = pi * bm.cos(pi * x)
         return val
 
+    @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
         x = p[..., 0]
@@ -49,10 +57,12 @@ class SinData1D:
         val = pi**2 * bm.sin(pi * x)
         return val
 
+    @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition"""
         return self.solution(p)
 
+    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x = p

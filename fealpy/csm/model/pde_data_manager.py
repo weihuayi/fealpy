@@ -38,7 +38,9 @@ class PDEDataManager:
     """
 
     _registry = {
-        "beam": "fealpy.csm.model.beam",
+        "optimal_control": "fealpy.csm.model.optimal_control",
+        "elliptic": "fealpy.csm.model.elliptic",
+        
     }
 
     def __init__(self, pde_type: str = None):

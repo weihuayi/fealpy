@@ -17,64 +17,89 @@ class EdgeMesh(SimplexMesh, Plotable):
     This class inherits from SimplexMesh and Plotable, enabling advanced mesh functionalities and visualization capabilities.
 
     Parameters
-        node : TensorLike
-            A tensor representing the coordinates of the mesh nodes.
-            Each row corresponds to a node in the mesh, with columns representing spatial dimensions.
-        cell : TensorLike
-            A tensor representing the connectivity of the mesh cells (edges).
-            Each row corresponds to an edge, defined by indices of its two endpoint nodes.
+    node : TensorLike
+        Array of node coordinates, shape (num_nodes, geo_dimension).
+    cell : TensorLike
+        Array of element connectivity, shape (num_cells, 2), each row represents the indices of the two endpoints of an edge.
+
     Attributes
-        node : TensorLike
-            The coordinates of the mesh nodes.
-        cell : TensorLike
-            The connectivity of the mesh cells (edges).
-        nodedata : dict
-            A dictionary to store additional data associated with nodes.
-        facedata : dict 
-            A dictionary to store additional data associated with faces (not applicable for 1D meshes).
-        celldata : dict
-            A dictionary to store additional data associated with cells (edges).
-        edgedata : dict
-            A dictionary to store additional data associated with edges.
-        meshdata : dict
-            A dictionary to store additional mesh-related data, such as boundary conditions and loads.
-        cell_length : callable
-            A method to compute the length of edges (cells) in the mesh.
-        cell_tangent : callable
-            A method to compute the tangent vectors of edges (cells) in the mesh.
+    node : TensorLike
+        Node coordinate array.
+    cell : TensorLike
+        Element connectivity array.
+    nodedata : dict
+        Dictionary for node-related data.
+    facedata : dict
+        Dictionary for face-related data (shared with nodedata).
+    celldata : dict
+        Dictionary for cell-related data.
+    edgedata : dict
+        Dictionary for edge-related data (shared with celldata).
+    meshdata : dict
+        Dictionary for mesh-level data.
+    cell_length : callable
+        Method to compute the length of elements (edges).
+    cell_tangent : callable
+        Method to compute the tangent vector of elements (edges).
+
     Methods
-        cell_to_ipoint(p: int, index: Index=_S) -> TensorLike
-            Get the interpolation point indices for the specified cell order and index.
-        face2cell() -> TensorLike
-            Return mapping from faces to cells (edges).
-        ref_cell_measure() -> float
-            Return the measure (length) of the reference cell (edge).
-        ref_face_measure() -> float
-            Return the measure of the reference face (edge).
-        quadrature_formula(q: int, etype: Union[str, int]='cell') -> GaussLegendreQuadrature
-            Return the Gaussian quadrature formula for the specified order and entity type.
-        edge_tangent(index=None) -> TensorLike
-            Compute the tangent vector of edges.
-        edge_length(index=None) -> TensorLike
-            Compute the length of edges.
-        entity_measure(etype: Union[int, str]='cell', index=None, node=None) -> TensorLike
-            Compute the measure (length or placeholder) of a specified mesh entity.
-        grad_lambda(index=None) -> TensorLike
-            Compute the derivatives of barycentric coordinate functions for edges.
-        number_of_local_ipoints(p: int, iptype: Union[int, str]='cell') -> int
-            Return the number of local interpolation points for the specified order and entity type.
-        number_of_global_ipoints(p: int) -> int
-            Return the number of global interpolation points for the specified order.
-        interpolation_points(p: int, index=None) -> TensorLike
-            Return the coordinates of interpolation points for the specified order and index.
-        face_unit_normal(index=None, node=None) -> TensorLike
-            Compute the unit normal vector of faces (not applicable for 1D meshes).
-        cell_normal(index=None, node=None) -> TensorLike
-            Compute the normal vector of elements (in 2D, not applicable for 1D meshes).
-    Notes
-        This class is specifically designed for 1D edge meshes and does not support higher-dimensional entities like faces or volumes.
-        The methods provided are tailored for edge-based finite element analysis, focusing on edge lengths, tangents, and interpolation points.
-        The class can be used to generate standard edge meshes, such as those found in truss or beam structures.
+    cell_to_ipoint(p, index)
+        Return interpolation point coordinates on the element.
+    face2cell
+        Return mapping from nodes to elements.
+    ref_cell_measure()
+        Return the measure (length) of the reference element.
+    ref_face_measure()
+        Return the measure of the reference face.
+    quadrature_formula(q, etype)
+        Return the Gaussian quadrature formula of specified order.
+    edge_tangent(index)
+        Compute the tangent vector of edges.
+    edge_length(index)
+        Compute the length of edges.
+    entity_measure(etype, index, node)
+        Return the measure of the specified entity type.
+    grad_lambda(index)
+        Compute the derivatives of barycentric coordinate functions.
+    number_of_local_ipoints(p, iptype)
+        Return the number of local interpolation points.
+    number_of_global_ipoints(p)
+        Return the number of global interpolation points.
+    interpolation_points(p, index)
+        Return the coordinates of interpolation points.
+    face_unit_normal(index, node)
+        Compute the unit normal vector of faces (nodes) (not implemented).
+    cell_normal(index, node)
+        Compute the normal vector of elements (in 2D).
+    from_triangle_mesh(mesh)
+        Generate edge mesh from triangle mesh (not implemented).
+    from_tetrahedron_mesh(mesh)
+        Generate edge mesh from tetrahedron mesh (not implemented).
+    from_tower()
+        Generate edge mesh for tower structure.
+    from_four_bar_mesh()
+        Generate edge mesh for four-bar mechanism.
+    generate_balcony_truss_mesh()
+        Generate edge mesh for balcony truss structure.
+    from_simple_3d_truss()
+        Generate edge mesh for simple 3D truss.
+    generate_cantilevered_mesh()
+        Generate edge mesh for cantilever beam structure.
+    generate_tri_beam_frame_mesh()
+        Generate edge mesh for tri-beam frame structure.
+    plane_frame()
+        Generate edge mesh for plane frame structure.
+
+    Notes    
+    This class is suitable for finite element modeling of 1D structures and supports rapid generation of various typical structures.
+    Some methods depend on external libraries (such as bm), and some advanced features need to be implemented in subclasses or externally.
+
+    Examples
+    >>> node = bm.tensor([[0, 0], [1, 0], [2, 0]], dtype=bm.float64)
+    >>> cell = bm.tensor([[0, 1], [1, 2]], dtype=bm.int_)
+    >>> mesh = EdgeMesh(node, cell)
+    >>> print(mesh.cell_length())
+    [1.0, 1.0]
     """
     def __init__(self, node, cell):
         super().__init__(TD=1, itype=cell.dtype, ftype=node.dtype)
@@ -133,11 +158,9 @@ class EdgeMesh(SimplexMesh, Plotable):
         This function returns the measure of the reference cell used in the mesh, 
         which is typically 1.0 for a standardized reference edge.
         Returns
-        -------
         measure : float
             The measure (length) of the reference cell. For a reference edge, this is 1.0.
         Notes
-        -----
         This value is used for scaling and integration over the reference cell in finite element computations.
         """
         return 1.0
@@ -148,11 +171,9 @@ class EdgeMesh(SimplexMesh, Plotable):
         This function returns the measure of the reference face used in the mesh,
         which is typically 1.0 for a standardized reference edge.
         Returns
-        -------
         measure : float
             The measure of the reference face. For a reference edge, this is 1.0.
         Notes
-        -----
         This value is used for scaling and integration over the reference face in finite element computations.
         """
         return 0.0
@@ -161,18 +182,15 @@ class EdgeMesh(SimplexMesh, Plotable):
         """
         Return the Gaussian quadrature formula for the specified order and entity type.
         Parameters
-        ----------
         q : int
             The order of the quadrature formula.
             etype : Union[str, int], optional
             The type of entity for which the quadrature formula is defined. 
             Default is 'cell', which refers to the cell (edge) entity.
         Returns
-        -------
         quadrature : GaussLegendreQuadrature
             An instance of GaussLegendreQuadrature representing the quadrature formula for the specified order and entity type.
         Notes
-        -----
         This method is used to obtain the quadrature points and weights for numerical integration over the specified entity type.
         If etype is 'cell', it returns the quadrature formula for the edge elements.
         """
@@ -188,17 +206,14 @@ class EdgeMesh(SimplexMesh, Plotable):
         to the second node of each edge.
 
         Parameters
-        ----------
         index : optional
             Indices of the edges for which to compute the tangent vectors. If None, computes for all edges.
 
         Returns
-        -------
         tangent : TensorLike
             An array of tangent vectors for the specified edges. Shape: (num_edges, geo_dimension).
 
         Notes
-        -----
         The tangent vector is useful for geometric computations and finite element formulations
         involving edge orientation.
         """
@@ -212,15 +227,12 @@ class EdgeMesh(SimplexMesh, Plotable):
         This method calculates the lengths of the specified edges in the mesh.
         The length is computed as the Euclidean distance between the two nodes of each edge.
         Parameters
-        ----------
         index : optional
             Indices of the edges for which to compute the lengths. If None, computes for all edges.
         Returns
-        -------
         length : TensorLike
             An array of lengths for the specified edges. Shape: (num_edges,).
         Notes
-        -----
         The edge length is used in finite element analysis for scaling and integration purposes.
         """
         edge = self.entity('edge', index=index)
@@ -232,7 +244,6 @@ class EdgeMesh(SimplexMesh, Plotable):
         Compute the measure (length or placeholder) of a specified mesh entity.
         This function returns the measure of a given entity type in the mesh, such as cell (edge) or node (face). For cells/edges, it returns their length. For nodes/faces, it returns a tensor with value 0.0 as a placeholder.
         Parameters
-        ----------
         etype : int or str, optional, default='cell'
             The type of entity whose measure is to be computed. Supported values are 1, 'cell', 'edge' for edges/cells, and 0, 'face', 'node' for nodes/faces.
         index : array-like or None, optional, default=None
@@ -240,18 +251,14 @@ class EdgeMesh(SimplexMesh, Plotable):
         node : array-like or None, optional, default=None
             Node information, if required by the implementation. Default is None.
         Returns
-        -------
         measure : tensor
             The measure of the specified entity type. For cells/edges, returns their length as a tensor. For nodes/faces, returns a tensor with value 0.0.
         Raises
-        ------
         ValueError
             If the provided entity type `etype` is not recognized.
         Notes
-        -----
         The function distinguishes between edge/cell and node/face types. For unsupported types, an exception is raised.
         Examples
-        --------
         >>> mesh.entity_measure('cell')
         tensor([...])  # Lengths of all cells/edges
         >>> mesh.entity_measure('node')
@@ -270,16 +277,13 @@ class EdgeMesh(SimplexMesh, Plotable):
         This method calculates the derivatives of the barycentric coordinate functions for the edges of the mesh.
         The barycentric coordinates are used to interpolate values along the edges of the mesh.
         Parameters
-        ----------
         index : optional
             Indices of the edges for which to compute the derivatives. If None, computes for all edges.
         Returns
-        -------
         Dlambda : TensorLike
             An array of shape (num_edges, 2, geo_dimension) containing the derivatives of the barycentric coordinate functions for each edge.
             The first dimension corresponds to the two nodes of the edge, and the second dimension corresponds to the spatial dimensions.
         Notes
-        -----
         The barycentric coordinates are defined such that they are linear functions of the position along the edge.
         The derivatives are computed as the difference between the coordinates of the two nodes of each edge, normalized by the length of the edge.
         """
@@ -298,7 +302,6 @@ class EdgeMesh(SimplexMesh, Plotable):
         """
         Return the number of local interpolation points for the specified order and entity type.
         Parameters
-        ----------
         p : int
             The order of the interpolation points.
         iptype : int or str, optional, default='cell'
@@ -306,19 +309,15 @@ class EdgeMesh(SimplexMesh, Plotable):
             The type of entity for which the interpolation points are defined.
             Supported values are 1, 'cell', 'edge' for edges/cells, and 0, 'face', 'node' for nodes/faces.
         Returns
-        -------
         n_ipoints : int
             The number of local interpolation points for the specified order and entity type.
         Raises
-        ------
         ValueError
             If the provided entity type `iptype` is not recognized.
         Notes
-        -----
         The function distinguishes between edge/cell and node/face types. For edges/cells, it returns p+1, indicating the number of interpolation points along the edge.
         For nodes/faces, it returns 1, indicating a single interpolation point at the node.
         Examples
-        --------
         >>> mesh.number_of_local_ipoints(1, 'cell')
         2
         """
@@ -328,15 +327,12 @@ class EdgeMesh(SimplexMesh, Plotable):
         """
         Return the number of global interpolation points for the specified order.
         Parameters
-        ----------
         p : int
             The order of the interpolation points.
         Returns
-        -------
         n_ipoints : int
             The total number of global interpolation points for the specified order.
         Notes
-        -----
         The total number of global interpolation points is calculated as the sum of the number of nodes and the additional interpolation points introduced by the order p.
         For a 1D edge mesh, this is given by the formula:
         n_ipoints = number_of_nodes + (p - 1) * number_of_cells
@@ -350,17 +346,14 @@ class EdgeMesh(SimplexMesh, Plotable):
         """
         Return the coordinates of interpolation points for the specified order and index.
         Parameters
-        ----------
         p : int
             The order of the interpolation points.
         index : optional
             Indices of the cells for which to compute the interpolation points. If None, computes for all cells.
         Returns
-        -------
         ipoint : TensorLike
             An array of shape (n_ipoints, geo_dimension) containing the coordinates of the interpolation points.
         Notes
-        -----
         For a 1D edge mesh, if p = 1, it returns the coordinates of the nodes.
         If p > 1, it computes additional interpolation points along the edges based on the specified order.
         The interpolation points are computed as a linear combination of the node coordinates, where the coefficients are determined by the order p.
@@ -391,15 +384,12 @@ class EdgeMesh(SimplexMesh, Plotable):
         Compute the unit normal vector of faces (nodes).
         This method is not implemented for 1D edge meshes, as edges do not have a well-defined normal vector in the same way that faces in higher dimensions do.
         Parameters
-        ----------
         index : optional
             Indices of the faces for which to compute the normal vectors. If None, computes for all faces.
         node : optional
             Node information, if required by the implementation. Default is None.
         Returns
-        -------
         Raises
-        ------
         NotImplementedError
         This method raises a NotImplementedError because edges do not have a normal vector in 1D.
         """
@@ -410,18 +400,15 @@ class EdgeMesh(SimplexMesh, Plotable):
         Compute the normal vector of elements (in 2D).
         This method computes the normal vector for edges in a 2D context by taking the tangent vector of the edge and rotating it by 90 degrees.
         Parameters
-        ----------
         index : optional
             Indices of the edges for which to compute the normal vectors. If None, computes for all edges.
         node : optional
             Node information, if required by the implementation. Default is None.
         Returns
-        -------
         normal : TensorLike
             An array of shape (num_edges, geo_dimension) containing the normal vectors for the specified edges.
             The normal vectors are computed by rotating the tangent vectors by 90 degrees in the 2D plane.
         Notes
-        -----
         This method assumes that the mesh is 2D and that the edges are represented as line segments in the plane.
         The normal vector is computed by taking the tangent vector of the edge and applying a rotation matrix to obtain the perpendicular direction.
         The rotation matrix used is:
@@ -432,6 +419,61 @@ class EdgeMesh(SimplexMesh, Plotable):
         v = self.cell_tangent(index=index)
         w = bm.tensor([(0, -1),(1, 0)],dtype=self.ftype)
         return v@w
+    
+    def vtk_cell_type(self):
+        VTK_LINE = 3
+        return VTK_LINE
+    
+    def to_vtk(self, fname=None, etype='edge', index:Index=_S):
+        """
+        Convert the edge mesh to VTK format and optionally write to a file.
+        This method prepares the mesh data for visualization in VTK format, including node coordinates and cell connectivity.
+        Parameters
+        fname : str, optional
+            The name of the output file to write the VTK data. If None, returns the data without writing to a file.
+        etype : str, optional, default='edge'
+            The type of entity to convert to VTK format. Default is 'edge', which refers to the edges of the mesh.
+        index : Index, optional, default=_S
+            Indices of the entities to include in the VTK output. If None, includes all entities of the specified type.
+        Returns
+        node : TensorLike
+            An array of node coordinates, shape (num_nodes, geo_dimension).
+        cell : TensorLike
+            An array of cell connectivity, shape (num_cells, NV).
+        cellType : int  
+            The VTK cell type for the edges, which is typically 3 for line segments.
+        NC : int    
+            The number of cells (edges) in the mesh.
+        Notes
+        If `fname` is provided, the method writes the mesh data to a VTK file using the `write_to_vtu` function.
+        If `fname` is None, it returns the node coordinates, cell connectivity, cell type, and number of cells without writing to a file.
+        This method is useful for exporting the mesh for visualization in VTK-compatible software, such as ParaView or VisIt.
+        Examples
+        >>> mesh.to_vtk('mesh.vtu')
+        This will write the mesh data to a file named 'mesh.vtu'.
+        """
+        from fealpy.mesh.vtk_extent import  write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD < 3:
+            node = bm.concatenate((node, bm.zeros((node.shape[0], 3-GD), dtype=bm.float64)), axis=1)
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell[:, 0] = NV
+
+        cellType = self.vtk_cell_type()  # segment
+        if fname is None:
+            return node, cell.flatten(), cellType, NC
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
     
     ## @ingroup MeshGenerators
     @classmethod
