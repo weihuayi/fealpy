@@ -21,7 +21,7 @@ from fealpy.csm.fem import OPCMixedFEMModel
 from fealpy.decorator import barycentric, cartesian
 model = OPCMixedFEMModel()
 model.set_pde()
-model.set_init_mesh(nx=20, ny=20)
+model.set_init_mesh(nx=40, ny=40)
 model.set_order(p=0)
 maxit = 20  # Maximum number of iterations for the optimization process
 space1,space2 = model.set_space(p=0)
@@ -47,7 +47,7 @@ for i in range(maxit):
     A, b_forward = model.apply_bc(A, b_forward, gd=pde.y_solution)
     xh[:] = model.solve(A, b_forward)
     p1[:] = xh[:pdof]
-    u1[:] = xh[pdof:]
+    y1[:] = xh[pdof:]
     @barycentric
     def coef_p(bcs, index=None):
         result = - p1(bcs, index)
