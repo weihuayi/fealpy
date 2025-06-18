@@ -14,7 +14,6 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
     - 3D beam: 6 DOFs/node [u, v, w, theta_x, theta_y, theta_z]
 
     Parameters
-    ----------
     space : FunctionSpace
         Finite element function space.
     beam_type : str

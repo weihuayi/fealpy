@@ -135,11 +135,9 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
         This method retrieves the quadrature points, weights, and basis functions
         for the given function space.
         Parameters
-        ----------
         space : _FS
             The function space on which to perform the assembly operation.
         Returns
-        -------
         bcs : TensorLike
             The quadrature points in the reference element.
         global_points : TensorLike
@@ -198,12 +196,10 @@ class OPCIntegrator(LinearInt, OpInt, CellInt):
         quadrature points, and returns the result as a tensor.
 
         Parameters
-        ----------
         space : _FS
             The function space on which to perform the assembly.
 
         Returns
-        -------
         TensorLike
             The result of the assembly operation.
         """

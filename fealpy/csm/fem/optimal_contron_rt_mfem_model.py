@@ -101,7 +101,6 @@ class OPCMixedFEMModel(ComputationalModel):
         Set the finite element spaces for the model.
         
         Parameters
-        ----------
         p : int, optional
             The polynomial degree of the Raviart-Thomas space. If None, use the default degree.
         """

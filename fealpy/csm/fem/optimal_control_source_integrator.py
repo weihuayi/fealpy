@@ -24,7 +24,6 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
     high-accuracy source assembly via integration over sub-triangles.
 
     Parameters
-    ----------
     source : CoefLike, optional
         The source function or tensor for the optimal control problem.
     q : int, optional
@@ -37,7 +36,6 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
         Assembly method, default is 'assembly'.
 
     Methods
-    -------
     to_global_dof(space)
         Maps local cell degrees of freedom to global degrees of freedom.
     transform_subtriangle_points(quad_points)
@@ -48,7 +46,6 @@ class OPCSIntegrator(LinearInt, OpInt, CellInt):
         Assembles the global source vector for the optimal control problem.
 
     Notes
-    -----
     This integrator is suitable for high-accuracy source integration in optimal control PDE finite element solvers,
     especially for mixed elements such as Raviart-Thomas.
     """

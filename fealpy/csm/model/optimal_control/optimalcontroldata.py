@@ -157,7 +157,6 @@ class OptimalControlData():
         Return the geometric dimension of the problem.
 
         Returns
-        -------
         int
             The geometric dimension, which is 2 for this problem.
         """

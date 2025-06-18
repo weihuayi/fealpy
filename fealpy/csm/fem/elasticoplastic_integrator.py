@@ -20,7 +20,6 @@ class ElasticoplasticIntegrator(LinearElasticIntegrator):
     ElasticoplasticIntegrator integrates the constitutive behavior of elastoplastic materials within a finite element framework.
     This class extends the LinearElasticIntegrator to handle elastoplastic constitutive updates, internal force computation, and tangent stiffness matrix assembly. It is designed for use in computational solid mechanics simulations where both elastic and plastic material responses are present.
     Parameters
-    ----------
     D_ep : array-like
         Elastoplastic material stiffness matrix, typically of shape (n_cells, n_qp, n_strain, n_strain).
     space : FunctionSpace
@@ -34,7 +33,6 @@ class ElasticoplasticIntegrator(LinearElasticIntegrator):
     method : str or None, optional, default=None
         Integration method or scheme to be used.
     Attributes
-    ----------
     D_ep : array-like
         Elastoplastic material stiffness matrix used in tangent computations.
     space : FunctionSpace
@@ -42,7 +40,6 @@ class ElasticoplasticIntegrator(LinearElasticIntegrator):
     equivalent_plastic_strain : array-like
         Stores the equivalent plastic strain at each integration point.
     Methods
-    -------
     compute_internal_force(uh, plastic_strain, index=_FS)
         Compute the internal force vector considering plastic strain effects.
     constitutive_update(uh, plastic_strain_old, material, yield_stress, strain_total_e)
@@ -52,10 +49,8 @@ class ElasticoplasticIntegrator(LinearElasticIntegrator):
     assembly(space)
         Assemble the global tangent stiffness matrix for the current state.
     Notes
-    -----
     This class assumes small strain elastoplasticity and is suitable for incremental-iterative solution procedures such as Newton-Raphson. The implementation supports von Mises plasticity and can be extended for other yield criteria.
     Examples
-    --------
     >>> integrator = ElasticoplasticIntegrator(D_ep, space, material, q, eq_plastic_strain)
     >>> F_int = integrator.compute_internal_force(uh, plastic_strain)
     >>> converged, plastic_strain_new, D_ep_new, strain_total_e = integrator.constitutive_update(

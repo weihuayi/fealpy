@@ -23,20 +23,17 @@ class EllipticMixedFEMModel(ComputationalModel):
     automatic mesh generation, linear system assembly, boundary condition handling, solution, and error analysis.
 
     Parameters
-    ----------
     pde : EllipticPDEDataT, optional, default=None
         The elliptic PDE data object, including coefficients, source terms, and boundary conditions.
         If None, a built-in example problem ('coscos') is used.
 
     Attributes
-    ----------
     pde : EllipticPDEDataT
         The current elliptic PDE data object, including coefficients, source terms, and boundary conditions.
     mesh : TriangleMesh
         The current 2D triangle mesh object used for finite element discretization.
 
     Methods
-    -------
     run(maxit=4)
         Execute the complete FEM solution process and return the numerical solutions of the primary and auxiliary variables.
     set_init_mesh()
@@ -51,13 +48,11 @@ class EllipticMixedFEMModel(ComputationalModel):
         Compute the error between the numerical and exact solutions.
 
     Notes
-    -----
     This class uses a mixed finite element method (Raviart-Thomas space and Lagrange space),
     suitable for elliptic problems with flux continuity requirements.
     It supports automatic boundary condition handling and error evaluation for algorithm verification and numerical experiments.
 
     Examples
-    --------
     >>> model = EllipticMixedFEMModel()
     >>> model.run()
     >>> error_u, error_p = model.postprocess()
