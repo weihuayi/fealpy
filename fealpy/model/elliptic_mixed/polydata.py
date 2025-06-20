@@ -7,14 +7,25 @@ import sympy as sp
 class PolyData():
     
     def __init__(self, c=2): 
+        """PolyData provides data and methods for a 2D elliptic PDE problem with a polynomial exact solution.
+        The model problem is:
+            -div(A ∇u) + c u = f,   in Ω = [0, 1] x [0, 1]
+                ∇u · n = 0,        on ∂Ω (Neumann)
+        with the exact solution:
+            u(x, y) = x^2 (1-x)^2 y^2 (1-y)^2
+        The diffusion coefficient A, reaction coefficient c, and source term f are defined as:
+            A = [[1 + x^2, 0], [0, 1 + y^2]]
+            c = 2 (default)
+            f(x, y) is computed to match the exact solution and coefficients.
+        Homogeneous Neumann boundary conditions are imposed on all boundaries.
+        This class provides methods for mesh generation, coefficients, exact solution, gradient, flux, and boundary identification for use in finite element simulations.
+        """
         self.c = c
         self.manager, = bm._backends
 
         x1, x2 = sp.symbols('x1, x2', real=True)
         self.x1 = x1
         self.x2 = x2
-
-        # 修改为满足齐次Neumann边界条件的精确解
         self.u = x1**2 * (1-x1)**2 * x2**2 * (1-x2)**2
 
         # 计算通量变量 p = -A∇u
@@ -34,6 +45,7 @@ class PolyData():
         self._precompute_terms()
         
     def _precompute_terms(self):
+        """Precompute terms for the PDE."""
         x1, x2 = self.x1, self.x2
         
         # 计算 div(p)
@@ -55,6 +67,7 @@ class PolyData():
 
     @cartesian
     def domain(self):
+        """Return the computational domain of the problem."""
         return [0, 1, 0, 1]
     
     @variantmethod('tri')
