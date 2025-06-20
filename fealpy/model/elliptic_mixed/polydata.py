@@ -1,101 +1,122 @@
-import sympy as sp
-from fealpy.backend import backend_manager as bm
+from typing import Sequence
 from fealpy.decorator import cartesian, variantmethod
+from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
+import sympy as sp
 
-class PolyData:
-    def __init__(self):
+class PolyData():
+    
+    def __init__(self, c=2): 
+        self.c = c
+        self.manager, = bm._backends
+
         x1, x2 = sp.symbols('x1, x2', real=True)
         self.x1 = x1
         self.x2 = x2
 
-        # 构造满足 Neumann 边界条件的解析解
-        p1 = (x1 - 0.5)**2 * x1**2 * (1 - x1)**2
-        p2 = (x2 - 0.5)**2 * x2**2 * (1 - x2)**2
-        u_sym = p1 * p2
-        self.u_sym = u_sym
+        # 修改为满足齐次Neumann边界条件的精确解
+        self.u = x1**2 * (1-x1)**2 * x2**2 * (1-x2)**2
 
-        # 变量系数扩散张量
-        A11 = 1 + x1**2
-        A22 = 1 + x2**2
+        # 计算通量变量 p = -A∇u
+        dy_dx1 = sp.diff(self.u, x1)
+        dy_dx2 = sp.diff(self.u, x2)
+        self.p0 = -(1+x1**2) * dy_dx1
+        self.p1 = -(1+x2**2) * dy_dx2
+        self.p = sp.Matrix([self.p0, self.p1])
+        
+        
+        # 系数矩阵
+        self.A00 = 1+x1**2
+        self.A11 = 1+x2**2
+        self.A = sp.Matrix([[self.A00, 0], [0, self.A11]])
+        
+        # 预计算源项和期望状态
+        self._precompute_terms()
+        
+    def _precompute_terms(self):
+        x1, x2 = self.x1, self.x2
+        
+        # 计算 div(p)
+        self.div_p = sp.diff(self.p0, x1) + sp.diff(self.p1, x2)
+        
+        # 计算源项 f
+        self.f = self.div_p + self.c * self.u
 
-        # 梯度与通量
-        grad_u = [sp.diff(u_sym, x1), sp.diff(u_sym, x2)]
-        flux = [-A11 * grad_u[0], -A22 * grad_u[1]]
-
-        div_flux = sp.diff(flux[0], x1) + sp.diff(flux[1], x2)
-
-        # 反应项系数
-        c = 2
-
-        f_sym = -div_flux + c * u_sym
-        self.f_sym = f_sym
-
-        # 编译
-        self._u_func = sp.lambdify((x1, x2), u_sym, 'numpy')
-        self._grad_u_x1_func = sp.lambdify((x1, x2), grad_u[0], 'numpy')
-        self._grad_u_x2_func = sp.lambdify((x1, x2), grad_u[1], 'numpy')
-        self._flux1_func = sp.lambdify((x1, x2), flux[0], 'numpy')
-        self._flux2_func = sp.lambdify((x1, x2), flux[1], 'numpy')
-        self._f_func = sp.lambdify((x1, x2), f_sym, 'numpy')
-
-    def domain(self):
-        return [0., 1., 0., 1.]
-
+        
     def geo_dimension(self) -> int:
+        """
+        Return the geometric dimension of the problem.
+
+        Returns
+        int
+            The geometric dimension, which is 2 for this problem.
+        """
         return 2
 
+    @cartesian
+    def domain(self):
+        return [0, 1, 0, 1]
+    
     @variantmethod('tri')
     def init_mesh(self, nx=10, ny=10):
         from fealpy.mesh import TriangleMesh
-        return TriangleMesh.from_box(self.domain(), nx=nx, ny=ny)
-
+        d = self.domain()
+        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
+        return mesh
+    
+    @init_mesh.register('quad')
+    def init_mesh(self, nx=10, ny=10):
+        from fealpy.mesh import QuadrangleMesh
+        d = self.domain()
+        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
+        return mesh
+    
     @cartesian
-    def solution(self, p: TensorLike) -> TensorLike:
-        x1, x2 = p[..., 0], p[..., 1]
-        return self._u_func(x1, x2)
-
+    def solution(self, space):
+        """ Compute the exact solution y at given points in space."""
+        result = sp.lambdify([self.x1, self.x2], self.u ,self.manager)
+        return result(space[...,0], space[...,1])
+    
     @cartesian
-    def gradient(self, p: TensorLike) -> TensorLike:
-        x1, x2 = p[..., 0], p[..., 1]
-        gx = self._grad_u_x1_func(x1, x2)
-        gy = self._grad_u_x2_func(x1, x2)
-        return bm.stack([gx, gy], axis=-1)
-
+    def flux(self, space):
+        """ Compute the flux p at given points in space."""
+        x = space[..., 0]
+        y = space[..., 1]
+        result = bm.zeros_like(space)
+        p0 = sp.lambdify([self.x1, self.x2], self.p0, self.manager)
+        p1 = sp.lambdify([self.x1, self.x2], self.p1, self.manager)
+        result[...,0] = p0(x, y) 
+        result[...,1] = p1(x, y) 
+        return result
+    
+    
     @cartesian
-    def flux(self, p: TensorLike) -> TensorLike:
-        x1, x2 = p[..., 0], p[..., 1]
-        q1 = self._flux1_func(x1, x2)
-        q2 = self._flux2_func(x1, x2)
-        return bm.stack([q1, q2], axis=-1)
-
+    def diffusion_coef(self, space): 
+        """ Compute the diffusion coefficient matrix at given points in space."""
+        x = space[..., 0]
+        y = space[..., 1]
+        result = bm.zeros(space.shape[:-1]+(2,2)) 
+        result[..., 0, 0] = 1+x**2 
+        result[..., 1, 1] = 1+y**2
+        return result 
+    
     @cartesian
-    def diffusion_coef(self, p: TensorLike) -> TensorLike:
-        x1, x2 = p[..., 0], p[..., 1]
-        shape = p.shape[:-1] + (2, 2)
-        val = bm.zeros(shape)
-        val[..., 0, 0] = 1 + x1**2
-        val[..., 1, 1] = 1 + x2**2
-        return val
-
+    def diffusion_coef_inv(self, space):
+        """ Compute the inverse of the diffusion coefficient matrix at given points in space."""
+        x = space[..., 0]
+        y = space[..., 1]
+        result = bm.zeros(space.shape[:-1]+(2,2)) 
+        result[..., 0, 0] = 1/(1+x**2)
+        result[..., 1, 1] = 1/(1+y**2)
+        return result 
+    
     @cartesian
-    def diffusion_coef_inv(self, p: TensorLike) -> TensorLike:
-        x1, x2 = p[..., 0], p[..., 1]
-        shape = p.shape[:-1] + (2, 2)
-        val = bm.zeros(shape)
-        val[..., 0, 0] = 1 / (1 + x1**2)
-        val[..., 1, 1] = 1 / (1 + x2**2)
-        return val
-
-    @cartesian
-    def source(self, p: TensorLike) -> TensorLike:
-        x1, x2 = p[..., 0], p[..., 1]
-        return self._f_func(x1, x2)
-
+    def source(self, space, index=None):
+        """ Compute the source term f at given points in space."""
+        result = sp.lambdify([self.x1, self.x2], self.f, self.manager) 
+        return result(space[...,0], space[...,1])
+    
     @cartesian
     def grad_dirichlet(self, p, space):
-        return bm.zeros_like(p[..., 0])  # 不使用
-
-    @cartesian
-    def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        return bm.zeros(p.shape[:-1], dtype=bool)  # 全为 Neumann 条件
+        return bm.zeros_like(p[..., 0])
+    

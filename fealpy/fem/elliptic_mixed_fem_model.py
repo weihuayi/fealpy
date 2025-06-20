@@ -196,7 +196,7 @@ class EllipticMixedFEMModel(ComputationalModel):
         """
         Apply the boundary conditions to the linear system.
         """
-        uspace, pspace = self.space()
+        uspace, pspace = self.space(self.p)
         ugdof = uspace.number_of_global_dofs()
         uGdof = uspace.number_of_global_dofs()
         pGdof = pspace.number_of_global_dofs()
