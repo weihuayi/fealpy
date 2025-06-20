@@ -42,7 +42,8 @@ class PDEDataManager:
         "elliptic": "fealpy.model.elliptic",
         "parabolic": "fealpy.model.parabolic",
         "wave": "fealpy.model.wave",
-        "hyperbolic":"fealpy.model.hyperbolic"
+        "hyperbolic":"fealpy.model.hyperbolic",
+        "elliptic_mixed": "fealpy.model.elliptic_mixed",
     }
 
     def __init__(self, pde_type: str = None):
