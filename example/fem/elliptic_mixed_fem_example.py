@@ -19,10 +19,12 @@ bm.set_backend(args.backend)
 from fealpy.fem import EllipticMixedFEMModel
 
 model = EllipticMixedFEMModel()
+#model.set_pde("poly")
 model.set_pde("coscos")  
 model.set_init_mesh(nx=10, ny=10)
 model.set_space_degree(p=0)
 model.space.set('rt')
+#model.apply_bc.set('dirichlet')
 model.apply_bc.set('neumann')
 model.solve.set('direct')
 model.run['uniform_refine']()
