@@ -20,8 +20,8 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                  q: Optional[int]=None, *,
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
-        super().__init__(method=method)
-
+        super().__init__()
+        self.assembly.set(method)
         self.material = material
         self.q = q
         self.index = index
@@ -595,7 +595,3 @@ class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
                         ws, detJ, B, D, B)
 
         return KK
-    
-    @assembly.selector
-    def assembly(self):
-        return self.method

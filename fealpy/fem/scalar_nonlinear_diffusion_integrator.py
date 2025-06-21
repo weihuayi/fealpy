@@ -18,9 +18,8 @@ class ScalarNonlinearDiffusionIntegrator(NonlinearInt, OpInt, CellInt):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
-                 batched: bool=False,
-                 method: Optional[str]=None) -> None:
-        super().__init__(method=method)
+                 batched: bool=False) -> None:
+        super().__init__()
         self.coef = coef
         if hasattr(coef, 'uh'):
             self.uh = coef.uh

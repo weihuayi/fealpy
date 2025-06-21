@@ -3,7 +3,7 @@ from typing import Union, Callable, Dict
 CoefType = Union[int, float, Callable]
 
 class CahnHilliard(BaseEquation):
-    def __init__(self, pde, init_variables=True):
+    def __init__(self, pde=None, init_variables=True):
         super().__init__(pde)
         self._coefs = {
             'mobility': 1,  # 时间导数项系数
@@ -16,6 +16,8 @@ class CahnHilliard(BaseEquation):
             'mu': None            # 化学势
         }
         if init_variables:
+            if value is None:
+                raise ValueError("Value cannot be None")
             self.initialize_from_pde(pde)
 
     def initialize_from_pde(self, pde):
