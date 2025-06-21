@@ -4,7 +4,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 import sympy as sp
 
-class PolyData():
+class PolyData2D():
     
     def __init__(self, c=2): 
         """PolyData provides data and methods for a 2D elliptic PDE problem with a polynomial exact solution.
