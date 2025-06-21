@@ -12,9 +12,8 @@ from fealpy.fem import DirichletBC
 
 
 backend = 'pytorch'
-device = 'cuda'
+device = 'cpu'
 bm.set_backend(backend)
-bm.set_default_device(device)
 
 
 logger.setLevel('WARNING')
@@ -57,7 +56,8 @@ for i in range(maxit):
     f = ScalarSourceIntegrator(pde.source, q=3)
     
     sform = NonlinearForm(space)
-    sform.add_integrator([D, M])
+    sform.add_integrator(D)
+    sform.add_integrator(M)
     sform.add_integrator(f)
     bc = DirichletBC(space, gd=0.0, threshold=isDDof)
 

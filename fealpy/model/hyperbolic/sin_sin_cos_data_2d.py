@@ -1,4 +1,5 @@
 from typing import Sequence
+from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
@@ -31,16 +32,19 @@ class SinSinCosData2D:
         """ Get the convection coefficient (wave speed)."""
         return bm.tensor([1.0, 1.0])  
 
+    @cartesian
     def init_solution(self, p: TensorLike) -> TensorLike:
         """Compute initial condition ."""
         x, y = p[..., 0], p[..., 1]
         return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
 
+    @cartesian
     def solution(self, p: TensorLike, t: float) -> TensorLike:
         """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
         return bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * bm.cos(bm.pi * t)
 
+    @cartesian
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
         """Compute spatial gradient of solution at time t."""
         x, y = p[..., 0], p[..., 1]
@@ -49,6 +53,7 @@ class SinSinCosData2D:
         du_dy = bm.pi * bm.sin(bm.pi * x) * bm.cos(bm.pi * y) * cos_πt
         return bm.stack([du_dx, du_dy], axis=-1)  # Returns a vector field
 
+    @cartesian
     def source(self, p: TensorLike, t: float) -> TensorLike:
         """Compute exact solution at time t. """
         x, y = p[..., 0], p[..., 1]
@@ -58,10 +63,12 @@ class SinSinCosData2D:
         term3 = bm.pi * bm.sin(bm.pi * x) * bm.cos(bm.pi * y) * bm.cos(bm.pi * t)  # ∂u/∂y
         return term1 + self.convection_coef()[1] * (term2 + term3)
 
+    @cartesian
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
         """Dirichlet boundary condition."""
         return self.solution(p=p, t=t) 
 
+    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]

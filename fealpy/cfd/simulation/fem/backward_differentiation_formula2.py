@@ -22,8 +22,8 @@ class BDF2(FEM):
         A00 = BilinearForm(uspace)
         self.BM = ScalarMassIntegrator(q=q)
         self.BC = ScalarConvectionIntegrator(q=q)
-        self.BD = ScalarDiffusionIntegrator(q=q)
-        #self.BD = ViscousWorkIntegrator(q=q)
+        #self.BD = ScalarDiffusionIntegrator(q=q)
+        self.BD = ViscousWorkIntegrator(q=q)
         A00.add_integrator(self.BM)
         A00.add_integrator(self.BC)
         A00.add_integrator(self.BD)
@@ -70,8 +70,8 @@ class BDF2(FEM):
             return result
         self.BC.coef = BC_coef
 
-        #self.BD.coef = 2*cv 
-        self.BD.coef = cv 
+        self.BD.coef = 2*cv 
+        #self.BD.coef = cv 
         self.BPW0.coef = -pc
         self.BPW1.coef = -1
 

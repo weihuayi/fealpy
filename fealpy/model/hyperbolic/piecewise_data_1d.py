@@ -1,4 +1,5 @@
 from typing import Sequence
+from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
@@ -33,11 +34,13 @@ class PiecewiseData1D:
         """ Get the convection coefficient (wave speed)."""
         return bm.tensor([1.0])
     
+    @cartesian
     def init_solution(self, p: TensorLike) -> TensorLike:
         """Compute initial condition u(x,0) = |x - 1|."""
         x = p[..., 0]
         return bm.abs(x - 1)
 
+    @cartesian
     def solution(self, p: TensorLike, t: float) -> TensorLike:
         """Compute exact solution at time t. """
         x = p[..., 0]
@@ -50,6 +53,7 @@ class PiecewiseData1D:
         val[flag2] = x[flag2] - t - 1
         return val
 
+    @cartesian
     def gradient(self, p: TensorLike, t: float) -> TensorLike:
         """Compute spatial gradient of solution at time t."""
         x = p[..., 0]
@@ -62,16 +66,19 @@ class PiecewiseData1D:
         grad[flag2] = 1
         return grad
 
+    @cartesian
     def source(self, p: TensorLike, t: float) -> TensorLike:
         """Compute source term (always zero for this problem)."""
         x = p[..., 0]
         return bm.zeros_like(x)
 
+    @cartesian
     def dirichlet(self, p: TensorLike, t: float) -> TensorLike:
         """Dirichlet boundary condition u(0,t)=1"""
         x = p[..., 0]
         return bm.ones_like(x)
 
+    @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x = p[..., 0]
