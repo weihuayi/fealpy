@@ -1,0 +1,13 @@
+{
+  "mn": 5,
+  "z": 19,
+  "alpha_n": 20,
+  "beta": 15,
+  "x": 0.2,
+  "hac": 1,
+  "cc": 0.25,
+  "rco": 0.38,
+  "jn": 0.1,
+  "involute_section": 30,
+  "transition_section": 20
+}

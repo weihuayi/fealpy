@@ -1,21 +1,14 @@
-import platform
 
-from .solve import solve, active_set_solver
-from .amg import AMGSolver
+from .gamg_solver import GAMGSolver
 
-try:
-    from .matlab_solver import MatlabSolver
-except ImportError:
-    print('I do not find matlab installed on this system!, so you can not use it')
-
-#try:
-#    from .petsc_solver import PETScSolver
-#except ImportError:
-#    print('I do not find petsc and petsc4py installed on this system!, so you can not use it')
-
-from .fast_solver import HighOrderLagrangeFEMFastSolver
-from .fast_solver import SaddlePointFastSolver
-from .fast_solver import LinearElasticityLFEMFastSolver 
-from .fast_solver import LevelSetFEMFastSolver 
-
-from .LinearElasticityRLFEMFastSolver import LinearElasticityRLFEMFastSolver
+from .direct import spsolve, spsolve_triangular
+from .gauss_seidel import gauss_seidel 
+from .jacobi import jacobi
+from .cg import cg
+from .minres import minres
+from .gmres import gmres
+from .lgmres import lgmres
+from .direct_solver_manger import DirectSolverManager
+from .iterative_solver_manger import IterativeSolverManager
+from .bicgstab import bicgstab
+from .bicg import bicg

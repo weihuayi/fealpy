@@ -1,69 +1,46 @@
-import numpy as np
 
-from fealpy.decorator import cartesian, barycentric
-from fealpy.mesh import TriangleMesh, LagrangeTriangleMesh, LagrangeWedgeMesh, MeshFactory
-from fealpy.geometry.implicit_surface import SphereSurface
+from typing import List, Tuple, Union
 
-from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
-
+from ..backend import TensorLike
+from ..backend import backend_manager as bm
+from ..decorator import cartesian
 
 class CosCosCosData:
-    def __init__(self):
-        pass
-    def domain(self):#我加的
-        return np.array([0, 1, 0, 1, 0, 1])
+    def __init__(self, omega: int = 1, kappa: float = 1.):
+        self.omega = omega
+        self.kappa = kappa
 
-    def init_mesh(self, n=1, meshtype='tet'):
-        """!
-        @brief 初始网格
-        """
-        node = np.array([
-            [-1, -1, -1],
-            [1, -1, -1],
-            [1, 1, -1],
-            [-1, 1, -1],
-            [-1, -1, 1],
-            [1, -1, 1],
-            [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float64)
-
-        cell = np.array([
-            [0, 1, 2, 6],
-            [0, 5, 1, 6],
-            [0, 4, 5, 6],
-            [0, 7, 4, 6],
-            [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int_)
-        mesh = TetrahedronMesh(node, cell)
-        #mesh.uniform_refine(n)
-        mesh = MeshFactory.boxmesh3d([0, 1, 0, 1, 0, 1], nx=n, ny=n, nz=n, meshtype="tet")
-        #mesh.label() # 标记最长边
-        return mesh
+    @staticmethod
+    def domain():
+        return [0, 1, 0, 1, 0, 1]
 
     @cartesian
-    def solution(self, p):
+    def solution(self, p: TensorLike):
         """ the exact solution
         """
+        op = bm.pi * self.omega
+        cos = bm.cos
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        u = np.cos(np.pi*x)*np.cos(np.pi*y)*np.cos(np.pi*z)
+        u = cos(op*x) * cos(op*y) * cos(op*z)
         return u
 
     @cartesian
-    def gradient(self, p):
+    def gradient(self, p: TensorLike):
         """ The gradient of the exact solution
         """
-        pi = np.pi
-        sin = np.sin
-        cos = np.cos
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-        val = np.zeros(p.shape, dtype=p.dtype)
-        val[..., 0] = -pi*sin(pi*x)*cos(pi*y)*cos(pi*z)
-        val[..., 1] = -pi*cos(pi*x)*sin(pi*y)*cos(pi*z)
-        val[..., 2] = -pi*cos(pi*x)*cos(pi*y)*sin(pi*z)
+        op = self.omega * bm.pi
+        sin = bm.sin
+        cos = bm.cos
+        opx = p[..., 0] * op
+        opy = p[..., 1] * op
+        opz = p[..., 2] * op
+        val = bm.stack([
+            -op * sin(opx) * cos(opy) * cos(opz),
+            -op * cos(opx) * sin(opy) * cos(opz),
+            -op * cos(opx) * cos(opy) * sin(opz)
+        ], axis=-1)
         return val
 
     @cartesian
@@ -71,229 +48,98 @@ class CosCosCosData:
         return -self.gradient(p)
 
     @cartesian
-    def source(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-        val = 3*np.pi**2*np.cos(np.pi*x)*np.cos(np.pi*y)*np.cos(np.pi*z)
+    def source(self, p: TensorLike):
+        op = bm.pi * self.omega
+        cos = bm.cos
+        opx = p[..., 0] * op
+        opy = p[..., 1] * op
+        opz = p[..., 2] * op
+        val = 3 * op**2 * cos(opx) * cos(opy) * cos(opz)
+        return val
+
+    # @cartesian
+    # def dirichlet(self, p):
+    #     """Dilichlet boundary condition
+    #     """
+    #     return self.solution(p)
+    dirichlet = solution
+
+    @cartesian
+    def neumann(self, p: TensorLike, n: TensorLike):
+        grad = self.gradient(p) # (*shape, 3)
+        if n.ndim == 2:
+            n = bm.expand_dims(n, axis=1)
+        val = bm.einsum('...d, ...d -> ...', grad, n) # (*shape)
         return val
 
     @cartesian
-    def dirichlet(self, p):
-        """Dilichlet boundary condition
-        """
-        return self.solution(p)
-    
-    @cartesian
-    def neumann(self, p, n):
-        """ 
-        Neuman  boundary condition
-
-        Parameters
-        ----------
-
-        p: (NQ, NE, 3)
-        n: (NE, 3)
-
-        grad*n : (NQ, NE, 3)
-        """
-        grad = self.gradient(p) # (NQ, NE, 3)
-        val = np.sum(grad*n, axis=-1) # (NQ, NE)
-        return val
-
-    @cartesian
-    def robin(self, p, n):
-        grad = self.gradient(p) # (NQ, NE, 3)
-        val = np.sum(grad*n, axis=-1)
-        shape = len(val.shape)*(1, )
-        kappa = np.array([1.0], dtype=np.float64).reshape(shape)
-        val += self.solution(p) 
-        return val, kappa
+    def robin(self, p: TensorLike, n: TensorLike):
+        # grad = self.gradient(p) # (*shape, 3)
+        # val = bm.sum(grad*n, axis=-1)
+        # shape = len(val.shape)*(1, )
+        # kappa = bm.array([1.0], dtype=bm.float64).reshape(shape)
+        # val = bm.sum(grad*n, axis=-1) + self.solution(p) 
+        # return val, kappa
+        return self.neumann(p, n) + self.kappa * self.dirichlet(p)
 
 
-class X2Y2Z2Data:
-    def __init__(self):
-        pass
+class BatchedCosCosCosData():
+    def __init__(self, omega: Union[List[int], Tuple[int, ...]], kappa: float = 1., *,
+                 dtype=None, device=None):
+        self.dtype = dtype
+        self.device = device
+        self.kappa = kappa
+        self.omega = bm.array(omega, dtype=dtype, device=device)
 
-    def init_mesh(self, n=1, meshtype='tet'):
-        node = np.array([
-            [-1, -1, -1],
-            [1, -1, -1],
-            [1, 1, -1],
-            [-1, 1, -1],
-            [-1, -1, 1],
-            [1, -1, 1],
-            [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float64)
-
-        cell = np.array([
-            [0, 1, 2, 6],
-            [0, 5, 1, 6],
-            [0, 4, 5, 6],
-            [0, 7, 4, 6],
-            [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int_)
-        mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
-        mesh.label()
-        return mesh
+    @staticmethod
+    def domain():
+        return [0, 1, 0, 1, 0, 1]
 
     @cartesian
-    def solution(self, p):
-        """ the exact solution
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-        u = x**2*y**2*z**2
-        return u
+    def solution(self, p: TensorLike): # (*shape, 3)
+        pi = bm.pi
+        cos = bm.cos
+        opx = bm.tensordot(self.omega, p[..., 0], axes=0) * pi
+        opy = bm.tensordot(self.omega, p[..., 1], axes=0) * pi
+        opz = bm.tensordot(self.omega, p[..., 2], axes=0) * pi
+        return cos(opx) * cos(opy) * cos(opz) # (B, *shape)
+
+    dirichlet = solution
 
     @cartesian
-    def gradient(self, p):
-        """ The gradient of the exact solution
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-        val = np.zeros(p.shape, dtype=p.dtype)
-        val[..., 0] = 2*x*y**2*z**2
-        val[..., 1] = 2*x**2*y*z**2
-        val[..., 2] = 2*x**2*y**2*z
-        return val
+    def gradient(self, p: TensorLike):
+        pi = bm.pi
+        sin = bm.sin
+        cos = bm.cos
+        opx = bm.tensordot(self.omega, p[..., 0], axes=0) * pi
+        opy = bm.tensordot(self.omega, p[..., 1], axes=0) * pi
+        opz = bm.tensordot(self.omega, p[..., 2], axes=0) * pi
+        val = bm.stack([
+            -sin(opx) * cos(opy) * cos(opz),
+            -cos(opx) * sin(opy) * cos(opz),
+            -cos(opx) * cos(opy) * sin(opz)
+        ], axis=-1) * pi # (B, *shape, 3)
+        return bm.einsum('b, b...d -> b...d', self.omega, val)
 
     @cartesian
-    def flux(self, p):
-        return -self.gradient(p)
+    def source(self, p: TensorLike):
+        pi = bm.pi
+        cos = bm.cos
+        opx = bm.tensordot(self.omega, p[..., 0], axes=0) * pi
+        opy = bm.tensordot(self.omega, p[..., 1], axes=0) * pi
+        opz = bm.tensordot(self.omega, p[..., 2], axes=0) * pi
+        val = 3 * pi**2 * cos(opx) * cos(opy) * cos(opz) # (B, *shape)
+        return bm.einsum('b, b... -> b...', self.omega**2, val)
 
     @cartesian
-    def source(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-        val = -(2*y**2*z**2 + 2*x**2*z**2 + 2*x**2*y**2)
-        return val
+    def neumann(self, p: TensorLike, n: TensorLike): # (*shape, 3)
+        grad = self.gradient(p) # (B, *shape, 3)
+
+        if n.ndim == 2:
+            n = bm.expand_dims(n, axis=1)
+
+        return bm.einsum('b...d, ...d -> b...', grad, n) # (B, *shape)
 
     @cartesian
-    def dirichlet(self, p):
-        """Dilichlet boundary condition
-        """
-        return self.solution(p)
-    
-    @cartesian
-    def neumann(self, p, n):
-        """ 
-        Neuman  boundary condition
-
-        Parameters
-        ----------
-
-        p: (NQ, NE, 3)
-        n: (NE, 3)
-
-        grad*n : (NQ, NE, 3)
-        """
-        grad = self.gradient(p) # (NQ, NE, 3)
-        val = np.sum(grad*n, axis=-1) # (NQ, NE)
-        return val
-
-    @cartesian
-    def robin(self, p, n):
-        grad = self.gradient(p) # (NQ, NE, 3)
-        val = np.sum(grad*n, axis=-1)
-        shape = len(val.shape)*(1, )
-        kappa = np.array([1.0], dtype=np.float64).reshape(shape)
-        val += self.solution(p) 
-        return val, kappa
-
-class LShapeRSinData:
-    def __init__(self):
-        pass
-
-    def init_mesh(self, n=2, meshtype='tet'):
-        node = np.array([
-            [-1, -1, -1],
-            [1, -1, -1],
-            [1, 1, -1],
-            [-1, 1, -1],
-            [-1, -1, 1],
-            [1, -1, 1],
-            [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float64)
-
-        cell = np.array([
-            [0, 1, 2, 6],
-            [0, 5, 1, 6],
-            [0, 4, 5, 6],
-            [0, 7, 4, 6],
-            [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int_)
-        mesh = TetrahedronMesh(node, cell)
-        for i in range(n):
-            mesh.bisect()
-
-        NN = mesh.number_of_nodes()
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
-        bc = mesh.entity_barycenter('cell')
-        isDelCell = ((bc[:, 0] > 0) & (bc[:, 1] < 0))
-        cell = cell[~isDelCell]
-        isValidNode = np.zeros(NN, dtype=np.bool)
-        isValidNode[cell] = True
-        node = node[isValidNode]
-
-        idxMap = np.zeros(NN, dtype=mesh.itype)
-        idxMap[isValidNode] = range(isValidNode.sum())
-        cell = idxMap[cell]
-        mesh = TetrahedronMesh(node, cell)
-        mesh.label() # 标记最长边
-
-        return mesh
-
-    @cartesian
-    def solution(self, p):
-        """ the exact solution
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        r = np.sqrt(x**2 + y**2)
-        theta = np.arctan2(y, x)
-        theta[theta < 0] += 2*pi
-        u = r**(2/3)*np.sin(2*theta/3)
-        return u
-
-    @cartesian
-    def gradient(self, p):
-        """ The gradient of the exact solution
-        """
-        pi = np.pi
-        sin = np.sin
-        cos = np.cos
-
-        x = p[..., 0]
-        y = p[..., 1]
-        r = np.sqrt(x**2 + y**2)
-        theta = np.arctan2(y, x)
-        theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
-
-        val = np.zeros(p.shape, dtype=p.dtype)
-        val[..., 0] = (
-                2/3*r**(-1/3)*sin(2*theta/3)*x/r -
-                2/3*r**(2/3)*cos(2*theta/3)*y/r**2
-                )
-        val[..., 1] = (
-                2/3*r**(-1/3)*sin(2*theta/3)*y/r +
-                2/3*r**(2/3)*cos(2*theta/3)*x/r**2
-                )
-        return val
-
-    @cartesian
-    def source(self, p):
-        val = np.zeros(p.shape[:-1], dtype=p.dtype)
-        return val
-
-    @cartesian
-    def dirichlet(self, p):
-        """Dilichlet boundary condition
-        """
-        return self.solution(p)
+    def robin(self, p: TensorLike, n: TensorLike):
+        return self.neumann(p, n) + self.kappa * self.dirichlet(p)

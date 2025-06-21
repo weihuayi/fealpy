@@ -1,0 +1,14 @@
+[[source]]
+#url = "https://pypi.org/simple"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+verify_ssl = true
+
+[packages]
+numpy = '>=2.0.1'
+scipy = '>=1.14.0'
+torch = '>=2.4.0' #+cu121, 依赖虚拟环境中的 cuda 
+jax = '>=0.4.31' #+cu121, 依赖虚拟环境中的 cuda
+cupy = '>=13.2.0' #依赖系统中的 CUDA
+paddle = '>=2.6.1'
+taichi = '>=1.7.1'
+

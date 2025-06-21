@@ -1,14 +1,9 @@
-from .GaussLobattoQuadrature import GaussLobattoQuadrature
-from .GaussLegendreQuadrature import GaussLegendreQuadrature
-from .IntervalQuadrature import IntervalQuadrature
-from .TriangleQuadrature import TriangleQuadrature
-from .TetrahedronQuadrature import TetrahedronQuadrature
-from .QuadrangleQuadrature import QuadrangleQuadrature
-from .HexahedronQuadrature import HexahedronQuadrature
-from .PrismQuadrature import PrismQuadrature
-from .FEMeshIntegralAlg import FEMeshIntegralAlg
-from .PolygonMeshIntegralAlg import PolygonMeshIntegralAlg
-from .PolyhedronMeshIntegralAlg import PolyhedronMeshIntegralAlg
 
-from .TensorProductQuadrature import TensorProductQuadrature
+from .quadrature import Quadrature
 
+from .gauss_legendre import GaussLegendreQuadrature
+from .gauss_lobatto import GaussLobattoQuadrature
+from .triangle import TriangleQuadrature
+from .quadrangle import QuadrangleQuadrature
+from .tetrahedron import TetrahedronQuadrature
+from .tensor_product import TensorProductQuadrature

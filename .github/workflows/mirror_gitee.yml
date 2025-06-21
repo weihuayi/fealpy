@@ -8,6 +8,7 @@ concurrency:
 
 jobs:
   git-mirror:
+    if: github.repository == 'deepmodeling/fealpy'
     runs-on: ubuntu-latest
     steps:
       - uses: wearerequired/git-mirror-action@v1

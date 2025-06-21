@@ -1,39 +1,45 @@
 
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
-from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
+from .space import FunctionSpace
+from .function import Function
 
-from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
-from .BernsteinFiniteElementSpace import BernsteinFiniteElementSpace
+from .dofs import LinearMeshCFEDof
 
-from .CrouzeixRaviartFiniteElementSpace import CrouzeixRaviartFiniteElementSpace
+from .lagrange_fe_space import LagrangeFESpace
+from .tensor_space import TensorFunctionSpace
+from .cm_conforming_fe_space import CmConformingFESpace2d
+from .cm_conforming_fe_space3d import CmConformingFESpace3d
+from .bernstein_fe_space import BernsteinFESpace
 
-# H(div)
-from .RaviartThomasFiniteElementSpace2d import RaviartThomasFiniteElementSpace2d
-from .RaviartThomasFiniteElementSpace3d import RaviartThomasFiniteElementSpace3d
+from .first_nedelec_fe_space import FirstNedelecFESpace
+from .first_nedelec_fe_space_2d import FirstNedelecFESpace2d
+from .first_nedelec_fe_space_3d import FirstNedelecFESpace3d
 
-# H(curl)
-from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementSpace2d
-from .FirstNedelecFiniteElementSpace2d import FirstNedelecFiniteElementSpace2d
-from .FirstNedelecFiniteElementSpace3d import FirstNedelecFiniteElementSpace3d
+from .second_nedelec_fe_space import SecondNedelecFESpace
+from .second_nedelec_fe_space_2d import SecondNedelecFESpace2d
+from .second_nedelec_fe_space_3d import SecondNedelecFESpace3d
 
-from .SecondNedelecFiniteElementSpace2d import SecondNedelecFiniteElementSpace2d
-from .SecondNedelecFiniteElementSpace3d import SecondNedelecFiniteElementSpace3d
+from .raviart_thomas_fe_space import RaviartThomasFESpace
+from .raviart_thomas_fe_space_2d import  RaviartThomasFESpace2d
+from .raviart_thomas_fe_space_3d import  RaviartThomasFESpace3d
 
-# PFEM
-from .ParametricLagrangeFiniteElementSpace import ParametricLagrangeFiniteElementSpace
-from .ParametricLagrangeFiniteElementSpaceOnWedgeMesh import ParametricLagrangeFiniteElementSpaceOnWedgeMesh
+from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
 
-# VEM
-from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
-from .NonConformingVirtualElementSpace2d import NCVEMDof2d, NonConformingVirtualElementSpace2d
-from .DivFreeNonConformingVirtualElementSpace2d import DivFreeNonConformingVirtualElementSpace2d
-from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonConformingVirtualElementSpace2d
+from .huzhang_fe_space_2d import HuZhangFESpace2D
 
-# WG
-from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
+from .brezzi_douglas_marini_fe_space import BrezziDouglasMariniFESpace
+from .brezzi_douglas_marini_fe_space_2d import BrezziDouglasMariniFESpace2d
+from .brezzi_douglas_marini_fe_space_3d import BrezziDouglasMariniFESpace3d
 
-from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
 
-#from .FourierSpace import FourierSpace
-#from .SurfaceLagrangeFiniteElementSpace import SurfaceLagrangeFiniteElementSpace
-#from .SimplexSetSpace import SimplexSetSpace
+from .interior_penalty_fe_space_2d import InteriorPenaltyFESpace2d
+
+## VESpace
+from .scaled_monomial_space_2d import ScaledMonomialSpace2d
+from .conforming_scalar_ve_space_2d import ConformingScalarVESpace2d
+from .non_conforming_scalar_ve_space_2d import NonConformingScalarVESpace2d
+
+
+
+
+
+

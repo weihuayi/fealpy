@@ -1,157 +1,69 @@
-import numpy as np
-import gmsh
-import meshio
-from fealpy.mesh import TriangleMesh
+#!/usr/bin/python3
+'''!    	
+	@Author: wpx
+	@File Name: navier_stokes_equation_2d.py
+	@Mail: wpx15673207315@gmail.com 
+	@Created Time: Mon 14 Oct 2024 04:53:51 PM CST
+	@bref 
+	@ref 
+'''  
 from fealpy.decorator import cartesian
-from fealpy.mesh import MeshFactory as MF
-from fealpy.geometry import DistDomain2d
-from fealpy.mesh import DistMesh2d
-from fealpy.geometry import dcircle,drectangle,ddiff,dmin
-from fealpy.geometry import huniform
-class SinCosData:
-    """
-    [0, 1]^2
-    u(x, y) = (sin(pi*x)*cos(pi*y), -cos(pi*x)*sin(piy))
-    p = 1/(y**2 + 1) - pi/4
-    """
-    def __init__(self):
-        self.box = [0, 1, 0, 1]
-
-    def domain(self):
-        return self.box
-
-    @cartesian
-    def velocity(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        cos = np.cos
-        sin = np.sin
-        val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] = sin(pi*x)*cos(pi*y) 
-        val[..., 1] = -cos(pi*x)*sin(pi*y) 
-        return val
-
-    @cartesian
-    def pressure(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        val = 1/(y**2 + 1) - pi/4 
-        return val
+from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TriangleMesh
+class ChannelFlow: 
+    def __init__(self, eps=1e-10, rho=1, mu=1, R=None):
+        self.eps = eps
+        self.rho = rho
+        self.mu = mu
+        if R is None:
+            self.R = rho/mu
     
-    @cartesian
-    def source(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        sin = np.sin
-        cos = np.cos
-        val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] = 2*pi**2*sin(pi*x)*cos(pi*y) + pi*sin(pi*x)*cos(pi*x)
-        val[..., 1] = -2*y/(y**2 + 1)**2 - 2*pi**2*sin(pi*y)*cos(pi*x) + pi*sin(pi*y)*cos(pi*x) 
-        return val
-
-
-    @cartesian
-    def dirichlet(self, p):
-        return self.velocity(p)
-
-class Poisuille:
-    """
-    [0, 1]^2
-    u(x, y) = (4y(1-y), 0)
-    p = 8(1-x)
-    """
-    def __init__(self):
-        self.box = [0, 1, 0, 1]
-
-    def domain(self):
-        return self.box
-
+    def mesh(self, n=16):
+        box = [0, 1, 0, 1]
+        mesh = TriangleMesh.from_box(box, nx=n, ny=n)
+        return mesh
+    
     @cartesian
     def velocity(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = np.zeros(p.shape)
+        value = bm.zeros(p.shape)
         value[...,0] = 4*y*(1-y)
         return value
-
+    
     @cartesian
     def pressure(self, p):
         x = p[..., 0]
-        y = p[..., 1]
         val = 8*(1-x) 
         return val
     
     @cartesian
-    def source(self, p):
-        val = np.zeros(p.shape, dtype=np.float)
-        return val
+    def is_p_boundary(self, p):
+        tag_left = bm.abs(p[..., 0]) < self.eps
+        tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
+        return tag_left | tag_right
 
     @cartesian
-    def is_p_boundary(p):
-        return (np.abs(p[..., 0]) < eps) | (np.abs(p[..., 0] - 1.0) < eps)
-      
-    @cartesian
-    def is_wall_boundary(p):
-        return (np.abs(p[..., 1]) < eps) | (np.abs(p[..., 1] - 1.0) < eps)
-
-    @cartesian
-    def dirichlet(self, p):
-        return self.velocity(p)
-
+    def is_u_boundary(self, p):
+        tag_up = bm.abs(p[..., 1] - 1.0) < self.eps
+        tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
+        return tag_up | tag_down 
+    
 class FlowPastCylinder:
     '''
     @brief 圆柱绕流
     '''
-    def __init__(self, eps=1e-12, rho=1, mu=0.001):
+    def __init__(self, eps=1e-10, rho=1, mu=0.001):
         self.eps = eps
         self.rho = rho
         self.mu = mu
     
-    def mesh2(self, h0):
-        fd1 = lambda p: dcircle(p,[0.2,0.2],0.05)
-        fd2 = lambda p: drectangle(p,[0.0,2.2,0.0,0.41])
-        fd = lambda p: ddiff(fd2(p),fd1(p))
-
-        def fh(p):
-            h = 0.003 + 0.05*fd1(p)
-            h[h>0.01] = 0.01
-            return h
-
-        bbox = [0,3,0,1]
-        pfix = np.array([(0.0,0.0),(2.2,0.0),(2.2,0.41),(0.0,0.41)],dtype=np.float64)
-        domain = DistDomain2d(fd,fh,bbox,pfix)
-        distmesh2d = DistMesh2d(domain,h0)
-        distmesh2d.run()
-
-        mesh = distmesh2d.mesh
-        return mesh
-
-
-
-    def mesh1(self,h):
-        points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
-                dtype=np.float64)
-        facets = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.int_)
-
-
-        p, f = MF.circle_interval_mesh([0.2, 0.2], 0.05, 0.01) 
-
-        points = np.append(points, p, axis=0)
-        facets = np.append(facets, f+4, axis=0)
-
-        fm = np.array([0, 1, 2, 3])
-
-        smesh = MF.meshpy2d(points, facets, h, hole_points=[[0.2, 0.2]], facet_markers=fm, meshtype='tri')
-        return smesh
-
-    def mesh(self): 
+    def _gmesh_mesh(self, h): 
+        import gmsh
         gmsh.initialize()
 
         gmsh.model.add("gntest2")
-        lc = 0.01
+        lc = h
 
         gmsh.model.geo.addPoint(0.0,0.0,0.0,lc,1)
         gmsh.model.geo.addPoint(2.2,0.0,0.0,lc,2)
@@ -194,76 +106,103 @@ class FlowPastCylinder:
         mesh = meshio.read('gn.msh',file_format = 'gmsh')
         node = mesh.points[:,:2]
         cell = mesh.cells_dict['triangle']
-        mesh = TriangleMesh(node,cell)
-        return mesh
+        return node, cell
     
+    def _fealpy_mesh(self,h):
+        from meshpy.triangle import MeshInfo, build
+        from fealpy.mesh import IntervalMesh
+        backend = bm.backend_name
+        bm.set_backend('numpy')
+        points = bm.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
+                dtype=bm.float64)
+        facets = bm.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=bm.int32)
+
+
+        mm = IntervalMesh.from_circle_boundary([0.2, 0.2], 0.1, int(2*0.1*bm.pi/0.01))
+        p = mm.entity('node')
+        f = mm.entity('cell')
+
+        points = bm.concat((points, p), axis=0)
+        facets = bm.concat((facets, f+4), axis=0)
+        
+        mesh_info = MeshInfo()
+        mesh_info.set_points(bm.to_numpy(points))
+        mesh_info.set_facets(bm.to_numpy(facets))
+        mesh_info.set_holes([[0.2, 0.2]])
+        mesh = build(mesh_info, max_volume=h**2)
+        node = bm.array(mesh.points, dtype=bm.float64)
+        cell = bm.array(mesh.elements, dtype=bm.int32)
+        
+        bm.set_backend(backend)
+        node = bm.from_numpy(node)
+        cell = bm.from_numpy(cell)
+        return node,cell
+
+    def mesh(self, h, method:str='fealpy', device='cpu'):
+        if method == 'fealpy':
+            node,cell = self._fealpy_mesh(h)
+            node = bm.device_put(node, device)
+            cell = bm.device_put(cell, device) 
+        elif mesh == 'gmesh':
+            node,cell = self._gmesh_mesh(h)
+        else:
+            raise ValueError(f"Unknown method:{method}")
+        return TriangleMesh(node, cell)
+
+
     @cartesian
     def is_outflow_boundary(self,p):
-        return np.abs(p[..., 0] - 2.2) < self.eps
+        x = p[...,0]
+        y = p[...,1]
+        cond1 = bm.abs(x - 2.2) < self.eps
+        cond2 = bm.abs(y-0)>self.eps
+        cond3 = bm.abs(y-0.41)>self.eps
+        return (cond1) & (cond2 & cond3) 
     
     @cartesian
     def is_inflow_boundary(self,p):
-        return np.abs(p[..., 0]) < self.eps
+        return bm.abs(p[..., 0]) < self.eps
     
     @cartesian
     def is_circle_boundary(self,p):
         x = p[...,0]
         y = p[...,1]
-        return (np.sqrt(x**2 + y**2) - 0.05) < self.eps
-      
+        return (bm.sqrt((x-0.2)**2 + (y-0.2)**2) - 0.05) < self.eps
+    
     @cartesian
     def is_wall_boundary(self,p):
-        return (np.abs(p[..., 1] -0.41) < self.eps) | \
-               (np.abs(p[..., 1] ) < self.eps)
+        return (bm.abs(p[..., 1] -0.41) < self.eps) | \
+               (bm.abs(p[..., 1] ) < self.eps)
+    
+    @cartesian
+    def is_u_boundary(self,p):
+        return ~self.is_outflow_boundary(p)
+    
+    @cartesian
+    def is_p_boundary(self,p):
+        return self.is_outflow_boundary(p) 
 
     @cartesian
     def u_inflow_dirichlet(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = np.zeros(p.shape,dtype=np.float64)
+        value = bm.zeros_like(p)
         value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
         value[...,1] = 0
         return value
     
-class ChannelFlowWithLevelSet:
-    '''
-    @brief 圆柱绕流
-    '''
-    def __init__(self, domain ,eps=1e-12, rho=1, mu=0.001):
-        self.eps = eps
-        self.rho = rho
-        self.mu = mu
-        self.domain = domain
-    
-    def mesh(self, nx ,ny):
-        domain = self.domain
-        mesh = MF.boxmesh2d([domain[0],domain[1],domain[2],domain[3]], nx, ny)
-        return mesh
-    
     @cartesian
-    def is_outflow_boundary(self,p):
-        domain = self.domain
-        return np.abs(p[..., 0] - domain[1]) < self.eps
-    
-    @cartesian
-    def is_inflow_boundary(self,p):
-        domain = self.domain
-        return np.abs(p[..., 0] - domain[0]) < self.eps
-    
-      
-    @cartesian
-    def is_wall_boundary(self,p):
-        domain = self.domain
-        return (np.abs(p[..., 1] - domain[2]) < self.eps) | \
-               (np.abs(p[..., 1] - domain[3]) < self.eps)
-
-    @cartesian
-    def u_inflow_dirichlet(self, p):
-        domain = self.domain
+    def p_dirichlet(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = np.zeros(p.shape,dtype=np.float)
-        value[...,0] = 1.5*4*y*(domain[3]-y)/(domain[3]**2)
-        value[...,1] = 0
+        value = bm.zeros_like(x)
         return value
-    
+
+    @cartesian
+    def u_dirichlet(self, p):
+        x = p[...,0]
+        y = p[...,1]
+        index = self.is_inflow_boundary(p)
+        result = bm.zeros_like(p)
+        result[index] = self.u_inflow_dirichlet(p[index])
+        return result

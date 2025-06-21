@@ -10,6 +10,7 @@
 doc/project
 *.html
 *.inp
+*.mtx
 *.mexa64
 
 meviewer
@@ -29,7 +30,7 @@ paper/*.pdf
 code/*.mat
 log.txt
 fealpyapp
-fealpy.egg-info
+*.egg-info
 dependcies
 *.npz
 *.csv
@@ -41,15 +42,18 @@ dist
 *.png
 *.fig
 *.vtk
+*.vts
 *.so
 *.swn
 *.swo
 *.vtu
+*.txt
+*.json
 
 *.cpython-38.pyc
 .vscode
 *.pickle
-
+codetest/*
 docs/_site
 docs/.sass-cache
 docs/.jekyll-cache
@@ -61,3 +65,12 @@ __pycache__
 *.mp4
 *.vtr
 *.pkl
+.mypy_cache/
+*.so
+tags
+.idea
+
+.DS_Store
+.DS_Store
+*env
+tmp

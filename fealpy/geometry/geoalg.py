@@ -1,5 +1,10 @@
-import numpy as np
 
+from ..backend import backend_manager as bm
+
+def msign(x, eps=1e-10):
+    flag = bm.sign(x)
+    flag[bm.abs(x) < eps] = 0
+    return flag
 
 def find_cut_point(phi, p0, p1):
     """ 
@@ -11,15 +16,15 @@ def find_cut_point(phi, p0, p1):
     phi1 = phi(p1)
     phic = phi(cutPoint)
 
-    isLeft = np.zeros(p0.shape[0], dtype=np.bool_)
-    isRight = np.zeros(p0.shape[0], dtype=np.bool_)
+    isLeft = bm.zeros(p0.shape[0], dtype=bm.bool)
+    isRight = bm.zeros(p0.shape[0], dtype=bm.bool_)
     vec = p1 - p0
-    h = np.sqrt(np.sum(vec**2, axis=1))
+    h = bm.sqrt(bm.sum(vec**2, axis=1))
 
-    eps = np.finfo(p0.dtype).eps
-    tol = np.sqrt(eps)*h*h
+    eps = bm.finfo(p0.dtype).eps
+    tol = bm.sqrt(eps)*h*h
     isNotOK = (h > tol) & (phic != 0)
-    while np.any(isNotOK):
+    while bm.any(isNotOK):
         cutPoint[isNotOK, :] = (p0[isNotOK, :] + p1[isNotOK,:])/2
         phic[isNotOK] = phi(cutPoint[isNotOK, :])
         isLeft[isNotOK] = phi0[isNotOK] * phic[isNotOK] > 0
@@ -39,21 +44,21 @@ def find_cut_point(phi, p0, p1):
 
 def project(imfun, p0, maxit=200, tol=1e-13, returngrad=False, returnd=False):
 
-    eps = np.finfo(float).eps
+    eps = bm.finfo(float).eps
     p = p0
     value = imfun(p)
-    s = np.sign(value)
+    s = bm.sign(value)
     grad = imfun.gradient(p)
-    lg = np.sum(grad**2, axis=-1, keepdims=True)
+    lg = bm.sum(grad**2, axis=-1, keepdims=True)
     grad /= lg
-    grad *= value[..., np.newaxis]
+    grad *= value[..., None]
     pp = p - grad
-    v = s[..., np.newaxis]*(pp - p0)
-    d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-    d *= s[..., np.newaxis]
+    v = s[..., bm]*(pp - p0)
+    d = bm.sqrt(bm.sum(v**2, axis=-1, keepdims=True))
+    d *= s[..., None]
 
     g = imfun.gradient(pp)
-    g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+    g /= bm.sqrt(bm.sum(g**2, axis=-1, keepdims=True))
     g *= d
     p = p0 - g
 
@@ -61,19 +66,19 @@ def project(imfun, p0, maxit=200, tol=1e-13, returngrad=False, returnd=False):
     while True:
         value = imfun(p)
         grad = imfun.gradient(p)
-        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        lg = bm.sqrt(bm.sum(grad**2, axis=-1, keepdims=True))
         grad /= lg
 
-        v = s[..., np.newaxis]*(p0 - p)
-        d = np.sqrt(np.sum(v**2, axis=-1))
+        v = s[..., bm.newaxis]*(p0 - p)
+        d = bm.sqrt(bm.sum(v**2, axis=-1))
         isOK = d < eps
         d[isOK] = 0
         v[isOK] = grad[isOK]
-        v[~isOK] /= d[~isOK][..., np.newaxis]
+        v[~isOK] /= d[~isOK][..., None]
         d *= s
 
         ev = grad - v
-        e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
+        e = bm.max(bm.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + bm.sum(ev**2, axis=-1)))
         if e < tol:
             break
         else:
@@ -81,14 +86,14 @@ def project(imfun, p0, maxit=200, tol=1e-13, returngrad=False, returnd=False):
             if k > maxit:
                 break
             grad /= lg
-            grad *= value[..., np.newaxis]
+            grad *= value[..., None]
             pp = p - grad
-            v = s[..., np.newaxis]*(pp - p0)
-            d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-            d *= s[..., np.newaxis]
+            v = s[..., None]*(pp - p0)
+            d = bm.sqrt(bm.sum(v**2, axis=-1, keepdims=True))
+            d *= s[..., None]
 
             g = imfun.gradient(pp)
-            g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+            g /= bm.sqrt(bm.sum(g**2, axis=-1, keepdims=True))
             g *= d
             p = p0 - g
 

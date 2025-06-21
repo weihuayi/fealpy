@@ -1,0 +1,27 @@
+# Am example config file for `box_tri_generator.py`
+
+head: 0
+tail: 20
+
+data:
+  gd_folder: 'gd'
+  gn_file: 'gn'
+  sigma: [10., 1.]
+  ext: 63
+  num_cir: 3
+  freq: [1, 2, 3, 4, 5, 6, 8, 16]
+
+label:
+  label_folder: 'inclusion'
+  dtype: 'bool'
+  transition: 'bool'
+
+fem:
+  p: 1
+  q: 3
+
+backend: 'numpy'
+seed: 26710
+seed_offsets: [621, 928, 122, 222]
+num_process: 4
+output_folder: './tmp'

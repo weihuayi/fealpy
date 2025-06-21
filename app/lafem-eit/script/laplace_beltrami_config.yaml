@@ -1,0 +1,13 @@
+# Am example config file for `box_tri_generator.py`
+
+mesh:
+  ext: [63, 63]
+  length: [2, 2]
+  origin: [-1, -1]
+  refine: 0
+
+fem:
+  order: 3
+  integral: 5
+
+file: "./tmp/laplace_beltrami_63_63_torch.npz"

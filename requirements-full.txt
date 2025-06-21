@@ -1,0 +1,16 @@
+taichi
+jax
+numba
+numpy
+scipy
+sympy
+matplotlib
+gmsh
+meshpy
+pyamg
+pypardiso
+vtk
+pyevtk
+pytest
+pytest-cov
+bump2version

@@ -1,0 +1,77 @@
+[
+    {
+        "name": "pangulu",
+        "env": "WITH_PANGULU",
+        "compile_from_source": true,
+        "version": "4.2.0",
+        "source_url": [
+            "git@github.com:SuperScientificSoftwareLaboratory/PanguLU.git",
+            "https://www.ssslab.cn/assets/panguLU/PanguLU-4.2.0.zip"
+        ],
+        "install_prefix": "~/.local",
+        "libraries": [
+            {
+                "name": "openmpi",
+                "apt_package": "libopenmpi-dev",
+                "check_command": [
+                    "pkg-config --exists openmpi",
+                    "test -f /usr/lib/x86_64-linux-gnu/openmpi/include/mpi.h"
+                ]
+            },
+            {
+                "name": "openblas",
+                "apt_package": "libopenblas-dev",
+                "check_command": [
+                    "pkg-config --exists openblas",
+                    "test -f /usr/include/openblas/cblas.h"
+                ]
+            },
+            {
+                "name": "metis",
+                "apt_package": "libmetis-dev",
+                "check_command": [
+                    "pkg-config --exists metis",
+                    "test -f /usr/include/metis.h"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "mumps",
+        "env": "WITH_MUMPS",
+        "compile_from_source": false,
+        "version": "4.2.0",
+        "libraries": [
+            {
+                "name": "openmpi",
+                "apt_package": "libopenmpi-dev",
+                "check_command": [
+                    "pkg-config --exists openmpi",
+                    "test -f /usr/lib/x86_64-linux-gnu/openmpi/include/mpi.h"
+                ]
+            },
+            {
+                "name": "openblas",
+                "apt_package": "libopenblas-dev",
+                "check_command": [
+                    "pkg-config --exists openblas",
+                    "test -f /usr/include/openblas/cblas.h"
+                ]
+            },
+            {
+                "name": "metis",
+                "apt_package": "libmetis-dev",
+                "check_command": [
+                    "pkg-config --exists metis",
+                    "test -f /usr/include/metis.h"
+                ]
+            }
+        ]
+    },
+    {
+        "name": "p4est",
+        "env": "WITH_P4EST",
+        "compile_from_source": false,
+        "apt_package": "libp4est-dev"
+    }
+]

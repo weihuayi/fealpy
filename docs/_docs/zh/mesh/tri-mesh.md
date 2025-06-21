@@ -38,7 +38,7 @@ plt.show()
 
 生成的网格图像为
 
-<img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
+<img src="../../../assets/images/mesh/tri-mesh/triangle_1.png" alt="Triangle" style="zoom:50%;" />
 
 $\quad$如代码所示，`node` 给出了节点的数据，`cell` 给出了单元的数据。
 在上述算例中，`cell` 包含两个单元，即[1,2,0]与[3,0,2]，
@@ -101,7 +101,7 @@ eh = mesh.entity_measure('edge') # (NE,1), 每条边的长度
 以如下网格单元剖分为例结合输出进行说明
 ## cell 与 node,edge,cell 间的关系
 
-<img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
+<img src="../../../assets/images/mesh/tri-mesh/triangle_1.png" alt="Triangle" style="zoom:50%;" />
 ### cell 与 node 间的关系
 ```python
 cell2node = mesh.ds.cell_to_node()

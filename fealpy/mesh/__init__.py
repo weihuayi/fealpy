@@ -1,57 +1,19 @@
-'''
-mesh
-====
 
-This module provide mesh 
+from .mesh_data_structure import MeshDS
+from .mesh_base import Mesh, HomogeneousMesh, SimplexMesh, TensorMesh, StructuredMesh
 
-'''
+from .interval_mesh import IntervalMesh
+from .triangle_mesh import TriangleMesh
+from .tetrahedron_mesh import TetrahedronMesh
+from .quadrangle_mesh import QuadrangleMesh
+from .hexahedron_mesh import HexahedronMesh
+from .polygon_mesh import PolygonMesh
+from .halfedge_mesh import HalfEdgeMesh2d
 
-# 结构化网格
-from .UniformMesh2d import UniformMesh2d,UniformMesh2dFunction
-from .UniformMesh3d import UniformMesh3d,UniformMesh3dFunction
-from .StructureIntervalMesh import StructureIntervalMesh
-from .StructureQuadMesh import StructureQuadMesh
-from .StructureHexMesh import StructureHexMesh
+from .uniform_mesh import UniformMesh
+from .uniform_mesh_1d import UniformMesh1d
+from .uniform_mesh_2d import UniformMesh2d
+from .uniform_mesh_3d import UniformMesh3d
 
-from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
-from .PolygonMesh import PolygonMesh
-from .QuadrangleMesh import QuadrangleMesh
-from .TetrahedronMesh import TetrahedronMesh
-from .IntervalMesh import IntervalMesh
-from .HexahedronMesh import HexahedronMesh
-from .TrussMesh import TrussMesh
-
-from .SurfaceTriangleMesh import SurfaceTriangleMesh
-from .PrismMesh import PrismMesh
-
-from .LagrangeTriangleMesh import LagrangeTriangleMesh
-from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
-from .LagrangeHexahedronMesh import LagrangeHexahedronMesh
-from .LagrangeWedgeMesh import LagrangeWedgeMesh
-
-from .Tritree import Tritree
-from .Quadtree import Quadtree
-from .Octree import Octree
-
-from .QuadtreeForest import QuadtreeMesh, QuadtreeForest
-
-
-from .distmesh import DistMesh2d
-from .mesh_tools import *
-
-
-from .HalfEdgeDomain import HalfEdgeDomain
-from .HalfEdgeMesh2d import HalfEdgeMesh2d
-from .DartMesh3d import DartMesh3d
-
-from .PolyFileReader import PolyFileReader
-from .InpFileReader import InpFileReader
-from .CCGMeshReader import CCGMeshReader
-from .FABFileReader import FABFileReader
-
-from .meshio import load_mat_mesh
-
-# Mesher
-from .DistMesher2d import DistMesher2d
-from .DistMesher3d import DistMesher3d
-from .CVTPMesher import CVTPMesher, VoroAlgorithm
+from .lagrange_triangle_mesh import LagrangeTriangleMesh
+from .lagrange_quadrangle_mesh import LagrangeQuadrangleMesh

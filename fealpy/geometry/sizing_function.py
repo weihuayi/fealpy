@@ -1,5 +1,8 @@
-import numpy as np
+from ..backend import backend_manager as bm
 
 def huniform(points, *args):
-    h = np.ones((points.shape[0], ))
+    """
+    TOTO: Add context.
+    """
+    h = bm.ones((points.shape[0], ))
     return h

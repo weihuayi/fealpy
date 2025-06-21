@@ -1,284 +1,215 @@
+from typing import Optional, Protocol
 
-from numpy import sqrt, inner, finfo, zeros
-from numpy.linalg import norm
+from ..backend import backend_manager as bm
+from ..backend import TensorLike
+from ..sparse.coo_tensor import COOTensor
+from ..sparse.csr_tensor import CSRTensor
 
-from scipy.sparse.linalg.isolve.utils import make_system
+from .. import logger
 
 
-def minres(A, b, x0=None, shift=0.0, tol=1e-5, maxiter=None,
-           M=None, callback=None, show=False, check=False):
-    A, M, x, b, postprocess = make_system(A, M, x0, b)
+class SupportsMatmul(Protocol):
+    def __matmul__(self, other: TensorLike) -> TensorLike: ...
 
-    matvec = A.matvec
-    psolve = M.matvec
 
-    first = 'Enter minres.   '
-    last = 'Exit  minres.   '
+def minres(
+    A: SupportsMatmul,
+    b: TensorLike,
+    x0: Optional[TensorLike] = None,
+    atol: float = 1e-12,
+    rtol: float = 1e-8,
+    maxit: Optional[int] = None,
+    M: Optional[SupportsMatmul] = None
+) -> tuple[TensorLike, dict]:
+    """
+    Solve a linear system Ax = b using MINimum RESidual iteration (minres) method.
 
-    n = A.shape[0]
+    Parameters:
+        A (SupportsMatmul): The coefficient matrix of the linear system.
+        b (TensorLike): The right-hand side vector of the linear system, can be a 1D or 2D tensor.
+        x0 (TensorLike, optional): Initial guess for the solution, a 1D or 2D tensor.
+            Must have the same shape as b when reshaped appropriately. Defaults to None.
+        atol (float, optional): Absolute tolerance for convergence. Defaults to 1e-12.
+        rtol (float, optional): Relative tolerance for convergence. Defaults to 1e-8.
+        maxit (int, optional): Maximum number of iterations allowed. Defaults to 5*m.
+            If not provided, the method will continue until convergence based on tolerances.
+        M (TensorLike): Inverse of the preconditioner of `A`.  `M` should approximate the
+            inverse of `A` and be easy to solve. Defaults to None.
 
-    if maxiter is None:
-        maxiter = 5 * n
+    Returns:
+        TensorLike: The approximate solution to the system Ax = b.
+        dict: Information dictionary containing residual, iteration count, and relative tolerance.
 
-    msg = [' beta2 = 0.  If M = I, b and x are eigenvectors    ',   # -1
-            ' beta1 = 0.  The exact solution is  x = 0          ',   # 0
-            ' A solution to Ax = b was found, given rtol        ',   # 1
-            ' A least-squares solution was found, given rtol    ',   # 2
-            ' Reasonable accuracy achieved, given eps           ',   # 3
-            ' x has converged to an eigenvector                 ',   # 4
-            ' acond has exceeded 0.1/eps                        ',   # 5
-            ' The iteration limit was reached                   ',   # 6
-            ' A  does not define a symmetric matrix             ',   # 7
-            ' M  does not define a symmetric matrix             ',   # 8
-            ' M  does not define a pos-def preconditioner       ']   # 9
+    Raises:
+        ValueError: If inputs do not meet specified conditions (e.g., dimensions mismatch).
+    """
+    assert isinstance(b, TensorLike), "b must be a Tensor"
+    if x0 is not None:
+        assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"
+    if b.ndim not in {1, 2}:
+        raise ValueError("b must be a 1D or 2D dense tensor")
+    
+    if x0 is None:
+        x0 = bm.zeros_like(b)
+    elif x0.shape != b.shape:
+        raise ValueError("x0 and b must have the same shape")
+    
+    m, n = A.shape  # Matrix dimensions
 
-    if show:
-        print(first + 'Solution of symmetric Ax = b')
-        print(first + 'n      =  %3g     shift  =  %23.14e' % (n,shift))
-        print(first + 'itnlim =  %3g     rtol   =  %11.2e' % (maxiter,tol))
-        print()
+    maxit = maxit or 5 * m  # Default maximum iterations
+    if x0 is None:
+        r = b.copy()
+    else:
+        r = b - A @ x0  # Initial residual
+    if M is not None:
+        y = M @ r
+    else:
+        y = r
+    beta = bm.sqrt(y @ r)
 
-    istop = 0
-    itn = 0
-    Anorm = 0
-    Acond = 0
-    rnorm = 0
-    ynorm = 0
-
-    xtype = x.dtype
-
-    eps = finfo(xtype).eps
-
-    x = zeros(n, dtype=xtype)
-
-    # Set up y and v for the first Lanczos vector v1.
-    # y  =  beta1 P' v1,  where  P = C**(-1).
-    # v is really P' v1.
-
-    y = b
-    r1 = b
-
-    y = psolve(b)
-
-    beta1 = inner(b,y)
-
-    if beta1 < 0:
-        raise ValueError('indefinite preconditioner')
-    elif beta1 == 0:
-        return (postprocess(x), 0)
-
-    beta1 = sqrt(beta1)
-
-    if check:
-        # are these too strict?
-
-        # see if A is symmetric
-        w = matvec(y)
-        r2 = matvec(w)
-        s = inner(w,w)
-        t = inner(y,r2)
-        z = abs(s - t)
-        epsa = (s + eps) * eps**(1.0/3.0)
-        if z > epsa:
-            raise ValueError('non-symmetric matrix')
-
-        # see if M is symmetric
-        r2 = psolve(y)
-        s = inner(y,y)
-        t = inner(r1,r2)
-        z = abs(s - t)
-        epsa = (s + eps) * eps**(1.0/3.0)
-        if z > epsa:
+    # check if A is symmetric
+    w = A @ r
+    w_1 = A @ w
+    s = w @ w
+    a = r @ w_1
+    eps = bm.finfo(x0.dtype).eps
+    epsa = (s + eps) * eps**(1.0 / 3.0)
+    if bm.abs(s - a) > epsa:
+        raise ValueError("A must be symmetric matrix")
+    
+    # check if M is symmetric
+    if M is not None:
+        w = M @ r
+        w_1 = M @ w
+        s = w @ w
+        a = r @ w_1
+        if bm.abs(s - a) > epsa:
             raise ValueError('non-symmetric preconditioner')
 
-    # Initialize other quantities
-    oldb = 0
-    beta = beta1
-    dbar = 0
-    epsln = 0
-    qrnorm = beta1
-    phibar = beta1
-    rhs1 = beta1
-    rhs2 = 0
-    tnorm2 = 0
-    ynorm2 = 0
-    cs = -1
-    sn = 0
-    w = zeros(n, dtype=xtype)
-    w2 = zeros(n, dtype=xtype)
-    r2 = r1
+    if x0 is not None:
+        kwags = bm.context(x0)
+    else:
+        kwags = bm.context(b)
 
-    if show:
-        print()
-        print()
-        print('   Itn     x(1)     Compatible    LS       norm(A)  cond(A) gbar/|A|')
+    info = {}
 
-    while itn < maxiter:
-        itn += 1
+    # bases of Krylov subspace
+    r2 = r1 = r
+    
+    # Tridiagonal matrix storage
+    T_diag = []  # Main diagonal elements
+    T_offdiag = []  # Off-diagonal elements
 
-        s = 1.0/beta
-        v = s*y
+    # QR decomposition elements
+    a1 = 0
+    a2 = 0
+    b1 = 0
+    a = 0
+    b0 = 0
+    d = 0
 
-        y = matvec(v)
-        y = y - shift * v
+    t_0 = 0
+    t_1 = beta
 
-        if itn >= 2:
-            y = y - (beta/oldb)*r1
+    p_1 = bm.zeros(n, **kwags)
+    p_0 = bm.zeros(n, **kwags)
+    p_2 = bm.zeros(n, **kwags)
+    
+    Tnorm = 0  # Norm of tridiagonal matrix
+    x = x0
+    prev_res = float('inf')
+    Tnorm = 0
+    
+    for niter in range(maxit):
+        # Lanczos
+        s = 1.0 / beta
+        if niter > 0:
+            w0 = w
+        v = s * y
+        w = v
+        y = bm.tensor(A @ v)
+        
+        # Orthogonalization
+        if niter > 0:
+            y -= (T_offdiag[niter-1] / oldbeta) * r1
+        T_diag.append(v @ y)
+        y -= (T_diag[niter] / beta) * r2
 
-        alfa = inner(v,y)
-        y = y - (alfa/beta)*r2
+        oldbeta = beta
         r1 = r2
         r2 = y
-        y = psolve(r2)
-        oldb = beta
-        beta = inner(r2,y)
-        if beta < 0:
-            raise ValueError('non-symmetric matrix')
-        beta = sqrt(beta)
-        tnorm2 += alfa**2 + oldb**2 + beta**2
+        if M is not None:
+            y = M @ y
+        beta = r2 @ y
+        beta = bm.sqrt(beta)
+        T_offdiag.append(beta)
+        
+        # Update Tnorm
+        Tnorm0 = Tnorm
+        Tnorm += T_diag[-1]**2 + T_offdiag[-1]**2 + oldbeta**2
+        Anorm = bm.sqrt(bm.tensor(Tnorm0))
+        
+        if niter < 1:
+            continue 
 
-        if itn == 1:
-            if beta/beta1 <= 10*eps:
-                istop = -1  # Terminate later
-            # tnorm2 = alfa**2 ??
-            gmax = abs(alfa)
-            gmin = gmax
+        # QR step
+        c = T_diag[-2] / bm.sqrt(abs(T_offdiag[-2])**2 + abs(T_diag[-2])**2)
+        s = T_offdiag[-2] / bm.sqrt(abs(T_offdiag[-2])**2 + abs(T_diag[-2])**2)
+        t_0 = t_1
+        t_1 = s * t_0
+        t_0 = c * t_0
 
-        # Apply previous rotation Qk-1 to get
-        #   [deltak epslnk+1] = [cs  sn][dbark    0   ]
-        #   [gbar k dbar k+1]   [sn -cs][alfak betak+1].
+        # Update T
+        a2 = b1
+        a1 = a
+        b1 = b0
+        T_diag = bm.set_at(T_diag, -2, c*T_diag[-2] + s*T_offdiag[-2])
+        if niter < 2:
+            a = c * T_offdiag[-2] + s * T_diag[-1]
+            T_diag = bm.set_at(T_diag, -1, s.conj()*T_offdiag[-2] - c*T_diag[-1])
+        else:
+            a = c * d + s * T_diag[-1]
+            T_diag = bm.set_at(T_diag, -1, s*d - c*T_diag[-1])
 
-        oldeps = epsln
-        delta = cs * dbar + sn * alfa   # delta1 = 0         deltak
-        gbar = sn * dbar - cs * alfa   # gbar 1 = alfa1     gbar k
-        epsln = sn * beta     # epsln2 = 0         epslnk+1
-        dbar = - cs * beta   # dbar 2 = beta2     dbar k+1
-        root = norm([gbar, dbar])
-        Arnorm = phibar * root
+        b0 = s * T_offdiag[-1]
+        d = -c * T_offdiag[-1]
+        T_offdiag[-2] = 0
 
-        # Compute the next plane rotation Qk
+        # x
+        p_0 = p_1
+        p_1 = p_2
+        p_2 = (w0 - a1 * p_1 - a2 * p_0) / T_diag[-2]
+        x = x + t_0 * p_2
 
-        gamma = norm([gbar, beta])       # gammak
-        gamma = max(gamma, eps)
-        cs = gbar / gamma             # ck
-        sn = beta / gamma             # sk
-        phi = cs * phibar              # phik
-        phibar = sn * phibar              # phibark+1
+        # Residual
+        res = bm.abs(t_1)
+        # Monitor residual growth
+        if res > prev_res:
+            logger.warning("Residual stagnation, terminating early.")
+            break
 
-        # Update  x.
+        prev_res = res
+        xnorm = bm.linalg.norm(x)
+        stop_res = res / (Anorm * xnorm)
 
-        denom = 1.0/gamma
-        w1 = w2
-        w2 = w
-        w = (v - oldeps*w1 - delta*w2) * denom
-        x = x + phi*w
+        # Convergence checks
+        if res < atol:
+            logger.info(
+                f"minres: converged in {niter} iterations, (absolute tolerance: {atol:.1e})"
+                )
+            break
 
-        # Go round again.
+        if stop_res < rtol:
+            logger.info(
+                f"minres: converged in {niter} iterations, (relative tolerance: {rtol:.1e})"
+            )
+            break
+        
+        if (maxit is not None) and (niter >= maxit):
+            logger.info(f"minres: failed, stopped by maxiter ({maxit}).")
+            break
 
-        gmax = max(gmax, gamma)
-        gmin = min(gmin, gamma)
-        z = rhs1 / gamma
-        ynorm2 = z**2 + ynorm2
-        rhs1 = rhs2 - delta*z
-        rhs2 = - epsln*z
-
-        # Estimate various norms and test for convergence.
-
-        Anorm = sqrt(tnorm2)
-        ynorm = sqrt(ynorm2)
-        epsa = Anorm * eps
-        epsx = Anorm * ynorm * eps
-        epsr = Anorm * ynorm * tol
-        diag = gbar
-
-        if diag == 0:
-            diag = epsa
-
-        qrnorm = phibar
-        rnorm = qrnorm
-        test1 = rnorm / (Anorm*ynorm)    # ||r||  / (||A|| ||x||)
-        test2 = root / Anorm            # ||Ar|| / (||A|| ||r||)
-
-        # Estimate  cond(A).
-        # In this version we look at the diagonals of  R  in the
-        # factorization of the lower Hessenberg matrix,  Q * H = R,
-        # where H is the tridiagonal matrix from Lanczos with one
-        # extra row, beta(k+1) e_k^T.
-
-        Acond = gmax/(gmin+eps)
-
-        # See if any of the stopping criteria are satisfied.
-        # In rare cases, istop is already -1 from above (Abar = const*I).
-
-        if istop == 0:
-            t1 = 1 + test1      # These tests work if tol < eps
-            t2 = 1 + test2
-            if t2 <= 1:
-                istop = 2
-            if t1 <= 1:
-                istop = 1
-
-            if itn >= maxiter:
-                istop = 6
-            if Acond >= 0.1/eps:
-                istop = 4
-            if epsx >= beta:
-                istop = 3
-            # if rnorm <= epsx   : istop = 2
-            # if rnorm <= epsr   : istop = 1
-            if test2 <= tol:
-                istop = 2
-            if test1 <= tol:
-                istop = 1
-
-        # See if it is time to print something.
-
-        prnt = False
-        if n <= 40:
-            prnt = True
-        if itn <= 10:
-            prnt = True
-        if itn >= maxiter-10:
-            prnt = True
-        if itn % 10 == 0:
-            prnt = True
-        if qrnorm <= 10*epsx:
-            prnt = True
-        if qrnorm <= 10*epsr:
-            prnt = True
-        if Acond <= 1e-2/eps:
-            prnt = True
-        if istop != 0:
-            prnt = True
-
-        if show and prnt:
-            str1 = '%6g %12.5e %10.3e' % (itn, x[0], test1)
-            str2 = ' %10.3e' % (test2,)
-            str3 = ' %8.1e %8.1e %8.1e' % (Anorm, Acond, gbar/Anorm)
-
-            print(str1 + str2 + str3)
-
-            if itn % 10 == 0:
-                print()
-
-        if callback is not None:
-            callback(x)
-
-        if istop in [1, 2]:
-            pass
-            #break  # TODO check this
-
-    if show:
-        print()
-        print(last + ' istop   =  %3g               itn   =%5g' % (istop,itn))
-        print(last + ' Anorm   =  %12.4e      Acond =  %12.4e' % (Anorm,Acond))
-        print(last + ' rnorm   =  %12.4e      ynorm =  %12.4e' % (rnorm,ynorm))
-        print(last + ' Arnorm  =  %12.4e' % (Arnorm,))
-        print(last + msg[istop+1])
-
-    if istop == 6:
-        info = maxiter
-    else:
-        info = 0
-
-    return (postprocess(x),info)
+    info['residual'] = res
+    info['niter'] = niter
+    info['relative tolerance'] = stop_res
+    return x,info

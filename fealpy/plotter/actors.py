@@ -1,6 +1,5 @@
 import vtk
 import numpy as np
-
 from vtk.util import numpy_support as vns
 
 

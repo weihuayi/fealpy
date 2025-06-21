@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import TriangleMesh
 from fealpy.mesh import MeshFactory as MF
 
-p = 6 
+p = 3 
 
 #box = [0, 1, 0, 1]
 #mesh = MF.boxmesh2d(box, nx=1, ny=1, meshtype='tri')
@@ -14,16 +14,20 @@ mesh = MF.one_triangle_mesh(meshtype='equ')
 
 mi = mesh.multi_index_matrix(p=p)
 
-bcs = mi/p
+print(mi)
 
-node = mesh.entity('node')
-cell = mesh.entity('cell')
+bcs = mi/p # (NI, 3)
+
+node = mesh.entity('node') # (NN, 2)
+cell = mesh.entity('cell') # (NC, 3)
+print("node\n", node)
+print("cell\n", cell)
 
 # bcs
 # node[cell].shape = (NC, 3, 2)
 points = np.einsum('ij, cjk->cik', bcs, node[cell])
 
-print(bcs)
+print(points[0])
 
 fig = plt.figure()
 axes = fig.gca()
