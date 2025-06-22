@@ -129,15 +129,16 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
             assert len(gd) == self.number_of_global_dofs()
             if uh is None:
                 uh = bm.zeros_like(gd)
-            uh[isDDof] = gd[isDDof] 
-            return uh,isDDof 
-        if callable(gd):
+            uh = bm.set_at(uh, (..., isDDof), gd[isDDof])
+        elif callable(gd):
             gd = gd(ipoints[isDDof])
-        if uh is None:
-            uh = self.function()
-        uh[:] = bm.set_at(uh[:], (..., isDDof), gd)
+            if uh is None:
+                uh = bm.zeros_like(gd)
+            uh = bm.set_at(uh, (..., isDDof), gd)
+        else:
+            raise TypeError("gd must be a tensor or a callable function")
         
-        return self.function(uh), isDDof
+        return uh, isDDof
 
     set_dirichlet_bc = boundary_interpolate
 

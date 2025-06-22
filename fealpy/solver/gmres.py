@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Tuple
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
@@ -21,7 +21,7 @@ def gmres(
     restart: Optional[int] = None,
     maxit: Optional[int] = None,
     M: Optional[SupportsMatmul] = None
-) -> tuple[TensorLike, dict]:
+) -> Tuple[TensorLike, dict]:
     """
     Solve a linear system Ax = b using Generalized Minimal RESidual iteration (gmres) method.
 
