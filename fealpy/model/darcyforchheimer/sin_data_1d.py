@@ -7,8 +7,8 @@ class SinData1D:
     """
     Darcy-Forchheimer 1D test PDE:
 
-        (μ/k + β·ρ·|u|)·u + ∂p/∂x = g(x)
-        ∂u/∂x = f(x)
+        (μ/k + β·ρ·|u|)·u + ∂p/∂x = f
+        ∂u/∂x = g
         μ = 2.0, k = 4.0, β = 5.0, ρ = 1.0
 
     With exact solutions:
@@ -18,8 +18,8 @@ class SinData1D:
 
     Source and forcing terms:
 
-        g(x) = (μ/k + β·ρ·|sin(π x)|)·sin(π x) - 2 x + 1
-        f(x) = cos(π x)
+        f(x) = (μ/k + β·ρ·|sin(π x)|)·sin(π x) - 2 x + 1
+        g(x) = cos(π x)
     """
 
     def geo_dimension(self) -> int:
@@ -47,13 +47,13 @@ class SinData1D:
         return 1 - 2 * p
 
     @cartesian
-    def source(self, p: TensorLike) -> TensorLike:
+    def g(self, p: TensorLike) -> TensorLike:
         """Right-hand side source f(x) = pi * cos(pi * x)"""
         pi = bm.pi
         return pi * bm.cos(pi * p)
 
     @cartesian
-    def flux(self, p: TensorLike) -> TensorLike:
+    def f(self, p: TensorLike) -> TensorLike:
         """Nonlinear flux term g(u,p) = (mu/k + beta*rho*|u|)*u + dp/dx"""
         u = self.velocity(p)
         dpdx = self.grad_pressure(p)
