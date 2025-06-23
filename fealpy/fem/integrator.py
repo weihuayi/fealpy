@@ -192,7 +192,7 @@ class Integrator(metaclass=VariantMeta):
         return ConstIntegrator(value, to_gdof)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.method})"
+        return f"{self.__class__.__name__}"
 
     def __call__(self, *args, **kwargs):
         return self.assembly(*args, **kwargs)

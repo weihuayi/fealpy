@@ -15,7 +15,7 @@ create_directory(os.path.expanduser("~/.local/include"))
 create_directory(os.path.expanduser("~/.local/lib"))
 
 
-__version__ = "3.2.0"
+__version__ = "3.3.1"
 
 here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / "README.md").read_text(encoding="utf-8")
