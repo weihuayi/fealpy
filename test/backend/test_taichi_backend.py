@@ -74,7 +74,24 @@ def test_to_numpy():
     assert isinstance(np_x, np.ndarray)
     assert np.allclose(np_x, np.array([[0.0, 0.1, 0.2], [1.0, 1.1, 1.2]]))  
 
+#测试 device_type 方法
+def test_device_type():
+    x = ti.field(dtype=ti.f32, shape=(2, 3))
 
+    # 填充数据
+    @ti.kernel
+    def fill():
+        for i, j in x:
+            x[i, j] = i * 1.0 + j * 0.1
+
+    fill()
+
+    dt = bm.device_type(x)
+
+    # device 应为 'cpu'
+    assert dt== "cpu"
+
+    print(dt)
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])

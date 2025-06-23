@@ -85,7 +85,13 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         # Store the chosen device for future reference
         TaichiBackend._device = device
-    
+        
+    @staticmethod
+    def device_type(field: ti.Field, /):  # type: ignore
+        arch = ti.cfg.arch
+        device = "cpu" if arch == ti.cpu else "cuda" if arch == ti.cuda else str(arch)
+        return device
+
     @staticmethod
     def to_numpy(field: ti.Field, /) -> np.ndarray:
         """
@@ -99,4 +105,4 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         """
         return field.to_numpy()
 
-    
+   
