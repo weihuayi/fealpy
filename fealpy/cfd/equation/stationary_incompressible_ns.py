@@ -2,23 +2,17 @@ from .base import BaseEquation
 from typing import Union, Callable, Dict
 CoefType = Union[int, float, Callable]
 
-class IncompressibleNS(BaseEquation):
-    def __init__(self, pde, init_variables=False):
+class StationaryIncompressibleNS(BaseEquation):
+    def __init__(self, pde):
         super().__init__(pde)
         self._coefs = {
-            'time_derivative': 1,  # 时间导数项系数
             'convection': 1,      # 对流项系数
             'pressure': 1,        # 压力项系数
             'viscosity': 1,       # 粘性项系数
-            'body_force': 0      # 外力项系数
-        }
-        self._variables = { 
-            'velocity': None,     # 速度变量
-            'pressure': None     # 压力变量
+            'body_force': 1      # 外力项系数
         }
         self.pde = pde
-        if init_variables:
-            self.initialize_from_pde(pde) 
+        self.initialize_from_pde(pde) 
     
     def initialize_from_pde(self, pde):
         """
@@ -45,43 +39,18 @@ class IncompressibleNS(BaseEquation):
             rho = 1.0
             mu = 1.0
 
-        # 设置系数
-        self._coefs['time_derivative'] = rho
+        # 设置系数 
         self._coefs['convection'] = rho
         self._coefs['pressure'] = 1
         self._coefs['viscosity'] = mu
-        self._coefs['body_force'] = getattr(pde, 'body_force', 0)
+        self._coefs['body_force'] = getattr(pde, 'source', 0)
 
-        # 设置变量
-        self._variables['velocity'] = getattr(pde, 'init_velocity', None)
-        self._variables['pressure'] = getattr(pde, 'init_pressure', None)  
-    
-    # 定义变量访问
-    @property
-    def variables(self):
-        """变量字典"""
-        return self._variables
-
-    @property
-    def velocity(self):
-        """速度变量"""
-        return self._variables['velocity']
-
-    @property
-    def pressure(self):
-        """压力变量"""
-        return self._variables['pressure']
 
     # 定义属性访问
     @property
     def coefs(self):
         """系数字典"""
         return self._coefs
-
-    @property
-    def coef_time_derivative(self) -> float | Callable:
-        """时间导数项系数"""
-        return self._coefs['time_derivative']
 
     @property
     def coef_convection(self) -> CoefType:
