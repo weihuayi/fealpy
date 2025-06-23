@@ -2,7 +2,7 @@ from ..backend import backend_manager as bm
 from ..typing import TensorLike
 from ..mesh import TriangleMesh,TetrahedronMesh,QuadrangleMesh,HexahedronMesh
 from ..mesh import LagrangeTriangleMesh,LagrangeQuadrangleMesh
-from ..functionspace import LagrangeFESpace,ParametricLagrangeFESpace
+from ..functionspace import LagrangeFESpace,ParametricLagrangeFESpace,Function
 from ..fem import ( BilinearForm 
                     ,LinearForm
                     ,ScalarDiffusionIntegrator
@@ -23,6 +23,8 @@ _U =  Union[TriangleMesh,
       LagrangeTriangleMesh,
       LagrangeQuadrangleMesh]
 
+_V = Union[LagrangeFESpace, ParametricLagrangeFESpace]
+
 __all__ = [
     'bm', 'TensorLike', 
     'TriangleMesh', 'TetrahedronMesh', 'QuadrangleMesh', 'HexahedronMesh',
@@ -36,8 +38,9 @@ __all__ = [
     'DirichletBC', 
     'spsolve', 'cg', 
     'CSRTensor', 'COOTensor', 'spdiags','bmat', 'hstack', 'vstack',
-    'solve_ivp', 'Any', 'Union', 'Optional',
-    '_U', 
+    'solve_ivp', 'Any', 'Union', 'Optional','Function',
+    '_U',
+    '_V', 
     'Config'
 ]
 
@@ -53,6 +56,7 @@ class Config:
                  logic_domain = None,
                  tol = None,
                  tau = None,
+                 t_max = 0.5,
                  maxit = 500,
                  is_pre = True,
                  pre_steps = 5,
@@ -90,6 +94,7 @@ class Config:
         self.is_pre = is_pre
         self.pre_steps = pre_steps
         self.tau = tau
+        self.t_max = t_max
         self.fun_solver = fun_solver
         self.monitor = monitor
         self.mol_meth = mol_meth

@@ -251,12 +251,29 @@ def quad_equ_solver(coef:list):
     @param b: the coefficient of x
     @param c: the constant term
     """
+    eps = 1e-12
     a,b,c = coef
-    discriminant = b**2 - 4*a*c
-    right_idx = bm.where(discriminant >= 0)[0]
-    x1 = (-b[right_idx] + bm.sqrt(discriminant[right_idx]))/(2*a[right_idx])
-    x2 = (-b[right_idx] - bm.sqrt(discriminant[right_idx]))/(2*a[right_idx])
-    x = bm.concat([x1,x2])
+    is_linear = bm.abs(a) < eps
+    if bm.any(is_linear):
+        linear_mask = is_linear
+        x_linear = -c[linear_mask] / (b[linear_mask] + eps)
+    x1 = None
+    x2 = None
+    quadratic_mask = ~is_linear
+    if bm.any(quadratic_mask):
+        a_mark = a[quadratic_mask]
+        b_mark = b[quadratic_mask]
+        c_mark = c[quadratic_mask]
+        discriminant = b_mark**2 - 4*a_mark*c_mark
+        right_idx = bm.where(discriminant >= 0)[0]
+        x1 = (-b_mark[right_idx] + bm.sqrt(discriminant[right_idx]))/(2*a_mark[right_idx])
+        x2 = (-b_mark[right_idx] - bm.sqrt(discriminant[right_idx]))/(2*a_mark[right_idx])
+    if x1 is None:
+        x=  x_linear
+    else:
+        x = bm.concat([x1,x2])
+        if bm.any(is_linear):
+            x = bm.concat([x, x_linear])
     return x
     
 def cubic_equ_solver(coef:list):
@@ -287,3 +304,226 @@ def cubic_equ_solver(coef:list):
     x3 = -upv / 2 - umv * sq3 * 1j / 2 - move_dis
     x = bm.concat([x1, x2, x3])
     return x
+
+def _compute_coef_general_2d(A,C):
+    """
+    @brief compute the coefficient of the quadratic equation
+    """
+    a = bm.linalg.det(C)
+    c = bm.linalg.det(A)
+    b = (A[:, 0, 0] * C[:, 1, 1] - 
+            A[:, 0, 1] * C[:, 1, 0] + 
+            C[:, 0, 0] * A[:, 1, 1] - 
+            C[:, 0, 1] * A[:, 1, 0])
+    return [a, b, c]
+
+def _compute_coef_general_3d(A,C):
+    """
+    @brief compute the coefficient of the cubic equation
+    """
+    a0, a1, a2 = (C[:, 1, 1] * C[:, 2, 2] - C[:, 1, 2] * C[:, 2, 1],
+                    C[:, 1, 2] * C[:, 2, 0] - C[:, 1, 0] * C[:, 2, 2],
+                    C[:, 1, 0] * C[:, 2, 1] - C[:, 1, 1] * C[:, 2, 0])
+    b0, b1, b2 = (A[:, 1, 1] * C[:, 2, 2] - A[:, 1, 2] * C[:, 2, 1] + 
+                    C[:, 1, 1] * A[:, 2, 2] - C[:, 1, 2] * A[:, 2, 1], 
+                    A[:, 1, 0] * C[:, 2, 2] - A[:, 1, 2] * C[:, 2, 0] + 
+                    C[:, 1, 0] * A[:, 2, 2] - C[:, 1, 2] * A[:, 2, 0], 
+                    A[:, 1, 0] * C[:, 2, 1] - A[:, 1, 1] * C[:, 2, 0] + 
+                    C[:, 1, 0] * A[:, 2, 1] - C[:, 1, 1] * A[:, 2, 0])
+    c0, c1, c2 = (A[:, 1, 1] * A[:, 2, 2] - A[:, 1, 2] * A[:, 2, 1], 
+                    A[:, 1, 0] * A[:, 2, 2] - A[:, 1, 2] * A[:, 2, 0],
+                    A[:, 1, 0] * A[:, 2, 1] - A[:, 1, 1] * A[:, 2, 0])
+    a = C[:, 0, 0] * a0 - C[:, 0, 1] * a1 + C[:, 0, 2] * a2
+    ridx = bm.where(a > 1e-14)[0]
+    b = (A[:, 0, 0] * a0 - A[:, 0, 1] * a1 + 
+            A[:, 0, 2] * a2 + C[:, 0, 0] * b0 - 
+            C[:, 0, 1] * b1 + C[:, 0, 2] * b2)
+    c = (A[:, 0, 0] * b0 - A[:, 0, 1] * b1 + 
+            A[:, 0, 2] * b2 + C[:, 0, 0] * c0 - 
+            C[:, 0, 1] * c1 + C[:, 0, 2] * c2)
+    d = A[:, 0, 0] * c0 - A[:, 0, 1] *c1 + A[:, 0, 2] * c2
+    a, b, c, d = a[ridx], b[ridx], c[ridx], d[ridx]
+    return [a, b, c, d]
+
+def _compute_coef_2d(delta_x,AC_gererator):
+    """
+    Compute coefficients for 2D case.
+    """
+    return _compute_general_coef(delta_x,AC_gererator,_compute_coef_general_2d)
+
+def _compute_coef_3d(delta_x,AC_gererator):
+    """
+    Compute coefficients for 3D case.
+    """
+    return _compute_general_coef(delta_x,AC_gererator, _compute_coef_general_3d)
+
+def _compute_general_coef(delta_x ,AC_gererator, fun):
+    """
+    @brief compute the coefficient of the quadratic equation
+    """
+    A, C = AC_gererator(delta_x)
+    return fun(A, C)
+
+def _solve_bilinear_system(p, A, B, C, D):
+    """
+    @brief 统一的双线性系统求解 [0,1]×[0,1] 参数空间
+    """
+    px, py = p[:, 0], p[:, 1]
+    Ax, Ay = A[:, 0], A[:, 1]
+    Bx, By = B[:, 0], B[:, 1]
+    Cx, Cy = C[:, 0], C[:, 1]
+    Dx, Dy = D[:, 0], D[:, 1]
+    
+    kwarg = bm.context(px)
+    eps = 1e-12
+    
+    # 选择更稳定的方程（基于Cx, Cy的绝对值）
+    use_x_eq = bm.abs(Cx) >= bm.abs(Cy)
+    
+    # 统一的参数选择，避免重复的if-else逻辑
+    p_coord = bm.where(use_x_eq, px, py)
+    p_other = bm.where(use_x_eq, py, px)
+    A_coord = bm.where(use_x_eq, Ax, Ay)
+    A_other = bm.where(use_x_eq, Ay, Ax)
+    B_coord = bm.where(use_x_eq, Bx, By)
+    B_other = bm.where(use_x_eq, By, Bx)
+    C_coord = bm.where(use_x_eq, Cx, Cy)
+    C_other = bm.where(use_x_eq, Cy, Cx)
+    D_coord = bm.where(use_x_eq, Dx, Dy)
+    D_other = bm.where(use_x_eq, Dy, Dx)
+    
+    # 计算二次方程系数（统一公式）
+    delta_other = A_other - p_other
+    delta_coord = A_coord - p_coord 
+    
+    a = B_other * D_coord - D_other * B_coord
+    b = B_other * C_coord - C_other * B_coord + D_coord * delta_other - D_other * delta_coord
+    c = delta_other * C_coord - delta_coord * C_other
+    
+    # 求解二次方程（保留eta验证）
+    xi = _solve_quadratic_with_validation(
+        a, b, c, p_coord, A_coord, B_coord, C_coord, D_coord, eps
+    )
+    
+    # 计算eta
+    eta = (p_coord - A_coord - B_coord * xi) / (C_coord + D_coord * xi + eps)
+    
+    # 组装结果
+    xi_eta = bm.zeros((p.shape[0], 2), **kwarg)
+    xi_eta = bm.set_at(xi_eta, (..., 0), xi)
+    xi_eta = bm.set_at(xi_eta, (..., 1), eta)
+    
+    return xi_eta
+
+def _solve_quadratic_with_validation(a, b, c, p_coord, A_coord, B_coord, C_coord, D_coord, eps):
+    """
+    @brief 改进的二次方程求解，同时验证对应的eta是否合理
+    """
+    # 处理线性情况
+    is_linear = bm.abs(a) < eps
+    xi = bm.zeros_like(a)
+    
+    # 线性情况
+    if bm.any(is_linear):
+        linear_mask = is_linear
+        xi_linear = -c[linear_mask] / (b[linear_mask] + eps)
+        
+        # 验证对应的eta
+        eta_linear = ((p_coord[linear_mask] - A_coord[linear_mask] - B_coord[linear_mask] * xi_linear) / 
+                     (C_coord[linear_mask] + D_coord[linear_mask] * xi_linear + eps))
+        
+        # 检查(xi, eta)对是否都在合理范围内
+        tolerance = 1e-6  # 放宽容差
+        pair_valid = ((xi_linear >= -tolerance) & (xi_linear <= 1.0 + tolerance) &
+                     (eta_linear >= -tolerance) & (eta_linear <= 1.0 + tolerance))
+        print(f"Linear valid pairs: {bm.sum(pair_valid)} out of {bm.size(pair_valid)}")
+        # 无效的解设为中心点
+        xi_linear = bm.where(pair_valid, xi_linear, 0.5)
+        xi = bm.set_at(xi, linear_mask, xi_linear)
+
+    # 二次情况
+    quadratic_mask = ~is_linear
+    if bm.any(quadratic_mask):
+        mask = quadratic_mask
+        discriminant = b[mask]**2 - 4*a[mask]*c[mask]
+        
+        # 只处理有实解的情况
+        has_real_roots = discriminant >= 0
+        if bm.any(has_real_roots):
+            real_mask = mask.copy()
+            real_mask[mask] = has_real_roots
+            
+            sqrt_d = bm.sqrt(discriminant[has_real_roots])
+            a_real = a[real_mask]
+            b_real = b[real_mask]
+            
+            x1 = (-b_real + sqrt_d) / (2 * a_real)
+            x2 = (-b_real - sqrt_d) / (2 * a_real)
+            
+            # 计算对应的eta值
+            eta1 = ((p_coord[real_mask] - A_coord[real_mask] - B_coord[real_mask] * x1) / 
+                   (C_coord[real_mask] + D_coord[real_mask] * x1 + eps))
+            eta2 = ((p_coord[real_mask] - A_coord[real_mask] - B_coord[real_mask] * x2) / 
+                   (C_coord[real_mask] + D_coord[real_mask] * x2 + eps))
+            
+            # 检查(xi, eta)对的有效性
+            tolerance = 1e-6
+            x1_pair_valid = ((x1 >= -tolerance) & (x1 <= 1.0 + tolerance) &
+                            (eta1 >= -tolerance) & (eta1 <= 1.0 + tolerance))
+            x2_pair_valid = ((x2 >= -tolerance) & (x2 <= 1.0 + tolerance) &
+                            (eta2 >= -tolerance) & (eta2 <= 1.0 + tolerance))
+            
+            # 选择策略：优先选择(xi, eta)都在范围内的解
+            xi_quad = bm.where(x1_pair_valid & ~x2_pair_valid, x1,           # 只有x1有效
+                              bm.where(x2_pair_valid & ~x1_pair_valid, x2,   # 只有x2有效
+                              bm.where(x1_pair_valid & x2_pair_valid,        # 都有效时
+                              bm.where(bm.abs(x1 - 0.5) < bm.abs(x2 - 0.5), x1, x2),
+                              bm.where(bm.abs(x1 - 0.5) < bm.abs(x2 - 0.5), x1, x2))))# 中心选择
+            
+            xi = bm.set_at(xi, real_mask, xi_quad)
+    
+    return xi
+
+def _solve_quad_parametric_coords(target_points, quad_vertices):
+    """
+    直接代数求解四边形参数坐标 (ξ,η) ∈ [0,1]x[0,1]
+
+    Parameter:
+        target_points: 目标点坐标，形状为 (N, 2)
+        quad_vertices: 四边形顶点坐标，形状为 (N, 4, 2)，四个顶点按逆时针顺序排列
+    """
+    # 四边形顶点按逆时针顺序：v0(0,0), v1(1,0), v2(1,1), v3(0,1)
+    v0, v1, v2, v3 = quad_vertices[:, 0], quad_vertices[:, 1], quad_vertices[:, 2], quad_vertices[:, 3]
+    p = target_points
+    
+    # 双线性映射：x(ξ,η) = A + Bξ + Cη + Dξη
+    A = v0                          # 常数项
+    B = v1 - v0                     # ξ 项系数
+    C = v3 - v0                     # η 项系数  
+    D = v2 - v1 - v3 + v0          # ξη 项系数
+    
+    # 求解方程组：p = A + Bξ + Cη + Dξη
+    D_norm = bm.linalg.norm(D, axis=-1)
+    is_linear = D_norm < 1e-10
+    
+    xi_eta = bm.zeros((target_points.shape[0], 2), **bm.context(target_points))
+    
+    # 处理线性情况（平行四边形）
+    if bm.any(is_linear):
+        linear_mask = is_linear
+        rhs = p[linear_mask] - A[linear_mask]
+        matrix = bm.stack([B[linear_mask], C[linear_mask]], axis=-1)
+        try:
+            solution = bm.linalg.solve(matrix, rhs[..., None])[..., 0]
+            xi_eta = bm.set_at(xi_eta, linear_mask, solution)
+        except:
+            pass
+    # 处理非线性情况
+    if bm.any(~is_linear):
+        xi_eta_nl = _solve_bilinear_system(
+            p[~is_linear], A[~is_linear], B[~is_linear], 
+            C[~is_linear], D[~is_linear]
+        )
+        xi_eta = bm.set_at(xi_eta, ~is_linear, xi_eta_nl)
+
+    return xi_eta

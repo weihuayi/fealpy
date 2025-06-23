@@ -356,7 +356,7 @@ class GroupIntegrator(Integrator):
         ct = self.ints[0](space, indices=indices)
 
         for int_ in self.ints[1:]:
-            new_ct = int_.assembly(space, indices=indices)
+            new_ct = int_.assembly(space)
             fdim = min(ct.ndim, new_ct.ndim)
             if ct.shape[:fdim] != new_ct.shape[:fdim]:
                 raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "

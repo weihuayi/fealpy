@@ -5,9 +5,9 @@ class MMesher:
     registered_param = {}
     def __init__(self,
                  mesh: Union[_U,list] ,
+                 uh: Union[TensorLike,Function,list] ,
+                 space: Union[_V,list] ,
                  beta:Union[float,list],
-                 vertices:Union[TensorLike,list],
-                 r:Union[float,list] = 0.15,
                  is_multi_phy:bool = False,
                  config : Union[Config,list] = Config()):
         """
@@ -19,9 +19,9 @@ class MMesher:
         @param vertices: vertices of the domain
         """
         self.mesh = mesh
+        self.uh = uh
+        self.space = space
         self.beta = beta
-        self.vertices = vertices
-        self.r = r
         self.is_multi_phy = is_multi_phy
         self.config = config
         self.classes = {}
@@ -29,7 +29,7 @@ class MMesher:
         self.dim = 1
 
         self._check()
-    
+            
     def _check(self):
         if isinstance(self.mesh, list) and len(self.mesh) == 1:
             self.mesh = self.mesh[0]
@@ -55,22 +55,19 @@ class MMesher:
                 if not isinstance(m, _U.__args__):
                     raise TypeError(f"Each mesh in the list must be one of the types: \
                                     {', '.join([t.__name__ for t in _U.__args__])}")
-
+            for i, mesh in enumerate(self.mesh):
+                if not hasattr(mesh, 'nodedata') and 'vertices' in mesh.nodedata:
+                    raise ValueError(f"mesh[{i}] does not have nodedata['vertices']")
+                
         elif not isinstance(self.mesh, _U):
             raise TypeError(f"mesh must be one of the types: \
                             {', '.join([t.__name__ for t in _U.__args__])}")
         
+        if not hasattr(self.mesh, 'nodedata') and 'vertices' in self.mesh.nodedata:
+            raise ValueError("mesh does not have nodedata['vertices']")
+            
         if not isinstance(self.beta, (float,int,list,TensorLike)):
             raise TypeError("beta must be a float or list")
-        
-        if not isinstance(self.vertices, (TensorLike,list)):
-            raise TypeError("vertices must be tensor-like data or list")
-
-        if isinstance(self.vertices, TensorLike) and self.dim > 1 and not self.is_multi_phy:
-            self.vertices = [self.vertices] * self.dim
-
-        if isinstance(self.r, float) and self.dim > 1 and not self.is_multi_phy:
-            self.r = [self.r] * self.dim
         
         if self.is_multi_phy:
             self.config.monitor = 'mp_arc_length'
@@ -146,7 +143,8 @@ class MMesher:
             class_name  = self.config.active_method
             module_name = f"{class_name.lower()}"
             class_ = self._load_class(module_name, class_name)
-            self.instance = class_(self.mesh,self.beta,self.vertices,self.r,self.config)
+            self.instance = class_(self.mesh,self.beta,self.space,self.config)
+            self.instance.uh = self.uh
             self._catch()
             print(f"Initializing {class_name} !")
         else:
@@ -160,7 +158,8 @@ class MMesher:
             module_name = f"{class_name.lower()}"
             class_ = self._load_class(module_name, class_name)  
             for i in range(self.dim):
-                instance = class_(self.mesh[i],self.beta[i],self.vertices[i],self.r[i],self.config)
+                instance = class_(self.mesh[i],self.beta[i],self.space[i],self.config)
+                instance.uh = self.uh[i]
                 self.instance_list.append(instance)
                 self._catch(instance)
             print(f"Initializing {class_name} !")
@@ -170,25 +169,45 @@ class MMesher:
         @brief catch the process function
         """
         if self.is_multi_phy:
-            if self.config.is_pre and not self.preprocessed:
-                self.process = self.instance.mp_preprocessor
-                self.preprocessed = True
+            if self.config.is_pre:
+                # create a self-switching process for multi-physics preprocessor
+                self.process = self._create_self_switching_process(
+                    self.instance.mp_preprocessor,
+                    self.instance.mp_mesh_redistributor
+                )
             else:
                 self.process = self.instance.mp_mesh_redistributor
-        else:        
+        else:
             if isinstance(self.mesh, list):
-                if self.config.is_pre and not self.preprocessed:
-                    self.process_list.append(instance.preprocessor)
-                    self.preprocessed = True
+                if self.config.is_pre:
+                    switching_process = self._create_self_switching_process(
+                        instance.preprocessor,
+                        instance.mesh_redistributor
+                    )
+                    self.process_list.append(switching_process)
                 else:
                     self.process_list.append(instance.mesh_redistributor)
             else:
-                if self.config.is_pre and not self.preprocessed:
-                    self.process = self._preprocessor_wrapper
-                    self.preprocessed = True
+                if self.config.is_pre:
+                    self.process = self._create_self_switching_process(
+                        self._preprocessor_wrapper,
+                        self.instance.mesh_redistributor
+                    )
                 else:
                     self.process = self.instance.mesh_redistributor
-        
+    
+    def _create_self_switching_process(self, first_func, second_func):
+        """
+        Create a self-switching process that executes the first function
+        """
+        def self_switching_process():
+            # 执行第一次函数
+            first_func()
+            # 立即替换自己为第二个函数
+            self.process = second_func
+            print("Function pointer switched")
+        return self_switching_process
+    
     def _preprocessor_wrapper(self):
         """
         Return a reference to the preprocessor method.
@@ -196,16 +215,15 @@ class MMesher:
         fun_solver = self.config.fun_solver
         self.instance.preprocessor(fun_solver)
         
-    def run(self,uh : TensorLike):
+    def run(self):
         """
         @brief run the active_method, applicable to scalar cases
         """
         return self._run_instance(self.instance, 
                                   self.process, 
-                                  uh, 
                                   self.config.active_method)
     
-    def run_multi(self,uh_list: list):
+    def run_multi(self):
         """
         @brief run the active_method, applicable to multi-mesh cases
         """
@@ -215,7 +233,6 @@ class MMesher:
             for i in range(self.dim):
                 result = self._run_instance(self.instance_list[i],
                                             self.process_list[i],
-                                            uh_list[i], 
                                             self.config.active_method)
                 results.append(result)
             mesh_list, uh_list = zip(*results)
@@ -227,7 +244,6 @@ class MMesher:
                     self._run_instance,
                     self.instance_list[i],
                     self.process_list[i],
-                    uh_list[i],
                     self.config.active_method
                 )
                 for i in range(self.dim)
@@ -238,23 +254,21 @@ class MMesher:
             mesh_list, uh_list = zip(*results)
         return list(mesh_list), list(uh_list)
 
-    def run_mp(self,uh: TensorLike):
+    def run_mp(self):
         """
         @brief run the active_method, applicable to multi-physics cases
         """
         return self._run_instance(self.instance,
                                   self.process, 
-                                  uh, 
                                   self.config.active_method,
                                   self.dim)
     
     @staticmethod
-    def _run_instance(instance, process, uh, active_method,dim = 1):
+    def _run_instance(instance, process, active_method,dim = 1):
         """
         Run the process for a specific instance.
         """
         # Set the uh for the current instance
-        instance.uh = uh
         instance.dim = dim
         # Run the process
         print(f"Running {active_method} for instance!")
@@ -268,17 +282,6 @@ class MMesher:
         """
         if self.executor:
             self.executor.shutdown()
-
-    def restart(self,uh):
-        """
-        @brief update the solution of the problem
-        """
-        instance = self.instance
-        instance.uh = uh
-        if self.is_multi_phy:
-            self.process = self.instance.mp_mesh_redistributor
-        else:
-            self.process = self.instance.mesh_redistributor
         
 
     def show_mesh(self,ax,scat_node = True , scat_index = slice(None)):

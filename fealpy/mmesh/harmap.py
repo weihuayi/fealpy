@@ -1,17 +1,21 @@
 from .base import *
-from .tool import quad_equ_solver,cubic_equ_solver
+from .tool import (quad_equ_solver,
+                   cubic_equ_solver,
+                   _compute_coef_2d,
+                   _compute_coef_3d,
+                   segmenter)
 
 
 class Harmap(MM_monitor,MM_Interpolater):
-    def __init__(self,mesh,beta,vertices,r, config:Config):
-        MM_monitor.__init__(self,mesh,beta,vertices,r,config)
-        MM_Interpolater.__init__(self,mesh,vertices,config)
+    def __init__(self,mesh,beta,space,config:Config):
+        MM_monitor.__init__(self,mesh,beta,space,config)
+        MM_Interpolater.__init__(self,mesh,space,config)
         self.alpha = config.alpha
         self.tol = config.tol
         self.maxit = config.maxit
         self.pre_steps = config.pre_steps
 
-        self.bform = BilinearForm(self.space)
+        self.bform = BilinearForm(self.mspace)
         self.bform.add_integrator(self.SDI)
         self.initialize()
     
@@ -21,10 +25,10 @@ class Harmap(MM_monitor,MM_Interpolater):
         """
         if self.TD == 2:
             self.equ_solver = quad_equ_solver
-            self.compute_coef = self._compute_coef_2d
+            self.compute_coef = lambda p : _compute_coef_2d(p,self.AC_gererator)
         elif self.TD == 3:
             self.equ_solver = cubic_equ_solver
-            self.compute_coef = self._compute_coef_3d
+            self.compute_coef = lambda p : _compute_coef_3d(p,self.AC_gererator)
 
         if self.mesh_type in ["TriangleMesh","TetrahedronMesh"]:
             self.scell = self.cell
@@ -44,7 +48,6 @@ class Harmap(MM_monitor,MM_Interpolater):
             self.tol = self._caculate_tol()
         print(f"tolerance: {self.tol}")
         self._clear_unused_attributes()
-
 
     def _mark_matrix(self):
         """
@@ -251,16 +254,18 @@ class Harmap(MM_monitor,MM_Interpolater):
         @param harmap: the map node after solving the harmap equation
         """
         node = self.node
-        cm = self.cm
+        d = self.d
+        rm = self.rm
         TD = self.TD
-        space = self.space
-        multi_index = self.multi_index 
-        gphi = space.grad_basis(multi_index)
+        mspace = self.mspace
+        bcs = self.bcs
+        gphi = mspace.grad_basis(bcs)
         grad_x = bm.zeros((self.NN,TD,TD),**self.kwargs0)
-        pcell = self.pcell
-        grad_X_incell = bm.einsum('cin, cqim -> cqnm',harmap[pcell], gphi)
-        grad_x_incell = bm.linalg.inv(grad_X_incell)*cm[:,None,None,None]
-        bm.index_add(grad_x , pcell , grad_x_incell)
+        cell2dof = self.cell2dof
+        grad_X_incell = bm.einsum('cin, cqim -> cqnm',harmap[cell2dof], gphi)
+        inv_grad_X = bm.linalg.inv(grad_X_incell)
+        grad_x_incell = bm.einsum('cq,cqnm,q-> cnm', d*rm ,inv_grad_X , self.ws)
+        bm.index_add(grad_x , cell2dof , grad_x_incell[:,None,...])
         grad_x /= self.sm[:,None,None]
         delta_x = (grad_x @ move_vertor_field[:,:,None]).reshape(-1,TD)
 
@@ -291,71 +296,12 @@ class Harmap(MM_monitor,MM_Interpolater):
         """
         J = self.mesh.jacobi_matrix(bc=self.bcs)
         gphi = self.mesh.grad_shape_function(self.bcs, p=self.p, variables='u')
-        dJ = bm.einsum('...in, ...qim -> ...qnm', delta_x[self.pcell], gphi)
+        dJ = bm.einsum('...in, ...qim -> ...qnm', delta_x[self.cell2dof], gphi)
         a = bm.linalg.det(dJ) @ self.ws
         c = bm.linalg.det(J) @ self.ws
         b = (J[..., 0, 0] * dJ[..., 1, 1] + J[..., 1, 1] * dJ[..., 0, 0]
              - J[..., 0, 1] * dJ[..., 1, 0] - J[..., 1, 0] * dJ[..., 0, 1]) @ self.ws
         return [a, b, c]
-    
-    def _compute_coef_2d(self, p):
-        """
-        Compute coefficients for 2D case.
-        """
-        return self._compute_general_coef(p, self._compute_coef_general_2d)
-
-    def _compute_coef_3d(self, p):
-        """
-        Compute coefficients for 3D case.
-        """
-        return self._compute_general_coef(p, self._compute_coef_general_3d)
-    
-    def _compute_general_coef(self, delta_x , fun):
-        """
-        @brief compute the coefficient of the quadratic equation
-        """
-        A, C = self.AC_gererator(delta_x)
-        return fun(A, C)
-    
-    def _compute_coef_general_2d(self,A,C):
-        """
-        @brief compute the coefficient of the quadratic equation
-        """
-        a = bm.linalg.det(C)
-        c = bm.linalg.det(A)
-        b = (A[:, 0, 0] * C[:, 1, 1] - 
-             A[:, 0, 1] * C[:, 1, 0] + 
-             C[:, 0, 0] * A[:, 1, 1] - 
-             C[:, 0, 1] * A[:, 1, 0])
-        return [a, b, c]
-
-    def _compute_coef_general_3d(self,A,C):
-        """
-        @brief compute the coefficient of the cubic equation
-        """
-        a0, a1, a2 = (C[:, 1, 1] * C[:, 2, 2] - C[:, 1, 2] * C[:, 2, 1],
-                      C[:, 1, 2] * C[:, 2, 0] - C[:, 1, 0] * C[:, 2, 2],
-                      C[:, 1, 0] * C[:, 2, 1] - C[:, 1, 1] * C[:, 2, 0])
-        b0, b1, b2 = (A[:, 1, 1] * C[:, 2, 2] - A[:, 1, 2] * C[:, 2, 1] + 
-                      C[:, 1, 1] * A[:, 2, 2] - C[:, 1, 2] * A[:, 2, 1], 
-                      A[:, 1, 0] * C[:, 2, 2] - A[:, 1, 2] * C[:, 2, 0] + 
-                      C[:, 1, 0] * A[:, 2, 2] - C[:, 1, 2] * A[:, 2, 0], 
-                      A[:, 1, 0] * C[:, 2, 1] - A[:, 1, 1] * C[:, 2, 0] + 
-                     C[:, 1, 0] * A[:, 2, 1] - C[:, 1, 1] * A[:, 2, 0])
-        c0, c1, c2 = (A[:, 1, 1] * A[:, 2, 2] - A[:, 1, 2] * A[:, 2, 1], 
-                      A[:, 1, 0] * A[:, 2, 2] - A[:, 1, 2] * A[:, 2, 0],
-                      A[:, 1, 0] * A[:, 2, 1] - A[:, 1, 1] * A[:, 2, 0])
-        a = C[:, 0, 0] * a0 - C[:, 0, 1] * a1 + C[:, 0, 2] * a2
-        ridx = bm.where(a > 1e-14)[0]
-        b = (A[:, 0, 0] * a0 - A[:, 0, 1] * a1 + 
-             A[:, 0, 2] * a2 + C[:, 0, 0] * b0 - 
-             C[:, 0, 1] * b1 + C[:, 0, 2] * b2)
-        c = (A[:, 0, 0] * b0 - A[:, 0, 1] * b1 + 
-             A[:, 0, 2] * b2 + C[:, 0, 0] * c0 - 
-             C[:, 0, 1] * c1 + C[:, 0, 2] * c2)
-        d = A[:, 0, 0] * c0 - A[:, 0, 1] *c1 + A[:, 0, 2] * c2
-        a, b, c, d = a[ridx], b[ridx], c[ridx], d[ridx]
-        return [a, b, c, d]
     
     def AC_gererator(self,delta_x):
         """
@@ -413,20 +359,18 @@ class Harmap(MM_monitor,MM_Interpolater):
         """
         @brief construct information for the harmap method before the next iteration
         """
-        self.interpolate(moved_node)
         self.mesh.node = moved_node
-        self.space.mesh = self.mesh
         self.node = moved_node
         self.d = self._sqrt_det_G(self.bcs)
+        self.sm = self._get_star_measure()
         self.update_matrix()
-        self.mot()
-
+        
     def mesh_redistributor(self):
         """
         @brief redistribute the mesh
         """
-        self.mot()
         for i in range(self.maxit):
+            self.mot()
             harmap,move_vector_field = self._solve_harmap(1/self.M,self.logic_node)
             L_infty_error = bm.max(bm.linalg.norm(self.logic_node - harmap,axis=1))
             print(f'iteration: {i}, L_infty_error: {L_infty_error}')
@@ -435,6 +379,7 @@ class Harmap(MM_monitor,MM_Interpolater):
                 break
 
             moved_node = self._get_physical_node(harmap,move_vector_field)
+            self.interpolate(moved_node)
             self._construct(moved_node)
         else:
             print('exceed the maximum iteration')
@@ -492,7 +437,7 @@ class Harmap(MM_monitor,MM_Interpolater):
         self.uh = self.uh.T.reshape(-1,)
 
     def repack(self):
-        GDOF = self.space.number_of_global_dofs()
+        GDOF = self.pspace.number_of_global_dofs()
         pro_uh = bm.zeros((GDOF,self.dim),**self.kwargs0)
         for i in range(self.dim):
             pro_uh = bm.set_at(pro_uh,(...,i), segmenter(self.uh,self.dim,i))
