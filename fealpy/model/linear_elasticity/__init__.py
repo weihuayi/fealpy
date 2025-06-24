@@ -56,4 +56,12 @@ class LinearElasticityPDEDataProtocol(Protocol):
 
 LinearElasticityPDEDataT = TypeVar("LinearElasticityPDEDataT", bound=LinearElasticityPDEDataProtocol)
 
+"""
+DATA_TABLE is a registry, when adding new PDE models, 
+follow the existing examples to register them in the registry.
+"""
+DATA_TABLE = {
+    # example name: (file_name, class_name)
+    "boxpoly": ("box_poly_data_3d", "BoxPolyData3d"),
+}
 
