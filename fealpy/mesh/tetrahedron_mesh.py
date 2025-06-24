@@ -345,7 +345,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         TD = self.top_dimension()
         fdof = (p+1)*(p+2)//2
 
-        edgeIdx = bm.zeros((2, p+1), dtype=bm.int64)
+        edgeIdx = bm.zeros((2, p+1), dtype=self.itype)
         edgeIdx[0, :] = bm.arange(p+1)
         edgeIdx[1, :] = bm.flip(edgeIdx[0])
 
@@ -357,9 +357,9 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         edge = self.entity('edge')
         face2edge = self.face_to_edge()
         edge2ipoint = self.edge_to_ipoint(p)
-        face2ipoint = bm.zeros((NF, fdof), dtype=bm.int32)
+        face2ipoint = bm.zeros((NF, fdof), dtype=self.itype)
 
-        faceIdx = self.multi_index_matrix(p, TD-1, dtype=bm.float64)
+        faceIdx = self.multi_index_matrix(p, TD-1, dtype=self.ftype)
         isEdgeIPoint = (faceIdx == 0)
 
         fe = bm.array([1, 0, 0])
@@ -1320,8 +1320,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
     def from_vtu(cls,file):
         import meshio
         data = meshio.read(file)
-        node = data.points
-        cell = data.cells_dict['tetra']
+        node = bm.array(data.points)
+        cell = bm.array(data.cells_dict['tetra'])
         mesh = cls(node, cell)
         return mesh
     
