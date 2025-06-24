@@ -4,7 +4,8 @@ from typing import Union, Optional, Dict, overload, Callable, Any
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, EntityName, _S, _int_func
 from .. import logger
-from ..sparse import COOTensor
+from ..sparse import COOTensor, CSRTensor
+from ..tools.sparse_tool import arr_to_csr
 from .utils import estr2dim, edim2entity, MeshMeta, flocc
 
 
@@ -122,14 +123,56 @@ class MeshDS(metaclass=MeshMeta):
         return edim2entity(self.storage(), self._entity_factory, etype, index)
 
     ### topology
-    def cell_to_node(self, index: Optional[Index]=None) -> TensorLike:
-        return self.entity('cell', index)
+    def cell_to_node(
+        self, 
+        index: Optional[Index] = None, 
+        format: str = 'array'
+    ) -> Union[TensorLike, CSRTensor, COOTensor]:
+        if format == 'csr':
+            return arr_to_csr(self.entity('cell', index))
+        elif format == 'coo':  
+            return arr_to_csr(self.entity('cell', index)).tocoo()
+        elif format == 'array':
+            return self.entity('cell', index)
+        else:
+            raise ValueError(
+                f"Unsupported format: {format}."
+                f"Must be one of 'array', 'csr', or 'coo'."
+            )      
 
-    def face_to_node(self, index: Optional[Index]=None) -> TensorLike:
-        return self.entity('face', index)
+    def face_to_node(
+        self, 
+        index: Optional[Index] = None, 
+        format: str = 'array'
+    ) -> Union[TensorLike, CSRTensor, COOTensor]:
+        if format == 'csr':
+            return arr_to_csr(self.entity('face', index))
+        elif format == 'coo':  
+            return arr_to_csr(self.entity('face', index)).tocoo()
+        elif format == 'array':
+            return self.entity('face', index)
+        else:
+            raise ValueError(
+                f"Unsupported format: {format}."
+                f"Must be one of 'array', 'csr', or 'coo'."
+            ) 
 
-    def edge_to_node(self, index: Optional[Index]=None) -> TensorLike:
-        return self.entity('edge', index)
+    def edge_to_node(
+        self, 
+        index: Optional[Index] = None, 
+        format: str = 'array'
+    ) -> Union[TensorLike, CSRTensor, COOTensor]:
+        if format == 'csr':
+            return arr_to_csr(self.entity('edge', index))
+        elif format == 'coo':  
+            return arr_to_csr(self.entity('edge', index)).tocoo()
+        elif format == 'array':
+            return self.entity('edge', index)
+        else:
+            raise ValueError(
+                f"Unsupported format: {format}."
+                f"Must be one of 'array', 'csr', or 'coo'."
+            )
 
     def cell_to_edge(self, index: Index=_S) -> TensorLike:
         if not hasattr(self, 'cell2edge'):
@@ -182,16 +225,27 @@ class MeshDS(metaclass=MeshMeta):
         cell2cell = bm.set_at(cell2cell, (face2cell[:, 1], face2cell[:, 3]), face2cell[:, 0])
         return cell2cell
     
-    def node_to_node(self):
+    def node_to_node(self, format: str ='csr'):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edge = self.edge
         indice = bm.stack([edge.reshape(-1), edge[:, [1, 0]].reshape(-1)], axis=0)
         data = bm.ones((2*NE,),  dtype=bm.bool, device=self.device)
-        node2node = COOTensor(indice, data, spshape=(NN, NN))
+        if format == 'csr':
+            node2node = COOTensor(indice, data, spshape=(NN, NN)).tocsr()
+        elif format == 'coo':
+            node2node = COOTensor(indice, data, spshape=(NN, NN))
+        elif format == 'array':
+            node2node = bm.zeros((NN, NN), dtype=bm.bool, device=self.device)
+            node2node = bm.set_at(node2node, (indice[0], indice[1]), data)
+        else:
+            raise ValueError(
+                f"Unsupported format: {format}."
+                f"Must be one of 'array', 'csr', or 'coo'."
+            )
         return node2node
 
-    def node_to_edge(self):
+    def node_to_edge(self, format: str ='csr'):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         nv = self.number_of_vertices_of_edges()
@@ -199,10 +253,21 @@ class MeshDS(metaclass=MeshMeta):
         kwargs = bm.context(edge)
         indice = bm.stack([edge.reshape(-1), bm.repeat(bm.arange(NE,**kwargs), nv)], axis=0)
         data = bm.ones((NE*nv), dtype=bm.bool, device=self.device)
-        node2edge = COOTensor(indice, data, spshape=(NN, NE))
+        if format == 'csr':
+            node2edge = COOTensor(indice, data, spshape=(NN, NE)).tocsr()
+        elif format == 'coo':
+            node2edge = COOTensor(indice, data, spshape=(NN, NE))
+        elif format == 'array':
+            node2edge = bm.zeros((NN, NE), dtype=bm.bool, device=self.device)
+            node2edge = bm.set_at(node2edge, (indice[0], indice[1]), data)
+        else:
+            raise ValueError(
+                f"Unsupported format: {format}."
+                f"Must be one of 'array', 'csr', or 'coo'."
+            )  
         return node2edge
 
-    def node_to_cell(self):
+    def node_to_cell(self, format: str ='csr'):
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         nv = self.number_of_vertices_of_cells()
@@ -210,10 +275,21 @@ class MeshDS(metaclass=MeshMeta):
         kwargs = bm.context(cell)
         indice = bm.stack([cell.reshape(-1), bm.repeat(bm.arange(NC,**kwargs), nv)], axis=0)
         data = bm.ones((NC*nv),  dtype=bm.bool, device=self.device)
-        node2edge = COOTensor(indice, data, spshape=(NN, NC))
-        return node2edge
+        if format == 'csr':
+            node2cell = COOTensor(indice, data, spshape=(NN, NC)).tocsr()
+        elif format == 'coo':
+            node2cell = COOTensor(indice, data, spshape=(NN, NC))
+        elif format == 'array':
+            node2cell = bm.zeros((NN, NC), dtype=bm.bool, device=self.device)
+            node2cell = bm.set_at(node2cell, (indice[0], indice[1]), data)
+        else:
+            raise ValueError(
+                f"Unsupported format: {format}."
+                f"Must be one of 'array', 'csr', or 'coo'."
+            )  
+        return node2cell
     
-    def node_to_face(self):
+    def node_to_face(self, format: str ='csr'):
         NN = self.number_of_nodes()
         NF = self.number_of_faces()
         nv = self.number_of_vertices_of_faces()
@@ -221,8 +297,19 @@ class MeshDS(metaclass=MeshMeta):
         kwargs = bm.context(face)
         indice = bm.stack([face.reshape(-1), bm.repeat(bm.arange(NF,**kwargs), nv)], axis=0)
         data = bm.ones((NF*nv),  dtype=bm.bool, device=self.device)
-        node2edge = COOTensor(indice, data, spshape=(NN, NF))
-        return node2edge
+        if format == 'csr':
+            node2face = COOTensor(indice, data, spshape=(NN, NF)).tocsr()
+        elif format == 'coo':
+            node2face = COOTensor(indice, data, spshape=(NN, NF))
+        elif format == 'array':
+            node2face = bm.zeros((NN, NF), dtype=bm.bool, device=self.device)
+            node2face = bm.set_at(node2face, (indice[0], indice[1]), data)
+        else:
+            raise ValueError(
+                f"Unsupported format: {format}."
+                f"Must be one of 'array', 'csr', or 'coo'."
+            )  
+        return node2face
 
     ### boundary
     def boundary_node_flag(self) -> TensorLike:
