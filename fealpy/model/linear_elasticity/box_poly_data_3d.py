@@ -84,9 +84,7 @@ class BoxPolyData3d():
 
     @cartesian
     def displacement(self, p: TensorLike):
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
         val = bm.zeros(p.shape, dtype=p.dtype, device=bm.get_device(p))
 
         val[..., 0] = 1e-3 * (2*x + y + z) / 2

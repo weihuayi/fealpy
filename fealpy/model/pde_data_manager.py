@@ -43,6 +43,10 @@ class PDEDataManager:
         "parabolic": "fealpy.model.parabolic",
         "wave": "fealpy.model.wave",
         "hyperbolic":"fealpy.model.hyperbolic",
+<<<<<<< HEAD
+=======
+        "nonlinear":"fealpy.model.nonlinear",
+>>>>>>> upstream/draft/linear_elasticity_lfem_model
         "linear_elasticity": "fealpy.model.linear_elasticity"
     }
 

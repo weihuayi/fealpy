@@ -133,12 +133,13 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         elif callable(gd):
             gd = gd(ipoints[isDDof])
             if uh is None:
-                uh = bm.zeros_like(gd)
+                kwargs = bm.context(gd)
+                uh = self.array(**kwargs)
             uh = bm.set_at(uh, (..., isDDof), gd)
         else:
             raise TypeError("gd must be a tensor or a callable function")
         
-        return uh, isDDof
+        return self.function(uh), isDDof
 
     set_dirichlet_bc = boundary_interpolate
 

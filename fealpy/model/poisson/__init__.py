@@ -1,4 +1,3 @@
-
 from typing import Protocol, Sequence, TypeVar
 from ...backend import TensorLike
 
@@ -35,7 +34,9 @@ follow the existing examples to register them in the registry.
 DATA_TABLE = {
     # example name: (file_name, class_name)
     "coscos": ("cos_cos_data_2d", "CosCosData2D"),
+    "coscoscos": ("cos_cos_cos_data_3d", "CosCosCosData3D"),
     "sin": ("sin_data_1d", "SinData1D"),
     "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
+    "sinsinsin": ("sin_sin_sin_data_3d", "SinSinSinData3D"),
 
 }
