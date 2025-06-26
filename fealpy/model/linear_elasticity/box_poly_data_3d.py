@@ -88,11 +88,17 @@ class BoxPolyData3d():
     @cartesian
     def displacement(self, p: TensorLike):
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
+        u_x = 1e-3 * (2*x + y + z) / 2
+        u_y = 1e-3 * (x + 2*y + z) / 2
+        u_z = 1e-3 * (x + y + 2*z) / 2
+        
+        return bm.stack([u_x, u_y, u_z], axis=-1)
+    
         val = bm.zeros(p.shape, dtype=p.dtype, device=bm.get_device(p))
-
-        val = bm.set_at(val, 0, 1e-3 * (2*x + y + z) / 2)
-        val = bm.set_at(val, 1, 1e-3 * (x + 2*y + z) / 2)
-        val = bm.set_at(val, 2, 1e-3 * (x + y + 2*z) / 2)
+    
+        val = bm.set_at(val, (..., 0), 1e-3 * (2*x + y + z) / 2)
+        val = bm.set_at(val, (..., 1), 1e-3 * (x + 2*y + z) / 2)
+        val = bm.set_at(val, (..., 2), 1e-3 * (x + y + 2*z) / 2)
 
         return val
 
@@ -101,16 +107,17 @@ class BoxPolyData3d():
         shape = p.shape[:-1] + (3, 3)
         val = bm.zeros(shape, dtype=p.dtype, device=bm.get_device(p))
 
-        val = bm.set_at(val, 0, 1e-3)
-        val = bm.set_at(val, 1, 1e-3)
-        val = bm.set_at(val, 2, 1e-3)
+        val = bm.set_at(val, (..., 0, 0), 1e-3)  
+        val = bm.set_at(val, (..., 1, 1), 1e-3)  
+        val = bm.set_at(val, (..., 2, 2), 1e-3)  
 
-        val = bm.set_at(val, 0, 1e-3 / 2)
-        val = bm.set_at(val, 1, 1e-3 / 2)
-        val = bm.set_at(val, 0, 1e-3 / 2)
-        val = bm.set_at(val, 2, 1e-3 / 2)
-        val = bm.set_at(val, 1, 1e-3 / 2)
-        val = bm.set_at(val, 2, 1e-3 / 2)
+        # Off-diagonal components (symmetric)
+        val = bm.set_at(val, (..., 0, 1), 1e-3 / 2)  
+        val = bm.set_at(val, (..., 1, 0), 1e-3 / 2)  
+        val = bm.set_at(val, (..., 0, 2), 1e-3 / 2)  
+        val = bm.set_at(val, (..., 2, 0), 1e-3 / 2)  
+        val = bm.set_at(val, (..., 1, 2), 1e-3 / 2)  
+        val = bm.set_at(val, (..., 2, 1), 1e-3 / 2)  
 
         return val
 
@@ -124,16 +131,16 @@ class BoxPolyData3d():
         
         tr_eps = 3e-3
 
-        val = bm.set_at(val, 0, lam * tr_eps + 2 * mu * 1e-3)
-        val = bm.set_at(val, 1, lam * tr_eps + 2 * mu * 1e-3)
-        val = bm.set_at(val, 2, lam * tr_eps + 2 * mu * 1e-3)
+        val = bm.set_at(val, (..., 0, 0), lam * tr_eps + 2 * mu * 1e-3)  
+        val = bm.set_at(val, (..., 1, 1), lam * tr_eps + 2 * mu * 1e-3)  
+        val = bm.set_at(val, (..., 2, 2), lam * tr_eps + 2 * mu * 1e-3)  
 
-        val = bm.set_at(val, 0, 2 * mu * 1e-3 / 2)
-        val = bm.set_at(val, 1, 2 * mu * 1e-3 / 2)
-        val = bm.set_at(val, 0, 2 * mu * 1e-3 / 2)
-        val = bm.set_at(val, 2, 2 * mu * 1e-3 / 2)
-        val = bm.set_at(val, 1, 2 * mu * 1e-3 / 2)
-        val = bm.set_at(val, 2, 2 * mu * 1e-3 / 2)
+        val = bm.set_at(val, (..., 0, 1), 2 * mu * 1e-3 / 2) 
+        val = bm.set_at(val, (..., 1, 0), 2 * mu * 1e-3 / 2)  
+        val = bm.set_at(val, (..., 0, 2), 2 * mu * 1e-3 / 2)  
+        val = bm.set_at(val, (..., 2, 0), 2 * mu * 1e-3 / 2)  
+        val = bm.set_at(val, (..., 1, 2), 2 * mu * 1e-3 / 2)  
+        val = bm.set_at(val, (..., 2, 1), 2 * mu * 1e-3 / 2) 
         
         return val
 
