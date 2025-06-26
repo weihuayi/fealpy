@@ -1,4 +1,4 @@
-from typing import Any, Union, Optional, TypeVar
+from typing import Any, Union, Optional, TypeVar, Tuple
 import numpy as np
 
 try:
@@ -105,4 +105,24 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         """
         return field.to_numpy()
 
-   
+    @staticmethod
+    def ones(shape: Union[int, Tuple[int, ...]], ) -> ti.Field:
+        x = ti.field(shape=shape,dtype=ti.i32)
+        x.fill(1)
+        return x
+    
+    @staticmethod
+    def full(shape: Union[int, Tuple[int, ...]], element: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
+        if dtype is None:
+            if isinstance(element, bool):
+                dtype = ti.u8  # Boolean type in Taichi
+            elif isinstance(element, int):
+                dtype = ti.i32  # Default integer type
+            elif isinstance(element, float):
+                dtype = ti.f64  # Default floating-point type
+            else:
+                raise TypeError("Unsupported fill_value type.")
+
+        x = ti.field(dtype=dtype, shape=shape)
+        x.fill(element)
+        return x
