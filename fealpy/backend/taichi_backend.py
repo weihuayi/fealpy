@@ -169,3 +169,20 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_eye()
         return field
+    
+    @staticmethod
+    def zeros(shape, dtype=ti.f32):
+        # 支持 int 或 tuple 作为 shape
+        if isinstance(shape, int):
+            shape = (shape,)
+        if any(s == 0 for s in shape):
+            return None
+        field = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_zeros():
+            for I in ti.grouped(field):
+                field[I] = 0
+
+        fill_zeros()
+        return field

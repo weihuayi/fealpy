@@ -168,6 +168,22 @@ class TestEye:
         field = bm.eye(0)
         assert field is None
 
+#测试 Zeros 函数
+class TestZeros:
+    def test_zeros_1d(self):
+        """测试 1D 零矩阵"""
+        field = bm.zeros((3,))
+        assert np.allclose(field.to_numpy(), np.zeros((3,)))
+
+    def test_zeros_2d(self):
+        """测试 2D 零矩阵"""
+        field = bm.zeros((2, 3))
+        assert np.allclose(field.to_numpy(), np.zeros((2, 3)))
+
+    def test_zeros_empty(self):
+        """测试空矩阵"""
+        field = bm.zeros((0,))
+        assert field is None
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])
