@@ -861,11 +861,10 @@ class MM_monitor(MM_PREProcessor):
         """
         M = self.M
         exp_nd = M.ndim - 2
-        cell2dof = self.cell2dof
+        cell2dof = self.cell2dof  # NC,NQ
         sm = self.sm
         d = self.d # NC,NQ
         rm = self.rm
-
         exp_sm = sm[(...,) + (None,) * exp_nd]
         shape = (self.NN,) + (self.TD,) * exp_nd
         phi = self.mspace.basis(self.bcs)
