@@ -128,6 +128,23 @@ class TestTolist:
 
         # 允许浮点数微小误差
         assert np.allclose(bm.to_list(field), [[1.1, 2.2, 3.3], [4.4, 5.5, 6.6]])
+        
+#测试 arange 方法
+class TestArange():
+    def test_arange_simple(self):
+        """测试基础范围生成"""
+        field = bm.arange(10)
+        assert np.allclose(field.to_numpy(), np.arange(10))
+
+    def test_arange_step(self):
+        """测试带步长的范围生成"""
+        field = bm.arange(0, 10, 2)
+        assert np.allclose(field.to_numpy(), np.arange(0,10,2))
+
+    def test_arrange_empty(self):
+        """测试空范围生成"""
+        field = bm.arange(0)
+        assert field is None
 
 
 

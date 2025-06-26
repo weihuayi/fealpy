@@ -120,3 +120,33 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         except Exception as e:
             print(f"An error occurred: {e}")
             return []
+        
+    @staticmethod
+    def arange(*args, dtype=ti.i32):
+        # 解析参数
+        if len(args) == 1:
+            start, stop, step = 0, args[0], 1
+        elif len(args) == 2:
+            start, stop = args
+            step = 1
+        elif len(args) == 3:
+            start, stop, step = args
+        else:
+            raise ValueError("arange expects 1~3 arguments (stop | start, stop | start, stop, step)")
+
+        # 计算元素个数
+        if step == 0:
+            raise ValueError("step must not be zero")
+        n = max(0, (stop - start + (step - (1 if step > 0 else -1))) // step)
+        if n == 0:
+            return None
+
+        field = ti.field(dtype=dtype, shape=(n,))
+
+        @ti.kernel
+        def fill():
+            for i in range(n):
+                field[i] = start + i * step
+
+        fill()
+        return field
