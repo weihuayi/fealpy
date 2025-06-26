@@ -1,5 +1,6 @@
 
 from typing import Union, Optional, Dict, overload, Callable, Any
+from logging import Logger
 
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, EntityName, _S, _int_func
@@ -16,6 +17,7 @@ from .utils import estr2dim, edim2entity, MeshMeta, flocc
 
 class MeshDS(metaclass=MeshMeta):
     _STORAGE_ATTR = ['cell', 'face', 'edge', 'node']
+    _logger: Logger = logger
     cell: TensorLike
     face: TensorLike
     edge: TensorLike
@@ -60,6 +62,14 @@ class MeshDS(metaclass=MeshMeta):
             del self._entity_storage[estr2dim(self, name)]
         else:
             super().__delattr__(name)
+
+    @classmethod
+    def set_logger(cls, logger: Logger):
+        cls._logger = logger
+
+    @property
+    def logger(self) -> Logger:
+        return self._logger
 
     def clear(self) -> None:
         """Remove all entities from the storage."""
@@ -422,6 +432,7 @@ class MeshDS(metaclass=MeshMeta):
 
         NN = self.number_of_nodes()
         NF = i0.shape[0]
-        logger.info(f"Mesh toplogy relation constructed, with {NC} cells, {NF} "
-                    f"faces, {NN} nodes "
-                    f"on device ?")
+        self.logger.info(
+            f"Mesh topology relation constructed, with {NC} cells, {NF} "
+            f"faces, {NN} nodes on device {self.device}."
+        )
