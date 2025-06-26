@@ -53,12 +53,30 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         p = space.p                                                             
         q = p+3                                                                 
         def u(x, index):                                                        
-            return bm.einsum('ij, ijm->ijm', f(x), phi(x, index))               
+            return bm.einsum('ij, ijm->ijm', f(x), phi(x, index)) # (NE, NQ, 2)              
         bb = space.mesh.integral(u, q=q, celltype=True)                         
         g = lambda x: x[0].T @ x[1]                                             
         PI0 = space.PI0                        
         bb = bm.concatenate(list(map(g, zip(PI0, bb))))                         
         return bb 
+
+    @assemblymethod('vector')
+    def vector_assembly(self, space):
+        scalar_space = space.scalar_space
+        f = self.source
+        phi = scalar_space.smspace.basis                                               
+        p = space.p                                                             
+        q = p+3                                                                 
+        def u(x, index):   # x:NE, NQ, 2; index:NE
+            return bm.einsum('ijd, ijm->ijmd', f(x), phi(x, index)) # (NE, NQ, 2) #(NE, NQ, ldof)             
+        bb = scalar_space.mesh.integral(u, q=p+3, celltype=True)                         
+        g = lambda x: x[0].T @ x[1]                                             
+        PI0 = scalar_space.PI0                        
+        import ipdb
+        ipdb.set_trace()
+        bb = list(map(g, zip(PI0, bb)))                     
+        return bb 
+
 
 
 

@@ -16,7 +16,32 @@ from .utils import (
 ##################################################
 
 class Mesh(MeshDS):
+    """
+    Base class for all mesh types in FEALPy.
+    
+    This class provides fundamental mesh operations and properties that are common
+    across different mesh types, including geometric calculations, shape functions,
+    and visualization capabilities.
+    
+    Attributes:
+        GD : int
+            Geometric dimension of the mesh (property)
+        itype : dtype
+            Integer type used for mesh indices
+        ftype : dtype  
+            Floating point type used for mesh coordinates
+        device : str
+            Device where mesh data is stored ('cpu' or 'cuda')
+    """
     def geo_dimension(self) -> int:
+        """Get the geometric dimension of the mesh.
+        
+        Returns:
+            int: The geometric dimension (such as 2 for 2D, 3 for 3D)
+            
+        Raises:
+            RuntimeError: If nodes are not assigned
+        """
         node = self.entity(0)
         if node is None:
             raise RuntimeError('Can not get the geometrical dimension as the node '
@@ -26,6 +51,21 @@ class Mesh(MeshDS):
     GD = property(geo_dimension)
 
     def multi_index_matrix(self, p: int, etype: int, dtype=None, device=None) -> TensorLike:
+        """Generate multi-index matrix for given order and entity type.
+        
+        Parameters:
+            p : int
+                Polynomial order
+            etype : int
+                Entity type (0=node, 1=edge, etc.)
+            dtype : dtype, optional
+                Data type for the matrix
+            device : str, optional
+                Device to store the matrix
+                
+        Returns:
+            TensorLike: The multi-index matrix
+        """
         dtype = self.itype if dtype is None else dtype
         device = self.device if device is None else device
         return bm.device_put(bm.multi_index_matrix(p, etype, dtype=dtype), device=device)
@@ -55,11 +95,11 @@ class Mesh(MeshDS):
         """Calculate the length of the edges.
 
         Parameters:
-            index (int | slice | Tensor, optional): Index of edges.
+            index (int | slice | Tensor, optional): Index of edges. Defaults to _S, _S means all.
             out (Tensor, optional): The output tensor. Defaults to None.
 
         Returns:
-            Tensor[NE,]: Length of edges, shaped [NE,].
+            Tensor, shape = (NE, ).
         """
         edge = self.entity(1, index=index)
         return bm.edge_length(edge, self.node, out=out)
@@ -68,12 +108,12 @@ class Mesh(MeshDS):
         """Calculate the normal of the edges.
 
         Parameters:
-            index (int | slice | Tensor, optional): Index of edges.\n
-            unit (bool, optional): _description_. Defaults to False.\n
-            out (Tensor, optional): _description_. Defaults to None.
+            index (int | slice | Tensor, optional): Index of edges.
+            unit (bool, optional): If unit=True, it means to calculate the unit normal vector.
+            out (Tensor, optional): The output tensor.
 
         Returns:
-            Tensor[NE, GD]: _description_
+            Tensor, shape = (NE, GD).
         """
         edge = self.entity(1, index=index)
         return bm.edge_normal(edge, self.node, unit=unit, out=out)
@@ -81,6 +121,13 @@ class Mesh(MeshDS):
     def edge_unit_normal(self, index: Index=_S, out=None) -> TensorLike:
         """Calculate the unit normal of the edges.
         Equivalent to `edge_normal(index=index, unit=True)`.
+
+        Parameters:
+            index (int | slice | Tensor, optional): Index of edges.Defaults to _S, _S means all.
+            out (Tensor, optional): Defaults to None.
+
+        Returns:
+            Tensor, shape = (NE, GD).
         """
         return self.edge_normal(index=index, unit=True, out=out)
 
@@ -88,20 +135,26 @@ class Mesh(MeshDS):
         """Calculate the tangent of the edges.
 
         Parameters:
-            index (Index, optional): _description_. Defaults to _S.\n
-            unit (bool, optional): _description_. Defaults to False.\n
-            out (TensorLike, optional): _description_. Defaults to None.
-
+            index (Index, optional): Defaults to _S, _S means all.
+            unit (bool, optional): If unit=True, it means to calculate the unit normal vector.
+            out (Tensor, optional): The output tensor.
         Returns:
-            TensorLike[NE, GD]: _description_
+            Tensor, shape = (NE, GD).
         """
         edge = self.entity(1, index=index)
         return bm.edge_tangent(edge, self.node, unit=unit, out=out)
 
     def cell_normal(self, index: Index=_S, node: Optional[TensorLike]=None) -> TensorLike:
-        """
-        @brief 计算网格单元的外法线方向，适用于三维空间中单元拓扑维数为 2 的情况，
-        比如三维空间中的三角形或四边形网格.
+        """Calculate normals of cells (for 2D surfaces in 3D space).
+        
+        Parameters:
+            index : Index, optional
+                Indices of cells to compute
+            node : TensorLike, optional
+                Custom node coordinates
+                
+        Returns:
+            TensorLike: Cell normals (NC, 3).
         """
         node = self.entity('node') if node is None else node
         cell = self.entity('cell', index=index)
@@ -115,7 +168,7 @@ class Mesh(MeshDS):
 
         Parameters:
             q (int): The index of the quadrature points.
-            etype (int | str, optional): The topology dimension of the entity to\
+            etype (int | str, optional): The topology dimension of the entity to
             generate the quadrature points on. Defaults to 'cell'.
 
         Returns:
@@ -130,7 +183,17 @@ class Mesh(MeshDS):
 
     # ipoints
     def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
-        """Get the relationship between edges and integration points."""
+        """Map edges to integration points.
+        
+        Parameters:
+            p : int
+                The order of the shape function.
+            index : Index, optional
+                Edge indices to include
+                
+        Returns:
+            TensorLike: Mapping matrix
+        """
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         edges = self.edge[index]
@@ -149,14 +212,14 @@ class Mesh(MeshDS):
         """Shape function value on the given bc points, in shape (..., ldof).
 
         Parameters:
-            bcs (Tensor): The bc points, in shape (NQ, bc).\n
-            p (int, optional): The order of the shape function. Defaults to 1.\n
-            index (int | slice | Tensor, optional): The index of the cell.\n
-            variables (str, optional): The variables name. Defaults to 'u'.\n
+            bcs (Tensor): The bc points, in shape (NQ, bc).
+            p (int, optional): The order of the shape function. Defaults to 1.
+            index (int | slice | Tensor, optional): The index of the cell.
+            variables (str, optional): The variables name. Defaults to 'u'.
             mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
         Returns:
-            Tensor: The shape function value with shape (NQ, ldof). The shape will\
+            Tensor: The shape function value with shape (NQ, ldof). The shape will
             be (1, NQ, ldof) if `variables == 'x'`.
         """
         raise NotImplementedError(f"shape function is not supported by {self.__class__.__name__}")
@@ -166,14 +229,14 @@ class Mesh(MeshDS):
         """Gradient of shape function on the given bc points, in shape (..., ldof, bc).
 
         Parameters:
-            bcs (Tensor): The bc points, in shape (NQ, bc).\n
-            p (int, optional): The order of the shape function. Defaults to 1.\n
-            index (int | slice | Tensor, optional): The index of the cell.\n
-            variables (str, optional): The variables name. Defaults to 'u'.\n
+            bcs (Tensor): The bc points, in shape (NQ, bc).
+            p (int, optional): The order of the shape function. Defaults to 1.
+            index (int | slice | Tensor, optional): The index of the cell.
+            variables (str, optional): The variables name. Defaults to 'u'.
             mi (Tensor, optional): The multi-index matrix. Defaults to None.
 
         Returns:
-            Tensor: The shape function value with shape (NQ, ldof, bc). The shape will\
+            Tensor: The shape function value with shape (NQ, ldof, bc). The shape will
             be (NC, NQ, ldof, GD) if `variables == 'x'`.
         """
         raise NotImplementedError(f"grad shape function is not supported by {self.__class__.__name__}")
@@ -187,11 +250,19 @@ class Mesh(MeshDS):
             background_color='1.0, 1.0, 1.0',
             show_type='Surface With Edges',
             ):
-        """
-        @brief 调用 ParaView 进行可视化
-
-        @param[in] file_name str 网格子类可以设置不同的 vtk 文件后缀名
-        @param[in] show_type str
+        """Visualize mesh using ParaView.
+        
+        Parameters:
+            file_name : str, default="temp.vtu"
+                Output VTK filename
+            background_color : str, default='1.0, 1.0, 1.0'
+                Background color in RGB
+            show_type : str, default='Surface With Edges'
+                Visualization style
+            
+        Notes:
+            Requires ParaView to be installed. On Ubuntu, install with:
+                sudo apt-get install paraview python3-paraview
         """
         import subprocess
         import os
@@ -240,7 +311,21 @@ class Mesh(MeshDS):
             edge_color: Tuple[float, float, float]=(0, 0, 0),
             edge_width=1.5,
             window_size: Tuple[int, int]=(800, 800)):
-        """
+        """Visualize mesh using VTK.
+        
+        Parameters:
+            etype : str, default='cell'
+                Entity type to visualize
+            showedge : bool, default=True
+                Whether to show edges
+            background_color : Tuple[float, float, float], default=(0.3, 0.2, 0.1)
+                Background color in RGB
+            edge_color : Tuple[float, float, float], default=(0, 0, 0)
+                Edge color in RGB
+            edge_width : float, default=1.5
+                Edge line width
+            window_size : Tuple[int, int], default=(800, 800)
+                Window dimensions
         """
         import numpy as np
         import vtk
@@ -338,8 +423,25 @@ class Mesh(MeshDS):
         return isMarked 
 
 class HomogeneousMesh(Mesh):
+    """Base class for homogeneous meshes where all elements have same topology.
+    
+    This class extends Mesh with implementations specific to homogeneous meshes,
+    providing common operations like barycenter calculation, point conversion,
+    and numerical integration that work for any homogeneous mesh type.
+    """
     # entity
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
+        """Calculate barycenters of mesh entities.
+        
+        Parameters:
+            etype : int | str
+                Entity type (dimension or name like 'cell', 'face')
+            index : Index, optional
+                Indices of specific entities to compute
+                
+        Returns:
+            TensorLike: Barycenter coordinates (N, GD)
+        """
         node = self.entity('node')
         if etype in ('node', 0):
             return node if index is None else node[index]
@@ -347,8 +449,19 @@ class HomogeneousMesh(Mesh):
         return bm.barycenter(entity, node)
 
     def bc_to_point(self, bcs: Union[TensorLike, Sequence[TensorLike]], index: Index=_S) -> TensorLike:
-        """Convert barycenter coordinate points to cartesian coordinate points
-        on mesh entities.
+        """Convert barycentric coordinates to Cartesian coordinates.
+        
+        Parameters:
+            bcs : TensorLike | Sequence[TensorLike]
+                Barycentric coordinates (either tensor or sequence of tensors)
+            index : Index, optional
+                Entity indices to compute points for
+                
+        Returns:
+            TensorLike: Cartesian coordinates of points
+            
+        Raises:
+            TypeError: If bcs has invalid type
         """
         if isinstance(bcs, Sequence): # tensor type
             etype = len(bcs)
@@ -365,6 +478,11 @@ class HomogeneousMesh(Mesh):
 
     # ipoints
     def interpolation_points(self, p: int, index: Index=_S) -> TensorLike:
+        """Get interpolation points of order p.
+        
+        Raises:
+            NotImplementedError: Must be implemented by subclasses
+        """
         raise NotImplementedError
 
     def cell_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
@@ -375,11 +493,24 @@ class HomogeneousMesh(Mesh):
 
     # tools
     def integral(self, f, q=3, celltype=False) -> TensorLike:
-        """
-        @brief 在网格中数值积分一个函数
+        """Numerically integrate a function over the mesh.
+        
+        Parameters:
+            f : callable | scalar | tensor
+                Function to integrate (can be callable or constant)
+            q : int, default=3
+                Quadrature order
+            celltype : bool, default=False
+                Whether to return cell-wise results
+                
+        Returns:
+            TensorLike: Integral value (scalar if celltype=False, per-cell if True)
+            
+        Raises:
+            ValueError: For unsupported function return types
         """
         GD = self.geo_dimension()
-        qf = self.integrator(q, etype='cell')
+        qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)
 
@@ -409,8 +540,22 @@ class HomogeneousMesh(Mesh):
             return bm.sum(e)
 
     def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
-        """
-        @brief Calculate the error between two functions.
+        """Calculate error between two functions.
+        
+        Parameters:
+            u : callable | array-like
+                Reference function/values
+            v : callable | array-like  
+                Comparison function/values
+            q : int, default=3
+                Quadrature order
+            power : int, default=2
+                Power for error norm (L^power norm)
+            celltype : bool, default=False
+                Whether to return cell-wise errors
+                
+        Returns:
+            TensorLike: Error measure (scalar or per-cell)
         """
         GD = self.geo_dimension()
 
@@ -429,6 +574,10 @@ class HomogeneousMesh(Mesh):
                 v = v(bcs)
             else:
                 v = v(ps)
+        
+        if u.ndim == 2 and v.ndim == 3 and v.shape[-1] == 1:  # 处理一维梯度计算形状不一致问题
+            u = u.reshape(u.shape[0], u.shape[1], 1)
+
         cm = self.entity_measure('cell')
         NC = self.number_of_cells()
         #if v.shape[-1] == NC:
@@ -452,18 +601,43 @@ class HomogeneousMesh(Mesh):
             #e = bm.power(bm.sum(e), 1/power)
             e = bm.sum(e)**(1/power)
         else:
-            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+            e = bm.pow(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
 
 
 class SimplexMesh(HomogeneousMesh):
+    """Mesh class for simplex elements (triangles, tetrahedrons, etc.).
+    
+    Provides specialized implementations for simplex meshes including shape functions
+    and interpolation point handling specific to simplex geometry.
+    """
     # ipoints
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell'):
+        """Get number of local interpolation points.
+        
+        Parameters:
+            p : int
+                Polynomial order
+            iptype : int | str, default='cell'
+                Entity type
+                
+        Returns:
+            int: Number of local interpolation points
+        """
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
         return simplex_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int):
+        """Get number of global interpolation points.
+        
+        Parameters:
+            p : int
+                Polynomial order
+                
+        Returns:
+            int: Number of global interpolation points
+        """
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
         return simplex_gdof(p, nums)
 
@@ -473,6 +647,21 @@ class SimplexMesh(HomogeneousMesh):
 
     def shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                        mi: Optional[TensorLike]=None) -> TensorLike:
+        """Evaluate simplex shape functions at given points.
+        
+        Parameters:
+            bcs : TensorLike
+                Barycentric coordinates
+            p : int, default=1
+                Polynomial order
+            index : Index, optional
+                Cell indices
+            mi : TensorLike, optional
+                Multi-index matrix
+                
+        Returns:
+            TensorLike: Shape function values
+        """
         TD = bcs.shape[-1] - 1
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
@@ -484,6 +673,26 @@ class SimplexMesh(HomogeneousMesh):
 
     def grad_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+        """Evaluate gradient of simplex shape functions.
+        
+        Parameters:
+            bcs : TensorLike
+                Barycentric coordinates
+            p : int, default=1
+                Polynomial order
+            index : Index, optional
+                Cell indices
+            variables : str, default='u'
+                Variable space ('u' or 'x')
+            mi : TensorLike, optional
+                Multi-index matrix
+                
+        Returns:
+            TensorLike: Gradient values
+            
+        Raises:
+            ValueError: For invalid variables type
+        """
         TD = bcs.shape[-1] - 1
         if mi is None:
             mi = bm.multi_index_matrix(p, TD, dtype=self.itype)
@@ -502,7 +711,37 @@ class SimplexMesh(HomogeneousMesh):
     
     def hess_shape_function(self, bcs: TensorLike, p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
-        """
+        """Evaluate Hessian (second derivatives) of simplex shape functions.
+    
+        Computes the second derivatives of shape functions either in reference 
+        ('u') or physical ('x') coordinates.
+
+        Parameters:
+            bcs : TensorLike
+                Barycentric coordinates of evaluation points with shape (NQ, TD+1)
+            p : int, default=1
+                Polynomial order of shape functions
+            index : Index, optional
+                Indices of cells to evaluate on (default all cells)
+            variables : str, default='u'
+                Coordinate space for derivatives:
+                - 'u': Reference element coordinates
+                - 'x': Physical coordinates
+            mi : TensorLike, optional
+                Precomputed multi-index matrix for efficiency
+
+        Returns:
+            TensorLike: 
+                - If variables='u': Hessian in reference space with shape (NQ, ldof, bc, bc)
+                - If variables='x': Hessian in physical space with shape (NC, NQ, ldof, GD, GD)
+
+        Raises:
+            ValueError: If invalid variables type is provided
+
+        Notes:
+            The physical space Hessian is computed using chain rule:
+            H_phys = J^-T @ H_ref @ J^-1
+            where J is the Jacobian matrix of the transformation
         """
         TD = bcs.shape[1] - 1
         if mi is None:
@@ -518,18 +757,50 @@ class SimplexMesh(HomogeneousMesh):
 class TensorMesh(HomogeneousMesh):
     # ipoints
     def number_of_local_ipoints(self, p: int, iptype: Union[int, str]='cell') -> int:
+        """Get number of local interpolation points.
+        
+        Parameters:
+            p : int
+                Polynomial order
+            iptype : int | str, default='cell'
+                Entity type
+                
+        Returns:
+            int: Number of local interpolation points
+        """
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
         return tensor_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p: int) -> int:
+        """Get number of global interpolation points.
+        
+        Parameters:
+            p : int
+                Polynomial order
+                
+        Returns:
+            int: Number of global interpolation points
+        """
         nums = [self.entity(i).shape[0] for i in range(self.TD+1)]
         return tensor_gdof(p, nums)
 
     def bc_to_point(self, bc, index=None):
+        """Convert barycentric coordinates to Cartesian coordinates.
+        
+        Parameters:
+            bcs : TensorLike | Sequence[TensorLike]
+                Barycentric coordinates (either tensor or sequence of tensors)
+            index : Index, optional
+                Entity indices to compute points for
+                
+        Returns:
+            TensorLike: Cartesian coordinates of points
+            
+        Raises:
+            TypeError: If bcs has invalid type
         """
-        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
-        """
+        
         node = self.entity('node')
         if isinstance(bc, tuple) and len(bc) == 3:
             cell = self.entity('cell', index)
@@ -564,6 +835,23 @@ class TensorMesh(HomogeneousMesh):
 
     def shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                        variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+        """Evaluate simplex shape functions at given points.
+        
+        Parameters:
+            bcs : TensorLike
+                Barycentric coordinates
+            p : int, default=1
+                Polynomial order
+            index : Index, optional
+                Cell indices
+            variables : str, default='u'
+                Variable space ('u' or 'x')
+            mi : TensorLike, optional
+                Multi-index matrix
+                
+        Returns:
+            TensorLike: Shape function values
+        """
         if mi is None:
             mi = bm.multi_index_matrix(p, 1, dtype=self.itype)
         raw_phi = [bm.simplex_shape_function(bc, p, mi) for bc in bcs]
@@ -581,6 +869,26 @@ class TensorMesh(HomogeneousMesh):
 
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
+        """Evaluate gradient of simplex shape functions.
+        
+        Parameters:
+            bcs : TensorLike
+                Barycentric coordinates
+            p : int, default=1
+                Polynomial order
+            index : Index, optional
+                Cell indices
+            variables : str, default='u'
+                Variable space ('u' or 'x')
+            mi : TensorLike, optional
+                Multi-index matrix
+                
+        Returns:
+            TensorLike: Gradient values
+            
+        Raises:
+            ValueError: For invalid variables type
+        """
         assert isinstance(bcs, tuple)
         TD = len(bcs)
         Dlambda = bm.array([-1, 1], dtype=self.ftype, device=bm.get_device(bcs[0]))
@@ -622,8 +930,30 @@ class TensorMesh(HomogeneousMesh):
         return gphi
 
     def quad_to_ipoint(self, p, index=None):
-        """
-        @brief Generate global indices for interpolation points on each face
+        """Generate global indices for quadrilateral face interpolation points.
+    
+        Constructs the global numbering of interpolation points on quadrilateral faces
+        for a given polynomial order p, handling edge orientation and interior points.
+
+        Parameters:
+            p : int
+                Polynomial order of the interpolation points
+            index : Index, optional
+                Indices of specific faces to compute (default: all faces)
+
+        Returns:
+            TensorLike: 
+                Integer array of shape (NF, (p+1)^2) containing global indices of 
+                interpolation points for each face, where NF is number of faces.
+                Points are ordered following tensor-product ordering.
+
+        Notes:
+            1. For each quadrilateral face, interpolation points consist of:
+            - Vertex nodes
+            - Edge nodes (p-1 points per edge)
+            - Interior points ((p-1)^2 points)
+            2. Edge points are numbered consistently with edge orientation
+            3. Interior points are numbered sequentially after edge points
         """
         NN = self.number_of_nodes()
         NE = self.number_of_edges()

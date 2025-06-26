@@ -22,6 +22,7 @@ from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
+from .mthlaplace_integrator import MthLaplaceIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -36,10 +37,12 @@ from .scalar_robin_bc_integrator import ScalarRobinBCIntegrator
 from .face_mass_integrator import BoundaryFaceMassIntegrator, InterFaceMassIntegrator
 from .fluid_boundary_friction_integrator import FluidBoundaryFrictionIntegrator
 from .scalar_interior_penalty_integrator import ScalarInteriorPenaltyIntegrator
+from .press_work_integrator import BoundaryPressWorkIntegrator
 
 ### Face Source
-from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator, ScalarRobinSourceIntegrator
 from .face_source_integrator import BoundaryFaceSourceIntegrator, InterFaceSourceIntegrator
+ScalarNeumannBCIntegrator = BoundaryFaceSourceIntegrator
+ScalarRobinSourceIntegrator = BoundaryFaceSourceIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC
@@ -50,8 +53,12 @@ from .recovery_alg import RecoveryAlg
 
 ### Other
 from .nonlinear_wrapper import NonlinearWrapperInt
+from .scalar_nonlinear_mass_diffusion_integrator import ScalarNonlinearMassAndDiffusionIntegrator
 
 
 ### solver
 from .poisson_lfem_solver import PoissonLFEMSolver
 from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver
+from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
+from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
+from .mlaplace_sfem_model import MthLaplaceSmoothFEMModel

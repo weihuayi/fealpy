@@ -206,7 +206,7 @@ class NedelecDof():
         return isDDof
 
 
-class  SecondNedelecFiniteElementSpace3d(FunctionSpace, Generic[_MT]):
+class  SecondNedelecFESpace3d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh, p, space=None, q = None):
         self.p = p
         self.mesh = mesh

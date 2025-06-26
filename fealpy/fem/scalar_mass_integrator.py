@@ -1,18 +1,13 @@
 from typing import Optional
 
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S
-
+from ..typing import TensorLike, Index, _S, CoefLike
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral, linear_integral, get_semilinear_coef
-from .integrator import (
-    LinearInt, OpInt, CellInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
+from ..decorator.variantmethod import variantmethod
+from .integrator import LinearInt, OpInt, CellInt, enable_cache
 
 
 class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
@@ -20,12 +15,12 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
-        method = 'assembly' if (method is None) else method
-        super().__init__(method=method)
+        super().__init__()
         self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -49,6 +44,7 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         phi = space.basis(bcs, index=index)
         return bcs, ws, phi, cm, index
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
@@ -57,8 +53,8 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
 
         return bilinear_integral(phi, phi, ws, cm, val, batched=self.batched)
 
-    @assemblymethod('semilinear')
-    def semilinear_assembly(self, space: _FS) -> TensorLike:
+    @assembly.register('semilinear')
+    def assembly(self, space: _FS) -> TensorLike:
         uh = self.uh
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
@@ -72,16 +68,15 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         return bilinear_integral(phi, phi, ws, cm, coef_A, batched=self.batched), \
                linear_integral(phi, ws, cm, coef_F, batched=self.batched)
 
-    @assemblymethod('isopara')
-    def isopara_assembly(self, space: _FS, /, indices=None) -> TensorLike:
+    @assembly.register('isopara')
+    def assembly(self, space: _FS, /, indices=None) -> TensorLike:
         """
         等参有限元质量矩阵组装
         """
         index = self.entity_selection(indices)
         mesh = getattr(space, 'mesh', None)
-
+        coef = self.coef
         rm = mesh.reference_cell_measure()
-        cm = mesh.entity_measure('cell', index=index)
 
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
@@ -90,7 +85,12 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         G = mesh.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G))
         phi = space.basis(bcs)
-        M = bm.einsum('q, cqi, cqj, cq -> cij', ws*rm, phi, phi, d) #(NC, ldof, ldof)
+        if coef is None:
+            M = bm.einsum(f'q, cqi, cqj,cq -> cij', ws*rm, phi, phi, d)
+        if isinstance(coef, (int, float)):
+            M = bm.einsum('q, cqi, cqj, cq -> cij', ws*rm, phi, phi, d) * coef
+        elif isinstance(coef, TensorLike):
+            M = bm.einsum('q, cqi, cqj, cq, cq -> cij', ws*rm, phi, phi, d, coef)
         return M
 
 

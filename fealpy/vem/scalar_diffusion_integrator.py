@@ -61,7 +61,64 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         KK = list(map(lambda x: x[0] + x[1], zip(K, stab)))
         return KK
 
-    
+    @assemblymethod('vector')
+    def vector_assembly(self, space):
+
+        from fealpy.vem.div_div_integrator import DivDivIntegrator
+        DDv = DivDivIntegrator(coef=1,q=space.p+3)
+        DDv = DDv.assembly(space)
+        scalar_space = space.scalar_space
+        SM = scalar_space.SM
+        #KK = self.assembly(scalar_space)
+        PI1 = scalar_space.PI1
+        NC = space.mesh.number_of_cells()
+
+        S = scalar_space.SS
+        import ipdb
+        ipdb.set_trace()
+        f = lambda x: x[0].T @ x[1] @ x[0]
+        KKK = list(map(f, zip(PI1, S)))
+        h = scalar_space.smspace.cellsize
+        stab = scalar_space.stab
+        D = scalar_space.dof_matrix
+
+
+        ldof = space.number_of_local_dofs()
+        coeff = self.coef
+        Px, Py = scalar_space.smspace.partial_matrix()
+        f = lambda x: x[0].T @ x[2].T @ x[1] @ x[2] @ x[0] 
+        K00 = list(map(f, zip(PI1, SM, Px, Py)))
+        f = lambda x: x[0].T @ x[3].T @ x[1] @ x[2] @ x[0] 
+        K01 = list(map(f, zip(PI1, SM, Px, Py)))
+        f = lambda x: x[0].T @ x[3].T @ x[1] @ x[3] @ x[0] 
+        K11 = list(map(f, zip(PI1, SM, Px, Py)))
+        f = lambda x: x[0].T @ x[2].T @ x[1] @ x[3] @ x[0] 
+        K10 = list(map(f, zip(PI1, SM, Px, Py)))
+        NV = space.mesh.number_of_vertices_of_cells()
+
+        ldof = scalar_space.number_of_local_dofs() 
+        VK = []
+        for i in range(NC):
+            K = bm.zeros((2*ldof[i], 2*ldof[i]), **space.mesh.fkwargs)
+            #K[:ldof[i], :ldof[i]] = coeff*K00[i] + coeff*KKK[i] + stab[i]
+            #K[:ldof[i], :ldof[i]] = coeff*K00[i] + coeff*KKK[i] 
+            K[:ldof[i], :ldof[i]] = 2*coeff*K00[i] + coeff*K11[i] 
+            #+ 0.5*bm.trace(coeff*K00[i]+coeff*KKK[i]+DDv[i][:ldof[i],:ldof[i]])*(bm.eye(PI1[i].shape[1])-D[i]@PI1[i])
+            K[:ldof[i], ldof[i]:] = coeff*K01[i]
+            K[ldof[i]:, :ldof[i]] = coeff*K01[i].T
+            #K[ldof[i]:, ldof[i]:] = coeff*K11[i] + coeff*KKK[i] + stab[i]
+            K[ldof[i]:, ldof[i]:] = 2*coeff*K11[i] + coeff*K00[i] 
+            #+ 0.5*bm.trace(coeff*K00[i]+coeff*KKK[i]+DDv[i][ldof[i]:,ldof[i]:])*(bm.eye(PI1[i].shape[1])-D[i]@PI1[i])
+            #VVK = bm.zeros_like(K)
+            #VVK[:ldof[i], :ldof[i]] = bm.eye(PI1[i].shape[1])-D[i]@PI1[i] 
+            #VVK[ldof[i]:, ldof[i]:] = bm.eye(PI1[i].shape[1])-D[i]@PI1[i] 
+            
+            #K = K + 0.5*bm.trace(K+DDv[i])*VVK
+            VK.append(K)
+
+        return VK
+
+   
         
 
 

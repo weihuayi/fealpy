@@ -3,22 +3,16 @@ from typing import Union, Optional, Sequence, Tuple, Any, Dict
 from ..backend import backend_manager as bm
 from ..typing import TensorLike, Index, _S
 from .. import logger
-from fealpy.cfd.sph.particle_solver_new import Space
-
 from .mesh_base import MeshDS 
+from fealpy.backend import TensorLike
+from scipy.spatial import cKDTree
 
-import jax.numpy as jnp
-import jax
-from jax_md import space, partition
-from jax import vmap, lax
+# Types
+Box = TensorLike
 
 class NodeMesh(MeshDS):
     def __init__(self, node: TensorLike, nodedata: Optional[Dict] = None, itype: str = 'default_itype', ftype: str = 'default_ftype') -> None: 
         super().__init__(TD=0, itype=itype, ftype=ftype)
-        '''
-        note : Currently using jax's own jax_md, vmap, lax, vstack , ravel,
-               full, where, mgrid, column_stack, full_like, hstack.
-        '''
         self.node = node
 
         if nodedata is None:
@@ -87,6 +81,7 @@ class NodeMesh(MeshDS):
             "rho": rho,
             "mass": mass,
             "eta": eta,
+            "dx": dx,
         }
         
         return cls(r, nodedata=nodedata)
@@ -155,6 +150,8 @@ class NodeMesh(MeshDS):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
+            "dx": dx,
+            
         }
 
         return cls(r, nodedata=nodedata) 
@@ -225,91 +222,282 @@ class NodeMesh(MeshDS):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
+            "dx": dx,
         }
 
         return cls(r, nodedata=nodedata)
 
     @classmethod
-    def from_long_rectangular_cavity_domain(cls, init_domain=bm.tensor([0.0,0.005,0,0.005]), domain=bm.tensor([0,0.05,0,0.005]), uin=bm.tensor([5.0, 0.0]), dx=1.25e-4):
-        H = 1.5 * dx
-        dy = dx
-        rho0 = 737.54
+    def from_pipe_domain(cls, domain, init_domain, H, dx=1.25e-4):
+        u_in = bm.array([5.0, 0.0], dtype=bm.float64) 
+        rho_0 = 737.54
 
-        #fluid particles
-        fp = jnp.mgrid[init_domain[0]:init_domain[1]:dx, \
-            init_domain[2]+dx:init_domain[3]:dx].reshape(2,-1).T
+        f_x = bm.arange(init_domain[0], init_domain[1], dx, dtype=bm.float64)
+        f_y = bm.arange(init_domain[2] + dx, init_domain[3], dx, dtype=bm.float64)
+        fy, fx = bm.meshgrid(f_y, f_x, indexing='xy')
+        fp = bm.stack((fx.ravel(), fy.ravel()), axis=1)
+        f_tag = bm.zeros(len(fp), dtype=bm.int64)
+        
+        x0 = bm.arange(domain[0], domain[1], dx, dtype=bm.float64)
+        bwp = bm.stack((x0, bm.full_like(x0, domain[2])), axis=1)
+        uwp = bm.stack((x0, bm.full_like(x0, domain[3])), axis=1)
+        wp = bm.concatenate((bwp, uwp), axis=0)
+        w_tag = bm.ones(len(wp), dtype=bm.int64)
+        
+        d_xb = bm.arange(domain[0], domain[1], dx, dtype=bm.float64)
+        d_yb = bm.arange(domain[2] - dx, domain[2] - dx * 4, -dx, dtype=bm.float64)
+        dyb, dxb = bm.meshgrid(d_yb, d_xb, indexing='xy')
+        bdp = bm.stack((dxb.ravel(), dyb.ravel()), axis=1)
+        d_yu = bm.arange(domain[3] + dx, domain[3] + dx * 3, dx, dtype=bm.float64)
+        dyu, dxu = bm.meshgrid(d_yu, d_xb, indexing='xy')
+        udp = bm.stack((dxu.ravel(), dyu.ravel()), axis=1)
+        dp = bm.concatenate((bdp, udp), axis=0)
+        d_tag = bm.full((len(dp),), 2, dtype=bm.int64)
 
-        #wall particles
-        x0 = bm.arange(domain[0],domain[1],dx)
+        g_x = bm.arange(-dx, -dx - 4 * H, -dx, dtype=bm.float64)
+        g_y = bm.arange(domain[2] + dx, domain[3], dx, dtype=bm.float64)
+        gy, gx = bm.meshgrid(g_y, g_x, indexing='xy')
+        gp = bm.stack((gx.ravel(), gy.ravel()), axis=1)
+        g_tag = bm.full((len(gp),), 3, dtype=bm.int64)
 
-        bwp = jnp.column_stack((x0,jnp.full_like(x0,domain[2])))
-        uwp = jnp.column_stack((x0,jnp.full_like(x0,domain[3])))
-        wp = jnp.vstack((bwp,uwp))
-
-        #dummy particles
-        bdp = jnp.mgrid[domain[0]:domain[1]:dx, \
-                domain[2]-dx:domain[2]-dx*4:-dx].reshape(2,-1).T
-        udp = jnp.mgrid[domain[0]:domain[1]:dx, \
-                domain[3]+dx:domain[3]+dx*3:dx].reshape(2,-1).T
-        dp = jnp.vstack((bdp,udp))
-
-        #gate particles
-        gp = jnp.mgrid[-dx:-dx-4*H:-dx, \
-                domain[2]+dx:domain[3]:dx].reshape(2,-1).T
-
-        #tag
-        '''
-        fluid particles: 0 
-        wall particles: 1 
-        dummy particles: 2
-        gate particles: 3
-        '''
-        tag_f = jnp.full((fp.shape[0],), 0, dtype=int)
-        tag_w = jnp.full((wp.shape[0],), 1, dtype=int)
-        tag_d = jnp.full((dp.shape[0],), 2,dtype=int)
-        tag_g = jnp.full((gp.shape[0],), 3,dtype=int)
-
-        r = jnp.vstack((fp, gp, wp, dp))
-        NN = r.shape[0]
-        tag = jnp.hstack((tag_f, tag_g, tag_w, tag_d))
-        fg_v =  bm.ones_like(jnp.vstack((fp, gp))) * uin
-        wd_v =  bm.zeros_like(jnp.vstack((wp, dp)))
-        v = jnp.vstack((fg_v, wd_v))
-        rho = bm.ones(NN) * rho0
-        mass = bm.ones(NN) * dx * dy * rho0
-
+        r = bm.concatenate((fp, wp, dp, gp), axis=0)
+        tag = bm.concatenate((f_tag, w_tag, d_tag, g_tag), axis=0)
+        u = bm.zeros((len(r), 2), dtype=bm.float64)
+        u = bm.set_at(u, (tag == 0)|(tag == 3), u_in)
+        rho = bm.full((len(r),), rho_0, dtype=bm.float64)
+        m0 = rho_0 * (init_domain[1] - init_domain[0]) * (init_domain[3] - init_domain[2]) / fp.shape[0]
+        m1 = rho_0 * 6 * dx * (domain[3] - domain[2]) / gp.shape[0]
+        mass0 = bm.full((len(r[tag != 3]),), m0, dtype=bm.float64)
+        mass1 = bm.full((len(r[tag == 3]),), m1, dtype=bm.float64)
+        mass = bm.concatenate((mass0, mass1), axis=0)
+        
         nodedata = {
             "position": r,
             "tag": tag,
-            "v": v,
+            "u": u,
+            "dudt": bm.zeros_like(u),
             "rho": rho,
+            "drhodt": bm.zeros_like(rho),
             "p": bm.zeros_like(rho),
             "sound": bm.zeros_like(rho),
-            "mass": mass, 
-        } 
-        
+            "mass": mass,
+            "mu": bm.zeros_like(rho),
+            "drdt": bm.zeros_like(r),
+            "dx": dx,
+        }
         return cls(r, nodedata=nodedata)
 
     @classmethod
-    def from_dam_break_domain(cls, dx=0.02, dy=0.02):
-        pp = jnp.mgrid[dx:1+dx:dx, dy:2+dy:dy].reshape(2, -1).T
+    def from_pipe_domain0(cls, domain, init_domain, H, dx=1.25e-4):
+        u_in = bm.array([5.0, 0.0], dtype=bm.float64) 
+        rho_0 = 737.54
 
-        #down
-        bp0 = jnp.mgrid[0:4+dx:dx, 0:dy:dy].reshape(2, -1).T
-        bp1 = jnp.mgrid[-dx/2:4+dx/2:dx, -dy/2:dy/2:dy].reshape(2, -1).T
-        bp = jnp.vstack((bp0, bp1))
+        f_x = bm.arange(init_domain[0], init_domain[1], dx, dtype=bm.float64)
+        f_y = bm.arange(init_domain[2] + dx, init_domain[3], dx, dtype=bm.float64)
+        fy, fx = bm.meshgrid(f_y, f_x, indexing='xy')
+        fp = bm.stack((fx.ravel(), fy.ravel()), axis=1)
+        f_tag = bm.zeros(len(fp), dtype=bm.int64)
+        
+        x0 = bm.arange(domain[0], domain[1]/2, dx, dtype=bm.float64)
+        bwp = bm.stack((x0, bm.full_like(x0, domain[2])), axis=1)
+        uwp = bm.stack((x0, bm.full_like(x0, domain[3])), axis=1)
+        y0 = bm.arange(domain[2] - dx * 3, domain[3] + dx * 4, dx, dtype=bm.float64)
+        rwp = bm.concatenate((bm.full((len(y0), 1), domain[1]/2), y0.reshape(-1, 1)), axis=1)
+        wp = bm.concatenate((bwp, uwp, rwp), axis=0)
+        w_tag = bm.ones(len(wp), dtype=bm.int64)
+        
+        d_xb = bm.arange(domain[0], domain[1]/2, dx, dtype=bm.float64)
+        d_yb = bm.arange(domain[2] - dx, domain[2] - dx * 4, -dx, dtype=bm.float64)
+        dyb, dxb = bm.meshgrid(d_yb, d_xb, indexing='xy')
+        bdp = bm.stack((dxb.ravel(), dyb.ravel()), axis=1)
+        d_yu = bm.arange(domain[3] + dx, domain[3] + dx * 3, dx, dtype=bm.float64)
+        dyu, dxu = bm.meshgrid(d_yu, d_xb, indexing='xy')
+        udp = bm.stack((dxu.ravel(), dyu.ravel()), axis=1)
 
-        #left
-        lp0 = jnp.mgrid[0:dx:dx, dy:4+dy:dy].reshape(2, -1).T
-        lp1 = jnp.mgrid[-dx/2:dx/2:dx, dy-dy/2:4+dy/2:dy].reshape(2, -1).T
-        lp = jnp.vstack((lp0, lp1))
+        x1 = bm.arange(domain[1]/2+dx, domain[1]/2 + 3*dx, dx, dtype=bm.float64)
+        dyr, dxr = bm.meshgrid(y0, x1, indexing='xy')
+        bdr = bm.stack((dxr.ravel(), dyr.ravel()), axis=1)
 
-        #right
-        rp0 = jnp.mgrid[4:4+dx/2:dx, dy:4+dy:dy].reshape(2, -1).T
-        rp1 = jnp.mgrid[4+dx/2:4+dx:dx, dy-dy/2:4+dy/2:dy].reshape(2, -1).T
-        rp = jnp.vstack((rp0, rp1))
+        dp = bm.concatenate((bdp, udp, bdr), axis=0)
+        d_tag = bm.full((len(dp),), 2, dtype=bm.int64)
 
-        boundaryp = jnp.vstack((bp, lp, rp))
-        node = jnp.vstack((pp, boundaryp))
+        g_x = bm.arange(-dx, -dx - 4 * H, -dx, dtype=bm.float64)
+        g_y = bm.arange(domain[2] + dx, domain[3], dx, dtype=bm.float64)
+        gy, gx = bm.meshgrid(g_y, g_x, indexing='xy')
+        gp = bm.stack((gx.ravel(), gy.ravel()), axis=1)
+        g_tag = bm.full((len(gp),), 3, dtype=bm.int64)
 
-        return cls(node)
+        r = bm.concatenate((fp, wp, dp, gp), axis=0)
+        tag = bm.concatenate((f_tag, w_tag, d_tag, g_tag), axis=0)
+        u = bm.zeros((len(r), 2), dtype=bm.float64)
+        u = bm.set_at(u, (tag == 0)|(tag == 3), u_in)
+        rho = bm.full((len(r),), rho_0, dtype=bm.float64)
+        m0 = rho_0 * (init_domain[1] - init_domain[0]) * (init_domain[3] - init_domain[2]) / fp.shape[0]
+        m1 = rho_0 * 6 * dx * (domain[3] - domain[2]) / gp.shape[0]
+        mass0 = bm.full((len(r[tag != 3]),), m0, dtype=bm.float64)
+        mass1 = bm.full((len(r[tag == 3]),), m1, dtype=bm.float64)
+        mass = bm.concatenate((mass0, mass1), axis=0)
+        
+        nodedata = {
+            "position": r,
+            "tag": tag,
+            "u": u,
+            "dudt": bm.zeros_like(u),
+            "rho": rho,
+            "drhodt": bm.zeros_like(rho),
+            "p": bm.zeros_like(rho),
+            "sound": bm.zeros_like(rho),
+            "mass": mass,
+            "mu": bm.zeros_like(rho),
+            "drdt": bm.zeros_like(r),
+            "dx": dx,
+        }
+        return cls(r, nodedata=nodedata)
+
+class Space:
+    def raw_transform(self, box:Box, R:TensorLike):
+        if box.ndim == 0 or box.size == 1:
+            
+            return R * box
+        elif box.ndim == 1:
+            indices = self._get_free_indices(R.ndim - 1) + "i"
+            
+            return bm.einsum(f"i,{indices}->{indices}", box, R)
+        elif box.ndim == 2:
+            free_indices = self._get_free_indices(R.ndim - 1)
+            left_indices = free_indices + "j"
+            right_indices = free_indices + "i"
+            
+            return bm.einsum(f"ij,{left_indices}->{right_indices}", box, R)
+        raise ValueError(
+            ("Box must be either: a scalar, a vector, or a matrix. " f"Found {box}.")
+        )
+
+    def _get_free_indices(self, n: int):
+        
+        return "".join([chr(ord("a") + i) for i in range(n)])
+
+    def pairwise_displacement(self, Ra: TensorLike, Rb: TensorLike):
+        if len(Ra.shape) != 1:
+            msg = (
+				"Can only compute displacements between vectors. To compute "
+				"displacements between sets of vectors use vmap or TODO."
+				)
+            raise ValueError(msg)
+
+        if Ra.shape != Rb.shape:
+            msg = "Can only compute displacement between vectors of equal dimension."
+            raise ValueError(msg)
+
+        return Ra - Rb
+
+    def periodic_displacement(self, side: Box, dR: TensorLike):
+        _dR = ((dR + side * 0.5) % side) - 0.5 * side
+        return _dR
+
+    def periodic_shift(self, side: Box, R: TensorLike, dR: TensorLike):
+
+        return (R + dR) % side
+
+    def periodic(self, side: Box, wrapped: bool = True):
+        def displacement_fn( Ra: TensorLike, Rb: TensorLike, perturbation = None, **unused_kwargs):
+            if "box" in unused_kwargs:
+                raise UnexpectedBoxException(
+                    (
+                        "`space.periodic` does not accept a box "
+                        "argument. Perhaps you meant to use "
+                        "`space.periodic_general`?"
+                    )
+                )
+            dR = self.periodic_displacement(side, self.pairwise_displacement(Ra, Rb))
+            if perturbation is not None:
+                dR = self.raw_transform(perturbation, dR)
+            
+            return dR
+        if wrapped:
+            def shift_fn(R: TensorLike, dR: TensorLike, **unused_kwargs):
+                if "box" in unused_kwargs:
+                    raise UnexpectedBoxException(
+                        (
+                            "`space.periodic` does not accept a box "
+                            "argument. Perhaps you meant to use "
+                            "`space.periodic_general`?"
+                        )
+                    )
+
+                return self.periodic_shift(side, R, dR)
+        else:
+                def shift_fn(R: TensorLike, dR: TensorLike, **unused_kwargs):
+                    if "box" in unused_kwargs:
+                        raise UnexpectedBoxException(
+                            (
+                                "`space.periodic` does not accept a box "
+                                "argument. Perhaps you meant to use "
+                                "`space.periodic_general`?"
+                            )
+                        )
+                    return R + dR
+
+        return displacement_fn, shift_fn
+
+    def distance(self, dR: TensorLike):
+        dr = self.square_distance(dR)
+        return self.safe_mask(dr > 0, bm.sqrt, dr)
+
+    def square_distance(self, dR: TensorLike):
+        return bm.sum(dR**2, axis=-1)
+
+    def safe_mask(self, mask, fn, operand, placeholder=0):
+        masked = bm.where(mask, operand, 0)
+        return bm.where(mask, fn(masked), placeholder)
+
+class NeighborManager():
+    @staticmethod
+    def wall_virtual(position, tag):
+        """Neighbor relationship between solid wall particles and virtual particles"""
+        vir_r = position[tag == 2]
+        wall_r = position[tag == 1]
+        tree = cKDTree(wall_r)
+        distance, neighbors = tree.query(vir_r, k=1)
+        
+        fuild_len = len(position[tag == 0]) 
+        neighbors = neighbors + fuild_len
+        node_self = bm.where(tag == 2)[0]
+        return node_self, neighbors
+
+    @staticmethod
+    def fuild_fwvg(state, node_self, neighbors, dr_i_j, dist, w_dist, grad_w_dist):
+        """Neighbor relations among fluid particles, solid wall particles, and virtual particles"""
+        tag = state["tag"]
+        wvg_tag = bm.where((tag == 1) | (tag == 2) | (tag == 3))[0]
+        wvg_indx = bm.where(bm.isin(node_self, wvg_tag))[0] 
+        wvg_mask = bm.ones(len(node_self), dtype=bm.bool)
+        wvg_mask = bm.set_at(wvg_mask, wvg_indx, False)
+        f_node = node_self[wvg_mask]
+        neighbors = neighbors[wvg_mask]
+        dr_i_j = dr_i_j[wvg_mask]
+        dist = dist[wvg_mask]
+        w_dist = w_dist[wvg_mask]
+        grad_w_dist = grad_w_dist[wvg_mask]
+        return f_node, neighbors, dr_i_j, dist, w_dist, grad_w_dist
+
+    @staticmethod
+    def wall_fg(state, node_self, neighbors, w_dist):
+        """Neighbor relationship between fluid particles and solid wall particles"""
+        tag = state["tag"]
+        fvg_tag = bm.where((tag == 0) | (tag == 2) | (tag == 3))[0]
+        fvg_indx = bm.where(bm.isin(node_self, fvg_tag))[0]
+        fvg_mask = bm.ones(len(node_self), dtype=bm.bool)
+        fvg_mask = bm.set_at(fvg_mask, fvg_indx, False)
+        w_node = node_self[fvg_mask]
+        fwvg_neighbors = neighbors[fvg_mask]
+        w_dist = w_dist[fvg_mask]
+
+        wv_tag = bm.where((tag == 1) | (tag == 2))[0]
+        wv_indx = bm.where(bm.isin(fwvg_neighbors, wv_tag))[0]
+        wv_mask = bm.ones(len(fwvg_neighbors), dtype=bm.bool)
+        wv_mask = bm.set_at(wv_mask, wv_indx, False)
+        w_node = w_node[wv_mask]
+        fg_neighbors = fwvg_neighbors[wv_mask]
+        w_dist = w_dist[wv_mask]
+        return w_node, fg_neighbors, w_dist

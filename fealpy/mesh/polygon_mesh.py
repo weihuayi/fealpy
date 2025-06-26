@@ -63,6 +63,7 @@ class PolygonMesh(Mesh, Plotable):
         """
         cell, cellLocation = self.cell
         kwargs = bm.context(cell)
+        itype = cell.dtype
         totalEdge = self.total_edge()
         j0, i0, i1, j,j1 = bm.unique_all_(bm.sort(totalEdge, axis=1), axis=0)
 
@@ -75,9 +76,10 @@ class PolygonMesh(Mesh, Plotable):
         NV = self.number_of_vertices_of_cells() # (NC, )
          
         cellIdx = bm.repeat(bm.arange(NC), NV)
-        shifts = bm.cumsum(NV,axis=0)
+        shifts = bm.cumsum(NV,axis=0, dtype=itype)
         id_arr = bm.ones(shifts[-1], **kwargs)
-        id_arr = bm.set_at(id_arr, (shifts[:-1]), -bm.asarray(NV[:-1])+1)
+        id_arr = bm.set_at(id_arr, (shifts[:-1]), -bm.asarray(NV[:-1],
+                                                              dtype=itype)+1)
         id_arr = bm.set_at(id_arr, 0, 0)
         localIdx = bm.cumsum(id_arr,axis=0)
 
@@ -105,7 +107,7 @@ class PolygonMesh(Mesh, Plotable):
             bc = bm.mean(node[edge, :], axis=1).reshape(-1, GD)
         elif etype == 0:
             bc = node
-        return bc
+        return bc[index]
 
     def entity_measure(self,etype:Union[int,str],index:Index=_S) ->TensorLike:
         node = self.node
@@ -367,7 +369,7 @@ class PolygonMesh(Mesh, Plotable):
     def uniform_refine(self, n: int=1) -> None:
         raise NotImplementedError
 
-    def integral(self, u, q=3, celltype=False):
+    def integral(self, u, q=None, celltype=False):
         """
         @brief 多边形网格上的数值积分
 
@@ -395,7 +397,7 @@ class PolygonMesh(Mesh, Plotable):
         v2 = node[edge[:, 1]] - bc[edge2cell[:, 0]]
         a = (v1[:,0]*v2[:,1] - v1[:,1]*v2[:,0])/2.0
     
-        pp = bm.einsum('ij, jkm->kim', bcs, tri)
+        pp = bm.einsum('ij, jkm->kim', bcs, tri) #(NQ, 3) (3, NE, 2) 
         val = u(pp, edge2cell[:, 0])
 
         shape = (NC, ) + val.shape[2:]
@@ -480,6 +482,14 @@ class PolygonMesh(Mesh, Plotable):
             return cell2node
         else:
             return self.cell
+
+    def number_of_vertices_of_cells(self):
+        cellLocation = self.cell[1]
+        return cellLocation[1:] - cellLocation[0:-1]
+
+    number_of_edges_of_cells = number_of_vertices_of_cells
+    number_of_faces_of_cells = number_of_vertices_of_cells
+
 
     @classmethod
     def from_triangle_mesh_by_dual(cls, mesh, bc=True):
