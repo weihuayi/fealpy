@@ -1,34 +1,32 @@
 from ..backend import backend_manager as bm
 from fealpy.decorator import barycentric
-from ..functionspace import CmConformingFESpace2d
+from ..functionspace import CmConformingFESpace3d
 from ..functionspace import LagrangeFESpace
 from . import BilinearForm, ScalarDiffusionIntegrator
 from .mthlaplace_integrator import MthLaplaceIntegrator
 from . import LinearForm, ScalarSourceIntegrator
 from . import DirichletBC
 from ..solver import spsolve
-from fealpy.pde.biharmonic_triharmonic_2d import DoubleLaplacePDE, TripleLaplacePDE, get_flist
+from fealpy.pde.biharmonic_triharmonic_3d import DoubleLaplacePDE, get_flist
 
 
-class MthLaplaceSmoothFEMSolver:
-    """
-     光滑元方法计算 \(\Delta^{m+1} u = f\) 方程
-    """
+class DoubleLaplaceSmoothFEMSolver:
     def __init__(self, pde, mesh, p, m, timer=None, logger=None):
         """
-        @param pde:
-            The partial differential equation to solve.
+        Smooth Finite Element Method (SmoothFEM) solver for the equation
+        \(\Delta^{m+1} u = f\).
 
-        @param mesh:
-            The finite element mesh, specifically for a 2D triangular mesh.
+        Parameters:
 
-        @param m:
-            The type of PDE to solve:
+            pde: The partial differential equation to solve.
+
+            mesh:The finite element mesh, specifically for a 3D Tetrahedron mesh.
+
+            m: The type of PDE to solve:
             - m = 1: Double Laplace equation (双调和方程)
             - m = 2: Triple Laplace equation (三调和方程)
 
-        @param p:
-            The degree of the finite element space. Should satisfy:
+            p: The degree of the finite element space. Should satisfy:
             - p >= 4 * m + 1
 
         Example:
@@ -38,9 +36,10 @@ class MthLaplaceSmoothFEMSolver:
                 pde = TripleLaplacePDE(u)
 
         Where:
-            u = sp.sin(2 * sp.pi * y) * sp.sin(2 * sp.pi * x)
+            u = sp.sin(2 * sp.pi * y) * sp.sin(2 * sp.pi * x) * sp.sin(2 * sp.pi * z) 
             x = sp.symbols('x')
             y = sp.symbols('y')
+            z = sp.symbols('z')
         """
         # 计时与日志
         self.timer = timer
@@ -48,9 +47,9 @@ class MthLaplaceSmoothFEMSolver:
         self.mesh = mesh
 
         self.pde = pde
-        ulist = get_flist(pde.su)[:2*m+1]
+        ulist = get_flist(pde.su)[:4*m+1]
 
-        self.space = CmConformingFESpace2d(mesh, p, m)
+        self.space = CmConformingFESpace3d(mesh, p, m)
         self.uh = self.space.function() # 建立一个有限元函数
         bform = BilinearForm(self.space)
         integrator = MthLaplaceIntegrator(m=m+1, coef=1, q=p+4)

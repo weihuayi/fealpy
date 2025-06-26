@@ -92,3 +92,5 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         elif isinstance(coef, TensorLike):
             M = bm.einsum('q, cqi, cqj, cq, cq -> cij', ws*rm, phi, phi, d, coef)
         return M
+
+

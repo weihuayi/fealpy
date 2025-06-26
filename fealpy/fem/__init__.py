@@ -22,6 +22,7 @@ from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
+from .mthlaplace_integrator import MthLaplaceIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -60,3 +61,4 @@ from .poisson_lfem_solver import PoissonLFEMSolver
 from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver
 from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
 from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
+from .mlaplace_sfem_model import MthLaplaceSmoothFEMModel

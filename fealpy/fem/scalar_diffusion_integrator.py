@@ -138,3 +138,5 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
             else:
                 A = bm.einsum('q, cqim, cqjm, cq, cq -> cij', ws*rm, gphi, gphi, d, coef)
         return A
+
+
