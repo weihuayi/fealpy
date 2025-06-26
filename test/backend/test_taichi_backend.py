@@ -244,6 +244,52 @@ class TestAbs:
     #     field.from_numpy(np.array([1+2j, 2-1j, 3+0j]))
     #     result = bm.abs(field)
     #     assert np.allclose(result.to_numpy(), np.array([np.sqrt(5), np.sqrt(5), 3.0]))
+    
+#测试 acos 函数
+class TestAcos:
+    def test_acos_normal_values(self):
+        """测试常规值"""
+        field = ti.field(ti.f32, shape=(3,))
+        field.from_numpy(np.array([0.5, -0.7, 0.9]))
+        result = bm.acos(field)
+        assert np.allclose(result.to_numpy(), np.arccos(np.array([0.5, -0.7, 0.9])))
+
+    def test_acos_boundary_values(self):
+        """测试边界值"""
+        field = ti.field(ti.f32, shape=(2,))
+        field.from_numpy(np.array([1.0, -1.0]))
+        result = bm.acos(field)
+        assert np.allclose(result.to_numpy(), np.arccos(np.array([1.0, -1.0])))
+
+    def test_acos_empty(self):
+        """测试空元素"""
+        field = ti.field(ti.f32, shape=())
+        field[None] = 0.5
+        result = bm.acos(field)
+        assert np.allclose(result.to_numpy(), np.arccos(0.5))
+        
+#测试 acos 函数
+class TestAcos:
+    def test_acos_normal_values(self):
+        """测试常规值"""
+        field = ti.field(ti.f32, shape=(3,))
+        field.from_numpy(np.array([0.5, -0.7, 0.9]))
+        result = bm.acos(field)
+        assert np.allclose(result.to_numpy(), np.arccos(np.array([0.5, -0.7, 0.9])))
+
+    def test_acos_boundary_values(self):
+        """测试边界值"""
+        field = ti.field(ti.f32, shape=(2,))
+        field.from_numpy(np.array([1.0, -1.0]))
+        result = bm.acos(field)
+        assert np.allclose(result.to_numpy(), np.arccos(np.array([1.0, -1.0])))
+
+    def test_acos_empty(self):
+        """测试空元素"""
+        field = ti.field(ti.f32, shape=())
+        field[None] = 0.5
+        result = bm.acos(field)
+        assert np.allclose(result.to_numpy(), np.arccos(0.5))
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])

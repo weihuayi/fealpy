@@ -227,3 +227,22 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_abs()
         return out
+    
+    @staticmethod
+    def acos(field: ti.Field):
+        """
+        返回每个元素的反余弦值，结果为新的 field.
+        """
+        shape = field.shape
+        if any(s == 0 for s in shape):
+            return None
+        dtype = field.dtype
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_acos():
+            for I in ti.grouped(field):
+                out[I] = ti.acos(field[I])
+
+        fill_acos()
+        return out
