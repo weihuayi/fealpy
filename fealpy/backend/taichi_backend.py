@@ -103,3 +103,20 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         field.from_numpy(ndarray)
         return field
 
+    @staticmethod
+    def to_list(field: ti.Field, /) -> list:
+        if field is None:
+            return []
+        try:
+            shape = field.shape
+            if len(shape) == 0:
+                return field[None]
+            elif len(shape) == 1:
+                return [field[i] for i in range(shape[0])]
+            elif len(shape) == 2:
+                return [[field[i, j] for j in range(shape[1])] for i in range(shape[0])]
+            else:
+                raise ValueError("Currently only 0D, 1D and 2D fields are supported.")
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return []

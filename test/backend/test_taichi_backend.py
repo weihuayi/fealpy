@@ -106,6 +106,28 @@ class TestFromNumpy:
         
         # 检查数据内容
         assert np.allclose(ti_field.to_numpy(), np_array)
+        
+#测试 to_list 方法   
+class TestTolist:
+    def test_to_list_empty(self):
+        """测试空 Field 是否能正确转换为空列表"""
+        field = ti.field(ti.f32, shape=())
+        result = bm.to_list(field)
+        assert np.allclose(result, [])
+
+    def test_to_list_1d(self):
+        """测试 1D Field 是否能正确转换为列表"""
+        field = ti.field(ti.i32, shape=(3,))
+        field.from_numpy(np.array([1, 2, 3]))
+        assert bm.to_list(field) == [1, 2, 3]
+
+    def test_to_list_2d(self):
+        """测试 2D Field 是否能正确转换为列表"""
+        field = ti.field(ti.f32, shape = (2, 3))
+        field.from_numpy(np.array([[1.1, 2.2, 3.3], [4.4, 5.5, 6.6]]))
+
+        # 允许浮点数微小误差
+        assert np.allclose(bm.to_list(field), [[1.1, 2.2, 3.3], [4.4, 5.5, 6.6]])
 
 
 
