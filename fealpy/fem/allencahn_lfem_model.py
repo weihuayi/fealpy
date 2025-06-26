@@ -66,7 +66,7 @@ class AllenCahnLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-    def set_order(self, p: int = 1):
+    def set_space_degree(self, p: int = 1):
         """
         Set the order of the Lagrange finite element space.
         
