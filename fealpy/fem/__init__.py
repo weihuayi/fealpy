@@ -16,12 +16,12 @@ from .scalar_nonlinear_mass_integrator import ScalarNonlinearMassIntegrator
 from .scalar_convection_integrator import ScalarConvectionIntegrator
 from .linear_elastic_integrator import LinearElasticIntegrator
 from .press_work_integrator import PressWorkIntegrator, PressWorkIntegratorX, PressWorkIntegratorY
-from .vector_mass_integrator import VectorMassIntegrator
 from .curlcurl_integrator import CurlCurlIntegrator
 from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
+from .mass_integrator import MassIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator

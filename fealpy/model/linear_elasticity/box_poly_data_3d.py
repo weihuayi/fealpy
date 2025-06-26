@@ -78,7 +78,8 @@ class BoxPolyData3d():
         return 4e5
 
     def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
-        pass
+        """Material density ρ = 1e4 kg/m³."""
+        return 1e4
 
     @cartesian
     def body_force(self, p: TensorLike):
@@ -93,56 +94,47 @@ class BoxPolyData3d():
         u_z = 1e-3 * (x + y + 2*z) / 2
         
         return bm.stack([u_x, u_y, u_z], axis=-1)
-    
-        val = bm.zeros(p.shape, dtype=p.dtype, device=bm.get_device(p))
-    
-        val = bm.set_at(val, (..., 0), 1e-3 * (2*x + y + z) / 2)
-        val = bm.set_at(val, (..., 1), 1e-3 * (x + 2*y + z) / 2)
-        val = bm.set_at(val, (..., 2), 1e-3 * (x + y + 2*z) / 2)
-
-        return val
 
     @cartesian
     def strain(self, p: TensorLike) -> TensorLike:
-        shape = p.shape[:-1] + (3, 3)
-        val = bm.zeros(shape, dtype=p.dtype, device=bm.get_device(p))
+        shape = p.shape[:-1]
+        diag = bm.full(
+                    shape, 1e-3, 
+                    dtype=p.dtype, device=bm.get_device(p)
+                )
+        off_diag = bm.full(
+                        shape, 1e-3/2, 
+                        dtype=p.dtype, device=bm.get_device(p)
+                    )
 
-        val = bm.set_at(val, (..., 0, 0), 1e-3)  
-        val = bm.set_at(val, (..., 1, 1), 1e-3)  
-        val = bm.set_at(val, (..., 2, 2), 1e-3)  
-
-        # Off-diagonal components (symmetric)
-        val = bm.set_at(val, (..., 0, 1), 1e-3 / 2)  
-        val = bm.set_at(val, (..., 1, 0), 1e-3 / 2)  
-        val = bm.set_at(val, (..., 0, 2), 1e-3 / 2)  
-        val = bm.set_at(val, (..., 2, 0), 1e-3 / 2)  
-        val = bm.set_at(val, (..., 1, 2), 1e-3 / 2)  
-        val = bm.set_at(val, (..., 2, 1), 1e-3 / 2)  
-
-        return val
+        elements = bm.stack([diag, off_diag, off_diag,
+                            off_diag, diag, off_diag,
+                            off_diag, off_diag, diag], axis=-1)
+        
+        return bm.reshape(elements, shape + (3, 3))
 
     @cartesian
     def stress(self, p: TensorLike) -> TensorLike:
-        shape = p.shape[:-1] + (3, 3)
-        val = bm.zeros(shape, dtype=p.dtype, device=bm.get_device(p))
-        
+        shape = p.shape[:-1]
+
         lam = self.lam(p)
         mu = self.mu(p) 
         
         tr_eps = 3e-3
 
-        val = bm.set_at(val, (..., 0, 0), lam * tr_eps + 2 * mu * 1e-3)  
-        val = bm.set_at(val, (..., 1, 1), lam * tr_eps + 2 * mu * 1e-3)  
-        val = bm.set_at(val, (..., 2, 2), lam * tr_eps + 2 * mu * 1e-3)  
-
-        val = bm.set_at(val, (..., 0, 1), 2 * mu * 1e-3 / 2) 
-        val = bm.set_at(val, (..., 1, 0), 2 * mu * 1e-3 / 2)  
-        val = bm.set_at(val, (..., 0, 2), 2 * mu * 1e-3 / 2)  
-        val = bm.set_at(val, (..., 2, 0), 2 * mu * 1e-3 / 2)  
-        val = bm.set_at(val, (..., 1, 2), 2 * mu * 1e-3 / 2)  
-        val = bm.set_at(val, (..., 2, 1), 2 * mu * 1e-3 / 2) 
+        diag = bm.full(
+                    shape, lam * tr_eps + 2 * mu * 1e-3,
+                    dtype=p.dtype, device=bm.get_device(p)
+                )
+        off_diag = bm.full(
+                        shape, 2 * mu * 1e-3 / 2,
+                        dtype=p.dtype, device=bm.get_device(p)
+                    )
+        elements = bm.stack([diag, off_diag, off_diag,
+                            off_diag, diag, off_diag,
+                            off_diag, off_diag, diag], axis=-1)
         
-        return val
+        return bm.reshape(elements, shape + (3, 3))
 
     @cartesian
     def displacement_bc(self, points: TensorLike) -> TensorLike:
