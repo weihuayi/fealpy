@@ -214,6 +214,36 @@ class TestTril:
         """测试空矩阵"""
         field = bm.tril(0)
         assert field is None
+        
+#测试 abs 函数
+class TestAbs:
+    def test_abs_positive(self):
+        """测试正数元素的绝对值"""
+        field = ti.field(ti.f32, shape=(3,))
+        field.from_numpy(np.array([1.0, 2.0, 3.0]))
+        result = bm.abs(field)
+        assert np.allclose(result.to_numpy(), np.array([1.0, 2.0, 3.0]))
+
+    def test_abs_negative(self):    
+        """测试负数元素的绝对值"""
+        field = ti.field(ti.f32, shape=(3,))
+        field.from_numpy(np.array([-1, -2, -3]))        
+        result = bm.abs(field)
+        assert np.allclose(result.to_numpy(), np.array([1, 2, 3]))
+
+    def test_abs_empty(self):
+        """测试空元素的绝对值"""
+        field = ti.field(ti.f32, shape=())
+        field[None] = 1.0
+        result = bm.abs(field)
+        assert np.allclose(result.to_numpy(), 1.0)
+
+    # def test_abs_complex(self):
+    #     """测试复数元素的绝对值"""
+    #     field = ti.field(ti.c64, shape=(3,))
+    #     field.from_numpy(np.array([1+2j, 2-1j, 3+0j]))
+    #     result = bm.abs(field)
+    #     assert np.allclose(result.to_numpy(), np.array([np.sqrt(5), np.sqrt(5), 3.0]))
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])

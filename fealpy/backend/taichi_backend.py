@@ -208,3 +208,22 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_tril()
         return field
+    
+    @staticmethod
+    def abs(field: ti.Field):
+        """
+        返回每个元素的绝对值，结果为新的 field.
+        """
+        shape = field.shape
+        if any(s == 0 for s in shape):
+            return None
+        dtype = field.dtype
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_abs():
+            for I in ti.grouped(field):
+                out[I] = ti.abs(field[I])
+
+        fill_abs()
+        return out
