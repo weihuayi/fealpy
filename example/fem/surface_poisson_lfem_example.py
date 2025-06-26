@@ -31,7 +31,7 @@ parser = argparse.ArgumentParser(description=
 
 parser.add_argument('--sdegree',
         default=1, type=int,
-        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+        help='Lagrange 参数有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--mdegree',
         default=1, type=int,
@@ -64,6 +64,8 @@ elif mtype == 'lquad':
     LinearMesh = QuadrangleMesh
     LagrangeMesh = LagrangeQuadrangleMesh
 
+tmr = timer()
+next(tmr)
 x, y, z = sp.symbols('x, y, z', real=True)
 F = x**2 + y**2 + z**2
 u = x * y
@@ -77,7 +79,8 @@ lmesh = LinearMesh.from_unit_sphere_surface()
 
 errorType = ['$|| u - u_h||_{\\Omega,0}$']
 errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
-NDof = bm.zeros(maxit, dtype=bm.int32)
+NDof = bm.zeros(maxit, dtype=bm.float64)
+h = bm.zeros(maxit, dtype=bm.float64)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
@@ -89,6 +92,7 @@ for i in range(maxit):
     
     space = ParametricLagrangeFESpace(mesh, p=sdegree)
     NDof[i] = space.number_of_global_dofs()
+    h[i] = mesh.entity_measure('edge').max()
 
     uI = space.interpolate(pde.solution)
 
@@ -100,27 +104,29 @@ for i in range(maxit):
     A = bfrom.assembly(format='coo')
     F = lfrom.assembly()
     C = space.integral_basis()
-
+    
     def coo(A):
         data = A._values
         indices = A._indices
         return coo_array((data, indices), shape=A.shape)
-    A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
+    A = bmat([[coo(A), C.reshape(-1,1)], [C[None,:], None]], format='coo')
     A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
 
     F = bm.concatenate((F, bm.array([0])))
     
     uh = space.function()
     x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
-    uh[:] = -x[:-1] 
+    uh[:] = -x[:-1]
+    tmr.send(f'第{i}次求解时间')
 
     errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)
 
     if i < maxit-1:
         lmesh.uniform_refine()
-
+    tmr.send(f'第{i}次去查计算及网格加密时间')
+next(tmr)
 print("最终误差:", errorMatrix)
 print("order:", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
 show_error_table(NDof, errorType, errorMatrix)
-showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
+showmultirate(plt, 1, h, errorMatrix,  errorType, propsize=20)
 plt.show()

@@ -43,6 +43,11 @@ class PDEDataManager:
         "parabolic": "fealpy.model.parabolic",
         "wave": "fealpy.model.wave",
         "hyperbolic":"fealpy.model.hyperbolic",
+<<<<<<< HEAD
+=======
+        "nonlinear":"fealpy.model.nonlinear",
+        "linear_elasticity": "fealpy.model.linear_elasticity"
+>>>>>>> upstream/develop
     }
 
     def __init__(self, pde_type: str = None):

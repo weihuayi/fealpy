@@ -2,12 +2,18 @@ from fealpy.old.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 from fealpy.utils import timer 
 from fealpy.backend import backend_manager as bm
-from scipy.sparse.linalg import spsolve
 from ns_fvm_solver import NSFVMSolver
 from ns_fvm_pde import NSFVMPde
+from ns_fvm_pde1 import NSFVMPde1
+import torch
+from fealpy.solver import spsolve
 
-pde = NSFVMPde()
-mesh = pde.mesh(nx = 5, ny = 5)
+bm.set_backend('pytorch')
+torch.set_printoptions(precision=16)
+#bm.set_default_device('cuda')
+
+pde = NSFVMPde1()
+mesh = pde.mesh(nx = 400, ny = 400)
 mesh0 = pde.mesh0()
 mesh1 = pde.mesh1()
 output = './'
@@ -27,17 +33,22 @@ v0 = v
 p0 = p
 
 for i in range(nt):
-    t = timeline.next_time_level()
-    #print(f"第{i+1}步")
-    #print("time=", t)
+    tmr = timer()
+    next(tmr)
 
+    t = timeline.next_time_level()
+    print(f"第{i+1}步")
+    print("time=", t)
     #IPCS算法第一步
     A_u0 = solver.NS_Lform_us()
     A_v0 = solver.NS_Lform_vs()
+    tmr.send('第1步矩阵组装时间')
     b_u0, b_v0 = solver.DirichletBC_1(u0, v0, p0)
-
+    tmr.send('第1步边界处理时间')
+    
     us = spsolve(A_u0, b_u0)
     vs = spsolve(A_v0, b_v0)
+    tmr.send('第1步求解器时间')
 
     #print('us', us)
     #print('vs', vs)
@@ -45,27 +56,39 @@ for i in range(nt):
     #IPCS算法第二步
     A_p = solver.NS_Lform_p()
     b_p = solver.NS_Bform_p(us, vs, p0)
+    tmr.send('第2步矩阵组装时间')
     p1 = spsolve(A_p, b_p)
+    tmr.send('第2步求解器时间')
 
     #IPCS算法第三步
     A_u1 = solver.NS_Lform_u1()
     A_v1 = solver.NS_Lform_v1()
     b_u1 = solver.NS_Bform_u1(us, p0, p1)
     b_v1 = solver.NS_Bform_v1(vs, p0, p1) 
+    tmr.send('第3步矩阵组装时间')
+    
     u1 = spsolve(A_u1, b_u1)
     v1 = spsolve(A_v1, b_v1)
+    tmr.send('第3步求解器时间')
 
     u0 = u1
     v0 = v1
     p0 = p1
-    #print( mesh0.error(u, u1))
-    #print( mesh1.error(v, v1))
-    #print( mesh.error(p, p1))
-    #print( bm.max(bm.abs(u - u1)))
-    #print( bm.max(bm.abs(v - v1)))
-    #print( bm.max(bm.abs(p - p1)))
+    eu = u - u1
+    ev = v - v1
+    ep = p - p1
+    h = 1/pde.nx
+    print('u-L2', bm.sqrt(bm.sum(h**2 * eu**2)))
+    print('v-L2', bm.sqrt(bm.sum(h**2 * ev**2)))
+    print('p-L2', bm.sqrt(bm.sum(h**2 * ep**2)))
+    print('u-max', bm.max(bm.abs(eu)))
+    print('v-max', bm.max(bm.abs(ev)))
+    print('p-max', bm.max(bm.abs(ep)))
+    
+    next(tmr)
 
     timeline.advance()
+
 
 fig = plt.figure()
 ax1 = fig.add_subplot(111,projection='3d')
@@ -75,7 +98,9 @@ yy = ipoint[..., 1]
 X = xx.reshape(pde.nx+1, pde.ny)
 Y = yy.reshape(pde.nx+1, pde.ny)
 Z = u1.reshape(pde.nx+1, pde.ny)
-ax1.plot_surface(X, Y, Z, cmap='rainbow')
+surf = ax1.plot_surface(X, Y, Z, cmap='rainbow')
+ax1.set_zlabel('Z (numerical solution of u)', fontsize = 16)
+fig.colorbar(surf, ax=ax1, shrink=0.5, aspect=20)
 plt.show()
 
 fig = plt.figure()
@@ -86,7 +111,9 @@ yy = ipoint[..., 1]
 X = xx.reshape(pde.nx, pde.ny+1)
 Y = yy.reshape(pde.nx, pde.ny+1)
 Z = v1.reshape(pde.nx, pde.ny+1)
-ax1.plot_surface(X, Y, Z, cmap='rainbow')
+surf = ax1.plot_surface(X, Y, Z, cmap='rainbow')
+ax1.set_zlabel('Z (numerical solution of v)', fontsize = 16)
+fig.colorbar(surf, ax=ax1, shrink=0.5, aspect=20)
 plt.show()
 
 fig = plt.figure()
@@ -97,29 +124,8 @@ yy = ipoint[..., 1]
 X = xx.reshape(pde.nx, pde.ny)
 Y = yy.reshape(pde.ny, pde.ny)
 Z = p1.reshape(pde.nx, pde.ny)
-ax1.plot_surface(X, Y, Z, cmap='rainbow')
+surf = ax1.plot_surface(X, Y, Z, cmap='rainbow')
+ax1.set_zlabel('Z (numerical solution of p)', fontsize = 16)
+fig.colorbar(surf, ax=ax1, shrink=0.5, aspect=20)
 plt.show()
-
-print('A_u0', A_u0.toarray())
-print('A_v0', A_v0.toarray())
-print('A_p', A_p.toarray())
-print('A_u1', A_u1.toarray())
-print('A_v1', A_v1.toarray())
-print('b_u0', b_u0)
-print('b_v0', b_v0)
-print('b_p', b_p)
-print('b_u1', b_u1)
-print('b_v1', b_v1)
-
-
-'''
-print(mesh0.error(u, u1))
-print(mesh1.error(v, v1))
-print(mesh.error(p, p1))
-
-print("最终误差", errorMatrix)
-print("order : ", bm.log2(errorMatrix[0, :-1] / errorMatrix[0, 1:]))
-print("order : ", bm.log2(errorMatrix[1, :-1] / errorMatrix[1, 1:]))
-print("order : ", bm.log2(errorMatrix[2, :-1] / errorMatrix[2, 1:]))
-'''
 

@@ -510,7 +510,7 @@ class HomogeneousMesh(Mesh):
             ValueError: For unsupported function return types
         """
         GD = self.geo_dimension()
-        qf = self.integrator(q, etype='cell')
+        qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = self.bc_to_point(bcs)
 
@@ -601,7 +601,7 @@ class HomogeneousMesh(Mesh):
             #e = bm.power(bm.sum(e), 1/power)
             e = bm.sum(e)**(1/power)
         else:
-            e = bm.power(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+            e = bm.pow(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
 
 

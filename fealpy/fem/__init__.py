@@ -40,8 +40,9 @@ from .scalar_interior_penalty_integrator import ScalarInteriorPenaltyIntegrator
 from .press_work_integrator import BoundaryPressWorkIntegrator
 
 ### Face Source
-from .scalar_neumann_bc_integrator import ScalarNeumannBCIntegrator, ScalarRobinSourceIntegrator
 from .face_source_integrator import BoundaryFaceSourceIntegrator, InterFaceSourceIntegrator
+ScalarNeumannBCIntegrator = BoundaryFaceSourceIntegrator
+ScalarRobinSourceIntegrator = BoundaryFaceSourceIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC
@@ -52,6 +53,7 @@ from .recovery_alg import RecoveryAlg
 
 ### Other
 from .nonlinear_wrapper import NonlinearWrapperInt
+from .scalar_nonlinear_mass_diffusion_integrator import ScalarNonlinearMassAndDiffusionIntegrator
 
 
 ### solver
