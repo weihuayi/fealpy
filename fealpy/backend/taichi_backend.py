@@ -150,3 +150,22 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill()
         return field
+    
+    @staticmethod
+    def eye(N, M=None, k=0, dtype=ti.f32):
+        if M is None:
+            M = N
+        if N <= 0 or M <= 0:
+            return None
+        field = ti.field(dtype=dtype, shape=(N, M))
+
+        @ti.kernel
+        def fill_eye():
+            for i, j in ti.ndrange(N, M):
+                if j - i == k:
+                    field[i, j] = 1
+                else:
+                    field[i, j] = 0
+
+        fill_eye()
+        return field

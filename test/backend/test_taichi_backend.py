@@ -146,6 +146,27 @@ class TestArange():
         field = bm.arange(0)
         assert field is None
 
+#测试 eye 函数
+class TestEye:
+    def test_eye_square(self):
+        """测试对角线为1的方阵"""
+        field = bm.eye(1)
+        assert np.allclose(field.to_numpy(), np.eye(1))
+
+    def test_eye_rectangle(self):
+        """"测试对角线为1的矩形"""
+        field = bm.eye(3,4)
+        assert np.allclose(field.to_numpy(),np.eye(3,4))
+
+    def test_eye_diagonal_offset(self):
+        """测试对角线偏移的方阵"""
+        field = bm.eye(3, k=1)
+        assert np.allclose(field.to_numpy(), np.eye(3, k=1))
+
+    def test_eye_empty(self):
+        """测试空方阵"""
+        field = bm.eye(0)
+        assert field is None
 
 
 if __name__ == '__main__':
