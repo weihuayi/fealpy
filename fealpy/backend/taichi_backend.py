@@ -246,3 +246,24 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_acos()
         return out
+    
+    @staticmethod
+    def zeros_like(field: ti.Field):
+        """
+        创建一个和输入 field 形状、dtype 相同的全零 field。
+        """
+        if field is None:
+            return None
+        shape = field.shape
+        if any(s == 0 for s in shape):
+            return None
+        dtype = field.dtype
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_zeros():
+            for I in ti.grouped(out):
+                out[I] = 0
+
+        fill_zeros()
+        return out

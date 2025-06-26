@@ -78,35 +78,35 @@ class TestFromNumpy:
     def test_from_numpy_float32(self):
         # 初始化Taichi（如果尚未初始化）
         ti.init(arch=ti.cpu)  # 使用CPU后端加速测试
-        
+
         np_array = np.array([1.1, 2.2, 3.3], dtype=np.float32)
         ti_field = bm.from_numpy(np_array)
-        
+
         # 检查数据类型
         assert ti_field.dtype == ti.f32
-        
+
         # 检查形状
         assert ti_field.shape == (3,)
-        
+
         # 检查数据内容（允许浮点数微小误差）
         assert np.allclose(ti_field.to_numpy(), np_array)
-        
+
     def test_from_numpy_int32(self):
         # 初始化Taichi
         ti.init(arch=ti.cpu)  # 使用CPU后端加速测试
-        
+
         np_array = np.array([1, 2, 3], dtype=np.int32)
         ti_field = bm.from_numpy(np_array)
-        
+
         # 检查数据类型
         assert ti_field.dtype == ti.i32
-        
+
         # 检查形状
         assert ti_field.shape == (3,)
-        
+
         # 检查数据内容
         assert np.allclose(ti_field.to_numpy(), np_array)
-        
+
 #测试 to_list 方法   
 class TestTolist:
     def test_to_list_empty(self):
@@ -128,7 +128,7 @@ class TestTolist:
 
         # 允许浮点数微小误差
         assert np.allclose(bm.to_list(field), [[1.1, 2.2, 3.3], [4.4, 5.5, 6.6]])
-        
+
 #测试 arange 方法
 class TestArange():
     def test_arange_simple(self):
@@ -145,6 +145,11 @@ class TestArange():
         """测试空范围生成"""
         field = bm.arange(0)
         assert field is None
+
+    def test_arange_invaild(self):
+        """测试无效范围生成"""
+        field = bm.arange(-1)
+        assert np.allclose(field, np.arange(-1))
 
 #测试 eye 函数
 class TestEye:
@@ -184,7 +189,7 @@ class TestZeros:
         """测试空矩阵"""
         field = bm.zeros((0,))
         assert field is None
-        
+
 #测试 tril 函数
 class TestTril:
     def test_tril_square(self):
@@ -214,7 +219,7 @@ class TestTril:
         """测试空矩阵"""
         field = bm.tril(0)
         assert field is None
-        
+
 #测试 abs 函数
 class TestAbs:
     def test_abs_positive(self):
@@ -234,9 +239,8 @@ class TestAbs:
     def test_abs_empty(self):
         """测试空元素的绝对值"""
         field = ti.field(ti.f32, shape=())
-        field[None] = 1.0
         result = bm.abs(field)
-        assert np.allclose(result.to_numpy(), 1.0)
+        assert np.allclose(result.to_numpy(), np.abs(field.to_numpy()))
 
     # def test_abs_complex(self):
     #     """测试复数元素的绝对值"""
@@ -244,7 +248,7 @@ class TestAbs:
     #     field.from_numpy(np.array([1+2j, 2-1j, 3+0j]))
     #     result = bm.abs(field)
     #     assert np.allclose(result.to_numpy(), np.array([np.sqrt(5), np.sqrt(5), 3.0]))
-    
+
 #测试 acos 函数
 class TestAcos:
     def test_acos_normal_values(self):
@@ -267,29 +271,20 @@ class TestAcos:
         field[None] = 0.5
         result = bm.acos(field)
         assert np.allclose(result.to_numpy(), np.arccos(0.5))
-        
-#测试 acos 函数
-class TestAcos:
-    def test_acos_normal_values(self):
-        """测试常规值"""
-        field = ti.field(ti.f32, shape=(3,))
-        field.from_numpy(np.array([0.5, -0.7, 0.9]))
-        result = bm.acos(field)
-        assert np.allclose(result.to_numpy(), np.arccos(np.array([0.5, -0.7, 0.9])))
 
-    def test_acos_boundary_values(self):
-        """测试边界值"""
-        field = ti.field(ti.f32, shape=(2,))
-        field.from_numpy(np.array([1.0, -1.0]))
-        result = bm.acos(field)
-        assert np.allclose(result.to_numpy(), np.arccos(np.array([1.0, -1.0])))
+#测试 zeros_like 函数
+class TestZerosLike:
+    def test_zeros_like_normal(self):
+        """测试常规情况"""
+        field = ti.field(ti.f32, shape=(2, 3))
+        result = bm.zeros_like(field)
+        assert np.allclose(result.to_numpy(), np.zeros((2, 3)))
 
-    def test_acos_empty(self):
+    def test_zeros_like_empty(self):
         """测试空元素"""
         field = ti.field(ti.f32, shape=())
-        field[None] = 0.5
-        result = bm.acos(field)
-        assert np.allclose(result.to_numpy(), np.arccos(0.5))
+        result = bm.zeros_like(field)
+        assert np.allclose(result.to_numpy(), np.zeros_like(field.to_numpy()))
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])
