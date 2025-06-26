@@ -184,6 +184,36 @@ class TestZeros:
         """测试空矩阵"""
         field = bm.zeros((0,))
         assert field is None
+        
+#测试 tril 函数
+class TestTril:
+    def test_tril_square(self):
+        """测试下三角方阵"""
+        field = bm.tril(3)
+        expected = np.array([[1,0,0],
+                             [1,1,0],
+                             [1,1,1]])
+        assert np.allclose(field.to_numpy(), expected)
+
+    def test_tril_rectangle(self):
+        """测试下三角矩阵"""
+        field = bm.tril(2,3)
+        expected = np.array([[1,0,0],
+                             [1,1,0]])
+        assert np.allclose(field.to_numpy(), expected)
+
+    def test_tril_diagonal_offset(self):
+        """测试下三角矩阵，偏移对角线"""
+        field = bm.tril(3, k=1)
+        expected = np.array([[1,1,0],
+                             [1,1,1],
+                             [1,1,1]])
+        assert np.allclose(field.to_numpy(), expected)
+
+    def test_tril_empty(self):
+        """测试空矩阵"""
+        field = bm.tril(0)
+        assert field is None
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])

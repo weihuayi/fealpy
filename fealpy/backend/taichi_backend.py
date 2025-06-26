@@ -186,3 +186,25 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_zeros()
         return field
+    
+    @staticmethod
+    def tril(N, M=None, k=0, dtype=ti.f32):
+        """
+        下三角阵
+        """
+        if M is None:
+            M = N
+        if N <= 0 or M <= 0:
+            return None
+        field = ti.field(dtype=dtype, shape=(N, M))
+
+        @ti.kernel
+        def fill_tril():
+            for i, j in ti.ndrange(N, M):
+                if j - i <= k:
+                    field[i, j] = 1
+                else:
+                    field[i, j] = 0
+
+        fill_tril()
+        return field
