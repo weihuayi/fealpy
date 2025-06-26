@@ -14,7 +14,6 @@
 import taichi as ti
 import pytest
 
-
 from fealpy.backend import backend_manager as bm
 import numpy as np
 bm.set_backend('taichi')
@@ -72,7 +71,41 @@ def test_to_numpy():
     np_x = bm.to_numpy(x)
     print("taichi data to numpy type: ", np_x.dtype)
     assert isinstance(np_x, np.ndarray)
-    assert np.allclose(np_x, np.array([[0.0, 0.1, 0.2], [1.0, 1.1, 1.2]]))  
+    assert np.allclose(np_x, np.array([[0.0, 0.1, 0.2], [1.0, 1.1, 1.2]]))
+    
+# 测试 from_numpy 方法
+class TestFromNumpy:
+    def test_from_numpy_float32(self):
+        # 初始化Taichi（如果尚未初始化）
+        ti.init(arch=ti.cpu)  # 使用CPU后端加速测试
+        
+        np_array = np.array([1.1, 2.2, 3.3], dtype=np.float32)
+        ti_field = bm.from_numpy(np_array)
+        
+        # 检查数据类型
+        assert ti_field.dtype == ti.f32
+        
+        # 检查形状
+        assert ti_field.shape == (3,)
+        
+        # 检查数据内容（允许浮点数微小误差）
+        assert np.allclose(ti_field.to_numpy(), np_array)
+        
+    def test_from_numpy_int32(self):
+        # 初始化Taichi
+        ti.init(arch=ti.cpu)  # 使用CPU后端加速测试
+        
+        np_array = np.array([1, 2, 3], dtype=np.int32)
+        ti_field = bm.from_numpy(np_array)
+        
+        # 检查数据类型
+        assert ti_field.dtype == ti.i32
+        
+        # 检查形状
+        assert ti_field.shape == (3,)
+        
+        # 检查数据内容
+        assert np.allclose(ti_field.to_numpy(), np_array)
 
 
 

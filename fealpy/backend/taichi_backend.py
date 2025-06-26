@@ -1,6 +1,5 @@
 from typing import Any, Union, Optional, TypeVar
 import numpy as np
-
 try:
     import taichi as ti
     import taichi.math as tm
@@ -13,17 +12,16 @@ except ImportError:
 
 Field = ti.Field
 Dtype = ti._lib.core.DataType
-Device = ti._lib.core.Arch 
-
+Device = ti._lib.core.Arch
 # dtype map from numpy to taichi
 dtype_map = {
-        np.dtype(np.bool): ti.u8,
-        np.dtype(np.float32): ti.f32,
-        np.dtype(np.float64): ti.f64,
-        np.dtype(np.int32): ti.i32,
-        np.dtype(np.int64): ti.i64,
-        np.dtype(np.uint32): ti.u32,
-        np.dtype(np.uint64): ti.u64,
+    np.dtype(np.bool): ti.u8,
+    np.dtype(np.float32): ti.f32,
+    np.dtype(np.float64): ti.f64,
+    np.dtype(np.int32): ti.i32,
+    np.dtype(np.int64): ti.i64,
+    np.dtype(np.uint32): ti.u32,
+    np.dtype(np.uint64): ti.u64,
 }
 
 # from fealpy.backend.base import BackendProxy
@@ -98,5 +96,10 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
             np.ndarray: A NumPy array containing the field data.
         """
         return field.to_numpy()
-
     
+    @staticmethod
+    def from_numpy(ndarray: np.ndarray, /) -> ti.Field:
+        field = ti.field(dtype=dtype_map[ndarray.dtype], shape=ndarray.shape)
+        field.from_numpy(ndarray)
+        return field
+
