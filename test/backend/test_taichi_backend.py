@@ -178,6 +178,56 @@ def test_full():
     assert x.shape == (2, 3, 4)
     assert np.all(x.to_numpy() == 7)
 
+# 测试 ones_like 方法
+def test_ones_like():
+    # 测试标量场
+    x_scalar = ti.field(dtype=ti.i32, shape=())
+    x_scalar[None] = 5
+    ones_like_scalar = bm.ones_like(x_scalar)
+    assert isinstance(ones_like_scalar, ti.Field)
+    assert ones_like_scalar.dtype == ti.i32
+    assert ones_like_scalar.shape == ()
+    assert ones_like_scalar[None] == 1
+
+    # 测试一维场
+    x_1d = ti.field(dtype=ti.f32, shape=(5,))
+    @ti.kernel
+    def fill_1d():
+        for i in x_1d:
+            x_1d[i] = 2.0
+    fill_1d()
+    ones_like_1d = bm.ones_like(x_1d)
+    assert isinstance(ones_like_1d, ti.Field)
+    assert ones_like_1d.dtype == ti.i32
+    assert ones_like_1d.shape == (5,)
+    assert np.all(ones_like_1d.to_numpy() == 1.0)
+
+    # 测试二维场
+    x_2d = ti.field(dtype=ti.i64, shape=(3, 4))
+    @ti.kernel
+    def fill_2d():
+        for i, j in x_2d:
+            x_2d[i, j] = 10
+    fill_2d()
+    ones_like_2d = bm.ones_like(x_2d)
+    assert isinstance(ones_like_2d, ti.Field)
+    assert ones_like_2d.dtype == ti.i32
+    assert ones_like_2d.shape == (3, 4)
+    assert np.all(ones_like_2d.to_numpy() == 1)
+
+    # 测试不同数据类型
+    dtypes = [ti.i8, ti.i16, ti.i32, ti.i64, ti.u8, ti.u16, ti.u32, ti.u64, ti.f32, ti.f64]
+    for dtype in dtypes:
+        x = ti.field(dtype=dtype, shape=(2,))
+        x.fill(100)
+        ones_like = bm.ones_like(x)
+        assert isinstance(ones_like, ti.Field)
+        assert ones_like.dtype == ti.i32
+        assert ones_like.shape == (2,)
+        assert np.all(ones_like.to_numpy() == 1)
+
+    
+
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])
 

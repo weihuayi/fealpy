@@ -126,3 +126,11 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         x = ti.field(dtype=dtype, shape=shape)
         x.fill(element)
         return x
+    
+    @staticmethod
+    def ones_like(field: ti.Field) -> ti.Field:
+        if field.shape == (0,):
+            return None
+        x = ti.field(dtype=ti.i32, shape=field.shape)
+        x.fill(1)
+        return x
