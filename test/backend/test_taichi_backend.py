@@ -276,6 +276,38 @@ def test_full_like():
     assert x.shape == (2, 3, 4)
     assert np.all(x.to_numpy() == 7)
 
+# 测试 acosh 方法
+def test_acosh():
+    # 测试标量输入且值在定义域内的情况
+    x_scalar = 2.0
+    result_scalar = bm.acosh(x_scalar)
+    expected_scalar = np.arccosh(x_scalar)
+    assert np.isclose(result_scalar, expected_scalar)
+
+    # 测试标量输入但值不在定义域内的情况
+    x_invalid_scalar = 0.5
+    with pytest.raises(ValueError, match="must be >= 1.0"):
+        bm.acosh(x_invalid_scalar)
+
+    # 测试 ti.Field 输入且所有值都在定义域内的情况
+    x_field = ti.field(dtype=ti.f32, shape=(3,))
+    x_field.from_numpy(np.array([1.5, 2.0, 3.0], dtype=np.float32))
+    result_field = bm.acosh(x_field)
+    expected_field = np.arccosh(x_field.to_numpy())
+    assert isinstance(result_field, ti.Field)
+    assert np.allclose(result_field.to_numpy(), expected_field)
+
+    # 测试 ti.Field 输入但部分值不在定义域内的情况
+    x_invalid_field = ti.field(dtype=ti.f32, shape=(3,))
+    x_invalid_field.from_numpy(np.array([0.5, 2.0, 3.0], dtype=np.float32))
+    with pytest.raises(ValueError, match="must be >= 1.0"):
+        bm.acosh(x_invalid_field)
+
+    # 测试输入类型无效的情况
+    x_invalid_type = np.array([1.0, 2.0])
+    with pytest.raises(TypeError, match="must be a ti.Field or a float"):
+        bm.acosh(x_invalid_type)
+
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])
 

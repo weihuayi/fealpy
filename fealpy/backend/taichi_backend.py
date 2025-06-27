@@ -152,3 +152,49 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         x.fill(element)
         return x
     
+    @staticmethod
+    def acosh(x: Union[ti.Field, float]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, float):
+            if x < 1.0:
+                raise ValueError(
+                    "Input value is out of the domain for acosh (must be >= 1.0)"
+                )
+            return ti.log(x + ti.sqrt(x * x - 1.0))
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a float")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        # 创建一个标志字段来标记错误
+        error_flag = ti.field(dtype=ti.i32, shape=())
+
+        @ti.kernel
+        def compute_acosh(
+            field: ti.template(), result: ti.template(), error_flag: ti.template()
+        ):
+            error_flag[None] = 0  # 初始化错误标志为 0
+            for I in ti.grouped(field):
+                if field[I] < 1.0:
+                    error_flag[None] = 1  # 设置错误标志为 1
+                else:
+                    result[I] = ti.log(field[I] + ti.sqrt(field[I] * field[I] - 1.0))
+
+        compute_acosh(x, result, error_flag)
+
+        if error_flag[None] == 1:
+            raise ValueError(
+                "Input value is out of the domain for acosh (must be >= 1.0)"
+            )
+
+        if len(shape) == 1 and shape[0] == 1:
+            # 如果结果是一个单值的 ti.Field，返回其单值
+            return result[None]
+
+        return result
