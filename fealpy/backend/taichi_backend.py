@@ -1,4 +1,4 @@
-from typing import Any, Union, Optional, TypeVar
+from typing import Any, Union, Optional, TypeVar, Tuple
 import numpy as np
 try:
     import taichi as ti
@@ -83,7 +83,13 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         # Store the chosen device for future reference
         TaichiBackend._device = device
-    
+        
+    @staticmethod
+    def device_type(field: ti.Field, /):  # type: ignore
+        arch = ti.cfg.arch
+        device = "cpu" if arch == ti.cpu else "cuda" if arch == ti.cuda else str(arch)
+        return device
+
     @staticmethod
     def to_numpy(field: ti.Field, /) -> np.ndarray:
         """
@@ -264,6 +270,148 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         def fill_zeros():
             for I in ti.grouped(out):
                 out[I] = 0
-
         fill_zeros()
         return out
+
+
+    @staticmethod
+    def ones(shape: Union[int, Tuple[int, ...]], ) -> ti.Field:
+        x = ti.field(shape=shape,dtype=ti.i32)
+        x.fill(1)
+        return x
+    
+    @staticmethod
+    def full(shape: Union[int, Tuple[int, ...]], element: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
+        if dtype is None:
+            if isinstance(element, bool):
+                dtype = ti.u8  # Boolean type in Taichi
+            elif isinstance(element, int):
+                dtype = ti.i32  # Default integer type
+            elif isinstance(element, float):
+                dtype = ti.f64  # Default floating-point type
+            else:
+                raise TypeError("Unsupported fill_value type.")
+
+        x = ti.field(dtype=dtype, shape=shape)
+        x.fill(element)
+        return x
+    
+    @staticmethod
+    def ones_like(field: ti.Field) -> ti.Field:
+        if field.shape == (0,):
+            return None
+        x = ti.field(dtype=ti.i32, shape=field.shape)
+        x.fill(1)
+        return x
+    
+    @staticmethod
+    def full_like(field: ti.Field, element: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
+
+        if dtype is None:
+            if isinstance(element, bool):
+                dtype = ti.u8  # Boolean type in Taichi
+            elif isinstance(element, int):
+                dtype = ti.i32  # Default integer type
+            elif isinstance(element, float):
+                dtype = ti.f64  # Default floating-point type
+            else:
+                raise TypeError("Unsupported fill_value type.")
+
+        x = ti.field(dtype=dtype, shape=field.shape)
+        x.fill(element)
+        return x
+    
+    @staticmethod
+    def acosh(x: Union[ti.Field, float]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, float):
+            if x < 1.0:
+                raise ValueError(
+                    "Input value is out of the domain for acosh (must be >= 1.0)"
+                )
+            return ti.log(x + ti.sqrt(x * x - 1.0))
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a float")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        # 创建一个标志字段来标记错误
+        error_flag = ti.field(dtype=ti.i32, shape=())
+
+        @ti.kernel
+        def compute_acosh(
+            field: ti.template(), result: ti.template(), error_flag: ti.template()
+        ):
+            error_flag[None] = 0  # 初始化错误标志为 0
+            for I in ti.grouped(field):
+                if field[I] < 1.0:
+                    error_flag[None] = 1  # 设置错误标志为 1
+                else:
+                    result[I] = ti.log(field[I] + ti.sqrt(field[I] * field[I] - 1.0))
+
+        compute_acosh(x, result, error_flag)
+
+        if error_flag[None] == 1:
+            raise ValueError(
+                "Input value is out of the domain for acosh (must be >= 1.0)"
+            )
+
+        if len(shape) == 1 and shape[0] == 1:
+            # 如果结果是一个单值的 ti.Field，返回其单值
+            return result[None]
+
+        return result
+
+    @staticmethod
+    def asinh(x: Union[ti.Field, float]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, float):
+            return ti.log(x + ti.sqrt(x * x + 1.0))
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a float")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_asinh(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = ti.log(field[I] + ti.sqrt(field[I] * field[I] + 1.0))
+
+        compute_asinh(x, result)
+
+        if len(shape) == 1 and shape[0] == 1:
+            # 如果结果是一个单值的 ti.Field，返回其单值
+            return result[None]
+
+        return result
+
+    @staticmethod
+    def add(x: ti.Field, y: ti.Field) -> ti.Field:
+        if not isinstance(x, ti.Field) or not isinstance(y, ti.Field):
+            raise TypeError("Both inputs must be ti.Field")
+
+        if x.shape != y.shape:
+            raise ValueError("Input fields must have the same shape")
+
+        @ti.kernel
+        def add_field(x: ti.template(), y: ti.template(), z: ti.template()):
+
+            for I in ti.grouped(x):
+                z[I] = x[I] + y[I]  # taichi math库里面有atomic_add函数
+
+        z = ti.field(dtype=x.dtype, shape=x.shape)
+        add_field(x, y, z)
+        return z
+
