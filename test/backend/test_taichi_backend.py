@@ -226,7 +226,55 @@ def test_ones_like():
         assert ones_like.shape == (2,)
         assert np.all(ones_like.to_numpy() == 1)
 
-    
+# 测试 full_like 方法
+def test_full_like():
+    # 测试布尔类型填充
+    x_bool = ti.field(dtype=ti.i32, shape=(3, 3))
+    element_bool = True
+    x = bm.full_like(x_bool, element_bool)
+    assert isinstance(x, ti.Field)
+    assert x.dtype == ti.u8
+    assert np.all(x.to_numpy() == 1)
+
+    # 测试整数类型填充
+    x_int = ti.field(dtype=ti.f32, shape=(2, 2))
+    element_int = 5
+    x = bm.full_like(x_int, element_int)
+    assert isinstance(x, ti.Field)
+    assert x.dtype == ti.i32
+    assert np.all(x.to_numpy() == 5)
+
+    # 测试浮点数类型填充
+    x_float = ti.field(dtype=ti.i64, shape=(4,))
+    element_float = 3.14
+    x = bm.full_like(x_float, element_float)
+    assert isinstance(x, ti.Field)
+    assert x.dtype == ti.f64
+    assert np.allclose(x.to_numpy(), 3.14)
+
+    # 测试自定义 dtype
+    x_custom = ti.field(dtype=ti.i32, shape=(3, 3))
+    element_custom = 10
+    custom_dtype = ti.f32
+    x = bm.full_like(x_custom, element_custom, dtype=custom_dtype)
+    assert isinstance(x, ti.Field)
+    assert x.dtype == ti.f32
+    assert np.all(x.to_numpy() == 10)
+
+    # 测试不支持的元素类型
+    x_invalid = ti.field(dtype=ti.i32, shape=(2, 2))
+    element_invalid = "invalid"
+    with pytest.raises(TypeError, match="Unsupported fill_value type."):
+        bm.full_like(x_invalid, element_invalid)
+
+    # 测试多维场
+    x_multi = ti.field(dtype=ti.f32, shape=(2, 3, 4))
+    element_multi = 7
+    x = bm.full_like(x_multi, element_multi)
+    assert isinstance(x, ti.Field)
+    assert x.dtype == ti.i32
+    assert x.shape == (2, 3, 4)
+    assert np.all(x.to_numpy() == 7)
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])

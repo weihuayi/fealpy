@@ -134,3 +134,21 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         x = ti.field(dtype=ti.i32, shape=field.shape)
         x.fill(1)
         return x
+    
+    @staticmethod
+    def full_like(field: ti.Field, element: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
+
+        if dtype is None:
+            if isinstance(element, bool):
+                dtype = ti.u8  # Boolean type in Taichi
+            elif isinstance(element, int):
+                dtype = ti.i32  # Default integer type
+            elif isinstance(element, float):
+                dtype = ti.f64  # Default floating-point type
+            else:
+                raise TypeError("Unsupported fill_value type.")
+
+        x = ti.field(dtype=dtype, shape=field.shape)
+        x.fill(element)
+        return x
+    
