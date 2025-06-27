@@ -227,3 +227,21 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
             return result[None]
 
         return result
+
+    @staticmethod
+    def add(x: ti.Field, y: ti.Field) -> ti.Field:
+        if not isinstance(x, ti.Field) or not isinstance(y, ti.Field):
+            raise TypeError("Both inputs must be ti.Field")
+
+        if x.shape != y.shape:
+            raise ValueError("Input fields must have the same shape")
+
+        @ti.kernel
+        def add_field(x: ti.template(), y: ti.template(), z: ti.template()):
+
+            for I in ti.grouped(x):
+                z[I] = x[I] + y[I]  # taichi math库里面有atomic_add函数
+
+        z = ti.field(dtype=x.dtype, shape=x.shape)
+        add_field(x, y, z)
+        return z

@@ -335,6 +335,50 @@ def test_asinh():
     with pytest.raises(TypeError, match="must be a ti.Field or a float"):
         bm.asinh(x_invalid_type)
 
+# 测试 add 方法
+def test_add():
+    # 测试两个形状相同的 ti.Field 相加成功的情况
+    x = ti.field(dtype=ti.f32, shape=(3, 3))
+    y = ti.field(dtype=ti.f32, shape=(3, 3))
+    # 初始化值
+    for i in range(3):
+        for j in range(3):
+            x[i, j] = i + j
+            y[i, j] = (i + j) * 2
+    # 执行相加
+    result = bm.add(x, y)
+    # 验证结果
+    for i in range(3):
+        for j in range(3):
+            assert result[i, j] == x[i, j] + y[i, j]
+
+    # 测试两个形状不同的 ti.Field 相加时抛出 ValueError
+    x = ti.field(dtype=ti.f32, shape=(2, 2))
+    y = ti.field(dtype=ti.f32, shape=(3, 3))
+    with pytest.raises(ValueError, match="Input fields must have the same shape"):
+        bm.add(x, y)
+
+    # 测试输入类型不是 ti.Field 时抛出 TypeError
+    x = np.array([1, 2, 3])
+    y = np.array([4, 5, 6])
+    with pytest.raises(TypeError, match="Both inputs must be ti.Field"):
+        bm.add(x, y)
+
+    # 测试不同数据类型的 ti.Field 相加（如果允许）
+    x = ti.field(dtype=ti.f32, shape=(2, 2))
+    y = ti.field(dtype=ti.i32, shape=(2, 2))
+    # 初始化值
+    for i in range(2):
+        for j in range(2):
+            x[i, j] = 1.5
+            y[i, j] = 2
+    result = bm.add(x, y)
+    # 验证结果是否自动提升类型
+    assert result.dtype == ti.f32
+    for i in range(2):
+        for j in range(2):
+            assert result[i, j] == pytest.approx(3.5)
+
 
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])
