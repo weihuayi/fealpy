@@ -24,7 +24,8 @@ from .raviart_thomas_fe_space_3d import  RaviartThomasFESpace3d
 
 from .parametric_lagrange_fe_space import ParametricLagrangeFESpace
 
-from .huzhang_fe_space_2d import HuZhangFESpace2D
+from .huzhang_fe_space_2d import HuZhangFESpace2d
+from .huzhang_fe_space_3d import HuZhangFESpace3d
 
 from .brezzi_douglas_marini_fe_space import BrezziDouglasMariniFESpace
 from .brezzi_douglas_marini_fe_space_2d import BrezziDouglasMariniFESpace2d
