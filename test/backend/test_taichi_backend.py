@@ -308,6 +308,34 @@ def test_acosh():
     with pytest.raises(TypeError, match="must be a ti.Field or a float"):
         bm.acosh(x_invalid_type)
 
+# 测试 asinh 方法
+def test_asinh():
+    # 测试标量输入情况
+    x_scalar = 1.0
+    result_scalar = bm.asinh(x_scalar)
+    expected_scalar = np.arcsinh(x_scalar)
+    assert np.isclose(result_scalar, expected_scalar)
+
+    # 测试标量输入边界值情况
+    x_boundary = 0.0
+    result_boundary = bm.asinh(x_boundary)
+    expected_boundary = np.arcsinh(x_boundary)
+    assert np.isclose(result_boundary, expected_boundary)
+
+    # 测试 ti.Field 输入且所有值都在定义域内的情况
+    x_field = ti.field(dtype=ti.f32, shape=(3,))
+    x_field.from_numpy(np.array([0.5, 1.0, 1.5], dtype=np.float32))
+    result_field = bm.asinh(x_field)
+    expected_field = np.arcsinh(x_field.to_numpy())
+    assert isinstance(result_field, ti.Field)
+    assert np.allclose(result_field.to_numpy(), expected_field)
+
+    # 测试输入类型无效的情况
+    x_invalid_type = np.array([1.0, 2.0])
+    with pytest.raises(TypeError, match="must be a ti.Field or a float"):
+        bm.asinh(x_invalid_type)
+
+
 if __name__ == '__main__':
     pytest.main(['-q', '-s'])
 

@@ -198,3 +198,32 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
             return result[None]
 
         return result
+
+    @staticmethod
+    def asinh(x: Union[ti.Field, float]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, float):
+            return ti.log(x + ti.sqrt(x * x + 1.0))
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a float")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_asinh(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = ti.log(field[I] + ti.sqrt(field[I] * field[I] + 1.0))
+
+        compute_asinh(x, result)
+
+        if len(shape) == 1 and shape[0] == 1:
+            # 如果结果是一个单值的 ti.Field，返回其单值
+            return result[None]
+
+        return result
