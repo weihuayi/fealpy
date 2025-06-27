@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh
-from fealpy.functionspace.huzhang_fe_space import HuZhangFESpace 
+from fealpy.functionspace.huzhang_fe_space_2d import HuZhangFESpace2d
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 from fealpy.fem.huzhang_stress_integrator import HuZhangStressIntegrator
@@ -34,7 +34,7 @@ import time
 
 def solve(pde, N, p):
     mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=N, ny=N)
-    space0 = HuZhangFESpace(mesh, p=p)
+    space0 = HuZhangFESpace2d(mesh, p=p)
 
     space = LagrangeFESpace(mesh, p=p-1, ctype='D')
     space1 = TensorFunctionSpace(space, shape=(-1, 2))
