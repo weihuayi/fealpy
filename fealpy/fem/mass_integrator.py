@@ -13,7 +13,7 @@ from .integrator import (
     enable_cache
 )
 
-class VectorMassIntegrator(LinearInt, OpInt, CellInt):
+class MassIntegrator(LinearInt, OpInt, CellInt):
     """
     @note (c u, v)
     """    

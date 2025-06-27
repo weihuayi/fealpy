@@ -77,6 +77,10 @@ class BoxPolyData3d():
         """Second Lamé parameter μ (shear modulus) = 4e5 MPa."""
         return 4e5
 
+    def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
+        """Material density ρ = 1e4 kg/m³."""
+        return 1e4
+
     @cartesian
     def body_force(self, p: TensorLike):
         val = bm.zeros(p.shape, dtype=p.dtype, device=bm.get_device(p))
@@ -84,57 +88,53 @@ class BoxPolyData3d():
 
     @cartesian
     def displacement(self, p: TensorLike):
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-        val = bm.zeros(p.shape, dtype=p.dtype, device=bm.get_device(p))
-
-        val[..., 0] = 1e-3 * (2*x + y + z) / 2
-        val[..., 1] = 1e-3 * (x + 2*y + z) / 2
-        val[..., 2] = 1e-3 * (x + y + 2*z) / 2
-
-        return val
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
+        u_x = 1e-3 * (2*x + y + z) / 2
+        u_y = 1e-3 * (x + 2*y + z) / 2
+        u_z = 1e-3 * (x + y + 2*z) / 2
+        
+        return bm.stack([u_x, u_y, u_z], axis=-1)
 
     @cartesian
     def strain(self, p: TensorLike) -> TensorLike:
-        shape = p.shape[:-1] + (3, 3)
-        val = bm.zeros(shape, dtype=p.dtype, device=bm.get_device(p))
-        
-        val[..., 0, 0] = 1e-3  
-        val[..., 1, 1] = 1e-3  
-        val[..., 2, 2] = 1e-3  
-        
-        val[..., 0, 1] = 1e-3 / 2  
-        val[..., 1, 0] = 1e-3 / 2  
-        val[..., 0, 2] = 1e-3 / 2  
-        val[..., 2, 0] = 1e-3 / 2  
-        val[..., 1, 2] = 1e-3 / 2  
-        val[..., 2, 1] = 1e-3 / 2  
+        shape = p.shape[:-1]
+        diag = bm.full(
+                    shape, 1e-3, 
+                    dtype=p.dtype, device=bm.get_device(p)
+                )
+        off_diag = bm.full(
+                        shape, 1e-3/2, 
+                        dtype=p.dtype, device=bm.get_device(p)
+                    )
 
-        return val
+        elements = bm.stack([diag, off_diag, off_diag,
+                            off_diag, diag, off_diag,
+                            off_diag, off_diag, diag], axis=-1)
+        
+        return bm.reshape(elements, shape + (3, 3))
 
     @cartesian
     def stress(self, p: TensorLike) -> TensorLike:
-        shape = p.shape[:-1] + (3, 3)
-        val = bm.zeros(shape, dtype=p.dtype, device=bm.get_device(p))
-        
+        shape = p.shape[:-1]
+
         lam = self.lam(p)
         mu = self.mu(p) 
         
         tr_eps = 3e-3
+
+        diag = bm.full(
+                    shape, lam * tr_eps + 2 * mu * 1e-3,
+                    dtype=p.dtype, device=bm.get_device(p)
+                )
+        off_diag = bm.full(
+                        shape, 2 * mu * 1e-3 / 2,
+                        dtype=p.dtype, device=bm.get_device(p)
+                    )
+        elements = bm.stack([diag, off_diag, off_diag,
+                            off_diag, diag, off_diag,
+                            off_diag, off_diag, diag], axis=-1)
         
-        val[..., 0, 0] = lam * tr_eps + 2 * mu * 1e-3
-        val[..., 1, 1] = lam * tr_eps + 2 * mu * 1e-3
-        val[..., 2, 2] = lam * tr_eps + 2 * mu * 1e-3
-        
-        val[..., 0, 1] = 2 * mu * 1e-3 / 2
-        val[..., 1, 0] = 2 * mu * 1e-3 / 2
-        val[..., 0, 2] = 2 * mu * 1e-3 / 2
-        val[..., 2, 0] = 2 * mu * 1e-3 / 2
-        val[..., 1, 2] = 2 * mu * 1e-3 / 2
-        val[..., 2, 1] = 2 * mu * 1e-3 / 2
-        
-        return val
+        return bm.reshape(elements, shape + (3, 3))
 
     @cartesian
     def displacement_bc(self, points: TensorLike) -> TensorLike:
@@ -145,9 +145,7 @@ class BoxPolyData3d():
     @cartesian
     def is_displacement_boundary(self, p: TensorLike) -> TensorLike:
         eps = 1e-12
-        x = p[..., 0]
-        y = p[..., 1] 
-        z = p[..., 2]
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
         
         on_x0 = bm.abs(x - 0.0) < eps
         on_x1 = bm.abs(x - 1.0) < eps

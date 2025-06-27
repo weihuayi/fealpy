@@ -11,7 +11,7 @@ from ..decorator.variantmethod import variantmethod
 from .integrator import LinearInt, OpInt, CellInt, enable_cache
 
 
-class LinearElasticIntegrator(LinearInt, OpInt, CellInt):
+class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
     """
     The linear elastic integrator for function spaces based on homogeneous meshes.
     """

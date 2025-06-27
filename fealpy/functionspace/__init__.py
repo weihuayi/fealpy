@@ -41,6 +41,13 @@ from .non_conforming_scalar_ve_space_2d import NonConformingScalarVESpace2d
 
 
 
+def functionspace(mesh, space_type, shape=None):
+    if space_type[0] == 'Lagrange':
+        scalar_space = LagrangeFESpace(mesh, space_type[1])
+        if shape is not None:
+            return TensorFunctionSpace(scalar_space, shape)
+        else:
+            return scalar_space
 
 
 

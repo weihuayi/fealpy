@@ -1,28 +1,31 @@
-<<<<<<< HEAD
-from typing import Union
+from typing import Optional, Union
 from ..backend import bm
+from ..typing import TensorLike
 from ..model import PDEDataManager, ComputationalModel
-from ..model.linear_elasticity import LinearElasticityPDEDataT
+from ..model.poisson import PoissonPDEDataT
 from ..decorator import variantmethod
 
 # FEM imports
-from ..functionspace import LagrangeFESpace, TensorFunctionSpace
+from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
-from ..fem import LinearElasticIntegrator, VectorSourceIntegrator
-from ..material import LinearElasticMaterial
+from ..fem import ScalarDiffusionIntegrator, ScalarSourceIntegrator
 
-class LinearElasticityLFEMModel(ComputationalModel):
+class PoissonLFEMModel(ComputationalModel):
+    """
+    """
     def __init__(self):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("linear_elasticity")
+        self.pdm = PDEDataManager("poisson")
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly"):
+    def set_pde(self, pde: Union[PoissonPDEDataT, str]="coscos"):
+        """
+        """
         if isinstance(pde, str):
             self.pde = self.pdm.get_example(pde)
         else:
             self.pde = pde
 
-    def set_init_mesh(self, meshtype: str = "hex", **kwargs):
+    def set_init_mesh(self, meshtype: str = "tri", **kwargs):
         self.mesh = self.pde.init_mesh[meshtype](**kwargs)
 
         NN = self.mesh.number_of_nodes()
@@ -36,44 +39,40 @@ class LinearElasticityLFEMModel(ComputationalModel):
         self.p = p
 
     def linear_system(self, mesh, p):
+        """
+        """
+
         self.space= LagrangeFESpace(mesh, p=p)
-        self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
 
-        LDOF = self.tspace.number_of_local_dofs()
-        GDOF = self.tspace.number_of_global_dofs()
+        LDOF = self.space.number_of_local_dofs()
+        GDOF = self.space.number_of_global_dofs()
         self.logger.info(f"local DOFs: {LDOF}, global DOFs: {GDOF}")
-        self.uh = self.tspace.function()
+        self.uh = self.space.function()
 
-        LEM = LinearElasticMaterial(
-                                name='E1nu025',
-                                lame_lambda=self.pde.lam(), shear_modulus=self.pde.mu(), 
-                                hypo='3D', device=bm.get_device(self.uh[:])
-                            )
-        
-        bform = BilinearForm(self.tspace)
-        LEI = LinearElasticIntegrator(
-                                material=LEM, q=self.p+3, method=None
-                            )
-        bform.add_integrator(LEI)
+        bform = BilinearForm(self.space)
+        DI = ScalarDiffusionIntegrator()
+        bform.add_integrator(DI)
 
-        lform = LinearForm(self.tspace)
-        SI = VectorSourceIntegrator(self.pde.body_force)
+        lform = LinearForm(self.space)
+        SI = ScalarSourceIntegrator(self.pde.source)
         lform.add_integrator(SI)
 
         A = bform.assembly()
         F = lform.assembly()
-
         return A, F
 
     def apply_bc(self, A, F):
+        """
+        Apply boundary conditions to the linear system.
+        """
         from ..fem import DirichletBC
-        if hasattr(self.pde, 'displacement_bc'):
+        if hasattr(self.pde, 'dirichlet'):
             A, F = DirichletBC(
-                    self.tspace,
-                    gd=self.pde.displacement_bc,
-                    threshold=self.pde.is_displacement_boundary).apply(A, F)
+                    self.space, 
+                    gd=self.pde.dirichlet,
+                    threshold=self.pde.is_dirichlet_boundary).apply(A, F)
         else:
-            pass
+            A, F = DirichletBC(self.space, gd=self.pde.solution).apply(A, F)
         return A, F
 
 
@@ -101,6 +100,7 @@ class LinearElasticityLFEMModel(ComputationalModel):
     def solve(self, A, F):
         pass
 
+
     @variantmethod('onestep')
     def run(self):
         """
@@ -108,8 +108,8 @@ class LinearElasticityLFEMModel(ComputationalModel):
         A, F = self.linear_system(self.mesh, self.p)
         A, F = self.apply_bc(A, F)
         self.uh[:] = self.solve(A, F)
-        l2 = self.postprocess()
-        self.logger.info(f"L2 Error: {l2}.")
+        l2, h1 = self.postprocess()
+        self.logger.info(f"L2 Error: {l2},  H1 Error: {h1}.")
 
     @run.register('uniform_refine')
     def run(self, maxit=4):
@@ -117,8 +117,8 @@ class LinearElasticityLFEMModel(ComputationalModel):
             A, F = self.linear_system(self.mesh, self.p)
             A, F = self.apply_bc(A, F)
             self.uh[:] = self.solve(A, F)
-            l2 = self.postprocess()
-            self.logger.info(f"{i}-th step with  L2 Error: {l2}.")
+            l2, h1 = self.postprocess()
+            self.logger.info(f"{i}-th step with  L2 Error: {l2},  H1 Error: {h1}.")
             if i < maxit - 1:
                 self.logger.info(f"Refining mesh {i+1}/{maxit}.")
                 self.mesh.uniform_refine()
@@ -131,5 +131,8 @@ class LinearElasticityLFEMModel(ComputationalModel):
 
     @variantmethod("error")
     def postprocess(self):
-        l2 = self.mesh.error(self.pde.displacement, self.uh)
-        return l2
+        """
+        """
+        l2 = self.mesh.error(self.pde.solution, self.uh)
+        h1 = self.mesh.error(self.pde.gradient, self.uh.grad_value)
+        return l2, h1 
