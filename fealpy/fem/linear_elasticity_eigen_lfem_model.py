@@ -4,7 +4,7 @@ from ..typing import TensorLike
 from ..decorator import variantmethod
 from ..model import ComputationalModel
 
-from ..functionspace import function_space 
+from ..functionspace import FunctionSpace
 from ..material import LinearElasticMaterial
 from ..fem import BilinearForm
 from ..fem import LinearElasticityIntegrator
