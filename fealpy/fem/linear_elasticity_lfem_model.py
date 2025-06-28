@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from typing import Union
 from ..backend import bm
 from ..model import PDEDataManager, ComputationalModel
@@ -8,7 +7,7 @@ from ..decorator import variantmethod
 # FEM imports
 from ..functionspace import LagrangeFESpace, TensorFunctionSpace
 from ..fem import BilinearForm, LinearForm
-from ..fem import LinearElasticIntegrator, VectorSourceIntegrator
+from ..fem import LinearElasticityIntegrator, VectorSourceIntegrator
 from ..material import LinearElasticMaterial
 
 class LinearElasticityLFEMModel(ComputationalModel):
@@ -31,7 +30,6 @@ class LinearElasticityLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-
     def set_space_degree(self, p: int = 1) -> None:    
         self.p = p
 
@@ -51,7 +49,7 @@ class LinearElasticityLFEMModel(ComputationalModel):
                             )
         
         bform = BilinearForm(self.tspace)
-        LEI = LinearElasticIntegrator(
+        LEI = LinearElasticityIntegrator(
                                 material=LEM, q=self.p+3, method=None
                             )
         bform.add_integrator(LEI)
@@ -127,7 +125,6 @@ class LinearElasticityLFEMModel(ComputationalModel):
     @run.register("bisect")
     def run(self):
         pass
-
 
     @variantmethod("error")
     def postprocess(self):
