@@ -4,7 +4,7 @@ from ..typing import TensorLike
 from ..decorator import variantmethod
 from ..model import ComputationalModel
 
-from ..functionspace import function_space 
+from ..functionspace import functionspace
 from ..material import LinearElasticMaterial
 from ..fem import BilinearForm
 from ..fem import LinearElasticityIntegrator
@@ -14,7 +14,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     """
     A class to represent a linear elasticity eigenvalue problem using the
     Lagrange finite element method (LFEM).
-    
+
     Attributes:
         mesh: The mesh of the domain.
     Reference:
@@ -26,7 +26,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
 
 
     def set_pde(self, pde):
-        self.pde = pde 
+        self.pde = pde
 
     def set_init_mesh(self, meshtype: str = "tri", **kwargs):
         self.mesh = self.pde.init_mesh[meshtype](**kwargs)
@@ -43,7 +43,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     def set_space_degree(self, p: int):
         """
         Set the polynomial degree of the finite element space.
-        
+
         Args:
             p: The polynomial degree.
         """
@@ -52,13 +52,13 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     def linear_system(self):
         """
         Construct the linear system for the eigenvalue problem.
-        
+
         Returns:
             The stiffness matrix and mass matrix.
         """
         # Implementation of the linear system construction goes here
         GD = self.mesh.geo_dimension()
-        space = function_space(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
+        space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
 
         bform = BilinearForm(space)
         integrator = LinearElasticityIntegrator(self.material)
@@ -76,7 +76,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     def solve(self):
         """
         Solve the eigenvalue problem using the finite element method.
-        
+
         Returns:
             Eigenvalues and eigenvectors of the system.
         """

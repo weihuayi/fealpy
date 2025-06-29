@@ -53,8 +53,6 @@ from .recovery_alg import RecoveryAlg
 
 ### Other
 from .nonlinear_wrapper import NonlinearWrapperInt
-from .scalar_nonlinear_mass_diffusion_integrator import ScalarNonlinearMassAndDiffusionIntegrator
-
 
 ### solver
 from .poisson_lfem_model import PoissonLFEMModel
