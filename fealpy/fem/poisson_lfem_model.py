@@ -35,7 +35,7 @@ class PoissonLFEMModel(ComputationalModel):
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
 
-    def set_space_degree(self, p: int = 1) -> None:    
+    def set_space_degree(self, p: int = 1) -> None:
         self.p = p
 
     def linear_system(self, mesh, p):
@@ -68,7 +68,7 @@ class PoissonLFEMModel(ComputationalModel):
         from ..fem import DirichletBC
         if hasattr(self.pde, 'dirichlet'):
             A, F = DirichletBC(
-                    self.space, 
+                    self.space,
                     gd=self.pde.dirichlet,
                     threshold=self.pde.is_dirichlet_boundary).apply(A, F)
         else:
@@ -88,13 +88,14 @@ class PoissonLFEMModel(ComputationalModel):
 
     @solve.register('cg')
     def solve(self, A, F):
-        from ..solver import cg 
-        self.uh[:], info = cg(A, F, maxit=5000, atol=1e-14, rtol=1e-14, returninfo=True)
+        from ..solver import cg
+        uh, info = cg(A, F, maxit=5000, atol=1e-14, rtol=1e-14, returninfo=True)
         res = info['residual']
         res_0 = bm.linalg.norm(F)
         stop_res = res/res_0
         self.logger.info(f"CG solver with {info['niter']} iterations"
                          f" and relative residual {stop_res:.4e}")
+        return uh
 
     @solve.register('pcg')
     def solve(self, A, F):
@@ -135,4 +136,4 @@ class PoissonLFEMModel(ComputationalModel):
         """
         l2 = self.mesh.error(self.pde.solution, self.uh)
         h1 = self.mesh.error(self.pde.gradient, self.uh.grad_value)
-        return l2, h1 
+        return l2, h1
