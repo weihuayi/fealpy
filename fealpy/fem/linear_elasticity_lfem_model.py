@@ -35,7 +35,11 @@ class LinearElasticityLFEMModel(ComputationalModel):
 
     def linear_system(self, mesh, p):
         self.space= LagrangeFESpace(mesh, p=p)
-        self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
+        gd = self.pde.geo_dimension()
+        if gd == 2:
+            self.tspace = TensorFunctionSpace(self.space, shape=(-1, 2))
+        elif gd == 3:
+            self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
 
         LDOF = self.tspace.number_of_local_dofs()
         GDOF = self.tspace.number_of_global_dofs()
@@ -45,7 +49,7 @@ class LinearElasticityLFEMModel(ComputationalModel):
         LEM = LinearElasticMaterial(
                                 name='E1nu025',
                                 lame_lambda=self.pde.lam(), shear_modulus=self.pde.mu(), 
-                                hypo='3D', device=bm.get_device(self.uh[:])
+                                hypo=self.pde.hypo, device=bm.get_device(self.uh[:])
                             )
         
         bform = BilinearForm(self.tspace)
