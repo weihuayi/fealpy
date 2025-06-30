@@ -37,6 +37,22 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
     # Holds the current Taichi arch (e.g., ti.cpu or ti.cuda)
     _device: Union[ti.cpu, ti.cuda, None] = None
     
+    ### dtype ###
+    bool = ti.uint8
+    uint8 = ti.uint8
+    uint16 = ti.uint16
+    uint32 = ti.uint32
+    uint64 = ti.uint64
+    int8 = ti.int8
+    int16 = ti.int16
+    int32 = ti.int32
+    int64 = ti.int64
+    float16 = ti.float16
+    float32 = ti.float32
+    float64 = ti.float64
+    complex64 = None  # 不支持
+    complex128 = None  # 不支持
+
     @staticmethod
     def context(tensor: ti.Field, /):
         """
@@ -275,50 +291,65 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
 
     @staticmethod
-    def ones(shape: Union[int, Tuple[int, ...]], ) -> ti.Field:
-        x = ti.field(shape=shape,dtype=ti.i32)
-        x.fill(1)
+    def ones(
+        shape: Union[int, Tuple[int, ...]], dtype: Optional[Dtype] = float64
+    ) -> ti.Field:
+
+        if not isinstance(shape, (int, tuple)) or (
+            isinstance(shape, tuple) and not all(isinstance(dim, int) for dim in shape)
+        ):
+            raise ValueError("Shape must be an int or a Tuple[int, ...].")
+        if shape == 0 or shape == (0,):
+            raise ValueError("Shape dimensions must be greater than 0.")
+        x = ti.field(shape=shape, dtype=dtype)
+        fill_value = ti.cast(1, dtype)
+        x.fill(fill_value)
         return x
     
     @staticmethod
-    def full(shape: Union[int, Tuple[int, ...]], element: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
+    def full(shape: Union[int, Tuple[int, ...]], fill_value: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
+        if not isinstance(shape, (int, tuple)) or (
+            isinstance(shape, tuple) and not all(isinstance(dim, int) for dim in shape)
+        ):
+            raise ValueError("Shape must be an int or a Tuple[int, ...].")
+        if shape == 0 or shape == (0,):
+            raise ValueError("Shape dimensions must be greater than 0.")
         if dtype is None:
-            if isinstance(element, bool):
+            if isinstance(fill_value, bool):
                 dtype = ti.u8  # Boolean type in Taichi
-            elif isinstance(element, int):
+            elif isinstance(fill_value, int):
                 dtype = ti.i32  # Default integer type
-            elif isinstance(element, float):
+            elif isinstance(fill_value, float):
                 dtype = ti.f64  # Default floating-point type
             else:
                 raise TypeError("Unsupported fill_value type.")
-
         x = ti.field(dtype=dtype, shape=shape)
-        x.fill(element)
+        x.fill(fill_value)
         return x
     
     @staticmethod
     def ones_like(field: ti.Field) -> ti.Field:
-        if field.shape == (0,):
-            return None
-        x = ti.field(dtype=ti.i32, shape=field.shape)
-        x.fill(1)
+
+        x = ti.field(shape=field.shape, dtype=field.dtype)
+        fill_value = ti.cast(1, field.dtype)
+        x.fill(fill_value)
         return x
     
     @staticmethod
-    def full_like(field: ti.Field, element: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
+    def full_like(field: ti.Field, fill_value: Union[bool, int, float], dtype: Optional[Dtype] = None) -> ti.Field:  # type: ignore
 
         if dtype is None:
-            if isinstance(element, bool):
+            if isinstance(fill_value, bool):
                 dtype = ti.u8  # Boolean type in Taichi
-            elif isinstance(element, int):
+            elif isinstance(fill_value, int):
                 dtype = ti.i32  # Default integer type
-            elif isinstance(element, float):
+            elif isinstance(fill_value, float):
                 dtype = ti.f64  # Default floating-point type
             else:
                 raise TypeError("Unsupported fill_value type.")
 
         x = ti.field(dtype=dtype, shape=field.shape)
-        x.fill(element)
+        x.fill(fill_value)
         return x
     
     @staticmethod
