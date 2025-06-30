@@ -17,7 +17,7 @@ model = LinearElasticityLFEMModel()
 # model.set_pde(pde)  
 model.set_pde("boxpoly3d")
 # model.set_pde("boxpoly2d")  
-# model.set_pde("sinsin2d")  
+# model.set_pde("boxsinsin2d")  
 
 #model.set_init_mesh(meshtype='uniform_tri')
 model.set_init_mesh(meshtype='custom_hex')
