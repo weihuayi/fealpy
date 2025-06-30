@@ -62,7 +62,13 @@ next(tmr)
 x = sp.symbols('x')
 y = sp.symbols('y')
 #u = (sp.sin(sp.pi*y)*sp.sin(sp.pi*x))**4
-u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+#u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
+#u = 1/(1+x+y)
+#r = sp.sqrt(x**2 + y**2)
+#theta = sp.atan2(y, x)
+#third_two = sp.Rational(3/2)
+#u = r**third_two*sp.sin(third_two*theta) 
+#u = sp.exp(2*x+y)
 #u = (sp.sin(4*sp.pi*y)*sp.sin(5*sp.pi*x))**3
 #u = (sp.sin(16*y)*sp.sin(15*x))**2
 #u = (sp.sin(9*y)*sp.sin(9*x))**3
@@ -70,10 +76,18 @@ u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))**2
 #u = (sp.sin(6*y)*sp.sin(6*x))**4
 #u = (sp.sin(5*sp.pi*y)*sp.sin(5*sp.pi*x))**2
 #pde = DoubleLaplacePDE(u, device=device) 
-pde = PDEDataManager("elliptic").get_example('biharmonic')
+pde = PDEDataManager("polyharmonic").get_example('lshape')
+
 #ulist = get_flist(u, device=device)[:3]
 ulist = pde.get_flist()
-mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
+#mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
+import ipdb
+ipdb.set_trace()
+mesh = pde.init_mesh(nx=10,ny=10)
+import matplotlib.pyplot as plt
+fig, axes = plt.subplots()
+mesh.add_plot(axes, showindex=True)
+plt.show()
 
 ikwargs = bm.context(mesh.cell)
 fkwargs = bm.context(mesh.node)
