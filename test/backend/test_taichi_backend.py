@@ -345,7 +345,7 @@ def test_full():
     assert np.all(x.to_numpy() == 5)
 
     # 测试浮点数类型填充
-    shape = (4,)
+    shape = (2,2)
     element = 3.14
     x = bm.full(shape, element)
     assert isinstance(x, ti.Field)
@@ -408,7 +408,7 @@ def test_ones_like():
     fill_1d()
     ones_like_1d = bm.ones_like(x_1d)
     assert isinstance(ones_like_1d, ti.Field)
-    assert ones_like_1d.dtype == ti.i32
+    assert ones_like_1d.dtype == ti.f32
     assert ones_like_1d.shape == (5,)
     assert np.all(ones_like_1d.to_numpy() == 1.0)
 
@@ -421,7 +421,7 @@ def test_ones_like():
     fill_2d()
     ones_like_2d = bm.ones_like(x_2d)
     assert isinstance(ones_like_2d, ti.Field)
-    assert ones_like_2d.dtype == ti.i32
+    assert ones_like_2d.dtype == ti.i64
     assert ones_like_2d.shape == (3, 4)
     assert np.all(ones_like_2d.to_numpy() == 1)
 
@@ -432,7 +432,7 @@ def test_ones_like():
         x.fill(100)
         ones_like = bm.ones_like(x)
         assert isinstance(ones_like, ti.Field)
-        assert ones_like.dtype == ti.i32
+        assert ones_like.dtype == dtype
         assert ones_like.shape == (2,)
         assert np.all(ones_like.to_numpy() == 1)
 
