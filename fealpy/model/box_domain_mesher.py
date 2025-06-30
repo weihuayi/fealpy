@@ -1,20 +1,31 @@
 from typing import Sequence
 from ..backend import backend_manager as bm
 from ..decorator import variantmethod
-from ..mesh import HexahedronMesh, TetrahedronMesh
+from ..mesh import HexahedronMesh, TetrahedronMesh, TriangleMesh, QuadrangleMesh
+from abc import ABC, abstractmethod
 
-class BoxDomainMesher:
+class BoxDomainMesher(ABC):
     """Box domain mesh generator"""
     def __init__(self, box=None):
+        self._box = box
+        self.setup_box()
 
-        if box is None:
-            self.box = [0, 1, 0, 1, 0, 1]
-        else:
-            self.box = box
-
+    @abstractmethod
     def geo_dimension(self) -> int:
-        return 3
-    
+        """Return 2 for 2D or 3 for 3D"""
+        pass
+
+    def setup_box(self):
+            """根据维度设置默认 box"""
+            if self._box is None:
+                if self.geo_dimension() == 2:
+                    self._box = [0, 1, 0, 1]  # 2D: x0, x1, y0, y1
+                elif self.geo_dimension() == 3:
+                    self._box = [0, 1, 0, 1, 0, 1]  # 3D: x0, x1, y0, y1, z0, z1
+                else:
+                    raise ValueError("Unsupported geo dimension.")
+            self.box = self._box  
+        
     def domain(self) -> Sequence[float]:
         return self.box
 
@@ -60,5 +71,14 @@ class BoxDomainMesher:
 
         return mesh
     
+    @init_mesh.register('uniform_tri')
+    def init_mesh(self, nx=10, ny=10):
+        mesh = TriangleMesh.from_box(box=self.box, nx=nx, ny=ny)
+        return mesh
+
+    @init_mesh.register('uniform_quad')
+    def init_mesh(self, nx=10, ny=10):
+        mesh = QuadrangleMesh.from_box(box=self.box, nx=nx, ny=ny)
+        return mesh
 
 

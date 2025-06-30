@@ -63,5 +63,8 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "boxpoly": ("box_poly_data_3d", "BoxPolyData3d"),
+    "boxpoly3d": ("box_poly_data_3d", "BoxPolyData3d"),
+    "boxpoly2d": ("box_poly_data_2d", "BoxPolyData2d"),
+    "sinsin2d": ("sin_sin_data_2d", "SinSinData2d"),
+
 }

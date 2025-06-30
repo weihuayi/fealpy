@@ -28,6 +28,11 @@ class BoxPolyData3d(BoxDomainMesher):
 
     def __init__(self, box=None):
         super().__init__(box=box)
+        self.hypo = '3D'  # Hypothesis for the problem
+
+    def geo_dimension(self):
+
+        return 3
 
     def lam(self, p: Optional[TensorLike] = None) -> TensorLike:
         """First Lamé parameter λ = 4e5 MPa."""
