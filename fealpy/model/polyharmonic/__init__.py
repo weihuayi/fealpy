@@ -40,7 +40,10 @@ class PolyharmonicPDEDataProtocol(Protocol):
 PolyharmonicPDEDataT = TypeVar('PolyharmonicPDEDataT', bound=PolyharmonicPDEDataProtocol)
 
 DATA_TABLE = {
-    # example name: (file_name, class_name)
-    "polyharmonic_2d": ("polyharmonic_data_2d", "PolyharmonicData2D"),
+        #example name: (file_name, class_name)
+    "sinsinbi": ("sin_sin_biharmonic_data_2d", "SinSinBiharmonicData2D"),
+    "sinsintri":("sin_sin_triharmonic_data_2d", "SinSinTriharmonicData2D"),
+    "sinsinsinbi": ("sin_sin_sin_biharmonic_data_3d", "SinSinSinBiharmonicData3D"),
+    "lshape":("lshape_biharmonic_data_2d", "LShapeBiharmonicData2D"),
 }
 
