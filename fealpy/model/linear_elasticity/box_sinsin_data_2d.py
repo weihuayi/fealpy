@@ -6,7 +6,7 @@ from ..box_domain_mesher import BoxDomainMesher2d
 import math
 
 
-class SinSinData2d(BoxDomainMesher2d):
+class BoxSinSinData2d(BoxDomainMesher2d):
     """
     2D Linear Elasticity problem with trigonometric displacement
 
