@@ -2,9 +2,9 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian, variantmethod
 from ...typing import  TensorLike
-from ..box_domain_mesher import BoxDomainMesher
+from ..box_domain_mesher import BoxDomainMesher3d
 
-class BoxPolyData3d(BoxDomainMesher):
+class BoxPolyData3d(BoxDomainMesher3d):
     """
     3D Linear Elasticity problem
 

@@ -1,6 +1,5 @@
 import argparse
 from fealpy.backend import backend_manager as bm
-from fealpy.model.linear_elasticity.box_poly_data_3d import BoxPolyData3d
 
 parser = argparse.ArgumentParser(description=
     """Solve 3D linear elasticity problem using linear Lagrange finite element method""")
@@ -16,12 +15,12 @@ model = LinearElasticityLFEMModel()
 
 # pde = BoxPolyData3d(box=[0, 2, 0, 2, 0, 2])
 # model.set_pde(pde)  
-# model.set_pde("boxpoly3d")
+model.set_pde("boxpoly3d")
 # model.set_pde("boxpoly2d")  
-model.set_pde("sinsin2d")  
+# model.set_pde("sinsin2d")  
 
-model.set_init_mesh(meshtype='uniform_tri')
-#model.set_init_mesh(meshtype='custom_hex')
+#model.set_init_mesh(meshtype='uniform_tri')
+model.set_init_mesh(meshtype='custom_hex')
 # model.set_init_mesh(meshtype='uniform_tet', nx=10, ny=10, nz=10)
 
 model.set_space_degree(p=1)
