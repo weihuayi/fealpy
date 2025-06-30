@@ -24,18 +24,13 @@ dtype_map = {
     np.dtype(np.uint64): ti.u64,
 }
 
-# from fealpy.backend.base import BackendProxy
-
-from .base import (
-    BackendProxy, ModuleProxy,
-    ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
-)
+from fealpy.backend.base import BackendProxy, ModuleProxy, ATTRIBUTE_MAPPING, FUNCTION_MAPPING, TRANSFORMS_MAPPING
 
 # 假设 BackendProxy 是你自己定义的基类
 class TaichiBackend(BackendProxy, backend_name='taichi'):
     DATA_CLASS = ti.Field
     # Holds the current Taichi arch (e.g., ti.cpu or ti.cuda)
-    _device: Union[ti.cpu, ti.cuda, None] = None
+    _device: Union[ti.cpu, ti.cuda, None] = None # type: ignore
     
     ### dtype ###
     bool = ti.uint8
@@ -69,7 +64,7 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         return {"dtype": tensor.dtype, "device": device}
 
     @staticmethod
-    def set_default_device(device: Union[str, ti.cpu, ti.cuda]) -> None:
+    def set_default_device(device: Union[str, ti.cpu, ti.cuda]) -> None: # type: ignore
         """
         Configure the default execution device for Taichi.
         This affects where all subsequent Field allocations and kernel runs occur.
@@ -118,7 +113,7 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
             np.ndarray: A NumPy array containing the field data.
         """
         return field.to_numpy()
-    
+
     @staticmethod
     def from_numpy(ndarray: np.ndarray, /) -> ti.Field:
         field = ti.field(dtype=dtype_map[ndarray.dtype], shape=ndarray.shape)
@@ -126,42 +121,52 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         return field
 
     @staticmethod
-    def to_list(field: ti.Field, /) -> list:
+    def tolist(field: ti.Field, /) -> list:
         if field is None:
             return []
         try:
             shape = field.shape
+            def rec(idx, dim):
+                if dim == len(shape):
+                    return field[tuple(idx)]
+                return [rec(idx + [i], dim + 1) for i in range(shape[dim])]
             if len(shape) == 0:
-                return field[None]
-            elif len(shape) == 1:
-                return [field[i] for i in range(shape[0])]
-            elif len(shape) == 2:
-                return [[field[i, j] for j in range(shape[1])] for i in range(shape[0])]
-            else:
-                raise ValueError("Currently only 0D, 1D and 2D fields are supported.")
+                return [field[None]]
+            return rec([], 0)
         except Exception as e:
             print(f"An error occurred: {e}")
             return []
-        
+
     @staticmethod
     def arange(*args, dtype=ti.i32):
-        # 解析参数
         if len(args) == 1:
-            start, stop, step = 0, args[0], 1
+            if args[0] is None:
+                raise ValueError("arange() requires stop to be specified.")
+            if args[0] <= 0:
+                return []
+            if args[0] > 0:
+                start, stop, step = 0, args[0], 1
         elif len(args) == 2:
-            start, stop = args
-            step = 1
+            a, b = args
+            if a >= b:
+                return []
+            else:
+                start, stop, step = a, b, 1
         elif len(args) == 3:
-            start, stop, step = args
+            a, b, c = args
+            if c == 0:
+                raise ValueError("step must not be zero")     
+            else:
+                if a >= b and c > 0:
+                    return []
+                if a <= b and c < 0:
+                    return []
+                else:
+                    start, stop, step = a, b, c
         else:
             raise ValueError("arange expects 1~3 arguments (stop | start, stop | start, stop, step)")
 
-        # 计算元素个数
-        if step == 0:
-            raise ValueError("step must not be zero")
-        n = max(0, (stop - start + (step - (1 if step > 0 else -1))) // step)
-        if n == 0:
-            return None
+        n = max(1, abs((stop - start + (step - (1 if step > 0 else -1))) // step))
 
         field = ti.field(dtype=dtype, shape=(n,))
 
@@ -172,13 +177,21 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill()
         return field
-    
+
     @staticmethod
     def eye(N, M=None, k=0, dtype=ti.f32):
+        if N is None and M is None:
+            raise ValueError("Both N and M are None. At least one dimension must be specified for eye().")
+        if N is None:
+            raise ValueError("N is None. The number of rows must be specified for eye().")
         if M is None:
             M = N
-        if N <= 0 or M <= 0:
-            return None
+        if not isinstance(N, int) or not isinstance(M, int):
+            raise TypeError(f"N and M must be integers, got N={N}, M={M}.")
+        if N == 0 or M == 0:
+            return []
+        if N < 0 or M < 0:
+            raise ValueError(f"N and M must be positive integers, got N={N}, M={M}.")
         field = ti.field(dtype=dtype, shape=(N, M))
 
         @ti.kernel
@@ -191,14 +204,19 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_eye()
         return field
-    
+
     @staticmethod
     def zeros(shape, dtype=ti.f32):
         # 支持 int 或 tuple 作为 shape
         if isinstance(shape, int):
-            shape = (shape,)
+            if shape == 0:
+                return []
+            if shape < 0:
+                raise ValueError(f"Shape must be a non-negative integer, got {shape}.")
+            if shape > 0:
+                shape = (shape,)
         if any(s == 0 for s in shape):
-            return None
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
         field = ti.field(dtype=dtype, shape=shape)
 
         @ti.kernel
@@ -210,35 +228,79 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         return field
     
     @staticmethod
-    def tril(N, M=None, k=0, dtype=ti.f32):
-        """
-        下三角阵
-        """
-        if M is None:
-            M = N
-        if N <= 0 or M <= 0:
-            return None
-        field = ti.field(dtype=dtype, shape=(N, M))
-
-        @ti.kernel
-        def fill_tril():
-            for i, j in ti.ndrange(N, M):
-                if j - i <= k:
-                    field[i, j] = 1
-                else:
-                    field[i, j] = 0
-
-        fill_tril()
-        return field
-    
-    @staticmethod
-    def abs(field: ti.Field):
-        """
-        返回每个元素的绝对值，结果为新的 field.
-        """
+    def zeros_like(field: ti.Field):
+        if field is None:
+            raise ValueError("Input field is None. Please provide a valid Taichi field.")
+        if not hasattr(field, "shape") or not hasattr(field, "dtype"):
+            raise TypeError("Input is not a valid Taichi field: missing 'shape' or 'dtype' attribute.")
         shape = field.shape
         if any(s == 0 for s in shape):
-            return None
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        out = ti.field(dtype=field.dtype, shape=shape)
+
+        @ti.kernel
+        def fill_zeros():
+            for I in ti.grouped(out):
+                out[I] = 0
+
+        fill_zeros()
+        return out
+    
+    @staticmethod
+    def tril(field: ti.Field, k: int = 0):
+        if field is None:
+            raise ValueError("Input field is None. Please provide a valid Taichi field.")
+        if not hasattr(field, "shape") or not hasattr(field, "dtype"):
+            raise TypeError("Input is not a valid Taichi field: missing 'shape' or 'dtype' attribute.")
+        shape = field.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        if len(shape) == 0:
+             raise ValueError("Input field is a scalar (0D), tril is not defined for scalars.")
+        dtype = field.dtype
+
+        if len(shape) == 1:
+            M = shape[0]
+            out = ti.field(dtype=dtype, shape=(M, M))
+
+            @ti.kernel
+            def fill_tril_1d():
+                for i, j in ti.ndrange(M, M):
+                    if j - i <= k:
+                        out[i, j] = field[j]
+                    else:
+                        out[i, j] = 0
+
+            fill_tril_1d()
+            return out
+
+        elif len(shape) == 2:
+            N, M = shape
+            out = ti.field(dtype=dtype, shape=shape)
+
+            @ti.kernel
+            def fill_tril_2d():
+                for i, j in ti.ndrange(N, M):
+                    if j - i <= k:
+                        out[i, j] = field[i, j]
+                    else:
+                        out[i, j] = 0
+
+            fill_tril_2d()
+            return out
+
+        else:
+            raise ValueError(f"Input field with shape {shape} is not supported. Only 1D and 2D fields are supported.")
+
+    @staticmethod
+    def abs(field: ti.Field):
+        if field is None:
+            raise ValueError("Input field is None. Please provide a valid Taichi field.")        
+        if not hasattr(field, "shape") or not hasattr(field, "dtype"):
+            raise TypeError("Input is not a valid Taichi field: missing 'shape' or 'dtype' attribute.")
+        shape = field.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
         dtype = field.dtype
         out = ti.field(dtype=dtype, shape=shape)
 
@@ -249,15 +311,16 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_abs()
         return out
-    
+
     @staticmethod
     def acos(field: ti.Field):
-        """
-        返回每个元素的反余弦值，结果为新的 field.
-        """
+        if field is None:
+            raise ValueError("Input field is None. Please provide a valid Taichi field.")
+        if not hasattr(field, "shape") or not hasattr(field, "dtype"):
+            raise TypeError("Input is not a valid Taichi field: missing 'shape' or 'dtype' attribute.")
         shape = field.shape
         if any(s == 0 for s in shape):
-            return None
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
         dtype = field.dtype
         out = ti.field(dtype=dtype, shape=shape)
 
@@ -268,27 +331,6 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         fill_acos()
         return out
-    
-    @staticmethod
-    def zeros_like(field: ti.Field):
-        """
-        创建一个和输入 field 形状、dtype 相同的全零 field。
-        """
-        if field is None:
-            return None
-        shape = field.shape
-        if any(s == 0 for s in shape):
-            return None
-        dtype = field.dtype
-        out = ti.field(dtype=dtype, shape=shape)
-
-        @ti.kernel
-        def fill_zeros():
-            for I in ti.grouped(out):
-                out[I] = 0
-        fill_zeros()
-        return out
-
 
     @staticmethod
     def ones(
@@ -445,4 +487,5 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         z = ti.field(dtype=x.dtype, shape=x.shape)
         add_field(x, y, z)
         return z
+
 
