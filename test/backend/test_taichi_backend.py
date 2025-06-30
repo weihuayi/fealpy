@@ -375,34 +375,6 @@ def test_add():
     for i in range(2):
         for j in range(2):
             assert result[i, j] == pytest.approx(3.5)
-
-        np_array = np.array([1.1, 2.2, 3.3], dtype=np.float32)
-        ti_field = bm.from_numpy(np_array)
-
-        # 检查数据类型
-        assert ti_field.dtype == ti.f32
-
-        # 检查形状
-        assert ti_field.shape == (3,)
-
-        # 检查数据内容（允许浮点数微小误差）
-        assert np.allclose(ti_field.to_numpy(), np_array)
-
-    def test_from_numpy_int32(self):
-        # 初始化Taichi
-        ti.init(arch=ti.cpu)  # 使用CPU后端加速测试
-
-        np_array = np.array([1, 2, 3], dtype=np.int32)
-        ti_field = bm.from_numpy(np_array)
-
-        # 检查数据类型
-        assert ti_field.dtype == ti.i32
-
-        # 检查形状
-        assert ti_field.shape == (3,)
-
-        # 检查数据内容
-        assert np.allclose(ti_field.to_numpy(), np_array)
         
 # 测试 from_numpy 方法
 class TestFromNumpy:
@@ -523,7 +495,7 @@ class TestEye:
 
     def test_eye_boundary(self): 
         """测试边界元素的单位阵"""
-        # 测试空矩阵  # TODO
+        # 测试空矩阵  
         field = bm.eye(0)
         assert np.array_equal(field, np.array([]))
         # N = 0
