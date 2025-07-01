@@ -62,7 +62,7 @@ First, clone the FEALPy repository from GitHub
 git clone https://github.com/weihuayi/fealpy.git
 ```
 
-If you can't acess GitHub, you can clone it from Gitee
+If you can't access GitHub, you can clone it from Gitee
 ```bash
 git clone https://gitee.com/whymath/fealpy
 ```
@@ -82,12 +82,12 @@ pip install -e .
 If you want to install optional dependencies, such as `pypardiso`, `pyamg`,
 `meshpy` and so on, you can do so by specifying the [optional] extra:
 ```
-pip install -e .[optional]
+pip install -e ".[optional]"
 ```
 
 To install both development and optional dependencies, use:
 ```bash
-pip install -e .[dev,optional]
+pip install -e ".[dev,optional]"
 ```
 To verify that FEALPy is installed correctly, you can run the following command:
 
@@ -131,7 +131,7 @@ git merge upstream/master
 After local development, push the modifications to your own remote repository:
 ```bash
 git add modified_files_name
-git commit -m"Explanation on modifications"
+git commit -m "Explanation on modifications"
 git push
 ```
 

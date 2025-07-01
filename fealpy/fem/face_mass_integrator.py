@@ -1,16 +1,12 @@
 from typing import Optional
-from ..typing import TensorLike, SourceLike, Threshold
+
+from ..typing import TensorLike, Threshold, CoefLike
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
+from .integrator import LinearInt, OpInt, FaceInt, enable_cache
 
-from .integrator import (
-    LinearInt, OpInt, FaceInt,
-    enable_cache,
-    assemblymethod,
-    CoefLike
-)
 
 class _FaceMassIntegrator(LinearInt, OpInt, FaceInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,

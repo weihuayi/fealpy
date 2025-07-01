@@ -3,7 +3,7 @@ import os
 import pathlib
 from setuptools import setup, find_packages, Extension
 
-# add current directory to Python Path 
+# add current directory to Python Path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
@@ -15,7 +15,7 @@ create_directory(os.path.expanduser("~/.local/include"))
 create_directory(os.path.expanduser("~/.local/lib"))
 
 
-__version__ = "3.1.2"
+__version__ = "3.3.2"
 
 here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / "README.md").read_text(encoding="utf-8")
@@ -58,4 +58,3 @@ setup(
     include_package_data=True,
     python_requires=">=3.10",
 )
-

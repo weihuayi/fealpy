@@ -5,3 +5,4 @@ matplotlib
 gmsh
 vtk
 pyevtk
+tqdm

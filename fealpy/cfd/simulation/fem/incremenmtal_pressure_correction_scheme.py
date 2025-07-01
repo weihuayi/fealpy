@@ -11,6 +11,7 @@ from .project_method import ProjectionMethod
 from ....fem import DirichletBC
 from ..simulation_base import SimulationBase, SimulationParameters
 from ....functionspace import Function
+from ....decorator import barycentric
 
 class IPCS(ProjectionMethod, FEM):
     """IPCS分裂投影法"""
@@ -114,7 +115,8 @@ class IPCS(ProjectionMethod, FEM):
         self.predict_BM.coef = ctd/dt
         self.predict_BF.coef = -cv
         self.predict_BVW.coef = 2*cv
-         
+        
+        @barycentric
         def LS_coef(bcs, index):
             masscoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             result = 1/dt*masscoef*u0(bcs, index)
@@ -125,6 +127,7 @@ class IPCS(ProjectionMethod, FEM):
             return result
         self.predict_LS.source = LS_coef
 
+        @barycentric
         def LGS_coef(bcs, index):
             I = bm.eye(self.mesh.GD)
             result = bm.repeat(p0(bcs,index)[...,bm.newaxis], self.mesh.GD, axis=-1)
@@ -133,6 +136,7 @@ class IPCS(ProjectionMethod, FEM):
             return result
         self.predict_LGS.source = LGS_coef
         
+        @barycentric
         def LBFS_coef(bcs, index):
             result = -bm.einsum('...i, ...j->...ij', p0(bcs, index), self.mesh.face_unit_normal(index=index))
             result *= pc(bcs, index) if callable(pc) else pc
@@ -171,12 +175,14 @@ class IPCS(ProjectionMethod, FEM):
         
         self.pressure_BD.coef = pc
 
+        @barycentric
         def LS_coef(bcs, index=None):
             result = -1/dt*bm.trace(us.grad_value(bcs, index), axis1=-2, axis2=-1)
             result *= ctd(bcs, index) if callable(ctd) else ctd
             return result
         self.pressure_LS.source = LS_coef
         
+        @barycentric
         def LGS_coef(bcs, index=None):
             result = p0.grad_value(bcs, index)
             result *= pc(bcs, index) if callable(pc) else pc
@@ -211,6 +217,7 @@ class IPCS(ProjectionMethod, FEM):
 
 
         self.correct_BM.coef = ctd
+        @barycentric
         def BM_coef(bcs, index):
             masscoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             result = masscoef * us(bcs, index)

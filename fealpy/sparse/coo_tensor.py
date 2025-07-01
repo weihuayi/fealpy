@@ -14,8 +14,8 @@ from ._spmm import spmm_coo
 
 class COOTensor(SparseTensor):
     def __init__(self, indices: TensorLike, values: Optional[TensorLike],
-                 spshape: Optional[Size]=None, *,
-                 is_coalesced: Optional[bool]=None):
+                 spshape: Optional[Size] = None, *,
+                 is_coalesced: Optional[bool] = None):
         """
         Initialize COO format sparse tensor.
 
@@ -113,20 +113,18 @@ class COOTensor(SparseTensor):
                          is_coalesced=self.is_coalesced)
 
     ### 3. Format Conversion ###
-    def to_dense(self, *, fill_value: Number = 1.0) -> TensorLike:
-        if self._values is None:
-            context = dict(dtype=bm.float64)
-        else:
-            context = self.values_context()
-
-        dense_tensor = bm.zeros(self.dense_shape + (prod(self._spshape),), **context)
-        flattened = flatten_indices(self._indices, self._spshape)[0]
-
-        if self._values is None:
+    def to_dense(self, *, fill_value: Union[Number, bool] = 1, dtype=None) -> TensorLike:
+        if self.values is None:
+            dtype = bm.float64 if (dtype is None) else dtype
+            context = {"dtype": dtype, "device": bm.get_device(self.indices)}
             src = bm.full((1,) * (self.dense_ndim + 1), fill_value, **context)
             src = bm.broadcast_to(src, self.dense_shape + (self.nnz,))
         else:
-            src = self._values
+            src = self.values if (dtype is None) else bm.astype(self.values, dtype)
+            context = {"dtype": src.dtype, "device": bm.get_device(src)}
+
+        dense_tensor = bm.zeros(self.dense_shape + (prod(self._spshape),), **context)
+        flattened = flatten_indices(self._indices, self._spshape)[0]
         dense_tensor = bm.index_add(dense_tensor, flattened, src, axis=-1)
 
         return dense_tensor.reshape(self.shape)
@@ -138,19 +136,16 @@ class COOTensor(SparseTensor):
 
     def tocsr(self, *, copy=False):
         from .csr_tensor import CSRTensor
-        try:
-            crow, col, values = bm.coo_tocsr(self.indices, self.values, self.sparse_shape)
-            return CSRTensor(crow, col, values, spshape=self._spshape)
-        except (AttributeError, NotImplementedError):
-            pass
+        # try:
+        #     crow, col, values = bm.coo_tocsr(self.indices, self.values, self.sparse_shape)
+        #     return CSRTensor(crow, col, values, spshape=self._spshape)
+        # except (AttributeError, NotImplementedError):
+        #     pass
 
         count = bm.bincount(self._indices[0], minlength=self._spshape[0])
-        crow = bm.cumsum(count)
+        crow = bm.cumsum(count, axis=0)
         crow = bm.concat([bm.tensor([0], **bm.context(crow)), crow])
-        count = bm.bincount(self._indices[0], minlength=self._spshape[0])
-        crow = bm.cumsum(count)
-        crow = bm.concat([bm.tensor([0], **bm.context(crow)), crow])
-        order = bm.argsort(self._indices[0], stable=True)
+        order = bm.argsort(self._indices[0])
         new_col = bm.copy(self._indices[-1, order])
 
         if self.values is None:
@@ -281,27 +276,6 @@ class COOTensor(SparseTensor):
         if len(coo_tensors) == 1:
             return coo_tensors[0]
 
-        indices_list = []
-        values_list = []
-        prev_len = 0
-
-        for coo in coo_tensors:
-            indices = bm.copy(coo.indices)
-            indices = bm.index_add(
-                indices, bm.array([axis], device=indices.device), prev_len,
-                axis=0
-            )
-            indices_list.append(indices)
-            values_list.append(bm.copy(coo.values))
-            prev_len += coo.sparse_shape[axis]
-
-        new_indices = bm.concat(indices_list, axis=1)
-        del indices_list
-        new_values = bm.concat(values_list, axis=-1)
-        del values_list
-        spshape = list(coo_tensors[-1].sparse_shape)
-        spshape[axis] = prev_len
-        return cls(new_indices, new_values, spshape)
         indices_list = []
         values_list = []
         prev_len = 0
