@@ -5,26 +5,51 @@ from fealpy.backend import backend_manager as bm
 ## 参数解析
 parser = argparse.ArgumentParser(description=
     """
-    最低阶Raviart-Thomas元和分片常数空间混合元求解椭圆方程
+    Solve elliptic equations using the lowest order Raviart-Thomas element and piecewise constant mixed finite element method.
     """)
 
 parser.add_argument('--backend',
-        default='numpy', type=str,
-        help="默认后端为 numpy. 还可以选择 pytorch, jax, tensorflow 等")
+    default='numpy', type=str,
+    help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
+parser.add_argument('--pde',
+    default='poly2d', type=str,
+    help="Name of the PDE model, default is poly2d")
 
-args = parser.parse_args()
-bm.set_backend(args.backend)
+parser.add_argument('--init_mesh',
+    default='uniform_tri', type=str,
+    help="Type of initial mesh, default is uniform_tri")
+
+parser.add_argument('--space_degree',
+    default=0, type=int,
+    help="Degree of Lagrange finite element space, default is 0")
+
+parser.add_argument('--pbar_log',
+    default=True, type=bool,
+    help="Whether to show progress bar, default is True")
+
+parser.add_argument('--log_level',
+    default='INFO', type=str,
+    help="Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL")
+
+parser.add_argument('--apply_bc',
+    default='dirichlet', type=str,
+    help="Type of boundary condition, default is dirichlet, options are dirichlet, neumann")
+
+parser.add_argument('--solve',
+    default='direct', type=str,
+    help="Type of solver, default is direct, options are direct, iterative")
+
+parser.add_argument('--run',
+    default='uniform_refine', type=str,
+    help="Type of refinement strategy, default is uniform_refine, options are uniform_refine, adaptive_refine")
+
+# 解析参数
+options = vars(parser.parse_args())
+
+from fealpy.backend import bm
+bm.set_backend(options['backend'])
 
 from fealpy.fem import EllipticMixedFEMModel
-
-model = EllipticMixedFEMModel()
-#model.set_pde("poly")
-model.set_pde("coscos")  
-model.set_init_mesh(nx=10, ny=10)
-model.set_space_degree(p=0)
-model.space.set('rt')
-#model.apply_bc.set('dirichlet')
-model.apply_bc.set('neumann')
-model.solve.set('direct')
-model.run['uniform_refine']()
+model = EllipticMixedFEMModel(options)
+model.run()

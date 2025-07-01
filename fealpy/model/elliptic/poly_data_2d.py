@@ -3,10 +3,11 @@ from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 import sympy as sp
+from fealpy.model.box_domain_mesher import BoxDomainMesher2d
 
-class PolyData2D():
-    
-    def __init__(self, c=2): 
+class PolyData2D(BoxDomainMesher2d):
+
+    def __init__(self, c=2):
         """PolyData provides data and methods for a 2D elliptic PDE problem with a polynomial exact solution.
         The model problem is:
             -div(A ∇u) + c u = f,   in Ω = [0, 1] x [0, 1]

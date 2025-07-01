@@ -12,6 +12,7 @@ from ..backend import backend_manager as bm
 from ..fem import DirichletBC
 from ..model import PDEDataManager
 from ..decorator import variantmethod
+from ..mesh import Mesh
 
 
 class EllipticMixedFEMModel(ComputationalModel):
@@ -58,23 +59,32 @@ class EllipticMixedFEMModel(ComputationalModel):
     >>> error_u, error_p = model.postprocess()
     """
 
-    def __init__(self):
-        super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("elliptic")
+    def __init__(self, options):
+        self.options = options
+        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.set_pde(options['pde'])
+        self.set_init_mesh(options['init_mesh'])
+        self.set_space_degree(options['space_degree'])
+        self.apply_bc.set(options['apply_bc'])
+        self.solve.set(options['solve'])
+        self.run.set(options['run'])
         
+
     def set_pde(self, pde: Union[EllipticPDEDataT, str]="coscos"):
         """
         Set the PDE data for the model.
         """
         if isinstance(pde, str):
-            self.pde = self.pdm.get_example(pde)
+            self.pde = PDEDataManager('elliptic').get_example(pde)
         else:
             self.pde = pde
 
             
-    @variantmethod("tri")
-    def set_init_mesh(self, meshtype: str = "tri", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tri", **kwargs):
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh[mesh](**kwargs)
+        else:
+            self.mesh = mesh
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -82,22 +92,18 @@ class EllipticMixedFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
         
-    @set_init_mesh.register("dis")
-    def set_init_mesh(self,meshtype: str = "dis", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
         
-        NN = self.mesh.number_of_nodes()
-        NE = self.mesh.number_of_edges()
-        NF = self.mesh.number_of_faces()
-        NC = self.mesh.number_of_cells()
-        self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
-        
-        
-    def set_space_degree(self, p: int = 1):    
+    def set_space_degree(self, p: int):
+        """
+        Set the polynomial degree of the finite element space.
+
+        Args:
+            p: The polynomial degree.
+        """
         self.p = p
         
     @variantmethod("rt")
-    def space(self, p: int = 1):
+    def space(self, p: int = 0):
         """
         Set the finite element spaces for the model.
         
@@ -112,7 +118,7 @@ class EllipticMixedFEMModel(ComputationalModel):
         return self.uspace, self.pspace
         
     @space.register("bdm")
-    def space(self, p: int = 1):
+    def space(self, p: int = 0):
         """
         Set the BDM finite element spaces for the model.
         
@@ -127,7 +133,7 @@ class EllipticMixedFEMModel(ComputationalModel):
         
         return self.uspace, self.pspace
         
-    def linear_system(self, mesh, p):
+    def linear_system(self):
         """
         Assemble the linear system for the elliptic mixed finite element model.
         """
@@ -175,10 +181,7 @@ class EllipticMixedFEMModel(ComputationalModel):
         """
 
         self.uspace, self.pspace = self.space(self.p)
-        uLDOF = self.uspace.number_of_local_dofs()
         uGDOF = self.uspace.number_of_global_dofs()
-        pLDOF = self.pspace.number_of_local_dofs()
-        pGDOF = self.pspace.number_of_global_dofs()
         ispBdof = self.pspace.is_boundary_dof()
         isyBdof = bm.zeros(uGDOF, dtype=bm.bool)
         isBdof = bm.concatenate([ispBdof,isyBdof],axis=0)
@@ -198,8 +201,6 @@ class EllipticMixedFEMModel(ComputationalModel):
         """
         uspace, pspace = self.space(self.p)
         ugdof = uspace.number_of_global_dofs()
-        uGdof = uspace.number_of_global_dofs()
-        pGdof = pspace.number_of_global_dofs()
         G_apply = pspace.set_neumann_bc(self.pde.solution)
         F = bm.zeros(ugdof, dtype=bm.float64)
         b_apply = bm.concatenate([G_apply,F],axis=0)
@@ -229,7 +230,7 @@ class EllipticMixedFEMModel(ComputationalModel):
     def run(self):
         """
         """
-        A, b = self.linear_system(self.mesh, self.p)
+        A, b = self.linear_system()
         A, b = self.apply_bc(A, b)
         self.xh[:] = self.solve(A, b)
         self.ph[:] = self.xh[:self.pspace.number_of_global_dofs()]
@@ -240,7 +241,7 @@ class EllipticMixedFEMModel(ComputationalModel):
     @run.register('uniform_refine')
     def run(self, maxit=4):
         for i in range(maxit):
-            A, b = self.linear_system(self.mesh, self.p)
+            A, b = self.linear_system()
             A, b = self.apply_bc(A, b)
             self.xh[:] = self.solve(A, b)
             self.ph[:] = self.xh[:self.pspace.number_of_global_dofs()]

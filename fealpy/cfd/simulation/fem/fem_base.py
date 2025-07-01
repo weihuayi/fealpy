@@ -52,7 +52,6 @@ class FEM:
     def __init__(self, equation, params: FEMParameters = None):
         self.equation = equation
         self.mesh = equation.pde.mesh
-
         self.params = params if params else FEMParameters()         
         self.set = self.Set(self)
         
@@ -62,7 +61,15 @@ class FEM:
         self._tspace = self._create_space('tspace') 
         
         self._q = self.params.assembly['quadrature_order']
+
     
+    def update_mesh(self, mesh):
+        self.mesh = mesh
+        uspace = self._create_space('uspace')
+        self._uspace = TensorFunctionSpace(uspace, (self.mesh.GD,-1))
+        self._pspace = self._create_space('pspace')
+        self._tspace = self._create_space('tspace')
+
     @property
     def uspace(self) -> FunctionSpace:
         return self._uspace

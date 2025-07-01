@@ -2,8 +2,9 @@ from typing import Sequence
 from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher2d
 
-class CosCosData2D():
+class CosCosData2D(BoxDomainMesher2d):
     """
     CosCosData provides data and methods for a 2D elliptic PDE problem with a cosine-cosine exact solution.
     The model problem is:
@@ -25,28 +26,6 @@ class CosCosData2D():
 
     def domain(self):
         return [0., 1., 0., 1.]
-    
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        from fealpy.mesh import TriangleMesh
-        d = self.domain()
-        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-    
-    @init_mesh.register('dis')
-    def init_mesh(self):
-        from fealpy.mesh import TriangleMesh
-        vertices = [[0, 0], [1, 0], [1, 1], [0, 1]]
-        h= 0.1
-        mesh = TriangleMesh.from_polygon_gmsh(vertices=vertices, h=h)
-        return mesh
-    
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from fealpy.mesh import QuadrangleMesh
-        d = self.domain()
-        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
 
     @cartesian
     def diffusion_coef(self, p: TensorLike) -> TensorLike:
