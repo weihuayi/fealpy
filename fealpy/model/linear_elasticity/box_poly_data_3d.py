@@ -2,9 +2,9 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian, variantmethod
 from ...typing import  TensorLike
-from ..box_domain_mesher import BoxDomainMesher
+from ..box_domain_mesher import BoxDomainMesher3d
 
-class BoxPolyData3d(BoxDomainMesher):
+class BoxPolyData3d(BoxDomainMesher3d):
     """
     3D Linear Elasticity problem
 
@@ -31,17 +31,17 @@ class BoxPolyData3d(BoxDomainMesher):
         self.hypo = '3D'  # Hypothesis for the problem
 
     def geo_dimension(self):
-
         return 3
 
+    @property
     def lam(self, p: Optional[TensorLike] = None) -> TensorLike:
         """First Lamé parameter λ = 4e5 MPa."""
         return 4e5
-
+    @property
     def mu(self, p: Optional[TensorLike] = None) -> TensorLike:
         """Second Lamé parameter μ (shear modulus) = 4e5 MPa."""
         return 4e5
-
+    @property
     def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
         """Material density ρ = 1e4 kg/m³."""
         return 1e4
@@ -102,9 +102,8 @@ class BoxPolyData3d(BoxDomainMesher):
         return bm.reshape(elements, shape + (3, 3))
 
     @cartesian
-    def displacement_bc(self, points: TensorLike) -> TensorLike:
-        result = self.displacement(points)
-
+    def displacement_bc(self, p: TensorLike) -> TensorLike:
+        result = self.displacement(p)
         return result
     
     @cartesian

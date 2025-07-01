@@ -65,6 +65,6 @@ DATA_TABLE = {
     # example name: (file_name, class_name)
     "boxpoly3d": ("box_poly_data_3d", "BoxPolyData3d"),
     "boxpoly2d": ("box_poly_data_2d", "BoxPolyData2d"),
-    "sinsin2d": ("sin_sin_data_2d", "SinSinData2d"),
+    "boxsinsin2d": ("box_sinsin_data_2d", "BoxSinSinData2d"),
 
 }
