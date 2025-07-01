@@ -789,26 +789,26 @@ def test_zeros():
     # 数字零矩阵
     field = bm.zeros(1)
     assert field.shape == (1,)
-    assert field.dtype == ti.f32
+    assert field.dtype == ti.f64
     assert field[0] == 0
 
     # 1d 零矩阵
     field = bm.zeros(3)
     assert field.shape == (3,)
-    assert field.dtype == ti.f32
+    assert field.dtype == ti.f64
     assert np.all(field, 0)
 
     # 2d 零矩阵
     field = bm.zeros((2, 3))
     logger.info(field)
     assert field.shape == (2, 3)
-    assert field.dtype == ti.f32
+    assert field.dtype == ti.f64
     assert np.all(field, 0)
 
     # 3d 零矩阵
     field = bm.zeros((2, 3, 4))
     assert field.shape == (2, 3, 4)
-    assert field.dtype == ti.f32
+    assert field.dtype == ti.f64
     assert np.all(field, 0)
 
     #shape为-1
@@ -920,8 +920,25 @@ def test_abs():
     result = bm.abs(field)
     expected = 1.1
     assert np.allclose(result, expected)
+    
+    # int 型
+    x = bm.abs(-100)
+    assert isinstance(x, int)
+    assert x == 100
+    
+    # float 型
+    x = bm.abs(-1.1)
+    assert isinstance(x, float)
+    assert np.allclose(x, 1.1)
 
-    # 数字
+    # bool 型
+    x = bm.abs(False)
+    assert x == 0
+    
+    y = bm.abs(True)
+    assert y == 1
+
+    # field 数字
     field = ti.field(ti.f32, shape=(1,))
     field[0] = -1.1
     result = bm.abs(field)
@@ -989,6 +1006,18 @@ def test_abs():
 
 #测试 acos 函数
     def test_acos():
+        
+        # int 型
+        x = bm.acos(0)
+        assert np.allclose(x, np.pi/2)
+        
+        # float 型
+        x = bm.acos(0.5)
+        assert np.allclose(x, np.pi/3)
+
+        # bool 型
+        x = bm.acos(True)
+        assert np.allclose(x, 0)
 
         # 空
         field = ti.field(ti.f32, shape=())
@@ -998,7 +1027,7 @@ def test_abs():
         assert result.dtype == ti.f32
         assert np.allclose(result[None], np.pi/3)
 
-        # 数字 0.0
+        # field 数字
         field = ti.field(ti.f32, shape=(1,))
         field[0] = 0.0
         result = bm.acos(field)
