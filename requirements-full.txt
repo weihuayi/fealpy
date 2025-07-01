@@ -14,3 +14,4 @@ pyevtk
 pytest
 pytest-cov
 bump2version
+tqdm
