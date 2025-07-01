@@ -2,13 +2,19 @@ from typing import Any, Optional, Union
 from ..backend import bm
 from ..typing import TensorLike
 from ..decorator import variantmethod
-from ..model import ComputationalModel
+from ..model import ComputationalModel, PDEDataManager
+from ..model.linear_elasticity import LinearElasticityPDEDataT
 
-from ..functionspace import functionspace
+from ..mesh import Mesh
+from ..functionspace import functionspace 
 from ..material import LinearElasticMaterial
+
 from ..fem import BilinearForm
 from ..fem import LinearElasticityIntegrator
 from ..fem import ScalarMassIntegrator as MassIntegrator
+
+from ..fem import DirichletBC
+from scipy.sparse.linalg import eigsh
 
 class LinearElasticityEigenLFEMModel(ComputationalModel):
     """
@@ -21,15 +27,28 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         https://wnesm678i4.feishu.cn/wiki/HwBfwzraXi0ahYkwg72c7gMqn3e?fromScene=spaceOverview
     """
 
-    def __init__(self, pbar_log=True, log_level="INFO"):
-        super().__init__(pbar_log=pbar_log, log_level=log_level)
+    def __init__(self, options):
+        self.options = options
+        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.set_pde(options['pde'])
+        self.set_material_parameters(self.pde.lam, self.pde.mu, self.pde.rho)
+        self.set_init_mesh(options['init_mesh'])
+        self.set_space_degree(options['space_degree'])
 
 
-    def set_pde(self, pde):
-        self.pde = pde
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly3d"):
+        """
+        """
+        if isinstance(pde, str):
+            self.pde = PDEDataManager('linear_elasticity').get_example(pde)
+        else:
+            self.pde = pde 
 
-    def set_init_mesh(self, meshtype: str = "tri", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tet", **kwargs):
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh[mesh](**kwargs)
+        else:
+            self.mesh = mesh
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -38,7 +57,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
     def set_material_parameters(self, lam: float, mu: float, rho: float):
-        self.material = LinearElasticMaterial(lame_lambda=lam, shear_modulus=mu, density=rho)
+        self.material = LinearElasticMaterial("eigens", lame_lambda=lam, shear_modulus=mu, density=rho)
 
     def set_space_degree(self, p: int):
         """
@@ -67,11 +86,16 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         S = bform.assembly()
 
         bform = BilinearForm(space)
-        integrator = MassIntegrator(self.material.density())
+        integrator = MassIntegrator(self.material.density)
         bform.add_integrator(integrator)
         M = bform.assembly()
 
         return S, M
+
+    def apply_bc(self):
+        """
+        """
+        pass
 
     def solve(self):
         """
@@ -80,5 +104,6 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         Returns:
             Eigenvalues and eigenvectors of the system.
         """
-        # Implementation of the FEM solver goes here
-        pass
+        S, M = self.linear_system()
+        val, vec = eigsh(S.to_scipy(), k=6, M=M.to_scipy(), which='SM', tol=1e-5, maxiter=1000)
+        self.logger.info(f"Eigenvalues: {val}")
