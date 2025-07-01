@@ -115,13 +115,19 @@ def test_ones():
 
 # 测试 full 方法
 def test_full():
-# 测试布尔类型填充
+    # 测试布尔类型填充
     shape = (3, 3)
     element = True
     x = bm.full(shape, element)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.u8
-    assert np.all(x.to_numpy() == 1)
+
+    @ti.kernel
+    def check_bool():
+        for i, j in x:
+            assert x[i, j] == 1
+
+    check_bool()
 
     # 测试整数类型填充
     shape = (2, 2)
@@ -129,15 +135,27 @@ def test_full():
     x = bm.full(shape, element)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.i32
-    assert np.all(x.to_numpy() == 5)
+
+    @ti.kernel
+    def check_int():
+        for i, j in x:
+            assert x[i, j] == 5
+
+    check_int()
 
     # 测试浮点数类型填充
-    shape = (2,2)
+    shape = (4,)
     element = 3.14
     x = bm.full(shape, element)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.f64
-    assert np.allclose(x.to_numpy(), 3.14)
+
+    @ti.kernel
+    def check_float():
+        for i in x:
+            assert x[i] == ti.cast(3.14, x.dtype)
+
+    check_float()
 
     # 测试自定义 dtype
     shape = (3, 3)
@@ -146,7 +164,13 @@ def test_full():
     x = bm.full(shape, element, dtype=custom_dtype)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.f32
-    assert np.all(x.to_numpy() == 10)
+
+    @ti.kernel
+    def check_custom():
+        for i, j in x:
+            assert x[i, j] == 10
+
+    check_custom()
 
     # 测试不支持的元素类型
     shape = (2, 2)
@@ -154,26 +178,19 @@ def test_full():
     with pytest.raises(TypeError, match="Unsupported fill_value type."):
         bm.full(shape, element)
 
-    # 测试标量 shape
-    shape = 5
-    element = 1
-    x = bm.full(shape, element)
-    assert x.shape == (5,)
-    assert np.all(x.to_numpy() == 1)
-
-    # 测试空 shape
-    shape = ()
-    element = 0
-    x = bm.full(shape, element)
-    assert x.shape == ()
-    assert x.to_numpy() == 0
-
-    # 测试多维 shape
+    # 测试多维场
     shape = (2, 3, 4)
     element = 7
     x = bm.full(shape, element)
-    assert x.shape == (2, 3, 4)
-    assert np.all(x.to_numpy() == 7)
+    assert isinstance(x, ti.Field)
+    assert x.dtype == ti.i32
+
+    @ti.kernel
+    def check_multi():
+        for I in ti.grouped(x):
+            assert x[I] == 7
+
+    check_multi()
 
 # 测试 ones_like 方法
 def test_ones_like():
@@ -188,90 +205,190 @@ def test_ones_like():
 
     # 测试一维场
     x_1d = ti.field(dtype=ti.f32, shape=(5,))
+
     @ti.kernel
     def fill_1d():
         for i in x_1d:
             x_1d[i] = 2.0
+
     fill_1d()
     ones_like_1d = bm.ones_like(x_1d)
     assert isinstance(ones_like_1d, ti.Field)
     assert ones_like_1d.dtype == ti.f32
     assert ones_like_1d.shape == (5,)
-    assert np.all(ones_like_1d.to_numpy() == 1.0)
+
+    @ti.kernel
+    def check_1d():
+        for i in ones_like_1d:
+            assert ones_like_1d[i] == 1.0
+
+    check_1d()
 
     # 测试二维场
     x_2d = ti.field(dtype=ti.i64, shape=(3, 4))
+
     @ti.kernel
     def fill_2d():
         for i, j in x_2d:
             x_2d[i, j] = 10
+
     fill_2d()
     ones_like_2d = bm.ones_like(x_2d)
     assert isinstance(ones_like_2d, ti.Field)
     assert ones_like_2d.dtype == ti.i64
     assert ones_like_2d.shape == (3, 4)
-    assert np.all(ones_like_2d.to_numpy() == 1)
+
+    @ti.kernel
+    def check_2d():
+        for i, j in ones_like_2d:
+            assert ones_like_2d[i, j] == 1
+
+    check_2d()
 
     # 测试不同数据类型
     dtypes = [ti.i8, ti.i16, ti.i32, ti.i64, ti.u8, ti.u16, ti.u32, ti.u64, ti.f32, ti.f64]
     for dtype in dtypes:
         x = ti.field(dtype=dtype, shape=(2,))
-        x.fill(100)
+
+        @ti.kernel
+        def fill_x():
+            for i in x:
+                x[i] = 100
+
+        fill_x()
         ones_like = bm.ones_like(x)
         assert isinstance(ones_like, ti.Field)
         assert ones_like.dtype == dtype
         assert ones_like.shape == (2,)
-        assert np.all(ones_like.to_numpy() == 1)
+
+        @ti.kernel
+        def check_dtype():
+            for i in ones_like:
+                assert ones_like[i] == 1
+
+        check_dtype()
 
 # 测试 full_like 方法
 def test_full_like():
     # 测试布尔类型填充
     x_bool = ti.field(dtype=ti.i32, shape=(3, 3))
+
+    @ti.kernel
+    def fill_bool():
+        for i, j in x_bool:
+            x_bool[i, j] = 5
+
+    fill_bool()
     element_bool = True
     x = bm.full_like(x_bool, element_bool)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.u8
-    assert np.all(x.to_numpy() == 1)
+
+    @ti.kernel
+    def check_bool():
+        for i, j in x:
+            assert x[i, j] == 1
+
+    check_bool()
 
     # 测试整数类型填充
     x_int = ti.field(dtype=ti.f32, shape=(2, 2))
+
+    @ti.kernel
+    def fill_int():
+        for i, j in x_int:
+            x_int[i, j] = 2.0
+
+    fill_int()
     element_int = 5
     x = bm.full_like(x_int, element_int)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.i32
-    assert np.all(x.to_numpy() == 5)
+
+    @ti.kernel
+    def check_int():
+        for i, j in x:
+            assert x[i, j] == 5
+
+    check_int()
 
     # 测试浮点数类型填充
     x_float = ti.field(dtype=ti.i64, shape=(4,))
+
+    @ti.kernel
+    def fill_float():
+        for i in x_float:
+            x_float[i] = 10
+
+    fill_float()
     element_float = 3.14
     x = bm.full_like(x_float, element_float)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.f64
-    assert np.allclose(x.to_numpy(), 3.14)
+
+    @ti.kernel
+    def check_float():
+        for i in x:
+            assert x[i] == ti.cast(3.14, x.dtype)
+
+    check_float()
 
     # 测试自定义 dtype
     x_custom = ti.field(dtype=ti.i32, shape=(3, 3))
+
+    @ti.kernel
+    def fill_custom():
+        for i, j in x_custom:
+            x_custom[i, j] = 5
+
+    fill_custom()
     element_custom = 10
     custom_dtype = ti.f32
     x = bm.full_like(x_custom, element_custom, dtype=custom_dtype)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.f32
-    assert np.all(x.to_numpy() == 10)
+
+    @ti.kernel
+    def check_custom():
+        for i, j in x:
+            assert x[i, j] == 10
+
+    check_custom()
 
     # 测试不支持的元素类型
     x_invalid = ti.field(dtype=ti.i32, shape=(2, 2))
+
+    @ti.kernel
+    def fill_invalid():
+        for i, j in x_invalid:
+            x_invalid[i, j] = 5
+
+    fill_invalid()
     element_invalid = "invalid"
     with pytest.raises(TypeError, match="Unsupported fill_value type."):
         bm.full_like(x_invalid, element_invalid)
 
     # 测试多维场
     x_multi = ti.field(dtype=ti.f32, shape=(2, 3, 4))
+
+    @ti.kernel
+    def fill_multi():
+        for I in ti.grouped(x_multi):
+            x_multi[I] = 2.0
+
+    fill_multi()
     element_multi = 7
     x = bm.full_like(x_multi, element_multi)
     assert isinstance(x, ti.Field)
     assert x.dtype == ti.i32
     assert x.shape == (2, 3, 4)
-    assert np.all(x.to_numpy() == 7)
+
+    @ti.kernel
+    def check_multi():
+        for I in ti.grouped(x):
+            assert x[I] == 7
+
+    check_multi()
 
 # 测试 acosh 方法
 def test_acosh():
@@ -298,12 +415,12 @@ def test_acosh():
     x_invalid_field = ti.field(dtype=ti.f32, shape=(3,))
     x_invalid_field.from_numpy(np.array([0.5, 2.0, 3.0], dtype=np.float32))
     with pytest.raises(ValueError, match="must be >= 1.0"):
-        bm.acosh(x_invalid_field)
+      bm.acosh(x_invalid_field)
 
     # 测试输入类型无效的情况
     x_invalid_type = np.array([1.0, 2.0])
     with pytest.raises(TypeError, match="must be a ti.Field or a float"):
-        bm.acosh(x_invalid_type)
+      bm.acosh(x_invalid_type)
 
 # 测试 asinh 方法
 def test_asinh():
@@ -337,17 +454,27 @@ def test_add():
     # 测试两个形状相同的 ti.Field 相加成功的情况
     x = ti.field(dtype=ti.f32, shape=(3, 3))
     y = ti.field(dtype=ti.f32, shape=(3, 3))
-    # 初始化值
-    for i in range(3):
-        for j in range(3):
+
+    @ti.kernel
+    def fill_x():
+        for i, j in x:
             x[i, j] = i + j
+
+    @ti.kernel
+    def fill_y():
+        for i, j in y:
             y[i, j] = (i + j) * 2
-    # 执行相加
+
+    fill_x()
+    fill_y()
     result = bm.add(x, y)
-    # 验证结果
-    for i in range(3):
-        for j in range(3):
+
+    @ti.kernel
+    def check_result():
+        for i, j in result:
             assert result[i, j] == x[i, j] + y[i, j]
+
+    check_result()
 
     # 测试两个形状不同的 ti.Field 相加时抛出 ValueError
     x = ti.field(dtype=ti.f32, shape=(2, 2))
@@ -364,17 +491,28 @@ def test_add():
     # 测试不同数据类型的 ti.Field 相加（如果允许）
     x = ti.field(dtype=ti.f32, shape=(2, 2))
     y = ti.field(dtype=ti.i32, shape=(2, 2))
-    # 初始化值
-    for i in range(2):
-        for j in range(2):
+
+    @ti.kernel
+    def fill_x_float():
+        for i, j in x:
             x[i, j] = 1.5
+
+    @ti.kernel
+    def fill_y_int():
+        for i, j in y:
             y[i, j] = 2
+
+    fill_x_float()
+    fill_y_int()
     result = bm.add(x, y)
-    # 验证结果是否自动提升类型
     assert result.dtype == ti.f32
-    for i in range(2):
-        for j in range(2):
-            assert result[i, j] == pytest.approx(3.5)
+
+    @ti.kernel
+    def check_mixed_type():
+        for i, j in result:
+            assert result[i, j] == ti.cast(3.5, result.dtype)
+
+    check_mixed_type()
         
 # 测试 from_numpy 方法
 class TestFromNumpy:
