@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from typing import Union
 from ..backend import bm
 from ..model import PDEDataManager, ComputationalModel
@@ -8,7 +7,7 @@ from ..decorator import variantmethod
 # FEM imports
 from ..functionspace import LagrangeFESpace, TensorFunctionSpace
 from ..fem import BilinearForm, LinearForm
-from ..fem import LinearElasticIntegrator, VectorSourceIntegrator
+from ..fem import LinearElasticityIntegrator, VectorSourceIntegrator
 from ..material import LinearElasticMaterial
 
 class LinearElasticityLFEMModel(ComputationalModel):
@@ -31,13 +30,16 @@ class LinearElasticityLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-
     def set_space_degree(self, p: int = 1) -> None:    
         self.p = p
 
     def linear_system(self, mesh, p):
         self.space= LagrangeFESpace(mesh, p=p)
-        self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
+        gd = self.pde.geo_dimension()
+        if gd == 2:
+            self.tspace = TensorFunctionSpace(self.space, shape=(-1, 2))
+        elif gd == 3:
+            self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
 
         LDOF = self.tspace.number_of_local_dofs()
         GDOF = self.tspace.number_of_global_dofs()
@@ -47,11 +49,11 @@ class LinearElasticityLFEMModel(ComputationalModel):
         LEM = LinearElasticMaterial(
                                 name='E1nu025',
                                 lame_lambda=self.pde.lam(), shear_modulus=self.pde.mu(), 
-                                hypo='3D', device=bm.get_device(self.uh[:])
+                                hypo=self.pde.hypo, device=bm.get_device(self.uh[:])
                             )
         
         bform = BilinearForm(self.tspace)
-        LEI = LinearElasticIntegrator(
+        LEI = LinearElasticityIntegrator(
                                 material=LEM, q=self.p+3, method=None
                             )
         bform.add_integrator(LEI)
@@ -127,7 +129,6 @@ class LinearElasticityLFEMModel(ComputationalModel):
     @run.register("bisect")
     def run(self):
         pass
-
 
     @variantmethod("error")
     def postprocess(self):
