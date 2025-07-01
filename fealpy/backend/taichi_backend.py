@@ -543,13 +543,6 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         z = ti.field(dtype=x.dtype, shape=x.shape)
         add_field(x, y, z)
         return z
-    
-if __name__ == "__main__":
-        # Example usage
-    ti.init(arch=ti.cpu)
-    field = TaichiBackend.eye(2)  # 或 zeros/ones/eye等
-    a = TaichiBackend.tolist(field)
-    print(a)
 
 
 
