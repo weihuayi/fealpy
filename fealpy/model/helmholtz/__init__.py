@@ -4,16 +4,15 @@ from ...typing import TensorLike
 class HelmholtzPDEDataProtocol(Protocol):
     """Protocol interface for Helmholtz PDE data components.
     
-    Defines the recommended protocol interface for Helmholtz-type partial differential equations,
+    Defines the recommended protocol interface for time-harmonic wave equations,
     typically written as:
-        Δu + k^2 u = f in Ω,
-        u = g_D on ∂Ω_D,
-        ∂u/∂n = g_N on ∂Ω_N.
+            -Δu - k²u = f(x)  in Ω
+            with appropriate boundary conditions.
 
     This protocol suggests four main categories of methods that implementing classes may provide:
         1. Domain specification methods (geometry and dimension)
         2. PDE data terms (exact solution, gradient, Laplacian, source, wave number)
-        3. Boundary condition terms (Dirichlet and Neumann)
+        3. Boundary condition terms (Dirichlet, Neumann, Robin)
         4. Additional utilities (boundary indicator functions)
 
     Notes:
@@ -34,10 +33,10 @@ class HelmholtzPDEDataProtocol(Protocol):
     def dirichlet(self, p: TensorLike) -> TensorLike: ...
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike: ...
     
-    def neumann(self, p: TensorLike) -> TensorLike: ...
+    def neumann(self, p: TensorLike, n: TensorLike) -> TensorLike:...
     def is_neumann_boundary(self, p: TensorLike) -> TensorLike: ...
 
-    def robin(self, p: TensorLike) -> TensorLike: ...
+    def robin(self, p: TensorLike, n: TensorLike) -> TensorLike: ...
     def is_robin_boundary(self, p: TensorLike) -> TensorLike: ...
 
 HelmholtzPDEDataT = TypeVar('HelmholtzPDEDataT', bound=HelmholtzPDEDataProtocol)
@@ -47,8 +46,10 @@ DATA_TABLE is a registry for Helmholtz PDE models.
 Each entry maps a model name to its corresponding module and class.
 """
 DATA_TABLE = {
-    # example name: (file_name, class_name)
-    "plane_wave": ("plane_wave_data_2d", "PlaneWaveData2D"),
-    "bessel": ("bessel_data_2d", "BesselData2D"),
+    "bessel": ("bessel_radiating_data_2d", "BesselRadiatingData2D"),
+    "evanescent_wave": ("evanescent_wave_data_2d", "EvanescentWaveData2D"),
+    "planewave_oblique_wave":("planeWave_oblique_incidence_data_2d", "PlaneWaveObliqueIncidenceData2D"),
+    "sinsin2d": ("sinsin_data_2d", "SinsinData2D"),
+    "sinsin3d": ("sinsin_data_3d", "SinsinData3D")
 }
 
