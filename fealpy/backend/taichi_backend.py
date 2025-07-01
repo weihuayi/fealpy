@@ -150,7 +150,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             return []
 
     @staticmethod
-    def arange(*args, dtype=ti.f32):
+    def arange(*args, dtype=ti.f64):
         if len(args) == 1:
             if args[0] is None:
                 raise ValueError("arange() requires stop to be specified.")
@@ -202,7 +202,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return field
 
     @staticmethod
-    def eye(N, M=None, k=0, dtype=ti.f32):
+    def eye(N, M=None, k=0, dtype=ti.f64):
         if N is None and M is None:
             raise ValueError(
                 "Both N and M are None. At least one dimension must be specified for eye()."
@@ -239,7 +239,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return field
 
     @staticmethod
-    def zeros(shape, dtype=ti.f32):
+    def zeros(shape, dtype=ti.f64):
         if isinstance(shape, float):
             if not shape.is_integer():
                 raise TypeError(f"Shape must be an integer or tuple of integers, got float {shape}.")
@@ -304,27 +304,19 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
     @staticmethod
     def tril(field: ti.Field, k: int = 0) -> ti.Field:
         if field is None:
-            raise ValueError(
-                "Input field is None. Please provide a valid Taichi field."
-            )
+            raise ValueError("Input field is None. Please provide a valid Taichi field.")
         if not hasattr(field, "shape") or not hasattr(field, "dtype"):
-            raise TypeError(
-                "Input is not a valid Taichi field: missing 'shape' or 'dtype' attribute."
-            )
+            raise TypeError("Input is not a valid Taichi field: missing 'shape' or 'dtype' attribute.")
         shape = field.shape
         if any(s == 0 for s in shape):
-            raise ValueError(
-                f"Input field has zero in its shape {shape}, which is not supported by Taichi."
-            )
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
         if len(shape) == 0:
             raise ValueError("Input field is a scalar (0D), tril is not defined for scalars.")
-
         dtype = field.dtype
 
         if len(shape) == 1:
             M = shape[0]
             out = ti.field(dtype=dtype, shape=(M, M))
-            
             @ti.kernel
             def fill_tril_1d():
                 for i, j in ti.ndrange(M, M):
@@ -332,22 +324,22 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                         out[i, j] = field[j]
                     else:
                         out[i, j] = 0
-                        
             fill_tril_1d()
             return out
 
         elif len(shape) > 1:
             out = ti.field(dtype=dtype, shape=shape)
-            
+            n_dim = len(shape)
+
             @ti.kernel
             def fill_tril_nd():
                 for I in ti.grouped(out):
-                    i, j = I[-2], I[-1]
+                    i = I[n_dim - 2]
+                    j = I[n_dim - 1]
                     if j - i <= k:
                         out[I] = field[I]
                     else:
                         out[I] = 0
-                        
             fill_tril_nd()
             return out
         else:

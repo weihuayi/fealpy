@@ -13,6 +13,7 @@
 
 import taichi as ti
 import pytest
+from loguru import logger
 
 from fealpy.backend import backend_manager as bm
 import numpy as np
@@ -538,335 +539,573 @@ def test_add():
 
     check_mixed_type()
 
+# 测试 from_numpy 方法  
+def test_from_numpy():
 
-# 测试 from_numpy 方法
-class TestFromNumpy:
-    def test_from_numpy_dtype(self):
-        """测试从 NumPy 数组创建不同的数据类型 field"""
-        # float型1d
-        arr = np.array([1.1, 2.2, 3.3], dtype=np.float32)
-        field = bm.from_numpy(arr)
-        assert np.array_equal(field.to_numpy(), arr)
+    # float型1d
+    arr = np.array([1.1, 2.2, 3.3], dtype=np.float32)
+    field = bm.from_numpy(arr)
+    for i in range(field.shape[0]):
+        assert field.dtype == ti.f32
+        assert field.shape == (3,)
+        assert isinstance(field, ti.Field)
+        assert field[i] == arr[i]
 
-        # int型2d
-        arr = np.array([[1, 2], [3, 4]], dtype=np.int32)
-        field = bm.from_numpy(arr)
-        assert np.array_equal(field.to_numpy(), arr)
+    # int型2d
+    arr = np.array([[1, 2],[3,4]], dtype=np.int32)
+    field = bm.from_numpy(arr)
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert field.dtype == ti.i32
+            assert field.shape == (2, 2)
+            assert isinstance(field, ti.Field)
+            assert field[i, j] == arr[i][j]
 
-        # bool型
-        arr = np.array([True, False, True], dtype=np.bool)
-        field = bm.from_numpy(arr)
-        assert np.array_equal(field.to_numpy(), arr)
+    # bool型
+    arr = np.array([True, False, True], dtype=np.bool)
+    field = bm.from_numpy(arr)
+    for i in range(field.shape[0]):
+        assert field.dtype == ti.u8
+        assert field.shape == (3,)
+        assert isinstance(field, ti.Field)
+        assert field[i] == arr[i]
 
-    def test_from_numpy_3d(self):
-        """测试从 3D NumPy 数组创建 field"""
-        arr = np.random.rand(2, 3, 4)
-        field = bm.from_numpy(arr)
-        assert np.array_equal(field.to_numpy(), arr)
+    # 3d
+    arr = np.array([[[1, 2, 3], 
+                        [4, 5, 6]], 
+                    [[7, 8, 9], 
+                        [10, 11, 12]]], dtype=np.int32)
+    field = bm.from_numpy(arr)
+    assert field.shape == (2, 2, 3)
+    assert field.dtype == ti.i32
+    assert isinstance(field, ti.Field)
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert field[i, j, k] == arr[i][j][k]
 
+# 测试 tolist 方法   
+def test_tolist():
 
-# 测试 tolist 方法
-class TestTolist:
-    def test_tolist_empty(self):
-        """测试标量是否能正确转换为列表"""
-        field = ti.field(ti.f32, shape=())
-        field[None] = 1.1
-        assert np.allclose(bm.tolist(field), np.array(1.1))
+    # 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 1.1
+    result = bm.tolist(field)
+    expected = [1.1]
+    assert isinstance(field, ti.Field)
+    assert field.dtype == ti.f32
+    assert np.allclose(result, expected)
 
-    def test_tolist_1d(self):
-        """测试 1D Field 是否能正确转换为列表"""
-        field = ti.field(ti.i32, shape=(3,))
-        field.from_numpy(np.array([1, 2, 3]))
-        assert np.array_equal(bm.tolist(field), np.array([1, 2, 3]))
+    # 数字
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 2.2
+    result = bm.tolist(field)
+    expected = [2.2]
+    assert isinstance(field, ti.Field)
+    assert field.dtype == ti.f32
+    assert np.allclose(result, expected)
 
-    def test_tolist_2d(self):
-        """测试 2D Field 是否能正确转换为列表"""
-        field = ti.field(ti.f32, shape=(2, 3))
-        field.from_numpy(np.array([[1.1, 2.2, 3.3], [4.4, 5.5, 6.6]]))
-        # 允许浮点数存在微笑误差
-        assert np.allclose(
-            bm.tolist(field), np.array([[1.1, 2.2, 3.3], [4.4, 5.5, 6.6]])
-        )
+    # 1D Field
+    field = ti.field(ti.i32, shape=(3,))
+    @ti.kernel
+    def fill():
+        for i in field:
+            field[i] = i  + 1
+    fill()
+    result = bm.tolist(field)
+    expected = [1, 2, 3]
+    assert field.shape == (3,)
+    assert isinstance(field, ti.Field)
+    assert field.dtype == ti.i32
+    assert result == expected
 
-    def test_tolist_3d(self):
-        """测试 3D Field 是否能正确转换为列表"""
-        field = ti.field(ti.f32, shape=(2, 3, 4))
-        field.from_numpy(np.random.rand(2, 3, 4))
-        assert np.array_equal(bm.tolist(field), field.to_numpy())
+    # 2D Field
+    field = ti.field(ti.f32, shape = (2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i  + j  + 1
+    fill()
+    result = bm.tolist(field)
+    expected = [[1.0, 2.0, 3.0], 
+                [2.0, 3.0, 4.0]]
+    assert field.shape == (2, 3)
+    assert isinstance(field, ti.Field)
+    assert field.dtype == ti.f32
+    assert result == expected
 
+    # 3D Field
+    field = ti.field(ti.f32, shape = (2, 3, 4))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = i  + j  + k  + 1
+    fill()
+    result = bm.tolist(field)
+    expected = [[[1.0, 2.0, 3.0, 4.0], 
+                [2.0, 3.0, 4.0, 5.0], 
+                [3.0, 4.0, 5.0, 6.0]], 
+                [[2.0, 3.0, 4.0, 5.0], 
+                [3.0, 4.0, 5.0, 6.0], 
+                [4.0, 5.0, 6.0, 7.0]]]
+    assert field.shape == (2, 3, 4)
+    assert isinstance(field, ti.Field)
+    assert field.dtype == ti.f32
+    assert result == expected
 
 # 测试 arange 方法
-class TestArange:
-    def test_arange_valid(self):
-        """测试基础范围生成"""
-        # 一个参数
-        field = bm.arange(10)
-        assert np.array_equal(field.to_numpy(), np.arange(10))
+def test_arange():
 
-        # 两个参数
-        field = bm.arange(0, 10)
-        assert np.array_equal(field.to_numpy(), np.arange(0, 10))
+    # 一个参数
+    field = bm.arange(10, dtype=ti.i32)
+    expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    for i in range(field.shape[0]):
+        assert field.dtype == ti.i32
+        assert isinstance(field, ti.Field)
+        assert field[i] == expected[i]
 
-        # 三个参数
-        field = bm.arange(0, 10, 2)
-        assert np.array_equal(field.to_numpy(), np.arange(0, 10, 2))
+    # 两个参数
+    field = bm.arange(0, 10, dtype=ti.i32)
+    expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    for i in range(field.shape[0]):
+        assert field.dtype == ti.i32
+        assert isinstance(field, ti.Field)
+        assert field[i] == expected[i]
 
-    def test_arange_boudary(self):
-        """测试边界范围生成"""
-        # 单参数为 0
-        field = bm.arange(0)
-        assert np.array_equal(field, np.arange(0))
+    # 三个参数
+    field = bm.arange(0, 10, 2,dtype=ti.i32)
+    expected = [0, 2, 4, 6, 8]
+    for i in range(field.shape[0]):
+        assert field.dtype == ti.i32
+        assert isinstance(field, ti.Field)
+        assert field[i] == expected[i]
 
-        # 单参数为负数
-        field = bm.arange(-10)
-        assert np.array_equal(field, np.arange(-10))
+    # 单参数为 0
+    field = bm.arange(0)
+    expected = []
+    assert field == expected
 
-        # 双参数中 N>M
-        field = bm.arange(10, 0)
-        assert np.array_equal(field, np.arange(10, 0))
+    # 单参数为负数
+    field = bm.arange(-10)
+    expected = []
+    assert field == expected
 
-        # 三参数中 N>M
-        field = bm.arange(10, 0, 2)
-        assert np.array_equal(field, np.arange(10, 0, 2))
+    # 双参数中 N>M
+    field = bm.arange(10, 0)
+    expected = []
+    assert field == expected
 
-    def test_arange_invaild(self):
-        """测试无效范围生成"""
-        # 无参数
-        with pytest.raises(
-            ValueError, match="arange\(\) requires stop to be specified."
-        ):
-            bm.arange(None)
+    # 三参数中 N>M
+    field = bm.arange(10, 0, 2)
+    expected = []
+    assert field == expected
 
-        # 参数大于 3
-        with pytest.raises(
-            ValueError,
-            match="arange expects 1~3 arguments \(stop \| start, stop \| start, stop, step\)",
-        ):
-            bm.arange(1, 3, 5, 7, 9)
+    # 步长大于总长度            
+    field = bm.arange(1, 10, 11, dtype=ti.i32)
+    expected = [1]
+    for i in range(field.shape[0]):
+        assert field.dtype == ti.i32
+        assert isinstance(field, ti.Field)
+        assert field[i] == expected[i]
 
-        # 步长为 0
-        with pytest.raises(ValueError, match="step must not be zero"):
-            bm.arange(1, 3, 0)
+    # 无参数
+    with pytest.raises(ValueError, match="arange\(\) requires stop to be specified."):
+        bm.arange(None)
+
+    # 参数大于 3
+    with pytest.raises(ValueError, match="arange expects 1~3 arguments \(stop \| start, stop \| start, stop, step\)"):
+        bm.arange(1,3,5,7,9)
+
+    # 步长为 0
+    with pytest.raises(ValueError, match="step must not be zero"):
+        bm.arange(1,3,0)
 
 
 # 测试 eye 函数
-class TestEye:
-    def test_eye_valid(self):
-        """测试基础元素的单位阵"""
-        # 测试 3 阶单位阵
-        field = bm.eye(3)
-        assert np.array_equal(field.to_numpy(), np.eye(3))
+def test_eye(): 
 
-        # 测试 3 行 4 列单位阵
-        field = bm.eye(3, 4)
-        assert np.array_equal(field.to_numpy(), np.eye(3, 4))
+    # 测试空矩阵  
+    field = bm.eye(0)
+    expected = []
+    assert field == expected
 
-        # 测试 3 行 4 列单位阵，偏移对角线
-        field = bm.eye(3, k=1)
-        assert np.array_equal(field.to_numpy(), np.eye(3, k=1))
+    # N = 0
+    field = bm.eye(0, 3)
+    expected = []
+    assert field == expected
 
-    def test_eye_boundary(self):
-        """测试边界元素的单位阵"""
-        # 测试空矩阵
-        field = bm.eye(0)
-        assert np.array_equal(field, np.array([]))
-        # N = 0
-        field = bm.eye(0, 3)
-        assert np.array_equal(field, np.array([]))
-        # M = 0
-        field = bm.eye(3, 0)
-        assert np.array_equal(field, np.array([]))
+    # M = 0
+    field = bm.eye(3, 0)
+    expected = []
+    assert field == expected
 
-    def test_eye_invalid(self):
-        """测试无效输入"""
-        # N 为 None
-        with pytest.raises(
-            ValueError,
-            match="Both N and M are None. At least one dimension must be specified for eye().",
-        ):
-            bm.eye(None)
+    # 一个数字单位阵
+    field = bm.eye(1, dtype=ti.i32)
+    expcted = [[1]]
+    assert field.dtype == ti.i32
+    assert field[0, 0] == expcted[0][0]                              
 
-        # N 为负数
-        with pytest.raises(
-            ValueError, match="N and M must be positive integers, got N=-1, M=3"
-        ):
-            bm.eye(-1, 3)
+    # 测试 3 阶单位阵
+    field = bm.eye(3, dtype=ti.i32)
+    expected = [[1, 0, 0], 
+                [0, 1, 0], 
+                [0, 0, 1]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert field.dtype == ti.i32
+            assert field[i, j] == expected[i][j]
 
-        # N 不是 int 型
-        with pytest.raises(
-            TypeError, match="N and M must be integers, got N=1.2, M=1.2"
-        ):
-            bm.eye(1.2)
+    # 测试 3 行 4 列单位阵，偏移对角线
+    field = bm.eye(3, 4 ,k=1)
+    expected = [[0.0, 1.0, 0.0, 0.0], 
+                [0.0, 0.0, 1.0, 0.0], 
+                [0.0, 0.0, 0.0, 1.0]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert field.dtype == ti.f64
+            assert field[i, j] == expected[i][j]
+
+    # N 为 None
+    with pytest.raises(ValueError, match="Both N and M are None. At least one dimension must be specified for eye()."):
+        bm.eye(None)
+
+    # N 为负数
+    with pytest.raises(ValueError, match="N and M must be positive integers, got N=-1, M=3"):
+        bm.eye(-1,3)
+
+    # N 不是 int 型
+    with pytest.raises(TypeError, match="N must be an integer, got 1.2."):
+        bm.eye(1.2)
 
 
 # 测试 zeros 函数
-class TestZeros:
-    def test_zeros_valid(self):
-        """测试基础元素的零值"""
-        # 测试3阶零方阵
-        field = bm.zeros(3)
-        assert np.allclose(field.to_numpy(), np.zeros(3))
+def test_zeros():
 
-        # 测试2行3列零矩阵
-        field = bm.zeros((2, 3))
-        assert np.allclose(field.to_numpy(), np.zeros((2, 3)))
+    # 空矩阵
+    field = bm.zeros(0)
+    assert len(field) == 0
+    assert np.array_equal(field, [])
 
-        # 测试空矩阵
-        field = bm.zeros(0)
-        assert np.allclose(field, np.zeros(0))
+    # 数字零矩阵
+    field = bm.zeros(1)
+    assert field.shape == (1,)
+    assert field.dtype == ti.f32
+    assert field[0] == 0
 
-    def test_zeros_invalid(self):
-        """测试无效输入"""
-        # shape为-1
-        with pytest.raises(
-            ValueError, match="Shape must be a non-negative integer, got (-1)."
-        ):
-            bm.zeros((-1))
+    # 1d 零矩阵
+    field = bm.zeros(3)
+    assert field.shape == (3,)
+    assert field.dtype == ti.f32
+    assert np.all(field, 0)
+
+    # 2d 零矩阵
+    field = bm.zeros((2, 3))
+    logger.info(field)
+    assert field.shape == (2, 3)
+    assert field.dtype == ti.f32
+    assert np.all(field, 0)
+
+    # 3d 零矩阵
+    field = bm.zeros((2, 3, 4))
+    assert field.shape == (2, 3, 4)
+    assert field.dtype == ti.f32
+    assert np.all(field, 0)
+
+    #shape为-1
+    with pytest.raises(ValueError, match="Shape must be a non-negative integer, got (-1)."):
+        bm.zeros((-1))
 
 
 # 测试 tril 函数
-class TestTril:
-    def test_tril_valid(self):
-        # 测试下三角 3 阶方阵
-        field = ti.field(ti.i32, shape=(3,))
-        field.from_numpy(np.array([1, 2, 3]))
-        result = bm.tril(field)
-        assert np.array_equal(result.to_numpy(), np.tril(np.array([1, 2, 3])))
+def test_tril():
 
-        # 测试下三角 2 行 3 列矩形
-        field = ti.field(ti.f32, shape=(2, 3))
-        field.from_numpy(np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
-        result = bm.tril(field)
-        assert np.array_equal(
-            result.to_numpy(), np.tril(np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
-        )
+    # 测试数组中只有一个数的情况
+    field = ti.field(ti.i32, shape=(1,))
+    field[0] = 1
+    result = bm.tril(field)
+    assert result[0, 0] == 1
 
-        # 测试下三角 3 阶方阵，偏移对角线
-        field = ti.field(ti.i32, shape=(3, 3))
-        field.from_numpy(np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]))
-        result = bm.tril(field, k=-1)
-        assert np.array_equal(
-            result.to_numpy(),
-            np.tril(np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]]), k=-1),
-        )
+    # 2d 下三角方阵
+    field = ti.field(ti.i32, shape = (3, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i + j + 1
+    fill()
+    result = bm.tril(field)
+    expected = [[1, 0, 0], 
+                [2, 3, 0], 
+                [3, 4, 5]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result.shape == (3, 3)
+            assert isinstance(result, ti.Field)
+            assert result.dtype == ti.i32
+            assert result[i, j] == expected[i][j]
 
-    def test_tril_invalid(self):
-        """测试无效输入"""
-        # shape 为 3d
-        field = ti.field(ti.f32, shape=(2, 3, 4))
-        with pytest.raises(
-            ValueError,
-            match="Input field with shape \(2, 3, 4\) is not supported\. Only 1D and 2D fields are supported\.",
-        ):
-            bm.tril(field)
+    # 2d 下三角矩阵
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i + j + 1
+    fill()
+    result = bm.tril(field)
+    expected = [[1.0, 0.0, 0.0], 
+                [2.0, 3.0, 0.0]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result.shape == (2, 3)
+            assert isinstance(result, ti.Field)
+            assert result.dtype == ti.f32
+            assert result[i, j] == expected[i][j]
 
-        # field 为标量
-        field = ti.field(ti.f32, shape=())
-        with pytest.raises(
-            ValueError,
-            match="Input field is a scalar \(0D\)\, tril is not defined for scalars\.",
-        ):
-            bm.tril(field)
+    #  2d 下三角方阵，偏移对角线
+    field = ti.field(ti.i32, shape=(3, 3)) 
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i + j + 1
+    fill()  
+    result = bm.tril(field, k=-1)
+    expected = [[0, 0, 0], 
+                [2, 0, 0], 
+                [3, 4, 0]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result.shape == (3, 3)
+            assert isinstance(result, ti.Field)
+            assert result.dtype == ti.i32
+            assert result[i, j] == expected[i][j]
+            
+    # 3d 下三角方阵
+    field = ti.field(ti.i32, shape=(2, 3, 4))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = i + j + k + 1
+    fill()
+    result = bm.tril(field)
+    expected = [[[1, 0, 0, 0], 
+                 [2, 3, 0, 0], 
+                 [3, 4, 5, 0]], 
+                [[2, 0, 0, 0], 
+                 [3, 4, 0, 0], 
+                 [4, 5, 6, 0]]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert result.shape == (2, 3, 4)
+                assert isinstance(result, ti.Field)
+                assert result.dtype == ti.i32
+                assert result[i, j, k] == expected[i][j][k]
 
-        # field 为 None
-        with pytest.raises(
-            ValueError,
-            match="Input field is None. Please provide a valid Taichi field.",
-        ):
-            bm.tril(None)
+    # 空
+    field = ti.field(ti.f32, shape=())
+    with pytest.raises(ValueError, match="Input field is a scalar \(0D\)\, tril is not defined for scalars\."):
+        bm.tril(field)
+
+    # field 为 None
+    with pytest.raises(ValueError, match="Input field is None. Please provide a valid Taichi field."):
+        bm.tril(None)
+
 
 
 # 测试 abs 函数
-class TestAbs:
-    def test_abs_valid(self):
-        """测试基础元素的绝对值"""
-        # 测试正数浮点数的绝对值
-        field = ti.field(ti.f32, shape=(3,))
-        field.from_numpy(np.array([1.0, 2.0, 3.0]))
-        result = bm.abs(field)
-        assert np.array_equal(result.to_numpy(), np.array([1.0, 2.0, 3.0]))
+def test_abs():
 
-        # 测试负数整数的绝对值
-        field = ti.field(ti.f32, shape=(3,))
-        field.from_numpy(np.array([-1, -2, -3]))
-        result = bm.abs(field)
-        assert np.array_equal(result.to_numpy(), np.array([1, 2, 3]))
+    # 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = -1.1
+    result = bm.abs(field)
+    expected = 1.1
+    assert np.allclose(result, expected)
 
-        # 测试零元素的绝对值
-        field = ti.field(ti.i32, shape=())
-        field[None] = 0
-        result = bm.abs(field)
-        assert np.array_equal(result.to_numpy(), np.array(0))
+    # 数字
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = -1.1
+    result = bm.abs(field)
+    expected = 1.1
+    assert result.shape == (1,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], expected)
 
-    def test_abs_invalid(self):
-        """测试无效输入"""
-        # 无参数
-        with pytest.raises(
-            ValueError,
-            match="Input field is None. Please provide a valid Taichi field.",
-        ):
-            bm.abs(None)
+    # 1d
+    field = ti.field(ti.i32, shape=(3,))
+    field[0] = -1
+    field[1] = 2
+    field[2] = -3
+    result = bm.abs(field)
+    expected = [1, 2, 3]
+    for i in range(field.shape[0]):
+        assert result.shape == (3,)
+        assert isinstance(result, ti.Field)
+        assert result.dtype == ti.i32
+        assert result[i] == expected[i]
 
+    # 2d
+    field = ti.field(ti.i32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i - j
+    fill()
+    result = bm.abs(field)
+    expected = [[0, 1, 2], 
+                [1, 0, 1]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result.shape == (2, 3)
+            assert isinstance(result, ti.Field)
+            assert result.dtype == ti.i32
+            assert result[i, j] == expected[i][j]
 
-# 测试 acos 函数
-class TestAcos:
-    def test_acos_valid(self):
-        """测试常规值"""
-        field = ti.field(ti.f32, shape=(3,))
-        field.from_numpy(np.array([0.5, -0.7, 0.9]))
+    # 3d
+    field = ti.field(ti.i32, shape=(2, 3, 4))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = i - j - k
+    fill()
+    result = bm.abs(field)
+    expected = [[[0, 1, 2, 3], 
+                    [1, 2, 3, 4], 
+                    [2, 3, 4, 5]], 
+                [[1, 0, 1, 2], 
+                    [0, 1, 2, 3], 
+                    [1, 2, 3, 4]]]
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert result.shape == (2, 3, 4)
+                assert isinstance(result, ti.Field)
+                assert result.dtype == ti.i32
+                assert result[i, j, k] == expected[i][j][k]
+
+    # 无参数
+    with pytest.raises(TypeError, match="Unsupported type for abs: <class 'NoneType'>. Expected int, float, bool, or ti.Field."):
+        bm.abs(None)
+
+#测试 acos 函数
+    def test_acos():
+
+        # 空
+        field = ti.field(ti.f32, shape=())
+        field[None] = 0.5
         result = bm.acos(field)
-        assert np.allclose(result.to_numpy(), np.arccos(np.array([0.5, -0.7, 0.9])))
+        assert result.shape == ()
+        assert result.dtype == ti.f32
+        assert np.allclose(result[None], np.pi/3)
 
-    def test_acos_boundary(self):
-        """测试边界值"""
-        # 测试 1.0 和 -1.0
-        field = ti.field(ti.f32, shape=(2,))
-        field.from_numpy(np.array([1.0, -1.0]))
+        # 数字 0.0
+        field = ti.field(ti.f32, shape=(1,))
+        field[0] = 0.0
         result = bm.acos(field)
-        assert np.allclose(result.to_numpy(), np.arccos(np.array([1.0, -1.0])))
+        assert result.shape == (1,)
+        assert result.dtype == ti.f32
+        assert np.allclose(result[0], np.pi/2)
 
-    def test_acos_invalid(self):
-        """测试无效输入"""
+        # 1d field
+        field = ti.field(ti.f32, shape=(3,))
+        field[0] = 0.5
+        field[1] = -0.7
+        field[2] = 0.9
+        result = bm.acos(field)
+        for i in range(field.shape[0]):
+            assert result.shape == (3,)
+            assert isinstance(result, ti.Field)
+            assert result.dtype == ti.f32
+            assert np.allclose(result[i], np.arccos(field[i]))
+
+        # 2d field
+        field = ti.field(ti.f32, shape=(2, 3))
+        @ti.kernel
+        def fill():
+            for i, j in field:
+                field[i, j] = i * 0.5 - j * 0.5
+        fill()
+        result = bm.acos(field)
+        expected = [[np.pi/2, np.pi*2/3, np.pi], 
+                    [np.pi/3, np.pi/2, np.pi*2/3]]
+        for i in range(field.shape[0]):
+            for j in range(field.shape[1]):
+                assert result.shape == (2, 3)
+                assert isinstance(result, ti.Field)
+                assert result.dtype == ti.f32
+                assert np.allclose(result[i, j], expected[i][j])
+
+        # 3d field
+        field = ti.field(ti.f32, shape=(2, 2, 2))
+        @ti.kernel
+        def fill():
+            for i, j, k in field:
+                field[i, j, k] = i / 2 - j / 2 - k / 2
+        fill()
+        result = bm.acos(field)
+        expected = [[[np.pi/2, np.pi*2/3], 
+                     [np.pi*2/3, np.pi]], 
+                    [[np.pi/3, np.pi/2], 
+                     [np.pi/2, np.pi*2/3]]]
+        for i in range(field.shape[0]):
+            for j in range(field.shape[1]):
+                for k in range(field.shape[2]):
+                    assert result.shape == (2, 2, 2)
+                    assert isinstance(result, ti.Field)
+                    assert result.dtype == ti.f32
+                    assert np.allclose(result[i, j, k], expected[i][j][k])
+
         # 无参数
-        with pytest.raises(
-            ValueError,
-            match="Input field is None. Please provide a valid Taichi field.",
-        ):
+        with pytest.raises(ValueError, match="Input field is None. Please provide a valid Taichi field."):
             bm.acos(None)
 
         # 参数为一维空数组
         field = ti.field(ti.f32, shape=(1,))
-        with pytest.raises(
-            ValueError,
-            match="ti\.field shape \(1,\) does not match the numpy array shape \(0,\)",
-        ):
+        with pytest.raises(ValueError, match="ti\.field shape \(1,\) does not match the numpy array shape \(0,\)"):
             result = field.from_numpy(np.array([]))
             bm.acos(result)
 
+#测试 zeros_like 函数
+def test_zeros():
 
-# 测试 zeros_like 函数
-class TestZerosLike:
-    def test_zeros_like_valid(self):
-        """测试常规情况"""
-        # 测试3阶方阵
-        field = ti.field(ti.f32, shape=(3,))
-        result = bm.zeros_like(field)
-        assert np.array_equal(result.to_numpy(), np.zeros(3))
+    # 空
+    field = ti.field(ti.f32, shape=())
+    result = bm.zeros_like(field)
+    assert result.shape == ()
+    assert result.dtype == ti.f32
+    assert result[None] == 0
 
-        # 测试2行3列矩阵
-        field = ti.field(ti.f32, shape=(2, 3))
-        result = bm.zeros_like(field)
-        assert np.array_equal(result.to_numpy(), np.zeros((2, 3)))
+    # 数字
+    field = ti.field(ti.f32, shape=(1,))
+    result = bm.zeros_like(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert result[0] == 0
 
-    def test_zeros_like_invalid(self):
-        """测试无效输入"""
-        # 无参数
-        with pytest.raises(
-            ValueError,
-            match="Input field is None. Please provide a valid Taichi field.",
-        ):
-            bm.zeros_like(None)
+    # 1d
+    field = ti.field(ti.f32, shape=(3,))
+    result = bm.zeros_like(field)
+    assert result.shape == (3,)
+    assert result.dtype == ti.f32
+    assert np.all(result, 0)
 
+    # 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    result = bm.zeros_like(field)
+    assert result.shape == (2, 3)
+    assert result.dtype == ti.f32
+    assert np.all(result, 0)
+
+    # 3d
+    field = ti.field(ti.f32, shape=(2, 3, 4))
+    result = bm.zeros_like(field)
+    assert result.shape == (2, 3, 4)
+    assert result.dtype == ti.f32
+    assert np.all(result, 0)
+
+    # 无参数
+    with pytest.raises(ValueError, match="Input field is None. Please provide a valid Taichi field."):
+        bm.zeros_like(None)
 
 if __name__ == "__main__":
     pytest.main(["-q", "-s"])
