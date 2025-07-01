@@ -166,7 +166,7 @@ class TensorFunctionSpace(FunctionSpace):
         elif (threshold is None) | (callable(threshold)) :
             scalar_is_bd_dof = scalar_space.is_boundary_dof(threshold, method=method)
 
-            if self.dof_priority:
+            if  self.dof_priority:
                 is_bd_dof = bm.reshape(scalar_is_bd_dof, (-1,) * self.dof_ndim + (scalar_gdof,))
                 is_bd_dof = bm.broadcast_to(is_bd_dof, self.dof_shape + (scalar_gdof,))
             else:
@@ -263,7 +263,8 @@ class TensorFunctionSpace(FunctionSpace):
                 raise ValueError(f"Unknown type of threshold {type(threshold)}")
         else:
             raise ValueError(f"Unknown type of gd {type(gd)}")
-        if self.dof_priority:
+
+        if  self.dof_priority:
             uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.T.reshape(-1))
         else:
             uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.reshape(-1))

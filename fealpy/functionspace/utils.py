@@ -54,19 +54,45 @@ def to_tensor_dof(to_dof: TensorLike, dof_numel: int, gdof: int, dof_priority: b
     Returns:
         Tensor: Global indices of tensor dofs in each entity.
     """
-    context = bm.context(to_dof)
-    indices = bm.arange(gdof*dof_numel, **context)
-    num_entity = to_dof.shape[0]
-
-    if dof_priority:
-        indices = indices.reshape(dof_numel, gdof)
-        indices = indices[:, to_dof] # (dof_numel, entity, ldof)
-        indices = bm.swapaxes(indices, 0, 1) # (entity, dof_numel, ldof)
+    if isinstance(to_dof, tuple):
+        scell2dof, scell2dofLocation = to_dof[0], to_dof[1]
+        sgdof = bm.max(scell2dof) + 1
+        context = bm.context(scell2dof)
+        NC = scell2dofLocation.shape[0] - 1
+        ldof = scell2dofLocation[1:] - scell2dofLocation[:-1]
+        cell2dofLocation = scell2dofLocation*2
+        cell2dof = bm.zeros(2*scell2dof.shape[0], **context)
+        scell2dof = list(bm.split(scell2dof,scell2dofLocation[1:-1]))
+        #if dof_priority:
+        for i in range(NC):
+            idx =  bm.arange(cell2dofLocation[i],
+                             cell2dofLocation[i]+ldof[i], **context)
+            cell2dof[idx] = scell2dof[i] 
+            idx2 = idx + ldof[i]
+            cell2dof[idx2] = scell2dof[i] + gdof 
+        return cell2dof, cell2dofLocation
+        #else:
+        #    for i in range(NC):
+        #        idx =  bm.arange(scell2dofLocation[i],
+        #                         scell2dofLocation[i]+ldof[i], **context)*2
+        #        cell2dof[idx] = scell2dof[i]*2 
+        #        idx2 = idx + 1
+        #        cell2dof[idx2] = scell2dof[i]*2 + 1 
+        #    return cell2dof, cell2dofLocation
     else:
-        indices = indices.reshape(gdof, dof_numel)
-        indices = indices[to_dof, :] # (entity, ldof, dof_numel)
+        context = bm.context(to_dof)
+        indices = bm.arange(gdof*dof_numel, **context)
+        num_entity = to_dof.shape[0]
 
-    return indices.reshape(num_entity, -1)
+        if dof_priority:
+            indices = indices.reshape(dof_numel, gdof)
+            indices = indices[:, to_dof] # (dof_numel, entity, ldof)
+            indices = bm.swapaxes(indices, 0, 1) # (entity, dof_numel, ldof)
+        else:
+            indices = indices.reshape(gdof, dof_numel)
+            indices = indices[to_dof, :] # (entity, ldof, dof_numel)
+
+        return indices.reshape(num_entity, -1)
 
 
 def tensor_basis(shape: Size, *, dtype=None, device=None) -> TensorLike:
