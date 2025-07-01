@@ -5,7 +5,7 @@ class AllenCahnPDEDataProtocol(Protocol):
     """Protocol interface for Allen-Cahn PDE data components.
     
     Defines the recommended protocol interface for Allen–Cahn type partial differential equations:
-        u_t - ε² Δu + f(u) = 0
+        φ_t + u·∇φ - ε² Δφ + f(φ) = 0
 
     This protocol suggests four main categories of methods that implementing classes may provide:
         1. Domain specification methods (geometry, computational domain)
@@ -26,11 +26,11 @@ class AllenCahnPDEDataProtocol(Protocol):
     # Initial condition u0(x)
     def init_condition(self, p: TensorLike) -> TensorLike: ...
     
-    # Double-well potential derivative f(u), e.g., f(u) = u^3 - u
-    def nonlinear_source(self, u: TensorLike) -> TensorLike: ...
+    # Double-well potential derivative f(u), e.g., f(φ) = 1/η^2 *(φ^3 - φ)
+    def nonlinear_source(self, phi: TensorLike) -> TensorLike: ...
     
     # ε parameter in the Allen–Cahn equation
-    def epsilon(self) -> float: ...
+    def gamma(self) -> float: ...
     
     # Optional: exact solution if known (used for validation)
     def solution(self, p: TensorLike, t: float = 0.0) -> TensorLike: ...
@@ -47,6 +47,6 @@ AllenCahnPDEDataT = TypeVar('AllenCahnPDEDataT', bound=AllenCahnPDEDataProtocol)
 DATA_TABLE = {
     # example name: (file_name, class_name)
     "circle_interface": ("circle_interface_data_2d", "CircleInterfaceData2D"),
-    "double_well": ("double_well_data_1d", "DoubleWellData1D"),
+    "sincoscos": ("sincoscos_data_2d", "SinCosCosData2D"),
 }
 
