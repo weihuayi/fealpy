@@ -502,6 +502,7 @@ def test_add():
         for i, j in y:
             y[i, j] = 2
 
+
     fill_x_float()
     fill_y_int()
     result = bm.add(x, y)
