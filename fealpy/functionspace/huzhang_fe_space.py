@@ -1,4 +1,4 @@
-from fealpy.mesh.mesh_base import Mesh
+from ..mesh import Mesh
 
 class HuZhangFESpace:
     """Factory class for creating HuZhang finite element spaces."""
