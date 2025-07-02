@@ -36,7 +36,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.set_space_degree(options['space_degree'])
 
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly3d"):
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxdomain3d"):
         """
         """
         if isinstance(pde, str):
@@ -77,25 +77,33 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         """
         # Implementation of the linear system construction goes here
         GD = self.mesh.geo_dimension()
-        space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
+        self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
 
-        bform = BilinearForm(space)
+        bform = BilinearForm(self.space)
         integrator = LinearElasticityIntegrator(self.material)
         integrator.assembly.set('fast')
         bform.add_integrator(integrator)
         S = bform.assembly()
 
-        bform = BilinearForm(space)
+        bform = BilinearForm(self.space)
         integrator = MassIntegrator(self.material.density)
         bform.add_integrator(integrator)
         M = bform.assembly()
 
         return S, M
 
-    def apply_bc(self):
+    def apply_bc(self, S, M):
         """
         """
-        pass
+        from ..fem import DirichletBC
+        
+        bc = DirichletBC(
+                self.space,
+                gd=self.pde.displacement_bc,
+                threshold=self.pde.is_displacement_boundary)
+        S = bc.apply_matrix(S)
+        M = bc.apply_matrix(M)
+        return S, M
 
     def solve(self):
         """

@@ -11,7 +11,7 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='boxpoly3d', type=str,
+                    default='boxdomain3d', type=str,
                     help='Name of the PDE model, default is boxpoly3d')
 
 parser.add_argument('--init_mesh',
