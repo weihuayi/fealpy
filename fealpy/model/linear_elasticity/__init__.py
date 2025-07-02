@@ -66,5 +66,5 @@ DATA_TABLE = {
     "boxpoly3d": ("box_poly_data_3d", "BoxPolyData3d"),
     "boxpoly2d": ("box_poly_data_2d", "BoxPolyData2d"),
     "boxsinsin2d": ("box_sinsin_data_2d", "BoxSinSinData2d"),
-
+    "boxdomain3d": ("box_domain_data_3d", "BoxDomainData3d"), # without true solution
 }
