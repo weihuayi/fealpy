@@ -145,7 +145,7 @@ class COOTensor(SparseTensor):
         count = bm.bincount(self._indices[0], minlength=self._spshape[0])
         crow = bm.cumsum(count, axis=0)
         crow = bm.concat([bm.tensor([0], **bm.context(crow)), crow])
-        order = bm.argsort(self._indices[0], stable=True)
+        order = bm.argsort(self._indices[0])
         new_col = bm.copy(self._indices[-1, order])
 
         if self.values is None:

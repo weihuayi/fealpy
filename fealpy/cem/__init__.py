@@ -1,3 +1,3 @@
 
 from .generator import EITDataGenerator
-from .emfdtdsim import EMFDTDSim
+from .em_fdtd_sim import EMFDTDSim

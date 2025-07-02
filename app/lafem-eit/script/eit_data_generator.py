@@ -104,7 +104,7 @@ def main(sigma_iterable: Sequence[int], seed: int = 0, index: int = 0):
         ctrs_ = np.random.rand(NUM_CIR, 2) * 1.6 - 0.8 # (NCir, GD)
         b = np.min(0.9-np.abs(ctrs_), axis=-1) # (NCir, )
         rads_ = np.random.rand(NUM_CIR) * (b-0.1) + 0.1 # (NCir, )
-        ctrs = bm.astype(ctrs, bm.float64)
+        ctrs = bm.astype(ctrs_, bm.float64)
         rads = bm.astype(rads_, bm.float64)
 
         ls_fn = lambda p: levelset(p, ctrs, rads)

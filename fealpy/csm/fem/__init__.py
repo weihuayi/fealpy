@@ -7,5 +7,4 @@ from .optimal_control_integrator import OPCIntegrator
 
 ### Model Operator
 from .beam_fem_model import BeamFEMModel
-from .elliptic_rt_mfem_model import EllipticMixedFEMModel
 from .optimal_contron_rt_mfem_model import OPCMixedFEMModel
