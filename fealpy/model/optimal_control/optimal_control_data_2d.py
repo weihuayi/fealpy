@@ -3,8 +3,9 @@ from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 import sympy as sp
+from fealpy.model.box_domain_mesher import BoxDomainMesher2d
 
-class OptimalControlData():
+class OptimalControlData2d(BoxDomainMesher2d):
     """
     A PDE example with homogeneous Neumann boundary conditions on the unit square.
 
@@ -66,7 +67,7 @@ class OptimalControlData():
     >>> print(y_val)
     """
     
-    def __init__(self, c=1): 
+    def __init__(self, c=1, box=None): 
         '''
         """
         Initialize the OptimalControlData class.
@@ -85,6 +86,7 @@ class OptimalControlData():
         The symbolic expressions are constructed using sympy for later numerical evaluation.
         """
         '''
+        super().__init__(box=box)
         self.c = c
         self.manager, = bm._backends
 
@@ -165,20 +167,6 @@ class OptimalControlData():
     @cartesian
     def domain(self):
         return [0, 1, 0, 1]
-    
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        from fealpy.mesh import TriangleMesh
-        d = self.domain()
-        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-    
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from fealpy.mesh import QuadrangleMesh
-        d = self.domain()
-        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
     
     @cartesian
     def y_solution(self, space):

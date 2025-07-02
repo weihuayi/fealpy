@@ -5,26 +5,55 @@ from fealpy.backend import backend_manager as bm
 ## 参数解析
 parser = argparse.ArgumentParser(description=
     """
-    最低阶Raviart-Thomas元和分片常数空间混合元求解椭圆方程
-    其中, 刚度矩阵带转移算子项
+    Solve elliptic equations using the lowest order Raviart-Thomas element and piecewise constant mixed finite element space.
+    The stiffness matrix includes a transfer operator term.
     """)
 
 parser.add_argument('--backend',
-        default='numpy', type=str,
-        help="默认后端为 numpy. 还可以选择 pytorch, jax, tensorflow 等")
+    default='numpy', type=str,
+    help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
+
+parser.add_argument('--pde',
+    default='opc', type=str,
+    help="Name of the PDE model, default is opc")
+
+parser.add_argument('--init_mesh',
+    default='uniform_tri', type=str,
+    help="Type of initial mesh, default is uniform_tri")
+
+parser.add_argument('--space_degree',
+    default=0, type=int,
+    help="Degree of Lagrange finite element space, default is 0")
+
+parser.add_argument('--uniform_refine',
+    default=0, type=int,
+    help="Number of uniform refinements, default is 0")
+
+parser.add_argument('--solve',
+    default='direct', type=str,
+    help="Type of solver, default is direct, options are direct, iterative")
+
+parser.add_argument('--pbar_log',
+    default=True, type=bool,
+    help="Whether to show progress bar, default is True")
+
+parser.add_argument('--log_level',
+    default='INFO', type=str,
+    help="Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL")
 
 
-args = parser.parse_args()
-bm.set_backend(args.backend)
+# 解析参数
+options = vars(parser.parse_args())
 
-from fealpy.csm.fem import OPCMixedFEMModel
+from fealpy.backend import bm
+bm.set_backend(options['backend'])
+
+from fealpy.fem import OPCMixedFEMModel
 from fealpy.decorator import barycentric, cartesian
-model = OPCMixedFEMModel()
-model.set_pde()
-model.set_init_mesh(nx=40, ny=40)
-model.set_order(p=0)
+
+model = OPCMixedFEMModel(options)
 maxit = 20  # Maximum number of iterations for the optimization process
-space1,space2 = model.set_space(p=0)
+space1,space2 = model.space(p=0)
 pdof = space2.dof.number_of_global_dofs()
 ydof = space1.dof.number_of_global_dofs()
 qdof = space2.dof.number_of_global_dofs()

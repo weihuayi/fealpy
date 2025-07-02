@@ -1,20 +1,19 @@
 from typing import Optional,Union
-from fealpy.csm.model import ComputationalModel
-from fealpy.csm.model.optimal_control import OPCPDEDataT
-from fealpy.mesh import TriangleMesh
+from fealpy.model import ComputationalModel
+from fealpy.model.optimal_control import OPCPDEDataT
 
 from fealpy.functionspace import RaviartThomasFESpace2d
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import BilinearForm, LinearForm
 from fealpy.fem import ScalarMassIntegrator, ScalarSourceIntegrator
 from fealpy.fem import DivIntegrator
-from fealpy.csm.fem import OPCSIntegrator,OPCIntegrator
+from fealpy.fem import OPCSIntegrator,OPCIntegrator
 from fealpy.fem import BlockForm
 from fealpy.backend import backend_manager as bm
 from fealpy.solver import spsolve
-from fealpy.fem import DirichletBC
-from fealpy.csm.model import PDEDataManager
+from fealpy.model import PDEDataManager
 from fealpy.decorator import variantmethod
+from fealpy.mesh import Mesh
 
 
 class OPCMixedFEMModel(ComputationalModel):
@@ -71,21 +70,28 @@ class OPCMixedFEMModel(ComputationalModel):
     >>> model.show_mesh()
     """
 
-    def __init__(self):
-        super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("optimal_control")
-        
+    def __init__(self, options):
+        self.options = options
+        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.set_pde(options['pde'])
+        self.set_init_mesh(options['init_mesh'], options['uniform_refine'])
+        self.set_order(options['space_degree'])
+        self.solve.set(options['solve']) 
         
     def set_pde(self, pde: Union[OPCPDEDataT, str]="opc"):
         """
         """
         if isinstance(pde, str):
-            self.pde = self.pdm.get_example(pde)
+            self.pde = PDEDataManager('optimal_control').get_example(pde)
         else:
             self.pde = pde
-            
-    def set_init_mesh(self, meshtype: str = "tri", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tri", n: int = 0, **kwargs):
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh[mesh](**kwargs)
+        else:
+            self.mesh = mesh
+        self.mesh.uniform_refine(n=n)
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -93,10 +99,10 @@ class OPCMixedFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-    def set_order(self, p: int = 1):    
+    def set_order(self, p: int = 0):    
         self.p = p    
         
-    def set_space(self, p: Optional[int] = None):
+    def space(self, p: Optional[int] = None):
         """
         Set the finite element spaces for the model.
         
@@ -159,7 +165,7 @@ class OPCMixedFEMModel(ComputationalModel):
         """
         Apply the boundary conditions to the linear system.
         """
-        uspace, pspace = self.set_space()
+        uspace, pspace = self.space()
         ugdof = uspace.number_of_global_dofs()
         G_apply = pspace.set_neumann_bc(gd)
         F = bm.zeros(ugdof, dtype=bm.float64)
