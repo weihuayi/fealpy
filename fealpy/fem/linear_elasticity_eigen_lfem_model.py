@@ -31,8 +31,19 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
+        GD = self.pde.geo_dimension()
+
         self.set_material_parameters(self.pde.lam, self.pde.mu, self.pde.rho)
-        self.set_init_mesh(options['init_mesh'])
+        mtype = options['mesh_type']
+        if 'uniform' in mtype:
+            if GD == 3:
+                self.set_init_mesh(mtype, nx=options['nx'], ny=options['ny'], nz=options['nz'])
+            elif GD == 2:
+                self.set_init_mesh(mtype, nx=options['nx'], ny=options['ny'])
+            else:
+                raise ValueError(f"Unsupported mesh type {mtype} for geo_dimension {GD}.")
+        else:
+            self.set_init_mesh(mtype)
         self.set_space_degree(options['space_degree'])
 
 

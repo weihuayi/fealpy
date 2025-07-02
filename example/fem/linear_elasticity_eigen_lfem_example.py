@@ -14,9 +14,18 @@ parser.add_argument('--pde',
                     default='boxdomain3d', type=str,
                     help='Name of the PDE model, default is boxpoly3d')
 
-parser.add_argument('--init_mesh',
+parser.add_argument('--mesh_type',
                     default='uniform_tet', type=str,
                     help='Type of mesh, default is uniform_tet')
+
+parser.add_argument('--nx', type=int, default=10,
+                    help='Number of divisions along x-direction, default is 10')
+
+parser.add_argument('--ny', type=int, default=10,
+                    help='Number of divisions along y-direction, default is 10')
+
+parser.add_argument('--nz', type=int, default=10,
+                    help='Number of divisions along z-direction, default is 10')
 
 parser.add_argument('--space_degree',
         default=1, type=int,
