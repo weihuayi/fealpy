@@ -100,7 +100,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
         lmesh.linearmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
-        lmesh.cell2edge = mesh.cell_to_edge()
+        lmesh.cell2edge = mesh.cell2edge
         lmesh.edge  = mesh.edge_to_ipoint(p)
         return lmesh
 
@@ -196,6 +196,23 @@ class LagrangeQuadrangleMesh(TensorMesh):
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
 
+    def entity_measure(self, etype: Union[int, str] = 'cell', index: Index = _S) -> TensorLike:
+        node = self.node
+
+        if isinstance(etype, str):
+            etype = estr2dim(self, etype)
+
+        if etype == 0:
+            return bm.tensor([0, ], dtype=self.ftype)
+        elif etype == 1:
+            edge = self.entity(1, index)
+            return bm.edge_length(edge, node)
+        elif etype == 2:
+            return self.cell_area(index=index)
+        else:
+            raise ValueError(f"Unsupported entity or top-dimension: {etype}")
+   
+    """ 
     def entity_measure(self, etype=2, index:Index=_S):
         if etype in {'cell', 2}:
             return self.cell_area(index=index)
@@ -205,6 +222,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             return bm.zeros(1, dtype=bm.float64)
         else:
             raise ValueError(f"entity type:{etype} is erong!")
+    """
 
     def cell_area(self, q=None, index: Index=_S):
         """
