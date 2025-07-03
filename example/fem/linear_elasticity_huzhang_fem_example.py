@@ -38,9 +38,5 @@ bm.set_backend(options['backend'])
 
 from fealpy.fem.linear_elasticity_huzhang_fem_model import LinearElasticityHuzhangFEMModel
 model = LinearElasticityHuzhangFEMModel(options)
-
-# model.set_pde(options['pde'])
-# model.set_init_mesh(options['init_mesh'])
-# model.set_space_degree(options['space_degree'])
 model.run['uniform_refine']()
 
