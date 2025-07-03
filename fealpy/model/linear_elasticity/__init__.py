@@ -63,8 +63,12 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
+<<<<<<< Updated upstream
     "boxpoly3d": ("box_poly_data_3d", "BoxPolyData3d"),
     "boxpoly2d": ("box_poly_data_2d", "BoxPolyData2d"),
     "boxsinsin2d": ("box_sinsin_data_2d", "BoxSinSinData2d"),
 
+=======
+    "boxpoly": ("box_poly_data_3d", "BoxPolyData3d"),
+>>>>>>> Stashed changes
 }
