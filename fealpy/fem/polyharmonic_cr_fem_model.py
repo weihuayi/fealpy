@@ -4,7 +4,7 @@ from ..model import PDEDataManager
 from ..model.elliptic import EllipticPDEDataT
 from ..decorator import variantmethod
 
-class MthLaplaceSmoothFEMModel:
+class PolyharmonicCrFEMModel:
     """
         Smooth Finite Element Method to solve the equation \(\Delta^{m+1} u =
         f\).  on a 2D/3D domain, using C^m-conforming finite element spaces.
