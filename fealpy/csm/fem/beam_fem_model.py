@@ -8,6 +8,8 @@ from ...fem import DirichletBC
 from ..fem import BeamDiffusionIntegrator
 from ..fem import BeamSourceIntegrator
 from ...solver import spsolve
+from typing import Union
+from ..model.beam import BeamPDEDataT
 
 import matplotlib.pyplot as plt
 
@@ -58,7 +60,7 @@ class BeamFEMModel(ComputationalModel):
         [0.0, 0.0012, 0.0023, ...]
     """
 
-    def __init__(self, example: str= 'beam2d'):
+    def __init__(self, options):
         '''
         Initializes the PoissonFDMModel with the specified example.
         Parameters:
@@ -74,14 +76,34 @@ class BeamFEMModel(ComputationalModel):
             >>> print(model.pde)
             <PDEDataManager object with beam parameters>
         '''
-        self.pde = PDEDataManager('beam').get_example(example) 
+        self.options = options
+        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.set_pde(options['pde'])
+        self.beam_type = options['beam_type']
+        self.E = options['modulus']
+        self.A = options['area']
+        self.I = options['inertia']
+        self.f = options['load']
+        self.l = options['length']
         self.mesh = self.pde.init_mesh()
-        self.E = self.pde.E
-        self.A = self.pde.A
-        self.I = self.pde.I
-        self.f = self.pde.f
-        self.l = self.pde.L
         
+    def set_pde(self, pde:Union[BeamPDEDataT, str]='beam2d'):
+        '''
+        Set the PDE parameters for the beam problem.
+        Parameters:
+            pde (PDEDataManager): The PDE data manager containing beam parameters and boundary conditions.
+        Raises:
+            ValueError: If the provided pde is not valid or does not contain necessary parameters.
+        Notes:
+            This method updates the model's physical parameters and mesh based on the provided PDE data.
+        Examples:
+            >>> model.set_pde(new_pde)
+        '''
+        if isinstance(pde, str):
+            self.pde = PDEDataManager('beam').get_example(pde)
+        else:
+            self.pde = pde
+        self.mesh = self.pde.init_mesh()
 
 
     def run(self):
@@ -110,12 +132,11 @@ class BeamFEMModel(ComputationalModel):
         scalar_space = LagrangeFESpace(mesh, 1)
         tensor_space = TensorFunctionSpace(scalar_space=scalar_space, shape=(-1, 2))
         bform = BilinearForm(tensor_space)
-        beamintegrator = BeamDiffusionIntegrator(tensor_space, 'pure', E, A=A, I=I, l=l)
-        KK = beamintegrator.assembly(tensor_space)
+        beamintegrator = BeamDiffusionIntegrator(tensor_space, self.beam_type, E, A=A, I=I, l=l)
         bform.add_integrator(beamintegrator)
         K = bform.assembly()
         lform = LinearForm(tensor_space)
-        FF  = BeamSourceIntegrator(tensor_space, 'pure', source=-f, l=l)
+        FF  = BeamSourceIntegrator(tensor_space, self.beam_type, source=-f, l=l)
         lform.add_integrator(FF)
         F = lform.assembly()
         return K, F

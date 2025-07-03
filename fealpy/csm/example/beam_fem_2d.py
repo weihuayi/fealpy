@@ -27,14 +27,29 @@ parser.add_argument('--length',
                     default=10, type=float,
                     help='梁的长度, 默认为 10 m.')
 
-args = parser.parse_args()
+parser.add_argument('--pbar_log',
+                    default=False, action='store_true',
+                    help='是否显示进度条日志.')
 
-E = args.modulus
-I = args.inertia
-A = args.area
-f = args.load
-L = args.length
+parser.add_argument('--log_level',
+                    default='INFO', type=str,
+                        help='日志级别, 默认为 INFO.')
 
-beammodel = BeamFEMModel(example='beam2d')
+parser.add_argument('--beam_type',
+                    default='euler_bernoulli_2d', type=str,
+                    help='梁的类型, 可选值为 "euler_bernoulli_2d", "normal_2d", "euler_bernoulli_3d".')
+
+parser.add_argument('--pde',
+                    default='beam2d', type=str,
+                    help='PDE 示例名称, 默认为 "beam2d".')
+
+# 解析参数
+options = vars(parser.parse_args())
+
+bm.set_backend('numpy')
+
+beammodel = BeamFEMModel(options)
 uh = beammodel.run()
+# 打印结果
+print("位移解向量 (uh):")
 print(uh)
