@@ -48,12 +48,8 @@ class PDEDataManager:
         "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
         "polyharmonic": "fealpy.model.polyharmonic",
         "stokes": "fealpy.model.stokes",
-<<<<<<< Updated upstream
         "linear_elasticity": "fealpy.model.linear_elasticity",
         "helmholtz": "fealpy.model.helmholtz"
-=======
-        "linear_elasticity": "fealpy.model.linear_elasticity"
->>>>>>> Stashed changes
     }
 
     def __init__(self, pde_type: str = None):
