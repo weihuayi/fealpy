@@ -31,9 +31,10 @@ class HuZhangMixIntegrator(LinearInt, OpInt, CellInt):
         space1 = space[1]
 
         p    = space0.p
-        mesh = space0.mesh
+        q = self.q if self.q else p+3
+        mesh = space1.mesh
         TD = mesh.top_dimension()
-        qf = mesh.quadrature_formula(p+3, 'cell')
+        qf = mesh.quadrature_formula(q, 'cell')
         cm = mesh.entity_measure('cell')
 
         bcs, ws = qf.get_quadrature_points_and_weights()
