@@ -1027,7 +1027,8 @@ class MM_Interpolater(MM_PREProcessor):
         )
         v_b = moved_node[nodes] - self.node[self.cell[cells, 0]]
         
-        lam = bm.linalg.solve(v_matrix, v_b)
+        inv_matrix = bm.linalg.inv(v_matrix)
+        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
         lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
         valid = bm.all(lam > -1e-14, axis=-1) & ~interpolated[nodes]
         

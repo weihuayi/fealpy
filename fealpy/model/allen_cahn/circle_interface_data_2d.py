@@ -39,6 +39,25 @@ class CircleInterfaceData2D:
         nx = 256
         ny = 256
         mesh = TriangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
+        return mesh
+    
+    @init_mesh.register('quad')
+    def init_mesh(self, **kwargs):
+        from ...mesh import QuadrangleMesh
+        nx = 256
+        ny = 256
+        mesh = QuadrangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
+        return mesh
+    
+    @init_mesh.register('moving_tri')
+    def init_mesh(self, **kwargs):
+        """
+        Initialize the mesh with given number of points in x and y directions.
+        """
+        from ...mesh import TriangleMesh
+        nx = 64
+        ny = 64
+        mesh = TriangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
 
         domain = self.box
         vertices = bm.array([[domain[0], domain[2]],
@@ -48,11 +67,11 @@ class CircleInterfaceData2D:
         mesh.nodedata['vertices'] = vertices
         return mesh
     
-    @variantmethod('quad')
+    @init_mesh.register('moving_quad')
     def init_mesh(self, **kwargs):
         from ...mesh import QuadrangleMesh
-        nx = 256
-        ny = 256
+        nx = 64
+        ny = 64
         mesh = QuadrangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
 
         domain = self.box
