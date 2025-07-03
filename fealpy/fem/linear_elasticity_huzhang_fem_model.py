@@ -1,7 +1,153 @@
+import matplotlib.pyplot as plt
+from typing import Union
+
+from ..backend import bm
+from ..mesh import Mesh
+from ..functionspace import HuZhangFESpace, TensorFunctionSpace, LagrangeFESpace
+from ..material import LinearElasticMaterial
+from ..fem import BilinearForm, LinearForm, BlockForm
+from ..fem import VectorSourceIntegrator
+from ..fem.huzhang_stress_integrator import HuZhangStressIntegrator
+from ..fem.huzhang_mix_integrator import HuZhangMixIntegrator
+from ..model import PDEDataManager, ComputationalModel
+from ..model.linear_elasticity import LinearElasticityPDEDataT
+from ..decorator import variantmethod
+from ..solver import spsolve
+from ..tools.show import show_error_table, showmultirate
+
+class LinearElasticityHuzhangFEMModel(ComputationalModel):
+    """
+    A class to represent a linear elasticity problem using the
+    HuZhang finite element method.
+
+    Reference:
+        https://wnesm678i4.feishu.cn/wiki/P3FWwKgx8iURXVkLY8UcdHcPnHg?fromScene=spaceOverview
+    """
+    def __init__(self, options):
+        self.options = options
+        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.set_pde(options['pde'])
+        self.set_material_parameters(self.pde.lam(), self.pde.mu())
+        self.set_init_mesh(options['init_mesh'])
+        self.set_space_degree(options['space_degree'])
+
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxtri2d"):
+        if isinstance(pde, str):
+            self.pde = PDEDataManager('linear_elasticity').get_example(pde)
+            self.logger.info(f"PDE initialized from string: '{pde}'")
+        else:
+            self.pde = pde
+            pde_name = type(pde).__name__
+            self.logger.info(f"PDE initialized from instance: {pde_name}") 
+
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tri", **kwargs):
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh[mesh](**kwargs)
+            mesh_type = mesh
+            self.logger.info(f"Mesh type: '{mesh_type}'")
+        else:
+            self.mesh = mesh
+            mesh_type = type(mesh).__name__
+            self.logger.info(f"Mesh type: custom {mesh_type} instance")
+
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        NF = self.mesh.number_of_faces()
+        NC = self.mesh.number_of_cells()
+        self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+
+    def set_material_parameters(self, lam: float, mu: float):
+        self.material = LinearElasticMaterial("isoparametric", lame_lambda=lam, shear_modulus=mu)
+        self.logger.info(f"Material parameters set: λ (Lamé first parameter) = {lam}, μ (shear modulus) = {mu}")
 
 
-class LinearElasticityHuzhangFEMModel:
-    """
-    A class to represent a linear elasticity model using the Huzhang finite element method.
-    This class is designed
-    """
+    def set_space_degree(self, p: int):
+        self.p = p
+
+    def linear_system(self, mesh, p):
+        GD = self.mesh.geo_dimension()
+        lambda0, lambda1 = self.pde.stress_matrix_coefficient() 
+
+        self.space_sigma = HuZhangFESpace(mesh, p=p)
+        self.space = LagrangeFESpace(mesh, p=p-1, ctype='D')
+        self.space_u = TensorFunctionSpace(scalar_space=self.space, shape=(GD, -1))
+
+        bform1 = BilinearForm(self.space_sigma)
+        bform1.add_integrator(HuZhangStressIntegrator(lambda0=lambda0, lambda1=lambda1))
+
+        bform2 = BilinearForm((self.space_u, self.space_sigma))
+        bform2.add_integrator(HuZhangMixIntegrator())
+
+        A = BlockForm([[bform1,   bform2],
+                       [bform2.T, None]])
+        A = A.assembly()
+
+        lform1 = LinearForm(self.space_u)
+        lform1.add_integrator(VectorSourceIntegrator(source=self.pde.body_force))
+
+        b = lform1.assembly()
+
+        gdof_sigma = self.space_sigma.number_of_global_dofs()
+        F = bm.zeros(A.shape[0], dtype=A.dtype)
+        F[gdof_sigma:] = -b
+
+        return A, F, self.space_sigma, self.space_u
+    
+    def apply_bc(self, A, F):
+        pass
+
+    @variantmethod("direct")
+    def solve(self):
+        A, F, space_sigma, space_u = self.linear_system(self.mesh, self.p)
+        X = spsolve(A, F, solver='mumps')
+        
+        gdof_sigma = space_sigma.number_of_global_dofs()
+        sigma_h = space_sigma.function()
+        u_h = space_u.function()
+
+        sigma_h[:] = X[:gdof_sigma]
+        u_h[:] = X[gdof_sigma:]
+
+        return sigma_h, u_h
+    
+    @solve.register('fast')
+    def solve(self):
+        pass
+    
+    @variantmethod('onestep')
+    def run(self):
+        sigma_h, u_h = self.solve()
+        l2_u = self.mesh.error(u_h, self.pde.displacement)
+        l2_sigma = self.mesh.error(sigma_h, self.pde.stress)
+
+        self.logger.info(f"u L2 error (u): {l2_u}, L2 error (σ): {l2_sigma}")
+
+    @run.register('uniform_refine')
+    def run(self, maxit=4):
+        errorType = [
+                 '$|| \\boldsymbol{\\sigma} - \\boldsymbol{\\sigma}_h||_{L_2}$',
+                 '$|| \\boldsymbol{u} - \\boldsymbol{u}_h||_{L_2}$',
+                 ]
+        errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
+        h = bm.zeros(maxit, dtype=bm.float64)
+
+        for i in range(maxit):
+            N =  2**(i+1)
+            sigma_h, u_h = self.solve()
+            l2_u = self.mesh.error(u_h, self.pde.displacement)
+            l2_sigma = self.mesh.error(sigma_h, self.pde.stress)
+
+            h[i] = 1 / N
+            errorMatrix[0, i] = l2_sigma
+            errorMatrix[1, i] = l2_u 
+
+            if i < maxit - 1:
+                self.mesh.uniform_refine()
+    
+        show_error_table(h, errorType, errorMatrix)
+        showmultirate(plt, 2, h, errorMatrix,  errorType, propsize=20)
+        plt.show()
+
+    
+
+
