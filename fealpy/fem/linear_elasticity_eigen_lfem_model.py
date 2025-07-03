@@ -31,12 +31,23 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
+        GD = self.pde.geo_dimension()
+
         self.set_material_parameters(self.pde.lam, self.pde.mu, self.pde.rho)
-        self.set_init_mesh(options['init_mesh'])
+        mtype = options['mesh_type']
+        if 'uniform' in mtype:
+            if GD == 3:
+                self.set_init_mesh(mtype, nx=options['nx'], ny=options['ny'], nz=options['nz'])
+            elif GD == 2:
+                self.set_init_mesh(mtype, nx=options['nx'], ny=options['ny'])
+            else:
+                raise ValueError(f"Unsupported mesh type {mtype} for geo_dimension {GD}.")
+        else:
+            self.set_init_mesh(mtype)
         self.set_space_degree(options['space_degree'])
 
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly3d"):
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxdomain3d"):
         """
         """
         if isinstance(pde, str):
@@ -77,25 +88,33 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         """
         # Implementation of the linear system construction goes here
         GD = self.mesh.geo_dimension()
-        space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
+        self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
 
-        bform = BilinearForm(space)
+        bform = BilinearForm(self.space)
         integrator = LinearElasticityIntegrator(self.material)
         integrator.assembly.set('fast')
         bform.add_integrator(integrator)
         S = bform.assembly()
 
-        bform = BilinearForm(space)
+        bform = BilinearForm(self.space)
         integrator = MassIntegrator(self.material.density)
         bform.add_integrator(integrator)
         M = bform.assembly()
 
         return S, M
 
-    def apply_bc(self):
+    def apply_bc(self, S, M):
         """
         """
-        pass
+        from ..fem import DirichletBC
+        
+        bc = DirichletBC(
+                self.space,
+                gd=self.pde.displacement_bc,
+                threshold=self.pde.is_displacement_boundary)
+        S = bc.apply_matrix(S)
+        M = bc.apply_matrix(M)
+        return S, M
 
     def solve(self):
         """
