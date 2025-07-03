@@ -23,7 +23,7 @@ class BeamData2D:
     This class constructs a 1D mesh and provides the source term.
     """
 
-    def __init__(self, E=200e9, I=118.6e-6, A=10.3, f=-25000, L=10):
+    def __init__(self):
         """
         Initialize beam parameters.
 
@@ -35,12 +35,6 @@ class BeamData2D:
             L (float): Beam length.
             n (int): Number of mesh elements.
         """
-        self.E = E
-        self.I = I
-        self.A = A
-        self.f = f
-        self.L = L
-
         self.mesh = self.init_mesh()
 
     def geo_dimension(self) -> int:

@@ -2,8 +2,8 @@ from typing import List, Optional
 import inspect
 import logging
 
-from fealpy.logs import TqdmLoggingHandler
-from fealpy.decorator.variantmethod import Variantmethod
+from ...logs import TqdmLoggingHandler
+from ...decorator.variantmethod import Variantmethod
 
 
 __all__ = ['ComputationalModel', ]
@@ -19,7 +19,7 @@ class ComputationalModel:
         if pbar_log:
             self.logger.addHandler(TqdmLoggingHandler())
         else:
-            from fealpy.logs import handler
+            from ...logs import handler
             self.logger.addHandler(handler)
 
     @staticmethod

@@ -29,7 +29,6 @@ class MMesher:
         self.dim = 1
 
         self._check()
-            
     def _check(self):
         if isinstance(self.mesh, list) and len(self.mesh) == 1:
             self.mesh = self.mesh[0]
@@ -282,7 +281,6 @@ class MMesher:
         """
         if self.executor:
             self.executor.shutdown()
-        
 
     def show_mesh(self,ax,scat_node = True , scat_index = slice(None)):
         instance = self.instance
@@ -304,4 +302,4 @@ class MMesher:
         else:
             linear_surfploter(ax,mesh,uh,
                               scat_node = scat_node, scat_index = index)
-        # ax.clear()
+        ax.clear()

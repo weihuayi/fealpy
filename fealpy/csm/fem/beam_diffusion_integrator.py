@@ -8,35 +8,36 @@ from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
 from typing import Optional, Literal
 from fealpy.typing import TensorLike, Index, _S
 from fealpy.functionspace.space import FunctionSpace as _FS
+from fealpy.decorator import variantmethod
 class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     """
     Short Description
     BeamDiffusionIntegrator assembles and manages the diffusion (stiffness) matrix for beam elements in a finite element space.
 
     Detailed Description
-    This class supports different types of beam elements ('pure', '2d', '3d') and precomputes relevant stiffness coefficients for efficient finite element analysis. It is designed for structural mechanics applications involving beam modeling and analysis.
+    This class supports different types of beam elements ('euler_bernoulli_2d', 'normal_2d', 'euler_bernoulli_3d') and precomputes relevant stiffness coefficients for efficient finite element analysis. It is designed for structural mechanics applications involving beam modeling and analysis.
 
     Parameters
     space : object
         The finite element space object defining element DOFs and interpolation functions.
     beam_type : str
-        Type of beam: 'pure' (pure bending), '2d' (2D beam), or '3d' (3D beam).
+        Type of beam: 'euler_bernoulli_2d' (pure bending), 'normal_2d' (2D beam), or 'euler_bernoulli_3d' (3D beam).
     E : float
         Young's modulus of the material.
     l : array_like
         Array of beam element lengths, shape (NC,).
     A : float, optional, default=None
-        Cross-sectional area (required for 2d/3d beams).
+        Cross-sectional area (required for normal_2d/euler_bernoulli_3d beams).
     I : float, optional, default=None
-        Moment of inertia (required for pure/2d beams).
+        Moment of inertia (required for euler_bernoulli_2d/normal_2d beams).
     Iy : float, optional, default=None
-        Moment of inertia about y-axis (required for 3d beams).
+        Moment of inertia about y-axis (required for euler_bernoulli_3d beams).
     Iz : float, optional, default=None
-        Moment of inertia about z-axis (required for 3d beams).
+        Moment of inertia about z-axis (required for euler_bernoulli_3d beams).
     G : float, optional, default=None
-        Shear modulus (required for 3d beams).
+        Shear modulus (required for euler_bernoulli_3d beams).
     J : float, optional, default=None
-        Torsional constant (required for 3d beams).
+        Torsional constant (required for euler_bernoulli_3d beams).
     method : str, optional, default='assembly'
         Assembly method, default is 'assembly'.
 
@@ -44,7 +45,7 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     space : object
         The finite element space object.
     type : str
-        Beam type: 'pure', '2d', or '3d'.
+        Beam type: 'euler_bernoulli_2d', 'normal_2d', or 'euler_bernoulli_3d'.
     E : float
         Young's modulus.
     l : array_like
@@ -54,15 +55,15 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     I : float or None
         Moment of inertia.
     EA : float or None
-        Axial stiffness (for 2d/3d beams).
+        Axial stiffness (for normal_2d/euler_bernoulli_3d beams).
     EI : float or None
-        Bending stiffness (for 2d beams).
+        Bending stiffness (for normal_2d beams).
     EIy : float or None
-        Bending stiffness about y-axis (for 3d beams).
+        Bending stiffness about y-axis (for euler_bernoulli_3d beams).
     EIz : float or None
-        Bending stiffness about z-axis (for 3d/pure beams).
+        Bending stiffness about z-axis (for euler_bernoulli_3d/euler_bernoulli_2d beams).
     GJ : float or None
-        Torsional stiffness (for 3d beams).
+        Torsional stiffness (for euler_bernoulli_3d beams).
 
     Methods
     to_global_dof(space)
@@ -74,7 +75,7 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     Required parameters depend on the beam type. The class automatically checks and computes necessary stiffness coefficients during initialization.
 
     Examples
-    >>> integrator = BeamDiffusionIntegrator(space, '2d', E=210e9, l=[1.0, 1.0], A=0.01, I=1e-6)
+    >>> integrator = BeamDiffusionIntegrator(space, 'normal_2d', E=210e9, l=[1.0, 1.0], A=0.01, I=1e-6)
     >>> print(integrator.EA)
     >>> print(integrator.EI)
     """
@@ -85,14 +86,14 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         """
         Parameters:
             space: FE space
-            beam_type: 'pure', '2d', or '3d'
+            beam_type: 'euler_bernoulli_2d', 'normal_2d', or 'euler_bernoulli_3d'
             E: Young's modulus
             l: element length array (NC,)
-            A: cross-sectional area (used for 2d/3d)
-            I: moment of inertia (used for pure/2d)
-            Iy, Iz: moments of inertia (used for 3d)
-            G: shear modulus (used for 3d)
-            J: torsional constant (used for 3d)
+            A: cross-sectional area (used for normal_2d/euler_bernoulli_3d)
+            I: moment of inertia (used for euler_bernoulli_2d/normal_2d)
+            Iy, Iz: moments of inertia (used for euler_bernoulli_3d)
+            G: shear modulus (used for euler_bernoulli_3d)
+            J: torsional constant (used for euler_bernoulli_3d)
         """
         self.space = space
         self.type = beam_type.lower()
@@ -102,14 +103,14 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
-        if self.type == 'pure':
+        if self.type == 'euler_bernoulli_2d':
             assert I is not None
             self.EIz = E * I
-        elif self.type == '2d':
+        elif self.type == 'normal_2d':
             assert A is not None and I is not None
             self.EA = E * A
             self.EI = E * I
-        elif self.type == '3d':
+        elif self.type == 'euler_bernoulli_3d':
             assert all(v is not None for v in [A, Iy, Iz, G, J])
             self.EA = E * A
             self.EIy = E * Iy
@@ -122,15 +123,8 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()
 
+    @variantmethod("euler_bernoulli_2d")
     def assembly(self, space: _TS) -> TensorLike:
-        if self.type == 'pure':
-            return self._pure_bending_beam()
-        elif self.type == '2d':
-            return self._beam_2d()
-        elif self.type == '3d':
-            return self._beam_3d()
-
-    def _pure_bending_beam(self):
         """
         Construct the stiffness matrix for pure bending beam elements.
         This function computes the (4, 4) pure bending stiffness matrix for each element
@@ -184,8 +178,8 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
 
         return Ke
 
-
-    def _beam_2d(self):
+    @assembly.register("normal_2d")
+    def assembly(self, space: _TS) -> TensorLike:
         """
         Construct the stiffness matrix for 2D beam elements.
         This function computes the (6, 6) stiffness matrix for each element
@@ -213,7 +207,7 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         EI_l2 = self.EI / l**2
         EI_l = self.EI / l
 
-        base = bm.array([
+        Ke = bm.array([
             [ EA_l,    0,        0,       -EA_l,   0,        0],
             [ 0,     12*EI_l3, 6*EI_l2,   0,    -12*EI_l3, 6*EI_l2],
             [ 0,     6*EI_l2,  4*EI_l,    0,     -6*EI_l2, 2*EI_l],
@@ -221,9 +215,10 @@ class BeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
             [ 0,    -12*EI_l3,-6*EI_l2,   0,     12*EI_l3,-6*EI_l2],
             [ 0,     6*EI_l2,  2*EI_l,    0,     -6*EI_l2, 4*EI_l],
         ])
-        return base
-
-    def _beam_3d(self):
+        return Ke
+    
+    @assembly.register("euler_bernoulli_3d")
+    def assembly(self, space: _TS) -> TensorLike:
         """
         Construct the stiffness matrix for 3D beam elements.
         This function computes the (12, 12) stiffness matrix for each element
