@@ -25,7 +25,6 @@ class BoxDomainMesher2d:
     @init_mesh.register('uniform_tri')
     def init_mesh(self, nx=10, ny=10):
         mesh = TriangleMesh.from_box(box=self.box, nx=nx, ny=ny)
-        print('dsasdadadsa')
         return mesh
 
 
