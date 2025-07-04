@@ -25,6 +25,7 @@ class AllenCahnLFEMModel(ComputationalModel):
     def __init__(self,options: Optional[dict] = None):
         super().__init__(pbar_log=options['pbar_log'], 
                          log_level=options['log_level'])
+        self.options = options
         self.assemble_method = None
         self.is_Lag_muliplier = False
         self.pdm = PDEDataManager("allen_cahn")
@@ -313,6 +314,12 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.logger.info("Bilinear form moving_mesh set with diffusion and mass terms.")
         
         self.assembly.set('moving_mesh')
+        if self.options['mm_param'] is None: 
+            self.set_move_mesher()
+        else:
+            valid_keys = {'mmesher', 'beta', 'tau', 'tmax', 'alpha', 'moltimes', 'monitor', 'mol_meth'}
+            filtered_params = {k: v for k, v in self.options['mm_param'].items() if k in valid_keys}
+            self.set_move_mesher(**filtered_params)
         self.logger.info("Assembly method set to moving_mesh.")
         
     def set_linear_form(self):
@@ -648,6 +655,11 @@ class AllenCahnLFEMModel(ComputationalModel):
         Returns:
             error (float): The estimated error.
         """
+        if not hasattr(self.pde, 'solution'):
+            self.logger.warning("pde.solution is not defined. Disabling error estimation.")
+            error_estimate_enabled = False
+            return 0.0
+        
         pde = self.pde
         error = self.mesh.error(self.phi,
                                 lambda p: pde.solution(p, t=self.t),)

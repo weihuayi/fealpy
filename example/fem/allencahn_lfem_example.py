@@ -13,12 +13,12 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='circle_interface', type=str,
-                    help='Name of the PDE model, default is circle_interface')
+                    default='sincoscos', type=str,
+                    help='Name of the PDE model, default is sincoscos')
 
 parser.add_argument('--init_mesh',
-                    default='moving_quad', type=str,
-                    help='Type of mesh, default is tri, options are moving_tri, moving_quad')
+                    default='tri', type=str,
+                    help='Type of mesh, default is tri, options are tri, quad, moving_tri, moving_quad')
 
 parser.add_argument('--space_degree',
                     default=1, type=int,
@@ -41,12 +41,12 @@ parser.add_argument('--quadrature',
                     help='index of quadrature formula, default is 4')
 
 parser.add_argument('--time_step',
-                    default = 0.1 , type=float,
+                    default = 0.0001 , type=float,
                     help='Time step size, default is 0.001')
 
 parser.add_argument('--time_strategy',
-                    default='moving_mesh', type=str,
-                    help='Time step strategy, default is moving_mesh, without other options')
+                    default='backward', type=str,
+                    help='Time step strategy, default is backward, options are backward, forward, moving_mesh')
 
 parser.add_argument('--up',
                     default=2, type=int,
@@ -60,20 +60,16 @@ parser.add_argument('--is_volume_conservation',
                     default=True, type=bool,
                     help='Whether to use Lagrange multiplier, default is True')
 
+parser.add_argument('--mm_param',
+                    default=None, type=dict,
+                    help='Parameters for moving mesh, default is None')
+
 options = vars(parser.parse_args())
-options["is_volume_conservation"] = True
 
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
 from fealpy.fem import AllenCahnLFEMModel
 model = AllenCahnLFEMModel(options)
-model.set_move_mesher(mmesher="GFMMPDE",
-                      beta = 0.5,
-                      tau=0.5,
-                      tmax = 0.5,
-                      alpha = 0.5,
-                      moltimes= 5,
-                      monitor= "arc_length",
-                      mol_meth= "projector",)
-model.run(save_vtu_enabled=True, error_estimate_enabled=False)
+
+model.run(save_vtu_enabled=True, error_estimate_enabled=True)
