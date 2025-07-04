@@ -23,18 +23,27 @@ class SphereDomainMesher:
         return mesh
     
 
-class SphereDamainMesher3D:
+class SphereDomainMesher3D:
     """Sphere domain mesh generator"""
-    def __init__(self, mtype,surface=None):
+    def __init__(self, surface=None):
         if surface is None:
-            self.surface = None
-        else:
             self.surface = SphereSurface()
-
+        else:
+            self.surface = surface
+        
     def geo_dimension(self) -> int:
         return 3
 
     @variantmethod('ltri')
-    def init_mesh(self): 
-        mesh = LagrangeTriangleMesh.from_triangle_mesh()
+    def init_mesh(self, p:int=1):
+        """Create a LagrangeTriangleMesh from a triangle mesh."""
+        lmesh = TriangleMesh.from_unit_sphere_surface()
+        mesh = LagrangeTriangleMesh.from_triangle_mesh(lmesh, p=p, surface=self.surface)
+        return mesh
+    
+    @variantmethod('lquad')
+    def init_mesh(self, p:int=1):
+        """Create a LagrangeQuadrangleMesh from a quadrangle mesh."""
+        lmesh = QuadrangleMesh.from_unit_sphere_surface()
+        mesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(lmesh, p=p, surface=self.surface)
         return mesh
