@@ -46,6 +46,7 @@ class PDEDataManager:
         "nonlinear": "fealpy.model.nonlinear",
         "linear_elasticity": "fealpy.model.linear_elasticity",
         "helmholtz": "fealpy.model.helmholtz"
+        "allen_cahn": "fealpy.model.allen_cahn",
     }
 
     def __init__(self, pde_type: str = None):
