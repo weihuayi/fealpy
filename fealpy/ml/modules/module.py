@@ -2,7 +2,8 @@ from typing import (
     Callable, Sequence, Union
 )
 
-import numpy as np
+from ...backend import backend_manager as bm
+from ...typing import TensorLike
 from numpy.typing import NDArray
 import torch
 from torch import Tensor, device, float64
@@ -106,12 +107,12 @@ class TensorMapping(Module):
 
         @note: This is a method with coordtype 'cartesian'.
         """
-        pt = torch.from_numpy(ps)
+        # pt = torch.from_numpy(ps)
         if device is None:
             device = self.get_device()
         if last_dim:
-            return self.last_dim(pt.to(device=device))
-        return self(pt.to(device=device))
+            return self.last_dim(ps.to(device=device))
+        return self(ps.to(device=device))
 
     from_numpy.__dict__['coordtype'] = 'cartesian'
 
@@ -174,27 +175,30 @@ class TensorMapping(Module):
 
         if coordtype in {'cartesian', 'c'}:
 
-            ps = mesh.bc_to_point(bcs).numpy()
-            val = self.from_numpy(ps, device=device, last_dim=True).cpu().detach().numpy()
+            ps = mesh.bc_to_point(bcs) # .numpy()
+            val = self.from_numpy(ps, device=device, last_dim=True).cpu()# .detach().numpy()
+            
             if squeeze:
                 val = val.squeeze(-1)
-            diff = np.abs(val - other(ps))**power
+            val_ture = other(ps)[...,None]
+            diff = bm.abs(val - val_ture)**power
 
         elif coordtype in {'barycentric', 'b'}:
 
             val = self.from_cell_bc(bcs, mesh, device=device).cpu().detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
-            diff = np.abs(val - other(bcs))**power
+            diff = bm.abs(val - other(bcs))**power
 
         else:
             raise ValueError(f"Invalid coordtype '{coordtype}'.")
 
 
-        e = np.einsum('q, cq..., c -> c...', ws, diff, cellmeasure)
+        e = bm.einsum('q, cq..., c -> c...', ws, diff, cellmeasure)
         if cell_type:
-            return np.power(e, 1/power, out=e)
-        return np.power(e.sum(axis=0), 1/power)
+            return bm.pow(e, 1/power, out=e)
+        
+        return bm.pow(e.sum(axis=0), 1/power)
 
     def estimate_error_tensor(self, other: TensorFunction, mesh, *, power: int=2,
                               q: int=3, cell_type: bool=False, dtype=float64):

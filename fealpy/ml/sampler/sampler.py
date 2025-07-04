@@ -174,6 +174,8 @@ class BoxBoundarySampler(Sampler):
     defined by two diagonal points, supporting both random and uniform sampling modes.
 
     Parameters:
+        *args: Either a single sequence of domain (e.g., [x_min, x_max, y_min, y_max, ...])
+               or two separate sequences representing diagonal points (p1=[x_min, y_min, ...], p2=[x_max, y_max, ...])
         p1: Sequence of floats representing the first diagonal point coordinates.
         p2: Sequence of floats representing the opposite diagonal point coordinates.
         mode: Sampling mode ('random' or 'linspace'). Defaults to 'random'.
@@ -181,20 +183,34 @@ class BoxBoundarySampler(Sampler):
         device: Device to store the samples. Defaults to None.
         requires_grad: Whether the samples require gradient computation. Defaults to False.
     
-    Example:
+    Example 1:
         >>> domain = (-1, 1, -1, 1, -1, 1)
         >>> p1, p2 = (-1, -1, -1) , (1, 1, 1)
-        >>> bc_sampler = BoxBoundarySampler(p1=p1, p2=p2, mode='random', 
+        >>> bc_sampler = BoxBoundarySampler(p1, p2, mode='random', 
+                                dtype=bm.float64, device=None, 
+                                requires_grad=True) 
+        >>> bc_point = bc_sampler.run(2, 2, 2, bd_type=False)
+    Example 2:
+        >>> domain = (-1, 1, -1, 1, -1, 1)
+        >>> bc_sampler = BoxBoundarySampler(domain, mode='random', 
                                 dtype=bm.float64, device=None, 
                                 requires_grad=True) 
         >>> bc_point = bc_sampler.run(2, 2, 2, bd_type=False)
     """
-    def __init__(self, p1: Sequence[float], p2: Sequence[float], mode: SampleMode='random',
+    def __init__(self, *args: Sequence[float], mode: SampleMode='random',
                  dtype=float64, device: device=None,
                  requires_grad: bool=False, **kwargs) -> None:
     
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
+        
+        if len(args) == 1:
+            p1 = args[0][0::2] 
+            p2 = args[0][1::2] 
+        elif len(args) == 2:
+            p1, p2 = args
+        else:
+            raise ValueError( f"Expected 1 argument (domain) or 2 arguments (p1, p2) for *args, but got {len(args)}")
         t1 = _as_tensor(p1, dtype=dtype, device=device)
         t2 = _as_tensor(p2, dtype=dtype, device=device)
         if len(t1.shape) != 1:
@@ -203,11 +219,6 @@ class BoxBoundarySampler(Sampler):
             raise ValueError("p1 and p2 should be in a same shape.")
         self.nd = int(t1.shape[0])
         self.mode = mode
-
-        # NOTE: the data is like
-        # [[x_min, x_max]
-        #  [y_min, y_max]
-        #  [z_min, z_max]]
         data = torch.vstack([t1, t2]).T
 
         self.subs: List[ISampler] = []
