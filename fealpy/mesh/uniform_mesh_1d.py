@@ -464,7 +464,7 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
             >>> numerical_sol = bm.array([0.0, 0.04, 0.09, ..., 0.81])
             >>> emax, eL2, eH1 = error(exact_sol, numerical_sol)
         """
-        h = self.h
+        h = self.h[0]
         node = self.node
         uI = u(node).flatten()
         e = uI - uh
