@@ -1,9 +1,10 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher2d
+from ...decorator import cartesian
 
-class EvanescentWaveData2D:
+class EvanescentWaveData2D(BoxDomainMesher2d):
     """
     2D Helmholtz problem with complex Robin (impedance-type) boundary condition:
 
@@ -20,9 +21,12 @@ class EvanescentWaveData2D:
     Parameters:
         k : wave number (float)
         beta : dimensionless propagation parameter (β > 1)
+
+    Source: 
+        https://www.sciencedirect.com/science/article/pii/S0045794917302602#e0010
     """
 
-    def __init__(self, k: float, beta: float):
+    def set(self, k: float=1.0, beta: float=1.001):
         self.k = k
         self.beta = beta
         self.gamma = bm.sqrt(beta**2 - 1.0)  # decay rate in x
@@ -32,16 +36,6 @@ class EvanescentWaveData2D:
 
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0, 0.0, 1.0]
-
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import TriangleMesh
-        return TriangleMesh.from_box(self.domain(), nx=nx, ny=ny)
-
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import QuadrangleMesh
-        return QuadrangleMesh.from_box(self.domain(), nx=nx, ny=ny)
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

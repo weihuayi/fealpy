@@ -49,7 +49,7 @@ DATA_TABLE = {
     "bessel2d": ("bessel_radiating_data_2d", "BesselRadiatingData2D"),
     "evanescent2d": ("evanescent_wave_data_2d", "EvanescentWaveData2D"),
     "oblique2d":("planeWave_oblique_incidence_data_2d", "PlaneWaveObliqueIncidenceData2D"),
-    "sinsin2d": ("sin_sin_data_2d", "SinsinData2D"),
-    "sinsin3d": ("sin_sin_data_3d", "SinsinData3D")
+    "sinsin2d": ("sin_sin_data_2d", "SinSinData2D"),
+    "sinsin3d": ("sin_sin_data_3d", "SinSinData3D")
 }
 

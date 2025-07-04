@@ -1,9 +1,10 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher3d
+from ...decorator import cartesian
 
-class SinSinData3D():
+class SinSinData3D(BoxDomainMesher3d):
     """
     3D Helmholtz problem with homogeneous Dirichlet boundary condition:
     
@@ -20,9 +21,12 @@ class SinSinData3D():
 
     Parameter:
         k : wave number (scalar)
+
+    Source:
+        https://link.springer.com/book/10.1007/b98828
     """
 
-    def __init__(self, k: float):
+    def set(self, k: float=1.0):
         self.k = k
 
     def geo_dimension(self) -> int:
@@ -33,20 +37,6 @@ class SinSinData3D():
         """Return the computational domain [xmin, xmax, ymin, ymax, zmin, zmax]."""
         return [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
     
-    @variantmethod('tet')
-    def init_mesh(self, nx=10, ny=10, nz=10):
-        from ...mesh import TetrahedronMesh
-        d = self.domain()
-        mesh = TetrahedronMesh.from_box(d, nx=nx, ny=ny, nz=nz)
-        return mesh
-
-    @init_mesh.register('hex')
-    def init_mesh(self, nx=10, ny=10, nz=10):
-        from ...mesh import HexahedronMesh
-        d = self.domain()
-        mesh = HexahedronMesh.from_box(d, nx=nx, ny=ny, nz=nz)
-        return mesh
-
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution u(x, y, z) = sin(kx)·sin(ky)·sin(kz)"""

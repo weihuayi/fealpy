@@ -1,7 +1,8 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher2d
+from ...decorator import cartesian
 
 def bessel_function(v: int, x: TensorLike) -> TensorLike:
     if bm.backend_name == 'pytorch':
@@ -22,7 +23,7 @@ def bessel_function(v: int, x: TensorLike) -> TensorLike:
             raise NotImplementedError("Just supports Bessel functions of order 0 and 1.")
 
 
-class BesselRadiatingData2D():
+class BesselRadiatingData2D(BoxDomainMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary conditions:
     
@@ -39,9 +40,11 @@ class BesselRadiatingData2D():
     Robin boundary term:
         g(x, y) = ∂u/∂n + i·k·u
 
+    Source:
+        https://cz5waila03cyo0tux1owpyofgoryroob.aminer.cn/A5/1A/1D/A51A1DBD4CE1D183344F2A280C430074.pdf
     """
 
-    def __init__(self, k=1.0):
+    def set(self, k=1.0):
         self.k = bm.tensor(k, dtype=bm.float64)
         c1 = bm.cos(self.k) + bm.sin(self.k) * 1j
         c2 = bessel_function(0, self.k) + 1j * bessel_function(1, self.k)
@@ -54,18 +57,6 @@ class BesselRadiatingData2D():
     def domain(self) -> Sequence[float]:
         """Return the bounding box [xmin, xmax, ymin, ymax]."""
         return [0, 1, 0, 1]
-
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        """Initialize triangular mesh."""
-        from ...mesh import TriangleMesh
-        return TriangleMesh.from_box(self.domain(), nx=nx, ny=ny)
-
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        """Initialize quadrilateral mesh."""
-        from ...mesh import QuadrangleMesh
-        return QuadrangleMesh.from_box(self.domain(), nx=nx, ny=ny)
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
