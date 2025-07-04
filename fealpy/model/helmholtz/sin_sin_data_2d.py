@@ -1,9 +1,10 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher2d
+from ...decorator import cartesian
 
-class SinSinData2D():
+class SinSinData2D(BoxDomainMesher2d):
     """
     2D Helmholtz problem with homogeneous Dirichlet boundary condition:
     
@@ -20,9 +21,12 @@ class SinSinData2D():
 
     Parameter:
         k : wave number (scalar)
+    
+    Source:
+        https://deepxde.readthedocs.io/en/latest/demos/pinn_forward/helmholtz.2d.dirichlet.html
     """
 
-    def __init__(self, k: float):
+    def set(self, k: float = 1.0):
         self.k = k
 
     def geo_dimension(self) -> int:
@@ -33,20 +37,6 @@ class SinSinData2D():
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [0.0, 1.0, 0.0, 1.0]
     
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import TriangleMesh
-        d = self.domain()
-        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh 
-     
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import QuadrangleMesh
-        d = self.domain()
-        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution u(x, y) = sin(kx)·sin(ky)"""
