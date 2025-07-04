@@ -49,6 +49,7 @@ dist
 *.vtu
 *.txt
 *.json
+*.mphtxt
 
 *.cpython-38.pyc
 .vscode
