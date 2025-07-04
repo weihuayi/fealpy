@@ -17,8 +17,10 @@ parser.add_argument('--pde',
 
 parser.add_argument('--init_mesh',
     default='tri', type=str,
-    help='Type of mesh, default is tri'
-)
+    help='Type of mesh, default is tri')
+
+parser.add_argument('--mesh_size',
+    default=10, type=int)
 
 parser.add_argument('--space_degree',
     default=5, type=int,
@@ -35,8 +37,6 @@ parser.add_argument('--pbar_log',
 parser.add_argument('--log_level',
     default='INFO', type=str,
     help='Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
-import ipdb
-ipdb.set_trace()
 options = vars(parser.parse_args())
 
 from fealpy.backend import bm
@@ -45,4 +45,4 @@ bm.set_backend(options['backend'])
 from fealpy.fem.polyharmonic_sfem_model import PolyharmonicCrFEMModel
 model = PolyharmonicCrFEMModel(options)
 model.solve()
-
+model.error()

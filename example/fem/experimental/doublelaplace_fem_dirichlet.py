@@ -76,14 +76,12 @@ y = sp.symbols('y')
 #u = (sp.sin(6*y)*sp.sin(6*x))**4
 #u = (sp.sin(5*sp.pi*y)*sp.sin(5*sp.pi*x))**2
 #pde = DoubleLaplacePDE(u, device=device) 
-pde = PDEDataManager("polyharmonic").get_example('lshape')
+pde = PDEDataManager("polyharmonic").get_example('sinsinbi')
 
 #ulist = get_flist(u, device=device)[:3]
 ulist = pde.get_flist()
 #mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
-import ipdb
-ipdb.set_trace()
-mesh = pde.init_mesh(nx=10,ny=10)
+mesh = pde.init_mesh(nx=2,ny=2)
 import matplotlib.pyplot as plt
 fig, axes = plt.subplots()
 mesh.add_plot(axes, showindex=True)
@@ -146,6 +144,7 @@ for i in range(maxit):
     #A = csr_matrix((A.values(), A.indices()),A.shape)
     #uh[:] = bm.tensor(spsolve(A, F))
     uh[:] = spsolve(A, F, "scipy")
+    print(uh[:])
     #uhh = bm.copy(uh)
     #uI = space.interpolation(ulist)
     #uII = bm.copy(uI)

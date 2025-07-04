@@ -1,6 +1,6 @@
 from typing import Optional, Union
 from ..backend import bm
-from ..model import PDEDataManager
+from ..model import PDEDataManager, ComputationalModel
 from ..model.polyharmonic import PolyharmonicPDEDataT
 from ..decorator import variantmethod
 
@@ -13,7 +13,7 @@ from ..fem import LinearForm, ScalarSourceIntegrator
 from ..fem import DirichletBC
 
 
-class PolyharmonicCrFEMModel:
+class PolyharmonicCrFEMModel(ComputationalModel):
     """
     Smooth Finite Element Method to solve the equation \(\Delta^{m+1} u = f\)
     on a 2D/3D domain, using \(C^m\)-conforming finite element spaces.
@@ -28,7 +28,10 @@ class PolyharmonicCrFEMModel:
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        self.set_init_mesh(options['init_mesh'])
+        import ipdb
+        ipdb.set_trace()
+        self.set_init_mesh(options['init_mesh'], nx=options['mesh_size'],
+                           ny=options['mesh_size'] )
         self.set_space_degree(options['space_degree'])
         self.set_smoothness(options['smoothness'])
 
@@ -40,9 +43,11 @@ class PolyharmonicCrFEMModel:
         else:
             self.pde = pde
 
-    def set_init_mesh(self, mesh: Union[Mesh, str] = "triangle_mesh", **kwargs):
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "tri", **kwargs):
         if isinstance(mesh, str):
-            self.mesh = self.pde.init_mesh
+            import ipdb
+            ipdb.set_trace()
+            self.mesh = self.pde.init_mesh(**kwargs)
         else:
             self.mesh = mesh
 
@@ -64,27 +69,29 @@ class PolyharmonicCrFEMModel:
     def set_smoothness(self, m: int):
         self.m = m
 
-     def linear_system(self):
+    def linear_system(self):
         """
         Construct the linear system for the eigenvalue problem.
 
         Returns:
             The stiffness matrix and mass matrix.
         """
-        # Implementation of the linear system construction goes here
+        from ..functionspace import CmConformingFESpace2d
+        from ..functionspace import CmConformingFESpace3d
+
         GD = self.mesh.geo_dimension()
         if self.mesh.TD == 2:
-            self.space = CmConformingFESpace2d(mesh, p, m)
+            self.space = CmConformingFESpace2d(self.mesh, self.p, self.m)
         if self.mesh.TD == 3:
-            self.space = CmConformingFESpace3d(mesh, p, m)
+            self.space = CmConformingFESpace3d(self.mesh, self.p, self.m)
         self.uh = self.space.function() # 建立一个有限元函数
 
         bform = BilinearForm(self.space)
-        integrator = MthLaplaceIntegrator(m=m+1, coef=1, q=p+4)
+        integrator = MthLaplaceIntegrator(m=self.m+1, coef=1, q=self.p+4)
         bform.add_integrator(integrator)
 
         lform = LinearForm(self.space)
-        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=p+4))
+        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p+4))
 
         A = bform.assembly()
         F = lform.assembly()
@@ -98,6 +105,7 @@ class PolyharmonicCrFEMModel:
         Returns:
             A, F: Modified matrix and vector after applying boundary conditions.
         """
+
         from ..fem import DirichletBC
         A, F = DirichletBC( self.space, gd=self.pde.get_flist()).apply(A, F)
         return A, F
@@ -108,9 +116,12 @@ class PolyharmonicCrFEMModel:
         """
         from ..solver import spsolve
         A, F = self.linear_system()
-        return spsolve(A, F, solver='scipy')
+        A, F = self.apply_bc(A, F)
 
-    def error(error):
+        self.uh[:] =  spsolve(A, F, solver='scipy')
+        self.logger.info(f"uh: {self.uh[:]}")
+
+    def error(self):
         """
         Compute L2, H1, and H2 errors of the numerical solution.
 
@@ -132,7 +143,8 @@ class PolyharmonicCrFEMModel:
         l2 = self.mesh.error(self.pde.solution, self.uh)
         h1 = self.mesh.error(self.pde.gradient, ugval)
         h2 = self.mesh.error(self.pde.hessian, ug2val)
-        return l2, h1, h2
+
+        self.logger.info(f"l2: {l2}, h1: {h1}, h2: {h2}")
 
 
 
