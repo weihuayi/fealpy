@@ -12,7 +12,7 @@ from ..fem.huzhang_mix_integrator import HuZhangMixIntegrator
 from ..model import PDEDataManager, ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 from ..decorator import variantmethod
-from ..solver import spsolve
+from ..solver import spsolve,LinearElasticityHZFEMFastSolve
 from ..tools.show import show_error_table, showmultirate
 
 class LinearElasticityHuzhangFEMModel(ComputationalModel):
@@ -70,7 +70,7 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
 
         self.space_sigma = HuZhangFESpace(mesh, p=p)
         self.space = LagrangeFESpace(mesh, p=p-1, ctype='D')
-        self.space_u = TensorFunctionSpace(scalar_space=self.space, shape=(GD, -1))
+        self.space_u = TensorFunctionSpace(scalar_space=self.space, shape=(-1,GD))
 
         bform1 = BilinearForm(self.space_sigma)
         bform1.add_integrator(HuZhangStressIntegrator(lambda0=lambda0, lambda1=lambda1))
@@ -83,6 +83,7 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
         A = A.assembly()
 
         lform1 = LinearForm(self.space_u)
+    
         lform1.add_integrator(VectorSourceIntegrator(source=self.pde.body_force))
 
         b = lform1.assembly()
@@ -99,8 +100,9 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
     @variantmethod("direct")
     def solve(self):
         A, F, space_sigma, space_u = self.linear_system(self.mesh, self.p)
-        X = spsolve(A, F, solver='mumps')
-        
+        X = spsolve(A, F, solver='scipy')
+        info = {}
+        info['residual'] = bm.linalg.norm(A @ X - F, ord=2)
         gdof_sigma = space_sigma.number_of_global_dofs()
         sigma_h = space_sigma.function()
         u_h = space_u.function()
@@ -108,15 +110,40 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
         sigma_h[:] = X[:gdof_sigma]
         u_h[:] = X[gdof_sigma:]
 
-        return sigma_h, u_h
+        return sigma_h, u_h, info
     
-    @solve.register('fast')
+    @solve.register('gmres')
     def solve(self):
-        pass
+        A, F, space_sigma, space_u = self.linear_system(self.mesh, self.p)
+        X,info = LinearElasticityHZFEMFastSolve(A, F, self.space, solver='gmres', rtol=1e-8, restart=20, maxit=None).solve()
+    
+        gdof_sigma = space_sigma.number_of_global_dofs()
+        sigma_h = space_sigma.function()
+        u_h = space_u.function()
+
+        sigma_h[:] = X[:gdof_sigma]
+        u_h[:] = X[gdof_sigma:]
+
+        return sigma_h, u_h,info
+    
+    @solve.register('minres')
+    def solve(self):
+        A, F, space_sigma, space_u = self.linear_system(self.mesh, self.p)
+        X,info = LinearElasticityHZFEMFastSolve(A, F, self.space, solver='minres', rtol=1e-8).solve()
+    
+        gdof_sigma = space_sigma.number_of_global_dofs()
+        sigma_h = space_sigma.function()
+        u_h = space_u.function()
+
+        sigma_h[:] = X[:gdof_sigma]
+        u_h[:] = X[gdof_sigma:]
+
+        return sigma_h, u_h,info
+        
     
     @variantmethod('onestep')
     def run(self):
-        sigma_h, u_h = self.solve()
+        sigma_h, u_h = self.solve['direct']()
         l2_u = self.mesh.error(u_h, self.pde.displacement)
         l2_sigma = self.mesh.error(sigma_h, self.pde.stress)
 
@@ -147,7 +174,53 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
         show_error_table(h, errorType, errorMatrix)
         showmultirate(plt, 2, h, errorMatrix,  errorType, propsize=20)
         plt.show()
-
+        
     
+    @run.register('performance')
+    def run(self, maxit=2):
+        
+        methods = ['direct', 'gmres', 'minres']
+        results = {m: {'time': [], 'res': [], 'iters': []} for m in methods}
+        hs = []
 
+        import time
+        for i in range(maxit):
+            h = 10*2**(i)
+            hs.append(h)
 
+            for m in methods:
+                start = time.perf_counter()
+                if m == 'direct':
+                    _, _, info = self.solve['direct']()
+                    elapsed = time.perf_counter() - start
+                    results[m]['time'].append(elapsed)
+                    results[m]['res'].append(info.get('residual', None))
+                    results[m]['iters'].append(None)
+                else:
+                    _, _, info = self.solve[m]()
+                    elapsed = time.perf_counter() - start
+                    results[m]['time'].append(elapsed)
+                    results[m]['res'].append(info.get('residual'))
+                    results[m]['iters'].append(info.get('niter'))
+            
+            if i < maxit - 1:
+                self.mesh.uniform_refine()
+
+        hdr = 'lvl |   h   ' \
+            + ''.join(f'| {m}_time ' for m in methods) \
+            + ''.join(f'| {m}_res  ' for m in methods) \
+            + ''.join(f'| {m}_iters ' for m in ['gmres','minres'])
+        print(hdr)
+        print('-'*len(hdr))
+
+        for i, h in enumerate(hs):
+            row = f'{i:3d} | {h:.3e} '
+            for m in methods:
+                row += f'| {results[m]["time"][i]:8.4f} '
+            for m in methods:
+                res = results[m]['res'][i]
+                row += f'| {res if res is not None else "   N/A":8} '
+            for m in ['gmres','minres']:
+                it = results[m]['iters'][i]
+                row += f'| {it if it is not None else "   N/A":6} '
+            print(row)

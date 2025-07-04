@@ -38,5 +38,5 @@ bm.set_backend(options['backend'])
 
 from fealpy.fem.linear_elasticity_huzhang_fem_model import LinearElasticityHuzhangFEMModel
 model = LinearElasticityHuzhangFEMModel(options)
-model.run['uniform_refine']()
+model.run['onestep']()
 
