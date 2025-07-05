@@ -28,6 +28,41 @@ class BlockForm(Form):
     @property
     def shape(self) -> Size:
         return self.sparse_shape
+    
+    def assembly_sparse_matrix(self, format='csr'):
+        a = bm.max(self.block_shape[...,0], axis=1)
+        row_offset = bm.cumsum(bm.max(self.block_shape[...,0],axis = 1), axis=0)
+        col_offset = bm.cumsum(bm.max(self.block_shape[...,1],axis = 0), axis=0)
+        row_offset = bm.concatenate((bm.array([0]),row_offset))
+        col_offset = bm.concatenate((bm.array([0]),col_offset))
+         
+        for j in range(self.ncols):
+            block = self.blocks[0][j]
+            if block is not None:
+                indices = bm.empty((2, 0), dtype=block.indices.dtype)
+                values = bm.empty((0,), dtype=block.values.dtype)
+                break
+        sparse_shape = self.shape
+        
+        for i in range(self.nrows):
+            for j in range(self.ncols):
+                block = self.blocks[i][j]
+                if block is None:
+                    continue
+                block = block.tocoo()
+                block_indices = block.indices + bm.array([[row_offset[i]], [col_offset[j]]])
+                block_values = block.values 
+                indices = bm.concatenate((indices, block_indices), axis=1)
+                values = bm.concatenate((values, block_values))
+        M = COOTensor(indices, values, sparse_shape) 
+        if format == 'csr':
+            self._M = M.coalesce().tocsr()
+        elif format == 'coo':
+            self._M = M.coalesce()
+        else:
+            raise ValueError(f"Unknown format {format}.")
+        logger.info(f"Block form matrix constructed, with shape {list(self._M.shape)}.")
+        return self._M
 
     def assembly(self, format='csr'):
         a = bm.max(self.block_shape[...,0], axis=1)

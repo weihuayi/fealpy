@@ -3,7 +3,7 @@ from typing import Union, Callable, Dict
 CoefType = Union[int, float, Callable]
 
 class IncompressibleNS(BaseEquation):
-    def __init__(self, pde, init_variables=True):
+    def __init__(self, pde, init_variables=False):
         super().__init__(pde)
         self._coefs = {
             'time_derivative': 1,  # 时间导数项系数
