@@ -8,7 +8,6 @@ from functools import partial
 
 __all__ = "variantmethod", "VariantMeta"
 
-Self = TypeVar('Self', bound='VariantMeta')
 _T = TypeVar("_T")
 _P = ParamSpec("_P")
 _R_co = TypeVar("_R_co", covariant=True)
@@ -49,7 +48,7 @@ class Variantmethod(Generic[_T, _P, _R_co]):
 
     def __set__(self, obj: _T, val: Any):
         raise RuntimeError("Variantmethod has no setter.")
-    
+
     def __len__(self) -> int:
         return len(self.virtual_table)
 
@@ -58,6 +57,9 @@ class Variantmethod(Generic[_T, _P, _R_co]):
             return self.virtual_table[key]
         else:
             return self.__func__
+
+    def __contains__(self, item: Any) -> bool:
+        return item in self.virtual_table
 
     def register(self, key: Any, /):
         def decorator(func: Callable) -> Variantmethod[_T, _P, _R_co]:
@@ -96,6 +98,9 @@ class VariantHandler(Generic[_T, _P, _R_co]):
     def __getitem__(self, val: Any) -> Callable[_P, _R_co]:
         func = self.vm[val]
         return func.__get__(self.instance, self.owner)
+
+    def __contains__(self, item: Any) -> bool:
+        return item in self.vm.virtual_table
 
     def set(self, val: Any):
         self.vm.set_key(self.instance, val)

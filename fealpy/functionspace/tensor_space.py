@@ -267,7 +267,7 @@ class TensorFunctionSpace(FunctionSpace):
         if  self.dof_priority:
             uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.T.reshape(-1))
         else:
-            uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.reshape(-1))
+            uh[:] = bm.set_at(uh[:], isTensorBDof, gd_tensor.reshape(-1)[isTensorBDof])
 
         return uh, isTensorBDof
 

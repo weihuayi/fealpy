@@ -2,8 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
+from ..box_domain_mesher import BoxDomainMesher2d
 
-class SinSinData2D:
+class SinSinData2D(BoxDomainMesher2d):
     """
     2D Elliptic equation with constant diagonal diffusion, advection, and reaction:
 

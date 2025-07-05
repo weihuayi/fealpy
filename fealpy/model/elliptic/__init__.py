@@ -55,8 +55,9 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "coscos": ("cos_cos_data_2d", "CosCosData2D"),
-    "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
+    "coscos2d": ("cos_cos_data_2d", "CosCosData2D"),
+    "sinsin2d": ("sin_sin_data_2d", "SinSinData2D"),
+    "poly2d": ("poly_data_2d", "PolyData2D"),
     "biharm2d": ("biharmonic_data_2d", "BiharmonicData2D"),
     "triharm2d": ("triharmonic_data_2d", "TriharmonicData2D"),
     "biharm3d": ("biharmonic_data_3d", "BiharmonicData3D"),
