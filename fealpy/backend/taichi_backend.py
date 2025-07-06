@@ -9,7 +9,6 @@ except ImportError:
                       'the Taichi backend in FEALPy. '
                       'See https://taichi-lang.cn/ for installation.')
 
-
 Field = ti.Field
 Dtype = ti._lib.core.DataType
 Device = ti._lib.core.Arch
@@ -138,7 +137,7 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
             return []
 
     @staticmethod
-    def arange(*args, dtype=ti.f32):
+    def arange(*args, dtype=ti.f64):
         if len(args) == 1:
             if args[0] is None:
                 raise ValueError("arange() requires stop to be specified.")
@@ -188,7 +187,7 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         return field
 
     @staticmethod
-    def eye(N, M=None, k=0, dtype=ti.f32):
+    def eye(N, M=None, k=0, dtype=ti.f64):
         if N is None and M is None:
             raise ValueError("Both N and M are None. At least one dimension must be specified for eye().")
         if N is None:
@@ -221,7 +220,7 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         return field
 
     @staticmethod
-    def zeros(shape, dtype=ti.f32):
+    def zeros(shape, dtype=ti.f64):
         if isinstance(shape, float):
             if not shape.is_integer():
                 raise TypeError(f"Shape must be an integer or tuple of integers, got float {shape}.")
@@ -291,7 +290,6 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         if len(shape) == 1:
             M = shape[0]
             out = ti.field(dtype=dtype, shape=(M, M))
-            
             @ti.kernel
             def fill_tril_1d():
                 for i, j in ti.ndrange(M, M):
@@ -299,22 +297,22 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
                         out[i, j] = field[j]
                     else:
                         out[i, j] = 0
-                        
             fill_tril_1d()
             return out
 
         elif len(shape) > 1:
             out = ti.field(dtype=dtype, shape=shape)
+            n_dim = len(shape)
             
             @ti.kernel
             def fill_tril_nd():
                 for I in ti.grouped(out):
-                    i, j = I[-2], I[-1]
+                    i = I[n_dim - 2]
+                    j = I[n_dim - 1]
                     if j - i <= k:
                         out[I] = field[I]
                     else:
                         out[I] = 0
-                        
             fill_tril_nd()
             return out
         else:
@@ -357,36 +355,469 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
     def acos(
         x: Union[int, float, bool, ti.Field]
     ) -> Union[float, ti.Field]:
+
+        if isinstance(x, (int, float, bool)):         
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+            
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in shape {shape}, not supported by Taichi.")
+            
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+            
+        out = ti.field(dtype=dtype, shape=shape)
+        error_flag = ti.field(dtype=ti.i32, shape=())
+
+        @ti.kernel
+        def fill_acos(
+            field: ti.template(), 
+            out: ti.template(), 
+            error_flag: ti.template()
+        ):
+            error_flag[None] = 0
+            for I in ti.grouped(field):
+                val = field[I]
+                if val < -1 or val > 1:
+                    error_flag[None] = 1
+                else:
+                    out[I] = ti.acos(val)
+
+        fill_acos(x, out, error_flag)
+            
+        if error_flag[None] == 1:
+            raise ValueError("Some elements are out of domain for acos (must be in [-1, 1])")
+            
+        return out[None] if len(shape) == 0 else out
+        
+    @staticmethod
+    def asin(
+        x: Union[int, float, bool, ti.Field]
+    ) -> Union[float, ti.Field]:
+
+        if isinstance(x, (int, float, bool)):         
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+            
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in shape {shape}, not supported by Taichi.")
+            
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+            
+        out = ti.field(dtype=dtype, shape=shape)
+        error_flag = ti.field(dtype=ti.i32, shape=())
+
+        @ti.kernel
+        def fill_asin(
+            field: ti.template(), 
+            out: ti.template(), 
+            error_flag: ti.template()
+        ):
+            error_flag[None] = 0
+            for I in ti.grouped(field):
+                val = field[I]
+                if val < -1 or val > 1:
+                    error_flag[None] = 1
+                else:
+                    out[I] = ti.asin(val)
+
+        fill_asin(x, out, error_flag)
+            
+        if error_flag[None] == 1:
+            raise ValueError("Some elements are out of domain for asin (must be in [-1, 1])")
+            
+        return out[None] if len(shape) == 0 else out
+        
+        
+    @staticmethod
+    def atan(
+        x: Union[int, float, bool, ti.Field]
+    ) -> Union[float, ti.Field]:
+
         if isinstance(x, (int, float, bool)):
-            if x < -1 or x > 1:
-                raise ValueError(f"Input value {x} is out of domain for acos (must be in [-1, 1])")
-            return float(ti.acos(x))
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+            
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in shape {shape}, not supported by Taichi.")
+            
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+            
+        out = ti.field(dtype=dtype, shape=shape)
+        error_flag = ti.field(dtype=ti.i32, shape=())
+
+        @ti.kernel
+        def fill_atan(
+            field: ti.template(), 
+            out: ti.template(), 
+        ):
+            error_flag[None] = 0
+            for I in ti.grouped(field):
+                val = field[I]
+                out[I] = ti.atan2(val,1)
+
+        fill_atan(x, out)
+               
+        return out[None] if len(shape) == 0 else out
+        
+    @staticmethod
+    def atan2(
+        y: Union[int, float, bool, ti.Field],
+        x: Union[int, float, bool, ti.Field]
+    ) -> Union[float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        if isinstance(y, (int, float, bool)):
+            b = ti.field(dtype=ti.f64, shape=())
+            b[None] = float(y)
+            y = b
+        shape = y.shape
+
+        if shape != x.shape:
+            raise ValueError("Input fields must have the same shape.")
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = y.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_atan2(y_field: ti.template(), x_field: ti.template(), out: ti.template()):
+            for I in ti.grouped(y_field):
+                out[I] = ti.atan2(y_field[I], x_field[I])
+
+        fill_atan2(y, x, out)
+        if len(shape) == 0:
+            return out[None]
+        return out
+        
+    @staticmethod
+    def ceil(x: Union[int, float, bool, ti.Field]) -> Union[int, float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_ceil(field: ti.template(), out: ti.template()):
+            for I in ti.grouped(field):
+                out[I] = ti.ceil(field[I])
+
+        fill_ceil(x, out)
+        if len(shape) == 0:
+            return out[None]
+        return out
+        
+    @staticmethod
+    def clip(
+        x: Union[int, float, bool, ti.Field],
+        a_min: Optional[Union[int, float, bool]] = None,
+        a_max: Optional[Union[int, float, bool]] = None
+    ) -> Union[int, float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            x = float(x)
+            if a_min is not None:
+                a_min = float(a_min)
+                x = max(a_min, x)
+            if a_max is not None:
+                a_max = float(a_max)
+                x = min(x, a_max)
+            return x
+
         if isinstance(x, ti.Field):
             shape = x.shape
             if any(s == 0 for s in shape):
                 raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
             dtype = x.dtype
             out = ti.field(dtype=dtype, shape=shape)
-            error_flag = ti.field(dtype=ti.i32, shape=())
 
             @ti.kernel
-            def fill_acos(field: ti.template, out: ti.template, error_flag: ti.template):
-                error_flag[None] = 0
+            def fill_clip(field: ti.template(), out: ti.template(), a_min: ti.f64, a_max: ti.f64, use_min: ti.i32, use_max: ti.i32):
                 for I in ti.grouped(field):
-                    if field[I] < -1 or field[I] > 1:
-                        error_flag[None] = 1
-                    else:
-                        out[I] = ti.acos(field[I])
+                    v = field[I]
+                    if use_min:
+                        v = max(a_min, v)
+                    if use_max:
+                        v = min(a_max, v)
+                    out[I] = v
 
-            fill_acos(x, out, error_flag)
-            if error_flag[None] == 1:
-                raise ValueError("Some elements are out of domain for acos (must be in [-1, 1])")
+            use_min = int(a_min is not None)
+            use_max = int(a_max is not None)
+
+            if dtype in (ti.f32, ti.f64):
+                a_min_val = float(a_min) if a_min is not None else 0.0
+                a_max_val = float(a_max) if a_max is not None else 0.0
+            elif dtype in (ti.i32, ti.i64, ti.u8, ti.u16, ti.u32, ti.u64):
+                a_min_val = int(a_min) if a_min is not None else 0
+                a_max_val = int(a_max) if a_max is not None else 0
+            else:
+                a_min_val = float(a_min) if a_min is not None else 0.0
+                a_max_val = float(a_max) if a_max is not None else 0.0
+
+            fill_clip(
+                x, out,
+                a_min_val,
+                a_max_val,
+                use_min, use_max
+            )
             if len(shape) == 0:
                 return out[None]
             return out
+
         raise TypeError(
-            f"Unsupported type for acos: {type(x)}. Expected int, float, bool, or ti.Field."
+            f"Unsupported type for clip: {type(x)}. Expected int, float, bool, or ti.Field."
         )
+        
+    @staticmethod
+    def cos(x: Union[int, float, bool, ti.Field]) -> Union[float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_cos(field: ti.template(), out: ti.template()):
+            for I in ti.grouped(field):
+                out[I] = ti.cos(field[I])
+
+        fill_cos(x, out)
+        if len(shape) == 0:
+            return out[None]
+        return out
+
+    @staticmethod
+    def cosh(x: Union[int, float, bool, ti.Field]) -> Union[float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_cosh(field: ti.template(), out: ti.template()):
+            for I in ti.grouped(field):
+                out[I] = (ti.exp(field[I]) + ti.exp(-field[I])) * 0.5
+
+        fill_cosh(x, out)
+        if len(shape) == 0:
+            return out[None]
+        return out
+        
+        
+    @staticmethod
+    def floor(x: Union[int, float, bool, ti.Field]) -> Union[int, float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_floor(field: ti.template(), out: ti.template()):
+            for I in ti.grouped(field):
+                out[I] = ti.floor(field[I])
+
+        fill_floor(x, out)
+        if len(shape) == 0:
+            return out[None]
+        return out
+        
+    @staticmethod
+    def floor_divide(
+        x: Union[int, float, bool, ti.Field],
+        y: Union[int, float, bool, ti.Field]
+    ) -> Union[int, float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        if isinstance(y, (int, float, bool)):
+            b = ti.field(dtype=ti.f64, shape=())
+            b[None] = float(y)
+            y = b
+        shape = x.shape
+        if shape != y.shape:
+            raise ValueError("Input fields must have the same shape.")
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+        has_zero = ti.field(ti.i32, shape=())
+
+        @ti.kernel
+        def fill_floor_divide(x_field: ti.template(), y_field: ti.template(), out: ti.template()):
+            for I in ti.grouped(y_field):
+                out[I] = ti.floor(x_field[I] / y_field[I])
+        
+        @ti.kernel
+        def check_zeros(y_field: ti.template()):
+            for I in ti.grouped(y_field):
+                if y_field[I] == 0:
+                    has_zero[None] = 1
+                    
+        has_zero[None] = 0
+        check_zeros(y) 
+        if has_zero[None] == 1:
+            raise ZeroDivisionError("Field contains zero values in divisor")     
+
+        else:
+            fill_floor_divide(x, y, out)
+            if len(shape) == 0:
+                return out[None]
+            return out
+        
+    @staticmethod
+    def sin(x: Union[int, float, bool, ti.Field]) -> Union[float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_sin(field: ti.template(), out: ti.template()):
+            for I in ti.grouped(field):
+                out[I] = ti.sin(field[I])
+
+        fill_sin(x, out)
+        if len(shape) == 0:
+            return out[None]
+        return out
+        
+    @staticmethod
+    def sinh(x: Union[int, float, bool, ti.Field]) -> Union[float, ti.Field]:
+        if isinstance(x, (int, float, bool)):
+            a = ti.field(dtype=ti.f64, shape=())
+            a[None] = float(x)
+            x = a
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.)")
+        dtype = x.dtype
+        if ti.types.is_integral(dtype):
+            dtype = ti.get_default_fp()
+        out = ti.field(dtype=dtype, shape=shape)
+
+        @ti.kernel
+        def fill_sinh(field: ti.template(), out: ti.template()):
+            for I in ti.grouped(field):
+                out[I] = (ti.exp(field[I]) - ti.exp(-field[I])) * 0.5
+
+        fill_sinh(x, out)
+        if len(shape) == 0:
+            return out[None]
+        return out
+        
+    @staticmethod
+    def trace(x: ti.Field) -> Union[float, int]:
+        if not isinstance(x, ti.Field):
+            raise TypeError(f"Unsupported type for trace: {type(x)}. Expected ti.Field.")
+        shape = x.shape
+        if len(shape) != 2:
+            raise ValueError("Input field must be 2D.")
+        if shape[0] != shape[1]:
+            raise ValueError("Input field must be square (same number of rows and columns).")
+        dtype = x.dtype
+        trace_value = ti.field(dtype=dtype, shape=())
+
+        @ti.kernel
+        def compute_trace(field: ti.template(), trace_value: ti.template()):
+            trace_value[None] = 0
+            for i in range(shape[0]):
+                trace_value[None] += field[i, i]
+
+        compute_trace(x, trace_value)
+        return trace_value[None]
+    
+    @staticmethod
+    def insert(x: ti.Field, values: Union[int, float, bool, ti.Vector], indices: Tuple[int, ...]) -> ti.Field:#TO DO
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input x must be a Taichi Field.")
+        if not isinstance(values, (int, float, bool, ti.Vector)):
+            raise TypeError("Values must be an int, float, bool, or ti.Vector.")
+        if not isinstance(indices, tuple) or not all(isinstance(i, int) for i in indices):
+            raise TypeError("Indices must be a tuple of integers.")
+
+        if len(indices) != len(x.shape):
+            raise ValueError(f"Indices length {len(indices)} does not match field shape {x.shape}.")
+
+        # 转为 Taichi 向量（如果是多维索引）
+        if len(indices) == 0:
+            @ti.kernel
+            def insert_value(field: ti.template(), value: ti.template()):
+                field[None] = value
+            insert_value(x, values)
+        else:
+            @ti.kernel
+            def insert_value(field: ti.template(), value: ti.template(), idx: ti.template()):
+                field[idx] = value
+            insert_value(x, values, indices)
+            
+    @staticmethod
+    def unique(x: ti.Field) -> ti.Field:
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input x must be a Taichi Field.")
+        shape = x.shape
+        if any(s == 0 for s in shape):
+            raise ValueError(f"Input field has zero in its shape {shape}, which is not supported by Taichi.")
+        dtype = x.dtype
+
+        arr = x.to_numpy().flatten()
+        unique_values = sorted(set(arr.tolist()))
+        n_unique = len(unique_values)
+        unique_field = ti.field(dtype=dtype, shape=(n_unique,))
+        for i, v in enumerate(unique_values):
+            unique_field[i] = v
+        return unique_field
+
 
     @staticmethod
     def ones(
@@ -545,4 +976,10 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         return z
 
 
-
+if __name__ == '__main__':
+    ti.init(arch=ti.cpu)
+    a=np.ndarray(dtype=np.float32, shape=(3,4))
+    for i in range(3):
+        for j in range(4):
+            a[i, j] = 1
+    print(np.insert(a, [1,2], 0, axis=0))
