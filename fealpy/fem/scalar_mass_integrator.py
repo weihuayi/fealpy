@@ -75,9 +75,8 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         """
         index = self.entity_selection(indices)
         mesh = getattr(space, 'mesh', None)
-
+        coef = self.coef
         rm = mesh.reference_cell_measure()
-        cm = mesh.entity_measure('cell', index=index)
 
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
@@ -86,5 +85,12 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         G = mesh.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G))
         phi = space.basis(bcs)
-        M = bm.einsum('q, cqi, cqj, cq -> cij', ws*rm, phi, phi, d) #(NC, ldof, ldof)
+        if coef is None:
+            M = bm.einsum(f'q, cqi, cqj,cq -> cij', ws*rm, phi, phi, d)
+        if isinstance(coef, (int, float)):
+            M = bm.einsum('q, cqi, cqj, cq -> cij', ws*rm, phi, phi, d) * coef
+        elif isinstance(coef, TensorLike):
+            M = bm.einsum('q, cqi, cqj, cq, cq -> cij', ws*rm, phi, phi, d, coef)
         return M
+
+

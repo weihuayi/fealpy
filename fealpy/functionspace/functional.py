@@ -119,6 +119,8 @@ def symmetry_span_array(arr, alpha):
     ret = bm.zeros_like(M) # TODO 可以优化
     count = 0
     while True:
+        #for i in idx:
+        #    ret += bm.transpose(M, 0, i+1) 
         ret += bm.transpose(M, (0, ) + tuple([i+1 for i in idx]))
         count += 1
         sss = custom_next_permutation(idx, lambda x, y : idx1[x]-idx1[y])
