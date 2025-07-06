@@ -107,12 +107,12 @@ class TensorMapping(Module):
 
         @note: This is a method with coordtype 'cartesian'.
         """
-        # pt = torch.from_numpy(ps)
+        pt = torch.from_numpy(ps)
         if device is None:
             device = self.get_device()
         if last_dim:
-            return self.last_dim(ps.to(device=device))
-        return self(ps.to(device=device))
+            return self.last_dim(pt.to(device=device))
+        return self(pt.to(device=device))
 
     from_numpy.__dict__['coordtype'] = 'cartesian'
 
@@ -175,12 +175,24 @@ class TensorMapping(Module):
 
         if coordtype in {'cartesian', 'c'}:
 
-            ps = mesh.bc_to_point(bcs) # .numpy()
-            val = self.from_numpy(ps, device=device, last_dim=True).cpu()# .detach().numpy()
-            
+            ps = mesh.bc_to_point(bcs)
+            val = self.from_numpy(ps.numpy(), device=device, last_dim=True).cpu()
+    
             if squeeze:
                 val = val.squeeze(-1)
-            val_ture = other(ps)[...,None]
+            val_ture = other(ps)
+            val = val.detach() if val.requires_grad else val
+
+            # 统一形状
+            ndim = len(val_ture.shape)
+            if ndim == 2:  # 如果 val_ture 是 (N, M)
+                val_ture = val_ture.unsqueeze(-1)  # -> (N, M, 1)
+            elif ndim == 4:  # 如果 val_ture 是 (N, M, 1, 1)
+                val_ture = val_ture.squeeze()  # -> (N, M, 1)
+    
+            # 检查最终形状是否匹配
+            assert val.shape == val_ture.shape, f"Shape mismatch: val {val.shape}, val_ture {val_ture.shape}"
+
             diff = bm.abs(val - val_ture)**power
 
         elif coordtype in {'barycentric', 'b'}:
@@ -193,7 +205,8 @@ class TensorMapping(Module):
         else:
             raise ValueError(f"Invalid coordtype '{coordtype}'.")
 
-
+        # if mesh.GD == 1:
+        #     diff = diff.transpose(0, 1)
         e = bm.einsum('q, cq..., c -> c...', ws, diff, cellmeasure)
         if cell_type:
             return bm.pow(e, 1/power, out=e)
@@ -233,6 +246,19 @@ class TensorMapping(Module):
         if cell_type:
             return torch.pow(e, 1/power, out=e)
         return torch.pow(e.sum(dim=0), 1/power)
+    
+    def estimate_error_func(self, other: TensorFunction, mesh):
+        """
+        @brief Estimate error between the function and another tensor function.
+
+        @param other: TensorFunction. The target to compare with.
+        @param mesh: Mesh. The mesh to estimate error.
+
+        """
+        device = self.get_device()
+        node = mesh.entity('node')
+        diff = torch.max(torch.abs(self(node) - other(node)))
+        return diff
 
     ### plotting
 

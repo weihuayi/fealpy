@@ -150,6 +150,8 @@ class ISampler(Sampler):
             ) # (GD, m, 2)
             ret = torch.einsum('db, dmb -> md', self.nodes, ruler)
         elif self.mode == 'linspace':
+            if len(m) == 1:
+                m *= self.nd
             assert len(m) == self.nd, "Length of `m` must match the dimension."
             ps = [torch.einsum(
                 'b, mb -> m',
@@ -247,7 +249,9 @@ class BoxBoundarySampler(Sampler):
             Returns:
                 Tensor: The generated samples, either concatenated or separated by boundary.
         """
-        assert len(mb) * 2 == len(self.subs)
+        if len(mb) == 1:
+            mb *= self.nd
+        # assert len(mb) * 2 == len(self.subs)
         results: List[Tensor] = []
 
         if self.mode == 'linspace':
