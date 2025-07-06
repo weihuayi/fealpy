@@ -776,30 +776,6 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
 
         compute_trace(x, trace_value)
         return trace_value[None]
-    
-    @staticmethod
-    def insert(x: ti.Field, values: Union[int, float, bool, ti.Vector], indices: Tuple[int, ...]) -> ti.Field:#TO DO
-        if not isinstance(x, ti.Field):
-            raise TypeError("Input x must be a Taichi Field.")
-        if not isinstance(values, (int, float, bool, ti.Vector)):
-            raise TypeError("Values must be an int, float, bool, or ti.Vector.")
-        if not isinstance(indices, tuple) or not all(isinstance(i, int) for i in indices):
-            raise TypeError("Indices must be a tuple of integers.")
-
-        if len(indices) != len(x.shape):
-            raise ValueError(f"Indices length {len(indices)} does not match field shape {x.shape}.")
-
-        # 转为 Taichi 向量（如果是多维索引）
-        if len(indices) == 0:
-            @ti.kernel
-            def insert_value(field: ti.template(), value: ti.template()):
-                field[None] = value
-            insert_value(x, values)
-        else:
-            @ti.kernel
-            def insert_value(field: ti.template(), value: ti.template(), idx: ti.template()):
-                field[idx] = value
-            insert_value(x, values, indices)
             
     @staticmethod
     def unique(x: ti.Field) -> ti.Field:
@@ -975,11 +951,3 @@ class TaichiBackend(BackendProxy, backend_name='taichi'):
         add_field(x, y, z)
         return z
 
-
-if __name__ == '__main__':
-    ti.init(arch=ti.cpu)
-    a=np.ndarray(dtype=np.float32, shape=(3,4))
-    for i in range(3):
-        for j in range(4):
-            a[i, j] = 1
-    print(np.insert(a, [1,2], 0, axis=0))
