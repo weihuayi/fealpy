@@ -59,7 +59,8 @@ class PoissonPINNModel(ComputationalModel):
             Error history compared with finite element method.
         options : dict
             Configuration dictionary passed during initialization.
-    
+    Reference:
+        https://wnesm678i4.feishu.cn/wiki/Me8lw5ryxigAMbkcnL8cWVQpn4g?from=from_copylink
     Methods
         set_pde(pde)
             Initialize the PDE problem.
