@@ -1,10 +1,10 @@
-from typing import Sequence
+from typing import Optional,Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher3d
 
-
-class SinSinSinData3D:
+class SinSinSin_Sin_Dir_3D(BoxDomainMesher3d):
     """
     3D Poisson problem:
 
@@ -21,6 +21,9 @@ class SinSinSinData3D:
 
     Homogeneous Dirichlet boundary conditions are applied on all boundaries.
     """
+    def configure(self, box: Optional[Sequence[float]] = None):
+        """Configure the relevant parameters of PDE."""
+        self.box = box
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""

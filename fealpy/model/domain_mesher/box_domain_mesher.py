@@ -1,7 +1,7 @@
 from typing import Sequence
-from ..backend import backend_manager as bm
-from ..decorator import variantmethod
-from ..mesh import HexahedronMesh, TetrahedronMesh, QuadrangleMesh, TriangleMesh
+from ...backend import backend_manager as bm
+from ...decorator import variantmethod
+from ...mesh import HexahedronMesh, TetrahedronMesh, QuadrangleMesh, TriangleMesh
 
 class BoxDomainMesher2d:
     """Box domain mesh generator"""
