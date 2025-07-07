@@ -479,13 +479,13 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return x
 
     @staticmethod
-    def acosh(x: Union[ti.Field, float]) -> Union[ti.Field, float]:
+    def acosh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
         # 检查输入是否是单值（标量）
-        if isinstance(x, float):
+        if isinstance(x, (float, int)):
             return ti.log(x + ti.sqrt(x * x - 1.0))
 
         if not isinstance(x, ti.Field):
-            raise TypeError("Input must be a ti.Field or a float")
+            raise TypeError("Input must be a ti.Field or a scalar")
 
         # 获取矩阵的形状
         shape = x.shape
@@ -507,14 +507,14 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return result
 
     @staticmethod
-    def asinh(x: Union[ti.Field, float]) -> Union[ti.Field, float]:
+    def asinh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
         # 检查输入是否是单值（标量）
-        if isinstance(x, float):
+        if isinstance(x, (float, int)):
             return ti.log(x + ti.sqrt(x * x + 1.0))
 
         # 如果输入是 ti.Field
         if not isinstance(x, ti.Field):
-            raise TypeError("Input must be a ti.Field or a float")
+            raise TypeError("Input must be a ti.Field or a scalar")
 
         # 获取矩阵的形状
         shape = x.shape
@@ -555,9 +555,9 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
 
     @staticmethod
-    def atanh(x: Union[ti.Field, float,int]) -> Union[ti.Field, float]:
+    def atanh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
         # 检查输入是否是单值（标量）
-        if isinstance(x, (float,int)):
+        if isinstance(x, (float, int)):
             return ti.log((1.0 + x) / (1.0 - x)) / 2.0
 
         # 如果输入是 ti.Field
@@ -602,7 +602,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
 
     @staticmethod
-    def exp(x: Union[ti.Field, float,int]) -> Union[ti.Field, float]:
+    def exp(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
         # 检查输入是否是单值（标量）
         if isinstance(x, (float, int)):
             return ti.exp(x)
