@@ -26,3 +26,17 @@ class SurfaceLeveLSetPDEDataProtocol(Protocol):
     def solution(self, p: TensorLike) -> TensorLike: ...
     def gradient_of_solution(self, p: TensorLike) -> TensorLike: ...
     def source(self, p: TensorLike) -> TensorLike: ...
+
+    def neumann(self, p: TensorLike) -> TensorLike: ...
+    def is_neumann_boundary(self, p: TensorLike) -> TensorLike: ...
+
+SurfacePDEDataT = TypeVar("SurfacePDEDataT", bound=SurfaceLeveLSetPDEDataProtocol)
+
+"""
+DATA_TABLE is a registry, when adding new PDE models, 
+follow the existing examples to register them in the registry.
+"""
+DATA_TABLE = {
+    # example name: (file_name, class_name)
+    "spheresurface":("surface_level_set_data", "SurfaceLevelSetData")
+}

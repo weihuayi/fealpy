@@ -61,3 +61,4 @@ from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
 from .elliptic_mixed_fem_model import EllipticMixedFEMModel
 from .polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
