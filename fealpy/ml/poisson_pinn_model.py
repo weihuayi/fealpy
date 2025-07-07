@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
 
 from ..backend import bm
-from typing import Union
+from typing import Union, Optional
 from ..typing import TensorLike
 from ..model import ComputationalModel, PDEDataManager
 from ..model.poisson import PoissonPDEDataT
@@ -24,83 +24,75 @@ class PoissonPINNModel(ComputationalModel):
     Parameters
         options : dict
             Configuration dictionary containing:
-            - pde: PDE definition (str or PoissonPDEDataT)
-            - meshtype: Type of mesh ('tri' or 'uni')
-            - lr: Learning rate
-            - epochs: Number of training epochs
-            - hidden_sizes: List of hidden layer sizes
-            - npde: Number of PDE collocation points
-            - nbc: Number of boundary collocation points
-            - activation: Activation function
-            - loss: Loss function
-            - optimizer: Optimization algorithm
-            - step_size: Learning rate scheduler step size
-            - gamma: Learning rate decay factor
-            - sampling_mode: Sampling strategy ('linspace' or 'random')
+            - pde: PDE definition (str or PoissonPDEDataT);
+            - meshtype: Type of mesh ('tri' or 'uni');
+            - lr: Learning rate;
+            - epochs: Number of training epochs;
+            - hidden_sizes: List of hidden layer sizes;
+            - npde: Number of PDE collocation points;
+            - nbc: Number of boundary collocation points;
+            - activation: Activation function;
+            - loss: Loss function;
+            - optimizer: Optimization algorithm;
+            - sampling_mode: Sampling strategy ('linspace' or 'random').
         
     Attributes
         pde : PoissonPDEDataT
-            The Poisson PDE problem definition
+            The Poisson PDE problem definition.
         gd : int
-            Geometric dimension of the problem
-        domain : tuple
-            Computational domain boundaries
+            Geometric dimension of the PDE.
+        domain : list
+            Computational domain boundaries.
         mesh : TriangleMesh or UniformMesh
-            Discretization mesh for error estimation
+            Discretization mesh for error estimation.
         sampler_pde : ISampler
-            Sampler for PDE collocation points
+            Sampler for PDE collocation points.
         sampler_bc : BoxBoundarySampler
-            Sampler for boundary points
-        net : Solution
-            Neural network approximator
-        optimizer : torch.optim.Optimizer
-            Training optimizer
-        scheduler : torch.optim.lr_scheduler.StepLR
-            Learning rate scheduler
+            Sampler for boundary points.
+        net : 
+            Neural network .
+        optimizer : torch.optim
+            Training optimizer.
         Loss : list
-            Training loss history
+            Training loss history.
         error_fem : list
-            FEM error history
-        error_true : list
-            True solution error history
+            Error history compared with finite element method.
+        options : dict
+            Configuration dictionary passed during initialization.
     
     Methods
         set_pde(pde)
-            Initialize the PDE problem
+            Initialize the PDE problem.
         set_network(net)
-            Configure the neural network architecture
-        set_steplr(step_size, gamma)
-            Setup learning rate scheduler
+            Configure the neural network architecture.
         set_mesh(type)
-            Initialize computational mesh
-        pde_residual(p, net)
-            Compute PDE residual
-        bc_residual(p, net)
-            Compute boundary condition residual
+            Initialize computational mesh.
+        pde_residual(p)
+            Compute PDE residual.
+        bc_residual(p)
+            Compute boundary condition residual.
         train()
-            Execute training process
+            Execute training process.
         predict(p)
-            Make predictions at given points
+            Make predictions at given points.
         show()
-            Visualize results
+            Visualize results.
     
     Notes
         The implementation uses automatic differentiation for:
-        1. PDE residual calculation (Laplacian computation)
-        2. Backpropagation during training
+        1. PDE residual calculation (Laplacian computation);
+        2. Backpropagation during training;
         The loss function combines PDE residual and boundary condition terms.
     
     Examples
-        Basic usage:
-        
         >>> options = {
-        ...     'pde': 'sinsin',
+        ...     'pde': 'sin',
         ...     'meshtype': 'tri',
         ...     'lr': 0.001,
         ...     'epochs': 1000,
-        ...     'hidden_sizes': [20, 20],
-        ...     'npde': 100,
-        ...     'nbc': 50,
+        ...     'hidden_sizes': (32, 32, 16),
+        ...     'npde': 400,
+        ...     'nbc': 100,
         ...     'activation': nn.Tanh(),
         ...     'loss': nn.MSELoss(),
         ...     'optimizer': torch.optim.Adam,
@@ -138,15 +130,15 @@ class PoissonPINNModel(ComputationalModel):
 
         # 优化器与学习率调度器
         self.optimizer = self.options["optimizer"](params=self.net.parameters(), lr=self.lr)
-        self.set_steplr(self.options['step_size'], self.options['gamma'])
+
         
-    def set_pde(self, pde: Union[PoissonPDEDataT, str]='sinsin'):
+    def set_pde(self, pde: Union[PoissonPDEDataT, str]='sin'):
         """Initialize the PDE problem definition.
         
         Parameters
             pde : Union[PoissonPDEDataT, str]
                 Either a predefined PDE object or string identifier for built-in examples.
-                Defaults to 'sinsin' example problem.
+                Defaults to 'sin' example problem.
         """
         if isinstance(pde, str):
             self.pde = PDEDataManager('poisson').get_example(pde)
@@ -171,15 +163,17 @@ class PoissonPINNModel(ComputationalModel):
             net = nn.Sequential(*layers)
         self.net = Solution(net)
 
-    def set_steplr(self, step_size=0, gamma=0.1):
-        """
-        """
-        if step_size == 0:
-            self.scheduler = None
-        else:
-            self.scheduler = StepLR(self.optimizer, step_size=step_size, gamma=gamma)
+    
 
-    def set_mesh(self, type='tri'):
+    def set_mesh(self, type:str='tri'):
+        """Initialize the computational mesh for error estimation.
+        
+        Creates either triangular mesh (for dimensions > 1) or uniform mesh based on configuration.
+        
+        Parameters
+            type : str, optional, default='tri'
+                Mesh type specification ('tri' for triangular, 'uni' for uniform).
+        """
         if self.gd > 1:
             if type == "tri":
                 self.mesh = TriangleMesh.from_box(self.domain, nx=30, ny=30)
@@ -187,28 +181,27 @@ class PoissonPINNModel(ComputationalModel):
                  self.mesh = UniformMesh(self.domain, (0, 30)*self.gd)
         else:
             self.mesh = UniformMesh(self.domain, (0, 30)*self.gd)
-    
-
-
 
     def pde_residual(self, p: TensorLike) -> TensorLike:
         """Compute PDE residual (Laplacian(u) + f).
         
         Parameters
             p : TensorLike
-                Collocation points where residual is evaluated
-            net : torch.nn.Module
-                Neural network approximator
+                Collocation points where residual is evaluated.
             
         Returns
             TensorLike
-                PDE residual values at input points
+                PDE residual values at input points.
+                
+        Notes
+            Uses automatic differentiation to compute second derivatives.
+            The residual is calculated as Δu + f where Δ is the Laplacian operator.
         """
         u = self.net(p)
         f = self.pde.source(p)
         
         # 一阶导数计算
-        grad_u = gradient(u, p, create_graph=True)  ## 一阶导数计算(npde, dim)
+        grad_u = gradient(u, p, create_graph=True)  ## (npde, dim)
         laplacian = bm.zeros(u.shape[0])    # 拉普拉斯项初始化
         
         for i in range(p.shape[-1]):
@@ -221,29 +214,39 @@ class PoissonPINNModel(ComputationalModel):
         return val
 
     def bc_residual(self, p: TensorLike) -> TensorLike:
-        """
-
+        """Compute boundary condition residual (u - g).
+        
+        Parameters
+            p : TensorLike
+                Boundary points where residual is evaluated.
+                
+        Returns
+            TensorLike
+                Boundary condition residual values at input points.
+                
+        Notes
+            g represents the Dirichlet boundary condition values.
+            The residual is calculated as u - g where u is the network prediction.
         """
         u = self.net(p).flatten()
         bc = self.pde.dirichlet(p)
-        # print("p ", p, "bc ", bc, "u ", u, sep='\n')
         assert u.shape == bc.shape, \
             f"Shape mismatch: u.shape={u.shape}, bc.shape={bc.shape}."
         val = u - self.pde.dirichlet(p)
-        # print("bc:", "u.shape", u.shape, " bc.shape",  bc.shape, "val.shape", val.shape)
         return val
 
     def train(self):
-        """Execute the training process.
+        """Execute the training process for the PINN model.
         
         Notes
-            Implements:
-            1. Collocation point sampling
-            2. PDE and BC residual computation
-            3. Loss backpropagation
-            4. Periodic error evaluation
-            5. Learning rate scheduling
-       """
+            Training process includes:
+            1. Collocation point sampling;
+            2. PDE and BC residual computation;
+            3. Loss backpropagation;
+            4. Periodic error evaluation;
+            
+            The loss function combines PDE residual and boundary condition terms.
+        """
         start_time = time.time()
         self.Loss = []
         self.error_fem = []
@@ -260,9 +263,6 @@ class PoissonPINNModel(ComputationalModel):
                     ''' 均匀采样只采一次 '''
                     spde = self.sampler_pde.run(self.npde)
                     sbc = self.sampler_bc.run(self.nbc)
-                else:
-                    spde = spde
-                    sbc = sbc
             else:
                 spde = self.sampler_pde.run(self.npde)
                 sbc = self.sampler_bc.run(self.nbc)
@@ -275,31 +275,44 @@ class PoissonPINNModel(ComputationalModel):
             mse_pde = self.loss(pde_res, bm.zeros_like(pde_res))
             mse_bc = self.loss(bc_res, bm.zeros_like(bc_res))
 
-            loss = 0.7 * mse_pde + 0.3 * mse_bc
+            loss = 1.0 * mse_pde + 1.0 * mse_bc
             loss.backward()
             # 更新参数
             self.optimizer.step()
-            if self.scheduler:
-                self.scheduler.step() 
+
 
             if epoch % 100 == 0:
                 error = self.net.estimate_error(self.pde.solution, mesh, coordtype='c')
-                # e0 = self.net.estimate_error_func(self.pde.solution, mesh)
-                # self.error_true.append(e0.detach().numpy())
                 self.error_fem.append(error.detach().numpy())
                 self.Loss.append(loss.detach().numpy())
-                print(f"epoch: {epoch}, loss: {loss.item():.4f}, error_fem: {error.item():.4f}")
+                print(f"epoch: {epoch}, mse_pde: {mse_pde:.4f}, mse_bc: {mse_bc:.4f}, loss: {loss.item():.4f}, error_fem: {error.item():.4f}")
                
-
         end_time = time.time()
         print(f'Training completed in {end_time - start_time:.2f} seconds.')
 
     def prefict(self, p: TensorLike) -> TensorLike:
+        """Make predictions using the trained network.
+        
+        Parameters
+            p : TensorLike
+                Input points where prediction is needed.
+                
+        Returns
+            TensorLike
+                Network predictions at input points.
+        """
         return self.net(p)
 
     def show(self):
-        """
-        在同一三维坐标系中可视化真解与PINN预测解
+        """Visualize training results and solution comparisons.
+        
+        Notes
+            Creates plots showing:
+            1. Training loss history.
+            2. Error compared to FEM solution.
+            3. For 1D/2D problems: comparison between predicted and true solutions.
+            
+            Uses matplotlib for visualization with separate subplots for different metrics.
         """
         import matplotlib.pyplot as plt
 
@@ -317,21 +330,13 @@ class PoissonPINNModel(ComputationalModel):
         axes[1].set_ylabel('Error', fontsize=10)
         axes[1].grid(True)
 
-        # 绘制PINN vs 真实解误差 (底部子图)
-        # axes[2].plot(self.error_true, 'g-.', linewidth=2)
-        # axes[2].set_title('Error between PINN and True Solution', fontsize=12)
-        # axes[2].set_xlabel('Epoch/Iteration', fontsize=10)
-        # axes[2].set_ylabel('Error', fontsize=10)
-        # axes[2].grid(True)
-
-        
         if self.gd <= 2:
             mesh = self.mesh
             node = mesh.entity('node')
             # 获取预测解和真解
             u_pred = self.net(node).detach().numpy().flatten()  # PINN预测解
             u_true = self.pde.solution(node).detach().numpy()   # 解析解
-            
+            node = node.detach().numpy()
             fig = plt.figure()
             if self.gd == 1:
                 # 绘制真实解和预测解
@@ -367,7 +372,8 @@ class PoissonPINNModel(ComputationalModel):
                 ax2_3d.set_zlabel('u(x,y)')
                 fig.colorbar(surf2, ax=ax2_3d, shrink=0.5, label='Value')
                 plt.suptitle('Solution Comparison: PINN vs Analytical')
+
         plt.tight_layout()      
-        plt.show()  # 显示第二个Figure（3D图）
+        plt.show()  # 显示第二个Figure
 
 

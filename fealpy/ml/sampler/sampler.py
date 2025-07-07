@@ -12,6 +12,19 @@ SampleMode = Literal['random', 'linspace']
 
 
 def _as_tensor(__sequence: Sequence, dtype=float64, device: device=None):
+    """Convert a sequence to a tensor with specified dtype and device.
+    
+    Parameters:
+        __sequence: Sequence
+            Input sequence to convert (can be numpy array, list, or existing tensor)
+        dtype: torch.dtype, optional
+            Target data type (default: float64)
+        device: torch.device, optional
+            Target device (default: None for CPU)
+            
+    Returns:
+        Tensor: Converted tensor with specified properties
+    """
     seq = __sequence
     if isinstance(seq, Tensor):
         return seq.detach().clone().to(device=device).to(dtype=dtype)
@@ -20,22 +33,30 @@ def _as_tensor(__sequence: Sequence, dtype=float64, device: device=None):
 
 
 class Sampler():
-    """
-    The base class for all types of samplers.
+    """Base class for all sampling implementations.
+    
+    Provides common interface and functionality for generating sample points in various
+    domains and distributions. Subclasses should implement the actual sampling logic.
+    
+    Attributes:
+        nd: int
+            Number of dimensions in sampled points
+        _weight: Tensor
+            Storage for sample weights (reciprocal of sampling density)
+        enable_weight: bool
+            Whether to compute sample weights
+        dtype: torch.dtype
+            Data type for samples
+        device: torch.device
+            Device for sample storage
+        requires_grad: bool
+            Whether samples require gradient computation
     """
     nd: int = 0
     _weight: Tensor
     def __init__(self, enable_weight=False,
                  dtype=float64, device: device=None,
                  requires_grad: bool=False, **kwargs) -> None:
-        """
-        @brief Initializes a Sampler instance.
-
-        @param dtype: Data type of samples. Defaults to `torch.float64`.
-        @param device: device.
-        @param requires_grad: A boolean indicating whether the samples should\
-               require gradient computation. Defaults to `False`.
-        """
         self.enable_weight = enable_weight
         self.dtype = dtype
         self.device = device
@@ -43,45 +64,52 @@ class Sampler():
         self._weight = torch.tensor(torch.nan, dtype=dtype, device=device)
 
     def run(self, n: int) -> Tensor:
-        """
-        @brief Generates samples.
-
-        @return: A tensor with shape (n, GD) containing the generated samples.
+        """Generate samples (must be implemented by subclasses).
+        
+        Parameters:
+            n: int
+                Number of samples to generate
+                
+        Returns:
+            Tensor: Generated samples with shape (n, nd)
+            
+        Raises:
+            NotImplementedError: If not implemented by subclass
         """
         raise NotImplementedError
 
     def weight(self) -> Tensor:
-        """
-        @brief Get weights of the latest sample points. The weight of a sample is\
-               equal to the reciprocal of the sampling density.
-
-        @return: A tensor with shape (m, 1).
+        """Get weights of latest generated samples.
+        
+        Returns:
+            Tensor: Sample weights with shape (m, 1)
         """
         return self._weight
 
     def load(self, n: int, epoch: int=1) -> Generator[torch.Tensor, None, None]:
-        """
-        @brief Return a generator to call `sampler.run()`.
-
-        @param epoch: Iteration number, defaults to 1.
-
-        @return: Generator.
+        """Create a generator that yields samples over multiple epochs.
+        
+        Parameters:
+            n: int
+                Samples per epoch
+            epoch: int, optional
+                Number of epochs (default: 1)
+                
+        Returns:
+            Generator: Yields sample tensors for each epoch
         """
         for _ in range(epoch):
             yield self.run(n)
 
 
 class ConstantSampler(Sampler):
-    """
-    A sampler generating constants.
+    """Sampler that generates constant values.
+    
+    Attributes:
+        value: Tensor
+            Constant value to repeat
     """
     def __init__(self, value: Tensor, requires_grad: bool=False, **kwargs) -> None:
-        """
-        @brief Build a sampler generats constants.
-
-        @param value: A constant tensor.
-        @param requires_grad: bool.
-        """
         assert value.ndim == 2
         super().__init__(dtype=value.dtype, device=value.device,
                          requires_grad=requires_grad, **kwargs)
@@ -91,32 +119,34 @@ class ConstantSampler(Sampler):
             self._weight[:] = torch.tensor(0.0, dtype=self.dtype, device=value.device)
 
     def run(self, n: int) -> Tensor:
+        """Generate constant samples by repeating input value.
+        
+        Parameters:
+            n: int
+                Number of repetitions
+                
+        Returns:
+            Tensor: Repeated values with shape (n, nd)
+        """
         ret = self.value.repeat(n)
         ret.requires_grad = self.requires_grad
         return ret
 
 
 class ISampler(Sampler):
-    """
-    A sampler that generates samples independently in each axis.
+    """Independent axis sampler for hyperrectangular domains.
+    
+    Samples each dimension independently according to specified ranges and mode.
+    
+    Attributes:
+        nodes: Tensor
+            Sampling ranges for each dimension (shape [GD, 2])
+        mode: SampleMode
+            Sampling mode ('random' or 'linspace')
     """
     def __init__(self, ranges: Any, mode: SampleMode='random', dtype=float64,
                  device: device=None, requires_grad: bool=False, **kwargs) -> None:
-        """
-        @brief Initializes an ISampler instance.
-
-        @param ranges: An object that can be converted to a `numpy.ndarray`,\
-               representing the ranges in each sampling axis.\
-               For example, if sampling x in [0, 1] and y in [4, 5],\
-               use `ranges=[[0, 1], [4, 5]]`, or `ranges=[0, 1, 4, 5]`.
-        @param mode: 'random' or 'linspace'. Defaults to 'random'.
-        @param dtype: Data type of samples. Defaults to `torch.float64`.
-        @param requires_grad: A boolean indicating whether the samples should\
-               require gradient computation. Defaults to `False`.\
-               See `torch.autograd.grad`
-
-        @throws ValueError: If `ranges` has an unexpected shape.
-        """
+        
         super().__init__(dtype=dtype, device=device, requires_grad=requires_grad,
                          **kwargs)
         ranges_arr = _as_tensor(ranges, dtype=dtype, device=device)
@@ -133,14 +163,18 @@ class ISampler(Sampler):
         self.mode = mode
 
     def run(self, *m: int) -> Tensor:
-        """
-        @brief Generates independent samples in each axis.
-
-        @param *m: int. In 'random' mode, only one single int `m` is required, saying\
-               the number of samples. In 'linspace' mode, number of `m` must match\
-               the dimension, saying number of steps in each dimension.
-
-        @return: A tensor with shape (#samples, GD) containing the generated samples.
+        """Generate independent samples in each dimension.
+        
+        Parameters:
+            *m: int
+                In 'random' mode: single integer for number of samples
+                In 'linspace' mode: one integer per dimension for steps
+                
+        Returns:
+            Tensor: Generated samples with shape (#samples, GD)
+            
+        Raises:
+            ValueError: For invalid sampling mode or dimension mismatch
         """
         if self.mode == 'random':
             ruler = torch.stack(
@@ -282,8 +316,24 @@ from ..nntyping import S
 EType = Literal['cell', 'face', 'edge', 'node']
 
 class MeshSampler(Sampler):
-    """
-    Sample in the specified entity of a mesh.
+    """Abstract base class for mesh-based sampling.
+    
+    Provides infrastructure for sampling points within mesh entities (cells, faces, edges, nodes)
+    using a factory pattern to select appropriate implementations based on mesh type.
+    
+    Attributes:
+        DIRECTOR: Dict[Tuple[Optional[str], Optional[str]], Type['MeshSampler']]
+            Registry mapping (mesh_type, entity_type) to sampler implementations
+        etype: EType
+            Entity type being sampled
+        node: Tensor
+            Mesh nodes coordinates
+        cell: Tensor
+            Mesh entity connectivity
+        NVC: int
+            Number of vertices per entity
+        mode: Literal['random', 'linspace']
+            Sampling mode
     """
 
     DIRECTOR: Dict[Tuple[Optional[str], Optional[str]], Type['MeshSampler']] = {}
@@ -292,12 +342,44 @@ class MeshSampler(Sampler):
                 mode: Literal['random', 'linspace']='random',
                 dtype=float64, device: device=None,
                 requires_grad: bool=False):
+        """Factory method to create appropriate sampler instance.
+        
+        Parameters:
+            mesh: Any
+                Mesh object to sample from
+            etype: EType
+                Entity type to sample ('cell', 'face', 'edge', or 'node')
+            index: Any, optional
+                Entity indices to sample (default: all)
+            mode: Literal['random', 'linspace'], optional
+                Sampling mode (default: 'random')
+            dtype: torch.dtype, optional
+                Sample data type (default: float64)
+            device: torch.device, optional
+                Sample storage device (default: None for CPU)
+            requires_grad: bool, optional
+                Whether samples require gradients (default: False)
+                
+        Returns:
+            MeshSampler: Appropriate sampler instance for given mesh and entity type
+        """
         mesh_name = mesh.__class__.__name__
         ms_class = cls._get_sampler_class(mesh_name, etype)
         return object.__new__(ms_class)
 
     @classmethod
     def _assigned(cls, mesh_name: Optional[str], etype: Optional[str]='cell'):
+        """Register sampler implementation for specific mesh and entity types.
+        
+        Parameters:
+            mesh_name: Optional[str]
+                Mesh class name or None for all meshes
+            etype: Optional[str]
+                Entity type or None for all entities
+                
+        Raises:
+            KeyError: If mapping already exists
+        """
         if (mesh_name, etype) in cls.DIRECTOR.keys():
             if mesh_name is None:
                 mesh_name = "all types of mesh"
@@ -309,6 +391,21 @@ class MeshSampler(Sampler):
 
     @classmethod
     def _get_sampler_class(cls, mesh_name: str, etype: EType):
+        """Look up appropriate sampler class for given mesh and entity type.
+        
+        Parameters:
+            mesh_name: str
+                Mesh class name
+            etype: EType
+                Entity type to sample
+                
+        Returns:
+            Type[MeshSampler]: Sampler implementation class
+            
+        Raises:
+            ValueError: For invalid entity type
+            NotImplementedError: If no suitable implementation found
+        """
         if etype not in {'cell', 'face', 'edge', 'node'}:
             raise ValueError(f"Invalid etity type name '{etype}'.")
         ms_class = cls.DIRECTOR.get((mesh_name, etype), None)
@@ -325,15 +422,23 @@ class MeshSampler(Sampler):
                  mode: Literal['random', 'linspace']='random',
                  dtype=float64, device: device=None,
                  requires_grad: bool=False, **kwargs) -> None:
-        """
-        @brief Generate samples in the specified entities of a mesh.
-
-        @param mesh: Mesh.
-        @param etype: 'cell', 'face' or 'edge'. Type of entity to sample from.
-        @param index: Index of entities to sample from.
-        @param mode: 'random' or 'linspace'.
-        @param dtype: Data type of samples. Defaults to `torch.float64`.
-        @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
+        """Initialize mesh sampler base functionality.
+        
+        Parameters:
+            mesh: Any
+                Mesh object to sample from
+            etype: EType
+                Entity type to sample
+            index: Any, optional
+                Entity indices to sample (default: all)
+            mode: Literal['random', 'linspace'], optional
+                Sampling mode (default: 'random')
+            dtype: torch.dtype, optional
+                Sample data type (default: float64)
+            device: torch.device, optional
+                Sample storage device (default: None for CPU)
+            requires_grad: bool, optional
+                Whether samples require gradients (default: False)
         """
         self.etype = etype
         self.node = torch.tensor(mesh.entity('node'), dtype=dtype, device=device)
@@ -366,11 +471,20 @@ class MeshSampler(Sampler):
     #     self._weight = arr.repeat(1, mp).reshape(-1, 1).to(device=self.device)
 
     def get_bcs(self, mp: int, n: int):
-        """
-        @brief Generate bcs according to the current mode.
-
-        `mp` is the number of samples in 'random' mode, and is the order of\
-        multiple indices in 'linspace' mode.
+        """Generate barycentric coordinates according to current sampling mode.
+        
+        Parameters:
+            mp: int
+                In 'random' mode: number of samples
+                In 'linspace' mode: order of indices
+            n: int
+                Number of barycentric coordinates to generate
+                
+        Returns:
+            Tensor: Generated coordinates
+            
+        Raises:
+            ValueError: For invalid sampling mode
         """
         if self.mode == 'random':
             return F.random_weights(mp, n, dtype=self.dtype, device=self.device)
@@ -380,9 +494,16 @@ class MeshSampler(Sampler):
             raise ValueError(f"Invalid mode {self.mode}.")
 
     def cell_bc_to_point(self, bcs: Tensor) -> Tensor:
-        """
-        The optimized version of method `mesh.cell_bc_to_point()`
-        to support faster sampling.
+        """Convert barycentric coordinates to physical points.
+        
+        Optimized version of mesh.cell_bc_to_point() for faster sampling.
+        
+        Parameters:
+            bcs: Tensor
+                Barycentric coordinates
+                
+        Returns:
+            Tensor: Physical point coordinates
         """
         node = self.node
         cell = self.cell
@@ -393,6 +514,15 @@ class _PolytopeSampler(MeshSampler):
     """Sampler in all homogeneous polytope entities, such as triangle cells\
         and tetrahedron cells."""
     def run(self, mp: int) -> Tensor:
+        """Generate samples in polytope entities.
+        
+        Parameters:
+            mp: int
+                Number of samples per entity
+                
+        Returns:
+            Tensor: Generated samples with shape (total_samples, nd)
+        """
         self.bcs = self.get_bcs(mp, self.NVC)
         return self.cell_bc_to_point(self.bcs).reshape((-1, self.nd))
 
@@ -407,6 +537,15 @@ _PolytopeSampler._assigned('PolygonMesh', 'face')
 class _QuadSampler(MeshSampler):
     """Sampler in a quadrangle entity."""
     def run(self, mp: int) -> Tensor:
+        """Generate samples in quadrangle entities.
+        
+        Parameters:
+            mp: int
+                Number of samples per entity
+                
+        Returns:
+            Tensor: Generated samples with shape (total_samples, nd)
+        """
         bc_0 = self.get_bcs(mp, 2)
         bc_1 = self.get_bcs(mp, 2)
         if self.mode == 'linspace':
@@ -422,6 +561,19 @@ _QuadSampler._assigned('HexahedronMesh', 'face')
 class _UniformSampler(MeshSampler):
     """Sampler in a n-d uniform mesh."""
     def run(self, mp: int, *, entity_type=False) -> Tensor:
+        """Generate samples in uniform mesh entities.
+        
+        Parameters:
+            mp: int
+                Number of samples per entity
+            entity_type: bool, optional
+                If True, returns samples organized by entity (default: False)
+                
+        Returns:
+            Tensor: Generated samples with shape:
+                   - (total_samples, nd) if entity_type=False
+                   - (entities, samples, nd) if entity_type=True
+        """
         ND = int(log2(self.NVC))
         bc_list = [self.get_bcs(mp, 2) for _ in range(ND)]
         if self.mode == 'linspace':
