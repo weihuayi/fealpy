@@ -39,6 +39,7 @@ class PDEDataManager:
 
     _registry = {
         "beam": "fealpy.csm.model.beam",
+        "elastoplasticity": "fealpy.csm.model.elastoplasticity", 
     }
 
     def __init__(self, pde_type: str = None):
