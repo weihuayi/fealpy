@@ -39,5 +39,6 @@ DATA_TABLE = {
     "sin": ("sin_data_1d", "SinData1D"),
     "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
     "sinsinsin": ("sin_sin_sin_data_3d", "SinSinSinData3D"),
-
+    "interior":("interior_layer_data_2d", "InteriorLayerData2d"),
+    "corner":("corner_singularity_data_2d", "CornerSingularityData2d")
 }
