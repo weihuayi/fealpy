@@ -2,7 +2,7 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 import math
 
 
