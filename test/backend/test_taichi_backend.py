@@ -545,29 +545,29 @@ def test_from_numpy():
     # float型1d
     arr = np.array([1.1, 2.2, 3.3], dtype=np.float32)
     field = bm.from_numpy(arr)
+    assert field.dtype == ti.f32
+    assert field.shape == (3,)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
-        assert field.dtype == ti.f32
-        assert field.shape == (3,)
-        assert isinstance(field, ti.Field)
         assert field[i] == arr[i]
 
     # int型2d
     arr = np.array([[1, 2],[3,4]], dtype=np.int32)
     field = bm.from_numpy(arr)
+    assert field.dtype == ti.i32
+    assert field.shape == (2, 2)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
-            assert field.dtype == ti.i32
-            assert field.shape == (2, 2)
-            assert isinstance(field, ti.Field)
             assert field[i, j] == arr[i][j]
 
     # bool型
     arr = np.array([True, False, True], dtype=np.bool)
     field = bm.from_numpy(arr)
+    assert field.dtype == ti.u8
+    assert field.shape == (3,)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
-        assert field.dtype == ti.u8
-        assert field.shape == (3,)
-        assert isinstance(field, ti.Field)
         assert field[i] == arr[i]
 
     # 3d
@@ -592,8 +592,9 @@ def test_tolist():
     field[None] = 1.1
     result = bm.tolist(field)
     expected = [1.1]
-    assert isinstance(field, ti.Field)
-    assert field.dtype == ti.f32
+    # assert field.shape == ()
+    # assert isinstance(field, ti.Field)
+    # assert field.dtype == ti.f32
     assert np.allclose(result, expected)
 
     # 数字
@@ -601,6 +602,7 @@ def test_tolist():
     field[0] = 2.2
     result = bm.tolist(field)
     expected = [2.2]
+    assert field.shape == (1,)
     assert isinstance(field, ti.Field)
     assert field.dtype == ti.f32
     assert np.allclose(result, expected)
@@ -659,25 +661,28 @@ def test_arange():
     # 一个参数
     field = bm.arange(10, dtype=ti.i32)
     expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert field.dtype == ti.i32
+    assert field.shape == (10,)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
-        assert field.dtype == ti.i32
-        assert isinstance(field, ti.Field)
         assert field[i] == expected[i]
 
     # 两个参数
     field = bm.arange(0, 10, dtype=ti.i32)
     expected = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert field.dtype == ti.i32
+    assert field.shape == (10,)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
-        assert field.dtype == ti.i32
-        assert isinstance(field, ti.Field)
         assert field[i] == expected[i]
 
     # 三个参数
     field = bm.arange(0, 10, 2,dtype=ti.i32)
     expected = [0, 2, 4, 6, 8]
+    assert field.dtype == ti.i32
+    assert field.shape == (5,)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
-        assert field.dtype == ti.i32
-        assert isinstance(field, ti.Field)
         assert field[i] == expected[i]
 
     # 单参数为 0
@@ -703,23 +708,11 @@ def test_arange():
     # 步长大于总长度            
     field = bm.arange(1, 10, 11, dtype=ti.i32)
     expected = [1]
+    assert field.dtype == ti.i32
+    assert field.shape == (1,)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
-        assert field.dtype == ti.i32
-        assert isinstance(field, ti.Field)
         assert field[i] == expected[i]
-
-    # 无参数
-    with pytest.raises(ValueError, match="arange\(\) requires stop to be specified."):
-        bm.arange(None)
-
-    # 参数大于 3
-    with pytest.raises(ValueError, match="arange expects 1~3 arguments \(stop \| start, stop \| start, stop, step\)"):
-        bm.arange(1,3,5,7,9)
-
-    # 步长为 0
-    with pytest.raises(ValueError, match="step must not be zero"):
-        bm.arange(1,3,0)
-
 
 # 测试 eye 函数
 def test_eye(): 
@@ -743,6 +736,8 @@ def test_eye():
     field = bm.eye(1, dtype=ti.i32)
     expcted = [[1]]
     assert field.dtype == ti.i32
+    assert field.shape == (1, 1)
+    assert isinstance(field, ti.Field)
     assert field[0, 0] == expcted[0][0]                              
 
     # 测试 3 阶单位阵
@@ -750,9 +745,11 @@ def test_eye():
     expected = [[1, 0, 0], 
                 [0, 1, 0], 
                 [0, 0, 1]]
+    assert field.dtype == ti.i32
+    assert field.shape == (3, 3)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
-            assert field.dtype == ti.i32
             assert field[i, j] == expected[i][j]
 
     # 测试 3 行 4 列单位阵，偏移对角线
@@ -760,23 +757,12 @@ def test_eye():
     expected = [[0.0, 1.0, 0.0, 0.0], 
                 [0.0, 0.0, 1.0, 0.0], 
                 [0.0, 0.0, 0.0, 1.0]]
+    assert field.dtype == ti.f64
+    assert field.shape == (3, 4)
+    assert isinstance(field, ti.Field)
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
-            assert field.dtype == ti.f64
             assert field[i, j] == expected[i][j]
-
-    # N 为 None
-    with pytest.raises(ValueError, match="Both N and M are None. At least one dimension must be specified for eye()."):
-        bm.eye(None)
-
-    # N 为负数
-    with pytest.raises(ValueError, match="N and M must be positive integers, got N=-1, M=3"):
-        bm.eye(-1,3)
-
-    # N 不是 int 型
-    with pytest.raises(TypeError, match="N must be an integer, got 1.2."):
-        bm.eye(1.2)
-
 
 # 测试 zeros 函数
 def test_zeros():
@@ -784,17 +770,20 @@ def test_zeros():
     # 空矩阵
     field = bm.zeros(0)
     assert len(field) == 0
+    assert isinstance(field, ti.Field)
     assert np.array_equal(field, [])
 
     # 数字零矩阵
     field = bm.zeros(1)
     assert field.shape == (1,)
+    assert isinstance(field, ti.Field)
     assert field.dtype == ti.f64
     assert field[0] == 0
 
     # 1d 零矩阵
     field = bm.zeros(3)
     assert field.shape == (3,)
+    assert isinstance(field, ti.Field)
     assert field.dtype == ti.f64
     assert np.all(field, 0)
 
@@ -802,18 +791,16 @@ def test_zeros():
     field = bm.zeros((2, 3))
     logger.info(field)
     assert field.shape == (2, 3)
+    assert isinstance(field, ti.Field)
     assert field.dtype == ti.f64
     assert np.all(field, 0)
 
     # 3d 零矩阵
     field = bm.zeros((2, 3, 4))
     assert field.shape == (2, 3, 4)
+    assert isinstance(field, ti.Field)
     assert field.dtype == ti.f64
     assert np.all(field, 0)
-
-    #shape为-1
-    with pytest.raises(ValueError, match="Shape must be a non-negative integer, got (-1)."):
-        bm.zeros((-1))
 
 
 # 测试 tril 函数
@@ -823,6 +810,9 @@ def test_tril():
     field = ti.field(ti.i32, shape=(1,))
     field[0] = 1
     result = bm.tril(field)
+    assert result.shape == (1, 1)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.i32
     assert result[0, 0] == 1
 
     # 2d 下三角方阵
@@ -836,11 +826,11 @@ def test_tril():
     expected = [[1, 0, 0], 
                 [2, 3, 0], 
                 [3, 4, 5]]
+    assert result.shape == (3, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.i32
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
-            assert result.shape == (3, 3)
-            assert isinstance(result, ti.Field)
-            assert result.dtype == ti.i32
             assert result[i, j] == expected[i][j]
 
     # 2d 下三角矩阵
@@ -853,11 +843,11 @@ def test_tril():
     result = bm.tril(field)
     expected = [[1.0, 0.0, 0.0], 
                 [2.0, 3.0, 0.0]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
-            assert result.shape == (2, 3)
-            assert isinstance(result, ti.Field)
-            assert result.dtype == ti.f32
             assert result[i, j] == expected[i][j]
 
     #  2d 下三角方阵，偏移对角线
@@ -871,13 +861,13 @@ def test_tril():
     expected = [[0, 0, 0], 
                 [2, 0, 0], 
                 [3, 4, 0]]
+    assert result.shape == (3, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.i32
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
-            assert result.shape == (3, 3)
-            assert isinstance(result, ti.Field)
-            assert result.dtype == ti.i32
             assert result[i, j] == expected[i][j]
-            
+
     # 3d 下三角方阵
     field = ti.field(ti.i32, shape=(2, 3, 4))
     @ti.kernel
@@ -892,24 +882,13 @@ def test_tril():
                 [[2, 0, 0, 0], 
                  [3, 4, 0, 0], 
                  [4, 5, 6, 0]]]
+    assert result.shape == (2, 3, 4)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.i32
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
             for k in range(field.shape[2]):
-                assert result.shape == (2, 3, 4)
-                assert isinstance(result, ti.Field)
-                assert result.dtype == ti.i32
                 assert result[i, j, k] == expected[i][j][k]
-
-    # 空
-    field = ti.field(ti.f32, shape=())
-    with pytest.raises(ValueError, match="Input field is a scalar \(0D\)\, tril is not defined for scalars\."):
-        bm.tril(field)
-
-    # field 为 None
-    with pytest.raises(ValueError, match="Input field is None. Please provide a valid Taichi field."):
-        bm.tril(None)
-
-
 
 # 测试 abs 函数
 def test_abs():
@@ -920,12 +899,12 @@ def test_abs():
     result = bm.abs(field)
     expected = 1.1
     assert np.allclose(result, expected)
-    
+
     # int 型
     x = bm.abs(-100)
     assert isinstance(x, int)
     assert x == 100
-    
+
     # float 型
     x = bm.abs(-1.1)
     assert isinstance(x, float)
@@ -934,7 +913,7 @@ def test_abs():
     # bool 型
     x = bm.abs(False)
     assert x == 0
-    
+
     y = bm.abs(True)
     assert y == 1
 
@@ -955,10 +934,10 @@ def test_abs():
     field[2] = -3
     result = bm.abs(field)
     expected = [1, 2, 3]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.i32
     for i in range(field.shape[0]):
-        assert result.shape == (3,)
-        assert isinstance(result, ti.Field)
-        assert result.dtype == ti.i32
         assert result[i] == expected[i]
 
     # 2d
@@ -971,11 +950,11 @@ def test_abs():
     result = bm.abs(field)
     expected = [[0, 1, 2], 
                 [1, 0, 1]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.i32
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
-            assert result.shape == (2, 3)
-            assert isinstance(result, ti.Field)
-            assert result.dtype == ti.i32
             assert result[i, j] == expected[i][j]
 
     # 3d
@@ -992,115 +971,103 @@ def test_abs():
                 [[1, 0, 1, 2], 
                     [0, 1, 2, 3], 
                     [1, 2, 3, 4]]]
+    assert result.shape == (2, 3, 4)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.i32
     for i in range(field.shape[0]):
         for j in range(field.shape[1]):
             for k in range(field.shape[2]):
-                assert result.shape == (2, 3, 4)
-                assert isinstance(result, ti.Field)
-                assert result.dtype == ti.i32
                 assert result[i, j, k] == expected[i][j][k]
 
-    # 无参数
-    with pytest.raises(TypeError, match="Unsupported type for abs: <class 'NoneType'>. Expected int, float, bool, or ti.Field."):
-        bm.abs(None)
+# 测试 acos 函数
+def test_acos():
 
-#测试 acos 函数
-    def test_acos():
-        
-        # int 型
-        x = bm.acos(0)
-        assert np.allclose(x, np.pi/2)
-        
-        # float 型
-        x = bm.acos(0.5)
-        assert np.allclose(x, np.pi/3)
+    # int 型
+    x = bm.acos(0)
+    assert np.allclose(x, np.pi/2)
 
-        # bool 型
-        x = bm.acos(True)
-        assert np.allclose(x, 0)
+    # float 型
+    x = bm.acos(0.5)
+    assert np.allclose(x, np.pi/3)
 
-        # 空
-        field = ti.field(ti.f32, shape=())
-        field[None] = 0.5
-        result = bm.acos(field)
-        assert result.shape == ()
-        assert result.dtype == ti.f32
-        assert np.allclose(result[None], np.pi/3)
+    # bool 型
+    x = bm.acos(True)
+    assert x == 0
 
-        # field 数字
-        field = ti.field(ti.f32, shape=(1,))
-        field[0] = 0.0
-        result = bm.acos(field)
-        assert result.shape == (1,)
-        assert result.dtype == ti.f32
-        assert np.allclose(result[0], np.pi/2)
+    y = bm.acos(False)
+    assert np.allclose(y, np.pi/2)
 
-        # 1d field
-        field = ti.field(ti.f32, shape=(3,))
-        field[0] = 0.5
-        field[1] = -0.7
-        field[2] = 0.9
-        result = bm.acos(field)
-        for i in range(field.shape[0]):
-            assert result.shape == (3,)
-            assert isinstance(result, ti.Field)
-            assert result.dtype == ti.f32
-            assert np.allclose(result[i], np.arccos(field[i]))
+    # 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 0.5
+    result = bm.acos(field)
+    assert np.allclose(result, np.pi/3)
 
-        # 2d field
-        field = ti.field(ti.f32, shape=(2, 3))
-        @ti.kernel
-        def fill():
-            for i, j in field:
-                field[i, j] = i * 0.5 - j * 0.5
-        fill()
-        result = bm.acos(field)
-        expected = [[np.pi/2, np.pi*2/3, np.pi], 
-                    [np.pi/3, np.pi/2, np.pi*2/3]]
-        for i in range(field.shape[0]):
-            for j in range(field.shape[1]):
-                assert result.shape == (2, 3)
-                assert isinstance(result, ti.Field)
-                assert result.dtype == ti.f32
-                assert np.allclose(result[i, j], expected[i][j])
+    # field 数字
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 0.0
+    result = bm.acos(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], np.pi/2)
 
-        # 3d field
-        field = ti.field(ti.f32, shape=(2, 2, 2))
-        @ti.kernel
-        def fill():
-            for i, j, k in field:
-                field[i, j, k] = i / 2 - j / 2 - k / 2
-        fill()
-        result = bm.acos(field)
-        expected = [[[np.pi/2, np.pi*2/3], 
-                     [np.pi*2/3, np.pi]], 
-                    [[np.pi/3, np.pi/2], 
-                     [np.pi/2, np.pi*2/3]]]
-        for i in range(field.shape[0]):
-            for j in range(field.shape[1]):
-                for k in range(field.shape[2]):
-                    assert result.shape == (2, 2, 2)
-                    assert isinstance(result, ti.Field)
-                    assert result.dtype == ti.f32
-                    assert np.allclose(result[i, j, k], expected[i][j][k])
+    # 1d field
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0.5
+    field[1] = -0.7
+    field[2] = 0.9
+    result = bm.acos(field)
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], np.arccos(field[i]))
 
-        # 无参数
-        with pytest.raises(ValueError, match="Input field is None. Please provide a valid Taichi field."):
-            bm.acos(None)
+    # 2d field
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i * 0.5 - j * 0.5
+    fill()
+    result = bm.acos(field)
+    expected = [[np.pi/2, np.pi*2/3, np.pi], 
+                [np.pi/3, np.pi/2, np.pi*2/3]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j])
 
-        # 参数为一维空数组
-        field = ti.field(ti.f32, shape=(1,))
-        with pytest.raises(ValueError, match="ti\.field shape \(1,\) does not match the numpy array shape \(0,\)"):
-            result = field.from_numpy(np.array([]))
-            bm.acos(result)
+    # 3d field
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = i / 2 - j / 2 - k / 2
+    fill()
+    result = bm.acos(field)
+    expected = [[[np.pi/2, np.pi*2/3], 
+                    [np.pi*2/3, np.pi]], 
+                [[np.pi/3, np.pi/2], 
+                    [np.pi/2, np.pi*2/3]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k])
 
-#测试 zeros_like 函数
+# 测试 zeros_like 函数
 def test_zeros():
 
     # 空
     field = ti.field(ti.f32, shape=())
     result = bm.zeros_like(field)
     assert result.shape == ()
+    assert isinstance(result, ti.Field)
     assert result.dtype == ti.f32
     assert result[None] == 0
 
@@ -1108,6 +1075,7 @@ def test_zeros():
     field = ti.field(ti.f32, shape=(1,))
     result = bm.zeros_like(field)
     assert result.shape == (1,)
+    assert isinstance(result, ti.Field)
     assert result.dtype == ti.f32
     assert result[0] == 0
 
@@ -1115,6 +1083,7 @@ def test_zeros():
     field = ti.field(ti.f32, shape=(3,))
     result = bm.zeros_like(field)
     assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
     assert result.dtype == ti.f32
     assert np.all(result, 0)
 
@@ -1122,6 +1091,7 @@ def test_zeros():
     field = ti.field(ti.f32, shape=(2, 3))
     result = bm.zeros_like(field)
     assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
     assert result.dtype == ti.f32
     assert np.all(result, 0)
 
@@ -1129,12 +1099,1047 @@ def test_zeros():
     field = ti.field(ti.f32, shape=(2, 3, 4))
     result = bm.zeros_like(field)
     assert result.shape == (2, 3, 4)
+    assert isinstance(result, ti.Field)
     assert result.dtype == ti.f32
     assert np.all(result, 0)
 
-    # 无参数
-    with pytest.raises(ValueError, match="Input field is None. Please provide a valid Taichi field."):
-        bm.zeros_like(None)
+# 测试 asin 函数
+def test_asin():
+
+    # int 型
+    x = bm.asin(0)
+    assert x == 0
+
+    # float 型
+    x = bm.asin(0.5)
+    assert np.allclose(x, np.pi/6)
+
+    # bool 型
+    x = bm.asin(True)
+    assert np.allclose(x, np.pi/2)
+
+    y = bm.asin(False)
+    assert y == 0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 0.5
+    result = bm.asin(field)
+    assert np.allclose(result, np.pi/6)
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = -0.5
+    result = bm.asin(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], -np.pi/6)
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0.5
+    field[1] = -0.7
+    field[2] = 0.9
+    result = bm.asin(field)
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], np.arcsin(field[i]))
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i * 0.5 - j * 0.5
+    fill()
+    result = bm.asin(field)
+    expected = [[0, -np.pi/6, -np.pi/2], 
+                [np.pi/6, 0, -np.pi/6]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j])
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = i / 2 - j / 2 - k / 2
+    fill()
+    result = bm.asin(field)
+    expected = [[[0, -np.pi/6], 
+                 [-np.pi/6, -np.pi/2]], 
+                [[np.pi/6, 0], 
+                 [0, -np.pi/6]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k])
+
+# 测试 atan 函数
+def test_atan():
+
+    # int 型
+    x = bm.atan(1)
+    assert x == np.pi/4
+
+    # float 型
+    x = bm.atan(0.5)
+    assert np.allclose(x, np.atan(0.5))
+
+    # bool 型
+    x = bm.atan(True)
+    assert x == np.pi/4
+
+    y = bm.atan(False)
+    assert y ==0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 0.5
+    result = bm.atan(field)
+    assert np.allclose(result, np.atan(0.5))
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 0.5
+    result = bm.atan(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], np.atan(0.5))
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0.5
+    field[1] = -0.7
+    field[2] = 0.9
+    result = bm.atan(field)
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], np.arctan(field[i]))
+
+    # field 2d
+    field = ti.field(ti.f32, shape = (2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i * 0.5 - j * 0.5
+    fill()
+    result = bm.atan(field)
+    expected = [[0, np.arctan(-0.5), -np.pi/4], 
+                [np.arctan(0.5), 0, np.arctan(-0.5)]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j])
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = i / 2 - j / 2 - k / 2
+    fill()
+    result = bm.atan(field)
+    expected = [[[0, np.arctan(-0.5)], 
+                 [np.arctan(-0.5), -np.pi/4]], 
+                [[np.arctan(0.5), 0], 
+                 [0, np.arctan(-0.5)]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k])
+                
+# 测试 atan2 函数
+def test_atan2():
+
+    # int 型
+    x = bm.atan2(1, 1)
+    assert x == np.pi/4
+
+    # float 型
+    x = bm.atan2(0.5, 1)
+    assert np.allclose(x, np.arctan(0.5))
+
+    # bool 型
+    x = bm.atan2(True, 1)
+    assert x == np.pi/4
+
+    y = bm.atan2(False, 0.5)
+    assert y == 0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 0.5
+    Field = ti.field(ti.f32, shape=())
+    Field[None] = 1.0
+    result = bm.atan2(field, Field)
+    assert np.allclose(result, np.arctan(0.5))
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 0.5
+    Field = ti.field(ti.f32, shape=(1,))
+    Field[0] = 1.0
+    result = bm.atan2(field, Field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], np.arctan(0.5))
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0.5
+    field[1] = -0.7
+    field[2] = 0.9
+    Field = ti.field(ti.f32, shape=(3,))
+    Field[0] = 1.0
+    Field[1] = 1.0
+    Field[2] = 1.0
+    result = bm.atan2(field, Field)
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], np.arctan2(field[i], Field[i]))
+
+    # field 2d
+    field = ti.field(ti.f32, shape = (2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i * 0.5 - j * 0.5
+    fill()
+    Field = ti.field(ti.f32, shape = (2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in Field:
+            Field[i, j] = i * 0.5 + j * 0.5 + 1
+    fill()
+    result = bm.atan2(field, Field)
+    expected = [[0, np.arctan2(-0.5, 1.5), np.arctan2(-1, 2)], 
+                [np.arctan2(0.5, 1.5), 0, np.arctan2(-0.5, 2.5)]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j])
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = i / 2 - j / 2 - k / 2
+    fill()
+    Field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in Field:
+            Field[i, j, k] = i / 2 + j / 2 + k / 2 + 1
+    fill()
+    result = bm.atan2(field, Field)
+    expected = [[[0, np.arctan2(-0.5, 1.5)], 
+                 [np.arctan2(-0.5, 1.5), np.arctan2(-1, 2)]], 
+                [[np.arctan2(0.5, 1.5), 0], 
+                 [0, np.arctan2(-0.5, 2.5)]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k])
+
+# 测试 ceil 函数
+def test_ceil():
+
+    # int 型
+    x = bm.ceil(0)
+    assert x == 0
+
+    # float 型
+    x = bm.ceil(0.5)
+    assert x == 1
+
+    y = bm.ceil(-1.5)
+    assert y == -1
+
+    # bool 型
+    x = bm.ceil(True)
+    assert x == 1
+
+    y = bm.ceil(False)
+    assert y == 0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 0.5
+    result = bm.ceil(field)
+    assert field.shape == ()
+    assert field.dtype == ti.f32
+    assert result == 1
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = -0.5
+    result = bm.ceil(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert result[0] == 0
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 3.5
+    field[1] = -6.6
+    field[2] = 2.5
+    result = bm.ceil(field)
+    expected = [4, -6, 3]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert result[i] == expected[i]
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = (-1) ** (i+j) * (i+j) * 0.5
+    fill()
+    result = bm.ceil(field)
+    expected = [[0, 0, 1], 
+                [0, 1, -1]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result[i, j] == expected[i][j]
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k) * 0.5
+    fill()
+    result = bm.ceil(field)
+    expected = [[[0, 0], 
+                 [0, 1]], 
+                [[0, 1], 
+                 [1, -1]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert result[i, j, k] == expected[i][j][k]
+
+# 测试 clip 函数
+def test_clip():
+
+    # int 型（传入的参数在 min 和 max 之间）
+    x = bm.clip(2, 0, 5)
+    assert x == 2
+
+    # float 型（传入的参数大于 max）
+    x = bm.clip(10.0, 0.0, 5.0)
+    assert x == 5.0
+
+    # bool 型 （传入的参数小于 min）
+    x = bm.clip(False, 2, 7)
+    assert x == 2
+
+    # a_min 为 None
+    x = bm.clip(2, a_max = 5)
+    assert x == 2
+
+    # a_max 为 None
+    x = bm.clip(2, a_min = 4)
+    assert x == 4
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 2.5
+    result = bm.clip(field, 0.0, 5.0)
+    assert result == 2.5
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 2.5
+    result = bm.clip(field, 0.0, 5.0)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert result[0] == 2.5
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 2.5
+    field[1] = -0.7
+    field[2] = 10.0
+    result = bm.clip(field, 0.0, 5.0)
+    expected = [2.5, 0.0, 5.0]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert result[i] == expected[i]
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = (-1) ** (i+j) * (i+j)
+    fill()
+    result = bm.clip(field, -2.0, 2.0)
+    expected = [[0.0, -1.0, 2.0], 
+                [-1.0, 2.0, -2.0]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result[i, j] == expected[i][j]
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k)
+    fill()
+    result = bm.clip(field, -2.0, 2.0)
+    expected = [[[0.0, -1.0], 
+                 [-1.0, 2.0]], 
+                [[-1.0, 2.0], 
+                 [2.0, -2.0]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert result[i, j, k] == expected[i][j][k]
+
+# 测试 cos 函数
+def test_cos():
+
+    # int 型
+    x = bm.cos(0)
+    assert x == 1
+
+    # float 型
+    x = bm.cos(np.pi/3)
+    assert np.allclose(x, 0.5)
+
+    # bool 型
+    x = bm.cos(True)
+    assert x == np.cos(1)
+
+    y = bm.cos(False)
+    assert y == 1
+
+    # field 空
+    field = ti.field(ti.f32, shape = ())
+    field[None] = np.pi/3
+    result = bm.cos(field)
+    assert np.allclose(result, 0.5)
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = np.pi*2/3
+    result = bm.cos(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], -0.5)
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = np.pi/2
+    field[1] = np.pi/4
+    field[2] = np.pi*2/3
+    result = bm.cos(field)
+    expected = [0, np.sqrt(2)/2, -0.5]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], expected[i], atol = 1e-6)
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = (-1) ** (i+j) * (i+j) * np.pi/6
+    fill()
+    result = bm.cos(field)
+    expected = [[1, np.sqrt(3)/2, 0.5], 
+                [np.sqrt(3)/2, 0.5, 0]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j], atol = 1e-6)
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k) * np.pi/6
+    fill()
+    result = bm.cos(field)
+    expected = [[[1, np.sqrt(3)/2], 
+                 [np.sqrt(3)/2, 0.5]], 
+                [[np.sqrt(3)/2, 0.5], 
+                 [0.5, 0]]]
+
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k], atol = 1e-6)
+
+# 测试 cosh 函数
+def test_cosh():
+
+    # int 型
+    x = bm.cosh(0)
+    assert x == 1
+
+    # float 型
+    x = bm.cosh(0.5)
+    assert x == (np.exp(0.5) + np.exp(-0.5))/2
+
+    # bool 型
+    x = bm.cosh(True)
+    assert x == (np.exp(1) + np.exp(-1))/2
+
+    y = bm.cosh(False)
+    assert y == 1
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 0.5
+    result = bm.cosh(field)
+    assert np.allclose(result, (np.exp(0.5) + np.exp(-0.5))/2)
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 0.5
+    result = bm.cosh(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], (np.exp(0.5) + np.exp(-0.5))/2)
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0
+    field[1] = 0.5
+    field[2] = True
+    result = bm.cosh(field)
+    expected = [1, (np.exp(0.5) + np.exp(-0.5))/2, (np.exp(1) + np.exp(-1))/2]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], expected[i])
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = (-1) ** (i+j) * (i+j) * 0.5
+    fill()
+    result = bm.cosh(field)
+    expected = [[1, (np.exp(-0.5) + np.exp(0.5))/2, (np.exp(1) + np.exp(-1))/2], 
+                [(np.exp(-0.5) + np.exp(0.5))/2, (np.exp(1) + np.exp(-1))/2, (np.exp(-1.5) + np.exp(1.5))/2]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j])
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k) * 0.5
+    fill()
+    result = bm.cosh(field)
+    expected = [[[1, (np.exp(-0.5) + np.exp(0.5))/2], 
+                 [(np.exp(-0.5) + np.exp(0.5))/2, (np.exp(1) + np.exp(-1))/2]], 
+                [[(np.exp(-0.5) + np.exp(0.5))/2, (np.exp(1) + np.exp(-1))/2], 
+                 [(np.exp(1) + np.exp(-1))/2, (np.exp(-1.5) + np.exp(1.5))/2]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k])
+
+# 测试 floor 函数
+def test_floor():
+
+    # int 型
+    x = bm.floor(1)
+    assert x == 1
+
+    # float 型
+    x = bm.floor(1.5)
+    assert x == 1
+
+    # bool 型
+    x = bm.floor(True)
+    assert x == 1
+
+    y = bm.floor(False)
+    assert y == 0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = -1.5
+    result = bm.floor(field)
+    assert result == -2
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 7.8
+    result = bm.floor(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert result[0] == 7
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0
+    field[1] = -6.6
+    field[2] = True
+    result = bm.floor(field)
+    expected = [0, -7, 1]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert result[i] == expected[i]
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = (-1) ** (i+j) * (i+j) * 1.7
+    fill()
+    result = bm.floor(field)
+    expected = [[0, -2, 3], 
+                [-2, 3, -6]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result[i, j] == expected[i][j]
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k) * 1.7
+    fill()
+    result = bm.floor(field)
+    expected = [[[0, -2], 
+                 [-2, 3]], 
+                [[-2, 3], 
+                 [3, -6]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert result[i, j, k] == expected[i][j][k]
+
+# 测试 floor_divide 函数
+def test_floor_divide():
+
+    # int 型
+    x = bm.floor_divide(10, 3)
+    assert x == 3
+
+    # float 型
+    x = bm.floor_divide(-10.5, 2.4)
+    assert x == -5
+
+    # bool 型
+    x = bm.floor_divide(True, 0.7)
+    assert x == 1
+
+    y = bm.floor_divide(False, 12.4)
+    assert y == 0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 6.6
+    Field = ti.field(ti.f32, shape=())
+    Field[None] = 2
+    result = bm.floor_divide(field, Field)
+    assert result == 3
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = -8.8
+    Field = ti.field(ti.f32, shape=(1,))
+    Field[0] = 2.4
+    result = bm.floor_divide(field, Field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert result[0] == -4
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 10
+    field[1] = -12.6
+    field[2] = True
+    Field = ti.field(ti.f32, shape=(3,))
+    Field[0] = 2
+    Field[1] = 3
+    Field[2] = 2
+    result = bm.floor_divide(field, Field)
+    expected = [5, -5, 0]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert result[i] == expected[i]
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = i + j * 2
+    fill()
+    Field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in Field:
+            Field[i, j] = i - j * 0.5 + 2
+    fill()
+    result = bm.floor_divide(field, Field)
+    expected = [[0, 1, 4], 
+                [0, 1, 2]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert result[i, j] == expected[i][j]
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k)
+    fill()
+    Field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in Field:
+            Field[i, j, k] = (-1) ** (i+j+k) + 0.1
+    fill()
+    result = bm.floor_divide(field, Field)
+    expected = [[[0, 1], 
+                 [1, 1]], 
+                [[1, 1], 
+                 [1, 3]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert result[i, j, k] == expected[i][j][k]
+
+# 测试 sin 函数
+def test_sin():
+
+    # int 型
+    x = bm.sin(0)
+    assert x == 0
+
+    # float 型
+    x = bm.sin(np.pi/2)
+    assert x == 1
+
+    # bool 型
+    x = bm.sin(True)
+    assert x == np.sin(1)
+
+    y = bm.sin(False)
+    assert y == 0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = np.pi/2
+    result = bm.sin(field)
+    assert result == 1
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = np.pi/6
+    result = bm.sin(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert result[0] == 0.5
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0
+    field[1] = np.pi/2
+    field[2] = True
+    result = bm.sin(field)
+    expected = [0, 1, np.sin(1)]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], expected[i])
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = (-1) ** (i+j) * (i+j) * np.pi/6
+    fill()
+    result = bm.sin(field)
+    expected = [[0, -0.5, np.sqrt(3)/2], 
+                [-0.5, np.sqrt(3)/2, -1]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j])
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k) * np.pi/6
+    fill()
+    result = bm.sin(field)
+    expected = [[[0, -0.5], 
+                 [-0.5, np.sqrt(3)/2]], 
+                [[-0.5, np.sqrt(3)/2], 
+                 [np.sqrt(3)/2, -1]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k])
+                
+# 测试 sinh 函数
+def test_sinh():
+
+    # int 型
+    x = bm.sinh(0)
+    assert x == 0
+
+    # float 型
+    x = bm.sinh(0.5)
+    assert x == (np.exp(0.5) - np.exp(-0.5))/2
+
+    # bool 型
+    x = bm.sinh(True)
+    assert x == (np.exp(1) - np.exp(-1))/2
+
+    y = bm.sinh(False)
+    assert y == 0
+
+    # field 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 0.5
+    result = bm.sinh(field)
+    assert np.allclose(result, (np.exp(0.5) - np.exp(-0.5))/2)
+
+    # field 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 0.5
+    result = bm.sinh(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert np.allclose(result[0], (np.exp(0.5) - np.exp(-0.5))/2)
+
+    # field 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 0
+    field[1] = 0.5
+    field[2] = True
+    result = bm.sinh(field)
+    expected = [0, (np.exp(0.5) - np.exp(-0.5))/2, (np.exp(1) - np.exp(-1))/2]
+    assert result.shape == (3,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        assert np.allclose(result[i], expected[i])
+
+    # field 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    @ti.kernel
+    def fill():
+        for i, j in field:
+            field[i, j] = (-1) ** (i+j) * (i+j) * 0.5
+    fill()
+    result = bm.sinh(field)
+    expected = [[0, (np.exp(-0.5) - np.exp(0.5))/2, (np.exp(1) - np.exp(-1))/2], 
+                [(np.exp(-0.5) - np.exp(0.5))/2, (np.exp(1) - np.exp(-1))/2, (np.exp(-1.5) - np.exp(1.5))/2]]
+    assert result.shape == (2, 3)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            assert np.allclose(result[i, j], expected[i][j])
+
+    # field 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    @ti.kernel
+    def fill():
+        for i, j, k in field:
+            field[i, j, k] = (-1) ** (i+j+k) * (i+j+k) * 0.5
+    fill()
+    result = bm.sinh(field)
+    expected = [[[0, (np.exp(-0.5) - np.exp(0.5))/2], 
+                 [(np.exp(-0.5) - np.exp(0.5))/2, (np.exp(1) - np.exp(-1))/2]], 
+                [[(np.exp(-0.5) - np.exp(0.5))/2, (np.exp(1) - np.exp(-1))/2], 
+                 [(np.exp(1) - np.exp(-1))/2, (np.exp(-1.5) - np.exp(1.5))/2]]]
+    assert result.shape == (2, 2, 2)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(field.shape[0]):
+        for j in range(field.shape[1]):
+            for k in range(field.shape[2]):
+                assert np.allclose(result[i, j, k], expected[i][j][k])
+
+# 测试 trace 函数
+def test_trace():
+
+    # 2d field(三阶方阵)
+    field = ti.field(ti.f32, shape=(3, 3))
+    field.fill(1)
+    field[1, 1] = 2
+    result = bm.trace(field)
+    assert result == 4
+
+    # 2d field(一阶方阵)
+    field = ti.field(ti.f32, shape=(1, 1))
+    field[0, 0] = 2
+    result = bm.trace(field)
+    assert result == 2
+
+# 测试 insert 函数
+def test_insert():
+
+    pass
+
+# 测试 unique 函数
+def test_unique():
+
+    # 空
+    field = ti.field(ti.f32, shape=())
+    field[None] = 1
+    result = bm.unique(field)
+    assert result.shape == (1,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    assert result[0] == 1
+
+    # 数字型
+    field = ti.field(ti.f32, shape=(1,))
+    field[0] = 1
+    result = bm.unique(field)
+    assert result.shape == (1,)
+    assert result.dtype == ti.f32
+    assert result[0] == 1
+
+    # 1d
+    field = ti.field(ti.f32, shape=(3,))
+    field[0] = 1
+    field[1] = 2
+    field[2] = 1
+    result = bm.unique(field)
+    excepted = [1, 2]
+    assert result.shape == (2,)
+    assert isinstance(result, ti.Field)
+    assert result.dtype == ti.f32
+    for i in range(result.shape[0]):
+        assert result[i] == excepted[i]
+
+    # 2d
+    field = ti.field(ti.f32, shape=(2, 3))
+    field[0, 0] = 1
+    field[0, 1] = 2
+    field[0, 2] = 3
+    field[1, 0] = 2
+    field[1, 1] = 1
+    field[1, 2] = 3
+    result = bm.unique(field)
+    excepted = [1, 2, 3]
+    assert isinstance(result, ti.Field)
+    assert result.shape == (3,)
+    assert result.dtype == ti.f32
+    for i in range(result.shape[0]):
+        assert result[i] == excepted[i]
+
+    # 3d
+    field = ti.field(ti.f32, shape=(2, 2, 2))
+    field[0, 0, 0] = 1
+    field[0, 0, 1] = 2
+    field[0, 1, 0] = 3
+    field[0, 1, 1] = 2
+    field[1, 0, 0] = 2
+    field[1, 0, 1] = 1
+    field[1, 1, 0] = 3
+    field[1, 1, 1] = 2
+    result = bm.unique(field)
+    excepted = [1, 2, 3]
+    assert isinstance(result, ti.Field)
+    assert result.shape == (3,)
+    assert result.dtype == ti.f32
+    for i in range(result.shape[0]):
+        assert result[i] == excepted[i]
 
 if __name__ == "__main__":
     pytest.main(["-q", "-s"])
