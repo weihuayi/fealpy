@@ -236,7 +236,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         fill_eye()
         return field
-
+    
     @staticmethod
     def zeros(shape, dtype=ti.f64):
         if isinstance(shape, float):
@@ -379,7 +379,6 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             )
 
     @staticmethod
-    
     def acos(
         x: Union[int, float, bool, ti.Field]
     ) -> Union[float, ti.Field]:
@@ -494,7 +493,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             for I in ti.grouped(field):
                 val = field[I]
                 out[I] = ti.atan2(val,1)
-
+                
         fill_atan(x, out)
                
         return out[None] if len(shape) == 0 else out
@@ -980,3 +979,5 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         add_field(x, y, z)
         return z
 
+
+    

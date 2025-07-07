@@ -14,7 +14,6 @@
 import taichi as ti
 import pytest
 from loguru import logger
-
 from fealpy.backend import backend_manager as bm
 import numpy as np
 
@@ -39,7 +38,6 @@ def test_set_default_device():
     # bm.set_default_device(ti.cuda)
     # assert bm.get_current_backend()._device == ti.cuda
 
-
 # 测试 context 方法
 def test_context():
     x = ti.field(dtype=ti.f32, shape=(2, 3))
@@ -49,7 +47,6 @@ def test_context():
     def fill():
         for i, j in x:
             x[i, j] = i * 1.0 + j * 0.1
-
     fill()
 
     ctx = bm.context(x)
@@ -91,7 +88,6 @@ def test_to_numpy():
     def fill():
         for i, j in x:
             x[i, j] = i * 1.0 + j * 0.1
-
     fill()
 
     print("taichi data type: ", x.dtype)  # 输出 Taichi 的 dtype
@@ -2143,3 +2139,4 @@ def test_unique():
 
 if __name__ == "__main__":
     pytest.main(["-q", "-s"])
+
