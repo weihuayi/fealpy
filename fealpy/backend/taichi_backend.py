@@ -557,12 +557,12 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
     @staticmethod
     def atanh(x: Union[ti.Field, float,int]) -> Union[ti.Field, float]:
         # 检查输入是否是单值（标量）
-        if isinstance(x, float):
+        if isinstance(x, (float,int)):
             return ti.log((1.0 + x) / (1.0 - x)) / 2.0
 
         # 如果输入是 ti.Field
         if not isinstance(x, ti.Field):
-            raise TypeError("Input must be a ti.Field or a float")
+            raise TypeError("Input must be a ti.Field or a scalar")
 
         # 获取矩阵的形状
         shape = x.shape
@@ -577,10 +577,255 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         compute_atanh(x, result)
 
-        if len(shape) == 1 and shape[0] == 1:
-            # 如果结果是一个单值的 ti.Field，返回其单值
-            return result[None]
+        return result
+
+    @staticmethod
+    def equal(x: ti.Field, y: ti.Field) -> ti.Field:
+        if not isinstance(x, ti.Field) or not isinstance(y, ti.Field):
+            raise TypeError("Both inputs must be ti.Field")
+
+        if x.shape != y.shape:
+            raise ValueError("Input fields must have the same shape")
+
+        @ti.kernel
+        def equal_field(x: ti.template(), y: ti.template(), z: ti.template()):
+
+            for I in ti.grouped(x):
+                if x[I] == y[I]:
+                    z[I] = True
+                else:
+                    z[I] = False
+
+        z = ti.field(dtype=ti.u1, shape=x.shape)
+        equal_field(x, y, z)
+        return z
+
+
+    @staticmethod
+    def exp(x: Union[ti.Field, float,int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+            return ti.exp(x)
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_exp(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = ti.exp(field[I])
+
+        compute_exp(x, result)
+
+        return result
+    
+
+    @staticmethod
+    def expm1(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+            if ti.abs(x) < 1e-5:
+                return x + (x * x) / 2 + (x * x * x) / 6
+            else:
+                return ti.exp(x) - 1
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_expm1(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                if ti.abs(field[I]) < 1e-5:
+                    result[I] = (
+                        field[I]
+                        + (field[I] * field[I]) / 2
+                        + (field[I] * field[I] * field[I]) / 6
+                    )
+                else:
+                    result[I] = ti.exp(field[I]) - 1
+
+        compute_expm1(x, result)
 
         return result
 
 
+    @staticmethod
+    def log(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+            return ti.log(x)
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_log(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = ti.log(field[I])
+
+        compute_log(x, result)
+
+
+        return result
+
+
+    @staticmethod
+    def log1p(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+            if ti.abs(x) > 1e-4:
+                return ti.log(1.0 + x)
+            else:
+                return x - (x * x) / 2 + (x * x * x) / 3
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_log1p(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                if ti.abs(field[I]) > 1e-4:
+                    result[I] = ti.log(1.0 + field[I])
+                else:
+                    result[I] = (
+                        field[I]
+                        - (field[I] * field[I]) / 2
+                        + (field[I] * field[I] * field[I]) / 3
+                    )
+
+        compute_log1p(x, result)
+
+        return result
+
+
+    @staticmethod
+    def sqrt(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+            return ti.sqrt(x)
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_sqrt(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = ti.sqrt(field[I])
+
+        compute_sqrt(x, result)
+
+        return result
+
+
+    @staticmethod
+    def sign(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+
+            @ti.kernel
+            def compute_sign_scalar(x: ti.template()) -> float:
+                return tm.sign(x)
+
+            return compute_sign_scalar(x)
+       
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_sign(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = tm.sign(field[I])
+
+        compute_sign(x, result)
+
+        return result
+
+    @staticmethod
+    def tan(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+            return ti.tan(x)
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_tan(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = ti.tan(field[I])
+
+        compute_tan(x, result)
+
+        return result
+    
+    @staticmethod
+    def tanh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        # 检查输入是否是单值（标量）
+        if isinstance(x, (float, int)):
+            return ti.tanh(x)
+
+        # 如果输入是 ti.Field
+        if not isinstance(x, ti.Field):
+            raise TypeError("Input must be a ti.Field or a scalar")
+
+        # 获取矩阵的形状
+        shape = x.shape
+
+        # 创建一个新的 ti.Field 来存储结果
+        result = ti.field(dtype=x.dtype, shape=shape)
+
+        @ti.kernel
+        def compute_tanh(field: ti.template(), result: ti.template()):
+            for I in ti.grouped(field):
+                result[I] = ti.tanh(field[I])
+
+        compute_tanh(x, result)
+
+        return result
