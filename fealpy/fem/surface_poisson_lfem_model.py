@@ -1,11 +1,11 @@
-from typing import Union
+from typing import Optional, Union
 from scipy.sparse import coo_array, bmat
-from fealpy.backend import backend_manager as bm
+from ..backend import backend_manager as bm
 from ..model import PDEDataManager, ComputationalModel
 from ..model.surface_poisson import SurfacePDEDataT
 from ..decorator import variantmethod
 
-# FEM import
+
 from ..functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 from ..fem import BilinearForm, ScalarDiffusionIntegrator
 from ..fem import LinearForm, ScalarSourceIntegrator
@@ -13,13 +13,27 @@ from ..sparse import COOTensor
 
 
 class SurfacePoissonLFEMModel(ComputationalModel):
-    def __init__(self):
-       super().__init__(pbar_log=True, log_level="INFO")
-       self.pdm = PDEDataManager("surface_poisson")
+    """
+    A class to represent a surface Poisson problem using the Lagrange finite element method (LFEM).
+    
+    Attributes:
+        mesh: The mesh of the domain.                                           
+    Reference:
+        https://wnesm678i4.feishu.cn/wiki/SsOKwQiVqi241WkusA9cn9ylnPf
+    """
+    
+    
+    def __init__(self, options):
+       self.options = options
+       super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+       self.set_pde(options['pde'])
+       self.set_init_mesh(options['init_mesh']) 
+       self.set_space_degree(options['space_degree']) 
+       
 
     def set_pde(self, pde: Union[SurfacePDEDataT, str] = "sphere"):
         if isinstance(pde, str):
-            self.pde = self.pdm.get_example(pde)
+            self.pde = PDEDataManager("surface_poisson").get_example(pde)
         else:
             self.pde = pde
 

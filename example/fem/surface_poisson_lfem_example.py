@@ -15,8 +15,8 @@ parser.add_argument('--pde',
                     help='Name of the PDE model, default is surfacelevelset')
 
 parser.add_argument('--init_mesh',
-                    default='uniform_tet', type=str,
-                    help='Type of mesh, default is uniform_tet')
+                    default='ltri', type=str,
+                    help='Type of mesh, default is lagrange_triangle_mesh')
 
 parser.add_argument('--space_degree',
         default=1, type=int,
