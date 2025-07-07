@@ -60,7 +60,6 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
             self.mesh = self.pde.init_mesh[mesh](**kwargs)
         else:
             self.mesh = mesh
-
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
@@ -126,3 +125,4 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         S, M = self.linear_system()
         val, vec = eigsh(S.to_scipy(), k=6, M=M.to_scipy(), which='SM', tol=1e-5, maxiter=1000)
         self.logger.info(f"Eigenvalues: {val}")
+

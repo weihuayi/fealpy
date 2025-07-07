@@ -46,6 +46,10 @@ class BoxPolyData3d(BoxDomainMesher3d):
         """Material density ρ = 1e4 kg/m³."""
         return 1e4
 
+    def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
+        """Material density ρ = 1e4 kg/m³."""
+        return 1e4
+
     @cartesian
     def body_force(self, p: TensorLike):
         val = bm.zeros(p.shape, dtype=p.dtype, device=bm.get_device(p))
