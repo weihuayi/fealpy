@@ -12,6 +12,7 @@ doc/project
 *.inp
 *.mtx
 *.mexa64
+*.mphtxt
 
 meviewer
 
