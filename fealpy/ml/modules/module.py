@@ -2,7 +2,8 @@ from typing import (
     Callable, Sequence, Union
 )
 
-import numpy as np
+from ...backend import backend_manager as bm
+from ...typing import TensorLike
 from numpy.typing import NDArray
 import torch
 from torch import Tensor, device, float64
@@ -13,18 +14,41 @@ from fealpy.ml.nntyping import VectorFunction, TensorFunction
 
 
 class TensorMapping(Module):
-    """
-    @brief A function whose input and output are tensors. The `forward` method\
-           is not implemented, override it to build a function.
+    """Base class for tensor-to-tensor mappings with extended functionality.
+    
+    Provides common operations for tensor mappings including device management,
+    dimension operations, error estimation, and visualization tools. Designed as
+    an abstract base class that should be subclassed with `forward` implemented.
+
+    Attributes:
+        _device: torch.device
+            Stores the default device for tensor operations (optional)
+    
+    Methods:
+        get_device(): Get the device of the first parameter or stored _device
+        set_device(): Set the default device for the mapping
+        last_dim(): Apply mapping while preserving all but last dimension
+        diff(): Create difference mapping between two functions
+        real(): Create mapping returning real part of complex output
+        fixed(): Create mapping with fixed input features
+        extracted(): Create mapping extracting specific output features
+        from_numpy(): Convert numpy input to tensor and apply mapping
+        from_cell_bc(): Evaluate at barycentric coordinates in mesh cells
+        estimate_error(): Calculate error against reference function on mesh
+        estimate_error_tensor(): Tensor-based error estimation
+        estimate_error_func(): Functional error estimation
+        meshgrid_mapping(): Evaluate mapping on meshgrid coordinates
+        add_surface(): 3D surface plot of 2D input mapping
+        add_pcolor(): 2D pseudocolor plot of 2D input mapping
     """
 
     def get_device(self) -> Union[device, None]:
-        """
-        @brief Get the device of the first parameter in this module. Return `None`\
-               if no parameters.
-
-        If no submodule found, try to return `_device` attribute. This attribute\
-        can be set by the `set_device` method.
+        """Get the device of the first parameter in this module.
+        
+        Returns:
+            torch.device or None: 
+                Device of first parameter if exists, otherwise checks for _device attribute.
+                Returns None if neither exists.
         """
         for param in self.parameters():
             return param.device
@@ -32,8 +56,14 @@ class TensorMapping(Module):
         return getattr(self, '_device', None)
 
     def set_device(self, device: device):
-        """
-        @brief Set the default device. This can NOT set devices for submodules.
+        """Set the default device for tensor operations.
+        
+        Parameters:
+            device: torch.device
+                Target device for tensor operations
+                
+        Note:
+            Does not affect submodules' devices.
         """
         setattr(self, '_device', device)
 
@@ -42,9 +72,16 @@ class TensorMapping(Module):
     ### dim operating
 
     def last_dim(self, p: Tensor):
-        """
-        @brief Apply the model on the last dim/axis of the input `p`. Other dims\
-               will be preserved.
+        """Apply mapping while preserving all but last dimension.
+        
+        Parameters:
+            p: Tensor
+                Input tensor of shape (..., d) where d is input dimension
+                
+        Returns:
+            Tensor: 
+                Output tensor of shape (..., k) where k is output dimension,
+                preserving all leading dimensions
         """
         origin_shape = p.shape[:-1]
         p = p.reshape(-1, p.shape[-1])
@@ -54,57 +91,82 @@ class TensorMapping(Module):
     ### module wrapping
 
     def diff(self, target: TensorFunction):
-        """
-        @brief Get a new module whose output is the difference.
-
-        This is useful when drawing the difference.
+        """Create a new mapping representing difference with target function.
+        
+        Parameters:
+            target: TensorFunction
+                Function to subtract from this mapping
+                
+        Returns:
+            TensorMapping: 
+                New mapping that computes self(p) - target(p)
         """
         return DiffSolution(self, target)
 
     def real(self, dtype):
-        """
-        @brief
+        """Create mapping returning real part of complex output.
+        
+        Parameters:
+            dtype: torch.dtype
+                Data type for real conversion
+                
+        Returns:
+            TensorMapping: 
+                New mapping that computes real part of output
         """
         return RealSolution(self, dtype)
 
     def fixed(self, idx: Sequence[int], value: Sequence[float],
                  dtype=torch.float64):
-        """
-        @brief Return a module wrapped from this, to make some input features fixed.\
-               See `fealpy.ml.modules.Fixed`.
-
-        @param idx: Sequence[int]. The indices of features to be fixed.
-        @param value: Sequence[int]. Values of data in fixed features.
-        @param dtype: dtype, optional.
+        """Create mapping with fixed input features.
+        
+        Parameters:
+            idx: Sequence[int]
+                Indices of input features to fix
+            value: Sequence[float]
+                Values for fixed features
+            dtype: torch.dtype, optional
+                Data type for fixed values (default: float64)
+                
+        Returns:
+            TensorMapping: 
+                New mapping with specified input features fixed
         """
         assert len(idx) == len(value)
         return Fixed(self, idx, value, dtype=dtype)
 
     def extracted(self, *idx: int):
-        """
-        @brief Return a module wrapped from this. The output features of the wrapped module are extracted\
-               from the original one. See `fealpy.ml.modules.Extracted`.
-
-        @param *idx: int. Indices of features to extract.
+        """Create mapping extracting specific output features.
+        
+        Parameters:
+            *idx: int
+                Indices of output features to extract
+                
+        Returns:
+            TensorMapping: 
+                New mapping that outputs only specified features
         """
         return Extracted(self, idx)
 
     ### numpy & mesh
 
     def from_numpy(self, ps: NDArray, device=None, last_dim=False) -> Tensor:
-        """
-        @brief Accept numpy array as input, and return in Tensor type.
-
-        @param ps: NDArray.
-        @param device: torch.device | None. Specify the device when making tensor\
-               from numpy array. Use the deivce of parameters in the module if\
-               `None`. If no parameters in the module, use cpu by default.
-        @param last_dim: bool. Apply the model on the last axis of the input if\
-               `True`, and other axis will be preserved. Defaults to `False`.
-
-        @return: Tensor.
-
-        @note: This is a method with coordtype 'cartesian'.
+        """Convert numpy array to tensor and apply mapping.
+        
+        Parameters:
+            ps: NDArray
+                Input numpy array
+            device: torch.device, optional
+                Target device (default: module's device)
+            last_dim: bool, optional
+                Whether to apply mapping on last dimension (default: False)
+                
+        Returns:
+            Tensor: 
+                Output tensor after applying mapping
+                
+        Note:
+            This method has coordtype 'cartesian' attribute for compatibility.
         """
         pt = torch.from_numpy(ps)
         if device is None:
@@ -116,15 +178,20 @@ class TensorMapping(Module):
     from_numpy.__dict__['coordtype'] = 'cartesian'
 
     def from_cell_bc(self, bc: NDArray, mesh, device=None) -> Tensor:
-        """
-        @brief From bc in mesh cells to outputs of the solution.
-
-        @param bc: NDArray containing bc points. It may has a shape (m, TD+1) where m is the number\
-                   of bc points and TD is the topology dimension of the mesh.
-
-        @return: Tensor with shape (b, c, ...). Outputs in every bc points and every cells.\
-                 In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'\
-                 is the shape of the function output.
+        """Evaluate mapping at barycentric coordinates in mesh cells.
+        
+        Parameters:
+            bc: NDArray
+                Barycentric coordinates with shape (m, TD+1)
+            mesh: Mesh
+                Computational mesh
+            device: torch.device, optional
+                Target device (default: module's device)
+                
+        Returns:
+            Tensor: 
+                Output values with shape (b, c, ...) where b is number of
+                bc points and c is number of cells
         """
         points = mesh.cell_bc_to_point(bc)
         return self.from_numpy(points, device=device, last_dim=True)
@@ -134,26 +201,29 @@ class TensorMapping(Module):
     def estimate_error(self, other: VectorFunction, mesh=None, power: int=2, q: int=3,
                        cell_type: bool=False, coordtype: str='b', squeeze: bool=False,
                        device=None):
-        """
-        @brief Calculate error between the solution and `other` in finite element space `space`.
-
-        @param other: VectorFunction. The function(target) to be compared with.
-        @param mesh: MeshLike, optional. A mesh in which the error is estimated. If `other` is a function in finite\
-               element space, use mesh of the space instead and this parameter will be ignored.
-        @param power: int. Defaults to 2, which means to measure L-2 error by default.
-        @param q: int. The index of quadratures.
-        @param cell_type: bool. Split error values from each cell if `True`, and the shape of return will be (NC, ...)\
-               where 'NC' refers to number of cells, and '...' is the shape of function output. If `False`,\
-               the output has the same shape to the funtion output. Defaults to `False`.
-        @param coordtype: `'barycentric'`(`'b'`) or `'cartesian'`(`'c'`). The coordtype\
-               of the target `other`. Defaults to `'b'`. This parameter will be\
-               ignored if `other` has attribute `coordtype`.
-        @param squeeze: bool. Defaults to `False`. Squeeze the function output before calculation.\
-               This is sometimes useful when estimating error for an 1-output network.
-        @param device: device | None. Use the device of the parameter in the model\
-               if `None`.
-
-        @return: error.
+        """Calculate error between this mapping and reference function.
+        
+        Parameters:
+            other: VectorFunction
+                Reference function to compare against
+            mesh: Mesh, optional
+                Mesh for error estimation (required if other not in FE space)
+            power: int, optional
+                L-error order (default: 2 for L2 error)
+            q: int, optional
+                Quadrature order (default: 3)
+            cell_type: bool, optional
+                Whether to return per-cell errors (default: False)
+            coordtype: str, optional
+                Coordinate type ('b' for barycentric, 'c' for cartesian) (default: 'b')
+            squeeze: bool, optional
+                Whether to squeeze output dimensions (default: False)
+            device: torch.device, optional
+                Computation device (default: module's device)
+                
+        Returns:
+            Tensor: 
+                Computed error measure
         """
         from fealpy.functionspace.function import Function
 
@@ -174,38 +244,65 @@ class TensorMapping(Module):
 
         if coordtype in {'cartesian', 'c'}:
 
-            ps = mesh.bc_to_point(bcs).numpy()
-            val = self.from_numpy(ps, device=device, last_dim=True).cpu().detach().numpy()
+            ps = mesh.bc_to_point(bcs)
+            val = self.from_numpy(ps.numpy(), device=device, last_dim=True).cpu()
+    
             if squeeze:
                 val = val.squeeze(-1)
-            diff = np.abs(val - other(ps))**power
+            val_ture = other(ps)
+            val = val.detach() if val.requires_grad else val
+
+            # 统一形状
+            ndim = len(val_ture.shape)
+            if ndim == 2:  # 如果 val_ture 是 (N, M)
+                val_ture = val_ture.unsqueeze(-1)  # -> (N, M, 1)
+            elif ndim == 4:  # 如果 val_ture 是 (N, M, 1, 1)
+                val_ture = val_ture.squeeze()  # -> (N, M, 1)
+    
+            # 检查最终形状是否匹配
+            assert val.shape == val_ture.shape, f"Shape mismatch: val {val.shape}, val_ture {val_ture.shape}"
+
+            diff = bm.abs(val - val_ture)**power
 
         elif coordtype in {'barycentric', 'b'}:
 
             val = self.from_cell_bc(bcs, mesh, device=device).cpu().detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
-            diff = np.abs(val - other(bcs))**power
+            diff = bm.abs(val - other(bcs))**power
 
         else:
             raise ValueError(f"Invalid coordtype '{coordtype}'.")
 
-
-        e = np.einsum('q, cq..., c -> c...', ws, diff, cellmeasure)
+        # if mesh.GD == 1:
+        #     diff = diff.transpose(0, 1)
+        e = bm.einsum('q, cq..., c -> c...', ws, diff, cellmeasure)
         if cell_type:
-            return np.power(e, 1/power, out=e)
-        return np.power(e.sum(axis=0), 1/power)
+            return bm.pow(e, 1/power, out=e)
+        
+        return bm.pow(e.sum(axis=0), 1/power)
 
     def estimate_error_tensor(self, other: TensorFunction, mesh, *, power: int=2,
                               q: int=3, cell_type: bool=False, dtype=float64):
-        """
-        @brief Estimate error between the function and another tensor function.
-
-        @param other: TensorFunction. The target to compare with.
-        @param mesh: Mesh. The mesh to estimate error.
-        @param power: int, optional. The order of L-error, defaults to 2.
-        @param q: int, optional. The index of quadratures, defualts to 3.
-        @param cell_type: bool, optional.
+        """Tensor-based error estimation between mappings.
+        
+        Parameters:
+            other: TensorFunction
+                Reference tensor function
+            mesh: Mesh
+                Computational mesh
+            power: int, optional
+                L-error order (default: 2)
+            q: int, optional
+                Quadrature order (default: 3)
+            cell_type: bool, optional
+                Whether to return per-cell errors (default: False)
+            dtype: torch.dtype, optional
+                Computation dtype (default: float64)
+                
+        Returns:
+            Tensor: 
+                Computed error measure
         """
         device = self.get_device()
         qf = mesh.integrator(q, etype='cell')
@@ -229,19 +326,40 @@ class TensorMapping(Module):
         if cell_type:
             return torch.pow(e, 1/power, out=e)
         return torch.pow(e.sum(dim=0), 1/power)
+    
+    # def estimate_error_func(self, other: TensorFunction, mesh):
+    #     """Functional error estimation via maximum difference at nodes.
+        
+    #     Parameters:
+    #         other: TensorFunction
+    #             Reference tensor function
+    #         mesh: Mesh
+    #             Computational mesh
+                
+    #     Returns:
+    #         Tensor: 
+    #             Maximum absolute difference at mesh nodes
+    #     """
+    #     device = self.get_device()
+    #     node = mesh.entity('node')
+    #     diff = torch.max(torch.abs(self(node) - other(node)))
+    #     return diff
 
     ### plotting
 
     def meshgrid_mapping(self, *xi: Tensor, detach=True):
-        """
-        @brief Calculate the function value in a meshgrid.
-
-        @param *xi: Tensor. See `torch.meshgrid`.
-        @param detach: bool, optional.
-
-        @return: tensor, (X1, X2, ..., Xn). For output having more than one\
-                 feature, return a list instead. Each element is a tensor,\
-                 containing values of a feature in the meshgrid.
+        """Evaluate mapping on meshgrid coordinates.
+        
+        Parameters:
+            *xi: Tensor
+                Coordinate vectors for meshgrid
+            detach: bool, optional
+                Whether to detach from computation graph (default: True)
+                
+        Returns:
+            tuple: 
+                (values, meshgrid) where values are either a single tensor or
+                list of tensors for multi-output mappings
         """
         mesh = torch.meshgrid(*xi, indexing='ij')
         origin = mesh[0].shape
@@ -267,16 +385,29 @@ class TensorMapping(Module):
                     out_idx: Sequence[int]=[0, ],
                     edgecolor='blue', linewidth=0.0003, cmap=None,
                     vmin=None, vmax=None):
-        """
-        @brief Draw a surface for modules having 2 input features.
-
-        @param axes: Axes3D.
-        @param box: Seuqence[float]. Box of the plotting area. Like `[0, 1, 0, 1]`.
-        @param nums: Sequence[int]. Number of points in x and y direction.
-        @param out_idx: Sequence[int]. Specify the output feature(s) to plot the\
-               surface. Number of surfaces is equal to the number of output features.
-
-        @returns: None.
+        """Add 3D surface plot of 2D input mapping.
+        
+        Parameters:
+            axes: Axes3D
+                Matplotlib 3D axes
+            box: Sequence[float]
+                Plotting domain [xmin, xmax, ymin, ymax]
+            nums: Sequence[int]
+                Grid resolution [nx, ny]
+            dtype: torch.dtype, optional
+                Computation dtype (default: float64)
+            out_idx: Sequence[int], optional
+                Output feature indices to plot (default: [0])
+            edgecolor: str, optional
+                Edge color (default: 'blue')
+            linewidth: float, optional
+                Edge linewidth (default: 0.0003)
+            cmap: Colormap, optional
+                Color mapping (default: RdYlBu_r)
+            vmin: float, optional
+                Color scale minimum
+            vmax: float, optional
+                Color scale maximum
         """
         from matplotlib import cm
         if cmap is None:
@@ -298,15 +429,29 @@ class TensorMapping(Module):
     def add_pcolor(self, axes, box: Sequence[float], nums: Sequence[int],
                    dtype=float64,
                    out_idx=0, vmin=None, vmax=None, cmap=None):
-        """
-        @brief Call pcolormesh for modules having 2 input features.
-
-        @param axes: Axes.
-        @param box: Sequence[float].
-        @param nums: Sequence[int].
-        @param out_index: int, optional. Specify the output feature to plot.
-
-        @returns: matplotlib.collections.QuadMesh
+        """Add 2D pseudocolor plot of 2D input mapping.
+        
+        Parameters:
+            axes: Axes
+                Matplotlib axes
+            box: Sequence[float]
+                Plotting domain [xmin, xmax, ymin, ymax]
+            nums: Sequence[int]
+                Grid resolution [nx, ny]
+            dtype: torch.dtype, optional
+                Computation dtype (default: float64)
+            out_idx: int, optional
+                Output feature index to plot (default: 0)
+            vmin: float, optional
+                Color scale minimum
+            vmax: float, optional
+                Color scale maximum
+            cmap: Colormap, optional
+                Color mapping (default: RdYlBu_r)
+                
+        Returns:
+            QuadMesh: 
+                Matplotlib collection object
         """
         from matplotlib import cm
         if cmap is None:
@@ -376,6 +521,7 @@ class Solution(TensorMapping):
 
 
 class DiffSolution(TensorMapping):
+    """Mapping representing difference between two tensor functions."""
     def __init__(self, fn1: TensorFunction, fn2: TensorFunction) -> None:
         super().__init__()
         self.__fn_1 = fn1
@@ -396,18 +542,25 @@ class RealSolution(TensorMapping):
 
 
 class Fixed(Solution):
+    """Mapping with fixed input features.
+    
+        Initialize fixed feature mapping.
+        
+        Parameters:
+            func: TensorFunction
+                Original mapping
+            idx: Sequence[int]
+                Indices of input features to fix
+            values: Sequence[float]
+                Values for fixed features
+            dtype: torch.dtype, optional
+                Data type for fixed values (default: float64)
+    """
     def __init__(self, func: TensorFunction,
                  idx: Sequence[int],
                  values: Sequence[float],
                  dtype=torch.float64
         ) -> None:
-        """
-        @brief Fix some input features of `func`, as a wrapped module.
-
-        @param func: The original module.
-        @param idx: Indices of features to be fixed.
-        @param values: Values of fixed features.
-        """
         super().__init__(func)
         self._fixed_idx = torch.tensor(idx, dtype=torch.long)
         self._fixed_value = torch.tensor(values, dtype=dtype).unsqueeze(0)
@@ -426,6 +579,15 @@ class Fixed(Solution):
 
 
 class Extracted(Solution):
+    """Mapping extracting specific output features from another mapping.
+        Initialize feature extraction mapping.
+        
+        Parameters:
+            func: TensorFunction
+                Original mapping
+            idx: Sequence[int]
+                Indices of output features to extract
+    """
     def __init__(self, func: TensorFunction,
                  idx: Sequence[int]
         ) -> None:
@@ -443,15 +605,17 @@ class Extracted(Solution):
 
 
 class Projected(Solution):
+    """Mapping projecting input features into subspace before evaluation.
+       Initialize projected input mapping.
+        
+        Parameters:
+            func: TensorFunction
+                Original mapping
+            comps: Sequence[Union[None, Tensor, float]]
+                Components defining projection subspace
+    """
     def __init__(self, func: TensorFunction,
                  comps: Sequence[Union[None, Tensor, float]]) -> None:
-        """
-        @brief Project the input features of `func` into a sub space, as a wrapped module.\
-               See `fealpy.pinn.tools.proj`.
-
-        @param func: The original module.
-        @param comps: Components in projected features.
-        """
         super().__init__(func)
         self._comps = comps
 
