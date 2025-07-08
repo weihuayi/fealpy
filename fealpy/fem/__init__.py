@@ -65,3 +65,4 @@ from .polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
 from .allencahn_lfem_model import AllenCahnLFEMModel
 from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
+from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
