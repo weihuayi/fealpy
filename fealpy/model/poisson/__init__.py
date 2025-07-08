@@ -43,10 +43,10 @@ DATA_TABLE = {
     "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
     "sinsinsin": ("sin_sin_sin_data_3d", "SinSinSinData3D"),
     "interior":("interior_layer_data_2d", "InteriorLayerData2d"),
-    "corner":("corner_singularity_data_2d", "CornerSingularityData2d")
+    "corner":("corner_singularity_data_2d", "CornerSingularityData2d"),
     "CosCos_Cos_Dir_2D": ("coscos_cos_dir_2d", "CosCos_Cos_Dir_2D"),
     "CosCosCos_Cos_Dir_3D": ("coscoscos_cos_dir_3d", "CosCosCos_Cos_Dir_3D"),
     "Sin_Sin_Dir_1D": ("sin_sin_dir_1d", "Sin_Sin_Dir_1D"),
     "SinSin_Sin_Dir_2D": ("sinsin_sin_dir_2d", "SinSin_Sin_Dir_2D"),
-    "SinSinSin_Sin_Dir_3D": ("sinsinsin_sin_dir_3d", "SinSinSin_Sin_Dir_3D"),
+    "SinSinSin_Sin_Dir_3D": ("sinsinsin_sin_dir_3d", "SinSinSin_Sin_Dir_3D")
 }

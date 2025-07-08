@@ -1,7 +1,7 @@
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import  TensorLike
-from ..sphere_domain_mesher import SphereDomainMesher3D
+from ..domain_mesher.sphere_domain_mesher import SphereDomainMesher3D
 
 
 class SurfaceLevelSetData(SphereDomainMesher3D):
