@@ -1,47 +1,61 @@
+from typing import Optional
 
-from ...decorator import cartesian, variantmethod
-from ...backend import bm
+from ...backend import bm 
 from ...typing import TensorLike
-from ...material import LinearElasticMaterial
+from ...decorator import cartesian
+from ..box_domain_mesher import BoxDomainMesher3d
 
 
-class BoxDomainData3d():
+class BoxDomainData3d(BoxDomainMesher3d):
 
     def __init__(self):
-        self.eps = 1e-12
+        super().__init__(box=[0, 1, 0, 0.2, 0, 0.2])
 
+        self.L = 1.0 # length of the box in x direction
+        self.W = 0.2 # width of the box in y and z direction
 
-    def domain(self):
-        return [0, 1, 0, 1, 0, 1]
+        delta = self.W/self.L # aspect ratio 
+        self.g = 0.4 * delta**2 # gravity acceleration 
+        self.d = bm.array(
+                [0.0, 0.0, 1.0], 
+                dtype=bm.float64,
+                device=bm.get_device())
+    
+    @property
+    def lam(self, p: Optional[TensorLike] = None) -> TensorLike:
+        return 1.25 
+    @property
+    def mu(self, p: Optional[TensorLike] = None) -> TensorLike:
+        return 1.0 
+    @property
+    def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
+        return 1.0 
 
-    @variantmethod('hex')
-    def init_mesh(self):
-        from ...mesh import HexahedronMesh
-        node = bm.array([[0.249, 0.342, 0.192],
-                [0.826, 0.288, 0.288],
-                [0.850, 0.649, 0.263],
-                [0.273, 0.750, 0.230],
-                [0.320, 0.186, 0.643],
-                [0.677, 0.305, 0.683],
-                [0.788, 0.693, 0.644],
-                [0.165, 0.745, 0.702],
-                [0, 0, 0],
-                [1, 0, 0],
-                [1, 1, 0],
-                [0, 1, 0],
-                [0, 0, 1],
-                [1, 0, 1],
-                [1, 1, 1],
-                [0, 1, 1]],
-            dtype=bm.float64)
+    @cartesian
+    def body_force(self, p: TensorLike):
+        val = bm.zeros_like(p, **bm.context(p))
+        return val
 
-        cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7],
-                        [0, 3, 2, 1, 8, 11, 10, 9],
-                        [4, 5, 6, 7, 12, 13, 14, 15],
-                        [3, 7, 6, 2, 11, 15, 14, 10],
-                        [0, 1, 5, 4, 8, 9, 13, 12],
-                        [1, 2, 6, 5, 9, 10, 14, 13],
-                        [0, 4, 7, 3, 8, 12, 15, 11]],
-                        dtype=bm.int32)
-        mesh = HexahedronMesh(node, cell)
-        return mesh
+    @cartesian
+    def displacement(self, p: TensorLike):
+        raise NotImplementedError(
+                "Displacement computation is not implemented for BoxDomainData3d.")
+
+    @cartesian
+    def strain(self, p: TensorLike) -> TensorLike:
+        raise NotImplementedError(
+                "Strain computation is not implemented for BoxDomainData3d.")
+
+    @cartesian
+    def stress(self, p: TensorLike) -> TensorLike:
+        raise NotImplementedError(
+                "Stress computation is not implemented for BoxDomainData3d.")
+
+    @cartesian
+    def displacement_bc(self, p: TensorLike) -> TensorLike:
+        return bm.zeros_like(p, **bm.context(p))
+    
+    @cartesian
+    def is_displacement_boundary(self, p: TensorLike) -> TensorLike:
+        return bm.abs(p[..., 0]) < 1e-12 
+>>>>>>> upstream/draft/momo

@@ -1,5 +1,6 @@
 import argparse
 from fealpy.backend import backend_manager as bm
+from fealpy.model.linear_elasticity.box_poly_data_3d import BoxPolyData3d
 
 <<<<<<< Updated upstream
 =======

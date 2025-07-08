@@ -28,6 +28,8 @@ class PolyharmonicCrFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
+        import ipdb
+        ipdb.set_trace()
         self.set_init_mesh(options['init_mesh'], nx=options['mesh_size'],
                            ny=options['mesh_size'] )
         self.set_space_degree(options['space_degree'])
@@ -43,6 +45,8 @@ class PolyharmonicCrFEMModel(ComputationalModel):
 
     def set_init_mesh(self, mesh: Union[Mesh, str] = "tri", **kwargs):
         if isinstance(mesh, str):
+            import ipdb
+            ipdb.set_trace()
             self.mesh = self.pde.init_mesh(**kwargs)
         else:
             self.mesh = mesh

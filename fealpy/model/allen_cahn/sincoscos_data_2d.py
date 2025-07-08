@@ -1,15 +1,16 @@
 from typing import Sequence
-from ...decorator import cartesian
+from ...decorator import cartesian,variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 import sympy as sp
 
-class AcSinCosCosData2D:
+class SinCosCosData2D:
     def __init__(self):
         self.box = [-1, 1, -1, 1]
         self.x, self.y, self.t = sp.symbols("x y t")
-        self.gamma = 0.02
-        self.eta = self.set_mesh()
+        self.gam = 0.02
+        self.n = 64
+        self.eta = 4*2/64
         self.area = 4
         self.phi_expr = 2 + sp.sin(self.t) * sp.cos(sp.pi * self.x) * sp.cos(sp.pi * self.y)
         self.u1_expr = sp.pi * sp.sin(2 * sp.pi * self.y) * sp.sin(sp.pi * self.x) ** 2 * sp.sin(self.t)
@@ -30,12 +31,54 @@ class AcSinCosCosData2D:
     
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""
-        return [0.0, 1.0]
+        return [0.0, 0.004]
+    
+    def nonlinear_source(self, phi):
+        """Return the nonlinear source term f(φ) = 1/η^2 *(φ^3 - φ)."""
+        eta = self.eta
+        return (phi**3 - phi) / (eta**2)
+    
+    def gamma(self) -> float:
+        """Return the gamma parameter in the Allen-Cahn equation."""
+        return self.gam
+    
+    @variantmethod('tri')
+    def init_mesh(self, **kwargs):
+        """
+        Initialize the mesh with given number of points in x and y directions.
+        """
+        from ...mesh import TriangleMesh
+        nx = self.n
+        ny = self.n
+        mesh = TriangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
+
+        domain = self.box
+        vertices = bm.array([[domain[0], domain[2]],
+                             [domain[1], domain[2]],
+                             [domain[1], domain[3]],
+                             [domain[0], domain[3]]], **kwargs)
+        mesh.nodedata['vertices'] = vertices
+        return mesh
+    
+    @variantmethod('quad')
+    def init_mesh(self, **kwargs):
+        from ...mesh import QuadrangleMesh
+        nx = self.n
+        ny = self.n
+        mesh = QuadrangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
+
+        domain = self.box
+        vertices = bm.array([[domain[0], domain[2]],
+                             [domain[1], domain[2]],
+                             [domain[1], domain[3]],
+                             [domain[0], domain[3]]], **kwargs)
+        mesh.nodedata['vertices'] = vertices
+        return mesh
     
     def init_force(self):
         x, y, t = self.x, self.y, self.t
         eta = self.eta
-        gamma = self.gamma
+        gamma = self.gamma()
         u1 = self.u1_expr
         u2 = self.u2_expr
         phi = self.phi_expr
@@ -77,16 +120,11 @@ class AcSinCosCosData2D:
         """Return the initial condition for the phase field."""
         return self.solution(p, t)
     
-    def set_mesh(self, n=120):
-        from ...mesh import TriangleMesh
-        mesh = TriangleMesh.from_box(self.box, nx=n, ny=n)
-        return 4* bm.min(mesh.entity_measure('edge'))
-    
     def verify_phase_solution(self):
         x, y, t = self.x, self.y, self.t
         u1 = self.u1_expr
         u2 = self.u2_expr
-        gamma = self.gamma
+        gamma = self.gamma()
         eta = self.eta
         
         # 解析表达式
