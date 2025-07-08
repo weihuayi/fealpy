@@ -25,7 +25,7 @@ class PlaneWaveObliqueIncidenceData2D(BoxDomainMesher2d):
         self.k = k
         self.theta = theta
         self.k1 = k * bm.cos(theta)
-        self.k2 = k * bm.sin(theta)
+        self.k2 = k * bm.sin(theta)       
 
     def geo_dimension(self) -> int:
         return 2
@@ -39,6 +39,11 @@ class PlaneWaveObliqueIncidenceData2D(BoxDomainMesher2d):
         x, y = p[..., 0], p[..., 1]
         phase = self.k1 * x + self.k2 * y
         return bm.exp(1j * phase)
+    
+    @cartesian
+    def source(self, p: TensorLike) -> TensorLike:
+        """Right-hand side f(x, y) ≡ 0"""
+        return bm.zeros_like(p[..., 0], dtype=bm.complex128)
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
@@ -52,7 +57,7 @@ class PlaneWaveObliqueIncidenceData2D(BoxDomainMesher2d):
         """Robin boundary value: ∂u/∂n + iku = g(x)"""
         u_val = self.solution(p)
         grad_u = self.gradient(p)
-        dndu = bm.sum(grad_u * n, axis=-1)  # ∇u · n
+        dndu = bm.sum(grad_u * n[:, None, :], axis=-1)  # ∇u · n
         return dndu + 1j * self.k * u_val
 
     @cartesian
