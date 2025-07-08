@@ -11,8 +11,8 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='surfacelevelset', type=str,
-                    help='Name of the PDE model, default is surfacelevelset')
+                    default='sphere', type=str,
+                    help='Name of the PDE model, default is sphere')
 
 parser.add_argument('--init_mesh',
                     default='ltri', type=str,

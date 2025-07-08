@@ -5,11 +5,13 @@ from ..model import PDEDataManager, ComputationalModel
 from ..model.surface_poisson import SurfacePDEDataT
 from ..decorator import variantmethod
 
-
+from ..mesh import Mesh
 from ..functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
 from ..fem import BilinearForm, ScalarDiffusionIntegrator
 from ..fem import LinearForm, ScalarSourceIntegrator
 from ..sparse import COOTensor
+
+from ..solver import spsolve, cg
 
 
 class SurfacePoissonLFEMModel(ComputationalModel):
@@ -37,8 +39,11 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         else:
             self.pde = pde
 
-    def set_init_mesh(self, meshtype: str = "ltri", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "ltri", **kwargs):
+        if isinstance(mesh,str):
+            self.mesh = self.pde.init_mesh[mesh](**kwargs)
+        else:
+            self.mesh = mesh
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -46,11 +51,18 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-    def set_space_degree(self, p: int = 1) -> None:
+
+    def set_space_degree(self, p: int) -> None:
         self.p = p
 
-    def surface_poisson_system(self, mesh, p):
-        self.space = ParametricLagrangeFESpace(mesh, p=p)
+    def surface_poisson_system(self):
+        """
+        Construct the linear system for the surface problem.
+
+        Returns:
+            The diffusion matrix and source matrix.
+        """
+        self.space = ParametricLagrangeFESpace(self.mesh, self.p)
         self.uh = self.space.function()
 
         bform = BilinearForm(self.space)
@@ -79,13 +91,16 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         return A, F
     
     @variantmethod("direct")
-    def solve(self, A, F):
-        from ..solver import spsolve
+    def solve(self):
+        """
+        Solve the surface problem using the finite element method.
+        """
+        A, F = self.surface_poisson_system()
         return spsolve(A, F, solver='scipy')
     
     @solve.register('cg')
-    def solve(self, A, F):
-        from ..solver import cg
+    def solve(self):
+        A, F = self.surface_poisson_system()
         self.uh, info = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
         self.uh[:] = -self.uh[:-1]
         res = info['residual']
@@ -95,7 +110,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     def run(self):
         """
         """
-        A, F = self.surface_poisson_system(self.mesh, self.p)
+        A, F = self.surface_poisson_system()
         self.uh[:] = self.solve(A, F)
         l2 = self.postprocess()
         self.logger.info(f"L2 Error: {l2}.")
@@ -103,8 +118,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     @run.register('uniform_refine')
     def run(self, maxit=4):
         for i in range(maxit):
-            A, F = self.linear_system(self.mesh, self.p)
-            A, F = self.apply_bc(A, F)
+            A, F = self.surface_poisson_system()
             self.uh[:] = self.solve(A, F)
             l2 = self.postprocess()
             self.logger.info(f"{i}-th step with  L2 Error: {l2}.")

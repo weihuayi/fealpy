@@ -38,5 +38,5 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "spheresurface":("surface_level_set_data", "SurfaceLevelSetData")
+    "sphere": ("surface_level_set_data", "SurfaceLevelSetData")
 }
