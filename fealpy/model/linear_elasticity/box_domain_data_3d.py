@@ -58,4 +58,3 @@ class BoxDomainData3d(BoxDomainMesher3d):
     @cartesian
     def is_displacement_boundary(self, p: TensorLike) -> TensorLike:
         return bm.abs(p[..., 0]) < 1e-12 
->>>>>>> upstream/draft/momo
