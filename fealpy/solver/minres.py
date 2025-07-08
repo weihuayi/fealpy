@@ -19,7 +19,9 @@ def minres(
     atol: float = 1e-12,
     rtol: float = 1e-8,
     maxit: Optional[int] = None,
-    M: Optional[SupportsMatmul] = None
+    M: Optional[SupportsMatmul] = None,
+    *,
+    shape: Optional[tuple[int,int]] = None
 ) -> tuple[TensorLike, dict]:
     """
     Solve a linear system Ax = b using MINimum RESidual iteration (minres) method.
@@ -54,7 +56,14 @@ def minres(
     elif x0.shape != b.shape:
         raise ValueError("x0 and b must have the same shape")
     
-    m, n = A.shape  # Matrix dimensions
+    if shape is not None:
+        m, n = shape
+    else:
+        try:
+            m, n = A.shape
+        except AttributeError:
+            m = b.shape[0]
+            n = m
 
     maxit = maxit or 5 * m  # Default maximum iterations
     if x0 is None:
@@ -78,13 +87,13 @@ def minres(
         raise ValueError("A must be symmetric matrix")
     
     # check if M is symmetric
-    if M is not None:
-        w = M @ r
-        w_1 = M @ w
-        s = w @ w
-        a = r @ w_1
-        if bm.abs(s - a) > epsa:
-            raise ValueError('non-symmetric preconditioner')
+    # if M is not None:
+    #     w = M @ r
+    #     w_1 = M @ w
+    #     s = w @ w
+    #     a = r @ w_1
+    #     if bm.abs(s - a) > epsa:
+    #         raise ValueError('non-symmetric preconditioner')
 
     if x0 is not None:
         kwags = bm.context(x0)
