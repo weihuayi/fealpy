@@ -5,31 +5,24 @@ from ...geometry import SphereSurface
 from ...mesh import TetrahedronMesh,QuadrangleMesh,TriangleMesh
 from ...mesh import LagrangeQuadrangleMesh,LagrangeTriangleMesh
 
-class SphereDomainMesher:
+class SphereVolumnMesher:
     """Sphere domain mesh generator"""
-    def __init__(self, h=None):
-
-        if h is None:
-            self.h = 0.3
-        else:
-            self.h = h
+    def __init__(self):
+        self.surface = SphereSurface()
 
     def geo_dimension(self) -> int:
         return 3
 
     @variantmethod('tet')
-    def init_mesh(self): 
+    def init_mesh(self, h=0.1): 
         mesh = TetrahedronMesh.from_unit_sphere_gmsh(h=self.h)
         return mesh
     
 
-class SphereDomainMesher3D:
+class SphereSurfaceMesher:
     """Sphere domain mesh generator"""
-    def __init__(self, surface=None):
-        if surface is None:
-            self.surface = SphereSurface()
-        else:
-            self.surface = surface
+    def __init__(self):
+        self.surface = SphereSurface()
         
     def geo_dimension(self) -> int:
         return 3

@@ -3,7 +3,7 @@ from ...backend import backend_manager as bm
 from ...decorator import variantmethod
 from ...mesh import TriangleMesh
 
-class LshapeDomainMesher:
+class LshapeMesher:
     """Lshape domain mesh generator"""
     def __init__(self, n=None):
 

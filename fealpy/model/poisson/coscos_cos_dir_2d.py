@@ -2,7 +2,7 @@ from typing import Optional,Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
+from ..mesher.box_domain_mesher import BoxDomainMesher2d
 
 class CosCos_Cos_Dir_2D(BoxDomainMesher2d):
     """

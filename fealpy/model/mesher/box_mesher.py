@@ -3,7 +3,7 @@ from ...backend import backend_manager as bm
 from ...decorator import variantmethod
 from ...mesh import HexahedronMesh, TetrahedronMesh, QuadrangleMesh, TriangleMesh
 
-class BoxDomainMesher2d:
+class BoxMesher2d:
     """Box domain mesh generator"""
     def __init__(self, box=None):
         if box is None:
@@ -28,7 +28,7 @@ class BoxDomainMesher2d:
         return mesh
 
 
-class BoxDomainMesher3d:
+class BoxMesher3d:
     """Box domain mesh generator"""
     def __init__(self, box=None):
 

@@ -3,7 +3,7 @@ from ...backend import backend_manager as bm
 from ...decorator import variantmethod
 from ...mesh import HexahedronMesh, TetrahedronMesh
 
-class CylinderDomainMesher:
+class CylinderMesher:
     """Cylinder domain mesh generator"""
     def __init__(self, radius=None, height=None, lc=None):
         
