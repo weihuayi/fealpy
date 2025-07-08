@@ -1,90 +1,93 @@
 from typing import Optional, Union
 from ..backend import bm
-from ..model import PDEDataManager
-from ..model.elliptic import EllipticPDEDataT
+from ..model import PDEDataManager, ComputationalModel
+from ..model.polyharmonic import PolyharmonicPDEDataT
 from ..decorator import variantmethod
 
-class PolyharmonicCrFEMModel:
+from ..mesh import Mesh
+from ..functionspace import functionspace
+
+from ..fem import BilinearForm, ScalarDiffusionIntegrator
+from ..fem import MthLaplaceIntegrator
+from ..fem import LinearForm, ScalarSourceIntegrator
+from ..fem import DirichletBC
+
+
+class PolyharmonicCrFEMModel(ComputationalModel):
     """
-        Smooth Finite Element Method to solve the equation \(\Delta^{m+1} u =
-        f\).  on a 2D/3D domain, using C^m-conforming finite element spaces.
+    Smooth Finite Element Method to solve the equation \(\Delta^{m+1} u = f\)
+    on a 2D/3D domain, using \(C^m\)-conforming finite element spaces.
+
+    Attributes:
+        mesh: The computational mesh.
+        pde: The PDE problem data.
+        p: Polynomial degree of finite element space.
+        m: Smoothness order.
     """
-    def __init__(self, logger=None, timer=None):
-        if logger is None:
-            from .. import logger 
+    def __init__(self, options):
+        self.options = options
+        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.set_pde(options['pde'])
+        self.set_init_mesh(options['init_mesh'], nx=options['mesh_size'],
+                           ny=options['mesh_size'] )
+        self.set_space_degree(options['space_degree'])
+        self.set_smoothness(options['smoothness'])
 
-        self.logger = logger
-        self.logger.setLevel('WARNING')
-
-        if timer is None:
-            from ..utils import timer
-        self.timer = timer
-        self.pdm = PDEDataManager("elliptic")
-
-    def set_pde(self, pde: Union[EllipticPDEDataT, str]="biharm2d"):
+    def set_pde(self, pde: Union[PolyharmonicPDEDataT, str]="sinsinbi"):
         """
-        Assign the PDE problem to be solved.
-
-        Args:
-            pde: Either a string key for predefined examples (e.g., "biharm2d",
-            "triharm2d, "biharm3d"")
-                 or a user-defined EllipticPDEDataT object.
         """
         if isinstance(pde, str):
-            self.pde = self.pdm.get_example(pde)
+            self.pde = PDEDataManager('polyharmonic').get_example(pde)
         else:
             self.pde = pde
-        
-    def set_init_mesh(self, **kwargs):
-        self.mesh = self.pde.init_mesh(**kwargs)
 
-    def set_order(self, p: int = 5):
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "tri", **kwargs):
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh(**kwargs)
+        else:
+            self.mesh = mesh
+
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        NF = self.mesh.number_of_faces()
+        NC = self.mesh.number_of_cells()
+        self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+
+    def set_space_degree(self, p: int):
         """
         Set the polynomial degree of the finite element space.
 
         Args:
-            p: Polynomial degree. Should satisfy p >= 2^dm + 1 for stability and approximation.
+            p: The polynomial degree.
         """
         self.p = p
 
-    def set_smoothness(self, m: int = 1):
-        """
-        Set the smoothness order of the FEM space.
-
-        Args:
-            m: Desired smoothness order. Corresponds to solving Δ^{m+1} u = f.
-        """
+    def set_smoothness(self, m: int):
         self.m = m
 
-
-
-    def linear_system(self, mesh, p):
+    def linear_system(self):
         """
-        Assemble the finite element linear system (stiffness matrix and load vector).
+        Construct the linear system for the eigenvalue problem.
 
         Returns:
-            A: Sparse matrix representing the bilinear form.
-            F: Load vector.
+            The stiffness matrix and mass matrix.
         """
         from ..functionspace import CmConformingFESpace2d
         from ..functionspace import CmConformingFESpace3d
-        from ..fem import BilinearForm, ScalarDiffusionIntegrator
-        from ..fem import MthLaplaceIntegrator
-        from ..fem import LinearForm, ScalarSourceIntegrator
-        m = self.pde.order()
-        
+
+        GD = self.mesh.geo_dimension()
         if self.mesh.TD == 2:
-            self.space = CmConformingFESpace2d(mesh, p, m)
+            self.space = CmConformingFESpace2d(self.mesh, self.p, self.m)
         if self.mesh.TD == 3:
-            self.space = CmConformingFESpace3d(mesh, p, m)
+            self.space = CmConformingFESpace3d(self.mesh, self.p, self.m)
         self.uh = self.space.function() # 建立一个有限元函数
 
         bform = BilinearForm(self.space)
-        integrator = MthLaplaceIntegrator(m=m+1, coef=1, q=p+4)
+        integrator = MthLaplaceIntegrator(m=self.m+1, coef=1, q=self.p+4)
         bform.add_integrator(integrator)
 
         lform = LinearForm(self.space)
-        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=p+4))
+        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p+4))
 
         A = bform.assembly()
         F = lform.assembly()
@@ -98,64 +101,23 @@ class PolyharmonicCrFEMModel:
         Returns:
             A, F: Modified matrix and vector after applying boundary conditions.
         """
+
         from ..fem import DirichletBC
         A, F = DirichletBC( self.space, gd=self.pde.get_flist()).apply(A, F)
         return A, F
 
-    @variantmethod("direct")
-    def solve(self, A, F):
+    def solve(self):
         """
         Solve the linear system using a direct solver (default method).
         """
         from ..solver import spsolve
-        return spsolve(A, F, solver='scipy')
-
-
-    @solve.register('amg')
-    def solve(self, A, F):
-        pass
-
-    @solve.register('mumps')
-    def solve(self, A, F):
-        from ..solver import spsolve
-        return spsolve(A, F, solver='mumps')
-
-    @solve.register('pcg')
-    def solve(self, A, F):
-        pass
-
-
-    @variantmethod('onestep')
-    def run(self):
-        """
-        Execute one step of the solve process:
-        - Assemble system
-        - Apply boundary conditions
-        - Solve the linear system
-        - Postprocess and report errors
-        """
-        A, F = self.linear_system(self.mesh, self.p)
-        #self.timer.send(f"组装方程离散系统") 
+        A, F = self.linear_system()
         A, F = self.apply_bc(A, F)
-        #self.timer.send(f"处理边界条件")
-        self.uh[:] = self.solve(A, F)
-        #self.timer.send(f"求解线性系统")
-        l2, h1, h2 = self.postprocess()
-        print(f"L2 error: {l2}, H1 error: {h1}")
-        #self.logger.info(f"L2 error: {l2}, H1 error: {h1}")
 
-    @run.register('uniform_refine')
-    def run(self, maxit=4):
-        pass
+        self.uh[:] =  spsolve(A, F, solver='scipy')
+        self.logger.info(f"uh: {self.uh[:]}")
 
-
-    @run.register("bisect")
-    def run(self):
-        pass
-
-
-    @variantmethod("error")
-    def postprocess(self):
+    def error(self):
         """
         Compute L2, H1, and H2 errors of the numerical solution.
 
@@ -177,6 +139,8 @@ class PolyharmonicCrFEMModel:
         l2 = self.mesh.error(self.pde.solution, self.uh)
         h1 = self.mesh.error(self.pde.gradient, ugval)
         h2 = self.mesh.error(self.pde.hessian, ug2val)
-        return l2, h1, h2
+
+        self.logger.info(f"l2: {l2}, h1: {h1}, h2: {h2}")
+
 
 
