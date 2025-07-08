@@ -10,7 +10,7 @@ from typing import Union
 from ..model.elastoplasticity import ElastoplasticityPDEDataT
 
 
-def ElastoplasticityFEMModel(ComputationalModel):
+class ElastoplasticityFEMModel(ComputationalModel):
     """
     ElastoplasticityFEMModel is a finite element model for solving elastoplasticity problems.
 
