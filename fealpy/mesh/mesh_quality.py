@@ -318,6 +318,9 @@ class RadiusRatioQuality(MeshCellQuality):
             c12 = bm.sum(c12*d0, axis=-1)
             c23 = bm.sum(c23*d0, axis=-1)
             c31 = bm.sum(c31*d0, axis=-1)
+            c12 = bm.abs(c12)
+            c23 = bm.abs(c23)
+            c31 = bm.abs(c31)
             c = c12 + c23 + c31
 
             A = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
@@ -331,26 +334,11 @@ class RadiusRatioQuality(MeshCellQuality):
             A[:, 3, 3] = 2*c12
             A[:, 1:, 0] = A[:, 0, 1:]
             
-            K = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
-            K[:, 0, 1] -= l30 - l20
-            K[:, 0, 2] -= l10 - l30
-            K[:, 0, 3] -= l20 - l10
-            K[:, 1:, 0] -= K[:, 0, 1:]
-
-            K[:, 1, 2] -= l30
-            K[:, 1, 3] += l20
-            K[:, 2:, 1] -= K[:, 1, 2:]
-
-            K[:, 2, 3] -= l10
-            K[:, 3, 2] += l10
-
             S = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
             face = self.mesh.entity('face')
             fv01 = node[face[:,1],:] - node[face[:,0],:]
             fv02 = node[face[:,2],:] - node[face[:,0],:]
             fm = bm.sqrt(bm.square(bm.cross(fv01,fv02)).sum(axis=1))/2.0
-            #fm = self.mesh.entity_measure("face")
-            #cm = self.mesh.entity_measure("cell")
 
             cm = bm.sum(-v30*bm.cross(v10,v20),axis=1)/6.0
             c2f = self.mesh.cell_to_face()
@@ -386,63 +374,17 @@ class RadiusRatioQuality(MeshCellQuality):
             S[:, 3, 2] = q32
             S[:, 3, 3] = p3
             
-            C0 = bm.zeros((NC, 4, 4), dtype=bm.float64)
-            C1 = bm.zeros((NC, 4, 4), dtype=bm.float64)
-            C2 = bm.zeros((NC, 4, 4), dtype=bm.float64)
-            
-            def f(CC, xx):
-                CC[:, 0, 1] = xx[:, 2]
-                CC[:, 0, 2] = xx[:, 3]
-                CC[:, 0, 3] = xx[:, 1]
-                CC[:, 1, 0] = xx[:, 3]
-                CC[:, 1, 2] = xx[:, 0]
-                CC[:, 1, 3] = xx[:, 2]
-                CC[:, 2, 0] = xx[:, 1]
-                CC[:, 2, 1] = xx[:, 3]
-                CC[:, 2, 3] = xx[:, 0]
-                CC[:, 3, 0] = xx[:, 2]
-                CC[:, 3, 1] = xx[:, 0]
-                CC[:, 3, 2] = xx[:, 1]
-
-            f(C0, node[cell, 0])
-            f(C1, node[cell, 1])
-            f(C2, node[cell, 2])
-
-            C0 = 0.5*(-C0 + C0.swapaxes(-1, -2))
-            C1 = 0.5*(C1  - C1.swapaxes(-1, -2))
-            C2 = 0.5*(-C2 + C2.swapaxes(-1, -2))
-            
-            B0 = -d0[:,0,None,None]*K
-            B1 = d0[:,1,None,None]*K
-            B2 = -d0[:,2,None,None]*K
-            
             ld0 = bm.sum(d0**2,axis=-1)
      
             A  /= ld0[:,None,None]
-            B0 /= ld0[:,None,None]
-            B1 /= ld0[:,None,None]
-            B2 /= ld0[:,None,None]
-
             S  /= s_sum[:,None,None]
 
-            C0 /= 3*cm[:,None,None]
-            C1 /= 3*cm[:,None,None]
-            C2 /= 3*cm[:,None,None]
-
             A  += S
-            B0 -= C0
-            B1 -= C1
-            B2 -= C2
 
             mu = s_sum*bm.sqrt(ld0)/(108*cm**2)
-            #mu = s_sum*np.sqrt(ld0)/(108)
 
-            #''' 
             A  *= mu[:,None,None]/NC
-            B0 *= mu[:,None,None]/NC
-            B1 *= mu[:,None,None]/NC
-            B2 *= mu[:,None,None]/NC
-            return (A,B0,B1,B2)
+            return A
 
 
 
