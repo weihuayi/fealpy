@@ -62,14 +62,14 @@ class EvanescentWaveData2D(BoxDomainMesher2d):
         """g(x, y) = ∂u/∂n + i·k·u"""
         grad_u = self.gradient(p)
         u_val = self.solution(p)
-        normal_derivative = bm.sum(grad_u * n, axis=-1)
+        normal_derivative = bm.sum(grad_u * n[:, None, :], axis=-1)
         return normal_derivative + 1j * self.k * u_val
 
     @cartesian
     def is_robin_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary ∂Ω to apply Robin condition"""
         x, y = p[..., 0], p[..., 1]
-        atol = 1e-12  # 允许一点点浮点误差
+        atol = 1e-12
         on_boundary = (
             (bm.abs(x - 0.0) < atol) |
             (bm.abs(x - 1.0) < atol) |

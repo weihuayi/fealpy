@@ -23,6 +23,8 @@ from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 from .mthlaplace_integrator import MthLaplaceIntegrator
 from .mass_integrator import MassIntegrator
+from .curlip_mass_integrator import CurlipMassIntegrator
+from .helmip_mass_integrator import HelmipMassIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -60,3 +62,4 @@ from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
 from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
 from .polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+from .helm_interiorpenalty_lfem_model import HelmInteriorPenaltyLFEMModel

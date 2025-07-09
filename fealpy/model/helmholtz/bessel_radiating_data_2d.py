@@ -27,7 +27,7 @@ class BesselRadiatingData2D(BoxDomainMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary conditions:
     
-        -Δu - k^2 u = f   in Ω = [-0.5, 0.5]^2
+        -Δu - k^2 u = f   in Ω = [0, 1]^2
          iku + ∂u/∂n = g  on ∂Ω
 
     Exact solution:
@@ -56,14 +56,19 @@ class BesselRadiatingData2D(BoxDomainMesher2d):
 
     def domain(self) -> Sequence[float]:
         """Return the bounding box [xmin, xmax, ymin, ymax]."""
-        return [0, 1, 0, 1]
+        return [0.0, 1.0, 0.0, 1.0]
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """
         Exact solution u(x, y) = (cos(k·r) - c·J0(k·r)) / k
         """
-        x, y = p[..., 0:1], p[..., 1:2]
+        if bm.backend_name == 'pytorch':
+            x = p[..., 0:1]
+            y = p[..., 1:2]
+        elif bm.backend_name == 'numpy':
+            x = p[..., 0]
+            y = p[..., 1]
         r = bm.sqrt(x**2 + y**2)
         val = bm.zeros(x.shape, dtype=bm.complex128)
         val[:] = (bm.cos(self.k * r) - self.c * bessel_function(0, self.k * r)) / self.k
