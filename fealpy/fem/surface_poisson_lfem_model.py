@@ -29,7 +29,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
        self.options = options
        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
        self.set_pde(options['pde'])
-       self.set_init_mesh(options['init_mesh']) 
+       self.set_init_mesh(options['mesh_degree'], options['init_mesh']) 
        self.set_space_degree(options['space_degree']) 
        
 
@@ -39,9 +39,9 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         else:
             self.pde = pde
 
-    def set_init_mesh(self, mesh: Union[Mesh, str] = "ltri", **kwargs):
+    def set_init_mesh(self, p:int, mesh: Union[Mesh, str] = "ltri", **kwargs):
         if isinstance(mesh,str):
-            self.mesh = self.pde.init_mesh[mesh](**kwargs)
+            self.mesh = self.pde.init_mesh[mesh](p, **kwargs)
         else:
             self.mesh = mesh
 

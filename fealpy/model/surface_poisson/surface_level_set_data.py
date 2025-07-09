@@ -1,10 +1,10 @@
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import  TensorLike
-from ..domain_mesher.sphere_domain_mesher import SphereDomainMesher3D
+from ..mesher.sphere_mesher import SphereSurfaceMesher
 
 
-class SurfaceLevelSetData(SphereDomainMesher3D):
+class SurfaceLevelSetData(SphereSurfaceMesher):
     """
     Surface Poisson problem on a closed manifold:
 
@@ -28,8 +28,8 @@ class SurfaceLevelSetData(SphereDomainMesher3D):
               f = -Δ_S (x·y).
     """
 
-    def __init__(self, surface=None):
-        super().__init__(surface=surface)
+    def __init__(self):
+        super().__init__()
         
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
