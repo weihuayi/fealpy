@@ -1,7 +1,9 @@
 from .config import *
 from concurrent.futures import ProcessPoolExecutor,ThreadPoolExecutor,as_completed
+from ..model import ComputationalModel
 
-class MMesher:
+
+class MMesher(ComputationalModel):
     registered_param = {}
     def __init__(self,
                  mesh: Union[_U,list] ,
@@ -18,6 +20,7 @@ class MMesher:
         @param beta: parameter of the monitor function
         @param vertices: vertices of the domain
         """
+        super().__init__(pbar_log=True, log_level="INFO")
         self.mesh = mesh
         self.uh = uh
         self.space = space
@@ -29,6 +32,7 @@ class MMesher:
         self.dim = 1
 
         self._check()
+        
     def _check(self):
         if isinstance(self.mesh, list) and len(self.mesh) == 1:
             self.mesh = self.mesh[0]
@@ -72,6 +76,45 @@ class MMesher:
             self.config.monitor = 'mp_arc_length'
             self.config.int_meth = 'mp_comass'
 
+    def set_interpolation_method(self, method_name: str):
+        """
+        Set the interpolation method dynamically.
+        
+        Parameters:
+            method_name: The name of the interpolation method to set.
+                    It should be a string that matches a registered method.
+        """
+        if not isinstance(method_name, str):
+            raise TypeError("method_name must be a string")
+        self.logger.info(f"Setting interpolation method to: {method_name}")
+        self.instance.interpolate.set(method_name)
+    
+    def set_monitor(self, method_name: str):
+        """
+        Set the monitor dynamically.
+        
+        Parameters:
+            method_name: The name of the monitor to set.
+                    It should be a string that matches a registered method.
+        """
+        if not isinstance(method_name, str):
+            raise TypeError("method_name must be a string")
+        self.logger.info(f"Setting monitor method to: {method_name}")
+        self.instance.monitor.set(method_name)
+        
+    def set_mol_method(self, method_name: str):
+        """
+        Set the method of the method of lines dynamically.
+        
+        Parameters:
+            method_name: The name of the method to set.
+                    It should be a string that matches a registered method.
+        """
+        if not isinstance(method_name, str):
+            raise TypeError("method_name must be a string")
+        self.logger.info(f"Setting method of lines to: {method_name}")
+        self.instance.mol_method.set(method_name)
+        
     def register(self, parameters: dict):
         """
         Register or update parameters.
@@ -95,6 +138,7 @@ class MMesher:
             for key, value in parameters.items():
                 setattr(self.config, key, value)  
                 self._update_recursive(self.instance, key, value)
+
         self._initialize_param()
         self._check()
 

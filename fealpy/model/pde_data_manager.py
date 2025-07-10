@@ -45,7 +45,7 @@ class PDEDataManager:
         "hyperbolic": "fealpy.model.hyperbolic",
         "nonlinear": "fealpy.model.nonlinear",
         "linear_elasticity": "fealpy.model.linear_elasticity",
-        "helmholtz": "fealpy.model.helmholtz"
+        "helmholtz": "fealpy.model.helmholtz",
         "allen_cahn": "fealpy.model.allen_cahn",
     }
 
