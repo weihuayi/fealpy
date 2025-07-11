@@ -1,10 +1,10 @@
-from typing import Sequence
-from ...decorator import cartesian, variantmethod
+from typing import Optional,Sequence
+from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 
-
-class CosCosData2D():
+class CosCos_Cos_Dir_2D(BoxDomainMesher2d):
     """
     2D Poisson problem:
     
@@ -21,27 +21,17 @@ class CosCosData2D():
     Homogeneous Dirichlet boundary conditions are applied on all edges.
     """
 
-    def geo_dimension(self) -> int:
+    def configure(self, box: Optional[Sequence[float]] = None):
+        """Configure the relevant parameters of PDE."""
+        self.box = box
+        
+    def get_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [-1., 1., -1., 1.]
-
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import TriangleMesh
-        d = self.domain()
-        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import QuadrangleMesh
-        d = self.domain()
-        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
     
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

@@ -8,7 +8,7 @@ from ..mesh import Mesh
 from ..functionspace import functionspace
 
 from ..fem import BilinearForm, ScalarDiffusionIntegrator
-from ..fem import MthLaplaceIntegrator
+from ..fem import PolyharmonicIntegrator
 from ..fem import LinearForm, ScalarSourceIntegrator
 from ..fem import DirichletBC
 
@@ -28,8 +28,6 @@ class PolyharmonicCrFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        import ipdb
-        ipdb.set_trace()
         self.set_init_mesh(options['init_mesh'], nx=options['mesh_size'],
                            ny=options['mesh_size'] )
         self.set_space_degree(options['space_degree'])
@@ -45,8 +43,6 @@ class PolyharmonicCrFEMModel(ComputationalModel):
 
     def set_init_mesh(self, mesh: Union[Mesh, str] = "tri", **kwargs):
         if isinstance(mesh, str):
-            import ipdb
-            ipdb.set_trace()
             self.mesh = self.pde.init_mesh(**kwargs)
         else:
             self.mesh = mesh
@@ -76,18 +72,18 @@ class PolyharmonicCrFEMModel(ComputationalModel):
         Returns:
             The stiffness matrix and mass matrix.
         """
-        from ..functionspace import CmConformingFESpace2d
-        from ..functionspace import CmConformingFESpace3d
+        from ..functionspace import CrConformingFESpace2d
+        from ..functionspace import CrConformingFESpace3d
 
         GD = self.mesh.geo_dimension()
         if self.mesh.TD == 2:
-            self.space = CmConformingFESpace2d(self.mesh, self.p, self.m)
+            self.space = CrConformingFESpace2d(self.mesh, self.p, self.m)
         if self.mesh.TD == 3:
-            self.space = CmConformingFESpace3d(self.mesh, self.p, self.m)
+            self.space = CrConformingFESpace3d(self.mesh, self.p, self.m)
         self.uh = self.space.function() # 建立一个有限元函数
 
         bform = BilinearForm(self.space)
-        integrator = MthLaplaceIntegrator(m=self.m+1, coef=1, q=self.p+4)
+        integrator = PolyharmonicIntegrator(m=self.m+1, coef=1, q=self.p+4)
         bform.add_integrator(integrator)
 
         lform = LinearForm(self.space)

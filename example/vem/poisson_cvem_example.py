@@ -3,8 +3,8 @@ import argparse
 # Argument parsing
 parser = argparse.ArgumentParser(description=
         """
-        C^m-conforming finite element method for solving polyharmonic problems
-        of the form Δ^{m+1} u = f on 2D/3D domains.
+        virtual element method for poisson equation with Dirichlet boundary
+        condition 
         """)
 
 parser.add_argument('--backend',
@@ -12,23 +12,23 @@ parser.add_argument('--backend',
     help='Default backend is numpy')
 
 parser.add_argument('--pde',
-    default='sinsinbi', type=str,
-    help='Name of the PDE model (e.g., sinsinbi, sinsinsinbi, sinsintri)')
+    default='SinSin_Sin_Dir_2D', type=str,
+    help='Name of the PDE model')
 
-parser.add_argument('--init_mesh',
-    default='tri', type=str,
+parser.add_argument('--mesh_type',
+    default='uniform_poly', type=str,
     help='Type of mesh, default is tri')
 
-parser.add_argument('--mesh_size',
+parser.add_argument('--nx',
+    default=10, type=int)
+
+parser.add_argument('--ny',
     default=10, type=int)
 
 parser.add_argument('--space_degree',
-    default=5, type=int,
-    help='Polynomial degree of the finite element space (recommended >= 2m+1)')
+    default=3, type=int,
+    help='Polynomial degree of the virtual element space')
 
-parser.add_argument('--smoothness',
-    default=1, type=int,
-    help='Smoothness order m, where the PDE is Δ^{m+1} u = f')
 
 parser.add_argument('--pbar_log',
     default=True, type=bool,
@@ -42,7 +42,7 @@ options = vars(parser.parse_args())
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
-from fealpy.fem.polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
-model = PolyharmonicCrFEMModel(options)
+from fealpy.vem.poisson_cvem_2d_model1 import PoissonCVEMModel
+model = PoissonCVEMModel(options)
 model.solve()
 model.error()

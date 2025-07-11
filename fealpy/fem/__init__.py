@@ -21,7 +21,7 @@ from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
-from .mthlaplace_integrator import MthLaplaceIntegrator
+from .polyharmonic_integrator import PolyharmonicIntegrator
 from .mass_integrator import MassIntegrator
 from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator
@@ -65,3 +65,4 @@ from .polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
 from .allencahn_lfem_model import AllenCahnLFEMModel
 from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
+from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
