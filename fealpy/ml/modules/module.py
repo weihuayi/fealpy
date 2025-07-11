@@ -200,7 +200,7 @@ class TensorMapping(Module):
 
     def estimate_error(self, other: VectorFunction, mesh=None, power: int=2, q: int=3,
                        cell_type: bool=False, coordtype: str='b', squeeze: bool=False,
-                       device=None):
+                       device=None, compare: str='real'):
         """Calculate error between this mapping and reference function.
         
         Parameters:
@@ -220,6 +220,9 @@ class TensorMapping(Module):
                 Whether to squeeze output dimensions (default: False)
             device: torch.device, optional
                 Computation device (default: module's device)
+            compare: str
+            'real' or 'imag', default: 'real'.
+
                 
         Returns:
             Tensor: 
@@ -232,6 +235,7 @@ class TensorMapping(Module):
 
         if mesh is None:
             raise ValueError("Param 'mesh' is required if the target is not a function in finite element space.")
+        assert compare in ('real', 'imag'), f"option is 'real' or 'imag', but got {compare}"
 
         o_coordtype = getattr(other, 'coordtype', None)
         if o_coordtype is not None:
@@ -261,7 +265,12 @@ class TensorMapping(Module):
     
             # 检查最终形状是否匹配
             assert val.shape == val_ture.shape, f"Shape mismatch: val {val.shape}, val_ture {val_ture.shape}"
-
+            if compare == "real":
+                val = bm.real(val)
+                val_ture = bm.real(val_ture)
+            elif compare == 'imag':
+                val = bm.imag(val)
+                val_ture = bm.imag(val_ture)
             diff = bm.abs(val - val_ture)**power
 
         elif coordtype in {'barycentric', 'b'}:
@@ -269,13 +278,18 @@ class TensorMapping(Module):
             val = self.from_cell_bc(bcs, mesh, device=device).cpu().detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
+            val_ture = other(bcs)
+            if compare == "real":
+                val = bm.real(val)
+                val_ture = bm.real(val_ture)
+            elif compare == 'imag':
+                val = bm.imag(val)
+                val_ture = bm.imag(val_ture)
             diff = bm.abs(val - other(bcs))**power
 
         else:
             raise ValueError(f"Invalid coordtype '{coordtype}'.")
 
-        # if mesh.GD == 1:
-        #     diff = diff.transpose(0, 1)
         e = bm.einsum('q, cq..., c -> c...', ws, diff, cellmeasure)
         if cell_type:
             return bm.pow(e, 1/power, out=e)
@@ -493,9 +507,10 @@ class Solution(TensorMapping):
         >>> points = torch.rand(100, 2)
         >>> outputs = sol(points)  # Forward pass through the network
     """
-    def __init__(self, func: TensorFunction) -> None:
+    def __init__(self, func: TensorFunction, complex: bool=False) -> None:
         super().__init__()
         self.__func = func
+        self.complex = complex
 
     @property
     def net(self):
@@ -517,7 +532,13 @@ class Solution(TensorMapping):
         Returns:
             Tensor: Output tensor of shape (..., k), where k is the output dimension.
         """
-        return self.__func(p)
+        out = self.__func(p)
+        if self.complex:
+            if out.shape[-1] != 2:
+                raise ValueError(f"Expected the network output shape to be (..., 2), but got {out.shape}")
+            out = out[:, 0:1] + 1j * out[:, 1:2]
+
+        return out
 
 
 class DiffSolution(TensorMapping):
