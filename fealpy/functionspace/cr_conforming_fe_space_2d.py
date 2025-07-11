@@ -16,7 +16,7 @@ Index = Union[int, slice, TensorLike]
 Number = Union[int, float]
 _S = slice(None)
 
-class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
+class CrConformingFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh: _MT, p: int, m: int, device=None):
         assert(p>4*m)
         self.mesh = mesh

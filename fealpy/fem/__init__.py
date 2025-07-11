@@ -21,7 +21,7 @@ from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
-from .mthlaplace_integrator import MthLaplaceIntegrator
+from .polyharmonic_integrator import PolyharmonicIntegrator
 from .mass_integrator import MassIntegrator
 from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator

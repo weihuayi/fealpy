@@ -6,8 +6,8 @@ from .dofs import LinearMeshCFEDof
 
 from .lagrange_fe_space import LagrangeFESpace
 from .tensor_space import TensorFunctionSpace
-from .cm_conforming_fe_space_2d import CmConformingFESpace2d
-from .cm_conforming_fe_space_3d import CmConformingFESpace3d
+from .cr_conforming_fe_space_2d import CrConformingFESpace2d
+from .cr_conforming_fe_space_3d import CrConformingFESpace3d
 from .bernstein_fe_space import BernsteinFESpace
 
 from .first_nedelec_fe_space import FirstNedelecFESpace
