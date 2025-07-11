@@ -125,6 +125,16 @@ class MetalensesMesherTet:
         # 网格生成
         gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size * base_size)
         gmsh.model.mesh.generate(3)
+        # TEST 获取周期边界的对应点
+        origin_face_tag_x = [65, 60, 58, 70]
+        periodic_node_pairs_x = {}
+        periodic_node_pairs_x_inv = {}
+        for face in origin_face_tag_x:
+            master_tag, origin_node_tag, master_node_tag, _ = gmsh.model.mesh.getPeriodicNodes(2, face)
+            if origin_node_tag is not None:
+                for i in range(len(origin_node_tag)):
+                    periodic_node_pairs_x[origin_node_tag[i]-1] = master_node_tag[i]-1
+                    periodic_node_pairs_x_inv[master_node_tag[i]-1] = origin_node_tag[i]-1
         # 获取所有节点坐标
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
         points = bm.array(node_coords).reshape(-1, 3)
