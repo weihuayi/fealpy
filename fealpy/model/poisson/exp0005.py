@@ -4,7 +4,8 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 from ..domain_mesher.box_domain_mesher import BoxDomainMesher3d
 
-class CosCosCos_Cos_Dir_3D(BoxDomainMesher3d):
+class exp0005(BoxDomainMesher3d):
+
     """
     3D Poisson problem:
 
@@ -21,9 +22,8 @@ class CosCosCos_Cos_Dir_3D(BoxDomainMesher3d):
 
     Homogeneous Dirichlet boundary conditions are applied on all boundaries.
     """
-    def configure(self, box: Optional[Sequence[float]] = None):
-        """Configure the relevant parameters of PDE."""
-        self.box = box
+    def __init__(self, box=None):
+        super().__init__(box)
 
     def get_dimension(self) -> int:
         """Return the geometric dimension of the domain (3D)."""

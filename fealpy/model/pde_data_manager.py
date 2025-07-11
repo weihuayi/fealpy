@@ -111,20 +111,20 @@ class PDEDataManager:
             print(f" - {key}: ({file_name}, {class_name})")
         print(f"\nExample usage:\n   pde = PDEDataManager('{self.pde_type}').get_example('example name')")
 
-    def get_example(self, key: str = None):
+    def get_example(self, key: int = None):
         """
         Instantiate and return a PDE model object based on example key.
 
         Parameters
             key : str, optional
-                The example name key from the current PDE type (e.g., 'coscos').
+                The example name key from the current PDE type (e.g.,'1').
 
         Returns
             instance : object
                 An instance of the selected PDE model class.
 
         Examples
-            >>> pde = PDEDataManager("poisson").get_example("coscos")
+            >>> pde = PDEDataManager("poisson").get_example('1')
         """
         if not self.pde_type or not self.data_table:
             raise RuntimeError("PDE type not set. Please initialize with a valid pde_type.")
