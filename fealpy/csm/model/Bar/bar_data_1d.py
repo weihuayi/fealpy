@@ -69,13 +69,13 @@ class BarData1D:
         f = bm.zeros_like(x)
         
         # Apply point loads at the corresponding nodes
-        # Apply f1 at node 1 (x=0)
+        # Apply f1 at node 0 (x=0)
         f += bm.where(x == 0, self.f[0], 0)  
 
-        # Apply f2 at node 2 (x=l1)
+        # Apply f2 at node 21 (x=l1)
         f += bm.where(x == self.init_mesh[1], self.ff[1], 0)  
 
-        # Apply p3 at node 3 (x=l1 + l2)
+        # Apply p3 at node 2 (x=l1 + l2)
         f += bm.where(x == self.init_mesh[1] + self.init_mesh[2], self.f[2], 0)  
 
         return f

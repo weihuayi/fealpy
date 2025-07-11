@@ -3,6 +3,7 @@ from ....backend import TensorLike
 
 class BarPDEDataProtocol(Protocol):
     """
+
     A protocol for beam PDE data classes.This protocol defines the expected methods and properties
     that any Bar PDE data class should implement.
 
@@ -46,5 +47,6 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # Add beam PDE models here (file_name, class_name)
-    "bar1d": ("bar_data_1d", "BarData1D")
+    "bar1d": ("bar_data_1d", "BarData1D"),
+    "bar2d": ("bar_data_1d", "BarData2D")
 }
