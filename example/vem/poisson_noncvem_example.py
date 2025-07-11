@@ -27,7 +27,7 @@ parser.add_argument('--ny',
 
 parser.add_argument('--space_degree',
     default=3, type=int,
-    help='Polynomial degree of the virtual element space')
+    help='Polynomial degree of the nonconforming virtual element space')
 
 
 parser.add_argument('--pbar_log',
@@ -42,7 +42,7 @@ options = vars(parser.parse_args())
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
-from fealpy.vem.poisson_cvem_2d_model import PoissonCVEMModel
-model = PoissonCVEMModel(options)
+from fealpy.vem.poisson_noncvem_2d_model import PoissonNonCVEMModel
+model = PoissonNonCVEMModel(options)
 model.solve()
 model.error()
