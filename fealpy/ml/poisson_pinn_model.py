@@ -59,8 +59,10 @@ class PoissonPINNModel(ComputationalModel):
             Error history compared with finite element method.
         options : dict
             Configuration dictionary passed during initialization.
+            
     Reference:
         https://wnesm678i4.feishu.cn/wiki/Me8lw5ryxigAMbkcnL8cWVQpn4g?from=from_copylink
+
     Methods
         set_pde(pde)
             Initialize the PDE problem.
@@ -236,7 +238,7 @@ class PoissonPINNModel(ComputationalModel):
         val = u - self.pde.dirichlet(p)
         return val
 
-    def train(self):
+    def run(self):
         """Execute the training process for the PINN model.
         
         Notes
@@ -291,7 +293,7 @@ class PoissonPINNModel(ComputationalModel):
         end_time = time.time()
         print(f'Training completed in {end_time - start_time:.2f} seconds.')
 
-    def prefict(self, p: TensorLike) -> TensorLike:
+    def predict(self, p: TensorLike) -> TensorLike:
         """Make predictions using the trained network.
         
         Parameters

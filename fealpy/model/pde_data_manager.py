@@ -111,7 +111,7 @@ class PDEDataManager:
             print(f" - {key}: ({file_name}, {class_name})")
         print(f"\nExample usage:\n   pde = PDEDataManager('{self.pde_type}').get_example('example name')")
 
-    def get_example(self, key: str = None):
+    def get_example(self, key: int = None, **options):
         """
         Instantiate and return a PDE model object based on example key.
 
@@ -143,4 +143,7 @@ class PDEDataManager:
         file_name, class_name = self.data_table[key]
         submodule = importlib.import_module(f"{self.module_path}.{file_name}")
         cls = getattr(submodule, class_name)
-        return cls()
+        if options == {}:
+            return cls()
+        else:
+            return cls(options)

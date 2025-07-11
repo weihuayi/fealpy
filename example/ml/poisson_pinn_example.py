@@ -66,6 +66,6 @@ bm.set_backend(options['backend'])
 
 from fealpy.ml.poisson_pinn_model import PoissonPINNModel
 model = PoissonPINNModel(options)
-model.train()
+model.run()
 model.show()
 
