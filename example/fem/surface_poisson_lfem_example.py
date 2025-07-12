@@ -20,11 +20,11 @@ parser.add_argument('--init_mesh',
 
 parser.add_argument('--mesh_degree',
         default=3, type=int,
-        help='Degree of Mehs Space, default is 1')
+        help='Degree of Mehs Space, default is 3')
 
 parser.add_argument('--space_degree',
         default=3, type=int,
-        help='Degree of Isoparametric Finite Element Space, default is 1')
+        help='Degree of Isoparametric Finite Element Space, default is 3')
 
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
@@ -41,8 +41,6 @@ bm.set_backend(options['backend'])
 
 from fealpy.fem import SurfacePoissonLFEMModel
 model = SurfacePoissonLFEMModel(options)
-model.set_pde(options['pde'])
-model.set_init_mesh(options['mesh_degree'], options['init_mesh'])
-model.set_space_degree(options['space_degree'])
-model.solve.set('cg')
-#model.run['uniform_refine']()
+#model.solve['cg']()
+model.run()
+model.run['uniform_refine']()

@@ -1,6 +1,6 @@
 from typing import Optional, Union
 from scipy.sparse import coo_array, bmat
-from ..backend import backend_manager as bm
+from ..backend import bm
 from ..model import PDEDataManager, ComputationalModel
 from ..model.surface_poisson import SurfacePDEDataT
 from ..decorator import variantmethod
@@ -31,6 +31,8 @@ class SurfacePoissonLFEMModel(ComputationalModel):
        self.set_pde(options['pde'])
        self.set_init_mesh(options['mesh_degree'], options['init_mesh']) 
        self.set_space_degree(options['space_degree']) 
+       self.set_init_mesh(options['mesh_degree'], options['init_mesh'])
+       self.set_space_degree(options['space_degree'])
        
 
     def set_pde(self, pde: Union[SurfacePDEDataT, str] = "sphere"):
@@ -49,7 +51,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
         NC = self.mesh.number_of_cells()
-        self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+        #self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
 
     def set_space_degree(self, p: int) -> None:
@@ -66,10 +68,10 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         self.uh = self.space.function()
 
         bform = BilinearForm(self.space)
+        lform = LinearForm(self.space)
+
         SDI = ScalarDiffusionIntegrator(method='isopara')
         bform.add_integrator(SDI)
-
-        lform = LinearForm(self.space)
         SSI = ScalarSourceIntegrator(self.pde.source, method='isopara')
         lform.add_integrator(SSI)
 
@@ -80,7 +82,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
 
         def coo(A):
             data = A._values
-            indices = A._indices   
+            indices = A._indices
             return coo_array((data, indices), shape=A.shape)
     
         A = bmat([[coo(A), C.reshape(-1,1)], [C[None,:], None]], format='coo')
@@ -101,8 +103,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     @solve.register('cg')
     def solve(self):
         A, F = self.surface_poisson_system()
-        self.uh, info = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
-        self.uh[:] = -self.uh[:-1]
+        self.uh, info = cg(A, F, maxit=1000, atol=1e-14, rtol=1e-14)[:-1]
         res = info['residual']
         self.logger.info(f"CG solver finished with residual: {res}")
 
@@ -110,16 +111,14 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     def run(self):
         """
         """
-        A, F = self.surface_poisson_system()
-        self.uh[:] = self.solve(A, F)
+        self.uh[:] = self.solve()[:-1]
         l2 = self.postprocess()
         self.logger.info(f"L2 Error: {l2}.")
 
     @run.register('uniform_refine')
     def run(self, maxit=4):
         for i in range(maxit):
-            A, F = self.surface_poisson_system()
-            self.uh[:] = self.solve(A, F)
+            self.uh[:] = self.solve()[:-1]
             l2 = self.postprocess()
             self.logger.info(f"{i}-th step with  L2 Error: {l2}.")
             if i < maxit - 1:
