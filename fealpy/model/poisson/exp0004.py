@@ -4,7 +4,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
 
-class CornerSingularityData2d:
+class Exp0004:
     """
     L-shaped domain corner singularity problem (2D Poisson):
 

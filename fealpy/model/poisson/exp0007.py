@@ -2,9 +2,9 @@ from typing import Optional,Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher3d
+from ..mesher.box_mesher import BoxDomainMesher3d
 
-class CosCosCos_Cos_Dir_3D(BoxDomainMesher3d):
+class Exp0007(BoxDomainMesher3d):
     """
     3D Poisson problem:
 

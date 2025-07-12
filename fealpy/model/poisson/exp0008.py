@@ -3,7 +3,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
 
-class SurfaceLevelSetData():
+class Exp0008():
     """
     Surface Poisson problem on a closed manifold:
 

@@ -3,7 +3,7 @@ from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
-class Sin_Sin_Dir_1D:
+class Exp0001:
     """
     1D Poisson problem:
 
