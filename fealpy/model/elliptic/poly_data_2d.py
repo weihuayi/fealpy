@@ -3,7 +3,7 @@ from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 import sympy as sp
-from fealpy.model.box_domain_mesher import BoxDomainMesher2d
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 
 class PolyData2D(BoxDomainMesher2d):
 

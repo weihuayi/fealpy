@@ -1,7 +1,7 @@
 from typing import Sequence
-from ..backend import backend_manager as bm
-from ..decorator import variantmethod
-from ..mesh import TriangleMesh
+from ...backend import backend_manager as bm
+from ...decorator import variantmethod
+from ...mesh import TriangleMesh
 
 class LshapeDomainMesher:
     """Lshape domain mesh generator"""

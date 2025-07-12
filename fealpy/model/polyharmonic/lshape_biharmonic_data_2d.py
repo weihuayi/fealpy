@@ -4,12 +4,6 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
 
-import numpy as np
-from typing import Sequence
-from ...decorator import cartesian
-from ...backend import backend_manager as bm
-from ...backend import TensorLike
-
 class LShapeBiharmonicData2D:
     """
     2D biharmonic problem on L-shaped domain:
@@ -30,9 +24,9 @@ class LShapeBiharmonicData2D:
     
     def domain(self):
         """Return bounding box of the computational domain."""
-        # Box large enough to contain L shape; actual domain excludes [0,1]^2
-        return [0.0, 2.0, 0.0, 2.0]
-    
+        # Box large enough to contain L shape; actual domain excludes [-1,1]^2
+        return [-1.0, 1.0, -1.0, 1.0]
+   
     def init_mesh(self, nx=10, ny=10):
         from ...mesh import TriangleMesh
         # This requires a mesh generator that supports polygonal domains with holes.

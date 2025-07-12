@@ -8,16 +8,16 @@ from ..model.poisson import PoissonPDEDataT
 from ..mesh import Mesh, PolygonMesh
 from ..functionspace import functionspace 
 from ..vem import BilinearForm                              
-from ..functionspace import ConformingScalarVESpace2d                         
+from ..functionspace import NonConformingScalarVESpace2d                         
 from ..vem import LinearForm                                  
 from ..vem import ScalarDiffusionIntegrator
 from ..vem import ScalarSourceIntegrator         
 from ..vem import DirichletBC                                
 
-class PoissonCVEMModel(ComputationalModel):
+class PoissonNonCVEMModel(ComputationalModel):
     """
-    A class representing the conforming virtual element method (CVEM)
-    for solving the 2D Poisson equation.
+    A computational model for solving the 2D Poisson equation using the
+    Nonconforming Virtual Element Method (NCVEM).
 
     Attributes:
         pde: The PDE problem with source and exact solution.
@@ -31,14 +31,7 @@ class PoissonCVEMModel(ComputationalModel):
 
     def __init__(self, options):
         """
-        Initialize the CVEM model from a configuration dictionary.
-
-        Args:
-            options (dict): Configuration options including:
-                - 'pde' (str or PoissonPDEDataT): PDE specification.
-                - 'mesh_type' (str): Type of polygonal mesh (e.g., 'uniform_poly').
-                - 'nx', 'ny' (int): Mesh resolution parameters.
-                - 'space_degree' (int): Polynomial degree of the virtual element space.
+        Initialize the NCVEM model from user-supplied options.
         """
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
@@ -49,11 +42,10 @@ class PoissonCVEMModel(ComputationalModel):
 
     def set_pde(self, pde: Union[PoissonPDEDataT, str]="sinsin"):
         """
-        Set the PDE data.
+        Assign the PDE data, either from a preset example or a user-defined instance.
 
         Args:
-            pde (Union[str, PoissonPDEDataT]): Either a predefined example key,
-            or a user-defined PoissonPDEDataT instance.
+            pde (str or PoissonPDEDataT): The PDE specification.
         """
         if isinstance(pde, str):
             self.pde = PDEDataManager('poisson').get_example(pde)
@@ -62,7 +54,7 @@ class PoissonCVEMModel(ComputationalModel):
 
     def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_poly", **kwargs):
         """
-        Initialize the polygonal mesh.
+        Initialize a polygonal mesh for the problem domain.
         """
         if isinstance(mesh, str):
             self.mesh = self.pde.init_mesh[mesh](**kwargs)
@@ -87,12 +79,12 @@ class PoissonCVEMModel(ComputationalModel):
 
     def linear_system(self):
         """
-        Assemble the CVEM linear system (stiffness matrix and load vector).
+        Assemble the linear system for the Poisson problem using NCVEM.
 
         Returns:
-            (A, F): Assembled stiffness matrix and right-hand-side vector.
+            (A, F): Tuple of stiffness matrix and load vector.
         """
-        self.space = ConformingScalarVESpace2d(self.mesh, p=self.p)
+        self.space = NonConformingScalarVESpace2d(self.mesh, p=self.p)
         self.uh = self.space.function() # 建立一个有限元函数
 
         bform = BilinearForm(self.space)
