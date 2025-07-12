@@ -1,5 +1,7 @@
 from fealpy.backend import backend_manager as bm
+from fealpy.mesh import TetrahedronMesh
 from ...decorator import variantmethod
+from ..tool.translate_mesh import translate_mesh
 
 
 class MetalensesMesher:
@@ -10,8 +12,13 @@ class MetalensesMesher:
     Parameters:
         metalenses_params: dict
             A dictionary containing parameters for the metalenses,
-            including base size, glass height, air layer height,
-            bottom PML height, top PML height, and antenna sizes and heights.
+            including
+            glass size,
+            glass height,
+            air layer height,
+            bottom PML height,
+            top PML height,
+            antenna sizes and heights.
         mesh_type: str
             The type of mesh to be generated. Default is 'tet' for tetrahedral meshes.
     """
@@ -28,7 +35,7 @@ class MetalensesMesher:
             mesh_size: float
                 The size of the mesh elements. Default is 0.2.
         """
-        from .metalenses_meshr_tet import MetalensesMesherTet
+        from .metalenses_mesher_tet import MetalensesMesherTet
 
         mesher = MetalensesMesherTet(self.metalenses_params)
         return mesher.generate_mesh(mesh_size)
@@ -37,7 +44,10 @@ class MetalensesMesher:
     def generate(self, mesh_size=0.1):
         raise NotImplementedError("The 'pri' mesh type is not implemented yet.")
 
-    def assemble_total_mesh(self, unit_mesh: None, mesh_type='tet'):
+    def assemble_total_mesh(self, unit_mesh: None, mesh_type='tet',
+                            node_pairs:list[dict]=None,
+                            translation_axes:tuple[int]=(1, 1, 0),
+                            translation_num:tuple[int]=(10, 10, 0)):
         """
         Assemble the total mesh from the individual components.
         maybe this method can be a static method,
@@ -48,19 +58,33 @@ class MetalensesMesher:
                 The mesh of a single component, which can be a tetrahedral or prism mesh.
             mesh_type: str
                 The type of mesh to be assembled. Default is 'tet' for tetrahedral meshes.
+            node_pairs: list[dict]
+                A list of dictionaries containing pairs of node indices to be translated.
+            translation_axes: tuple[int]
+                The axes along which the nodes will be translated. Default is [1, 1, 0],
+                meaning translation in the x and y directions.
+            translation_num: tuple[int]
+                The number of translations along each axis. Default is [10, 10, 0],
+                meaning 10 translations in the x direction and 10 in the y direction.
         """
         if unit_mesh is None:
-            unit_mesh = self.generate['mesh_type']()
+            unit_mesh = self.generate[mesh_type]()
 
         if mesh_type == 'tet':
-            pass
+            node_pairs = unit_mesh.meshdata['node_pairs']
+            total_mesh = unit_mesh
+            for i, ax in enumerate(translation_axes):
+                if ax == 0:
+                    continue
+                total_node, total_cell, node_pairs, domain = translate_mesh(total_mesh,
+                                                                    node_pairs,
+                                                                    i, translation_num[i])
+                total_mesh = TetrahedronMesh(total_node, total_cell)
+                total_mesh.celldata['domain'] = domain
+                total_mesh.meshdata['node_pairs'] = node_pairs
+            return total_mesh
         if mesh_type == 'pri':
-            pass
-
-        raise NotImplementedError("This method should be implemented in subclasses.")
-
-
-
+            raise NotImplementedError("The 'pri' mesh type is not implemented yet.")
 
 
 
@@ -73,7 +97,7 @@ if __name__ == "__main__":
     # with open("../data/parameters.json", "r") as f:
     #     metalenses_params = json.load(f)
     #
-    # base_size = metalenses_params["base_size"]
+    # glass_size = metalenses_params["glass_size"]
     # glass_height = metalenses_params["glass_height"]
     # air_layer_height = metalenses_params["air_layer_height"]
     # bottom_pml_height = metalenses_params["bottom_pml_height"]
@@ -89,7 +113,7 @@ if __name__ == "__main__":
 
     # 手动设置参数
     metalenses_params = {
-        "base_size": 800,
+        "glass_size": 800,
         "glass_height": 3000,
         "air_layer_height": 4800,
         "bottom_pml_height": 960,

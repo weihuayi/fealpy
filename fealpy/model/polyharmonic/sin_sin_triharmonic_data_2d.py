@@ -4,7 +4,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
 
-class TriharmonicData2D():
+class SinSinTriharmonicData2D():
     """
     2D triharmonic problem:
 

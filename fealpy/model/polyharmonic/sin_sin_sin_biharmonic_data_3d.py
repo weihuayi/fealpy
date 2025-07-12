@@ -4,7 +4,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
 
-class BiharmonicData3D():
+class SinSinSinBiharmonicData3D():
     """
     3D biharmonic problem:
 

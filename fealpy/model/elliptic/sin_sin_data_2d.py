@@ -2,7 +2,7 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
-from ..box_domain_mesher import BoxDomainMesher2d
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 
 class SinSinData2D(BoxDomainMesher2d):
     """

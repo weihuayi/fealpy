@@ -58,7 +58,7 @@ class PolyharmonicCrFEMModel:
 
 
 
-    def linear_system(self, mesh, p, m):
+    def linear_system(self, mesh, p):
         """
         Assemble the finite element linear system (stiffness matrix and load vector).
 
@@ -71,6 +71,7 @@ class PolyharmonicCrFEMModel:
         from ..fem import BilinearForm, ScalarDiffusionIntegrator
         from ..fem import MthLaplaceIntegrator
         from ..fem import LinearForm, ScalarSourceIntegrator
+        m = self.pde.order()
         
         if self.mesh.TD == 2:
             self.space = CmConformingFESpace2d(mesh, p, m)
@@ -133,7 +134,7 @@ class PolyharmonicCrFEMModel:
         - Solve the linear system
         - Postprocess and report errors
         """
-        A, F = self.linear_system(self.mesh, self.p, self.m)
+        A, F = self.linear_system(self.mesh, self.p)
         #self.timer.send(f"组装方程离散系统") 
         A, F = self.apply_bc(A, F)
         #self.timer.send(f"处理边界条件")
