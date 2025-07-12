@@ -10,35 +10,37 @@ class MetalensesMesherTet:
     create a tetrahedral mesh for metalenses.
 
     Parameters:
-        base_size: float
-            Size of the base square.
-        glass_height: float
-            Height of the glass layer(base square).
-        air_layer_height: float
-            Height of the air layer.
-        bottom_pml_height: float
-            Height of the bottom PML layer.
-        top_pml_height: float
-            Height of the top PML layer.
-        antenna1_size: float
-            Size of the first antenna.
-        antenna1_height: float
-            Height of the first antenna.
-        antenna2_size: float
-            Size of the second antenna.
-        antenna2_height: float
-            Height of the second antenna.
-        antenna3_size: float
-            Size of the third antenna.
-        antenna3_height: float
-            Height of the third antenna.
-        antenna4_size: float
-            Size of the fourth antenna.
-        antenna4_height: float
-            Height of the fourth antenna.
+        params: dict
+            A dictionary containing parameters for the metalenses, including:
+            glass_size: float
+                Size of the base square.
+            glass_height: float
+                Height of the glass layer(base square).
+            air_layer_height: float
+                Height of the air layer.
+            bottom_pml_height: float
+                Height of the bottom PML layer.
+            top_pml_height: float
+                Height of the top PML layer.
+            antenna1_size: float
+                Size of the first antenna.
+            antenna1_height: float
+                Height of the first antenna.
+            antenna2_size: float
+                Size of the second antenna.
+            antenna2_height: float
+                Height of the second antenna.
+            antenna3_size: float
+                Size of the third antenna.
+            antenna3_height: float
+                Height of the third antenna.
+            antenna4_size: float
+                Size of the fourth antenna.
+            antenna4_height: float
+                Height of the fourth antenna.
     """
     def __init__(self, params):
-        self.base_size = params["base_size"]
+        self.glass_size = params["glass_size"]
         self.glass_height = params["glass_height"]
         self.air_layer_height = params["air_layer_height"]
         self.bottom_pml_height = params["bottom_pml_height"]
@@ -54,7 +56,7 @@ class MetalensesMesherTet:
 
 
     def generate_mesh(self, mesh_size=0.2):
-        base_size = self.base_size
+        glass_size = self.glass_size
         glass_height = self.glass_height
         air_layer_height = self.air_layer_height
         bottom_pml_height = self.bottom_pml_height
@@ -72,21 +74,21 @@ class MetalensesMesherTet:
         gmsh.initialize()
         gmsh.model.add("metalenses")
         # 构造几何体
-        base = gmsh.model.occ.addBox(-base_size / 2, -base_size / 2, -glass_height, base_size, base_size, glass_height)
-        antenna1 = gmsh.model.occ.addBox(base_size / 4 - antenna1_size / 2, base_size / 4 - antenna1_size / 2, 0,
+        base = gmsh.model.occ.addBox(-glass_size / 2, -glass_size / 2, -glass_height, glass_size, glass_size, glass_height)
+        antenna1 = gmsh.model.occ.addBox(glass_size / 4 - antenna1_size / 2, glass_size / 4 - antenna1_size / 2, 0,
                                          antenna1_size, antenna1_size, antenna1_height)
-        antenna2 = gmsh.model.occ.addBox(-base_size / 4 - antenna2_size / 2, base_size / 4 - antenna2_size / 2, 0,
+        antenna2 = gmsh.model.occ.addBox(-glass_size / 4 - antenna2_size / 2, glass_size / 4 - antenna2_size / 2, 0,
                                          antenna2_size, antenna2_size, antenna2_height)
-        antenna3 = gmsh.model.occ.addBox(-base_size / 4 - antenna3_size / 2, -base_size / 4 - antenna3_size / 2, 0,
+        antenna3 = gmsh.model.occ.addBox(-glass_size / 4 - antenna3_size / 2, -glass_size / 4 - antenna3_size / 2, 0,
                                          antenna3_size, antenna3_size, antenna3_height)
-        antenna4 = gmsh.model.occ.addBox(base_size / 4 - antenna4_size / 2, -base_size / 4 - antenna4_size / 2, 0,
+        antenna4 = gmsh.model.occ.addBox(glass_size / 4 - antenna4_size / 2, -glass_size / 4 - antenna4_size / 2, 0,
                                          antenna4_size, antenna4_size, antenna4_height)
-        air_layer = gmsh.model.occ.addBox(-base_size / 2, -base_size / 2, 0,
-                                          base_size, base_size, air_layer_height)
-        bottom_plm_layer = gmsh.model.occ.addBox(-base_size / 2, -base_size / 2, -glass_height - bottom_pml_height,
-                                                 base_size, base_size, bottom_pml_height)
-        top_plm_layer = gmsh.model.occ.addBox(-base_size / 2, -base_size / 2, air_layer_height,
-                                              base_size, base_size, top_pml_height)
+        air_layer = gmsh.model.occ.addBox(-glass_size / 2, -glass_size / 2, 0,
+                                          glass_size, glass_size, air_layer_height)
+        bottom_plm_layer = gmsh.model.occ.addBox(-glass_size / 2, -glass_size / 2, -glass_height - bottom_pml_height,
+                                                 glass_size, glass_size, bottom_pml_height)
+        top_plm_layer = gmsh.model.occ.addBox(-glass_size / 2, -glass_size / 2, air_layer_height,
+                                              glass_size, glass_size, top_pml_height)
         gmsh.model.occ.synchronize()
         # 几何体组合
         antenna_with_air, _ = gmsh.model.occ.fragment([(3, air_layer)],
@@ -103,12 +105,12 @@ class MetalensesMesherTet:
         # 测试用，验证周期边界条件，实际可删除下面两行
         # gmsh.model.mesh.setSize(gmsh.model.getEntities(0), 2000)
         # gmsh.model.mesh.setSize([(0, 77), (0, 65), (0, 73)], 200)
-        translation_x = [1, 0, 0, base_size,
+        translation_x = [1, 0, 0, glass_size,
                          0, 1, 0, 0,
                          0, 0, 1, 0,
                          0, 0, 0, 1]
         translation_y = [1, 0, 0, 0,
-                         0, 1, 0, base_size,
+                         0, 1, 0, glass_size,
                          0, 0, 1, 0,
                          0, 0, 0, 1]
         gmsh.model.mesh.setPeriodic(2, [65, 60, 58, 70], [64, 59, 54, 69], translation_x)
@@ -123,18 +125,23 @@ class MetalensesMesherTet:
         gmsh.model.occ.synchronize()
 
         # 网格生成
-        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size * base_size)
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), mesh_size * glass_size)
         gmsh.model.mesh.generate(3)
-        # TEST 获取周期边界的对应点
+        # 获取周期边界的对应点
         origin_face_tag_x = [65, 60, 58, 70]
         periodic_node_pairs_x = {}
-        periodic_node_pairs_x_inv = {}
         for face in origin_face_tag_x:
             master_tag, origin_node_tag, master_node_tag, _ = gmsh.model.mesh.getPeriodicNodes(2, face)
             if origin_node_tag is not None:
                 for i in range(len(origin_node_tag)):
                     periodic_node_pairs_x[origin_node_tag[i]-1] = master_node_tag[i]-1
-                    periodic_node_pairs_x_inv[master_node_tag[i]-1] = origin_node_tag[i]-1
+        origin_face_tag_y = [67, 62, 57, 72]
+        periodic_node_pairs_y = {}
+        for face in origin_face_tag_y:
+            master_tag, origin_node_tag, master_node_tag, _ = gmsh.model.mesh.getPeriodicNodes(2, face)
+            if origin_node_tag is not None:
+                for i in range(len(origin_node_tag)):
+                    periodic_node_pairs_y[origin_node_tag[i]-1] = master_node_tag[i]-1
         # 获取所有节点坐标
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
         points = bm.array(node_coords).reshape(-1, 3)
@@ -153,6 +160,7 @@ class MetalensesMesherTet:
         tet_mesh = TetrahedronMesh(points, cells)
         tet_mesh.celldata['domain'] = bm.array([cell_to_physical.get(i + 1, -1) for i in range(len(cells))],
                                                dtype=bm.int64)
+        tet_mesh.meshdata['node_pairs'] = [periodic_node_pairs_x, periodic_node_pairs_y]
         # 结束GMSH
         gmsh.finalize()
 
@@ -163,7 +171,7 @@ if __name__ == "__main__":
     # 参数读取
     with open("../data/parameters.json", "r") as f:
         params = json.load(f)
-    # base_size = params["base_size"]
+    # glass_size = params["glass_size"]
     # glass_height = params["glass_height"]
     # air_layer_height = params["air_layer_height"]
     # bottom_pml_height = params["bottom_pml_height"]

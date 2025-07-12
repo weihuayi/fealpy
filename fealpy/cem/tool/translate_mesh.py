@@ -9,6 +9,7 @@ def translate_mesh(mesh,
                    translation_axes:int, translation_num:int):
     """
     Translate the mesh based on the periodic node pairs and translation axes.
+    Maybe this method can be a static method for the Mesh class.
 
     Parameters:
         mesh: Mesh
@@ -26,12 +27,17 @@ def translate_mesh(mesh,
     origin_node = mesh.node
     origin_cell = mesh.cell
     total_node = bm.copy(origin_node)
-    total_cell = bm.copy(origin_cell)
+    total_cell = bm.astype(bm.copy(origin_cell), bm.int64)
 
     trans_node_pairs = bm.array(list(node_pairs[translation_axes].items()), dtype=bm.int64)
     origin_node_pairs = bm.copy(trans_node_pairs)
     del node_pairs[translation_axes]
     origin_other_node_pairs = [bm.array(list(p.items()), dtype=bm.int64) for p in node_pairs]
+
+    domain = None
+    if mesh.celldata['domain'] is not None:
+        domain = mesh.celldata['domain']
+        origin_domain = bm.copy(domain)
 
     num_unit_node = len(origin_node)
     num_interface_node = len(trans_node_pairs)
@@ -67,13 +73,15 @@ def translate_mesh(mesh,
             for p in new_node_pairs_i:
                 node_pairs_dict[p[0].item()] = p[1].item()
             node_pairs[i] = node_pairs_dict
+        if domain is not None:
+            domain = bm.concat([domain, origin_domain], axis=0)
 
     trans_node_pairs_dict = {}
     for i, p in enumerate(trans_node_pairs):
         trans_node_pairs_dict[p[0].item()] = origin_node_pairs[i, 1].item()
     node_pairs.insert(translation_axes, trans_node_pairs_dict)
 
-    return total_node, total_cell, node_pairs
+    return total_node, total_cell, node_pairs, domain
 
 
 if __name__ == '__main__':
@@ -169,13 +177,13 @@ if __name__ == '__main__':
     # for p in periodic_node_pairs_y.items():
     #     print(p[0], "->", p[1])
     #     print(new_node[p[0]] - new_node[p[1]])
-    new_node, new_cell, node_pairs = translate_mesh(tet_mesh,
+    new_node, new_cell, node_pairs, _ = translate_mesh(tet_mesh,
                                                     node_pairs,
                                                     translation_axes=0, translation_num=9)
     new_tet_mesh = TetrahedronMesh(new_node, new_cell)
 
     new_tet_mesh.to_vtk(fname='../data/assembled_mesh_x.vtu')
-    new_node, new_cell, node_pairs = translate_mesh(new_tet_mesh,
+    new_node, new_cell, node_pairs, _ = translate_mesh(new_tet_mesh,
                                                     node_pairs,
                                                     translation_axes=1, translation_num=9)
     new_tet_mesh = TetrahedronMesh(new_node, new_cell)
