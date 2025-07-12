@@ -116,7 +116,7 @@ class SinCosCosData2D:
         return val
     
     @cartesian
-    def init_solution(self, p: TensorLike, t: float = 0.0) -> TensorLike:
+    def init_condition(self, p: TensorLike, t: float = 0.0) -> TensorLike:
         """Return the initial condition for the phase field."""
         return self.solution(p, t)
     
