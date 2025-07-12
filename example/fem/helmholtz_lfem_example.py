@@ -1,5 +1,5 @@
 import argparse
-from fealpy.fem import HelmInteriorPenaltyLFEMModel 
+from fealpy.fem import HelmholtzLFEMModel
 from fealpy.backend import bm
 
 
@@ -14,8 +14,8 @@ parser.add_argument('--backend',
                     help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='bessel2d', type=str,
-                    help='Name of the PDE model, default is bessel2d')
+                    default=3, type=int,
+                    help='Name of the PDE model, default is 1')
 
 parser.add_argument('--nx', default=20, type=int,
                     help='Number of subdivisions in x direction for mesh, default=20')
@@ -39,6 +39,10 @@ parser.add_argument('--gamma',
                     default=-0.07, type=float,
                     help='Gamma parameter, default is -0.07')
 
+parser.add_argument('--solver',
+                    default="direct", type=str,
+                    help='Solver type, default is direct')
+
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True')
@@ -48,14 +52,12 @@ parser.add_argument('--log_level',
                     help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
 parser.add_argument('--method', type=str, default='standard',
-                    choices=['standard', 'interior_penalty'],
-                    help='Choose finite element method: standard or interior_penalty')
-
+                    choices=['standard', 'penalty'],
+                    help='Choose finite element method: standard or penalty')
 
 options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 
-mode = HelmInteriorPenaltyLFEMModel(options)
-
-mode.plot_error_comparison()
-mode.plot_solution()
+model = HelmholtzLFEMModel(options)
+model.run()
+model.run['error']()

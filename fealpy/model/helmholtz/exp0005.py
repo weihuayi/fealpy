@@ -4,7 +4,7 @@ from ...backend import TensorLike
 from ..box_domain_mesher import BoxDomainMesher3d
 from ...decorator import cartesian
 
-class SinSinData3D(BoxDomainMesher3d):
+class EXP0005(BoxDomainMesher3d):
     """
     3D Helmholtz problem with homogeneous Dirichlet boundary condition:
 
