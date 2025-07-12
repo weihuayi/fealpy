@@ -4,7 +4,7 @@ from ...backend import TensorLike
 from ..box_domain_mesher import BoxDomainMesher2d
 from ...decorator import cartesian
 
-class SinSinData2D(BoxDomainMesher2d):
+class EXP0004(BoxDomainMesher2d):
     """
     2D Helmholtz problem with homogeneous Dirichlet boundary condition:
 

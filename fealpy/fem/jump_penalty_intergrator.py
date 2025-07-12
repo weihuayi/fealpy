@@ -4,13 +4,14 @@ from ..typing import TensorLike, Threshold, CoefLike
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
+from ..decorator import variantmethod
 from ..functional import bilinear_integral
 from .integrator import (
     LinearInt, OpInt, FaceInt,
     enable_cache
 )
 
-class HelmipMassIntegrator(LinearInt, OpInt, FaceInt):
+class JumpPenaltyIntergrator(LinearInt, OpInt, FaceInt):
     """
     A class for computing scalar face interior penalty integrals in finite element methods.
     
@@ -162,7 +163,8 @@ class HelmipMassIntegrator(LinearInt, OpInt, FaceInt):
         phi = phi[index]
 
         return bcs, ws, phi, cm, index
-
+    
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         '''Assemble the matrix for interior face penalty terms.'''
         coef = self.coef

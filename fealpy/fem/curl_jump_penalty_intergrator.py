@@ -6,9 +6,10 @@ from ..typing import TensorLike, CoefLike, Threshold
 from ..functionspace import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
+from ..decorator import variantmethod
 from .integrator import LinearInt, OpInt, FaceInt, enable_cache
 
-class CurlipMassIntegrator(LinearInt, OpInt, FaceInt):
+class CurlJumpPenaltyIntergrator(LinearInt, OpInt, FaceInt):
     def __init__(self, coef, q: Optional[int]=None, *,
                  threshold: Optional[Threshold]=None,
                  batched: bool=False):
@@ -130,6 +131,7 @@ class CurlipMassIntegrator(LinearInt, OpInt, FaceInt):
         
         return bcs, ws, phi, cm, index
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)

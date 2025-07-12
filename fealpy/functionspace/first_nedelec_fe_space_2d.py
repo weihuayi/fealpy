@@ -384,7 +384,29 @@ class FirstNedelecFESpace2d(FunctionSpace, Generic[_MT]):
         vec = bm.zeros(gdof, dtype=self.ftype)
         vec[edge2dof] = bm.einsum('eqg, eqlg,q,e->el', hval, bphi,ws,fm) # (NE, ldof)
         return vec
- 
+
+    def interpolate(self, u: Union[Callable[..., TensorLike], TensorLike],) -> TensorLike:
+
+        p = self.p
+        if p > 0:
+            raise NotImplementedError("Interpolation not implemented for p > 0")
+        mesh = self.mesh
+        qf = mesh.quadrature_formula(p+3, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        points = mesh.bc_to_point(bcs)
+
+        dof = self.number_of_global_dofs()
+        uI = bm.zeros(dof, dtype=self.ftype)
+
+        val = u(points)
+        val = val[:, :, None]
+        t = mesh.edge_unit_tangent()
+        cm = mesh.entity_measure('face')
+
+        vals = bm.einsum('q,eqlg, eg, e->el',ws, val, t , cm)
+        face2dof = self.face_to_dof()
+        uI = bm.index_add(uI, face2dof, vals)
+        return uI
 
     
     # def projection(self, f, method="L2"):
