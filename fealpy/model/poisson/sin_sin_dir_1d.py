@@ -3,7 +3,7 @@ from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
-class SinData1D:
+class Sin_Sin_Dir_1D:
     """
     1D Poisson problem:
 
@@ -21,7 +21,7 @@ class SinData1D:
     Dirichlet boundary conditions are applied at both ends of the interval.
     """
 
-    def geo_dimension(self) -> int: 
+    def get_dimension(self) -> int: 
         """Return the geometric dimension of the domain."""
         return 1
 
