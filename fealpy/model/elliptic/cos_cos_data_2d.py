@@ -2,7 +2,7 @@ from typing import Sequence
 from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 
 class CosCosData2D(BoxDomainMesher2d):
     """

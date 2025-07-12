@@ -1,9 +1,9 @@
 from typing import Sequence
-from ..backend import backend_manager as bm
-from ..decorator import variantmethod
-from ..mesh import TriangleMesh, QuadrangleMesh
+from ...backend import backend_manager as bm
+from ...decorator import variantmethod
+from ...mesh import TriangleMesh, QuadrangleMesh
 
-class CircleDomainMesher:
+class CircleMesher:
     """Circle domain mesh generator"""
     def __init__(self, vertices=None, h=None):
         if h is None:

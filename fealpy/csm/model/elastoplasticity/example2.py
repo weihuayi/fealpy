@@ -3,7 +3,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from typing import Tuple
 
-class ElastoplasticityData3D:
+class exp2():
     """
     3D Elasto-Plastic Block specimen with pure isotropic hardening.
 

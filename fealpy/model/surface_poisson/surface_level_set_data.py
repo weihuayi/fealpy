@@ -1,9 +1,10 @@
-from ...decorator import cartesian
 from ...backend import backend_manager as bm
-from ...backend import TensorLike
+from ...decorator import cartesian
+from ...typing import  TensorLike
+from ..domain_mesher.sphere_domain_mesher import SphereDomainMesher3D
 
 
-class SurfaceLevelSetData():
+class SurfaceLevelSetData(SphereDomainMesher3D):
     """
     Surface Poisson problem on a closed manifold:
 
@@ -27,20 +28,19 @@ class SurfaceLevelSetData():
               f = -Δ_S (x·y).
     """
 
+    def __init__(self, surface=None):
+        super().__init__(surface=surface)
+        
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
         return x * y
     
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute gradient of solution."""
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
         denom = x**2 + y**2 +z**2
         scale = 2*x*y / denom
 
@@ -53,14 +53,12 @@ class SurfaceLevelSetData():
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
         denom = x**2 + y**2 +z**2
         return - 6*x*y / denom
     
     @cartesian
-    def neumann(self, p: TensorLike, n : int) -> TensorLike:
+    def neumann(self, p: TensorLike, n: int) -> TensorLike:
         """
         Compute Neumann boundary condition.
 
