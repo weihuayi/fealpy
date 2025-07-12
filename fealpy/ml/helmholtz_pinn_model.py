@@ -71,7 +71,7 @@ class HelmholtzPINNModel(ComputationalModel):
         k : float
             Wave number for Helmholtz equation
     
-    Reference:
+    Reference
         https://wnesm678i4.feishu.cn/wiki/U219wwT18iH4v7kNTOacxl8cnXb?from=from_copylink
     
     Methods
