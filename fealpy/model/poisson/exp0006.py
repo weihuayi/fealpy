@@ -4,20 +4,20 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 from ..domain_mesher.box_domain_mesher import BoxDomainMesher3d
 
-class CosCosCos_Cos_Dir_3D(BoxDomainMesher3d):
+class Exp0006(BoxDomainMesher3d):
     """
     3D Poisson problem:
 
         -Δu(x, y, z) = f(x, y, z),  (x, y, z) ∈ (0, 1)^3
-         u(x, y, z) = g(x, y, z),            on ∂Ω
+         u(x, y, z) = 0,            on ∂Ω
 
     with the exact solution
 
-        u(x, y, z) = cos(πx)·cos(πy)·cos(πz)
+        u(x, y, z) = sin(πx)·sin(πy)·sin(πz)
 
     The corresponding source term is:
 
-        f(x, y, z) = 3·π²·cos(πx)·cos(πy)·cos(πz)
+        f(x, y, z) = 3·π²·sin(πx)·sin(πy)·sin(πz)
 
     Homogeneous Dirichlet boundary conditions are applied on all boundaries.
     """
@@ -25,53 +25,50 @@ class CosCosCos_Cos_Dir_3D(BoxDomainMesher3d):
         """Configure the relevant parameters of PDE."""
         self.box = box
 
-    def get_dimension(self) -> int:
-        """Return the geometric dimension of the domain (3D)."""
+    def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
         return 3
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax, zmin, zmax]."""
-        return self.box
+        return [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
-        """Compute the exact solution u(x, y, z) = cos(πx)·cos(πy)·cos(πz)."""
+        """Compute exact solution"""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
         pi = bm.pi
-        return bm.cos(pi * x) * bm.cos(pi * y) * bm.cos(pi * z)
+        return bm.sin(pi * x) * bm.sin(pi * y) * bm.sin(pi * z)
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
-        """Compute the gradient of the solution."""
+        """Compute gradient of solution."""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
         pi = bm.pi
-        du_dx = -pi * bm.sin(pi * x) * bm.cos(pi * y) * bm.cos(pi * z)
-        du_dy = -pi * bm.cos(pi * x) * bm.sin(pi * y) * bm.cos(pi * z)
-        du_dz = -pi * bm.cos(pi * x) * bm.cos(pi * y) * bm.sin(pi * z)
+        du_dx = pi * bm.cos(pi * x) * bm.sin(pi * y) * bm.sin(pi * z)
+        du_dy = pi * bm.sin(pi * x) * bm.cos(pi * y) * bm.sin(pi * z)
+        du_dz = pi * bm.sin(pi * x) * bm.sin(pi * y) * bm.cos(pi * z)
         return bm.stack([du_dx, du_dy, du_dz], axis=-1)
 
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
-        """Compute the source term f(x, y, z) = 3·π²·cos(πx)·cos(πy)·cos(πz)."""
+        """Compute exact source"""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
         pi = bm.pi
-        return 3 * pi**2 * bm.cos(pi * x) * bm.cos(pi * y) * bm.cos(pi * z)
+        return 3 * pi**2 * bm.sin(pi * x) * bm.sin(pi * y) * bm.sin(pi * z)
 
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
-        """Dirichlet boundary condition, same as the exact solution."""
+        """Dirichlet boundary condition"""
         return self.solution(p)
 
     @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        """Check if points are on the Dirichlet boundary."""
+        """Check if point is on boundary."""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
         atol = 1e-12
-        xmin, xmax, ymin, ymax, zmin, zmax = self.box
         return (
-            (bm.abs(x - xmin) < atol) | (bm.abs(x - xmax) < atol) |
-            (bm.abs(y - ymin) < atol) | (bm.abs(y - ymax) < atol) |
-            (bm.abs(z - zmin) < atol) | (bm.abs(z - zmax) < atol)
+            (bm.abs(x - 1.0) < atol) | (bm.abs(x) < atol) |
+            (bm.abs(y - 1.0) < atol) | (bm.abs(y) < atol) |
+            (bm.abs(z - 1.0) < atol) | (bm.abs(z) < atol)
         )
-
-    

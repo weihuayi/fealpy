@@ -4,7 +4,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 
-class SinSin_Sin_Dir_2D(BoxDomainMesher2d):
+class Exp0002(BoxDomainMesher2d):
     """
     2D Poisson problem:
     
