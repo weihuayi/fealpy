@@ -8,7 +8,11 @@ from ...fem import DirichletBC
 from ...solver import spsolve
 from typing import Union
 from ..model.elastoplasticity import ElastoplasticityPDEDataT
-
+from ...fem import VectorSourceIntegrator, ConstIntegrator
+from .elastoplastic_integrator import ElastoplasticIntegrator
+from ...material import LinearElasticMaterial
+from ..material.elastoplastic_material import PlasticMaterial
+from ...functionspace import functionspace
 
 class ElastoplasticityFEMModel(ComputationalModel):
     """
@@ -81,7 +85,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         self.yield_strength = self.pde.sigma_y0
         self.f = self.pde.Ft_max
         self.a = self.pde.a
-        self.N =10
+        self.N = 10
 
 
     def set_pde(self, pde:Union[ElastoplasticityPDEDataT, str]='1'):
@@ -120,6 +124,56 @@ class ElastoplasticityFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
+    def set_material_parameters(self, lam: float, mu: float):
+        self.material = LinearElasticMaterial("elastoplastic", lame_lambda=lam, shear_modulus=mu, 
+                                              hypo='plane_stress', device=bm.get_device(self.mesh))
+        qf = self.mesh.quadrature_formula(q=self.mesh.scalar_space.p+3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        self.B = self.material.strain_matrix(True, gphi=self.mesh.scalar_space.grad_basis(bcs))
+        self.D = self.material.elastic_matrix()
+        
+    def set_space(self):
+        '''
+        Set the finite element space for the model.
+        This method initializes the function space used for the finite element discretization.
+        Raises:
+            ValueError: If the function space cannot be initialized due to invalid parameters.
+        Notes:
+            The function space is based on the mesh and polynomial degree defined in the PDE data.
+        Examples:
+            >>> model.set_space()
+        '''
+        GD = self.mesh.geo_dimension()
+        self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
+
+    # 根据当前位移场计算应力
+    def compute_stress(self, displacement, plastic_strain):
+        """
+        Compute the stress field based on the current displacement field.
+        """
+        node = self.mesh.entity('node')
+        kwargs = bm.context(node)
+        cell2dof = self.space.cell_to_dof()
+        uh = bm.array(displacement,**kwargs)
+        uh_cell = uh[cell2dof]
+        strain_total = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
+        strain_elastic = strain_total - plastic_strain
+
+        # 计算应力
+        stress = bm.einsum('cqij,cqj->cqi', self.D, strain_elastic)
+        return stress
+    
+    # 根据当前应力组装内部力项
+    def compute_internal_force(self, stress):
+        qf = self.mesh.quadrature_formula(q=self.mesh.scalar_space.p+3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cm = self.mesh.entity_measure('cell')
+        F_int_cell = bm.einsum('q, c, cqij,cqi->cj', 
+                             ws, cm, self.B, stress) # (NC, tdof)
+        
+        return F_int_cell
+
+    # TODO:需要修改!
     def linear_system(self):
         '''
         Assemble the linear system for the elastoplasticity problem.
@@ -133,7 +187,41 @@ class ElastoplasticityFEMModel(ComputationalModel):
         Examples:
             >>> A, b = model.linear_system()
         '''
-        pass
+        node = self.mesh.entity('node')
+        kwargs = bm.context(node)
+        NC = self.mesh.number_of_cells()
+        NQ = self.mesh.number_of_nodes()
+        equivalent_plastic_strain = bm.zeros((NC, NQ),**kwargs)
+        self.pfcm = PlasticMaterial(name='E1nu0.3',
+                                elastic_modulus=1e5, poisson_ratio=0.3,
+                                yield_stress=50, hardening_modulus=0.0, hypo='plane_stress', device=bm.get_device(self.mesh))
+        elasticintegrator= ElastoplasticIntegrator(self.pfcm.D_ep, material=self.pfcm,space=tensor_space, 
+                                    q=tensor_space.p+3)
+        bform = BilinearForm(tensor_space)
+        bform.add_integrator(elasticintegrator)
+        K = bform.assembly(format='csr')
+
+
+        load = self.f
+        space = LagrangeFESpace(self.mesh, p=1, ctype='C')
+        tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
+
+        lform = LinearForm(tensor_space) 
+        lform.add_integrator(VectorSourceIntegrator(source = load))
+        F_ext = lform.assembly()
+
+        elasticintegrator = ElastoplasticIntegrator(
+            material=self.pde.material,
+            space=tensor_space,
+            q=tensor_space.p + 3,
+            equivalent_plastic_strain=self.pde.equivalent_plastic_strain
+        )
+
+        F_int = elasticintegrator.assembly()
+
+
+
+        return K , F_int, F_ext
     
 
     def plasticity_update_2d(
@@ -224,19 +312,42 @@ class ElastoplasticityFEMModel(ComputationalModel):
     
     
     def solve(self):
-        '''
-        Solve the linear system for the elastoplasticity problem.
-        This method applies boundary conditions and solves the assembled linear system using a linear solver.
-        Returns:
-            ndarray: The displacement solution vector.
-        Raises:
-            ValueError: If the solution cannot be computed due to invalid parameters or assembly issues.
-        Notes:
-            The method uses Dirichlet boundary conditions defined in the PDE data manager.
-        Examples:
-            >>> displacement = model.solve()
-            >>> print(displacement)
-        '''
-        pass
-        
+        # 初始化
+        u = 0  # 初始位移
+        sigma = 0  # 初始应力
+        alpha = 0  # 初始塑性应变
+        ep = 0  # 初始等效塑性应变
+        tol = 1e-8
+        N = self.N
+
+        # 循环荷载步
+        for n in range(N):
+            delta_u = 0
+            converged = False
+            while not converged:
+                # i. 组装全局残余力向量 R = F_int - F_ext, 组装全局切线刚度矩阵 K
+                K, F_int, F_ext = self.linear_system()
+                R = F_int - F_ext
+                from fealpy.solver import spsolve
+                delta_u = spsolve(K, -R)
+
+                # iv. 更新位移增量 Δu ← Δu + δΔu
+                delta_u += delta_u
+
+                # v. 更新所有积分点状态
+                sigma, alpha, ep = self.plasticity_update_2d(u, sigma, alpha, ep, delta_u)
+
+                # vi. 检查收敛
+                if bm.norm(R) < tol and bm.norm(delta_u) < tol:
+                    converged = True
+
+            # d. 更新总位移
+            u += delta_u
+
+            # e. 保存状态变量 (σ, α, ep) 用于下一步
+            self.save_state(sigma, alpha, ep)
+
+        # 返回最终结果或状态
+        return u, sigma, alpha, ep
+
        
