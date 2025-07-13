@@ -43,6 +43,7 @@ def test_set_default_device():
 
 # 测试 context 方法
 def test_context():
+
     x = ti.field(dtype=ti.f64, shape=(2, 3))
 
     # 填充数据
@@ -213,6 +214,7 @@ def test_full():
 
     check_multi()
 
+    
 # 测试 ones_like 方法
 def test_ones_like():
     # 测试标量场
@@ -299,6 +301,7 @@ def test_ones_like():
                 assert ones_like[i] == 1
 
         check_dtype()
+
 
 # 测试 full_like 方法
 def test_full_like():
@@ -402,7 +405,7 @@ def test_full_like():
 
     # 测试多维场
     x_multi = ti.field(dtype=ti.f64, shape=(2, 3, 4))
-
+    
     @ti.kernel
     def fill_multi():
         for I in ti.grouped(x_multi):
@@ -422,6 +425,7 @@ def test_full_like():
 
     check_multi()
 
+    
 # 测试 acosh 方法
 def test_acosh():
     # 测试标量输入且值在定义域内的情况
@@ -442,6 +446,7 @@ def test_acosh():
     x_invalid_type = np.array([1.0, 2.0])
     with pytest.raises(TypeError, match="must be a ti.Field or a scalar"):
       bm.acosh(x_invalid_type)
+
 
 # 测试 asinh 方法
 def test_asinh():
@@ -546,6 +551,7 @@ def test_from_numpy():
         assert field.dtype == ti.f32
         assert field.shape == (3,)
         assert isinstance(field, ti.Field)
+
         assert field[i] == arr[i]
 
     # int型2d
@@ -618,6 +624,7 @@ def test_tolist():
 
     # 2D Field
     field = ti.field(ti.f64, shape = (2, 3))
+
     @ti.kernel
     def fill():
         for i, j in field:
@@ -905,7 +912,6 @@ def test_tril():
     # field 为 None
     with pytest.raises(ValueError, match="Input field is None. Please provide a valid Taichi field."):
         bm.tril(None)
-
 
 
 # 测试 abs 函数
@@ -2198,6 +2204,7 @@ def test_cross():
     vec2_4d = ti.field(dtype=ti.f64, shape=(4,))
     with pytest.raises(ValueError, match="Input fields must be 1D vectors of length 2 or 3"):
         bm.cross(vec1_4d, vec2_4d)
+
 
 
 if __name__ == "__main__":
