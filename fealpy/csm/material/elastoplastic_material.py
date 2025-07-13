@@ -1,8 +1,6 @@
 from fealpy.backend import backend_manager as bm
 
 from builtins import float, str
-from fealpy.material.material_base import MaterialBase
-from fealpy.functionspace.utils import flatten_indices
 
 from fealpy.typing import TensorLike
 from typing import Optional, Tuple, List
@@ -10,6 +8,44 @@ from fealpy.material.elastic_material import LinearElasticMaterial
 
 
 class PlasticMaterial(LinearElasticMaterial):
+    '''
+    PlasticMaterial represents a linear elastoplastic material with optional linear hardening.
+    This class models materials that exhibit both elastic and plastic behavior according to the von Mises yield criterion, with support for linear isotropic hardening. It extends LinearElasticMaterial by adding yield stress and hardening modulus, and provides methods for computing the elastoplastic tangent matrix and related quantities. Suitable for finite element analysis of elastoplastic solids.
+    Parameters
+    name : str
+        Name of the material.
+    yield_stress : float
+        Initial yield stress (scalar), i.e., the stress at which plastic deformation begins.
+    hardening_modulus : float, optional, default=0.0
+        Linear hardening modulus (H'), representing the slope of the yield surface in stress-plastic strain space.
+    **kwargs
+        Additional keyword arguments passed to the base LinearElasticMaterial class (e.g., elastic_modulus, poisson_ratio).
+    Attributes
+    yield_stress : float
+        Initial yield stress of the material.
+    hardening_modulus : float
+        Linear hardening modulus (H'). If zero, perfect plasticity is assumed.
+    is_hardening : bool
+        Whether the material considers hardening effects (True if hardening_modulus > 0).
+    Methods
+    df_dsigma(stress)
+        Compute the derivative of the yield function with respect to the Cauchy stress (for von Mises criterion).
+    deviatoric_stress(stress)
+        Compute the deviatoric (traceless) part of the stress tensor in Voigt notation.
+    elastico_plastic_matrix(stress=None, df_dsigma=None)
+        Compute the elastoplastic tangent matrix D^p at the current stress state.
+    elastico_plastic_hardening_matrix(stress=None, plastic_strain=None, df_dsigma=None)
+        Compute the elastoplastic tangent matrix D^p considering linear hardening.
+    Notes
+    - The class assumes small strain theory and uses Voigt notation for stress and strain tensors.
+    - Only linear (isotropic) hardening is supported; nonlinear hardening requires further extension.
+    - The elastoplastic tangent operator is computed using the return mapping algorithm for von Mises plasticity.
+    Examples
+    >>> mat = PlasticMaterial(name="Steel", yield_stress=250.0, elastic_modulus=210e3, poisson_ratio=0.3)
+    >>> stress = np.array([260.0, 240.0, 0.0])
+    >>> df = mat.df_dsigma(stress)
+    >>> Dp = mat.elastico_plastic_matrix(stress=stress)
+    '''
     def __init__(self, 
                  name: str,
                  yield_stress: float,          # 初始屈服应力

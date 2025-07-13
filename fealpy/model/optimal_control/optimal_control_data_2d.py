@@ -3,9 +3,9 @@ from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 import sympy as sp
-from fealpy.model.box_domain_mesher import BoxDomainMesher2d
+from fealpy.model.mesher.box_mesher import BoxMesher2d
 
-class OptimalControlData2d(BoxDomainMesher2d):
+class OptimalControlData2d(BoxMesher2d):
     """
     A PDE example with homogeneous Neumann boundary conditions on the unit square.
 

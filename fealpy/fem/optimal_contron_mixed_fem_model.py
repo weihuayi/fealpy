@@ -74,24 +74,24 @@ class OPCMixedFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        self.set_init_mesh(options['init_mesh'], options['uniform_refine'])
+        self.set_init_mesh(options['init_mesh'])
         self.set_order(options['space_degree'])
         self.solve.set(options['solve']) 
-        
+
     def set_pde(self, pde: Union[OPCPDEDataT, str]="opc"):
         """
+        Set the optimal control PDE data for the model.
         """
         if isinstance(pde, str):
             self.pde = PDEDataManager('optimal_control').get_example(pde)
         else:
             self.pde = pde
 
-    def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tri", n: int = 0, **kwargs):
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tri", **kwargs):
         if isinstance(mesh, str):
             self.mesh = self.pde.init_mesh[mesh](**kwargs)
         else:
             self.mesh = mesh
-        self.mesh.uniform_refine(n=n)
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -99,7 +99,14 @@ class OPCMixedFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-    def set_order(self, p: int = 0):    
+
+    def set_order(self, p: int = 0):   
+        """
+        Set the polynomial degree for the Raviart-Thomas finite element space.
+        Parameters
+        p : int, optional
+            The polynomial degree of the Raviart-Thomas space. Default is 0 (piecewise constant).
+        """ 
         self.p = p    
         
     def space(self, p: Optional[int] = None):
@@ -116,11 +123,12 @@ class OPCMixedFEMModel(ComputationalModel):
         self.uspace = LagrangeFESpace(self.mesh, p=p, ctype='D')
         return self.uspace, self.pspace
     
-    def linear_system(self, mesh, p, s1, s2, s3, s4):
+    def linear_system(self,  p, s1, s2, s3, s4):
         """
+        Assemble the linear system for the optimal control problem.
         """
-        self.pspace = RaviartThomasFESpace2d(mesh, p=p)
-        self.uspace= LagrangeFESpace(mesh, p=p, ctype='D')  
+        self.pspace = RaviartThomasFESpace2d(self.mesh, p=p)
+        self.uspace= LagrangeFESpace(self.mesh, p=p, ctype='D')  
 
         uLDOF = self.uspace.number_of_local_dofs()
         uGDOF = self.uspace.number_of_global_dofs()
@@ -194,7 +202,6 @@ class OPCMixedFEMModel(ComputationalModel):
                          f" and relative residual {stop_res:.4e}")
 
         
-    @variantmethod("error")
     def postprocess(self, uh, ph, solution1, solution2):
         """
         Post-process the numerical solution to compute the error in L2 norm.
@@ -202,8 +209,83 @@ class OPCMixedFEMModel(ComputationalModel):
         ul2 = self.mesh.error(solution1, uh)
         pl2 = self.mesh.error(solution2, ph)
         return ul2, pl2
-  
     
+    def postprocess_interpolate(self, uh, ph, solution1=None, solution2=None):
+        """
+        Post-process the numerical solution to compute the error in max norm.
+        """
+        if solution1 is None or solution2 is None:
+            raise ValueError("Exact solutions must be provided for error computation.")
+        u1 = self.uspace.interpolate(solution1)
+        p1 = self.pspace.interpolation(solution2)
+        umax = self.mesh.error(u1, uh)
+        pmax = self.mesh.error(p1, ph)
+        return umax, pmax
+    
+    def show_p0(self,solution):
+        """
+        Visualize the mesh structure.
+        """
+        u1 = self.uspace.interpolate(solution)
+        node = self.mesh.entity('node')  # 节点坐标 (N_node, 2)
+        cell = self.mesh.entity('cell')  # 单元 (N_cell, 3)
+        # 假设 node, cell, u1 已经定义好
+        num_nodes = len(node)
+        node_values = bm.zeros(num_nodes)
+
+        for i in range(len(cell)):
+            for j in cell[i]:
+                node_values[j] += u1[i]
+                
+        # 计算每个节点的平均值
+        node_values /= bm.bincount(bm.concatenate(cell))
+        from scipy.interpolate import griddata
+
+        xi = bm.linspace(min(node[:, 0]), max(node[:, 0]))
+        yi = bm.linspace(min(node[:, 1]), max(node[:, 1]))
+        xi, yi = bm.meshgrid(xi, yi)
+
+        zi = griddata((node[:, 0], node[:, 1]), node_values, (xi, yi), method='linear')
+        import matplotlib.pyplot as plt
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        surf = ax.plot_surface(xi, yi, zi, cmap='jet', linewidth=0, antialiased=False, edgecolor='none')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.set_title(f'{solution.__name__}—Exact Solution')
+        ax.xaxis._axinfo["grid"].update({"linewidth": 0.5, "linestyle": "--", "alpha": 0.5})
+        ax.yaxis._axinfo["grid"].update({"linewidth": 0.5, "linestyle": "--", "alpha": 0.5})
+        ax.zaxis._axinfo["grid"].update({"linewidth": 0.5, "linestyle": "--", "alpha": 0.5})
+        # 设置整个图表背景为透明
+        fig.colorbar(surf)
+        plt.show()
+
+    def show_rt(self, solution):
+        """
+        Visualize the mesh structure.
+        """
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        node = self.mesh.entity('node')
+        edge = self.mesh.entity('edge')
+        node_center = 0.5 * (node[edge[:, 0]] + node[edge[:, 1]])
+        p_solution = self.pspace.interpolation(solution)
+        x = node_center[:, 0]
+        y = node_center[:, 1]
+        surf = plt.tricontourf(x, y, p_solution, levels=50, cmap='jet', edgecolor='none')
+        ax.xaxis._axinfo["grid"].update({"linewidth": 0.5, "linestyle": "--", "alpha": 0.5})
+        ax.yaxis._axinfo["grid"].update({"linewidth": 0.5, "linestyle": "--", "alpha": 0.5})
+        ax.zaxis._axinfo["grid"].update({"linewidth": 0.5, "linestyle": "--", "alpha": 0.5})
+        fig.colorbar(surf)  
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.set_title(f'{solution.__name__}—Exact Solution ')
+        plt.show()
+
 
 
 
