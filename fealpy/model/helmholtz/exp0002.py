@@ -1,9 +1,10 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher2d
+from ...decorator import cartesian
 
-class EvanescentWaveData2D:
+class EXP0002(BoxDomainMesher2d):
     """
     2D Helmholtz problem with complex Robin (impedance-type) boundary condition:
 
@@ -20,9 +21,12 @@ class EvanescentWaveData2D:
     Parameters:
         k : wave number (float)
         beta : dimensionless propagation parameter (β > 1)
+
+    Source: 
+        https://www.sciencedirect.com/science/article/pii/S0045794917302602#e0010
     """
 
-    def __init__(self, k: float, beta: float):
+    def set(self, k: float=1.0, beta: float=1.001):
         self.k = k
         self.beta = beta
         self.gamma = bm.sqrt(beta**2 - 1.0)  # decay rate in x
@@ -32,16 +36,6 @@ class EvanescentWaveData2D:
 
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0, 0.0, 1.0]
-
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import TriangleMesh
-        return TriangleMesh.from_box(self.domain(), nx=nx, ny=ny)
-
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import QuadrangleMesh
-        return QuadrangleMesh.from_box(self.domain(), nx=nx, ny=ny)
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
@@ -68,14 +62,14 @@ class EvanescentWaveData2D:
         """g(x, y) = ∂u/∂n + i·k·u"""
         grad_u = self.gradient(p)
         u_val = self.solution(p)
-        normal_derivative = bm.sum(grad_u * n, axis=-1)
+        normal_derivative = bm.sum(grad_u * n[:, None, :], axis=-1)
         return normal_derivative + 1j * self.k * u_val
 
     @cartesian
     def is_robin_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary ∂Ω to apply Robin condition"""
         x, y = p[..., 0], p[..., 1]
-        atol = 1e-12  # 允许一点点浮点误差
+        atol = 1e-12
         on_boundary = (
             (bm.abs(x - 0.0) < atol) |
             (bm.abs(x - 1.0) < atol) |

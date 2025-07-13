@@ -53,6 +53,7 @@ class PDEDataManager:
         "optimal_control": "fealpy.model.optimal_control",
         "helmholtz": "fealpy.model.helmholtz",
         "surface_poisson": "fealpy.model.surface_poisson"
+        "curlcurl":"fealpy.model.curlcurl"
     }
 
     def __init__(self, pde_type: str = None):
@@ -61,7 +62,7 @@ class PDEDataManager:
 
         Parameters
             pde_type : str, optional
-                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'elliptic', 'hyperbolic', 'helmholtz'). If not set,
+                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'elliptic', 'hyperbolic', 'helmholtz', 'curlcurl'). If not set,
                 only show_types() is available.
         """
         current_dir = os.path.dirname(os.path.abspath(__file__))
