@@ -14,15 +14,17 @@ from .scalar_nonlinear_diffusion_integrator import ScalarNonlinearDiffusionInteg
 from .scalar_mass_integrator import ScalarMassIntegrator
 from .scalar_nonlinear_mass_integrator import ScalarNonlinearMassIntegrator
 from .scalar_convection_integrator import ScalarConvectionIntegrator
-from .linear_elastic_integrator import LinearElasticIntegrator
+from .linear_elasticity_integrator import LinearElasticityIntegrator
 from .press_work_integrator import PressWorkIntegrator, PressWorkIntegratorX, PressWorkIntegratorY
-from .vector_mass_integrator import VectorMassIntegrator
 from .curlcurl_integrator import CurlCurlIntegrator
 from .nonlinear_elastic_integrator import NonlinearElasticIntegrator
 from .div_integrator import DivIntegrator
 from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
-from .mthlaplace_integrator import MthLaplaceIntegrator
+from .polyharmonic_integrator import PolyharmonicIntegrator
+from .mass_integrator import MassIntegrator
+from .optimal_control_integrator import OPCIntegrator
+from .optimal_control_source_integrator import OPCSIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -53,12 +55,14 @@ from .recovery_alg import RecoveryAlg
 
 ### Other
 from .nonlinear_wrapper import NonlinearWrapperInt
-#from .scalar_nonlinear_mass_diffusion_integrator import ScalarNonlinearMassAndDiffusionIntegrator
 
-
-### solver
-from .poisson_lfem_solver import PoissonLFEMSolver
-from .linear_elasticity_lfem_solver import LinearElasticityLFEMSolver
+### computational model 
+from .poisson_lfem_model import PoissonLFEMModel
 from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
 from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
-from .mlaplace_sfem_model import MthLaplaceSmoothFEMModel
+from .elliptic_mixed_fem_model import EllipticMixedFEMModel
+from .polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
+from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+from .allencahn_lfem_model import AllenCahnLFEMModel
+from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
+from .surface_poisson_lfem_model import SurfacePoissonLFEMModel

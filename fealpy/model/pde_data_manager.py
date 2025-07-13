@@ -48,6 +48,11 @@ class PDEDataManager:
         "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
         "polyharmonic": "fealpy.model.polyharmonic",
         "stokes": "fealpy.model.stokes",
+        "linear_elasticity": "fealpy.model.linear_elasticity",
+        "allen_cahn": "fealpy.model.allen_cahn",
+        "optimal_control": "fealpy.model.optimal_control",
+        "helmholtz": "fealpy.model.helmholtz",
+        "surface_poisson": "fealpy.model.surface_poisson",
     }
 
     def __init__(self, pde_type: str = None):
@@ -56,7 +61,7 @@ class PDEDataManager:
 
         Parameters
             pde_type : str, optional
-                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'elliptic'). If not set,
+                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'elliptic', 'hyperbolic', 'helmholtz'). If not set,
                 only show_types() is available.
         """
         current_dir = os.path.dirname(os.path.abspath(__file__))

@@ -1,97 +1,113 @@
 from typing import Sequence
-from ...decorator import cartesian
-from ...backend import TensorLike 
-from ...backend import backend_manager as bm
+from fealpy.decorator import cartesian, variantmethod
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 
-
-class CosCosData2D:
+class CosCosData2D(BoxDomainMesher2d):
     """
-    2D Elliptic equation:
-
-        -∇·(A ∇u(x, y)) = f(x, y),  (x, y) ∈ Ω = (0, 1) x (0, 1)
-                                  u(x, y) = g(x, y),  on ∂Ω
-
+    CosCosData provides data and methods for a 2D elliptic PDE problem with a cosine-cosine exact solution.
+    The model problem is:
+        -div(A ∇u) + c u = f,   in Ω = [0, 1] x [0, 1]
+                ∇u · n = 0,        on ∂Ω (Neumann)
     with the exact solution:
-        u(x, y) = cos(2πx) * cos(2πy)
-
-    where:
-        A(x, y) = [[10, 0], [0, 10]]  (diffusion tensor)
-        f(x, y) = 80π²cos(2πx)cos(2πy)-8π²sin(2πx)sin(2πy)
+        u(x, y) = cos(2πx)·cos(2πy)
+    The diffusion coefficient A, reaction coefficient c, and source term f are defined as:
+        A = [[10, 0], [0, 10]]
+        c = 2
+        f(x, y) = 2·cos(2πx)·cos(2πy) + 80π²·cos(2πx)·cos(2πy)
+    Homogeneous Dirichlet or Neumann boundary conditions can be imposed on all boundaries.
+    This class provides methods for mesh generation, coefficients, exact solution, gradient, flux, and boundary identification for use in finite element simulations.
     """
-
+    """"Cosine-Cosine Solution Data"""
 
     def geo_dimension(self) -> int:
-        """Return the geometric dimension of the domain."""
         return 2
 
-    def domain(self) -> Sequence[float]:
-        """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 1.0, 0.0, 1.0]
+    def domain(self):
+        return [0., 1., 0., 1.]
 
-    def diffusion_coef(self) -> TensorLike:
-        """
-        Return diffusion tensor A(x, y), constant in this example, Shape: (2, 2).
-        """
-        val = bm.array([[10.0, 0], [0, 10.0]])
-        return val 
+    @cartesian
+    def diffusion_coef(self, p: TensorLike) -> TensorLike:
+        """Diffusion coefficient"""
+        val = bm.array([[10.0, 0.0], [0.0, 10.0]])
+        shape = p.shape[:-1] + val.shape
+        return bm.broadcast_to(val, shape)
+    
+    @cartesian
+    def diffusion_coef_inv(self, p: TensorLike) -> TensorLike:
+        """Inverse diffusion coefficient"""
+        val = bm.array([[0.1, 0], [0, 0.1]])
+        shape = p.shape[:-1] + val.shape
+        return bm.broadcast_to(val, shape)
 
-    def diffusion_coef_inv(self) -> TensorLike:
-        """
-        Return inverse of diffusion tensor A(x, y), constant, Shape: (2, 2).
-        """
-        val = bm.array([[10, 0.0], [0, 10]]) / 100  # Approximate inverse
-        return val 
+    @cartesian
+    def reaction_coef(self, p: TensorLike) -> TensorLike:
+        """Reaction coefficient"""
+        val = bm.array([2.0])
+        shape = p.shape[:-1] + val.shape
+        return bm.broadcast_to(val, shape)
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
-        """
-        Return the exact solution u(x, y) = cos(2πx) * cos(2πy), Shape: (..., ).
-        """
-        x, y = p[..., 0], p[..., 1]
+        """Exact solution"""
+        x = p[..., 0]
+        y = p[..., 1]
         pi = bm.pi
-        return bm.cos(2*pi*x) * bm.cos(2*pi*y)
+        val = bm.cos(2*pi*x)*bm.cos(2*pi*y)
+        return val # val.shape == x.shape
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
-        """
-        Return the gradient of the exact solution ∇u(x, y), Shape: (..., 2).
-        """
-        x, y = p[..., 0], p[..., 1]
+        """Gradient of the exact solution"""
+        x = p[..., 0]
+        y = p[..., 1]
         pi = bm.pi
-        return bm.stack((
-            -2*pi * bm.sin(2*pi*x) * bm.cos(2*pi*y),
-            -2*pi * bm.cos(2*pi*x) * bm.sin(2*pi*y)
-        ), axis=-1)
-
+        val = bm.stack((
+            -2*pi*bm.sin(2*pi*x)*bm.cos(2*pi*y),
+            -2*pi*bm.cos(2*pi*x)*bm.sin(2*pi*y)), axis=-1)
+        return val # val.shape == p.shape
+    
     @cartesian
     def flux(self, p: TensorLike) -> TensorLike:
-        """
-        Return the flux vector -A ∇u,  Shape: (..., 2).
-        """
-        grad = self.gradient(p)                  # (..., 2)
-        A = self.diffusion_coef()               # (..., 2, 2)
-        return -bm.einsum('...ij,...j->...i', A, -grad)
+        """Flux of the exact solution"""
+        grad = self.gradient(p)
+        val = self.diffusion_coef(p) 
+        val = bm.einsum('...ij, ...j->...i', val, -grad)
+        return val
     
     @cartesian
-    def source(self, p: TensorLike) -> TensorLike:
-        """Return the source term f(x, y)"""
-        x, y = p[..., 0], p[..., 1]
-        term1 = 80 * (bm.pi**2) * bm.cos(2 * bm.pi * x) * bm.cos(2 * bm.pi * y)
+    def source(self, p: TensorLike, index=None) -> TensorLike:
+        """Compute exact source"""
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = bm.pi
+        val = 2*bm.cos(2*pi*x)*bm.cos(2*pi*y) + 80*pi**2*bm.cos(2*pi*x)*bm.cos(2*pi*y)
+        return val
     
-        return term1
-
     @cartesian
-    def dirichlet(self, p: TensorLike) -> TensorLike:
-        """Dirichlet boundary condition."""
-        return self.solution(p)
+    def grad_dirichlet(self, p, space):
+        """Gradient of the Dirichlet boundary condition."""
+        return bm.zeros_like(p[..., 0])
+    
+    @cartesian
+    def source1(self, p):
+        """ Compute 0 source for a different form of the problem."""
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = bm.pi
+        val = 0*pi*pi*bm.cos(pi*x)*bm.cos(pi*y)+1
+        return val
 
     @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        """Check if point is on boundary."""
+        """Check if point is on boundary."""        
         x, y = p[..., 0], p[..., 1]
-        atol = 1e-12
-        return (
-            (bm.abs(x) < atol) | (bm.abs(x - 1) < atol) |
-            (bm.abs(y) < atol) | (bm.abs(y - 1) < atol)
+        atol = 1e-12  # 绝对误差容限
+    
+        # 检查是否接近 x=±1 或 y=±1
+        on_boundary = (
+            (bm.abs(x - 1.) < atol) | (bm.abs(x + 1.) < atol) |
+            (bm.abs(y - 1.) < atol) | (bm.abs(y + 1.) < atol)
         )
-
+        return on_boundary 

@@ -12,7 +12,7 @@ class SinSinBiharmonicData2D():
         u = ∂u/∂n = 0  on ∂Ω
 
     with exact solution:
-        u(x,y) = (sin(2πx)·cos(2πy))²
+        u(x,y) = (sin(2πx)·sin(2πy))²
     """
 
     def geo_dimension(self):
@@ -23,7 +23,7 @@ class SinSinBiharmonicData2D():
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [0., 1., 0., 1.]
 
-    def init_mesh(self, nx=10, ny=10):
+    def init_mesh(self, nx=4, ny=4):
         from ...mesh import TriangleMesh
         return TriangleMesh.from_box(self.domain(), nx=nx, ny=ny)
 
