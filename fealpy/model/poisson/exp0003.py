@@ -2,71 +2,71 @@ from typing import Optional,Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 
-class SinSin_Sin_Dir_2D(BoxDomainMesher2d):
+class Exp0003(BoxMesher2d):
     """
     2D Poisson problem:
     
-        -Δu(x, y) = f(x, y),  (x, y) ∈ (0, 1) x (0, 1)
-         u(x, y) = 0,         on ∂Ω
+        -Δu(x, y) = f(x, y),  (x, y) ∈ (-1, 1) x (-1, 1)
+         u(x, y) = g(x, y),    on ∂Ω
 
     with the exact solution:
 
-        u(x, y) = sin(πx)·sin(πy)
+        u(x, y) = cos(πx)·cos(πy)
 
     The corresponding source term is:
 
-        f(x, y) = 2·π²·sin(πx)·sin(πy)
-
+        f(x, y) = 2π²·cos(πx)·cos(πy)
     Homogeneous Dirichlet boundary conditions are applied on all edges.
     """
+
     def configure(self, box: Optional[Sequence[float]] = None):
         """Configure the relevant parameters of PDE."""
         self.box = box
-
+        
     def get_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 1.0, 0.0, 1.0]
-
+        return [-1., 1., -1., 1.]
+    
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
-        x = p[..., 0]
-        y = p[..., 1]
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
-        return bm.sin(pi * x) * bm.sin(pi * y)
+        val = bm.cos(pi*x)*bm.cos(pi*y)
+        return val # val.shape == x.shape
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute gradient of solution."""
-        x = p[..., 0]
-        y = p[..., 1]
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
-        du_dx = pi * bm.cos(pi * x) * bm.sin(pi * y)
-        du_dy = pi * bm.sin(pi * x) * bm.cos(pi * y)
-        return bm.stack([du_dx, du_dy], axis=-1)
+        val = bm.stack((
+            -pi*bm.sin(pi*x)*bm.cos(pi*y),
+            -pi*bm.cos(pi*x)*bm.sin(pi*y)), axis=-1)
+        return val # val.shape == p.shape
 
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
-        x = p[..., 0]
-        y = p[..., 1]
+        x, y = p[..., 0], p[..., 1]
         pi = bm.pi
-        return 2 * pi**2 * bm.sin(pi * x) * bm.sin(pi * y)
+        val = 2*pi*pi*bm.cos(pi*x)*bm.cos(pi*y)
+        return val
 
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition"""
         return self.solution(p)
-
+    
     @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
-        """Check if point is on boundary."""
+        """Check if point is on boundary."""        
         x, y = p[..., 0], p[..., 1]
         atol = 1e-12  # 绝对误差容限
     

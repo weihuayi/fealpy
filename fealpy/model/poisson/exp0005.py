@@ -4,7 +4,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 
 
-class InteriorLayerData2d:
+class Exp0005:
     """
     2D Poisson problem with interior layer on a square domain:
     
