@@ -1,6 +1,7 @@
 from typing import Any, Union, Optional, TypeVar, Tuple
 import numpy as np
 
+
 try:
     import taichi as ti
     import taichi.math as tm
@@ -97,7 +98,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         # Initialize Taichi runtime (ignored if already initialized)
         try:
-            ti.init(arch=device)
+            ti.init(arch=device,default_ip=ti.i32, default_fp=ti.f64)
         except Exception:
             # A subsequent init call may throw; safely ignore
             pass
@@ -380,7 +381,6 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             )
 
     @staticmethod
-    
     def acos(
         x: Union[int, float, bool, ti.Field]
     ) -> Union[float, ti.Field]:
@@ -556,11 +556,50 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
     @staticmethod
     def atanh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+        """
+        Computes the inverse hyperbolic tangent (atanh) of the input.
+
+        This function supports both scalar values (float or int) and Taichi fields.
+        For scalar inputs, it directly returns the computed value.
+        For Taichi fields, it computes the atanh value for each element and returns a new field
+        containing the results.
+
+        Args:
+            x (Union[ti.Field, float, int]):
+                The input value(s). Can be:
+                    - A scalar `float` or `int`.
+                    - A `ti.Field` containing numerical values.
+
+        Returns:
+            Union[ti.Field, float]:
+                - If the input is a scalar, returns a `float`.
+                - If the input is a `ti.Field`, returns a new `ti.Field` of the same shape
+                and data type, containing the computed atanh values element-wise.
+
+        Raises:
+            TypeError: If the input is neither a scalar (float or int) nor a `ti.Field`.
+
+        Notes:
+            The inverse hyperbolic tangent is computed as:
+                atanh(x) = 0.5 * log((1 + x) / (1 - x))
+            The input values should be in the range (-1, 1) for real results.
+
+        Example:
+            # Scalar usage:
+            result = MyClass.atanh(0.5)
+
+            # Field usage:
+            x = ti.field(dtype=ti.f32, shape=(4,))
+            x.from_numpy(np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32))
+            result_field = MyClass.atanh(x)
+        """
         # 检查输入是否是单值（标量）
         if isinstance(x, (float, int)):
-            return ti.log((1.0 + x) / (1.0 - x)) / 2.0
+            if x == 1.0:
+                return ti.math.inf
+            else:
+                return ti.log((1.0 + x) / (1.0 - x)) / 2.0
 
-        # 如果输入是 ti.Field
         if not isinstance(x, ti.Field):
             raise TypeError("Input must be a ti.Field or a scalar")
 
@@ -578,6 +617,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         compute_atanh(x, result)
 
         return result
+
 
     @staticmethod
     def equal(x: ti.Field, y: ti.Field) -> ti.Field:
@@ -829,3 +869,41 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         compute_tanh(x, result)
 
         return result
+
+    @staticmethod
+    def cross(field_1: ti.Field, field_2: ti.Field) -> ti.Field:
+
+        if not isinstance(field_1, ti.Field) or not isinstance(field_2, ti.Field):
+            raise TypeError("Both inputs must be ti.Field")
+        if field_1.shape != field_2.shape:
+            raise ValueError("Input fields must have the same shape")
+        dim = field_1.shape[0]
+        if len(field_1.shape) != 1 or dim not in (2, 3):
+            raise ValueError("Input fields must be 1D vectors of length 2 or 3")
+        if dim == 2:
+            result_shape = (1,)
+        else:
+            result_shape = field_1.shape
+        result = ti.field(dtype=field_1.dtype, shape=result_shape)
+
+        @ti.kernel
+        def compute_cross(field_1: ti.template(), field_2: ti.template()):
+
+            if ti.static(dim == 2):
+
+                vec1 = ti.Vector([field_1[0], field_1[1]])
+                vec2 = ti.Vector([field_2[0], field_2[1]])
+                result[0] = tm.cross(vec1, vec2)
+
+            else:
+
+                vec1 = ti.Vector([field_1[0], field_1[1], field_1[2]])
+                vec2 = ti.Vector([field_2[0], field_2[1], field_2[2]])
+                cross_result = tm.cross(vec1, vec2)
+
+                for i in ti.static(range(3)):
+                    result[i] = cross_result[i]
+
+        compute_cross(field_1, field_2)
+        return result
+    
