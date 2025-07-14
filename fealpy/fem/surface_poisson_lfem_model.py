@@ -32,8 +32,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
        self.set_init_mesh(options['mesh_degree'], options['init_mesh']) 
        self.set_space_degree(options['space_degree']) 
        self.set_init_mesh(options['mesh_degree'], options['init_mesh'])
-       self.set_space_degree(options['space_degree'])
-       
+       self.set_space_degree(options['space_degree'])  
 
     def set_pde(self, pde: Union[SurfacePDEDataT, str] = "sphere"):
         if isinstance(pde, str):
@@ -51,6 +50,8 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
         NC = self.mesh.number_of_cells()
+        #fname = f"sphere_test.vtu"
+        #self.mesh.to_vtk(fname=fname)
         #self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
 
@@ -68,12 +69,9 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         self.uh = self.space.function()
 
         bform = BilinearForm(self.space)
+        bform.add_integrator(ScalarDiffusionIntegrator(q=self.p+2, method='isopara'))
         lform = LinearForm(self.space)
-
-        SDI = ScalarDiffusionIntegrator(method='isopara')
-        bform.add_integrator(SDI)
-        SSI = ScalarSourceIntegrator(self.pde.source, method='isopara')
-        lform.add_integrator(SSI)
+        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p+2, method='isopara'))
 
         A = bform.assembly(format='coo')
         F = lform.assembly()

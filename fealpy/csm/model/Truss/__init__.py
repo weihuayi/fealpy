@@ -1,17 +1,17 @@
 from typing import Protocol, Sequence, TypeVar, overload,Optional
 from ....backend import TensorLike
 
-class BarPDEDataProtocol(Protocol):
+class TrussPDEDataProtocol(Protocol):
     """
 
-    A protocol for beam PDE data classes.This protocol defines the expected methods and properties
-    that any Bar PDE data class should implement.
+    A protocol for truss PDE data classes.This protocol defines the expected methods and properties
+    that any Truss PDE data class should implement.
 
     Parameters:
         E (float): Young's modulus.
         A (float): Cross-sectional area.
         f (float): load.
-        L (float): Beam length.
+        L (float): bar length.
         n (int): Number of mesh elements.
     Methods:
         init_mesh(p: TensorLike) -> None:
@@ -39,7 +39,7 @@ class BarPDEDataProtocol(Protocol):
     def dirichlet(self, p: TensorLike) -> Optional[TensorLike]: ...
     def is_dirichlet_boundary(self, p: TensorLike) -> Optional[TensorLike]: ...
 
-BarPDEDataT = TypeVar('BarPDEDataT', bound=BarPDEDataProtocol)
+TrussPDEDataT = TypeVar('TrussPDEDataT', bound=TrussPDEDataProtocol)
 
 """
 DATA_TABLE is a registry, when adding new PDE models, 
@@ -48,5 +48,5 @@ follow the existing examples to register them in the registry.
 DATA_TABLE = {
     # Add beam PDE models here (file_name, class_name)
     "bar1d": ("bar_data_1d", "BarData1D"),
-    "bar2d": ("bar_data_1d", "BarData2D")
+    "truss2d": ("truss_data_2d", "TrussData2D"),
 }

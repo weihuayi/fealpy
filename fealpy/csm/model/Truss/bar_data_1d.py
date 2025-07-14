@@ -7,9 +7,8 @@ class BarData1D:
     """
     1D Axial Bar Problem:
 
-        E A du/dx = p(x),    x ∈ (0, L)
-        u(0) = 0,            (fixed boundary at node 4)
-        p(x) = constant axial force
+        E A du/dx = f(x),    x ∈ (0, L)
+        f(x) = constant axial force
 
     Parameters:
         E: Young's modulus
@@ -23,17 +22,7 @@ class BarData1D:
     """
 
     def __init__(self):
-        """
-        Initialize bar parameters.
-
-        Parameters:
-            E (float): Young's modulus.
-            A (float): Cross-sectional area.
-            f (float): load.
-            L (float): Beam length.
-            n (int): Number of mesh elements.
-        """
-        self.mesh = self.init_mesh()
+        super().__init__()
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -65,20 +54,8 @@ class BarData1D:
         Returns:
             Tensor: Load vector f at x.
         """
-        # Initialize the load vector as zero
-        f = bm.zeros_like(x)
         
-        # Apply point loads at the corresponding nodes
-        # Apply f1 at node 0 (x=0)
-        f += bm.where(x == 0, self.f[0], 0)  
-
-        # Apply f2 at node 21 (x=l1)
-        f += bm.where(x == self.init_mesh[1], self.ff[1], 0)  
-
-        # Apply p3 at node 2 (x=l1 + l2)
-        f += bm.where(x == self.init_mesh[1] + self.init_mesh[2], self.f[2], 0)  
-
-        return f
+        return bm.ones_like(x) * self.f
     
     def dirichlet_dof_index(self) -> TensorLike:
         """
