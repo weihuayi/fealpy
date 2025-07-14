@@ -68,5 +68,4 @@ DATA_TABLE = {
     "boxsinsin2d": ("box_sinsin_data_2d", "BoxSinSinData2d"),
     "boxtri2d": ("box_tri_data_2d", "BoxTriData2d"),
     "boxmixed2d": ("box_mixed_data_2d", "BoxMixedData2d"),
-
 }
