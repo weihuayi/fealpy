@@ -82,6 +82,20 @@ class CircleInterfaceData2D:
         mesh.nodedata['vertices'] = vertices
         return mesh
     
+    @init_mesh.register('moving_tri_unstru')
+    def init_mesh(self, **kwargs):
+        domain = self.box
+        vertices = bm.array([[domain[0], domain[2]],
+                             [domain[1], domain[2]],
+                             [domain[1], domain[3]],
+                             [domain[0], domain[3]]], **kwargs)
+
+        from ...mesh import TriangleMesh
+        h = 0.04
+        mesh = TriangleMesh.from_polygon_gmsh(vertices=vertices,h=h, **kwargs)
+        mesh.nodedata['vertices'] = vertices
+        return mesh
+    
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""
         return [0.0, 5000.0]
@@ -102,7 +116,7 @@ class CircleInterfaceData2D:
         return bm.zeros_like(p, dtype=bm.float64)
 
     @cartesian
-    def init_solution(self, p: TensorLike,t = 0.0) -> TensorLike:
+    def init_condition(self, p: TensorLike,t = 0.0) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
         r = bm.sqrt((x)**2 + (y)**2)

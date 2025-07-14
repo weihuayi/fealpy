@@ -4,7 +4,11 @@ from ...typing import  TensorLike
 from ..domain_mesher.sphere_domain_mesher import SphereDomainMesher3D
 
 
+<<<<<<<< HEAD:fealpy/model/surface_poisson/surface_level_set_data.py
 class SurfaceLevelSetData(SphereDomainMesher3D):
+========
+class Exp0008():
+>>>>>>>> draft/edwin:fealpy/model/poisson/exp0008.py
     """
     Surface Poisson problem on a closed manifold:
 

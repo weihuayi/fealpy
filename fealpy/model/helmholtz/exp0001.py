@@ -1,7 +1,8 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher2d
+from ...decorator import cartesian
 
 def bessel_function(v: int, x: TensorLike) -> TensorLike:
     if bm.backend_name == 'pytorch':
@@ -22,11 +23,11 @@ def bessel_function(v: int, x: TensorLike) -> TensorLike:
             raise NotImplementedError("Just supports Bessel functions of order 0 and 1.")
 
 
-class BesselRadiatingData2D():
+class EXP0001(BoxDomainMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary conditions:
     
-        -Δu - k^2 u = f   in Ω = [-0.5, 0.5]^2
+        -Δu - k^2 u = f   in Ω = [0, 1]^2
          iku + ∂u/∂n = g  on ∂Ω
 
     Exact solution:
@@ -39,9 +40,15 @@ class BesselRadiatingData2D():
     Robin boundary term:
         g(x, y) = ∂u/∂n + i·k·u
 
+    Source:
+        https://cz5waila03cyo0tux1owpyofgoryroob.aminer.cn/A5/1A/1D/A51A1DBD4CE1D183344F2A280C430074.pdf
     """
+    
+    def __init__(self):
+        box = [-0.5, 0.5, -0.5, 0.5]
+        super().__init__(box=box)
 
-    def __init__(self, k=1.0):
+    def set(self, k=1.0):
         self.k = bm.tensor(k, dtype=bm.float64)
         c1 = bm.cos(self.k) + bm.sin(self.k) * 1j
         c2 = bessel_function(0, self.k) + 1j * bessel_function(1, self.k)
@@ -53,41 +60,26 @@ class BesselRadiatingData2D():
 
     def domain(self) -> Sequence[float]:
         """Return the bounding box [xmin, xmax, ymin, ymax]."""
-        return [0, 1, 0, 1]
-
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        """Initialize triangular mesh."""
-        from ...mesh import TriangleMesh
-        return TriangleMesh.from_box(self.domain(), nx=nx, ny=ny)
-
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        """Initialize quadrilateral mesh."""
-        from ...mesh import QuadrangleMesh
-        return QuadrangleMesh.from_box(self.domain(), nx=nx, ny=ny)
+        return [-0.5, 0.5, -0.5, 0.5]
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """
         Exact solution u(x, y) = (cos(k·r) - c·J0(k·r)) / k
         """
-        x, y = p[..., 0:1], p[..., 1:2]
+        x = p[..., 0]
+        y = p[..., 1]
         r = bm.sqrt(x**2 + y**2)
-        val = bm.zeros(x.shape, dtype=bm.complex128)
-        val[:] = (bm.cos(self.k * r) - self.c * bessel_function(0, self.k * r)) / self.k
-        return val
+        return (bm.cos(self.k * r) - self.c * bessel_function(0, self.k * r)) / self.k
 
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """
         Right-hand side: f(x, y) = sin(k·r)/r
         """
-        x, y = p[..., 0:1], p[..., 1:2]
+        x, y = p[..., 0], p[..., 1]
         r = bm.sqrt(x**2 + y**2)
-        f = bm.zeros(x.shape, dtype=bm.complex128)
-        f[:] = bm.sin(self.k * r) / r
-        return f
+        return bm.sin(self.k * r) / r
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
@@ -95,14 +87,14 @@ class BesselRadiatingData2D():
         Gradient ∇u = u_r * (x/r, y/r), 
         where u_r = -sin(k·r) + c·J1(k·r)
         """
-        x, y = p[..., 0:1], p[..., 1:2]
+        x, y = p[..., 0], p[..., 1]
         r = bm.sqrt(x**2 + y**2)
         u_r = self.c * bessel_function(1, self.k * r) - bm.sin(self.k * r)
 
-        val = bm.zeros(p.shape, dtype=bm.complex128)
-        val[..., 0:1] = u_r * x / r
-        val[..., 1:2] = u_r * y / r
-        return val
+        du_dx = u_r * x / r
+        du_dy = u_r * y / r
+        return bm.stack((du_dx, du_dy), axis=-1)
+
 
     @cartesian
     def robin(self, p: TensorLike, n: TensorLike) -> TensorLike:
@@ -110,12 +102,10 @@ class BesselRadiatingData2D():
         Robin boundary data: g = ∂u/∂n + i·k·u
         """
         kappa = 1j * self.k
-        if bm.backend_name == 'pytorch':
-            val = (self.gradient(p) * n).sum(dim=-1, keepdim=True) + kappa * self.solution(p)
-        elif bm.backend_name == 'numpy':
-            grad = self.gradient(p)
-            val = bm.sum(grad * n[:, None, :], axis=-1)
-            val += kappa * self.solution(p)
+        grad = self.gradient(p)
+        val = bm.sum(grad * n[:, None, :], axis=-1)
+        val += kappa * self.solution(p)
+        
         return val
 
     @cartesian

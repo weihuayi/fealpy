@@ -1,9 +1,10 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher2d
+from ...decorator import cartesian
 
-class PlaneWaveObliqueIncidenceData2D():
+class EXP0003(BoxDomainMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary condition:
 
@@ -15,40 +16,34 @@ class PlaneWaveObliqueIncidenceData2D():
     Parameters:
         k : wave number (scalar)
         theta : incident angle (in radians)
+
+    Source:
+        https://users.math.msu.edu/users/weig/PAPER/p103.pdf
     """
 
-    def __init__(self, k: float, theta: float):
+    def set(self, k: float=1.0, theta: float= bm.pi/4):
         self.k = k
         self.theta = theta
         self.k1 = k * bm.cos(theta)
-        self.k2 = k * bm.sin(theta)
+        self.k2 = k * bm.sin(theta)       
 
     def geo_dimension(self) -> int:
         return 2
 
     def domain(self) -> Sequence[float]:
         return [0.0, 1.0, 0.0, 1.0]
-
-    @variantmethod('tri')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import TriangleMesh
-        d = self.domain()
-        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import QuadrangleMesh
-        d = self.domain()
-        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-
+    
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """u(x, y) = exp(i(k1 x + k2 y))"""
         x, y = p[..., 0], p[..., 1]
         phase = self.k1 * x + self.k2 * y
         return bm.exp(1j * phase)
+    
+    @cartesian
+    def source(self, p: TensorLike) -> TensorLike:
+        """Right-hand side f(x, y) ≡ 0"""
+        return bm.zeros_like(p[..., 0], dtype=bm.complex128)
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
@@ -62,7 +57,7 @@ class PlaneWaveObliqueIncidenceData2D():
         """Robin boundary value: ∂u/∂n + iku = g(x)"""
         u_val = self.solution(p)
         grad_u = self.gradient(p)
-        dndu = bm.sum(grad_u * n, axis=-1)  # ∇u · n
+        dndu = bm.sum(grad_u * n[:, None, :], axis=-1)  # ∇u · n
         return dndu + 1j * self.k * u_val
 
     @cartesian

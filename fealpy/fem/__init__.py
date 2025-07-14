@@ -25,6 +25,8 @@ from .mthlaplace_integrator import MthLaplaceIntegrator
 from .mass_integrator import MassIntegrator
 from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator
+from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
+from .jump_penalty_intergrator import JumpPenaltyIntergrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -66,3 +68,5 @@ from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
 from .allencahn_lfem_model import AllenCahnLFEMModel
 from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
 from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
+from .helmholtz_lfem_model import HelmholtzLFEMModel
+from .curlcurl_lfem_model import CurlCurlLFEMModel

@@ -1,28 +1,32 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..box_domain_mesher import BoxDomainMesher3d
+from ...decorator import cartesian
 
-class SinSinData3D():
+class EXP0005(BoxDomainMesher3d):
     """
     3D Helmholtz problem with homogeneous Dirichlet boundary condition:
-    
-        -Δu(x, y, z) - k^2·u(x, y, z) = f(x, y, z),  (x, y, z) ∈ (0, 1)^3
-                                u(x, y, z) = 0,     on ∂Ω
+
+        -Δu(x, y, z) - k^2·u(x, y, z) = f(x, y, z),  in Ω = (0, 1)^3
+                               u(x, y, z) = 0,      on ∂Ω
 
     with the exact solution:
 
-        u(x, y, z) = sin(kx)·sin(ky)·sin(kz)
+        u(x, y, z) = sin(kπx)·sin(kπy)·sin(kπz)
 
     The corresponding source term is:
 
-        f(x, y, z) = 2k^2·sin(kx)·sin(ky)·sin(kz)
+        f(x, y, z) = k^2·(3π^2 - 1)·sin(kπx)·sin(kπy)·sin(kπz)
 
     Parameter:
         k : wave number (scalar)
+
+    Source:
+        https://link.springer.com/book/10.1007/b98828
     """
 
-    def __init__(self, k: float):
+    def set(self, k: float=1.0):
         self.k = k
 
     def geo_dimension(self) -> int:
@@ -33,44 +37,31 @@ class SinSinData3D():
         """Return the computational domain [xmin, xmax, ymin, ymax, zmin, zmax]."""
         return [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
     
-    @variantmethod('tet')
-    def init_mesh(self, nx=10, ny=10, nz=10):
-        from ...mesh import TetrahedronMesh
-        d = self.domain()
-        mesh = TetrahedronMesh.from_box(d, nx=nx, ny=ny, nz=nz)
-        return mesh
-
-    @init_mesh.register('hex')
-    def init_mesh(self, nx=10, ny=10, nz=10):
-        from ...mesh import HexahedronMesh
-        d = self.domain()
-        mesh = HexahedronMesh.from_box(d, nx=nx, ny=ny, nz=nz)
-        return mesh
-
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
-        """Compute exact solution u(x, y, z) = sin(kx)·sin(ky)·sin(kz)"""
+        """Compute exact solution u(x, y, z) = sin(kπx)·sin(kπy)·sin(kπz)"""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        k = self.k
-        return bm.sin(k * x) * bm.sin(k * y) * bm.sin(k * z)
+        kπ = bm.pi * self.k
+        return bm.sin(kπ * x) * bm.sin(kπ * y) * bm.sin(kπ * z)
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute gradient of the exact solution"""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        k = self.k
+        kπ = bm.pi * self.k
         return bm.stack((
-            k * bm.cos(k * x) * bm.sin(k * y) * bm.sin(k * z),
-            k * bm.sin(k * x) * bm.cos(k * y) * bm.sin(k * z),
-            k * bm.sin(k * x) * bm.sin(k * y) * bm.cos(k * z)
+            kπ * bm.cos(kπ * x) * bm.sin(kπ * y) * bm.sin(kπ * z),
+            kπ * bm.sin(kπ * x) * bm.cos(kπ * y) * bm.sin(kπ * z),
+            kπ * bm.sin(kπ * x) * bm.sin(kπ * y) * bm.cos(kπ * z),
         ), axis=-1)
 
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
-        """Compute source term f = 2k^2·sin(kx)·sin(ky)·sin(kz)"""
+        """Compute source term f = k^2·(3π^2 - 1)·sin(kπx)·sin(kπy)·sin(kπz)"""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
+        kπ = bm.pi * self.k
         k = self.k
-        return 2 * k**2 * bm.sin(k * x) * bm.sin(k * y) * bm.sin(k * z)
+        return k**2 * (3 * bm.pi**2 - 1) * bm.sin(kπ * x) * bm.sin(kπ * y) * bm.sin(kπ * z)
 
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
