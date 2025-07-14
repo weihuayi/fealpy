@@ -100,5 +100,3 @@ total_mesh = metalenses_mesher.assemble_total_mesh(unit_tet_mesh,
 if options['output_to_vtu']:
     unit_tet_mesh.to_vtk(fname='unit_tet_mesh.vtu')
     total_mesh.to_vtk(fname='total_mesh.vtu')
-unit_tet_mesh.to_vtk(fname='unit_tet_mesh.vtu')
-total_mesh.to_vtk(fname='total_mesh.vtu')
