@@ -1320,8 +1320,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
     def from_vtu(cls,file):
         import meshio
         data = meshio.read(file)
-        node = bm.array(data.points)
-        cell = bm.array(data.cells_dict['tetra'])
+        node = bm.from_numpy(data.points)
+        cell = bm.from_numpy(data.cells_dict['tetra'])
         mesh = cls(node, cell)
         return mesh
     

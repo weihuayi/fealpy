@@ -52,7 +52,7 @@ class PDEDataManager:
         "allen_cahn": "fealpy.model.allen_cahn",
         "optimal_control": "fealpy.model.optimal_control",
         "helmholtz": "fealpy.model.helmholtz",
-        "surface_poisson": "fealpy.model.surface_poisson"
+        "surface_poisson": "fealpy.model.surface_poisson",
         "curlcurl":"fealpy.model.curlcurl"
     }
 
