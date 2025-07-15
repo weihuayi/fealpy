@@ -54,7 +54,6 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         #self.mesh.to_vtk(fname=fname)
         #self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-
     def set_space_degree(self, p: int) -> None:
         self.p = p
 
@@ -69,9 +68,9 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         self.uh = self.space.function()
 
         bform = BilinearForm(self.space)
-        bform.add_integrator(ScalarDiffusionIntegrator(q=self.p+2, method='isopara'))
+        bform.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
         lform = LinearForm(self.space)
-        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p+2, method='isopara'))
+        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, method='isopara'))
 
         A = bform.assembly(format='coo')
         F = lform.assembly()
