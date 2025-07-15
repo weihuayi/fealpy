@@ -57,7 +57,7 @@ class PLBFGS(Optimizer):
             alpha = bm.set_at(alpha, i, bm.dot(self.S[i], q)*rho[i])
             q = q - alpha[i]*self.Y[i]
         if self.P is not None:
-            r = self.P@q
+            r = bm.tensor(self.P@q)
         else:
             r = q
 
@@ -84,7 +84,6 @@ class PLBFGS(Optimizer):
         for i in range(1, options["MaxIters"]):
             d = -self.hessian_gradient_prod(g)
             gtd = bm.dot(g, d)
-
             if gtd >= 0 or bm.isnan(gtd):
                 print(f'Not descent direction, quit at iteration {i} witht statt {f}, grad:{gnorm}')
                 break
