@@ -640,6 +640,8 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 raise ValueError(
                     f"Input field has zero in its shape {shape}, which is not supported by Taichi."
                 )
+            if len(shape) == 0:
+                raise ValueError("Input field is a scalar (0D), tril is not defined for scalars.")
             dtype = field.dtype
 
             if len(shape) == 1:
@@ -2388,7 +2390,8 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         """
         if isinstance(x, (float, int)) and isinstance(y, (float, int)):
             return x == y
-
+        if not isinstance(x, ti.Field) or not isinstance(y, ti.Field):
+            raise TypeError("Both inputs must be ti.Field or scalar")
         if x.shape != y.shape:  # TODO 未实现广播操作
             raise ValueError("Input fields must have the same shape")
 
