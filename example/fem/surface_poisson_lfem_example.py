@@ -42,5 +42,5 @@ bm.set_backend(options['backend'])
 from fealpy.fem import SurfacePoissonLFEMModel
 model = SurfacePoissonLFEMModel(options)
 #model.solve['cg']()
-model.run()
+#model.run()
 model.run['uniform_refine']()

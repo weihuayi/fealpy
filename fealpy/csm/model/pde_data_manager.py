@@ -38,6 +38,7 @@ class PDEDataManager:
     """
 
     _registry = {
+        "truss": "fealpy.csm.model.Truss",
         "beam": "fealpy.csm.model.beam",
         "elastoplasticity": "fealpy.csm.model.elastoplasticity", 
     }
