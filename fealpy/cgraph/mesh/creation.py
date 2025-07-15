@@ -1,6 +1,6 @@
 from typing import Tuple, Type
 import importlib
-from ..base import Node
+from ..core import Node
 
 
 def get_mesh_class(mesh_type: str) -> Type:
@@ -37,13 +37,13 @@ class Box2d(Node):
         super().__init__()
         self.MeshClass = get_mesh_class(mesh_type)
         self.kwargs = {"device": device, "itype": itype, "ftype": ftype}
-        self.add_input("xmin", default=0.)
-        self.add_input("xmax", default=1.)
-        self.add_input("ymin", default=0.)
-        self.add_input("ymax", default=1.)
-        self.add_input("nx", default=10)
-        self.add_input("ny", default=10)
-        self.add_output("mesh")
+        self.register_input("xmin", default=0.)
+        self.register_input("xmax", default=1.)
+        self.register_input("ymin", default=0.)
+        self.register_input("ymax", default=1.)
+        self.register_input("nx", default=10)
+        self.register_input("ny", default=10)
+        self.register_output("mesh")
 
     def run(self, xmin, xmax, ymin, ymax, nx, ny):
         domain = [xmin, xmax, ymin, ymax]

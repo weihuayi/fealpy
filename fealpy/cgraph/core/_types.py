@@ -94,15 +94,3 @@ class NodeIOError(Exception):
 class NodeTopologyError(Exception):
     """Inappropriate connection."""
     pass
-
-
-class GraphStatusError(Exception):
-    """Inappropriate status of graph."""
-    pass
-
-
-class GraphStatus(IntEnum):
-    READY = auto()
-    RUN = auto()
-    DEBUG = auto()
-    STOP = auto()

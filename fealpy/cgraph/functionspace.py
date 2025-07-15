@@ -2,7 +2,7 @@ from typing import Type
 import importlib
 
 from ..functionspace import Function
-from .base import Node
+from .core import Node
 
 
 SPACE_CLASSES = {
@@ -22,9 +22,9 @@ class FunctionSpace(Node):
     def __init__(self, space_type: str, ctype: str = "C"):
         super().__init__()
         self.SpaceClass = get_space_class(space_type)
-        self.add_input("mesh")
-        self.add_input("p", default=1)
-        self.add_output("space")
+        self.register_input("mesh")
+        self.register_input("p", default=1)
+        self.register_output("space")
         self.kwargs = {"ctype": ctype}
 
     def run(self, mesh, p):
@@ -35,9 +35,9 @@ class TensorToFEFunction(Node):
     def __init__(self, coordtype: str = 'barycentric'):
         super().__init__()
         self.coordtype = coordtype
-        self.add_input("tensor")
-        self.add_input("space")
-        self.add_output("out")
+        self.register_input("tensor")
+        self.register_input("space")
+        self.register_output("out")
 
     def run(self, tensor, space):
         return Function(space, tensor, coordtype=self.coordtype)

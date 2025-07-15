@@ -1,4 +1,4 @@
-from ..base import Node
+from ..core import Node
 
 
 class Error(Node):
@@ -25,12 +25,12 @@ class Error(Node):
         super().__init__()
         self.cell_type = celltype
         self.kwargs = {'celltype': celltype}
-        self.add_input("mesh")
-        self.add_input("u")
-        self.add_input("v")
-        self.add_input("q", default=3)
-        self.add_input("power", default=2)
-        self.add_output("out")
+        self.register_input("mesh")
+        self.register_input("u")
+        self.register_input("v")
+        self.register_input("q", default=3)
+        self.register_input("power", default=2)
+        self.register_output("out")
 
     def run(self, mesh, u, v, q, power):
         return mesh.error(u, v, q=q, power=power, **self.kwargs)

@@ -1,18 +1,49 @@
+import time
+from enum import IntEnum
 from typing import Set, Dict, List, Iterable, Any
 from collections import deque
+from collections.abc import Callable
+import threading
 
-from ._types import Node
+from ._types import Node, NodeExceptionData
 
 __all__ = ["Graph", "WORLD_GRAPH"]
 
 
+class GraphStatusError(Exception):
+    """Inappropriate status of graph."""
+    pass
+
+
+class GraphStatus(IntEnum):
+    READY = 0
+    RUN = 1
+    PAUSE = 2
+    DEBUG = 3
+    STOP = 4
+
+
+class GraphController:
+    """Graph controller."""
+    def __init__(self):
+        self.condition = threading.Condition()
+        self.status = GraphStatus.READY
+
+
 class Graph():
+    status : GraphStatus
     context : dict[Any, Any]
     output_nodes : list[Node]
+    error_listeners : list[Callable[[NodeExceptionData], Any]]
+    status_listeners : list[Callable[[GraphStatus], Any]]
 
     def __init__(self):
-        self.output_nodes = []
+        self.status = GraphStatus.READY
         self.context = {}
+        self.output_nodes = []
+        self.controller = threading.Condition()
+        self.error_listeners = []
+        self.status_listeners = []
 
     @staticmethod
     def receive_data(context, node: Node, input_values: dict[str, Any] = {}):
@@ -52,21 +83,75 @@ class Graph():
             context_key = node.dump_key(output_slot)
             context[context_key] = result
 
+    def _send_exception(self, info: NodeExceptionData) -> None:
+        for callback in self.error_listeners:
+            callback(info)
+
+    def _set_status(self, status: GraphStatus) -> None:
+        if status != self.status:
+            self.status = status
+            for callback in self.status_listeners:
+                callback(self.status)
+
+    @staticmethod
+    def _capture_error(node: Node, error: Exception, args, kwargs) -> NodeExceptionData:
+        return NodeExceptionData(
+                node=node,
+                timestamp=time.time(),
+                errtype=type(error),
+                message=str(error),
+                positional_inputs=args,
+                keyword_inputs=kwargs
+            )
+
     def execute(self) -> None:
+        if self.status != GraphStatus.READY:
+            raise GraphStatusError("Can not execute a graph with status %s".format(self.status))
+
         for node in self._topological_sort(self.output_nodes.values()):
+            with self.controller:
+                if self.status == GraphStatus.STOP:
+                    break
+                elif self.status == GraphStatus.PAUSE:
+                    self.controller.wait()
+
             input_values = {}
-            Graph.receive_data(self.context, node, input_values)
-            results = node.execute(**input_values)
-            Graph.send_data(self.context, node, results)
+            try:
+                Graph.receive_data(self.context, node, input_values)
+                results = node.run(**input_values)
+                Graph.send_data(self.context, node, results)
+            except Exception as error:
+                with self.controller:
+                    self._set_status(GraphStatus.DEBUG)
+                error_info = self._capture_error(node, error, (), results)
+                self._send_exception(error_info)
+                break
+
+            with self.controller:
+                self._set_status(GraphStatus.STOP)
 
     def pause(self):
-        pass
+        """Pause or resume the graph execution."""
+        with self.controller:
+            if self.status == GraphStatus.RUN:
+                self._set_status(GraphStatus.PAUSE)
+
+            elif self.status == GraphStatus.PAUSE:
+                self._set_status(GraphStatus.RUN)
+                self.controller.notify()
+
+            else:
+                raise GraphStatusError("Graph is not running or paused")
 
     def stop(self):
-        pass
+        with self.controller:
+            self._set_status(GraphStatus.STOP)
 
     def reset(self) -> None:
-        self.context.clear()
+        with self.controller:
+            if self.status == GraphStatus.STOP:
+                self.context.clear()
+                self._set_status(GraphStatus.READY)
 
     @staticmethod
     def _collect_relevant_nodes(nodes: Iterable[Node]):
