@@ -478,8 +478,6 @@ def test_asinh():
 
 # 测试 add 方法
 def test_add():
-    ti.init(arch=ti.cpu)
-
     # 测试两个形状相同的 ti.Field 相加成功的情况
     x = ti.field(dtype=ti.f64, shape=(3, 3))
     y = ti.field(dtype=ti.f64, shape=(3, 3))
@@ -1034,8 +1032,6 @@ def test_abs():
 
 # 测试 acos 函数
 def test_acos():
-
-    ti.init(arch = ti.cpu)
     # int 型
     x = bm.acos(0)
     assert x == ti.math.pi/2
