@@ -36,6 +36,7 @@ class HexahedronMesh(TensorMesh, Plotable):
             [4, 0], [3, 0], [5, 0], [0, 2],
             [2, 4], [4, 3], [3, 5], [5, 2],
             [1, 4], [1, 3], [1, 5], [2, 1]], **kwargs)
+        self.ccw = bm.array([0, 1, 2, 3], **kwargs)
 
         self.construct()
         self.nodedata = {}
@@ -483,6 +484,98 @@ class HexahedronMesh(TensorMesh, Plotable):
             node[4:] = upnode + bm.array([[0.5, 0.5, 1]], dtype=bm.float64)
 
         cell = bm.array([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=bm.int32)
+        return cls(node, cell)
+
+    @classmethod
+    def from_one_tetrahedron(cls):
+        """
+        Decompose a single tetrahedron region into four hexahedral cells.
+
+        Parameters:
+            cls: The class itself (usually a HexahedronMesh class).
+
+        Returns:
+            cls: An instance of the class (usually HexahedronMesh) constructed from the tetrahedron mesh.
+        """
+        from .tetrahedron_mesh import TetrahedronMesh
+
+        mesh = TetrahedronMesh.from_one_tetrahedron(meshtype='equ')
+        return cls.from_tetrahedron_mesh(mesh)
+
+    @classmethod
+    def from_tetrahedron_mesh(cls, mesh):
+        """
+        Convert a tetrahedral mesh into a hexahedral mesh.
+
+        Parameters:
+            cls: The class itself (usually a HexahedronMesh class).
+            mesh (TetrahedronMesh): The input tetrahedral mesh.
+
+        Returns:
+            cls: An instance of the class (usually HexahedronMesh), where each 
+             tetrahedron has been divided into four hexahedral cells.
+        """
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        NF = mesh.number_of_faces()
+        NC = mesh.number_of_cells()
+        kargs = bm.context(mesh.entity('node'))
+        node = bm.zeros((NN + NE + NF + NC, 3), **kargs)
+        start = 0
+        end = NN
+        node = bm.set_at(node, slice(start,end), mesh.entity('node'))
+        start = end
+        end = start + NE
+        node = bm.set_at(node, slice(start,end), mesh.entity_barycenter('edge'))
+        start = end
+        end = start + NF
+        node = bm.set_at(node, slice(start,end), mesh.entity_barycenter('face'))
+        start = end
+        end = start + NF
+        node = bm.set_at(node, slice(start,end), mesh.entity_barycenter('cell'))
+        
+        kargs = bm.context(mesh.entity('cell'))
+        cell = bm.zeros((4*NC, 8), **kargs)
+        c2n = mesh.entity('cell')
+        c2e = mesh.cell_to_edge() + NN
+        c2f = mesh.cell_to_face() + (NN + NE)
+        c2c = bm.arange(NC, **kargs) + (NN + NE + NF)
+
+        cell = bm.set_at(cell, (slice(0,4,2), 0), c2n[:, 0])
+        cell = bm.set_at(cell, (slice(0,4,2), 1), c2e[:, 0])
+        cell = bm.set_at(cell, (slice(0,4,2), 2), c2f[:, 3])
+        cell = bm.set_at(cell, (slice(0,4,2), 3), c2e[:, 1])
+        cell = bm.set_at(cell, (slice(0,4,2), 4), c2e[:, 2])
+        cell = bm.set_at(cell, (slice(0,4,2), 5), c2f[:, 2])
+        cell = bm.set_at(cell, (slice(0,4,2), 6), c2c)
+        cell = bm.set_at(cell, (slice(0,4,2), 7), c2f[:, 1])
+
+        cell = bm.set_at(cell, (slice(1,4,2), 0), c2n[:, 1])
+        cell = bm.set_at(cell, (slice(1,4,2), 1), c2e[:, 3])
+        cell = bm.set_at(cell, (slice(1,4,2), 2), c2f[:, 3])
+        cell = bm.set_at(cell, (slice(1,4,2), 3), c2e[:, 0])
+        cell = bm.set_at(cell, (slice(1,4,2), 4), c2e[:, 4])
+        cell = bm.set_at(cell, (slice(1,4,2), 5), c2f[:, 0])
+        cell = bm.set_at(cell, (slice(1,4,2), 6), c2c)
+        cell = bm.set_at(cell, (slice(1,4,2), 7), c2f[:, 2])
+
+        cell = bm.set_at(cell, (slice(2,4,2), 0), c2n[:, 2])
+        cell = bm.set_at(cell, (slice(2,4,2), 1), c2e[:, 1])
+        cell = bm.set_at(cell, (slice(2,4,2), 2), c2f[:, 3])
+        cell = bm.set_at(cell, (slice(2,4,2), 3), c2e[:, 3])
+        cell = bm.set_at(cell, (slice(2,4,2), 4), c2e[:, 5])
+        cell = bm.set_at(cell, (slice(2,4,2), 5), c2f[:, 1])
+        cell = bm.set_at(cell, (slice(2,4,2), 6), c2c)
+        cell = bm.set_at(cell, (slice(2,4,2), 7), c2f[:, 0])
+
+        cell = bm.set_at(cell, (slice(3,4,2), 0), c2n[:, 3])
+        cell = bm.set_at(cell, (slice(3,4,2), 1), c2e[:, 5])
+        cell = bm.set_at(cell, (slice(3,4,2), 2), c2f[:, 0])
+        cell = bm.set_at(cell, (slice(3,4,2), 3), c2e[:, 4])
+        cell = bm.set_at(cell, (slice(3,4,2), 4), c2e[:, 2])
+        cell = bm.set_at(cell, (slice(3,4,2), 5), c2f[:, 1])
+        cell = bm.set_at(cell, (slice(3,4,2), 6), c2c)
+        cell = bm.set_at(cell, (slice(3,4,2), 7), c2f[:, 2])
         return cls(node, cell)
 
     @classmethod
