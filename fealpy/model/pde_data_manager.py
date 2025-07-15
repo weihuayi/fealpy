@@ -42,7 +42,18 @@ class PDEDataManager:
         "elliptic": "fealpy.model.elliptic",
         "parabolic": "fealpy.model.parabolic",
         "wave": "fealpy.model.wave",
-        "hyperbolic":"fealpy.model.hyperbolic"
+        "hyperbolic":"fealpy.model.hyperbolic",
+        "nonlinear":"fealpy.model.nonlinear",
+        "linear_elasticity": "fealpy.model.linear_elasticity",
+        "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
+        "polyharmonic": "fealpy.model.polyharmonic",
+        "stokes": "fealpy.model.stokes",
+        "linear_elasticity": "fealpy.model.linear_elasticity",
+        "allen_cahn": "fealpy.model.allen_cahn",
+        "optimal_control": "fealpy.model.optimal_control",
+        "helmholtz": "fealpy.model.helmholtz",
+        "surface_poisson": "fealpy.model.surface_poisson"
+        "curlcurl":"fealpy.model.curlcurl"
     }
 
     def __init__(self, pde_type: str = None):
@@ -51,7 +62,7 @@ class PDEDataManager:
 
         Parameters
             pde_type : str, optional
-                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'elliptic'). If not set,
+                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'elliptic', 'hyperbolic', 'helmholtz', 'curlcurl'). If not set,
                 only show_types() is available.
         """
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -108,7 +119,7 @@ class PDEDataManager:
             print(f" - {key}: ({file_name}, {class_name})")
         print(f"\nExample usage:\n   pde = PDEDataManager('{self.pde_type}').get_example('example name')")
 
-    def get_example(self, key: str = None):
+    def get_example(self, key: int = None):
         """
         Instantiate and return a PDE model object based on example key.
 
@@ -121,7 +132,7 @@ class PDEDataManager:
                 An instance of the selected PDE model class.
 
         Examples
-            >>> pde = PDEDataManager("poisson").get_example("coscos")
+            >>> pde = PDEDataManager("poisson").get_example("1")
         """
         if not self.pde_type or not self.data_table:
             raise RuntimeError("PDE type not set. Please initialize with a valid pde_type.")
@@ -130,7 +141,7 @@ class PDEDataManager:
             raise ValueError(
                 f"[Error] No model name provided.\n"
                 f"Please pass a valid example key, like:\n"
-                f"    PDEDataManager('{self.pde_type}').get_example('coscos')\n"
+                f"    PDEDataManager('{self.pde_type}').get_example('1')\n"
                 f"Use .show_examples() to see all available models."
             )
 

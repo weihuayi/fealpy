@@ -117,7 +117,8 @@ class EITDataGenerator():
         else:
             current = gn_source
             kwargs = bm.context(current)
-            b_ = bm.zeros((gn_source.shape[0], self.gdof))
+            shape = (self.gdof,) if batch_size == 0 else (batch_size, self.gdof)
+            b_ = bm.zeros(shape, **kwargs)
             b_ = bm.set_at(b_, (slice(None), self._bd_node_index), current)
 
         if zero_integral:
