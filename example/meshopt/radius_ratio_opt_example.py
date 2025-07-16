@@ -3,13 +3,13 @@ import time
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.sparse.linalg import LinearOperator
 
 from fealpy.backend import backend_manager as bm
 from fealpy.opt import PLBFGS
 from fealpy.mesh import TetrahedronMesh
-from fealpy.mesh import RadiusRatioQuality
-from fealpy.mesh import RadiusRatioSumObjective
+from fealpy.meshopt import RadiusRatioQuality
+from fealpy.meshopt import RadiusRatioSumObjective
+from fealpy.operator import LinearOperator
 
 parser = argparse.ArgumentParser(description=
         '''
@@ -40,7 +40,7 @@ def test_sphere(P=0):
 
     NDof = len(sum_q.x0)
     if P==1:
-        Preconditioner = LinearOperator((NDof,NDof),sum_q.preconditioner,bm.float64)
+        Preconditioner = LinearOperator((NDof,NDof),sum_q.preconditioner)
         update_Preconditioner = sum_q.update_preconditioner
     elif P==0:
         Preconditioner = None

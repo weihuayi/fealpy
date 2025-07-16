@@ -4,7 +4,7 @@ from typing import TypeVar, Generic
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
 from ..opt import Objective
-from .mesh_base import Mesh
+from ..mesh import Mesh
 
 
 class MeshCellQuality():
