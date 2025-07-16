@@ -90,8 +90,9 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
         """
         m_fit1 = bm.sort(self.REP['fit'], axis=0)
         idx1 = bm.argsort(self.REP['fit'], axis=0)
-        m_up1 = bm.concatenate([m_fit1[1:], bm.array([[bm.inf, bm.inf]])])
-        m_down1 = bm.concatenate([bm.array([[bm.inf, bm.inf]]), m_fit1[:-1]])
+        inf_row = bm.full((1, m_fit1.shape[1]), bm.inf)
+        m_up1 = bm.concatenate([m_fit1[1:], inf_row])
+        m_down1 = bm.concatenate([inf_row, m_fit1[:-1]])
         distance1 = ((m_up1 - m_down1) / (bm.max(m_fit1, axis=0) - bm.min(m_fit1, axis=0)))
         distance1[distance1 == -bm.inf] = bm.inf
         idx1 = bm.argsort(idx1, axis=0)

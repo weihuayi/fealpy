@@ -55,7 +55,6 @@ class NondominatedSortingGeneticAlgIII():
         self.dim = dim
         self.lb = lb
         self.ub = ub
-        self.sigma = 0.1 * (ub - lb)
         self.zr = zr
         self.pop['x'] = x
         self.pop['fitness'] = fobj(x)
