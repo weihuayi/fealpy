@@ -1,7 +1,7 @@
-from ...backend import backend_manager as bm
-from ...decorator import cartesian
-from ...typing import  TensorLike
-from ..mesher.sphere_mesher import SphereSurfaceMesher
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import cartesian
+from fealpy.typing import  TensorLike
+from fealpy.model.mesher.sphere_mesher import SphereSurfaceMesher
 
 
 class SurfaceLevelSetData(SphereSurfaceMesher):
@@ -21,18 +21,18 @@ class SurfaceLevelSetData(SphereSurfaceMesher):
 
     def __init__(self):
         super().__init__()
-        
+
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        return x * y
+        return x*y
     
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute gradient of solution."""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        denom = x**2 + y**2 +z**2
+        denom = x**2 + y**2 + z**2
         scale = 2*x*y / denom
 
         grad_x = y - scale * x
@@ -45,8 +45,8 @@ class SurfaceLevelSetData(SphereSurfaceMesher):
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        denom = x**2 + y**2 +z**2
-        return - 6*x*y / denom
+        denom = x**2 + y**2 + z**2
+        return 6*x*y / denom
     
     @cartesian
     def neumann(self, p: TensorLike, n: int) -> TensorLike:
