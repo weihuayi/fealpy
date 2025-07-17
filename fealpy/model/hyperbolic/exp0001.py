@@ -2,8 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
+from ..mesher import IntervalMesher    
 
-class PiecewiseData1D:
+class Exp0001(IntervalMesher):
     """
     1D hyperbolic problem with piecewise linear solution:
 
@@ -17,6 +18,10 @@ class PiecewiseData1D:
         u = x - t - 1 for x > t+1
     This represents a wave propagating with speed a = 1.0.
     """
+    def __init__(self):
+        self.interval = [0.0, 2.0]
+        super().__init__(interval=self.interval)
+        
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -24,7 +29,7 @@ class PiecewiseData1D:
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax]."""
-        return [0.0, 2.0]
+        return self.interval
 
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""
@@ -32,7 +37,7 @@ class PiecewiseData1D:
 
     def convection_coef(self) -> TensorLike:
         """ Get the convection coefficient (wave speed)."""
-        return bm.tensor([1.0])
+        return 1.0
     
     @cartesian
     def init_solution(self, p: TensorLike) -> TensorLike:
@@ -87,4 +92,3 @@ class PiecewiseData1D:
         """Check if point is on boundary."""
         x = p[..., 0]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 2.0) < 1e-12)
-

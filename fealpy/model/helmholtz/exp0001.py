@@ -40,7 +40,7 @@ class Exp0001(BoxMesher2d):
     Robin boundary term:
         g(x, y) = ∂u/∂n + i·k·u
 
-    Source:
+    Reference:
         https://cz5waila03cyo0tux1owpyofgoryroob.aminer.cn/A5/1A/1D/A51A1DBD4CE1D183344F2A280C430074.pdf
     """
     

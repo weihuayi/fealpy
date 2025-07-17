@@ -39,10 +39,15 @@ class PDEDataManager:
 
     _registry = {
         "poisson": "fealpy.model.poisson",
-        "elliptic": "fealpy.model.elliptic",
+        "diffusion": "fealpy.model.diffusion",
+        "diffusion_convection": "fealpy.model.diffusion_convection",
+        "diffusion_convection_reaction": "fealpy.model.diffusion_convection_reaction",
+        "diffusion_reaction": "fealpy.model.diffusion_reaction",
         "parabolic": "fealpy.model.parabolic",
         "wave": "fealpy.model.wave",
         "hyperbolic":"fealpy.model.hyperbolic",
+        "interface_poisson":"fealpy.model.interface_poisson",
+        "ion_flow":"fealpy.model.ion_flow",
         "nonlinear":"fealpy.model.nonlinear",
         "linear_elasticity": "fealpy.model.linear_elasticity",
         "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",

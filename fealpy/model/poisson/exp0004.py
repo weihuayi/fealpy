@@ -2,25 +2,26 @@ from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 from ..mesher import LshapeMesher
+from typing import Sequence
 
 class Exp0004(LshapeMesher):
     """
     L-shaped domain corner singularity problem (2D Poisson):
 
-        -Δu(x, y) = f(x, y),  (x, y) ∈ (-1, 1)^2 / [0, 1) x (-1, 0]
+        -Δu(x, y) = f(x, y),  (x, y) ∈ (-1, 1)^2 \ [0, 1) x (-1, 0]
          u(x, y) = g(x, y),    on ∂Ω
 
     with the exact solution:
 
-        u(x, y) = r**(2/3) * sin(2/3*theta)
-
+        u(x, y) = r**(2/3) * sin(2/3*theta),
+        where r = sqrt(x^2 + y^2), theta = arctan(y, x) % (2 * bm.pi)
+    
     The corresponding source term is:
 
         f(x, y) = 0
     """
-    def __init__(self, option: dict = {}):
-        self.n = bm.tensor(option.get('n', 2))  
-        super().__init__(n=self.n)
+    def __init__(self):
+        super().__init__()
         
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""

@@ -17,7 +17,7 @@ class Exp0003(BoxMesher2d):
         k : wave number (scalar)
         theta : incident angle (in radians)
 
-    Source:
+    Reference:
         https://users.math.msu.edu/users/weig/PAPER/p103.pdf
     """
 

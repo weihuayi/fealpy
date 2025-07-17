@@ -5,18 +5,14 @@ from ...mesh import TriangleMesh
 
 class LshapeMesher:
     """Lshape domain mesh generator"""
-    def __init__(self, n=None):
-
-        if n is None:
-            self.n = 2
-        else:
-            self.n = n
+    def __init__(self):
+        pass
 
     def geo_dimension(self) -> int:
         return 2
 
     @variantmethod('tri')
-    def init_mesh(self): 
+    def init_mesh(self, n:int=2): 
         node = bm.array([
         [-1, -1],
         [ 0, -1],
@@ -35,11 +31,11 @@ class LshapeMesher:
             [4, 7, 3],
             [6, 3, 7]], dtype=bm.int32)
         mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(self.n)
+        mesh.uniform_refine(n)
         return mesh   
     
     @init_mesh.register('quad')
-    def init_mesh(self):
+    def init_mesh(self, n:int=2):
         from ...mesh import QuadrangleMesh
         node = bm.array([
             [-1, -1],
@@ -55,5 +51,5 @@ class LshapeMesher:
             [3, 4, 7, 6],
             [3, 6, 5, 2]], dtype=bm.int32)
         mesh = QuadrangleMesh(node, cell)
-        mesh.uniform_refine(self.n)
+        mesh.uniform_refine(n)
         return mesh

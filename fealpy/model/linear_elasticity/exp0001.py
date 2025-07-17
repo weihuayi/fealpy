@@ -2,30 +2,24 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..box_domain_mesher import BoxDomainMesher
-import math
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
 
 
-class SinSinData2d(BoxDomainMesher):
+class BoxPolyData2d(BoxDomainMesher2d):
     """
-    2D Linear Elasticity problem with trigonometric displacement
+    2D Linear Elasticity problem with polynomial displacement
 
     -∇·σ = f in Ω
     u = 0 on ∂Ω (homogeneous Dirichlet)
 
-    Displacement:
-        u = [sin(πx) sin(πy), 0]^T
-
-    Body force:
-        f = [(22.5π²/13) sin(πx) sin(πy), -(12.5π²/13) cos(πx) cos(πy)]^T
-
-    Material:
-        E = 1, ν = 0.3
+    Material parameters:
+    E = 1, ν = 0.3
     """
 
-    def __init__(self, box=None):
-        super().__init__(box)
-        self.hypo = 'plane_strain'  # 可选：'plane_stress'
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
+        self.hypo = 'plane_strain'  # Hypothesis for the problem
 
     def geo_dimension(self):
         return 2
@@ -51,16 +45,15 @@ class SinSinData2d(BoxDomainMesher):
     @cartesian
     def displacement(self, p: TensorLike) -> TensorLike:
         x, y = p[..., 0], p[..., 1]
-        u1 = bm.sin(math.pi * x) * bm.sin(math.pi * y)
+        u1 = x * (1 - x) * y * (1 - y)
         u2 = bm.zeros_like(u1)
         return bm.stack([u1, u2], axis=-1)
 
     @cartesian
     def body_force(self, p: TensorLike) -> TensorLike:
         x, y = p[..., 0], p[..., 1]
-        π2 = math.pi ** 2
-        f1 = (22.5 * π2 / 13.0) * bm.sin(math.pi * x) * bm.sin(math.pi * y)
-        f2 = -(12.5 * π2 / 13.0) * bm.cos(math.pi * x) * bm.cos(math.pi * y)
+        f1 = (35 / 13) * y - (35 / 13) * y**2 + (10 / 13) * x - (10 / 13) * x**2
+        f2 = - (25 / 26) * (1 - 2 * x) * (1 - 2 * y)
         return bm.stack([f1, f2], axis=-1)
 
     @cartesian

@@ -22,7 +22,7 @@ class Exp0004(BoxMesher2d):
     Parameter:
         k : wave number (scalar)
     
-    Source:
+    Reference:
         https://deepxde.readthedocs.io/en/latest/demos/pinn_forward/helmholtz.2d.dirichlet.html
     """
 

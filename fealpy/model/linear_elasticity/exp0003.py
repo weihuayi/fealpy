@@ -2,9 +2,9 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 
-class BoxTriData2d(BoxDomainMesher2d):
+class Exp0003(BoxMesher2d):
     """
     2D Linear Elasticity problem with polynomial displacement
 
@@ -20,8 +20,9 @@ class BoxTriData2d(BoxDomainMesher2d):
 
     """
 
-    def __init__(self, box=None):
-        super().__init__(box)
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
         self.hypo = 'plane_strain' 
 
     def geo_dimension(self):

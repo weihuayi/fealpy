@@ -2,9 +2,9 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian, variantmethod
 from ...typing import  TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher3d
+from ..mesher import BoxMesher3d
 
-class BoxPolyData3d(BoxDomainMesher3d):
+class Exp0005(BoxMesher3d):
     """
     3D Linear Elasticity problem
 
@@ -26,8 +26,9 @@ class BoxPolyData3d(BoxDomainMesher3d):
     - No traction (Neumann) boundary conditions
     """
 
-    def __init__(self, box=None):
-        super().__init__(box=box)
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
         self.hypo = '3D'  # Hypothesis for the problem
 
     def geo_dimension(self):

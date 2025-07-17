@@ -22,7 +22,7 @@ class Exp0002(BoxMesher2d):
         k : wave number (float)
         beta : dimensionless propagation parameter (β > 1)
 
-    Source: 
+    Reference: 
         https://www.sciencedirect.com/science/article/pii/S0045794917302602#e0010
     """
 

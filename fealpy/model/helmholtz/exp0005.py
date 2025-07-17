@@ -22,7 +22,7 @@ class Exp0005(BoxMesher3d):
     Parameter:
         k : wave number (scalar)
 
-    Source:
+    Reference:
         https://link.springer.com/book/10.1007/b98828
     """
 

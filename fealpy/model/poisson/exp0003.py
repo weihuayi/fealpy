@@ -31,7 +31,7 @@ class Exp0003(BoxMesher2d):
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [-1., 1., -1., 1.]
+        return self.box
     
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

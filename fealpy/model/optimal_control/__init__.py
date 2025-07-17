@@ -34,7 +34,7 @@ OPCPDEDataT = TypeVar('OPCPDEDataT', bound=OPCPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "opc": ("optimal_control_data_2d", "OptimalControlData2d"),
+   1:("exp0001", "Exp0001")
 }
 
 

@@ -2,9 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
+from ..mesher.box_mesher import BoxMesher2d
 
-class SinSinData2D(BoxDomainMesher2d):
+class Exp0001(BoxMesher2d):
     """
     2D Elliptic equation with constant diagonal diffusion, advection, and reaction:
 
@@ -21,6 +21,9 @@ class SinSinData2D(BoxDomainMesher2d):
         f(x, y) = (5π² + 4)sin(πx)sin(πy) + πcos(πx)sin(πy) - πsin(πx)cos(πy)
         g(x, y) = 0           (Dirichlet boundary condition)
     """
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -28,7 +31,7 @@ class SinSinData2D(BoxDomainMesher2d):
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 1.0, 0.0, 1.0]
+        return self.box
 
     def diffusion_coef(self) -> TensorLike:
         """Constant diagonal diffusion tensor (shape: (2, 2)."""

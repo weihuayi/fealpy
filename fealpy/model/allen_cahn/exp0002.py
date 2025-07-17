@@ -2,24 +2,39 @@ from typing import Sequence
 from ...decorator import cartesian,variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher import BoxMesher2d
 import sympy as sp
 
-class SinCosCosData2D:
-    def __init__(self):
+class Exp0002(BoxMesher2d):
+    """
+    2D Allen-Cahn phase-field equation with an exact manufactured solution.
+
+    The PDE takes the form:
+        ∂φ/∂t + (u · ∇)φ = γ(Δφ - f(φ)) + φ_force
+
+    where:
+        f(φ) = (φ³ - φ)/η² is the nonlinear source term,
+        γ is the interface mobility,
+        φ_force is constructed so that the analytical φ exactly satisfies the PDE.
+
+    This example is useful for verifying the correctness and accuracy of numerical solvers.
+    """
+    def __init__(self, option: dict = {}):
         self.box = [-1, 1, -1, 1]
+        self.gam = bm.tensor(option.get('gam', 0.02))
+        self.n = bm.tensor(option.get('n', 64))
+        self.eta = bm.tensor(option.get('eta', 4*2/64))
+        self.area = bm.tensor(option.get('area', 4))
         self.x, self.y, self.t = sp.symbols("x y t")
-        self.gam = 0.02
-        self.n = 64
-        self.eta = 4*2/64
-        self.area = 4
         self.phi_expr = 2 + sp.sin(self.t) * sp.cos(sp.pi * self.x) * sp.cos(sp.pi * self.y)
         self.u1_expr = sp.pi * sp.sin(2 * sp.pi * self.y) * sp.sin(sp.pi * self.x) ** 2 * sp.sin(self.t)
         self.u2_expr = -sp.pi * sp.sin(2 * sp.pi * self.x) * sp.sin(sp.pi * self.y) ** 2 * sp.sin(self.t)
-
         self.phi = sp.lambdify((self.x, self.y, self.t), self.phi_expr, "numpy")
         self.u1 = sp.lambdify((self.x, self.y, self.t), self.u1_expr, "numpy")
         self.u2 = sp.lambdify((self.x, self.y, self.t), self.u2_expr, "numpy")
         self.init_force()
+        super().__init__(box=self.box)
+
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -42,40 +57,14 @@ class SinCosCosData2D:
         """Return the gamma parameter in the Allen-Cahn equation."""
         return self.gam
     
-    @variantmethod('tri')
-    def init_mesh(self, **kwargs):
-        """
-        Initialize the mesh with given number of points in x and y directions.
-        """
-        from ...mesh import TriangleMesh
-        nx = self.n
-        ny = self.n
-        mesh = TriangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
-
-        domain = self.box
-        vertices = bm.array([[domain[0], domain[2]],
-                             [domain[1], domain[2]],
-                             [domain[1], domain[3]],
-                             [domain[0], domain[3]]], **kwargs)
-        mesh.nodedata['vertices'] = vertices
-        return mesh
-    
-    @variantmethod('quad')
-    def init_mesh(self, **kwargs):
-        from ...mesh import QuadrangleMesh
-        nx = self.n
-        ny = self.n
-        mesh = QuadrangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
-
-        domain = self.box
-        vertices = bm.array([[domain[0], domain[2]],
-                             [domain[1], domain[2]],
-                             [domain[1], domain[3]],
-                             [domain[0], domain[3]]], **kwargs)
-        mesh.nodedata['vertices'] = vertices
-        return mesh
-    
     def init_force(self):
+        """
+        Construct the source term φ_force such that φ(x, y, t)
+        is an exact solution of the Allen-Cahn equation.
+        
+        The expression is:
+            φ_force = ∂φ/∂t + u·∇φ - γ(Δφ - f(φ))
+        """
         x, y, t = self.x, self.y, self.t
         eta = self.eta
         gamma = self.gamma()
@@ -116,11 +105,19 @@ class SinCosCosData2D:
         return val
     
     @cartesian
-    def init_condition(self, p: TensorLike, t: float = 0.0) -> TensorLike:
+    def init_solution(self, p: TensorLike, t: float = 0.0) -> TensorLike:
         """Return the initial condition for the phase field."""
         return self.solution(p, t)
     
     def verify_phase_solution(self):
+        """
+        Symbolically verify that φ_expr satisfies the Allen-Cahn PDE
+        by computing the symbolic residual:
+        
+            Residual = (∂φ/∂t + u·∇φ - γ(Δφ - f(φ))) - φ_force
+
+        Should simplify to zero if implementation is correct.
+        """
         x, y, t = self.x, self.y, self.t
         u1 = self.u1_expr
         u2 = self.u2_expr
@@ -137,3 +134,4 @@ class SinCosCosData2D:
         phase_rhs = gamma * (lap_phi - f_phi) 
         phase_res = phase_lhs - phase_rhs - self.phi_force_expr
         print('相场方程残差:', sp.simplify(phase_res))
+    

@@ -1,11 +1,11 @@
 from typing import Sequence
-from fealpy.decorator import cartesian, variantmethod
-from fealpy.backend import backend_manager as bm
-from fealpy.backend import TensorLike
+from ...decorator import cartesian, variantmethod
+from ...backend import backend_manager as bm
+from ...backend import TensorLike
 import sympy as sp
-from fealpy.model.mesher.box_mesher import BoxMesher2d
+from ..mesher.box_mesher import BoxMesher2d
 
-class OptimalControlData2d(BoxMesher2d):
+class Exp0001(BoxMesher2d):
     """
     A PDE example with homogeneous Neumann boundary conditions on the unit square.
 
@@ -18,56 +18,56 @@ class OptimalControlData2d(BoxMesher2d):
         Problem parameter used in the source term and expected state.
 
     Attributes
-    c : float
-        Problem parameter.
-    manager : object
-        Backend manager for numerical computation.
-    x1, x2 : sympy.Symbol
-        Symbolic variables for spatial coordinates.
-    y, z, u : sympy.Expr
-        Symbolic expressions for the exact state, adjoint state, and control.
-    p, q : sympy.Matrix
-        Symbolic flux and adjoint flux.
-    A : sympy.Matrix
-        Coefficient matrix.
-    f : sympy.Expr
-        Source term.
-    y_d : sympy.Expr
-        Desired state.
-    div_p, div_q : sympy.Expr
-        Divergence of flux and adjoint flux.
+        c : float
+            Problem parameter.
+        manager : object
+            Backend manager for numerical computation.
+        x1, x2 : sympy.Symbol
+            Symbolic variables for spatial coordinates.
+        y, z, u : sympy.Expr
+            Symbolic expressions for the exact state, adjoint state, and control.
+        p, q : sympy.Matrix
+            Symbolic flux and adjoint flux.
+        A : sympy.Matrix
+            Coefficient matrix.
+        f : sympy.Expr
+            Source term.
+        y_d : sympy.Expr
+            Desired state.
+        div_p, div_q : sympy.Expr
+            Divergence of flux and adjoint flux.
 
     Methods
-    domain()
-        Return the computational domain.
-    y_solution(space)
-        Evaluate the exact state at given points.
-    z_solution(space)
-        Evaluate the adjoint state at given points.
-    u_solution(space)
-        Evaluate the control at given points.
-    p_solution(space)
-        Evaluate the flux at given points.
-    q_solution(space)
-        Evaluate the adjoint flux at given points.
-    f_fun(space)
-        Evaluate the source term at given points.
-    y_d_fun(space)
-        Evaluate the desired state at given points.
+        domain()
+            Return the computational domain.
+        y_solution(space)
+            Evaluate the exact state at given points.
+        z_solution(space)
+            Evaluate the adjoint state at given points.
+        u_solution(space)
+            Evaluate the control at given points.
+        p_solution(space)
+            Evaluate the flux at given points.
+        q_solution(space)
+            Evaluate the adjoint flux at given points.
+        f_fun(space)
+            Evaluate the source term at given points.
+        y_d_fun(space)
+            Evaluate the desired state at given points.
 
     Notes
-    The problem is defined on [0, 1] x [0, 1] with variable coefficients and homogeneous Neumann boundary conditions.
-    The class is designed for use with the FEALPy finite element library.
+        The problem is defined on [0, 1] x [0, 1] with variable coefficients and homogeneous Neumann boundary conditions.
+        The class is designed for use with the FEALPy finite element library.
 
     Examples
-    >>> example = Example1(c=1)
-    >>> import numpy as np
-    >>> pts = np.array([[0.5, 0.5]])
-    >>> y_val = example.y_solution(pts)
-    >>> print(y_val)
+        >>> example = Example1(c=1)
+        >>> import numpy as np
+        >>> pts = np.array([[0.5, 0.5]])
+        >>> y_val = example.y_solution(pts)
+        >>> print(y_val)
     """
     
-    def __init__(self, c=1, box=None): 
+    def __init__(self, options: dict={}): 
         '''
         """
         Initialize the OptimalControlData class.
@@ -86,8 +86,9 @@ class OptimalControlData2d(BoxMesher2d):
         The symbolic expressions are constructed using sympy for later numerical evaluation.
         """
         '''
-        super().__init__(box=box)
-        self.c = c
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
+        self.c = options.get('c', 1)
         self.manager, = bm._backends
 
         x1, x2 = sp.symbols('x1, x2', real=True)
@@ -164,7 +165,6 @@ class OptimalControlData2d(BoxMesher2d):
         """
         return 2
 
-    @cartesian
     def domain(self):
         return [0, 1, 0, 1]
     

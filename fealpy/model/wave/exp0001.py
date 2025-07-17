@@ -3,7 +3,7 @@ from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
 
-class SinMixData1D:
+class Exp0001():
     """
     1D wave equation problem:
 
@@ -19,6 +19,8 @@ class SinMixData1D:
     This example imposes homogeneous Dirichlet boundary conditions.
     It is useful for testing second-order hyperbolic solvers.
     """
+    def __init__(self):
+        self.box = [0.0, 1.0]
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -26,7 +28,7 @@ class SinMixData1D:
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax]."""
-        return [0.0, 1.0]
+        return self.box
     
     def speed(self) -> float:
         """Return propagation speed a."""

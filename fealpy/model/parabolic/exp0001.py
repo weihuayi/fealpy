@@ -2,8 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
+from ..mesher.interval_mesher import IntervalMesh
 
-class SinExpData1D:
+class Exp0001(IntervalMesh):
     """
     1D parabolic problem:
 
@@ -19,6 +20,9 @@ class SinExpData1D:
     This example imposes homogeneous Dirichlet boundary conditions at both ends.
     It is useful for testing time-dependent solvers.
     """
+    def __init__(self):
+        self.interval = [0.0, 1.0]
+        super().__init__(interval=self.interval)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -26,7 +30,7 @@ class SinExpData1D:
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax]."""
-        return [0.0, 1.0]
+        return self.interval
 
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""

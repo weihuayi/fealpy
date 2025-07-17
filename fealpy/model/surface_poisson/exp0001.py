@@ -1,14 +1,12 @@
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import  TensorLike
-from ..domain_mesher.sphere_domain_mesher import SphereDomainMesher3D
+from ...geometry import SphereSurface
+from ..mesher.sphere_mesher import SphereSurfaceMesher
 
 
-<<<<<<<< HEAD:fealpy/model/surface_poisson/surface_level_set_data.py
-class SurfaceLevelSetData(SphereDomainMesher3D):
-========
-class Exp0008():
->>>>>>>> draft/edwin:fealpy/model/poisson/exp0008.py
+class Exp0001(SphereSurfaceMesher):
+
     """
     Surface Poisson problem on a closed manifold:
 
@@ -16,7 +14,7 @@ class Exp0008():
 
     where:
         - S ⊂ ℝ³ is a closed, compact, C³-smooth surface without boundary (∂S = ∅),
-        - Δ_S is the Laplace–Beltrami operator on surface S,
+        - Δ_S is the Laplace-Beltrami operator on surface S,
         - f is a given function defined on S, satisfying the compatibility condition:
               ∫_S f dσ = 0,
           where dσ is the surface measure on S,
@@ -32,8 +30,9 @@ class Exp0008():
               f = -Δ_S (x·y).
     """
 
-    def __init__(self, surface=None):
-        super().__init__(surface=surface)
+    def __init__(self):
+        self.surface = SphereSurface(center=[0.0, 0.0, 0.0], radius=1.0) 
+        super().__init__(surface=self.surface)
         
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
