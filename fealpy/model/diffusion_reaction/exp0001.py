@@ -2,7 +2,7 @@ from typing import Sequence
 from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
-from ..mesher.box_mesher import BoxMesher2d
+from ..mesher import BoxMesher2d
 
 class Exp0001(BoxMesher2d):
     """

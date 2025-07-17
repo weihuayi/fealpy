@@ -2,10 +2,10 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 
 
-class BoxPolyData2d(BoxDomainMesher2d):
+class Exp0001(BoxMesher2d):
     """
     2D Linear Elasticity problem with polynomial displacement
 

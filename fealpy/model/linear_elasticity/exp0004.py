@@ -2,11 +2,11 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 import math
 
 
-class Exp0004(BoxDomainMesher2d):
+class Exp0004(BoxMesher2d):
     """
     2D Linear Elasticity problem with trigonometric displacement
 

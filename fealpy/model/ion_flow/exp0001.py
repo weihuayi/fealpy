@@ -3,9 +3,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
-from ..mesher.sphere_domain_mesher import SphereDomainMesher
+from ..mesher import SphereShellMesher
 
-class Exp0001(SphereDomainMesher):
+class Exp0001(SphereShellMesher):
     """
     Ion flow model in a 3D spherical shell domain.
     Implements the fully coupled ion-flow PDE on Ω = {x ∈ ℝ³ : r1 < |x| < r2}.
@@ -30,22 +30,21 @@ class Exp0001(SphereDomainMesher):
     Reference:
         https://wnesm678i4.feishu.cn/wiki/TxdhwkTHiihTdok7dyxc7YdunBg
     """
+    def __init__(self):
+            # Domain parameters
+            self.r1 = 0.05
+            self.r2 = 0.5
+            super().__init__()
+            self.U0 = 200
+            self.eps0 = 1.0
+            self.rho0 = 565.9759
+            self.m = 0.4
+            self.delta = 1.0
 
-    def __init__(self, option: dict = {}):
-        # Domain parameters
-        self.r1 = bm.tensor(option.get('r1', 0.05))
-        self.r2 = bm.tensor(option.get('r2', 0.5))
-        super().__init__()
-        self.U0 = bm.tensor(option.get('U0', 200))
-        self.eps0 = bm.tensor(option.get('eps0', 1.0))
-        self.rho0 = bm.tensor(option.get('rho0', 565.9759))
-        self.m = bm.tensor(option.get('m', 0.4))
-        self.delta = bm.tensor(option.get('delta', 1.0))
-
-        self.Eon = 33.7 * self.m * self.delta * (1 + 0.24 * bm.sqrt(100 * self.r1 * self.delta)) * 100
-        self.k2 = bm.sqrt(self.r1 * self.Eon * self.eps0 / self.rho0)
-        self.k3 = bm.sqrt(self.k2**2 - self.r1**2)
-        self.c1 = bm.sqrt(self.r1 * self.Eon * self.eps0 * self.rho0)
+            self.Eon = 33.7 * self.m * self.delta * (1 + 0.24 * bm.sqrt(100 * self.r1 * self.delta)) * 100
+            self.k2 = bm.sqrt(self.r1 * self.Eon * self.eps0 / self.rho0)
+            self.k3 = bm.sqrt(self.k2**2 - self.r1**2)
+            self.c1 = bm.sqrt(self.r1 * self.Eon * self.eps0 * self.rho0)
 
     def geo_dimension(self) -> int:
         return 3

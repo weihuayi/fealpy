@@ -2,7 +2,7 @@ from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 from ..mesher import LshapeMesher
-from typing import Sequence
+
 
 class Exp0004(LshapeMesher):
     """

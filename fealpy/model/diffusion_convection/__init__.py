@@ -3,7 +3,7 @@ from typing import Protocol, Sequence, TypeVar,Optional, overload
 from ...backend import TensorLike
 
 class DiffusionConvetionPDEDataProtocol(Protocol):
-    """Protocol interface for elliptic PDE data components with only diffusion and convection terms.
+    """Protocol interface for elliptic PDE data components with diffusion and convection terms.
     
     Defines the recommended protocol interface for elliptic partial differential equation solvers.
 

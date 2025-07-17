@@ -2,7 +2,7 @@ from typing import Protocol, Sequence, TypeVar,Optional, overload
 from ...backend import TensorLike
 
 class DiffusionReactionPDEDataProtocol(Protocol):
-    """Protocol interface for Diffusion-Reaction PDE data components only with diffusion and reaction terms.
+    """Protocol interface for Diffusion-Reaction PDE data components with diffusion and reaction terms.
     
     Defines the recommended protocol interface for elliptic partial differential equation solvers.
 

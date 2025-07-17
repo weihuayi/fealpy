@@ -2,7 +2,7 @@ from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import  TensorLike
 from ...geometry import SphereSurface
-from ..mesher.sphere_mesher import SphereSurfaceMesher
+from ..mesher import SphereSurfaceMesher
 
 
 class Exp0001(SphereSurfaceMesher):
@@ -31,8 +31,8 @@ class Exp0001(SphereSurfaceMesher):
     """
 
     def __init__(self):
-        self.surface = SphereSurface(center=[0.0, 0.0, 0.0], radius=1.0) 
-        super().__init__(surface=self.surface)
+        # self.surface = SphereSurface(center=[0.0, 0.0, 0.0], radius=1.0) 
+        super().__init__()
         
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

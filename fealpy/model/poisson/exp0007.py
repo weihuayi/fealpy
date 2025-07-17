@@ -2,7 +2,7 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher.box_mesher import BoxMesher3d
+from ..mesher import BoxMesher3d
 
 class Exp0007(BoxMesher3d):
     """

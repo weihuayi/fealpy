@@ -2,9 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher.box_mesher import BoxMesher2d
+from ..mesher import BoxMesher2d
 
-class Exp0001(BoxMesher2d):
+class Exp0002(BoxMesher2d):
     """
     2D biharmonic problem:
 

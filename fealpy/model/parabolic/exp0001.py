@@ -2,9 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
-from ..mesher.interval_mesher import IntervalMesh
+from ..mesher import IntervalMesher
 
-class Exp0001(IntervalMesh):
+class Exp0001(IntervalMesher):
     """
     1D parabolic problem:
 
