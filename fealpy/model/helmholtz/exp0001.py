@@ -1,7 +1,7 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 from ...decorator import cartesian
 
 def bessel_function(v: int, x: TensorLike) -> TensorLike:
@@ -23,7 +23,7 @@ def bessel_function(v: int, x: TensorLike) -> TensorLike:
             raise NotImplementedError("Just supports Bessel functions of order 0 and 1.")
 
 
-class EXP0001(BoxDomainMesher2d):
+class Exp0001(BoxMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary conditions:
     
@@ -121,4 +121,3 @@ class EXP0001(BoxDomainMesher2d):
             (bm.abs(y + 0.5) < atol) |
             (bm.abs(y - 0.5) < atol)
         )
-

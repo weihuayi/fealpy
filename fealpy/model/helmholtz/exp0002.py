@@ -1,10 +1,10 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 from ...decorator import cartesian
 
-class EXP0002(BoxDomainMesher2d):
+class Exp0002(BoxMesher2d):
     """
     2D Helmholtz problem with complex Robin (impedance-type) boundary condition:
 
@@ -77,6 +77,3 @@ class EXP0002(BoxDomainMesher2d):
             (bm.abs(y - 1.0) < atol)
         )
         return on_boundary
-
-
-

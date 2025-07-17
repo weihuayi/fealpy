@@ -1,10 +1,10 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher3d
+from ..mesher import BoxMesher3d
 from ...decorator import cartesian
 
-class EXP0005(BoxDomainMesher3d):
+class EXP0005(BoxMesher3d):
     """
     3D Helmholtz problem with homogeneous Dirichlet boundary condition:
 

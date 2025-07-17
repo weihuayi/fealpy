@@ -1,10 +1,10 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 from ...decorator import cartesian
 
-class EXP0003(BoxDomainMesher2d):
+class Exp0003(BoxMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary condition:
 

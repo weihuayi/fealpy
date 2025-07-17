@@ -45,10 +45,10 @@ DATA_TABLE is a registry for Helmholtz PDE models.
 Each entry maps a model name to its corresponding module and class.
 """
 DATA_TABLE = {
-        1: ("exp0001", "EXP0001"),
-        2: ("exp0002", "EXP0002"),
-        3: ("exp0003", "EXP0003"),
-        4: ("exp0004", "EXP0004"),
-        5: ("exp0005", "EXP0005")
+        1: ("exp0001", "Exp0001"),
+        2: ("exp0002", "Exp0002"),
+        3: ("exp0003", "Exp0003"),
+        4: ("exp0004", "Exp0004"),
+        5: ("exp0005", "Exp0005")
 }
 
