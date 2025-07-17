@@ -1,10 +1,9 @@
-from typing import Sequence
-from ...decorator import cartesian, variantmethod
+from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher import LshapeMesher
 
-
-class Exp0004:
+class Exp0004(LshapeMesher):
     """
     L-shaped domain corner singularity problem (2D Poisson):
 
@@ -19,53 +18,13 @@ class Exp0004:
 
         f(x, y) = 0
     """
-
+    def __init__(self, option: dict = {}):
+        self.n = bm.tensor(option.get('n', 2))  
+        super().__init__(n=self.n)
+        
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
-    
-    @variantmethod('tri')
-    def init_mesh(self, n=3):
-        from ...mesh import TriangleMesh
-        node = bm.array([
-            [-1, -1],
-            [ 0, -1],
-            [-1,  0],
-            [ 0,  0],
-            [ 1,  0],
-            [-1,  1],
-            [ 0,  1],
-            [ 1,  1]], dtype=bm.float64)
-        cell = bm.array([
-            [1, 3, 0],
-            [2, 0, 3],
-            [3, 6, 2],
-            [5, 2, 6],
-            [4, 7, 3],
-            [6, 3, 7]], dtype=bm.int32)
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n)
-        return mesh
-
-    @init_mesh.register('quad')
-    def init_mesh(self, n):
-        from ...mesh import QuadrangleMesh
-        node = bm.array([
-            [-1, -1],
-            [ 0, -1],
-            [-1,  0],
-            [ 0,  0],
-            [ 1,  0],
-            [-1,  1],
-            [ 0,  1],
-            [ 1,  1]], dtype=bm.float64)
-        cell = bm.array([
-            [0, 1, 3, 2],
-            [3, 4, 7, 6],
-            [3, 6, 5, 2]], dtype=bm.int32)
-        mesh = QuadrangleMesh(node, cell)
-        mesh.uniform_refine(n)
-        return mesh
     
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

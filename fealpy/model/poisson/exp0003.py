@@ -1,4 +1,4 @@
-from typing import Optional,Sequence
+from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
@@ -21,9 +21,9 @@ class Exp0003(BoxMesher2d):
     Homogeneous Dirichlet boundary conditions are applied on all edges.
     """
 
-    def configure(self, box: Optional[Sequence[float]] = None):
-        """Configure the relevant parameters of PDE."""
-        self.box = box
+    def __init__(self):
+        self.box = [-1.0, 1.0, -1.0, 1.0] 
+        super().__init__(box=self.box)
         
     def get_dimension(self) -> int:
         """Return the geometric dimension of the domain."""

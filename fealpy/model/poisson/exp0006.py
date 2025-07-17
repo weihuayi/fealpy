@@ -1,10 +1,10 @@
-from typing import Optional,Sequence
+from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher.box_mesher import BoxDomainMesher3d
+from ..mesher.box_mesher import BoxMesher3d
 
-class Exp0006(BoxDomainMesher3d):
+class Exp0006(BoxMesher3d):
     """
     3D Poisson problem:
 
@@ -21,9 +21,9 @@ class Exp0006(BoxDomainMesher3d):
 
     Homogeneous Dirichlet boundary conditions are applied on all boundaries.
     """
-    def configure(self, box: Optional[Sequence[float]] = None):
-        """Configure the relevant parameters of PDE."""
-        self.box = box
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0] 
+        super().__init__(box=self.box)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -31,7 +31,7 @@ class Exp0006(BoxDomainMesher3d):
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax, zmin, zmax]."""
-        return [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
+        return self.box
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
