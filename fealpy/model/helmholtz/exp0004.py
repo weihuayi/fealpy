@@ -26,8 +26,10 @@ class Exp0004(BoxMesher2d):
         https://deepxde.readthedocs.io/en/latest/demos/pinn_forward/helmholtz.2d.dirichlet.html
     """
 
-    def set(self, k: float = 1.0):
-        self.k = k
+    def __init__(self, options: dict = {}):  
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
+        self.k = options.get('k', 1.0)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -35,7 +37,7 @@ class Exp0004(BoxMesher2d):
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 1.0, 0.0, 1.0]
+        return self.box
     
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
