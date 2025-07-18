@@ -2,7 +2,7 @@ from typing import Any, Optional, Union
 from ..backend import bm
 from ..typing import TensorLike
 from ..decorator import variantmethod
-from ..model import ComputationalModel, PDEDataManager
+from ..model import ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 
 from ..mesh import Mesh
