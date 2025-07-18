@@ -2,11 +2,11 @@ from typing import Sequence
 from fealpy.decorator import cartesian, variantmethod
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
+from ..mesher import BoxMesher2d
 
-class CosCosData2D(BoxDomainMesher2d):
+class Exp0001(BoxMesher2d):
     """
-    CosCosData provides data and methods for a 2D elliptic PDE problem with a cosine-cosine exact solution.
+    Exp0001 provides data and methods for a 2D elliptic PDE problem with a exponential exact solution.
     The model problem is:
         -div(A ∇u) + c u = f,   in Ω = [0, 1] x [0, 1]
                 ∇u · n = 0,        on ∂Ω (Neumann)
@@ -20,12 +20,15 @@ class CosCosData2D(BoxDomainMesher2d):
     This class provides methods for mesh generation, coefficients, exact solution, gradient, flux, and boundary identification for use in finite element simulations.
     """
     """"Cosine-Cosine Solution Data"""
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
 
     def geo_dimension(self) -> int:
         return 2
 
     def domain(self):
-        return [0., 1., 0., 1.]
+        return self.box
 
     @cartesian
     def diffusion_coef(self, p: TensorLike) -> TensorLike:
@@ -104,10 +107,8 @@ class CosCosData2D(BoxDomainMesher2d):
         """Check if point is on boundary."""        
         x, y = p[..., 0], p[..., 1]
         atol = 1e-12  # 绝对误差容限
-    
-        # 检查是否接近 x=±1 或 y=±1
         on_boundary = (
-            (bm.abs(x - 1.) < atol) | (bm.abs(x + 1.) < atol) |
-            (bm.abs(y - 1.) < atol) | (bm.abs(y + 1.) < atol)
+            (bm.abs(x - 1.) < atol) | (bm.abs(x) < atol) |
+            (bm.abs(y - 1.) < atol) | (bm.abs(y) < atol)
         )
         return on_boundary 

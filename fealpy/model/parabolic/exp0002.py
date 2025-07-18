@@ -2,8 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
+from ..mesher import BoxMesher2d
 
-class SinSinExpData2D:
+class Exp0002(BoxMesher2d):
     """
     2D parabolic problem:
 
@@ -22,6 +23,9 @@ class SinSinExpData2D:
     This example imposes homogeneous Dirichlet boundary conditions on all four edges.
     It is useful for verifying time-dependent solvers in 2D.
     """
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0] 
+        super().__init__(box=self.box)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -29,7 +33,7 @@ class SinSinExpData2D:
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 1.0, 0.0, 1.0]  
+        return self.box 
 
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""

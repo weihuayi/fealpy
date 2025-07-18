@@ -2,15 +2,15 @@
 from typing import Protocol, Sequence, TypeVar,Optional, overload
 from ...backend import TensorLike
 
-class EllipticPDEDataProtocol(Protocol):
-    """Protocol interface for elliptic PDE data components.
+class DiffusionConvetionPDEDataProtocol(Protocol):
+    """Protocol interface for elliptic PDE data components with diffusion and convection terms.
     
     Defines the recommended protocol interface for elliptic partial differential equation solvers.
 
     This protocol suggests four main categories of methods that implementing classes may provide:
         1. Domain specification methods (geometry and computational domain)
-        2. PDE coefficient methods (diffusion, convection, reaction terms)
-        (Notes:When coefficients (diffusion, convection, reaction) are tensor-valued,
+        2. PDE coefficient methods (diffusion, convection terms)
+        (Notes:When coefficients (diffusion, convection) are tensor-valued,
                 the node coordinate tensor p can be omitted in method calls.)
         3. Equation terms methods (exact solution, grdient, flux and source terms)
         4. Boundary condition methods (Dirichlet, Neumann, Robin types)
@@ -32,10 +32,7 @@ class EllipticPDEDataProtocol(Protocol):
     def convection_coef(self, p: TensorLike) -> TensorLike: ...
     @overload
     def convection_coef(self) -> TensorLike: ...
-    @overload
-    def reaction_coef(self, p: TensorLike) -> TensorLike: ...
-    @overload
-    def reaction_coef(self) -> TensorLike: ...
+
     def solution(self, p: TensorLike) -> TensorLike: ...
     def gradient(self, p: TensorLike) -> TensorLike: ...
     def flux(self, p: TensorLike) -> TensorLike: ...
@@ -47,7 +44,7 @@ class EllipticPDEDataProtocol(Protocol):
     def robin(self, p: TensorLike) -> TensorLike: ...
     def is_robin_boundary(self, p: TensorLike) -> TensorLike: ...
 
-EllipticPDEDataT = TypeVar('EllipticPDEDataT', bound=EllipticPDEDataProtocol)
+DiffusionConvetionPDEDataT = TypeVar('DiffusionConvetionPDEDataT', bound=DiffusionConvetionPDEDataProtocol)
 
 """
 DATA_TABLE is a registry, when adding new PDE models, 
@@ -55,7 +52,5 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "coscos": ("cos_cos_data_2d", "CosCosData2D"),
-    "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
-    # "exp":("exp_data_2d", "ExpDate2D")
+   
 }

@@ -2,11 +2,11 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..domain_mesher.box_domain_mesher import BoxDomainMesher2d
-import math
+from ..mesher import BoxMesher2d
 
 
-class BoxSinSinData2d(BoxDomainMesher2d):
+
+class Exp0002(BoxMesher2d):
     """
     2D Linear Elasticity problem with trigonometric displacement
 
@@ -23,8 +23,9 @@ class BoxSinSinData2d(BoxDomainMesher2d):
         E = 1, ν = 0.3
     """
 
-    def __init__(self, box=None):
-        super().__init__(box)
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
         self.hypo = 'plane_strain'  # 可选：'plane_stress'
 
     def geo_dimension(self):

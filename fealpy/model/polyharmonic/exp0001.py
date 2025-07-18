@@ -2,15 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher import LshapeMesher
 
-
-import numpy as np
-from typing import Sequence
-from ...decorator import cartesian
-from ...backend import backend_manager as bm
-from ...backend import TensorLike
-
-class LShapeBiharmonicData2D:
+class Exp0001(LshapeMesher):
     """
     2D biharmonic problem on L-shaped domain:
     
@@ -23,7 +17,9 @@ class LShapeBiharmonicData2D:
     
     Viscosity parameter nu = 0.01 (if needed for further modeling).
     """
-    
+    def __init__(self):
+        super().__init__()
+
     def geo_dimension(self) -> int:
         """Return geometric dimension of the domain."""
         return 2

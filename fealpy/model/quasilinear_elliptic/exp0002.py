@@ -2,13 +2,13 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher.lshape_mesher import LshapeMesher
 
-
-class SingularCornerData2D:
+class Exp0002(LshapeMesher):
     """
     2D quasilinear Poisson problem with singularity at the origin:
 
-        -div(mu(x, |∇u|) ∇u) = f(x, y),  in Ω = (-1,1)^2 \ [0,1) × (-1,0]
+        -div(mu(x, |∇u|) ∇u) = f(x, y),  in Ω = (-1,1)^2 \ [0,1) x (-1,0]
                               u = 0      on ∂Ω
 
     Exact solution in polar coordinates:
@@ -16,13 +16,15 @@ class SingularCornerData2D:
 
     Nonlinear diffusion coefficient:
         mu(x, |∇u|) = 1 + exp(-|∇u|^2)
+    
+    Reference
+        https://arxiv.org/abs/2409.17779
     """
+    def __init__(self):
+        super().__init__()
 
     def geo_dimension(self) -> int:
         return 2
-
-    def domain(self) -> Sequence[float]:
-        return [-1.0, 1.0, -1.0, 1.0]
 
     @cartesian
     def threshold(self, p) -> TensorLike:
@@ -67,7 +69,7 @@ class SingularCornerData2D:
         theta = bm.atan2(y, x)
         theta[theta<0] += 2*bm.pi
         r = bm.sqrt(x**2 + y**2)
-        f = -16*exp(-4/(9*(x**2 + y**2)**(1/3)))*sin(2*theta/3)/(81*r**2)
+        f = -16*bm.exp(-4/(9*(x**2 + y**2)**(1/3)))*sin(2*theta/3)/(81*r**2)
         f = bm.where(r > 1e-14, f, 0.0)
         return f
 

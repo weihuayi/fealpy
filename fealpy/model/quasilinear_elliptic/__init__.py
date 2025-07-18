@@ -36,7 +36,7 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
-    "singular": ("singular_corner_data_2d", "SingularCornerData2D"),
-    "singulargauss": ("singular_gaussian_data_2d", "SingularGaussianData2D"),
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
+    3: ("exp0003", "Exp0003")
 }

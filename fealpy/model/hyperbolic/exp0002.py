@@ -2,8 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
+from ..mesher import BoxMesher2d
 
-class SinSinCosData2D:
+class Exp0002(BoxMesher2d):
     """
     2D hyperbolic problem with sinusoidal solution:
 
@@ -15,14 +16,17 @@ class SinSinCosData2D:
         u(x, y, t) = sin(πx)sin(πy)cos(πt)
     This represents a standing wave pattern in a 2D square domain.
     """
-
+    def __init__(self):
+        self.box = [0.0, 2.0, 0.0, 2.0]
+        super().__init__(box=self.box)
+        
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 2.0, 0.0, 2.0]  
+        return self.box  
 
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""
@@ -30,7 +34,7 @@ class SinSinCosData2D:
     
     def convection_coef(self) -> TensorLike:
         """ Get the convection coefficient (wave speed)."""
-        return bm.tensor([1.0, 1.0])  
+        return bm.tensor([1.0, 1.0])
 
     @cartesian
     def init_solution(self, p: TensorLike) -> TensorLike:
@@ -74,5 +78,3 @@ class SinSinCosData2D:
         x, y = p[..., 0], p[..., 1]
         return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 2.0) < 1e-12) | \
                (bm.abs(y - 0.0) < 1e-12) | (bm.abs(y - 2.0) < 1e-12)
-
- 

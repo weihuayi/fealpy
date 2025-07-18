@@ -2,9 +2,10 @@ from typing import Sequence
 from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher import BoxMesher2d
 
+class Exp0004(BoxMesher2d):
 
-class SinSinTriharmonicData2D():
     """
     2D triharmonic problem:
 
@@ -12,6 +13,10 @@ class SinSinTriharmonicData2D():
 
     Exact solution: u(x, y) = sin(2πx)·cos(2πy)
     """
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
+        
     def geo_dimension(self):
         """Return the geometric dimension of the domain."""
         return 2

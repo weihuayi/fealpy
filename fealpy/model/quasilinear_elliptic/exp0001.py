@@ -2,13 +2,14 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher.box_mesher import BoxMesher2d
 
 
-class SinSinData2D:
+class Exp0001(BoxMesher2d):
     """
-    2D Quasilinear Poisson-type problem:
+    2D Quasilinear elliptic-type problem:
 
-        -div(mu(|∇u|) ∇u) = f(x, y),  in Ω = (-1,1)²
+        -div(mu(|∇u|) ∇u) = f(x, y),  in Ω = (0, 1)^2
                           u = 0       on ∂Ω
 
     with exact solution:
@@ -16,12 +17,20 @@ class SinSinData2D:
 
     and nonlinear diffusion coefficient:
         mu(|∇u|) = 2 + 1 / (1 + |∇u|²)
+    
+    Reference
+        https://arxiv.org/abs/2409.17779
     """
+
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
+
     def geo_dimension(self) -> int:
         return 2
 
     def domain(self) -> Sequence[float]:
-        return [0.0, 1.0, 0.0, 1.0]
+        return self.box
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
@@ -52,7 +61,11 @@ class SinSinData2D:
         pi = bm.pi
         cos = bm.cos
         sin = bm.sin
-        return 2*pi**2*(pi**2*(cos(pi*x)**2*cos(2*pi*y) + cos(2*pi*x)*cos(pi*y)**2) + (pi**2*sin(pi*x)**2*cos(pi*y)**2 + pi**2*sin(pi*y)**2*cos(pi*x)**2 + 1)*(2*pi**2*sin(pi*x)**2*cos(pi*y)**2 + 2*pi**2*sin(pi*y)**2*cos(pi*x)**2 + 3))*sin(pi*x)*sin(pi*y)/(pi**2*sin(pi*x)**2*cos(pi*y)**2 + pi**2*sin(pi*y)**2*cos(pi*x)**2 + 1)**2 
+        #return 2*pi**2*(pi**2*(cos(pi*x)**2*cos(2*pi*y) + cos(2*pi*x)*cos(pi*y)**2) + (pi**2*sin(pi*x)**2*cos(pi*y)**2 + pi**2*sin(pi*y)**2*cos(pi*x)**2 + 1)*(2*pi**2*sin(pi*x)**2*cos(pi*y)**2 + 2*pi**2*sin(pi*y)**2*cos(pi*x)**2 + 3))*sin(pi*x)*sin(pi*y)/(pi**2*sin(pi*x)**2*cos(pi*y)**2 + pi**2*sin(pi*y)**2*cos(pi*x)**2 + 1)**2 
+        return 2*pi**2*(pi**2*(cos(pi*x)**2*cos(2*pi*y) + cos(2*pi*x)*cos(pi*y)**2) + \
+                        (pi**2*sin(pi*x)**2*cos(pi*y)**2 + pi**2*sin(pi*y)**2*cos(pi*x)**2 + 1) \
+                            *(2*pi**2*sin(pi*x)**2*cos(pi*y)**2 + 2*pi**2*sin(pi*y)**2*cos(pi*x)**2 + 3)) \
+                                *sin(pi*x)*sin(pi*y)/(pi**2*sin(pi*x)**2*cos(pi*y)**2 + pi**2*sin(pi*y)**2*cos(pi*x)**2 + 1)**2 
 
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:

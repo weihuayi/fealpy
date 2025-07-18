@@ -2,9 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher import BoxMesher2d
 
-
-class Exp0005:
+class Exp0005(BoxMesher2d):
     """
     2D Poisson problem with interior layer on a square domain:
     
@@ -19,6 +19,9 @@ class Exp0005:
 
         f(x, y) = -100·u·(1 - u)·[100·(1 - 2u) + 1/r]
     """
+    def __init__(self):
+        self.box = [-1.0, 1.0, -1.0, 1.0] 
+        super().__init__(box=self.box)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -26,7 +29,7 @@ class Exp0005:
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0., 1., 0., 1.]
+        return self.box
     
     @variantmethod('tri')
     def init_mesh(self, nx=16, ny=16):

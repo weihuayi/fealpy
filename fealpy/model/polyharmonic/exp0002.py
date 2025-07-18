@@ -2,9 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher import BoxMesher2d
 
-
-class SinSinBiharmonicData2D():
+class Exp0002(BoxMesher2d):
     """
     2D biharmonic problem:
 
@@ -14,6 +14,9 @@ class SinSinBiharmonicData2D():
     with exact solution:
         u(x,y) = (sin(2πx)·sin(2πy))²
     """
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
 
     def geo_dimension(self):
         """Return the geometric dimension of the domain."""
@@ -21,7 +24,7 @@ class SinSinBiharmonicData2D():
 
     def domain(self):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0., 1., 0., 1.]
+        return self.box
 
     def init_mesh(self, nx=4, ny=4):
         from ...mesh import TriangleMesh
