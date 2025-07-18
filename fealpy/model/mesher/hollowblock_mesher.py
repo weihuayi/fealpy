@@ -1,8 +1,8 @@
 from typing import Optional, List, Tuple, Union
 
-from ..backend import TensorLike, backend_manager as bm
-from ..decorator import variantmethod
-from ..mesh import TetrahedronMesh
+from ...backend import TensorLike, backend_manager as bm
+from ...decorator import variantmethod
+from ...mesh import TetrahedronMesh
 
 import gmsh
 import ast
