@@ -1,8 +1,8 @@
 import itertools
 
-from ..backend import backend_manager as bm
-from .opt_function import initialize
-from .optimizer_base import Optimizer
+from ...backend import backend_manager as bm
+from ..opt_function import initialize
+from ..optimizer_base import Optimizer
 import matplotlib.pyplot as plt
 
 
@@ -26,10 +26,10 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
         pbest_f = bm.copy(self.fitness)
         
         # Initialize repository with non-dominated solutions
-        Dominated = self.checkDomination(pbest_f)
+        Dominated = self.check_domination(pbest_f)
         self.REP['pos'] = self.x[Dominated == 0, :]
         self.REP['fit'] = self.fitness[Dominated == 0, :]
-        self.updateGrid()
+        self.update_grid()
 
         self.set_fit()
             
@@ -41,7 +41,7 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             alpha = 0.9 - 0.5 * (self.it / self.MaxIT)
             mbest = bm.sum(pbest, axis=0) / self.N
             phi = bm.random.rand(self.N, self.dim)
-            h = self.selectLeader()
+            h = self.select_leader()
             p = phi * pbest + (1 - phi) * self.REP['pos'][h]
             u = bm.random.rand(self.N, self.dim)
             
@@ -57,7 +57,7 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             
             # Update personal best
             pos_best = self.dominate(self.fitness, pbest_f)
-            best_pos = 1 - self.dominate(pbest_f, self.fitness)
+            best_pos = ~self.dominate(pbest_f, self.fitness)
             mask = bm.random.rand(self.N) > 0.5
             best_pos[(mask == 1)] = 0
             if bm.sum(pos_best) > 1:
@@ -68,9 +68,9 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
                 pbest_f = self.fitness * (best_pos[:, None] == 1) + pbest_f * (best_pos[:, None] == 0)
             
             # Update repository
-            self.updateRepository()
+            self.update_repository()
             if self.REP['pos'].shape[0] > self.Nr:
-                self.deleteFromRepository()
+                self.delete_from_repository()
             self.plotting()
             print("Generation #", self.it, "- Repository size: ", self.REP['pos'].shape[0])
 
@@ -84,49 +84,48 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             self.fig = plt.figure()
             self.ax = self.fig.add_subplot(111, projection='3d')
 
-    def deleteFromRepository(self):
+    def delete_from_repository(self):
         """
         Delete crowded solutions from the repository to maintain the repository size.
         """
-        crowding = bm.zeros((self.REP['pos'].shape[0], 1))
-        for m in range(self.REP['fit'].shape[1]):
-            m_fit = bm.sort(self.REP['fit'][:, m])
-            idx = bm.argsort(self.REP['fit'][:, m])
-            m_up = bm.concatenate([m_fit[1:], bm.array([bm.inf])])
-            m_down = bm.concatenate([bm.array([bm.inf]), m_fit[:-1]])
-            distance = ((m_up - m_down) / (bm.max(m_fit) - bm.min(m_fit)))
-            idx = bm.argsort(idx)
-            distance[distance == -bm.inf] = bm.inf
-            crowding = crowding + distance[idx][:, None]
+        m_fit1 = bm.sort(self.REP['fit'], axis=0)
+        idx1 = bm.argsort(self.REP['fit'], axis=0)
+        inf_row = bm.full((1, m_fit1.shape[1]), bm.inf)
+        m_up1 = bm.concatenate([m_fit1[1:], inf_row])
+        m_down1 = bm.concatenate([inf_row, m_fit1[:-1]])
+        distance1 = ((m_up1 - m_down1) / (bm.max(m_fit1, axis=0) - bm.min(m_fit1, axis=0)))
+        distance1[distance1 == -bm.inf] = bm.inf
+        idx1 = bm.argsort(idx1, axis=0)
+        distance11 = bm.zeros((distance1.shape))
+        m = bm.arange(0, self.REP['fit'].shape[1])
+        distance11[:, m] = distance1[idx1[:,m], m]
+        crowding = bm.sum(distance11, axis=1)
+
         crowding[bm.isnan(crowding)] = bm.inf
         del_idx = bm.argsort(crowding, axis=0)
         n_del = self.REP['pos'].shape[0] - self.Nr
         del_idx = del_idx[:n_del]
 
-        # Keep the remaining solutions
-        j = 0
-        pos = bm.zeros((self.Nr, self.dim))
-        fit = bm.zeros((self.Nr, self.REP['fit'].shape[1]))
-        for i in range(self.REP['pos'].shape[0]):
-            if i not in del_idx:
-                pos[j, :] = self.REP['pos'][i, :]
-                fit[j, :] = self.REP['fit'][i, :]
-                j += 1
+        keep_mask = bm.ones(self.REP['pos'].shape[0], dtype=bool)
+        keep_mask[del_idx] = False  
+        pos = self.REP['pos'][keep_mask]  
+        fit = self.REP['fit'][keep_mask]
+
         self.REP['pos'] = bm.copy(pos)
         self.REP['fit'] = bm.copy(fit)
-        self.updateGrid()
+        self.update_grid()
 
-    def updateRepository(self):
+    def update_repository(self):
         """
         Update the repository with current non-dominated solutions.
         """
-        Dominated = self.checkDomination(self.fitness)
+        Dominated = self.check_domination(self.fitness)
         self.REP['pos'] = bm.concatenate((self.REP['pos'], self.x[Dominated == 0, :]))
         self.REP['fit'] = bm.concatenate((self.REP['fit'], self.fitness[Dominated == 0, :]))
-        Dominated = self.checkDomination(self.REP['fit'])
+        Dominated = self.check_domination(self.REP['fit'])
         self.REP['pos'] = self.REP['pos'][Dominated == 0, :]
         self.REP['fit'] = self.REP['fit'][Dominated == 0, :]
-        self.updateGrid()
+        self.update_grid()
 
     def mutation(self):
         """
@@ -152,7 +151,7 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             idx = cum_sizes[1] + bm.unique(bm.random.randint(0, sub_sizes[2], (int(nmut),)))
             self.x[idx] = initialize(idx.shape[0], self.dim, self.ub, self.lb)
 
-    def selectLeader(self):
+    def select_leader(self):
         """
         Select a leader (guiding solution) from the repository based on crowding information.
         """
@@ -174,7 +173,7 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             self.ax.clear()
             plt.plot(self.fitness[:, 0], self.fitness[:, 1], 'o', markerfacecolor='none', markeredgecolor='red')
             plt.plot(self.REP['fit'][:, 0], self.REP['fit'][:, 1], 'o', markerfacecolor='none', markeredgecolor='black')
-            plt.plot(self.PF[:, 0], self.PF[:, 1], '.', markeredgecolor='green')
+            plt.plot(self.PF[:, 0], self.PF[:, 1], '.', markersize=1, markeredgecolor='green')
             self.ax.grid(True)
             self.ax.set_ylim(bm.min(self.REP['fit'][:, 1]), bm.max(self.REP['fit'][:, 1]))
             self.ax.set_xlim(bm.min(self.REP['fit'][:, 0]), bm.max(self.REP['fit'][:, 0]))
@@ -197,7 +196,7 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             self.ax.set_zlim(bm.min(self.REP['fit'][:, 2]), bm.max(self.REP['fit'][:, 2]))
             self.ax.plot(self.fitness[:, 0], self.fitness[:, 1], self.fitness[:, 2], 'o', markerfacecolor='none', markeredgecolor='red')
             self.ax.plot(self.REP['fit'][:, 0], self.REP['fit'][:, 1], self.REP['fit'][:, 2], 'o', markerfacecolor='none', markeredgecolor='black')
-            self.ax.plot(self.PF[:, 0], self.PF[:, 1], self.PF[:, 2], '.', markeredgecolor='green')
+            self.ax.plot(self.PF[:, 0], self.PF[:, 1], self.PF[:, 2], '.', markersize=1, markeredgecolor='green')
             self.ax.set_xticks(self.REP['hypercube_limits'][:, 0])
             self.ax.set_yticks(self.REP['hypercube_limits'][:, 1])
             self.ax.set_zticks(self.REP['hypercube_limits'][:, 2])
@@ -206,7 +205,7 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             plt.draw()
 
 
-    def updateGrid(self):
+    def update_grid(self):
         """
         Update the hypercube grid structure for selecting leaders.
         """
@@ -219,6 +218,22 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
         self.REP['grid_idx'] = bm.zeros((npar, 1))
         self.REP['grid_subid'] = bm.zeros((npar, ndim))
 
+        def sub_to_idx(ndim, shape, subid, order='F'):
+            if order == 'F':
+                idx = 0
+                product = 1
+                for i in range(ndim):
+                    idx += subid[i] * product
+                    product *= shape
+            else:
+                idx = 0
+                for i in range(self.ndim):
+                    product = 1
+                    for j in range(i+1, self.ndim):
+                        product *= self.shape[j]
+                    idx += subid[i] * product
+            return idx
+
         for n in range(npar):
             for d in range(ndim):
                 condition = (self.REP['fit'][n, d] <= self.REP['hypercube_limits'][:, d]) * 1
@@ -226,7 +241,13 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
                 self.REP['grid_subid'][n, d] -= 1
                 if self.REP['grid_subid'][n, d] == -1:
                     self.REP['grid_subid'][n, d] = 0
-            self.REP['grid_idx'][n] = self.REP['grid_subid'][n, 1] * self.ngrid + self.REP['grid_subid'][n, 0]
+
+            self.REP['grid_idx'][n] = sub_to_idx(
+                ndim, 
+                self.ngrid, 
+                self.REP['grid_subid'][n, :],
+                order='F'
+            )
 
         ids = bm.unique(self.REP['grid_idx'])
         self.REP['quality'] = bm.zeros((ids.shape[0], 2))
@@ -234,15 +255,21 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
             self.REP['quality'][i, 0] = ids[i]
             self.REP['quality'][i, 1] = 10 / bm.sum(self.REP['grid_idx'] == ids[i])
 
-    def checkDomination(self, fitness):
+    def check_domination(self, fitness):
         """
-        Check which solutions are dominated.
+        Identifies which solutions in the population are dominated.
 
-        Args:
-            fitness (tensor): Fitness values.
+        For each pair of solutions in the population, this function determines
+        dominance using the `dominate` method. A solution is marked as dominated 
+        if it is dominated by at least one other solution.
 
-        Returns:
-            tensor: Domination vector (0 = non-dominated, 1 = dominated).
+        Parameters:
+            fitness(tensor): A 2D tensor of shape (n, m), where each row represents the objective values of a solution.
+
+        Returns
+            Tensor: A 1D tensor of shape (n,), where each element is:
+                    - 0 if the solution is non-dominated,
+                    - 1 if the solution is dominated by at least one other.
         """
         dom_vector = bm.zeros((fitness.shape[0],))
         all_perm = bm.array(list(itertools.combinations(range(1, fitness.shape[0] + 1), 2))) - 1
@@ -254,19 +281,23 @@ class MO_QuantumParticleSwarmOpt(Optimizer):
         dom_vector[dominated_particles] = 1
         return dom_vector
 
+
     def dominate(self, x, y):
         """
-        Determine dominance between two solutions.
+        Determines whether each solution in `x` dominates the corresponding solution in `y`.
 
-        Args:
-            x (tensor): First set of solutions.
-            y (tensor): Second set of solutions.
+        A solution `x[i]` is said to dominate `y[i]` if all objectives in `x[i]` are 
+        less than or equal to those in `y[i]`, and at least one objective is strictly less.
+
+        Parameters:
+            x(tensor): A 2D tensor of shape (n, m), where each row represents a solution with `m` objectives.
+            
+            y(tensor): A 2D tensor of shape (n, m), representing the solutions to be compared against `x`.
 
         Returns:
-            tensor: Dominance result (1 = x dominates y, 0 = otherwise).
+            Tensor: A 1D boolean tensor of length `n`. Each element is `True` if `x[i]` dominates `y[i]`, otherwise `False`.
         """
         d = bm.all(x <= y, axis=1) & bm.any(x < y, axis=1)
-        d = bm.where(d == True, 1, 0)
         return d
 
 
