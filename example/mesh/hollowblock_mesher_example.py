@@ -1,6 +1,6 @@
 from fealpy.backend import bm
 import argparse
-from fealpy.model.hollowblock_mesher import HollowBlockMesher
+from fealpy.model.mesher.hollowblock_mesher import HollowBlockMesher
 
 # Argument parsing
 parser = argparse.ArgumentParser(description=
