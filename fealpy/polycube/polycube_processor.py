@@ -20,6 +20,7 @@ class PolyCubeProcessor:
         """
 
         self.mesh = origin_mesh
+        self.segmentator:PolyCubeSegmentator = None
 
     def mesh_normal_smooth_deformation(self, sigma=0.1, s=7, alpha=0.5, max_epochs=100000, error_threshold=1e-3, weights=None):
         """
@@ -76,15 +77,16 @@ class PolyCubeProcessor:
             is_valid : bool
                 Whether the resulting topology is valid.
         """
-        polycube_processor = PolyCubeSegmentator(self.mesh)
-        polycube_processor.build_candidate_charts()
-        polycube_processor.extract_candidate_edges_vertices()
-        polycube_processor.straighten_edges(max_iter=straighten_max_iter)
-        polycube_processor.merge_small_charts(min_size=merge_min_size)
-        is_valid = polycube_processor.validate_topology()
-        polycube_processor.laplacian_smooth(alpha=laplacian_smooth_alpha, max_iter=laplacian_smooth_max_iter)
-        polycube_processor.edge_projection()
-        polycube_processor.detect_turning_points()
+        polycube_segmentator = PolyCubeSegmentator(self.mesh)
+        polycube_segmentator.build_candidate_charts()
+        polycube_segmentator.extract_candidate_edges_vertices()
+        polycube_segmentator.straighten_edges(max_iter=straighten_max_iter)
+        polycube_segmentator.merge_small_charts(min_size=merge_min_size)
+        is_valid = polycube_segmentator.validate_topology()
+        polycube_segmentator.laplacian_smooth(alpha=laplacian_smooth_alpha, max_iter=laplacian_smooth_max_iter)
+        polycube_segmentator.edge_projection()
+        polycube_segmentator.detect_turning_points()
+        self.segmentator = polycube_segmentator
 
         return is_valid
 

@@ -162,10 +162,36 @@ class MeshNormalSmoothDeformation(MeshOptimizationBase):
         self.add_optimizable("rotate_matrix", self.rotate_matrix)
 
     def compute_gaussian_normals(self, face_centers, areas, face_normal):
-        t1 = -bm.linalg.norm(face_centers[:, None, :] - face_centers[None, ...], axis=-1) ** 2 / (2 * self.sigma ** 2)
-        t2 = bm.exp(t1)
-        gaussian_normals = bm.einsum('j,ij,jd->id', areas, t2, face_normal)
-        gaussian_normals = gaussian_normals / bm.linalg.norm(gaussian_normals, axis=-1, keepdims=True)
+        face_centers = face_centers.detach()
+        # t1 = -bm.linalg.norm(face_centers[:, None, :] - face_centers[None, ...], axis=-1) ** 2 / (2 * self.sigma ** 2)
+        # t2 = bm.exp(t1)
+        # gaussian_normals = bm.einsum('j,ij,jd->id', areas, t2, face_normal)
+        # gaussian_normals = gaussian_normals / bm.linalg.norm(gaussian_normals, axis=-1, keepdims=True)
+        batch_size = 1000  # 批处理大小
+        N = face_centers.shape[0]
+        sigma_sq = self.sigma ** 2
+        gaussian_normals = bm.zeros_like(face_normal)
+
+        for start in range(0, N, batch_size):
+            print(start//batch_size)
+            end = min(start + batch_size, N)
+            centers_batch = face_centers[start:end]  # shape (B, 3)
+
+            # 计算 (B, N) 的距离平方
+            diff = centers_batch[:, None, :] - face_centers[None, :, :]  # shape (B, N, 3)
+            dist_sq = bm.sum(diff ** 2, axis=-1)  # shape (B, N)
+
+            weights = bm.exp(-dist_sq / (2 * sigma_sq))  # shape (B, N)
+            weighted = weights * areas[None, :]  # shape (B, N)
+
+            # 执行权重求和： (B, N) @ (N, 3) -> (B, 3)
+            gaussian_part = bm.matmul(weighted, face_normal)
+
+            # 归一化
+            normed = gaussian_part / bm.linalg.norm(gaussian_part, axis=-1, keepdims=True)
+
+            # 回写结果
+            gaussian_normals[start:end] = normed
         return gaussian_normals
 
     def compute_smooth_normal_energy(self, gauss_normals, origin_normals):
