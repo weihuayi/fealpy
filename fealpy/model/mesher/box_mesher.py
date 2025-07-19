@@ -27,6 +27,26 @@ class BoxMesher2d:
         mesh = TriangleMesh.from_box(box=self.box, nx=nx, ny=ny)
         return mesh
 
+    @init_mesh.register('moving_tri')
+    def init_mesh(self, nx=64, ny=64,**kwargs):
+        mesh = TriangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
+        domain = self.box
+        vertices = bm.array([[domain[0], domain[2]],
+                             [domain[1], domain[2]],
+                             [domain[1], domain[3]],
+                             [domain[0], domain[3]]], **kwargs)
+        mesh.nodedata['vertices'] = vertices
+        return mesh
+    @init_mesh.register('moving_quad')
+    def init_mesh(self ,nx = 64, ny = 64, **kwargs):
+        mesh = QuadrangleMesh.from_box(self.box, nx=nx, ny=ny, **kwargs)
+        domain = self.box
+        vertices = bm.array([[domain[0], domain[2]],
+                             [domain[1], domain[2]],
+                             [domain[1], domain[3]],
+                             [domain[0], domain[3]]], **kwargs)
+        mesh.nodedata['vertices'] = vertices
+        return mesh
 
 class BoxMesher3d:
     """Box domain mesh generator"""

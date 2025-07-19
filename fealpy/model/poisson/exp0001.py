@@ -2,8 +2,9 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
+from ..mesher import IntervalMesher
 
-class Exp0001:
+class Exp0001(IntervalMesher):
     """
     1D Poisson problem:
 
@@ -20,6 +21,9 @@ class Exp0001:
 
     Dirichlet boundary conditions are applied at both ends of the interval.
     """
+    def __init__(self):
+        self.interval = [0.0, 1.0]
+        super().__init__(interval=self.interval)
 
     def get_dimension(self) -> int: 
         """Return the geometric dimension of the domain."""
@@ -27,7 +31,7 @@ class Exp0001:
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax]."""
-        return [0.0, 1.0]
+        return self.interval
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

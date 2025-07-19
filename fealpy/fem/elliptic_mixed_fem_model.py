@@ -1,6 +1,6 @@
 from typing import Optional, Union
 from ..model import ComputationalModel
-from ..model.elliptic import EllipticPDEDataT
+# from ..model.elliptic import EllipticPDEDataT
 
 from ..functionspace import RaviartThomasFESpace2d
 from ..functionspace import LagrangeFESpace
@@ -70,7 +70,7 @@ class EllipticMixedFEMModel(ComputationalModel):
         self.run.set(options['run'])
         
 
-    def set_pde(self, pde: Union[EllipticPDEDataT, str]="coscos"):
+    def set_pde(self, pde: Union[str]="coscos"):
         """
         Set the PDE data for the model.
         """
