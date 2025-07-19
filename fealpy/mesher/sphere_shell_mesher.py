@@ -1,7 +1,7 @@
 from typing import Sequence
-from ...backend import backend_manager as bm
-from ...decorator import variantmethod
-from ...mesh import TetrahedronMesh
+from ..backend import backend_manager as bm
+from ..decorator import variantmethod
+from ..mesh import TetrahedronMesh
 
 class SphereShellMesher:
     """Sphere shell mesh generator"""

@@ -2,7 +2,7 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher import IntervalMesher
+from ...mesher import IntervalMesher
 
 class Exp0001(IntervalMesher):
     """

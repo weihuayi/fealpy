@@ -1,7 +1,7 @@
 from typing import Sequence
-from ...backend import backend_manager as bm
-from ...decorator import variantmethod
-from ...mesh import IntervalMesh
+from ..backend import backend_manager as bm
+from ..decorator import variantmethod
+from ..mesh import IntervalMesh
 
 class IntervalMesher:
     """Interval domain mesh generator"""

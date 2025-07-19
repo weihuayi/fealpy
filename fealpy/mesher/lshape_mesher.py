@@ -1,7 +1,7 @@
 from typing import Sequence
-from ...backend import backend_manager as bm
-from ...decorator import variantmethod
-from ...mesh import TriangleMesh
+from ..backend import backend_manager as bm
+from ..decorator import variantmethod
+from ..mesh import TriangleMesh
 
 class LshapeMesher:
     """Lshape domain mesh generator"""
@@ -36,7 +36,7 @@ class LshapeMesher:
     
     @init_mesh.register('quad')
     def init_mesh(self, n:int=2):
-        from ...mesh import QuadrangleMesh
+        from ..mesh import QuadrangleMesh
         node = bm.array([
             [-1, -1],
             [ 0, -1],

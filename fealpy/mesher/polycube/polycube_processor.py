@@ -14,36 +14,34 @@ class PolyCubeProcessor:
         Initialize the PolyCubeProcessor with the original mesh.
 
         Parameters
-        ----------
-        origin_mesh : TriangleMesh or TetrahedronMesh
-            The original mesh to be processed.
+            origin_mesh : TriangleMesh or TetrahedronMesh
+                The original mesh to be processed.
         """
 
         self.mesh = origin_mesh
+        self.segmentator:PolyCubeSegmentator = None
 
     def mesh_normal_smooth_deformation(self, sigma=0.1, s=7, alpha=0.5, max_epochs=100000, error_threshold=1e-3, weights=None):
         """
         Apply normal smooth deformation to the original mesh.
 
         Parameters
-        ----------
-        sigma : float
-            The standard deviation for the Gaussian kernel.
-        s : int
-            The number of nearest neighbors to consider.
-        alpha : float
-            The weight for the smoothness term.
-        max_epochs : int
-            The maximum number of epochs for optimization.
-        error_threshold : float
-            The threshold for convergence.
-        weights : dict
-            Weights for different components in the deformation.
+            sigma : float
+                The standard deviation for the Gaussian kernel.
+            s : int
+                The number of nearest neighbors to consider.
+            alpha : float
+                The weight for the smoothness term.
+            max_epochs : int
+                The maximum number of epochs for optimization.
+            error_threshold : float
+                The threshold for convergence.
+            weights : dict
+                Weights for different components in the deformation.
 
         Returns
-        -------
-        TriangleMesh or TetrahedronMesh
-            The deformed mesh after normal smoothing.
+            TriangleMesh or TetrahedronMesh
+                The deformed mesh after normal smoothing.
         """
 
         normal_smooth_deformer = MeshNormalSmoothDeformation(self.mesh,
@@ -76,15 +74,16 @@ class PolyCubeProcessor:
             is_valid : bool
                 Whether the resulting topology is valid.
         """
-        polycube_processor = PolyCubeSegmentator(self.mesh)
-        polycube_processor.build_candidate_charts()
-        polycube_processor.extract_candidate_edges_vertices()
-        polycube_processor.straighten_edges(max_iter=straighten_max_iter)
-        polycube_processor.merge_small_charts(min_size=merge_min_size)
-        is_valid = polycube_processor.validate_topology()
-        polycube_processor.laplacian_smooth(alpha=laplacian_smooth_alpha, max_iter=laplacian_smooth_max_iter)
-        polycube_processor.edge_projection()
-        polycube_processor.detect_turning_points()
+        polycube_segmentator = PolyCubeSegmentator(self.mesh)
+        polycube_segmentator.build_candidate_charts()
+        polycube_segmentator.extract_candidate_edges_vertices()
+        polycube_segmentator.straighten_edges(max_iter=straighten_max_iter)
+        polycube_segmentator.merge_small_charts(min_size=merge_min_size)
+        is_valid = polycube_segmentator.validate_topology()
+        polycube_segmentator.laplacian_smooth(alpha=laplacian_smooth_alpha, max_iter=laplacian_smooth_max_iter)
+        polycube_segmentator.edge_projection()
+        polycube_segmentator.detect_turning_points()
+        self.segmentator = polycube_segmentator
 
         return is_valid
 

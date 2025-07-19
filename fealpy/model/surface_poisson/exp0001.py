@@ -2,7 +2,7 @@ from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import  TensorLike
 from ...geometry import SphereSurface
-from ..mesher import SphereSurfaceMesher
+from ...mesher import SphereSurfaceMesher
 
 
 class Exp0001(SphereSurfaceMesher):

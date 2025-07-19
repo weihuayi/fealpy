@@ -63,7 +63,6 @@ from .poisson_lfem_model import PoissonLFEMModel
 from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
 from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
 from .elliptic_mixed_fem_model import EllipticMixedFEMModel
-# from .polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
 from .allencahn_lfem_model import AllenCahnLFEMModel
 from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
 from .surface_poisson_lfem_model import SurfacePoissonLFEMModel

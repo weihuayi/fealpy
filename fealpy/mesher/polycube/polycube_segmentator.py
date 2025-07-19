@@ -10,7 +10,8 @@ bm.set_backend('pytorch')
 
 
 def get_bd_mesh(volume_mesh: TetrahedronMesh)->TriangleMesh:
-    """从体网格获取边界网格"""
+    """Get the boundary mesh from the volume mesh
+    """
     bd_face_idx = volume_mesh.boundary_face_index()
     node = volume_mesh.node
     face = volume_mesh.face
@@ -24,14 +25,16 @@ def get_bd_mesh(volume_mesh: TetrahedronMesh)->TriangleMesh:
 
 def edge_sort(oriented_edge):
     """
-    对边节点进行排序，使得相同的边在一起
+    Order the edges based on their node indices,
+    make sure that the edges are oriented consistently.
+
     Parameters
-    ----------
-    oriented_edge : array
-        边的节点索引，形状为 (NE, 2)，输入边的朝向一致
+        oriented_edge : array
+            The node index of the edge,
+            with a shape of (NE, 2), indicates that the input edge orientations are consistent
     Returns
-    -------
-    按照边连续的点索引
+        [sorted_edge, edge_idx]: list[array]
+            The sorted edge node index and the corresponding edge index
     """
     node_map = defaultdict(list)
     for idx, e in enumerate(oriented_edge):
@@ -82,7 +85,13 @@ def closed_axis_projection(v):
     return labels
 
 class PolyCubeSegmentator:
+    """
+    PolyCube segmentation processor for tetrahedral meshes.
 
+    Parameters
+        mesh : TetrahedronMesh
+            The input tetrahedral mesh to be segmented into PolyCube charts.
+    """
     # 六个轴方向
     axes = bm.tensor([
         [1, 0, 0], [-1, 0, 0],
@@ -105,7 +114,8 @@ class PolyCubeSegmentator:
         self.vertices = defaultdict(int)  # 候选顶点 {vertex_id: count}
 
     def assign_initial_labels(self):
-        """将每个面法向分配到最近的轴方向"""
+        """ Assign initial labels to the most closed faces based on their normals.
+        """
 
         # 计算每个法向量与所有轴的点积
         dots = bm.matmul(self.face_normal, self.axes.T)
@@ -113,7 +123,9 @@ class PolyCubeSegmentator:
         self.labels = bm.argmax(dots, dim=1)
 
     def build_candidate_charts(self):
-        """通过BFS聚类相邻且同标签的面"""
+        """ Build candidate charts by clustering adjacent faces with the same label.
+
+        """
         visited = bm.zeros(self.surface_mesh.number_of_cells(), dtype=bm.bool)
         face2face = self.surface_mesh.cell_to_cell()
         self.face2chart = bm.zeros(self.surface_mesh.number_of_cells(), dtype=bm.int32)
@@ -140,7 +152,9 @@ class PolyCubeSegmentator:
         self.charts_labels = bm.tensor(charts_labels, dtype=bm.int32)
 
     def extract_candidate_edges_vertices(self):
-        """提取候选边和顶点"""
+        """ Extract candidate edges and vertices from the surface mesh.
+
+        """
         self.edges.clear()
         self.vertices.clear()
         total_edge = self.surface_mesh.edge
@@ -180,13 +194,11 @@ class PolyCubeSegmentator:
 
     def straighten_edges(self, max_iter=5):
         """
-        调整边界边周围的面标签以减少锯齿
-        Parameters
-        ----------
-        max_iter
+        Adjust the face labels around the boundary edges to reduce jagged edges
 
-        Returns
-        -------
+        Parameters
+            max_iter: int
+                Maximum iterations to adjust the edges
 
         """
         total_edge = self.surface_mesh.edge
@@ -258,15 +270,10 @@ class PolyCubeSegmentator:
 
     def merge_small_charts(self, min_size=5):
         """
-        合并小的图册
+        Merge small charts
         Parameters
-        ----------
-        min_size : int
-            最小图册大小
-
-        Returns
-        -------
-
+            min_size : int
+                The minimum size of a chart to keep it separate.
         """
         # TODO: Test, 合并之后更新相关属性
         while True:
@@ -303,7 +310,9 @@ class PolyCubeSegmentator:
             break
 
     def validate_topology(self):
-        """检查PolyCube拓扑有效性"""
+        """Check the validity of the PolyCube topology
+
+        """
         # TODO: Test
         chart_num = len(self.charts)
         chart_adjacency = bm.zeros((chart_num, chart_num), dtype=bm.bool)
@@ -341,17 +350,14 @@ class PolyCubeSegmentator:
         return valid
 
     def laplacian_smooth(self, alpha=0.3, max_iter=5):
-        """
-        拉普拉斯平滑
+        """Laplacian smoothing of the polycube mesh
         Parameters
-        ----------
-        alpha : float
-            平滑系数
-        max_iter : int
-            最大迭代次数
+            alpha : float
+                The smoothing factor, typically between 0 and 1.
+            max_iter : int
+                The maximum number of iterations for smoothing.
 
         Returns
-        -------
 
         """
         origin_node = self.surface_mesh.node
