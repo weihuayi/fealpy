@@ -34,7 +34,10 @@ class PDEDataManager:
         >>> PDEDataManager.show_types()
         >>> manager = PDEDataManager('poisson')
         >>> manager.show_examples()
-        >>> pde = manager.get_example('coscos')
+        >>> pde = manager.get_example(1)
+        >>> manager = PDEDataManager('helmholtz')
+        >>> manager.show_examples()
+        >>> pde = manager.get_example(1, k=10)
     """
 
     _registry = {
@@ -67,7 +70,7 @@ class PDEDataManager:
 
         Parameters
             pde_type : str, optional
-                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'elliptic', 'hyperbolic', 'helmholtz', 'curlcurl'). If not set,
+                The PDE category to load (e.g., 'poisson', 'wave', 'parabolic', 'hyperbolic', 'helmholtz', 'curlcurl'). If not set,
                 only show_types() is available.
         """
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -130,7 +133,7 @@ class PDEDataManager:
 
         Parameters
             key : str, optional
-                The example name key from the current PDE type (e.g., 'coscos').
+                The example name key from the current PDE type (e.g., 1, 2,...).
 
         Returns
             instance : object
