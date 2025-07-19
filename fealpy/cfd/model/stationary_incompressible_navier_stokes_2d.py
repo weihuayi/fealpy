@@ -1,9 +1,9 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.decorator import cartesian
+from fealpy.decorator import cartesian,variantmethod
 from typing import Union, Callable, Dict
 from fealpy.mesh import TriangleMesh
 import sympy as sp
-from fealpy.decorator import variantmethod
+from fealpy.model.mesher.box_mesher import BoxMesher2d 
 
 
 CoefType = Union[int, float, Callable]
@@ -51,28 +51,27 @@ class StationaryNSLFEMPolynomialPDE:
         return val   
 
     @cartesian
-    def is_p_boundary(self, p):
+    def is_pressure_boundary(self, p):
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
         return result
 
     @cartesian
-    def is_u_boundary(self, p):
+    def is_velocity_boundary(self, p):
         result = bm.ones_like(p[..., 0], dtype=bm.bool)
         return result
-    
 
 
-class FromSympy:
+class FromSympy(BoxMesher2d):
     def __init__(self, rho=1.0, mu=1.0) -> None:
         self.eps = 1e-10
         self.box = [0, 1, 0, 1]
         self.mu = mu
         self.rho = rho
         self.x, self.y = sp.symbols('x, y')
-        self.select_pde["sin_sin"]()        
-        self.mesh = self.set_mesh()
+        self.select_pde["sinsin"]()        
+        self.mesh = self.init_mesh()
     
-    @variantmethod("sin_sin")
+    @variantmethod("sinsin")
     def select_pde(self):
         x, y = sp.symbols('x, y')
         self.u1 = sp.sin(3 * sp.pi * x) ** 2 * sp.sin(6 * sp.pi * y)
@@ -80,7 +79,7 @@ class FromSympy:
         self.p = x ** 2 - y ** 2
         self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
 
-    @select_pde.register("Polynomial")
+    @select_pde.register("poly2d")
     def select_pde(self):
         x, y = sp.symbols('x, y')
         self.u1 = 10 * x ** 2 * (x - 1) ** 2 * y * (y - 1) * (2 * y - 1)
@@ -88,7 +87,31 @@ class FromSympy:
         self.p = 10 * (2 * x - 1) * (2 * y - 1)
         self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
 
-    @select_pde.register("Custom")
+    @select_pde.register("sin")
+    def select_pde(self):
+        x, y = sp.symbols('x, y')
+        self.u1 = sp.sin(sp.pi * (x + y))
+        self.u2 = -sp.sin(sp.pi * (x + y))
+        self.p = x + y - 1
+        self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
+    
+    @select_pde.register("sinsinexp")
+    def select_pde(self):
+        x, y = sp.symbols('x, y')
+        self.u1 = 0.1/(2 * sp.pi) * sp.exp(0.1*y)/(sp.exp(0.1)-1)*sp.sin(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1))*(1-sp.cos(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1)))
+        self.u2 = -3/(2 * sp.pi) * sp.exp(3*x)/(sp.exp(3)-1)*sp.sin(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1))*(1-sp.cos(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1)))
+        self.p = 0.3*sp.exp(3*x)*sp.exp(0.1*y)/((sp.exp(3)-1)*(sp.exp(0.1)-1)) * sp.sin(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1)) * sp.sin(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1))* (1-sp.sin(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1)))
+        self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
+
+    @select_pde.register("cossin")
+    def select_pde(self):
+        x, y = sp.symbols('x, y')
+        self.u1 = -sp.cos(2*sp.pi * x) * sp.sin(2*sp.pi *y)
+        self.u2 = sp.sin(2*sp.pi *x) * sp.cos(2*sp.pi *y)
+        self.p = -0.25 * (sp.cos(4*sp.pi * x) + sp.sin(4*sp.pi * y))
+        self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
+
+    @select_pde.register("custom")
     def select_pde(self, u1, u2, p, mu, rho):
         self.u1 = u1
         self.u2 = u2
@@ -121,19 +144,20 @@ class FromSympy:
     def domain(self):
         return self.box
     
-    def set_mesh(self, n=16):
+    @variantmethod("tri")
+    def init_mesh(self, nx=8, ny=8):
         box = self.box
-        mesh = TriangleMesh.from_box(box, nx=n, ny=n)
+        mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         self.mesh = mesh
         return mesh
     
     @cartesian
-    def is_p_boundary(self, p):
+    def is_pressure_boundary(self, p):
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
         return result
     
     @cartesian
-    def is_u_boundary(self, p):
+    def is_velocity_boundary(self, p):
         return None
     
     @cartesian

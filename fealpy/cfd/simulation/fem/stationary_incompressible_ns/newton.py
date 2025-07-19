@@ -18,10 +18,7 @@ class Newton(FEM):
     def __init__(self, equation):
         FEM.__init__(self, equation)
 
-    def simulation(self):
-        return newton_simulation(self)
-
-    def BForm(self):
+    def BForm(self, diffusion=True):
         pspace = self.pspace
         uspace = self.uspace
         q = self.q
@@ -29,8 +26,12 @@ class Newton(FEM):
         A00 = BilinearForm(uspace)
         self.u_BM_netwon = ScalarMassIntegrator(q=q)
         self.u_BC = ScalarConvectionIntegrator(q=q)
-        self.u_BVW = ScalarDiffusionIntegrator(q=q)
-        #self.u_BVW = ViscousWorkIntegrator(q=q)
+
+        if diffusion:
+            self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        else:
+            self.u_BVW = ViscousWorkIntegrator(q=q)
+        
         A00.add_integrator(self.u_BM_netwon)
         A00.add_integrator(self.u_BC)
         A00.add_integrator(self.u_BVW)
@@ -40,8 +41,9 @@ class Newton(FEM):
         A01.add_integrator(self.u_BPW)
        
         A11 = BilinearForm(pspace)
-        A11.add_integrator(ScalarMassIntegrator(coef=1e-10))
-        A = BlockForm([[A00, A01], [A01.T, A11]]) 
+        #A11.add_integrator(ScalarMassIntegrator(coef=1e-10))
+        #A = BlockForm([[A00, A01], [A01.T, A11]]) 
+        A = BlockForm([[A00, A01], [A01.T, None]]) 
         return A
         
     def LForm(self):
@@ -67,7 +69,7 @@ class Newton(FEM):
         
         ## BilinearForm
         self.u_BVW.coef = cv
-        self.u_BPW.coef = -1
+        self.u_BPW.coef = -pc
 
         @barycentric
         def u_BC_coef(bcs, index):

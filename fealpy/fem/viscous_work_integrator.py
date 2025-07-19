@@ -24,7 +24,7 @@ from .integrator import (
 
 class ViscousWorkIntegrator(LinearInt, OpInt, CellInt):
     """
-    construct the mu * (epslion(u), epslion(v)) fem matrix
+    construct the 2 * mu * (epslion(u), epslion(v)) fem matrix
     epsion(u) = 1/2*(\\nabla u+ (\\nabla u).T)
     """
     def __init__(self, coef: Optional[CoefLike] = None, q: Optional[int] = None, *,
@@ -58,6 +58,6 @@ class ViscousWorkIntegrator(LinearInt, OpInt, CellInt):
         index=self.entity_selection(indices)
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         sym_gphi = 0.5*(bm.swapaxes(gphi, -2, -1) + gphi)
-        result = bilinear_integral(sym_gphi, sym_gphi, ws, cm, coef, batched=self.batched)
+        result = 2*bilinear_integral(sym_gphi, sym_gphi, ws, cm, coef, batched=self.batched)
         return result
 

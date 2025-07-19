@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.cfd.simulation.fem import Newton, Ossen
 from fealpy.cfd.equation import IncompressibleNS
-from fealpy.cfd.problem.IncompressibleNS import Channel
+from fealpy.cfd.problem.incompressible_navier_stokes_2d import Channel
 from fealpy.fem import DirichletBC
 from fealpy.solver import spsolve 
 
@@ -9,10 +9,10 @@ backend = 'numpy'
 bm.set_backend(backend)
 
 pde = Channel()
-pde.set_mesh(8)
+pde.set_mesh(32)
 ns_eq = IncompressibleNS(pde)
-#fem = Newton(ns_eq, pde.is_p_boundary)
-fem = Ossen(ns_eq, pde.is_p_boundary)
+fem = Newton(ns_eq, pde.is_p_boundary)
+#fem = Ossen(ns_eq, pde.is_p_boundary)
 fem.set.assembly(quadrature_order=5)
 
 mesh = pde.mesh
