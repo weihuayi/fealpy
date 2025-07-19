@@ -12,4 +12,3 @@ from .direct_solver_manger import DirectSolverManager
 from .iterative_solver_manger import IterativeSolverManager
 from .bicgstab import bicgstab
 from .bicg import bicg
-from .fast_solver import LinearElasticityHZFEMFastSolver

@@ -51,7 +51,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         """
         """
         if isinstance(pde, str):
-            self.pde = PDEDataManager('linear_elasticity').get_example(pde)
+            self.pde = PDEModelManager('linear_elasticity').get_example(pde)
         else:
             self.pde = pde 
 
