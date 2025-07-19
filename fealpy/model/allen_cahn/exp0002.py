@@ -2,7 +2,7 @@ from typing import Sequence
 from ...decorator import cartesian,variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher import BoxMesher2d
+from ...mesher import BoxMesher2d
 import sympy as sp
 
 class Exp0002(BoxMesher2d):
