@@ -20,8 +20,8 @@ parser.add_argument('--example',
         default='coscos', type=str,
         help="求解的 elliptic 方程的算例, 默认是'coscos',其他可选算例还有: 'sinsin', " \
         "还可以用下面的代码可查看可用的算例： \
-        from fealpy.model import PDEDataManager \
-        PDEDataManager('elliptic').show_examples().")
+        from fealpy.model import PDEModelManager \
+        PDEModelManager('elliptic').show_examples().")
 
 parser.add_argument('--maxit',
         default=4, type=int,

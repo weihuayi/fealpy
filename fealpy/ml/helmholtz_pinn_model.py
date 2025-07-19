@@ -8,7 +8,7 @@ from ..utils import timer
 
 from typing import Union, Optional
 from ..typing import TensorLike
-from ..model import ComputationalModel, PDEDataManager
+from ..model import ComputationalModel, PDEModelManager
 from ..model.poisson import PoissonPDEDataT
 from . import gradient
 from ..mesh import TriangleMesh, UniformMesh, Mesh
@@ -170,7 +170,7 @@ class HelmholtzPINNModel(ComputationalModel):
                 PDE object or built-in example ID.
         """
         if isinstance(pde, int):
-            self.pde = PDEDataManager('helmholtz').get_example(pde, k=self.k)
+            self.pde = PDEModelManager('helmholtz').get_example(pde, k=self.k)
         else:
             self.pde = pde 
 

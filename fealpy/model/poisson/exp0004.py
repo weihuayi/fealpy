@@ -1,7 +1,7 @@
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher import LshapeMesher
+from ...mesher import LshapeMesher
 
 
 class Exp0004(LshapeMesher):

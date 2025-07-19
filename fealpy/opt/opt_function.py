@@ -3,6 +3,47 @@ from ..typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from .chaos import *
 
+def generate_reference_points_layer(m: int, H: int):
+    """
+    Generate reference points using Das and Dennis's simplex-lattice method.
+
+    Parameters:
+        m (int): Objective space dimension.
+        H (int): Number of divisions along each axis.
+
+    Returns:
+        Tensor: Reference points array, shape (C(m+H-1, H), m).
+
+    Notes:
+        Produces points on the unit simplex in m-dimensional space.
+    """
+    def recursive_combination(m, H):
+        if m == 1:
+            yield [H]
+        else:
+            for i in range(H + 1):
+                for tail in recursive_combination(m - 1, H - i):
+                    yield [i] + tail
+    points = bm.array(list(recursive_combination(m, H))) / H
+    return points
+
+def generate_reference_points_double_layer(M, H1, H2):
+    """
+    Generate two-layer reference points for better diversity.
+
+    Returns:
+        Tensor: Combined reference points, shape (n_points, M).
+    """
+    coarse_points = generate_reference_points_layer(M, H1)
+    fine_points = generate_reference_points_layer(M, H2)
+
+    all_points = []
+    for cp in coarse_points:
+        alpha = 1 / H1
+        refined_points = (1 - alpha) * cp + alpha * fine_points
+        all_points.append(refined_points)
+    return bm.concatenate(all_points)
+
 def levy(n, m, beta):
     """
     Levy flight

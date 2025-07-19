@@ -3,7 +3,7 @@ from ...decorator import cartesian, variantmethod
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
 import sympy as sp
-from ..mesher import BoxMesher2d
+from ...mesher import BoxMesher2d
 
 class Exp0001(BoxMesher2d):
     """
@@ -89,7 +89,7 @@ class Exp0001(BoxMesher2d):
         self.box = [0.0, 1.0, 0.0, 1.0]
         super().__init__(box=self.box)
         self.c = options.get('c', 1)
-        self.manager, = bm._backends
+        self.manager = bm._backends
 
         x1, x2 = sp.symbols('x1, x2', real=True)
         self.x1 = x1

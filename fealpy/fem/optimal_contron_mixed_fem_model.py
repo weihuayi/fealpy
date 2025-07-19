@@ -11,7 +11,7 @@ from fealpy.fem import OPCSIntegrator,OPCIntegrator
 from fealpy.fem import BlockForm
 from fealpy.backend import backend_manager as bm
 from fealpy.solver import spsolve
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 from fealpy.decorator import variantmethod
 from fealpy.mesh import Mesh
 
@@ -83,7 +83,7 @@ class OPCMixedFEMModel(ComputationalModel):
         Set the optimal control PDE data for the model.
         """
         if isinstance(pde, str):
-            self.pde = PDEDataManager('optimal_control').get_example(pde)
+            self.pde = PDEModelManager('optimal_control').get_example(pde)
         else:
             self.pde = pde
 
