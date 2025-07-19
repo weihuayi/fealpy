@@ -385,7 +385,7 @@ class MeshBallDeformation(MeshOptimizationBase):
         return optimized_mesh
 
 if __name__ == "__main__":
-    origin_mesh = pickle.load(open("../../example/polycube/data/unit_sphere_mesh_torch.pkl", "rb"))
+    origin_mesh = pickle.load(open("../../../example/polycube/data/unit_sphere_mesh_torch.pkl", "rb"))
     weights = {"node": 1.0, "rotate_matrix": 0.0}
     deformer = MeshNormalSmoothDeformation(origin_mesh,
                                            sigma=0.1, s=1, alpha=0.5, max_epochs=100000,

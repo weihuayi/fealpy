@@ -1,6 +1,6 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.polycube import PolyCubeProcessor
+from fealpy.mesher.polycube import PolyCubeProcessor
 
 import pickle
 import json

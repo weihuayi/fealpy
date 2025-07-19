@@ -14,9 +14,8 @@ class PolyCubeProcessor:
         Initialize the PolyCubeProcessor with the original mesh.
 
         Parameters
-        ----------
-        origin_mesh : TriangleMesh or TetrahedronMesh
-            The original mesh to be processed.
+            origin_mesh : TriangleMesh or TetrahedronMesh
+                The original mesh to be processed.
         """
 
         self.mesh = origin_mesh
@@ -27,24 +26,22 @@ class PolyCubeProcessor:
         Apply normal smooth deformation to the original mesh.
 
         Parameters
-        ----------
-        sigma : float
-            The standard deviation for the Gaussian kernel.
-        s : int
-            The number of nearest neighbors to consider.
-        alpha : float
-            The weight for the smoothness term.
-        max_epochs : int
-            The maximum number of epochs for optimization.
-        error_threshold : float
-            The threshold for convergence.
-        weights : dict
-            Weights for different components in the deformation.
+            sigma : float
+                The standard deviation for the Gaussian kernel.
+            s : int
+                The number of nearest neighbors to consider.
+            alpha : float
+                The weight for the smoothness term.
+            max_epochs : int
+                The maximum number of epochs for optimization.
+            error_threshold : float
+                The threshold for convergence.
+            weights : dict
+                Weights for different components in the deformation.
 
         Returns
-        -------
-        TriangleMesh or TetrahedronMesh
-            The deformed mesh after normal smoothing.
+            TriangleMesh or TetrahedronMesh
+                The deformed mesh after normal smoothing.
         """
 
         normal_smooth_deformer = MeshNormalSmoothDeformation(self.mesh,
