@@ -77,7 +77,7 @@ class InterfacePoissonLFEMModel(ComputationalModel):
         A = bform.assembly()
 
         lform = LinearForm(space)
-        lform.add_integrator(InterFaceSourceIntegrator(pde.gN, threshold=isInterfaceFace))
+        lform.add_integrator(InterFaceSourceIntegrator(pde.flux_interface_condition, threshold=isInterfaceFace))
         F = lform.assembly()
 
         lform1 = LinearForm(space)

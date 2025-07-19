@@ -14,8 +14,8 @@ parser.add_argument('--backend',
         help="默认后端为 numpy. 还可以选择 pytorch, jax, tensorflow 等")
 
 parser.add_argument('--pde',
-                    default='electronic', type=str,
-                    help='Name of the PDE model, default is electronic')
+                    default='1', type=str,
+                    help='Idx of the PDE model, default is 1')
 
 parser.add_argument('--init_mesh',
                     default='uniform_tri', type=str,

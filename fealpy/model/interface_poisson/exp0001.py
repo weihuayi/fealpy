@@ -1,9 +1,10 @@
 from typing import Sequence
-from ...decorator import cartesian, variantmethod
+from ...decorator import cartesian
 from ...backend import TensorLike
 from ...backend import backend_manager as bm
+from ...mesher import InterfaceFittedMesher2d
 
-class ElectronicData2D:
+class Exp0001(InterfaceFittedMesher2d):
     """
     2D elliptic interface problem:
 
@@ -34,27 +35,6 @@ class ElectronicData2D:
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return [1, 10, -10, 10]  
-    
-    def level_function(self, p: TensorLike) -> TensorLike:
-        """Check if point is in Ω+ or Ω-."""
-        x = p[...,0]
-        y = p[...,1]
-
-        return x**2 + y**2 - 2.1**2
-
-    @variantmethod('uniform_tri')
-    def init_mesh(self, nx=10, ny=10):
-        domain = self.domain()
-        hx = (domain[1] - domain[0])/nx
-        hy = (domain[3] - domain[2])/ny
-        from ...mesh import UniformMesh, TriangleMesh
-        if hasattr(self, 'level_function'):
-            back_mesh = UniformMesh(extent=(0, nx, 0, ny), h=(hx, hy), origin=(domain[0], domain[2]))
-            mesh = TriangleMesh.interfacemesh_generator(back_mesh, self.level_function)
-            return mesh, back_mesh
-        else:
-            mesh = TriangleMesh.from_box(box=self.domain, nx=nx, ny=ny)
-            return mesh
             
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
@@ -96,7 +76,7 @@ class ElectronicData2D:
         return bm.stack((grad0, grad1), axis=-1)
 
     @cartesian
-    def gN(self, p: TensorLike)-> TensorLike:
+    def flux_interface_condition(self, p: TensorLike)-> TensorLike:
         """Interface flux jump conditon gN"""
         kwargs = bm.context(p)
         x, y = p[..., 0], p[..., 1]
