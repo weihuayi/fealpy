@@ -1,6 +1,6 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TetrahedronMesh
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 from fealpy.fem import ScalarSourceIntegrator, ScalarMassIntegrator, ScalarDiffusionIntegrator
 from fealpy.fem import ScalarNonlinearMassAndDiffusionIntegrator
 from fealpy.fem import BilinearForm, LinearForm, NonlinearForm
@@ -37,7 +37,7 @@ tol = 1e-4
 maxit = 2
 h = 0.1
 mesh = TetrahedronMesh.from_spherical_shell(r1=0.05, r2=0.5, h=h, device=device)
-pde = PDEDataManager('nonlinear').get_example('single')
+pde = PDEModelManager('nonlinear').get_example('single')
 # mesh = TetrahedronMesh(pde.node, pde.cell)
 # mesh = TetrahedronMesh.from_vtu("test_tet_mesh.vtu")
 pde.mesh = mesh

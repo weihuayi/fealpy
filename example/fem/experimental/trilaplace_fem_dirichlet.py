@@ -19,7 +19,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 from fealpy import logger
 from fealpy.solver import spsolve
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -69,7 +69,7 @@ y = sp.symbols('y')
 u = (sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*x))
 #pde = TripleLaplacePDE(u) 
 #ulist = get_flist(u, device=device)
-pde = PDEDataManager('elliptic').get_example('triharmonic')
+pde = PDEModelManager('elliptic').get_example('triharmonic')
 ulist = pde.get_flist()
 mesh = TriangleMesh.from_box([0,1,0,1], n, n, device=device)
 

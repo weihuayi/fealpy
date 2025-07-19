@@ -10,7 +10,7 @@ from ..fem import DivIntegrator
 from ..fem import BlockForm
 from ..backend import backend_manager as bm
 from ..fem import DirichletBC
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ..decorator import variantmethod
 from ..mesh import Mesh
 
@@ -75,7 +75,7 @@ class EllipticMixedFEMModel(ComputationalModel):
         Set the PDE data for the model.
         """
         if isinstance(pde, str):
-            self.pde = PDEDataManager('elliptic').get_example(pde)
+            self.pde = PDEModelManager('elliptic').get_example(pde)
         else:
             self.pde = pde
 

@@ -9,7 +9,7 @@ from ..fem import BilinearForm, LinearForm, BlockForm
 from ..fem import VectorSourceIntegrator
 from ..fem.huzhang_stress_integrator import HuZhangStressIntegrator
 from ..fem.huzhang_mix_integrator import HuZhangMixIntegrator
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 from ..decorator import variantmethod
 from ..solver import spsolve,LinearElasticityHZFEMFastSolver
@@ -33,7 +33,7 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
 
     def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxtri2d"):
         if isinstance(pde, str):
-            self.pde = PDEDataManager('linear_elasticity').get_example(pde)
+            self.pde = PDEModelManager('linear_elasticity').get_example(pde)
             self.logger.info(f"PDE initialized from string: '{pde}'")
         else:
             self.pde = pde
