@@ -59,6 +59,7 @@ from .recovery_alg import RecoveryAlg
 from .nonlinear_wrapper import NonlinearWrapperInt
 
 ### computational model 
+from .diffusion_lfem_model import DiffusionLFEMModel
 from .poisson_lfem_model import PoissonLFEMModel
 from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
 from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
