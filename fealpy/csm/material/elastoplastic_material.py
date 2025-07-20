@@ -7,45 +7,49 @@ from typing import Optional, Tuple, List
 from fealpy.material.elastic_material import LinearElasticMaterial
 
 
-class PlasticMaterial(LinearElasticMaterial):
-    '''
-    PlasticMaterial represents a linear elastoplastic material with optional linear hardening.
-    This class models materials that exhibit both elastic and plastic behavior according to the von Mises yield criterion, with support for linear isotropic hardening. It extends LinearElasticMaterial by adding yield stress and hardening modulus, and provides methods for computing the elastoplastic tangent matrix and related quantities. Suitable for finite element analysis of elastoplastic solids.
-    Parameters
+class ElastoplasticMaterial(LinearElasticMaterial):
+    """
+    ElastoplasticMaterial 表示支持各向同性材料、von Mises 屈服准则和各向同性线性硬化的弹塑性材料。
+    该类适用于小变形理论，采用 Voigt 表示法，适合有限元弹塑性分析。
+    支持特性:
+    - 各向同性弹性材料
+    - von Mises 屈服准则
+    - 各向同性线性硬化（hardening_modulus > 0 时）
+    参数
     name : str
-        Name of the material.
+        材料名称
     yield_stress : float
-        Initial yield stress (scalar), i.e., the stress at which plastic deformation begins.
+        初始屈服应力（材料进入塑性变形的应力）
     hardening_modulus : float, optional, default=0.0
-        Linear hardening modulus (H'), representing the slope of the yield surface in stress-plastic strain space.
+        线性硬化模量（H'），为屈服面随等效塑性应变增长的斜率
     **kwargs
-        Additional keyword arguments passed to the base LinearElasticMaterial class (e.g., elastic_modulus, poisson_ratio).
-    Attributes
+        传递给基类 LinearElasticMaterial 的其他参数（如 elastic_modulus, poisson_ratio）
+    属性
     yield_stress : float
-        Initial yield stress of the material.
+        初始屈服应力
     hardening_modulus : float
-        Linear hardening modulus (H'). If zero, perfect plasticity is assumed.
+        线性硬化模量，若为0则为理想弹塑性
     is_hardening : bool
-        Whether the material considers hardening effects (True if hardening_modulus > 0).
-    Methods
+        是否考虑硬化效应（hardening_modulus > 0）
+    方法
     df_dsigma(stress)
-        Compute the derivative of the yield function with respect to the Cauchy stress (for von Mises criterion).
+        计算 von Mises 屈服函数对柯西应力的导数
     deviatoric_stress(stress)
-        Compute the deviatoric (traceless) part of the stress tensor in Voigt notation.
+        计算应力的偏应力部分（去除体积分量）
     elastico_plastic_matrix(stress=None, df_dsigma=None)
-        Compute the elastoplastic tangent matrix D^p at the current stress state.
+        计算当前应力状态下的弹塑性切线矩阵 D^p
     elastico_plastic_hardening_matrix(stress=None, plastic_strain=None, df_dsigma=None)
-        Compute the elastoplastic tangent matrix D^p considering linear hardening.
-    Notes
-    - The class assumes small strain theory and uses Voigt notation for stress and strain tensors.
-    - Only linear (isotropic) hardening is supported; nonlinear hardening requires further extension.
-    - The elastoplastic tangent operator is computed using the return mapping algorithm for von Mises plasticity.
-    Examples
-    >>> mat = PlasticMaterial(name="Steel", yield_stress=250.0, elastic_modulus=210e3, poisson_ratio=0.3)
+        计算考虑线性硬化的弹塑性切线矩阵 D^p
+    注意
+    - 仅支持各向同性材料、von Mises 屈服和各向同性线性硬化
+    - 非线性硬化、各向异性材料等需进一步扩展
+    - 切线算子采用 von Mises 塑性理论的返回映射算法推导
+    示例
+    >>> mat = ElastoplasticMaterial(name="Steel", yield_stress=250.0, elastic_modulus=210e3, poisson_ratio=0.3)
     >>> stress = np.array([260.0, 240.0, 0.0])
     >>> df = mat.df_dsigma(stress)
     >>> Dp = mat.elastico_plastic_matrix(stress=stress)
-    '''
+    """
     def __init__(self, 
                  name: str,
                  yield_stress: float,          # 初始屈服应力
@@ -151,6 +155,50 @@ class PlasticMaterial(LinearElasticMaterial):
         """是否考虑硬化效应"""
         return self.hardening_modulus > 0
     
+    def material_update(self, 
+                     stress: Optional[TensorLike] = None, 
+                     plastic_strain: Optional[TensorLike] = None,
+                     df_dsigma: Optional[TensorLike] = None) -> TensorLike:
+        """
+        更新材料状态，计算弹塑性矩阵 D^p
+        
+        Args:
+            stress: 当前应力张量 (用于自动计算df_dsigma)
+            plastic_strain: 当前塑性应变张量 (可选)
+            df_dsigma: 直接提供导数张量 (可选)
+        
+        Returns:
+            Dp: 弹塑性矩阵
+        """
+        return self.elastico_plastic_hardening_matrix(stress, plastic_strain, df_dsigma)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    '''
     def elastico_plastic_hardening_matrix(self, 
                      stress: Optional[TensorLike] = None, 
                      plastic_strain: Optional[TensorLike] = None,
@@ -179,7 +227,7 @@ class PlasticMaterial(LinearElasticMaterial):
         # 扩展De到匹配df的维度
         De_exp = bm.broadcast_to(De, df.shape[:-1] + De.shape[-2:])  # (NC,NQ,N,N)
         
-        # 计算当前屈服应力（考虑线性硬化）#TODO: 未考虑非线性硬化
+        # 计算当前屈服应力（考虑线性硬化）#TODO: 未考虑非线性硬化（添加一个self.kaapa）
         if plastic_strain is not None:
             # σ_y = σ_y0 + H' * ε_p
             current_yield = self.yield_stress + self.hardening_modulus * plastic_strain
@@ -198,3 +246,4 @@ class PlasticMaterial(LinearElasticMaterial):
         Dp = De_exp - numerator / H[..., None, None]      # (NC,NQ,N,N)
         
         return Dp
+    '''

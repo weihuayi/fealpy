@@ -4,7 +4,7 @@ from fealpy.backend import TensorLike
 from typing import Tuple
 from fealpy.mesh import TriangleMesh
 
-class exp1():
+class Exp0001():
     """
     2D Elasto-Plastic Beam with von Mises Yield and Ziegler Hardening
 
@@ -17,9 +17,8 @@ class exp1():
     def __init__(self):
         self.E = 206900             # Young's modulus in MPa
         self.nu = 0.29              # Poisson's ratio
-        self.a = 10000              # Hardening modulus a in MPa
+        self.hardening_modulus = 10000              # Hardening modulus a in MPa
         self.sigma_y0 = 450 * (2/3)**0.5  # Initial yield stress in MPa
-        self.H = self.a             # Ziegler hardening parameter
 
         self.dim = 2
         self.Ft_max = 2e5           # N: max traction force

@@ -8,10 +8,10 @@ from ...fem import DirichletBC
 from ...solver import spsolve
 from typing import Union
 from ..model.elastoplasticity import ElastoplasticityPDEDataT
-from ...fem import VectorSourceIntegrator, ConstIntegrator
-from .elastoplastic_integrator import ElastoplasticIntegrator
+from ...fem import VectorSourceIntegrator, ScalarNeumannBCIntegrator
+from ..fem  import ElastoplasticDiffusionIntegrator
 from ...material import LinearElasticMaterial
-from ..material.elastoplastic_material import PlasticMaterial
+from ..material.elastoplastic_material import ElastoplasticMaterial
 from ...functionspace import functionspace
 
 class ElastoplasticityFEMModel(ComputationalModel):
@@ -79,13 +79,14 @@ class ElastoplasticityFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
+        self.set_space_degree(options['space_degree'])
         self.set_init_mesh()
         self.E = self.pde.E
         self.nu = self.pde.nu
-        self.yield_strength = self.pde.sigma_y0
+        self.yield_stress = self.pde.sigma_y0
         self.f = self.pde.Ft_max
-        self.a = self.pde.a
-        self.N = 10
+        self.hardening_modulus = self.pde.hardening_modulus
+        self.N = 10 # 载荷步数
 
 
     def set_pde(self, pde:Union[ElastoplasticityPDEDataT, str]='1'):
@@ -104,6 +105,20 @@ class ElastoplasticityFEMModel(ComputationalModel):
             self.pde = PDEDataManager('elastoplasticity').get_example(pde)
         else:
             self.pde = pde
+            
+    def set_space_degree(self, p: int = 1):
+        '''
+        Set the polynomial degree for the finite element space.
+        Parameters:
+            p (int): The polynomial degree for the finite element space. Default is 1.
+        Raises:
+            ValueError: If the polynomial degree is not valid or cannot be set.
+        Notes:
+            This method updates the finite element space used for the model based on the specified polynomial degree.
+        Examples:
+            >>> model.set_space_degree(2)
+        '''
+        self.p = p
 
     def set_init_mesh(self):
         '''
@@ -124,14 +139,17 @@ class ElastoplasticityFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-    def set_material_parameters(self, lam: float, mu: float):
-        self.material = LinearElasticMaterial("elastoplastic", lame_lambda=lam, shear_modulus=mu, 
+    def set_material_parameters(self, E: float, nu: float):
+        self.material = LinearElasticMaterial("elastoplastic", elastic_modulus=E, poisson_ratio=nu, 
                                               hypo='plane_stress', device=bm.get_device(self.mesh))
-        qf = self.mesh.quadrature_formula(q=self.mesh.scalar_space.p+3)
+        qf = self.mesh.quadrature_formula(q=self.space.scalar_space.p+3)
         bcs, ws = qf.get_quadrature_points_and_weights()
-        self.B = self.material.strain_matrix(True, gphi=self.mesh.scalar_space.grad_basis(bcs))
+        self.B = self.material.strain_matrix(True, gphi=self.space.scalar_space.grad_basis(bcs))
         self.D = self.material.elastic_matrix()
-        
+        self.pfcm = ElastoplasticMaterial(name='E1nu0.3',
+                                elastic_modulus=E, poisson_ratio=nu,
+                                yield_stress=self.yield_stress, hardening_modulus=self.hardening_modulus, hypo='plane_stress', device=bm.get_device(self.mesh))
+
     def set_space(self):
         '''
         Set the finite element space for the model.
@@ -145,6 +163,9 @@ class ElastoplasticityFEMModel(ComputationalModel):
         '''
         GD = self.mesh.geo_dimension()
         self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
+        Ldof = self.space.number_of_local_dofs()
+        GDof = self.space.number_of_global_dofs()
+        self.logger.info(f"Lagrange space: {self.space}, LDOF: {Ldof}, GDOF: {GDof}")
 
     # 根据当前位移场计算应力
     def compute_stress(self, displacement, plastic_strain):
@@ -162,16 +183,6 @@ class ElastoplasticityFEMModel(ComputationalModel):
         # 计算应力
         stress = bm.einsum('cqij,cqj->cqi', self.D, strain_elastic)
         return stress
-    
-    # 根据当前应力组装内部力项
-    def compute_internal_force(self, stress):
-        qf = self.mesh.quadrature_formula(q=self.mesh.scalar_space.p+3)
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        cm = self.mesh.entity_measure('cell')
-        F_int_cell = bm.einsum('q, c, cqij,cqi->cj', 
-                             ws, cm, self.B, stress) # (NC, tdof)
-        
-        return F_int_cell
 
     # TODO:需要修改!
     def linear_system(self):
@@ -192,10 +203,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         NQ = self.mesh.number_of_nodes()
         equivalent_plastic_strain = bm.zeros((NC, NQ),**kwargs)
-        self.pfcm = PlasticMaterial(name='E1nu0.3',
-                                elastic_modulus=1e5, poisson_ratio=0.3,
-                                yield_stress=50, hardening_modulus=0.0, hypo='plane_stress', device=bm.get_device(self.mesh))
-        elasticintegrator= ElastoplasticIntegrator(self.pfcm.D_ep, material=self.pfcm,space=tensor_space, 
+        elasticintegrator= ElastoplasticDiffusionIntegrator(self.pfcm.D_ep, material=self.pfcm,
                                     q=tensor_space.p+3)
         bform = BilinearForm(tensor_space)
         bform.add_integrator(elasticintegrator)
@@ -208,11 +216,15 @@ class ElastoplasticityFEMModel(ComputationalModel):
 
         lform = LinearForm(tensor_space) 
         lform.add_integrator(VectorSourceIntegrator(source = load))
+        # 需要写一下pde这部分的内容
+        lform.add_integrator(ScalarNeumannBCIntegrator(
+            source=lambda x: self.pde.time_dependent_load(x[0]),
+            boundary=self.pde.domain_boundary()
+        ))
         F_ext = lform.assembly()
 
-        elasticintegrator = ElastoplasticIntegrator(
+        elasticintegrator = ElastoplasticDiffusionIntegrator(
             material=self.pde.material,
-            space=tensor_space,
             q=tensor_space.p + 3,
             equivalent_plastic_strain=self.pde.equivalent_plastic_strain
         )
@@ -350,4 +362,5 @@ class ElastoplasticityFEMModel(ComputationalModel):
         # 返回最终结果或状态
         return u, sigma, alpha, ep
 
-       
+    def save_data(self, filename):
+        pass

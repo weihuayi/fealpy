@@ -2,9 +2,10 @@
 from .beam_diffusion_integrator import BeamDiffusionIntegrator
 from .beam_uniform_source_integrator import BeamSourceIntegrator
 from .beam_concentrated_source_integrator import BeamPLSourceIntegrator
+from .elastoplasticity_source_internal_integrator import ElastoplasticitySourceIntIntegrator
+from .elastoplasticity_diffusion_integrator import ElastoplasticDiffusionIntegrator
 
 
 ### Model Operator
 from .beam_fem_model import BeamFEMModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
-from .elastoplastic_integrator import ElastoplasticIntegrator
