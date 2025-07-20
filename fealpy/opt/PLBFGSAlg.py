@@ -57,7 +57,7 @@ class PLBFGS(Optimizer):
             alpha = bm.set_at(alpha, i, bm.dot(self.S[i], q)*rho[i])
             q = q - alpha[i]*self.Y[i]
         if self.P is not None:
-            r = bm.tensor(self.P@q)
+            r = self.P@q
         else:
             r = q
 
