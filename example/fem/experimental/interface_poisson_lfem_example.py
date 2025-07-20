@@ -14,7 +14,7 @@ parser.add_argument('--backend',
         help="默认后端为 numpy. 还可以选择 pytorch, jax, tensorflow 等")
 
 parser.add_argument('--pde',
-                    default='1', type=str,
+                    default=1, type=int,
                     help='Idx of the PDE model, default is 1')
 
 parser.add_argument('--init_mesh',

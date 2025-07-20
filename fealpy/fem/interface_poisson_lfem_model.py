@@ -2,7 +2,7 @@ from typing import Union
 
 from ..backend import bm
 from ..decorator import variantmethod
-from ..functionspace.lagrange_fe_space import LagrangeFESpace
+from ..functionspace import LagrangeFESpace
 from ..model.interface_poisson import InterfacePoissonDataT
 from ..model import PDEModelManager, ComputationalModel
 from ..fem import BilinearForm, LinearForm
@@ -19,11 +19,12 @@ class InterfacePoissonLFEMModel(ComputationalModel):
         self.set_init_mesh(options['init_mesh'])
         self.set_space_degree(options['space_degree'])
 
-    def set_pde(self, pde: Union[InterfacePoissonDataT, str]="eletronic"):
+    def set_pde(self, pde: Union[InterfacePoissonDataT, str]=1):
         """
         """
         if isinstance(pde, str):
             self.pde = self.pdm.get_example(pde)
+            print(self.pde.__doc__)
         else:
             self.pde = pde
 
