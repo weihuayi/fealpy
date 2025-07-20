@@ -1,10 +1,10 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher3d
+from ..mesher import BoxMesher3d
 from ...decorator import cartesian
 
-class EXP0005(BoxDomainMesher3d):
+class Exp0005(BoxMesher3d):
     """
     3D Helmholtz problem with homogeneous Dirichlet boundary condition:
 
@@ -22,12 +22,14 @@ class EXP0005(BoxDomainMesher3d):
     Parameter:
         k : wave number (scalar)
 
-    Source:
+    Reference:
         https://link.springer.com/book/10.1007/b98828
     """
 
-    def set(self, k: float=1.0):
-        self.k = k
+    def __init__(self, options: dict = {}):  
+        self.box = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
+        self.k = options.get('k', 1.0)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -35,7 +37,7 @@ class EXP0005(BoxDomainMesher3d):
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax, zmin, zmax]."""
-        return [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
+        return self.box
     
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

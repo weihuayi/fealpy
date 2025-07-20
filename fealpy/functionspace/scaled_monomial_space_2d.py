@@ -67,6 +67,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         cell2dof = bm.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
+    def edge_to_dof(self, p=None):
+        mesh = self.mesh
+        return mesh.face_to_cell()[:,:2]
+
     def number_of_local_dofs(self, p=None, doftype='cell'):
         p = self.p if p is None else p
         if doftype in {'cell', 2}:

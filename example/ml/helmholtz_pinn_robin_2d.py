@@ -18,7 +18,7 @@ bm.set_backend('pytorch')
 num_of_point_pde = 200  
 num_of_point_bc = 100   
 lr = 0.01
-iteration = 600 
+iteration = 600
 NN = 32  
 num_networks = 2  # 定义网络数量
 
@@ -54,8 +54,7 @@ residual = Residual('helmholtz_2d')
 
 # 共享采样器
 sampler_pde = ISampler(ranges=domain, requires_grad=True)
-bc1, bc2 = domain[0::2], domain[1::2]
-sampler_bc = BoxBoundarySampler(p1=bc1, p2=bc2, requires_grad=True)
+sampler_bc = BoxBoundarySampler(domain, requires_grad=True)
 
 # 训练过程
 start_time = time.time()

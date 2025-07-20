@@ -64,7 +64,7 @@ class SumObjective(Objective, Generic[_QT]):
         """
         self.__NF +=1
         NC = self.mesh_quality.mesh.number_of_cells()
-        return bm.sum(self.mesh_quality.fun(x), axis=0)/NC
+        return bm.mean(self.mesh_quality.fun(x))#bm.sum(self.mesh_quality.fun(x), axis=0)/NC
 
     def jac(self, x: TensorLike):
         """Gradient of the objective function.

@@ -7,4 +7,4 @@ from .dirichlet_bc import DirichletBC
 from .vector_decomposition import VectorDecomposition
 
 
-from .poisson_fvm_model import PoissonFvmModel
+from .poisson_fvm_model import PoissonFVMModel

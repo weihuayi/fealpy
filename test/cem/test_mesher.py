@@ -10,7 +10,7 @@ class TestMetalensesMesher:
     def mesher(self):
         # Example parameters, replace with actual values as needed
         metalenses_params = {
-            "base_size": 800,
+            "glass_size": 800,
             "glass_height": 3000,
             "air_layer_height": 4800,
             "bottom_pml_height": 960,
