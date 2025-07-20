@@ -1,9 +1,9 @@
 from typing import Sequence
-from ...backend import backend_manager as bm
-from ...decorator import variantmethod
-from ...geometry import SphereSurface
-from ...mesh import TetrahedronMesh,QuadrangleMesh,TriangleMesh
-from ...mesh import LagrangeQuadrangleMesh,LagrangeTriangleMesh
+from ..backend import backend_manager as bm
+from ..decorator import variantmethod
+from ..geometry import SphereSurface
+from ..mesh import TetrahedronMesh,QuadrangleMesh,TriangleMesh
+from ..mesh import LagrangeQuadrangleMesh,LagrangeTriangleMesh
 
 class SphereVolumnMesher:
     """Sphere domain mesh generator"""
