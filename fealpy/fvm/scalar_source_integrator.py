@@ -1,13 +1,10 @@
 from typing import Optional, Literal
-
 from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S, SourceLike
-
+from ..typing import TensorLike, SourceLike
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
-from ..functional import linear_integral
 from ..decorator.variantmethod import variantmethod
-from fealpy.fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
+from ..fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
 class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
@@ -33,10 +30,6 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
     def fetch(self, space: _FS, /, inidces=None):
         index = self.entity_selection(inidces)
         mesh = getattr(space, 'mesh', None)
-        # if not isinstance(mesh, HomogeneousMesh):
-        #     raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
-        #                        f"homogeneous meshes, but {type(mesh).__name__} is"
-        #                        "not a subclass of HomoMesh.")
         cm = mesh.entity_measure('cell', index=index)
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
@@ -44,17 +37,13 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
         if isinstance(bcs, tuple): 
             bcs = bm.stack(bcs, axis=-1)
             ws = bm.stack(ws, axis=-1)  
-        phi = space.basis(bcs, index=index)
-        return bcs, ws, phi, cm, index
+        return bcs, ws, cm, index
 
     @variantmethod
     def assembly(self, space: _FS, indices=None) -> TensorLike:
         f = self.source
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, phi, cm, index = self.fetch(space, indices)
+        bcs, ws, cm, index = self.fetch(space, indices)
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        # if self.batched:
-        #    result = bm.einsum('q, cq..., ij, c -> ...ci', ws, val, phi, cm)
-        # else:
         result = bm.einsum('j, qj,q -> q', ws, val, cm)
         return result 

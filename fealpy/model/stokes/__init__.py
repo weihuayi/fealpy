@@ -44,6 +44,6 @@ StokesPDEDataT = TypeVar('StokesPDEDataT', bound=StokesPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-
+    1: ("exp0001", "Exp0001"),
 }
 
