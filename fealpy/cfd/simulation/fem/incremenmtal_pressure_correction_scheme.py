@@ -79,7 +79,8 @@ class IPCS(ProjectionMethod, FEM):
         Bform = BilinearForm(uspace)
         self.predict_BM = ScalarMassIntegrator(q=q)
         self.predict_BF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold)
-        self.predict_BVW = ViscousWorkIntegrator(q=q)
+        # self.predict_BVW = ViscousWorkIntegrator(q=q)
+        self.predict_BVW = ScalarDiffusionIntegrator(q=q)
         
         Bform.add_integrator(self.predict_BM)
         Bform.add_integrator(self.predict_BF)
@@ -114,7 +115,7 @@ class IPCS(ProjectionMethod, FEM):
 
         self.predict_BM.coef = ctd/dt
         self.predict_BF.coef = -cv
-        self.predict_BVW.coef = 2*cv
+        self.predict_BVW.coef = cv
         
         @barycentric
         def LS_coef(bcs, index):
