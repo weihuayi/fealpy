@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
 
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 
 from fealpy.fdm.laplace_operator import LaplaceOperator
 from fealpy.mesh import UniformMesh
@@ -10,7 +10,7 @@ from fealpy.solver import spsolve
 import matplotlib.pyplot as plt
 
 
-pde = PDEDataManager('poisson').get_example('sinsin')
+pde = PDEModelManager('poisson').get_example('sinsin')
 # print(pde.__doc__)
 
 domain = pde.domain()

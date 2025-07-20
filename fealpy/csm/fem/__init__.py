@@ -9,3 +9,5 @@ from .elastoplasticity_diffusion_integrator import ElastoplasticDiffusionIntegra
 ### Model Operator
 from .beam_fem_model import BeamFEMModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
+from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+

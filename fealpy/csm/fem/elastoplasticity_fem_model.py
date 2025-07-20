@@ -1,6 +1,6 @@
 from ...backend import backend_manager as bm
 from ..model import ComputationalModel
-from ..model import PDEDataManager
+from ..model import CSMModelManager
 from ...fem import BilinearForm
 from ...fem import LinearForm
 from ...functionspace import LagrangeFESpace, TensorFunctionSpace
@@ -22,7 +22,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
     suitable for analyzing materials that exhibit both elastic and plastic behavior under loading. 
     By specifying material parameters, boundary conditions, and loads, it automatically constructs 
     the finite element mesh, assembles the stiffness matrix and load vector, and solves for the displacement field. 
-    It relies on PDEDataManager for physical parameters and boundary conditions, making it suitable for teaching, 
+    It relies on PDEModelManager for physical parameters and boundary conditions, making it suitable for teaching, 
     research, and preliminary engineering analysis.
     
     Parameters
@@ -30,7 +30,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
             Selects a preset elastoplasticity problem example for initializing PDE parameters and mesh.
     Attributes
         pde : object
-            Object returned by PDEDataManager containing physical parameters and boundary conditions.
+            Object returned by PDEModelManager containing physical parameters and boundary conditions.
         mesh : object
             Finite element mesh object describing the discretized domain.
         E : float
@@ -51,7 +51,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         solve()
             Applies boundary conditions and solves the linear system, returning the displacement solution.
     Notes
-        This class assumes the provided PDEDataManager example defines all necessary parameters and boundary conditions.
+        This class assumes the provided PDEModelManager example defines all necessary parameters and boundary conditions.
         Supports custom loads and boundary conditions for various elastoplasticity problems.
         Depends on external finite element spaces, integrators, and linear solvers.
     Examples
@@ -69,12 +69,12 @@ class ElastoplasticityFEMModel(ComputationalModel):
         Raises:
             ValueError: If the example is not recognized or cannot be initialized.
         Notes:
-            The example should be a valid key in the PDEDataManager for elastoplasticity problems.
+            The example should be a valid key in the PDEModelManager for elastoplasticity problems.
             It must define all necessary parameters and boundary conditions.
         Examples:
             >>> model = ElastoplasticityFEMModel(example='elastoplasticity3d')
             >>> print(model.pde)
-            <PDEDataManager object with elastoplasticity parameters>
+            <PDEModelManager object with elastoplasticity parameters>
         '''
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
@@ -93,7 +93,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         '''
         Set the PDE parameters for the elastoplasticity problem.
         Parameters:
-            pde (PDEDataManager): The PDE data manager containing elastoplasticity parameters and boundary conditions.
+            pde (PDEModelManager): The PDE data manager containing elastoplasticity parameters and boundary conditions.
         Raises:
             ValueError: If the provided pde is not valid or does not contain necessary parameters.
         Notes:
@@ -102,7 +102,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
             >>> model.set_pde(new_pde)
         '''
         if isinstance(pde, str):
-            self.pde = PDEDataManager('elastoplasticity').get_example(pde)
+            self.pde = CSMModelManager('elastoplasticity').get_example(pde)
         else:
             self.pde = pde
             

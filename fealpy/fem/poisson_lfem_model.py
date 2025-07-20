@@ -1,7 +1,7 @@
 from typing import Optional, Union
 from ..backend import bm
 from ..typing import TensorLike
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.poisson import PoissonPDEDataT
 from ..decorator import variantmethod
 
@@ -16,7 +16,7 @@ class PoissonLFEMModel(ComputationalModel):
     """
     def __init__(self):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("poisson")
+        self.pdm = PDEModelManager("poisson")
 
     def set_pde(self, pde: Union[PoissonPDEDataT, str]="coscos"):
         """

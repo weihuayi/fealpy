@@ -248,7 +248,7 @@ class UniformMesh1d(StructuredMesh, TensorMesh, Plotable):
     def bc_to_point(self, bcs: Union[Tuple, TensorLike], index=_S):
         node = self.node
         cell = self.entity('cell', index=index)
-        p = bm.einsum('...j, ijk->...ik', bcs, node[cell[index]])
+        p = bm.einsum('qj, cjk->cqk', bcs, node[cell[index]])
         return p
 
     def cell_location(self, ps):

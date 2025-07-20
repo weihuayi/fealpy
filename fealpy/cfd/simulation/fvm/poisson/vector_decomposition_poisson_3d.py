@@ -1,11 +1,11 @@
 from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
 from fealpy.mesh import TetrahedronMesh
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import coo_matrix
 
-pde = PDEDataManager('poisson').get_example('sinsinsin')
+pde = PDEModelManager('poisson').get_example('sinsinsin')
 domain = pde.domain()
 mesh = TetrahedronMesh.from_box(domain, nx=16, ny=16, nz=16)
 cell2cell = mesh.cell_to_cell()

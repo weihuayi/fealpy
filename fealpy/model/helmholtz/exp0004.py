@@ -1,10 +1,10 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ...mesher import BoxMesher2d
 from ...decorator import cartesian
 
-class EXP0004(BoxDomainMesher2d):
+class Exp0004(BoxMesher2d):
     """
     2D Helmholtz problem with homogeneous Dirichlet boundary condition:
 
@@ -22,12 +22,14 @@ class EXP0004(BoxDomainMesher2d):
     Parameter:
         k : wave number (scalar)
     
-    Source:
+    Reference:
         https://deepxde.readthedocs.io/en/latest/demos/pinn_forward/helmholtz.2d.dirichlet.html
     """
 
-    def set(self, k: float = 1.0):
-        self.k = k
+    def __init__(self, options: dict = {}):  
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
+        self.k = options.get('k', 1.0)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -35,7 +37,7 @@ class EXP0004(BoxDomainMesher2d):
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 1.0, 0.0, 1.0]
+        return self.box
     
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

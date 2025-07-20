@@ -19,7 +19,6 @@ class PoissonPDEDataProtocol(Protocol):
     """
     def get_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
-    def init_mesh(self): ...
     def solution(self, p: TensorLike) -> TensorLike: ...
     def gradient(self, p: TensorLike) -> TensorLike: ...
     def source(self, p: TensorLike) -> TensorLike: ...
@@ -37,11 +36,11 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "1": ("exp0001", "Exp0001"),
-    "2": ("exp0002", "Exp0002"),
-    "3": ("exp0003", "Exp0003"),
-    "4": ("exp0004", "Exp0004"),
-    "5": ("exp0005", "Exp0005"),
-    "6": ("exp0006", "Exp0006"),
-    "7": ("exp0007", "Exp0007"),
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
+    3: ("exp0003", "Exp0003"),
+    4: ("exp0004", "Exp0004"),
+    5: ("exp0005", "Exp0005"),
+    6: ("exp0006", "Exp0006"),
+    7: ("exp0007", "Exp0007"),
 }

@@ -56,9 +56,9 @@ parser.add_argument('--solve',
                     default='direct', type=str,
                     help='Solver method, default is direct, options are direct, cg')
 
-parser.add_argument('--is_volume_conservation',
-                    default=True, type=bool,
-                    help='Whether to use Lagrange multiplier, default is True')
+parser.add_argument('--lagrange_multiplier',
+                    default="implicit", type=str,
+                    help='Whether to use Lagrange multiplier, default is implicit')
 
 parser.add_argument('--mm_param',
                     default=None, type=dict,
