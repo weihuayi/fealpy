@@ -22,7 +22,6 @@ class HelmholtzPDEDataProtocol(Protocol):
     def geo_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
 
-    def init_mesh(self): ...
     def wave_number(self) -> float: ...
     
     def solution(self, p: TensorLike) -> TensorLike: ...
@@ -46,10 +45,10 @@ DATA_TABLE is a registry for Helmholtz PDE models.
 Each entry maps a model name to its corresponding module and class.
 """
 DATA_TABLE = {
-    "bessel2d": ("bessel_radiating_data_2d", "BesselRadiatingData2D"),
-    "evanescent2d": ("evanescent_wave_data_2d", "EvanescentWaveData2D"),
-    "oblique2d":("planeWave_oblique_incidence_data_2d", "PlaneWaveObliqueIncidenceData2D"),
-    "sinsin2d": ("sin_sin_data_2d", "SinsinData2D"),
-    "sinsin3d": ("sin_sin_data_3d", "SinsinData3D")
+        1: ("exp0001", "Exp0001"),
+        2: ("exp0002", "Exp0002"),
+        3: ("exp0003", "Exp0003"),
+        4: ("exp0004", "Exp0004"),
+        5: ("exp0005", "Exp0005")
 }
 

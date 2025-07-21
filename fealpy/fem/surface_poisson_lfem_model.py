@@ -1,7 +1,7 @@
 from typing import Optional, Union
-from scipy.sparse import coo_array, csr_matrix, bmat
-from ..backend import bm
-from ..model import PDEDataManager, ComputationalModel
+from scipy.sparse import coo_array, bmat
+from ..backend import backend_manager as bm
+from ..model import PDEModelManager, ComputationalModel
 from ..model.surface_poisson import SurfacePDEDataT
 from ..decorator import variantmethod
 
@@ -34,7 +34,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     
     def set_pde(self, pde: Union[SurfacePDEDataT, str] = "sphere"):
         if isinstance(pde, str):
-            self.pde = PDEDataManager("surface_poisson").get_example(pde)
+            self.pde = PDEModelManager("surface_poisson").get_example(pde)
         else:
             self.pde = pde
 

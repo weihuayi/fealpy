@@ -52,8 +52,8 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "sinexp": ("sin_exp_data_1d", "SinExpData1D"),
-    "sinsinexp": ("sin_sin_exp_data_2d", "SinSinExpData2D"),
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
 
 }
 

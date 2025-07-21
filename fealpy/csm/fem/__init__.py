@@ -7,3 +7,4 @@ from .beam_concentrated_source_integrator import BeamPLSourceIntegrator
 ### Model Operator
 from .beam_fem_model import BeamFEMModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
+from .elastoplastic_integrator import ElastoplasticIntegrator
