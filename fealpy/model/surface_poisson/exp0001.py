@@ -1,29 +1,16 @@
-<<<<<<< HEAD:fealpy/model/surface_poisson/surface_level_set_data.py
-from fealpy.backend import backend_manager as bm
-from fealpy.decorator import cartesian
-from fealpy.typing import  TensorLike
-from fealpy.model.mesher.sphere_mesher import SphereSurfaceMesher
-
-
-class SurfaceLevelSetData(SphereSurfaceMesher):
-=======
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import  TensorLike
-from ...geometry import SphereSurface
 from ...mesher import SphereSurfaceMesher
 
 
 class Exp0001(SphereSurfaceMesher):
 
->>>>>>> upstream/develop:fealpy/model/surface_poisson/exp0001.py
     """
     Surface Poisson problem on a closed manifold:
 
         -Δ_S u(x, y, z) = f(x, y, z),   (x, y, z) ∈ S
 
-<<<<<<< HEAD:fealpy/model/surface_poisson/surface_level_set_data.py
-=======
     where:
         - S ⊂ ℝ³ is a closed, compact, C³-smooth surface without boundary (∂S = ∅),
         - Δ_S is the Laplace-Beltrami operator on surface S,
@@ -33,7 +20,6 @@ class Exp0001(SphereSurfaceMesher):
         - To ensure uniqueness of the solution u, an additional constraint is imposed:
               ∫_S u dσ = 0.
 
->>>>>>> upstream/develop:fealpy/model/surface_poisson/exp0001.py
     In this example:
         - The surface S is the unit sphere, represented implicitly as the level set:
               x² + y² + z² - 1 = 0.
@@ -44,14 +30,8 @@ class Exp0001(SphereSurfaceMesher):
     """
 
     def __init__(self):
-<<<<<<< HEAD:fealpy/model/surface_poisson/surface_level_set_data.py
-        super().__init__()
-
-=======
-        # self.surface = SphereSurface(center=[0.0, 0.0, 0.0], radius=1.0) 
         super().__init__()
         
->>>>>>> upstream/develop:fealpy/model/surface_poisson/exp0001.py
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
