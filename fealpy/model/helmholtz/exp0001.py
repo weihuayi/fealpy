@@ -47,7 +47,7 @@ class Exp0001(BoxMesher2d):
     def __init__(self, options: dict = {}):
         self.box = [-0.5, 0.5, -0.5, 0.5]
         super().__init__(box=self.box)
-        self.k = options.get('k', 1.0)
+        self.k = bm.tensor(options.get('k', 1.0))
         c1 = bm.cos(self.k) + bm.sin(self.k) * 1j
         c2 = bessel_function(0, self.k) + 1j * bessel_function(1, self.k)
         self.c = c1 / c2

@@ -29,7 +29,7 @@ class Exp0005(BoxMesher3d):
     def __init__(self, options: dict = {}):  
         self.box = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]
         super().__init__(box=self.box)
-        self.k = options.get('k', 1.0)
+        self.k = bm.tensor(options.get('k', 1.0))
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""

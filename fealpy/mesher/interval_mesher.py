@@ -1,13 +1,7 @@
 from typing import Sequence
-<<<<<<< HEAD:fealpy/model/mesher/interval_mesher.py
-from ...backend import backend_manager as bm
-from ...decorator import variantmethod
-from ...mesh import IntervalMesh
-=======
 from ..backend import backend_manager as bm
 from ..decorator import variantmethod
 from ..mesh import IntervalMesh
->>>>>>> develop:fealpy/mesher/interval_mesher.py
 
 class IntervalMesher:
     """Interval domain mesh generator"""

@@ -122,8 +122,8 @@ class PDEModelManager(ModelManager):
     """PDEModelManager manages PDE model types and examples.
 
     Examples:
-        >>> ModelManager.show_types()
-        >>> manager = ModelManager('poisson')
+        >>> PDEModelManager.show_types()
+        >>> manager = PDEModelManager('poisson')
         >>> manager.show_examples()
         >>> model = manager.get_example(1)
     """

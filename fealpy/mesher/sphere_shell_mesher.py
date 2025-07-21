@@ -1,13 +1,7 @@
 from typing import Sequence
-<<<<<<< HEAD:fealpy/model/mesher/sphere_shell_mesher.py
-from ...backend import backend_manager as bm
-from ...decorator import variantmethod
-from ...mesh import TetrahedronMesh
-=======
 from ..backend import backend_manager as bm
 from ..decorator import variantmethod
 from ..mesh import TetrahedronMesh
->>>>>>> develop:fealpy/mesher/sphere_shell_mesher.py
 
 class SphereShellMesher:
     """Sphere shell mesh generator"""
