@@ -72,13 +72,19 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
 
         val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
         if  val is None:
-            return bm.einsum('q, cql, cq -> cl', ws*rm, phi, d)
+            return bm.einsum('q, cq..., cq -> c...', ws*rm, phi, d)
         elif isinstance(val, (int, float)):
-            return bm.einsum('q, cql, cq -> cl', ws*rm, phi, d)*val
+            return bm.einsum('q, cq..., cq -> c...', ws*rm, phi, d)*val
         elif isinstance(val, TensorLike):
-            if val.shape == (NC, ): # 分片常数
-                return bm.einsum('q, c, cql, cq -> cl', ws*rm, val, phi, d)
-            elif val.shape == (NC, NQ):
-                return bm.einsum('q, cq, cql, cq -> cl', ws*rm, val, phi, d)
+            dof_shape = phi.shape[3:]
+            phi = phi.reshape(*phi.shape[:3], -1)
+            if val.ndim <= 2:
+                new_shape = val.shape + (1,) * (2 - val.ndim)
+                val = bm.reshape(val, new_shape)
+                r =  bm.einsum('q, cq, cqld, cq -> cld', ws*rm, val, phi, d)
+                return bm.reshape(r, r.shape[:-1] + dof_shape)
+            elif val.ndim == 3:
+                return bm.einsum('q, cqd, cqld, cq -> cl', ws*rm, val, phi, d)
             else:
                 raise ValueError(f"I can not deal with {f.shape}!")
+

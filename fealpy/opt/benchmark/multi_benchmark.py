@@ -294,3 +294,29 @@ multi_benchmark_data = [
         'PF': get_PF('Viennet3'),
     },
 ]
+
+def DTLZ1(x, M, V):
+    f = bm.zeros((x.shape[0], M))
+    xm = V - M + 1
+    gx = 100 * (
+        xm + 
+        bm.sum((x[:, M-1:] - 0.5) ** 2, axis=-1) - 
+        bm.sum(bm.cos(20*bm.pi*(x[:, M-1:]-0.5)), axis=1)
+    )
+    f[:, 0] = 0.5 * bm.prod(x[:, :M-1], axis=1) * (1 + gx)
+    for i in range(1, M-1):
+        f[:, i] = 0.5 * bm.prod(x[:, :M-i-1], axis=-1) * (1 - x[:, M-i-1]) * (1 + gx)
+    f[:, M-1] = 0.5 * (1 + gx) * (1 - x[:, 0])
+    return f
+
+DTLZ_data = {
+        'DTLZ1': lambda M, V: (lambda x: DTLZ1(x, M, V)),
+}
+
+def get_dtlz(name, M, V):
+    if name not in DTLZ_data:
+        raise ValueError(f"Unknown DTLZ function: {name}")
+    return {
+        'fobj': DTLZ_data[name](M, V),
+        'domain': (0, 1)
+    }

@@ -69,14 +69,8 @@ class SnowAblationOpt(Optimizer):
         # Initial fitness values for the current population
         Objective_values = self.fun(self.x)
 
-        # Ensure lower and upper bounds are in array form
-        if not isinstance(self.lb, list):  
-            self.lb = bm.array([self.lb] * self.dim)  
-        if not isinstance(self.ub, list):
-            self.ub = bm.array([self.ub] * self.dim)
-
         # Calculate the number of elite solutions (half of the population size)
-        N1 = bm.array(int(bm.floor(bm.array(self.N * 0.5))))
+        N1 = int(bm.floor(bm.array(self.N * 0.5)))
 
         # Sort the fitness values to identify the best solutions
         idx1 = bm.argsort(Objective_values)
@@ -84,7 +78,7 @@ class SnowAblationOpt(Optimizer):
         # Store the best, second-best, and third-best solutions
         self.gbest = bm.copy(self.x[idx1[0], :])
         self.gbest_f = bm.copy(Objective_values[idx1[0]])
-
+        
         second_best = bm.copy(self.x[idx1[1], :])
         third_best = bm.copy(self.x[idx1[2], :])
 
@@ -92,14 +86,13 @@ class SnowAblationOpt(Optimizer):
         half_best_mean = bm.sum(self.x[idx1[:N1], :], axis=0) / N1
         
         # Create the elite pool (top 3 solutions and half-best mean)
-        Elite_pool = bm.concatenate((self.gbest.reshape(self.dim, 1), second_best.reshape(self.dim, 1), 
-                                     third_best.reshape(self.dim, 1), half_best_mean.reshape(self.dim, 1)), axis=1)
-        Elite_pool = Elite_pool.reshape(4, self.dim)
+        Elite_pool = bm.concatenate((self.gbest.reshape(1, self.dim), second_best.reshape(1, self.dim), 
+                                     third_best.reshape(1, self.dim), half_best_mean.reshape(1, self.dim)))
         
         # Split the population into two groups (Na and Nb)
         index = bm.arange(self.N)
-        Na = bm.array(int(self.N / 2))
-        Nb = bm.array(int(self.N / 2))
+        Na = int(self.N / 2)
+        Nb = int(self.N / 2)
 
         # Iterative optimization process
         for it in range(self.MaxIT):
@@ -113,15 +106,17 @@ class SnowAblationOpt(Optimizer):
             # Eq.(10) - Calculate the snow melt rate
             M = DDF * bm.exp(bm.array(-it / self.MaxIT))
 
+            X_centroid = bm.mean(self.x, axis=0)  # Population centroid position
+
             # Randomly assign solutions to two groups (Na and Nb)
-            index1 = bm.unique(bm.random.randint(0, self.N - 1, (Na,)))
+            # index1 = np.random.choice(self.N, Na, replace=False)
+            index1 = bm.unique(bm.random.randint(0, self.N, (Na,)))
             index2 = bm.array(list(set(index.tolist()).difference(index1.tolist())))
 
             # Update the positions of solutions in group Na
             r1 = bm.random.rand(len(index1), 1)
-            k1 = bm.random.randint(0, 3, (len(index1),))
-            self.x[index1] = Elite_pool[k1] + RB[index1] * (r1 * (self.gbest - self.x[index1]) + 
-                                                             (1 - r1) * (bm.mean(self.x, axis=0) - self.x[index1]))
+            k1 = bm.random.randint(0, 4, (len(index1),))
+            self.x[index1] = Elite_pool[k1] + RB[index1] * (r1 * (self.gbest - self.x[index1]) + (1 - r1) * (X_centroid - self.x[index1]))
 
             Na, Nb = (Na + 1, Nb - 1) if Na < self.N else (Na, Nb)
 
@@ -129,7 +124,7 @@ class SnowAblationOpt(Optimizer):
             if Nb >= 1:
                 r2 = 2 * bm.random.rand(len(index2), 1) - 1
                 self.x[index2] = M * self.gbest + RB[index2] * (r2 * (self.gbest - self.x[index2]) + 
-                                                                  (1 - r2) * (bm.mean(self.x, axis=0) - self.x[index2]))
+                                                                  (1 - r2) * (X_centroid - self.x[index2]))
 
             # Check and adjust the solutions to ensure they stay within the search space
             self.x = self.x + (self.lb - self.x) * (self.x < self.lb) + (self.ub - self.x) * (self.x > self.ub)

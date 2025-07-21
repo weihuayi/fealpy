@@ -1,7 +1,7 @@
 from typing import Union
 from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
-from fealpy.model import PDEDataManager, ComputationalModel
+from fealpy.model import PDEModelManager, ComputationalModel
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.fvm import (
@@ -33,7 +33,7 @@ class PoissonFvmModel(ComputationalModel):
 
     def set_pde(self, pde: Union[str, object]):
         if isinstance(pde, str):
-            self.pde = PDEDataManager('poisson').get_example(pde)
+            self.pde = PDEModelManager('poisson').get_example(pde)
         else:
             self.pde = pde
 
