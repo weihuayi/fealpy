@@ -23,4 +23,4 @@ from .evolutionary_based import (GeneticAlg, DifferentialEvolution)
 from .PLBFGSAlg import PLBFGS
 from .PNLCGAlg import PNLCG
 from .GradientDescentAlg import GradientDescent
-from .multi_quantum_particle_swarm_opt import MO_QuantumParticleSwarmOpt
+from .multi_opt import MO_QuantumParticleSwarmOpt, NondominatedSortingGeneticAlgIII

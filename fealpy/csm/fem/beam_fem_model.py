@@ -1,6 +1,6 @@
 from ...backend import backend_manager as bm
 from ..model import ComputationalModel
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ...fem import BilinearForm
 from ...fem import LinearForm
 from ...functionspace import LagrangeFESpace, TensorFunctionSpace
@@ -21,7 +21,7 @@ class BeamFEMModel(ComputationalModel):
     suitable for force and deformation analysis. By specifying material parameters, 
     section properties, and loads, it automatically constructs the finite element mesh, 
     assembles the stiffness matrix and load vector, and solves for the displacement field. 
-    It relies on PDEDataManager for physical parameters and boundary conditions, 
+    It relies on PDEModelManager for physical parameters and boundary conditions, 
     making it suitable for teaching, research, and preliminary engineering analysis.
     
     Parameters
@@ -29,7 +29,7 @@ class BeamFEMModel(ComputationalModel):
             Selects a preset beam problem example for initializing PDE parameters and mesh.
     Attributes
         pde : object
-            Object returned by PDEDataManager containing physical parameters and boundary conditions.
+            Object returned by PDEModelManager containing physical parameters and boundary conditions.
         mesh : object
             Finite element mesh object describing the discretized beam.
         E : float
@@ -50,7 +50,7 @@ class BeamFEMModel(ComputationalModel):
         solve()
             Applies boundary conditions and solves the linear system, returning the displacement solution.
     Notes
-        This class assumes the provided PDEDataManager example defines all necessary parameters and boundary conditions.
+        This class assumes the provided PDEModelManager example defines all necessary parameters and boundary conditions.
         Supports custom loads and boundary conditions for various beam problems.
         Depends on external finite element spaces, integrators, and linear solvers.
     Examples
@@ -69,12 +69,12 @@ class BeamFEMModel(ComputationalModel):
         Raises:
             ValueError: If the example is not recognized or cannot be initialized.
         Notes:
-            The example should be a valid key in the PDEDataManager for beam problems.
+            The example should be a valid key in the PDEModelManager for beam problems.
             It must define all necessary parameters and boundary conditions.
         Examples:
             >>> model = PoissonFDMModel(example='beam2d')
             >>> print(model.pde)
-            <PDEDataManager object with beam parameters>
+            <PDEModelManager object with beam parameters>
         '''
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
@@ -91,7 +91,7 @@ class BeamFEMModel(ComputationalModel):
         '''
         Set the PDE parameters for the beam problem.
         Parameters:
-            pde (PDEDataManager): The PDE data manager containing beam parameters and boundary conditions.
+            pde (PDEModelManager): The PDE data manager containing beam parameters and boundary conditions.
         Raises:
             ValueError: If the provided pde is not valid or does not contain necessary parameters.
         Notes:
@@ -100,7 +100,7 @@ class BeamFEMModel(ComputationalModel):
             >>> model.set_pde(new_pde)
         '''
         if isinstance(pde, str):
-            self.pde = PDEDataManager('beam').get_example(pde)
+            self.pde = PDEModelManager('beam').get_example(pde)
         else:
             self.pde = pde
         self.mesh = self.pde.init_mesh()

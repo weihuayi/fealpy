@@ -266,11 +266,11 @@ def F18(x):
     Returns:
         Tensor: The computed Rastrigin function.
     """
-    n = x.shape[-1]
-    o = 0
-    for i in range(n):
-        o += x[:,i] ** 2 - 10 * bm.cos(2 * bm.pi * x[:,i]) + 10
-    return o
+    return (
+        10 * x.shape[1] -
+        10 * bm.sum(bm.cos(2*bm.pi*x), axis=1) +
+        bm.sum(x ** 2, axis=1)
+    )
 
 def F19(x):
     """

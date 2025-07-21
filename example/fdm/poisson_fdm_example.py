@@ -16,11 +16,11 @@ parser = argparse.ArgumentParser(description=
         """ 在均匀网格上使用有限差分方法求解 poisson 方程 """)
 
 parser.add_argument('--example',
-        default='sinsin', type=str,
-        help="求解的 poisson 方程的算例, 默认是'sinsin',其他可选算例还有: 'sin', 'coscso', " \
+        default=2, type=int,
+        help="求解的 poisson 方程的算例, " \
         "还可以用下面的代码可查看可用的算例： \
-        from fealpy.model import PDEDataManager \
-        PDEDataManager('poisson').show_examples().")
+        from fealpy.model import PDEModelManager \
+        PDEModelManager('poisson').show_examples().")
 
 parser.add_argument('--maxit',
         default=4, type=int,
