@@ -46,7 +46,8 @@ AllenCahnPDEDataT = TypeVar('AllenCahnPDEDataT', bound=AllenCahnPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "circle_interface": ("circle_interface_data_2d", "CircleInterfaceData2D"),
-    "sincoscos": ("sincoscos_data_2d", "SinCosCosData2D"),
+    1: ("exp0001", "EXP0001"),
+    2: ("exp0002", "EXP0002"),
+    
 }
 

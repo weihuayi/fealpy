@@ -4,7 +4,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 import sympy as sp
 
-class SinCosCosData2D:
+class EXP0001:
     def __init__(self):
         self.box = [-1, 1, -1, 1]
         self.x, self.y, self.t = sp.symbols("x y t")

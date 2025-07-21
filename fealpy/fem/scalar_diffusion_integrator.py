@@ -127,6 +127,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         d = bm.sqrt(bm.linalg.det(G))
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         gphi = space.grad_basis(bcs, index=index, variable='x')
+        gphi = gphi.reshape(*gphi.shape[:3], -1)
         if coef is None:
             A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d)
         elif isinstance(coef, (int, float)):
