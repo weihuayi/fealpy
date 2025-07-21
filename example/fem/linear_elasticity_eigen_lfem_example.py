@@ -11,8 +11,8 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='boxdomain3d', type=str,
-                    help='Name of the PDE model, default is boxpoly3d')
+                    default=1, type=int,
+                    help='index of the linear elasticity  model, default is 1')
 
 parser.add_argument('--mesh_type',
                     default='uniform_tet', type=str,
@@ -45,6 +45,9 @@ options = vars(parser.parse_args())
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
-from fealpy.csm.fem import LinearElasticityEigenLFEMModel
+from fealpy.csm.model import CSMModelManager
+from fealpy.fem import LinearElasticityEigenLFEMModel
+pde = CSMModelManager("linear_elasticity").get_example(1)
+options['pde'] = pde
 model = LinearElasticityEigenLFEMModel(options)
-model.solve()
+#model.solve()

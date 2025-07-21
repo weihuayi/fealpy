@@ -17,43 +17,136 @@ from ..fem import DirichletBC
 from scipy.sparse.linalg import eigsh
 
 class LinearElasticityEigenLFEMModel(ComputationalModel):
-    """
-    A class to represent a linear elasticity eigenvalue problem using the
-    Lagrange finite element method (LFEM).
+    """Model for linear elasticity eigenvalue problems using the LFEM.
+
+    This class sets up and solves a linear elasticity eigenvalue problem
+    with arbitrary‐order Lagrange finite elements.  It encapsulates PDE
+    selection, mesh initialization, material parameters, and solver settings.
+
+    Parameters
+        options : dict
+            Configuration options for the model, as returned by :meth:`get_options`.
 
     Attributes
-        mesh: The mesh of the domain.
-    Reference
-        https://wnesm678i4.feishu.cn/wiki/HwBfwzraXi0ahYkwg72c7gMqn3e?fromScene=spaceOverview
+        options : dict
+            The configuration options passed to the model.
+        pde : object
+            The PDE data instance selected based on ``options['pde']``.
+        mesh : Mesh
+            The mesh object initialized according to ``options['mesh_type']`` and division counts.
+        space_degree : int
+            Polynomial degree of the finite element space.
+        _private_attr : any
+            (Optional) Example of a private attribute.
+
+    Methods
+        get_options(...)
+            Return a dict of default options, which users may override.
+    Examples
+        >>> opts = LinearElasticityEigenLFEMModel.get_options(
+        ...     backend='torch',
+        ...     mesh_type='uniform_quad',
+        ...     nx=20, ny=20, nz=20,
+        ...     pbar_log=False
+        ... )
+        >>> model = LinearElasticityEigenLFEMModel(opts)
+        >>> model.run()
     """
 
     def __init__(self, options):
         self.options = options
-        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        super().__init__(
+            pbar_log=options['pbar_log'],
+            log_level=options['log_level']
+        )
         self.set_pde(options['pde'])
         GD = self.pde.geo_dimension()
 
-        self.set_material_parameters(self.pde.lam, self.pde.mu, self.pde.rho)
+        self.set_material_parameters(
+            self.pde.lam, self.pde.mu, self.pde.rho
+        )
         mtype = options['mesh_type']
         if 'uniform' in mtype:
             if GD == 3:
-                self.set_init_mesh(mtype, nx=options['nx'], ny=options['ny'], nz=options['nz'])
+                self.set_init_mesh(
+                    mtype,
+                    nx=options['nx'],
+                    ny=options['ny'],
+                    nz=options['nz']
+                )
             elif GD == 2:
-                self.set_init_mesh(mtype, nx=options['nx'], ny=options['ny'])
+                self.set_init_mesh(
+                    mtype,
+                    nx=options['nx'],
+                    ny=options['ny']
+                )
             else:
-                raise ValueError(f"Unsupported mesh type {mtype} for geo_dimension {GD}.")
+                raise ValueError(
+                    f"Unsupported mesh type {mtype} for geo_dimension {GD}."
+                )
         else:
             self.set_init_mesh(mtype)
+
         self.set_space_degree(options['space_degree'])
 
+    @classmethod
+    def get_options(
+        cls,
+        backend: str = 'numpy',
+        pde: int = 1,
+        mesh_type: str = 'uniform_tet',
+        nx: int = 10,
+        ny: int = 10,
+        nz: int = 10,
+        space_degree: int = 1,
+        pbar_log: bool = True,
+        log_level: str = 'INFO',
+    ) -> dict:
+        """Generate a dict of default configuration options for the model.
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxdomain3d"):
+        Users may call this method and override any subset of parameters
+        to customize model behavior.
+
+        Parameters
+            pde : int, optional, default=1
+                Index of the linear elasticity PDE model to solve.
+            mesh_type : str, optional, default='uniform_tet'
+                Mesh type identifier used in :meth:`set_init_mesh`.
+            nx : int, optional, default=10
+                Number of divisions along the x‐direction for uniform meshes.
+            ny : int, optional, default=10
+                Number of divisions along the y‐direction for uniform meshes.
+            nz : int, optional, default=10
+                Number of divisions along the z‐direction for uniform meshes.
+            space_degree : int, optional, default=1
+                Degree of the Lagrange finite element space.
+            pbar_log : bool, optional, default=True
+                Whether to display a progress bar.
+            log_level : str, optional, default='INFO'
+                Logging level; one of 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
+
+        Returns
+            options : dict
+                A dictionary mapping each option name to its value.
+
+        Examples
+            >>> opts = LinearElasticityEigenLFEMModel.get_options(
+            ...     mesh_type='uniform_quad', nx=20, pbar_log=False
+            ... )
+            >>> print(opts['mesh_type'], opts['nx'], opts['pbar_log'])
+            uniform_quad 20 False
         """
-        """
-        if isinstance(pde, str):
-            self.pde = PDEModelManager('linear_elasticity').get_example(pde)
-        else:
-            self.pde = pde 
+        return {
+            'backend': backend,
+            'pde': pde,
+            'mesh_type': mesh_type,
+            'nx': nx,
+            'ny': ny,
+            'nz': nz,
+            'space_degree': space_degree,
+            'pbar_log': pbar_log,
+            'log_level': log_level,
+        }
 
     def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tet", **kwargs):
         if isinstance(mesh, str):
@@ -66,24 +159,24 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, int] = 1) -> None:
+        if isinstance(pde, int):
+            self.pde = PDEModelManager("linear_elasticity").get_example(1)
+        else:
+            self.pde = pde
+        self.logger.info(self.pde.__doc__)
+
     def set_material_parameters(self, lam: float, mu: float, rho: float):
         self.material = LinearElasticMaterial("eigens", lame_lambda=lam, shear_modulus=mu, density=rho)
+        self.logger.info(f"Created material:\n {self.material}")
 
     def set_space_degree(self, p: int):
         """
-        Set the polynomial degree of the finite element space.
-
-        Args:
-            p: The polynomial degree.
         """
         self.p = p
 
     def linear_system(self):
         """
-        Construct the linear system for the eigenvalue problem.
-
-        Returns:
-            The stiffness matrix and mass matrix.
         """
         # Implementation of the linear system construction goes here
         GD = self.mesh.geo_dimension()
