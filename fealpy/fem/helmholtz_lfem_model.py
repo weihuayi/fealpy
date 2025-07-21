@@ -3,7 +3,7 @@ from .. import logger
 logger.setLevel('WARNING')
 from typing import Union
 from ..backend import bm
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.helmholtz import HelmholtzPDEDataT
 
 from ..mesh import Mesh
@@ -62,7 +62,7 @@ class HelmholtzLFEMModel(ComputationalModel):
             pde: PDE model instance or string key to get example PDE.
         """
         if isinstance(pde, int):
-            self.pde = PDEDataManager('helmholtz').get_example(pde)
+            self.pde = PDEModelManager('helmholtz').get_example(pde)
         else:
             self.pde = pde
 

@@ -21,7 +21,6 @@ class AllenCahnPDEDataProtocol(Protocol):
     def geo_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
 
-    def init_mesh(self): ...
     
     # Initial condition u0(x)
     def init_condition(self, p: TensorLike) -> TensorLike: ...
@@ -46,8 +45,7 @@ AllenCahnPDEDataT = TypeVar('AllenCahnPDEDataT', bound=AllenCahnPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    1: ("exp0001", "EXP0001"),
-    2: ("exp0002", "EXP0002"),
-    
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
 }
 
