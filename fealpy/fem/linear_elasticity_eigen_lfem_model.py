@@ -21,9 +21,9 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     A class to represent a linear elasticity eigenvalue problem using the
     Lagrange finite element method (LFEM).
 
-    Attributes:
+    Attributes
         mesh: The mesh of the domain.
-    Reference:
+    Reference
         https://wnesm678i4.feishu.cn/wiki/HwBfwzraXi0ahYkwg72c7gMqn3e?fromScene=spaceOverview
     """
 
