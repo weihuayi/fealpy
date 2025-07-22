@@ -142,11 +142,9 @@ class LinearElasticMaterial(ElasticMaterial):
         )
 
     @property
-    def young_modulus(self) -> float:
+    def elastic_modulus(self) -> float:
         """Get Young's modulus"""
         return self.E
-
-    elastic_modulus = young_modulus
 
     @property
     def poisson_ratio(self) -> float:
