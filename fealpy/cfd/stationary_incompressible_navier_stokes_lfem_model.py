@@ -35,7 +35,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         """
         Set the PDE data for the model.
         """
-        from fealpy.cfd.model.stationary_incompressible_navier_stokes_2d import FromSympy
+        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
         self.pde = FromSympy(rho=rho, mu=mu)
         self.pde.select_pde[pde]()
 
@@ -44,7 +44,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         """
         Set the PDE data for the model in 3D.
         """
-        from fealpy.cfd.model.stationary_incompressible_navier_stokes_3d import FromSympy
+        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_3d import FromSympy
         self.pde = FromSympy(rho=rho, mu=mu)
         self.pde.select_pde[pde]()
     

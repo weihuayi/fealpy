@@ -33,7 +33,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         """
         Set the PDE data for the model.
         """
-        from fealpy.cfd.model.incompressible_navier_stokes_2d import FromSympy
+        from fealpy.cfd.model.test.incompressible_navier_stokes.incompressible_navier_stokes_2d import FromSympy
         self.pde = FromSympy(rho=rho, mu=mu)
         self.pde.select_pde[pde]()
 

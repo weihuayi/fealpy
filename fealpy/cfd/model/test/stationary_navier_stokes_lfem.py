@@ -1,9 +1,9 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.cfd.model.test.incompressible_navier_stokes.incompressible_navier_stokes_2d import FromSympy, NSLFEMChannelPDE
-from fealpy.cfd.incompressible_navier_stokes_lfem_2d_model import IncompressibleNSLFEM2DModel
+from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
+import sympy as sp
 import argparse
 
-
+## 参数解析
 parser = argparse.ArgumentParser(description=
     """
     Solve elliptic equations using the lowest order Raviart-Thomas element and piecewise constant mixed finite element method.
@@ -18,7 +18,7 @@ parser.add_argument('--GD',
     help="Geometry dimension, default is 2d. You can also choose 3d.")
     
 parser.add_argument('--pde',
-    default='poly2d', type=str,
+    default='sinsin', type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -45,18 +45,6 @@ parser.add_argument('--nz',
     default=8, type=int,
     help="Number of divisions in the z direction, default is 8 (only for 3D problems)")
 
-parser.add_argument('--T0',
-    default=0.0, type=float,
-    help="Initial time, default is 0.0")
-
-parser.add_argument('--T1',
-    default=0.5, type=float,
-    help="Final time, default is 0.5")
-
-parser.add_argument('--nt',
-    default=100, type=int,
-    help="Number of time steps, default is 1000")
-
 parser.add_argument('--method',
     default='Newton', type=str,
     help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
@@ -74,8 +62,8 @@ parser.add_argument('--maxit',
     help="Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',
-    default=10, type=int,
-    help="Maximum number of steps for the refinement, default is 10")
+    default=1000, type=int,
+    help="Maximum number of steps for the refinement, default is 1000")
 
 parser.add_argument('--tol',
     default=1e-10, type=float,
@@ -85,5 +73,4 @@ parser.add_argument('--tol',
 options = vars(parser.parse_args())
 
 bm.set_backend(options['backend'])
-# pde = FromSympy(rho=options['rho'], mu=options['mu'])
-model = IncompressibleNSLFEM2DModel(options)
+model = StationaryIncompressibleNSLFEMModel(options)
