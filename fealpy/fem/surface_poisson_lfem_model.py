@@ -39,7 +39,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
             self.pde = pde
 
     def set_init_mesh(self, p:int, mesh:Union[Mesh, str] = "ltri", **kwargs):
-        if isinstance(mesh,str):
+        if isinstance(mesh, str):
             self.mesh = self.pde.init_mesh[mesh](p, **kwargs)
         else:
             self.mesh = mesh
