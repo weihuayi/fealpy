@@ -32,9 +32,9 @@ class SurfacePoissonLFEMModel(ComputationalModel):
        self.set_init_mesh(options['mesh_degree'], options['init_mesh']) 
        self.set_space_degree(options['space_degree']) 
     
-    def set_pde(self, pde: Union[SurfacePDEDataT, str] = "exp0001") -> None:
+    def set_pde(self, pde: Union[SurfacePDEDataT, int] = 1) -> None:
         if isinstance(pde, str):
-            self.pde = PDEModelManager("surface_poisson").get_example(1)
+            self.pde = PDEModelManager("surface_poisson").get_example(pde)
         else:
             self.pde = pde
 
