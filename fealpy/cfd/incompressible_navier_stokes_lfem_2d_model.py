@@ -68,14 +68,12 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                                  bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
 
-
         A = BlockForm([[A, A1.T], [A1, None]])
         A = A.assembly_sparse_matrix(format='csr')
         b0 = bm.array([0])
         b  = bm.concatenate([b, b0], axis=0)
 
         return A, b
-        
 
     @variantmethod("Newton")
     def method(self):
@@ -112,7 +110,27 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         LForm = self.fem.LForm()
         return BForm, LForm
     
-    @variantmethod("neumann")
+    @variantmethod("dirichlet")
+    def apply_bc(self, A, b):
+        BC = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(lambda p: self.pde.velocity(p, self.t), lambda p: self.pde.pressure(p, self.t)), 
+            threshold=(self.pde.is_velocity_boundary, self.pde.is_pressure_boundary),
+            method='interp')
+        A, b = BC.apply(A, b)
+        return A, b
+    
+    @apply_bc.register("None")
+    def apply_bc(self, A, b):
+        BC = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(lambda p: self.pde.velocity(p, self.t), lambda p: self.pde.pressure(p, self.t)), 
+            threshold=(None, None),
+            method='interp')
+        A, b = BC.apply(A, b)
+        return A, b
+
+    @apply_bc.register("neumann")
     def apply_bc(self, A, b):
         pass
 
@@ -137,13 +155,12 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         if self.method_str == "IPCS":
             BCu = DirichletBC(space=fem.uspace, 
                 gd = cartesian(lambda p : pde.velocity(p, self.t)), 
-                threshold=None, 
+                threshold=pde.is_velocity_boundary, 
                 method='interp')
-            
 
             BCp = DirichletBC(space=fem.pspace, 
                 gd = cartesian(lambda p : pde.pressure(p, self.t)), 
-                threshold=None, 
+                threshold=pde.is_pressure_boundary, 
                 method='interp')
             
             uh1 = u0.space.function()
@@ -167,12 +184,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             u1 = u0
             p1 = p0
 
-            BC = DirichletBC(
-                (fem.uspace, fem.pspace), 
-                gd =(lambda p : pde.velocity(p, self.t), lambda p : pde.pressure(p, self.t)), 
-                threshold = (pde.is_velocity_boundary, pde.is_pressure_boundary),
-                method = 'interp')
-
             inneru_0 = fem.uspace.function()
             inneru_0[:] = u0[:]
             inneru_1 = fem.uspace.function()
@@ -182,12 +193,12 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 
                 A = BForm.assembly()
                 b = LForm.assembly()
-                A,b = BC.apply(A, b)
-                A, b = self.lagrange_multiplier(A, b)
+                A,b = self.apply_bc(A, b)
+                # A, b = self.lagrange_multiplier(A, b)
             
                 x = self.solve(A, b, 'mumps')
-                inneru_1[:] = x[:ugdof]
-                p1[:] = x[ugdof:-1]
+                inneru_1[:] = x[0:ugdof]
+                p1[:] = x[ugdof:]
                 res_u = pde.mesh.error(inneru_0, inneru_1)
                 inneru_0[:] = inneru_1
                 if res_u < tol:
@@ -224,13 +235,13 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             # print("uerror:", uerror)
             # print("perror:", perror)
         uerror, perror = self.postprocess(u1, p1) 
-        print(f"final uerror: {uerror}, final perror: {perror}")
+        self.logger.info(f"final uerror: {uerror}, final perror: {perror}")
 
     @run.register('uniform_refine')
     def run(self, maxit=5, t0 = 0, nt = 300, maxstep = 10, tol = 1e-12):
         fem = self.fem
         for i in range(maxit):
-            print('mesh', self.pde.mesh.number_of_cells())
+            self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
             self.run['time_step'](t0, nt, maxstep, tol)
             self.pde.mesh.uniform_refine()
             self.equation = IncompressibleNS(self.pde)
@@ -240,5 +251,5 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     def postprocess(self, uh, ph):
         uerror = self.pde.mesh.error(lambda p : self.pde.velocity(p, t = self.t), uh)
         perror = self.pde.mesh.error(lambda p : self.pde.pressure(p, t = self.t), ph)
-        #print(f"uerror: {uerror}, perror: {perror}")
+        # self.logger.info(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror

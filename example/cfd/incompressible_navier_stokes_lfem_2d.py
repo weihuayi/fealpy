@@ -18,7 +18,7 @@ parser.add_argument('--GD',
     help="Geometry dimension, default is 2d. You can also choose 3d.")
     
 parser.add_argument('--pde',
-    default='channel', type=str,
+    default='poly2d', type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -85,4 +85,5 @@ parser.add_argument('--tol',
 options = vars(parser.parse_args())
 
 bm.set_backend(options['backend'])
+# pde = FromSympy(rho=options['rho'], mu=options['mu'])
 model = IncompressibleNSLFEM2DModel(options)

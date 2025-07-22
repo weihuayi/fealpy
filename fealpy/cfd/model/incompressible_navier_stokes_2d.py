@@ -3,7 +3,7 @@ from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.decorator import cartesian,variantmethod
 from typing import Union, Callable, Dict
 from fealpy.mesh import TriangleMesh
-from fealpy.model.mesher.box_mesher import BoxMesher2d
+from fealpy.mesher.box_mesher import BoxMesher2d
 import sympy as sp
 CoefType = Union[int, float, Callable]
 
@@ -155,13 +155,27 @@ class FromSympy(BoxMesher2d):
     
     @cartesian
     def is_pressure_boundary(self, p):
-        result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        return result
+        x = p[..., 0]
+        y = p[..., 1]
+        atol = 1e-12
+        # 检查是否接近 x=±1 或 y=±1
+        on_boundary = (
+            (bm.abs(x - 0.) < atol) | (bm.abs(x - 1.) < atol) |
+            (bm.abs(y - 0.) < atol) | (bm.abs(y - 1.) < atol)
+        )
+        return on_boundary
     
     @cartesian
     def is_velocity_boundary(self, p):
-        result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        return result
+        x = p[..., 0]
+        y = p[..., 1]
+        atol = 1e-12
+        # 检查是否接近 x=±1 或 y=±1
+        on_boundary = (
+            (bm.abs(x - 0.) < atol) | (bm.abs(x - 1.) < atol) |
+            (bm.abs(y - 0.) < atol) | (bm.abs(y - 1.) < atol)
+        )
+        return on_boundary
     
     @cartesian
     def source(self, p, t):
