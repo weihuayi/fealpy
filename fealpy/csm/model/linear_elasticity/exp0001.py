@@ -1,16 +1,9 @@
 from typing import Optional
 
-from ....backend import bm 
-from ....typing import TensorLike
-from ....decorator import cartesian
-from ....mesher import BoxMesher3d
-
-
-from typing import Optional
-
 from ....backend import bm
 from ....typing import TensorLike
 from ....decorator import cartesian
+from ....material import LinearElasticMaterial
 from ....mesher import BoxMesher3d
 
 
@@ -32,12 +25,10 @@ class Exp0001(BoxMesher3d):
             Gravity direction vector.
     """
 
-    def __init__(self):
-        super().__init__(box=[0, 1, 0, 0.2, 0, 0.2])
+    def __init__(self, L=1.0, W=0.2):
+        super().__init__(box=[0, L, 0, W, 0, W])
 
-        self.L = 1.0  # length of the box in x direction
-        self.W = 0.2  # width of the box in y and z direction
-
+        self.L, self.W = L, W 
         delta = self.W / self.L  # aspect ratio
         self.g = 0.4 * delta**2  # gravity acceleration
         self.d = bm.array(
@@ -45,47 +36,21 @@ class Exp0001(BoxMesher3d):
             dtype=bm.float64
         )  # TODO: specify computation device
 
-    @property
-    def lam(self, p: Optional[TensorLike] = None) -> TensorLike:
-        """First Lamé parameter (λ) for linear elasticity.
+        # Initialize the material with constant parameters
+        self.material = LinearElasticMaterial("box", 
+                                              lame_lambda=1.25,
+                                              shear_modulus=1.0, 
+                                              density=1.0)
 
-        Parameters
-            p : TensorLike, optional
-                Evaluation points (unused for constant parameter).
-
-        Returns
-            lambda_val : TensorLike
-                Constant Lamé parameter λ = 1.25.
-        """
-        return 1.25
-
-    @property
-    def mu(self, p: Optional[TensorLike] = None) -> TensorLike:
-        """Shear modulus (μ) for linear elasticity.
-
-        Parameters
-            p : TensorLike, optional
-                Evaluation points (unused for constant parameter).
-
-        Returns
-            mu_val : TensorLike
-                Constant shear modulus μ = 1.0.
-        """
-        return 1.0
-
-    @property
-    def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
-        """Density ρ for the material.
-
-        Parameters
-            p : TensorLike, optional
-                Evaluation points (unused for constant parameter).
-
-        Returns
-            rho_val : TensorLike
-                Constant density ρ = 1.0.
-        """
-        return 1.0
+    def __str__(self) -> str:
+        """Return a multi-line summary including PDE type and key params."""
+        # make direction printable
+        direction = self.d.tolist() if hasattr(self.d, "tolist") else self.d
+        return (
+            f"\nExp0001 (3D Linear Elasticity PDE on box domain)\n"
+            f"  Box dimensions: L = {self.L}, W = {self.W}\n"
+            f"  Gravity: g = {self.g:.3g}, d = {direction}"
+        )
 
     @cartesian
     def body_force(self, p: TensorLike) -> TensorLike:

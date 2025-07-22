@@ -54,6 +54,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     """
 
     def __init__(self, options):
+
         self.options = options
         super().__init__(
             pbar_log=options['pbar_log'],
@@ -62,9 +63,6 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.set_pde(options['pde'])
         GD = self.pde.geo_dimension()
 
-        self.set_material_parameters(
-            self.pde.lam, self.pde.mu, self.pde.rho
-        )
         mtype = options['mesh_type']
         if 'uniform' in mtype:
             if GD == 3:
@@ -164,11 +162,8 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
             self.pde = PDEModelManager("linear_elasticity").get_example(1)
         else:
             self.pde = pde
-        self.logger.info(self.pde.__doc__)
-
-    def set_material_parameters(self, lam: float, mu: float, rho: float):
-        self.material = LinearElasticMaterial("eigens", lame_lambda=lam, shear_modulus=mu, density=rho)
-        self.logger.info(f"Created material:\n {self.material}")
+        self.logger.info(self.pde)
+        self.logger.info(self.pde.material)
 
     def set_space_degree(self, p: int):
         """

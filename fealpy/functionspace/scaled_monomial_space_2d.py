@@ -350,7 +350,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def partial_matrix(self, p=None, index=_S):
         """
-        \partial m = mP
+        \\partial m = mP
         """
         p = p or self.p
         #mindex = multi_index_matrix2d(p)
