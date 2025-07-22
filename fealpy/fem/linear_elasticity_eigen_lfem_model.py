@@ -44,8 +44,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
             Return a dict of default options, which users may override.
     Examples
         >>> opts = LinearElasticityEigenLFEMModel.get_options(
-        ...     backend='torch',
-        ...     mesh_type='uniform_quad',
+        ...     mesh_type='uniform_tet',
         ...     nx=20, ny=20, nz=20,
         ...     pbar_log=False
         ... )
@@ -90,7 +89,6 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     @classmethod
     def get_options(
         cls,
-        backend: str = 'numpy',
         pde: int = 1,
         mesh_type: str = 'uniform_tet',
         nx: int = 10,
@@ -135,7 +133,6 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
             uniform_quad 20 False
         """
         return {
-            'backend': backend,
             'pde': pde,
             'mesh_type': mesh_type,
             'nx': nx,
@@ -147,6 +144,8 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         }
 
     def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tet", **kwargs):
+        """
+        """
         if isinstance(mesh, str):
             self.mesh = self.pde.init_mesh[mesh](**kwargs)
         else:
@@ -178,13 +177,13 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
 
         bform = BilinearForm(self.space)
-        integrator = LinearElasticityIntegrator(self.material)
+        integrator = LinearElasticityIntegrator(self.pde.material)
         integrator.assembly.set('fast')
         bform.add_integrator(integrator)
         S = bform.assembly()
 
         bform = BilinearForm(self.space)
-        integrator = MassIntegrator(self.material.density)
+        integrator = MassIntegrator(self.pde.material.density)
         bform.add_integrator(integrator)
         M = bform.assembly()
 
@@ -195,13 +194,13 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         """
         from ..fem import DirichletBC
         
-        bc = DirichletBC(
+        self.bc = DirichletBC(
                 self.space,
                 gd=self.pde.displacement_bc,
                 threshold=self.pde.is_displacement_boundary)
-        S = bc.apply_matrix(S)
-        M = bc.apply_matrix(M)
-        return S, M
+        self.bc.apply_matrix(S)
+        self.bc.apply_matrix(M)
+        return S.to_scipy(), M.to_scipy()
 
     def solve(self):
         """
@@ -211,6 +210,25 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
             Eigenvalues and eigenvectors of the system.
         """
         S, M = self.linear_system()
-        val, vec = eigsh(S.to_scipy(), k=6, M=M.to_scipy(), which='SM', tol=1e-5, maxiter=1000)
-        self.logger.info(f"Eigenvalues: {val}")
+        S, M = self.apply_bc(S, M)
+        k = self.options.get('neign', 6)
+        val, vec = eigsh(S, k=k, M=M, which='SM', tol=1e-6, maxiter=1000)
+
+
+    def show_mesh(self):
+        from matplotlib import pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        fig = plt.figure()
+        axes = fig.add_subplot(111, projection='3d')
+        node = self.mesh.entity('node')
+        isBdNode = self.pde.is_displacement_boundary(node)
+        self.mesh.add_plot(axes)
+        self.mesh.find_node(axes, index=isBdNode)
+        plt.show()
+
+
+    def show_modal(self, val, vec):
+        from matplotlib import pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+
 
