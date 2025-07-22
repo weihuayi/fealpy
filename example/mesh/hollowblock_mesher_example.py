@@ -60,4 +60,4 @@ from fealpy.backend import bm
 bm.set_backend(options['backend'])
 model = HollowBlockMesher(options)
 model.get_options()
-model.get_holes(0)
+couple = model.get_coupling_lines((1,2))
