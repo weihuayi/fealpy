@@ -75,7 +75,7 @@ def coo_matrix(arg1, /, *,
             values = bm.empty((0,), dtype=ftype, device=device)
             return COOTensor(indices, values, spshape=arg1)
 
-        elif isinstance(arg1[0], _DT):
+        elif isinstance(arg1[0], _DT) or arg1[0] is None:
             assert len(arg1) == 2
             values = arg1[0] # non-zero elements
             indices = bm.stack(arg1[1], axis=0)
@@ -149,7 +149,7 @@ def csr_matrix(arg1,
             data = bm.empty((0,), dtype=ftype, device=device)
             return CSRTensor(indptr, indices, data, spshape=arg1)
 
-        elif isinstance(arg1[0], _DT):
+        elif isinstance(arg1[0], _DT) or arg1[0] is None:
             if len(arg1) == 2: # From a COO-like format
                 values = arg1[0]
                 indices = bm.stack(arg1[1], axis=0)

@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Optional, Protocol, Tuple
 
 from ..backend import backend_manager as bm
 from ..backend import TensorLike
@@ -20,8 +20,10 @@ def gmres(
     rtol: float = 1e-8,
     restart: Optional[int] = None,
     maxit: Optional[int] = None,
-    M: Optional[SupportsMatmul] = None
-) -> tuple[TensorLike, dict]:
+    M: Optional[SupportsMatmul] = None,
+    *,
+    shape: Optional[tuple[int,int]] = None
+) -> Tuple[TensorLike, dict]:
     """
     Solve a linear system Ax = b using Generalized Minimal RESidual iteration (gmres) method.
 
@@ -61,7 +63,15 @@ def gmres(
         if x0.shape != b.shape:
             raise ValueError("x0 and b must have the same shape")
     
-    m, n = A.shape  # Comma spacing
+    if shape is not None:
+        m, n = shape
+    else:
+        try:
+            m, n = A.shape
+        except AttributeError:
+            m = b.shape[0]
+            n = m
+            
     if restart is None:
         restart = 20
     restart = min(restart, m)
@@ -221,7 +231,7 @@ def lartg(a, b):
 
     # Thresholds for safe computation
     finfo = bm.finfo(float)
-    small_thresh = bm.sqrt(bm.tensor(finfo.min))
+    small_thresh = bm.sqrt(bm.tensor(finfo.tiny))
     large_thresh = bm.sqrt(bm.tensor(finfo.max))
 
     t = max(abs_a, abs_b)

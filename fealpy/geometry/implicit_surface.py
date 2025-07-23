@@ -1,25 +1,20 @@
-from typing import Optional
+from ..typing import  TensorLike
+from ..decorator import cartesian
 from ..backend import backend_manager as bm
-from ..backend import TensorLike
-from .geometry_base import GeometryBase
-from .functional import project
 
 class SphereSurface():
     def __init__(self, center=[0.0, 0.0, 0.0], radius=1.0):
         self.center = center
         self.radius = radius
         r = radius + radius/10
-        x = center[0]
-        y = center[1]
-        z = center[2]
+        x, y, z = center
         self.box = [x-r, x+r, y-r, y+r, z-r, z+r]
 
+    @cartesian
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[..., 0]
-            y = p[..., 1]
-            z = p[..., 2]
+            x, y, z = p[..., 0], p[..., 1], p[..., 2]
         elif len(args) == 3:
             x, y, z = args
         else:
@@ -28,35 +23,46 @@ class SphereSurface():
         cx, cy, cz = self.center
         r = self.radius
         return bm.sqrt((x - cx)**2 + (y - cy)**2 + (z - cz)**2) - r 
-
-    def gradient(self, p):
+    
+    @cartesian
+    def project(self, p:TensorLike, maxit=200, tol=1e-8) -> TensorLike:
+        d = self(p)
+        p = p - d[..., None]*self.unit_normal(p)
+        return p, d
+    
+    @cartesian
+    def gradient(self, p:TensorLike) -> TensorLike:
         l = bm.sqrt(bm.sum((p - self.center)**2, axis=-1))
         n = (p - self.center)/l[..., None]
         return n
-
-    def unit_normal(self, p):
+    
+    @cartesian
+    def unit_normal(self, p:TensorLike) -> TensorLike:
         return self.gradient(p)
+    
+    @cartesian
+    def hessian(self, p:TensorLike) -> TensorLike:
+        x, y, z = p[..., 0], p[..., 1], p[..., 2]
 
-    def hessian(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
-        shape = p.shape[:-1]+(3, 3)
-        H = bm.zeros(shape, dtype=bm.float64)
         L = bm.sqrt(bm.sum(p*p, axis=-1))
         L3 = L**3
-        H[..., 0, 0] = 1/L-x**2/L3
-        H[..., 0, 1] = -x*y/L3
-        H[..., 1, 0] = H[..., 0, 1]
-        H[..., 0, 2] = - x*z/L3
-        H[..., 2, 0] = H[..., 0, 2]
-        H[..., 1, 1] = 1/L - y**2/L3
-        H[..., 1, 2] = -y*z/L3
-        H[..., 2, 1] = H[..., 1, 2]
-        H[..., 2, 2] = 1/L - z**2/L3
-        return H
 
-    def jacobi_matrix(self, p):
+        H00 = 1/L - x**2/L3
+        H01 = -x*y/L3
+        H02 = -x*z/L3
+        H11 = 1/L - y**2/L3
+        H12 = -y*z/L3
+        H22 = 1/L - z**2/L3
+        
+        row0 = bm.stack([H00, H01, H02], axis=-1)
+        row1 = bm.stack([H01, H11, H12], axis=-1)
+        row2 = bm.stack([H02, H12, H22], axis=-1)
+        
+        H = bm.stack([row0, row1, row2], axis=-2)
+        return H
+    
+    @cartesian
+    def jacobi_matrix(self, p:TensorLike) -> TensorLike:
         H = self.hessian(p)
         n = self.unit_normal(p)
         p[:], d = self.project(p)
@@ -64,17 +70,14 @@ class SphereSurface():
         J = -(d[..., None, None]*H + bm.einsum('...ij, ...ik->...ijk', n, n))
         J[..., range(3), range(3)] += 1
         return J
-
+    
+    @cartesian
     def tangent_operator(self, p):
         pass
 
-    def project(self, p, maxit=200, tol=1e-8):
-        d = self(p)
-        p = p - d[..., None]*self.unit_normal(p)
-        return p, d
-
-    def init_mesh(self, meshtype='tri', returnnc=False, p=None):
-        if meshtype == 'tri':
+    @cartesian
+    def init_mesh(self, mtype='tri', returnnc=False, p=None):
+        if mtype == 'tri':
             t = (bm.sqrt(5) - 1)/2
             node = bm.array([
                 [ 0, 1, t],
@@ -115,13 +118,13 @@ class SphereSurface():
                 return node, cell
             else:
                 if p is None:
-                    from fealpy.mesh.triangle_mesh import TriangleMesh
+                    from fealpy.mesh import TriangleMesh
                     return TriangleMesh(node, cell) 
                 else:
-                    from fealpy.old.mesh.backup import LagrangeTriangleMesh
+                    from fealpy.mesh import LagrangeTriangleMesh
                     return LagrangeTriangleMesh(node, cell, p=p, surface=self) 
 
-        elif meshtype == 'quad':
+        elif mtype == 'quad':
             node = bm.array([
                 (-1, -1, -1),
                 (-1, -1, 1),
@@ -143,9 +146,9 @@ class SphereSurface():
                 return node, cell
             else:
                 if p is None:
-                    from fealpy.mesh.quadrangle_mesh import QuadrangleMesh 
+                    from fealpy.mesh import QuadrangleMesh 
                     return QuadrangleMesh(node, cell) 
                 else:
-                    from fealpy.old.mesh.backup import LagrangeQuadrangleMesh 
+                    from fealpy.mesh import LagrangeQuadrangleMesh 
                     return LagrangeQuadrangleMesh(node, cell, p=p, surface=self)
 

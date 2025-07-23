@@ -5,7 +5,7 @@ from .material_base import MaterialBase
 from ..functionspace.utils import flatten_indices
 
 from ..typing import TensorLike
-from typing import Optional, Tuple, List
+from typing import Optional, List
 
 class ElasticMaterial(MaterialBase):
     def __init__(self, name):
@@ -61,6 +61,7 @@ class LinearElasticMaterial(ElasticMaterial):
             poisson_ratio: Optional[float] = None, 
             lame_lambda: Optional[float] = None, 
             shear_modulus: Optional[float] = None,
+            density: Optional[float] = None,
             hypo: str = "3D",
             device: str = None):
         
@@ -93,16 +94,21 @@ class LinearElasticMaterial(ElasticMaterial):
 
         else:
             raise ValueError("You must provide either (elastic_modulus, poisson_ratio) or (lame_lambda, shear_modulus), or all four.")
+        
+        if density is not None:
+            self.set_property('density', density)
 
         self.E = self.get_property('elastic_modulus')
         self.nu = self.get_property('poisson_ratio')
         self.lam = self.get_property('lame_lambda')
         self.mu = self.get_property('shear_modulus')
+        self.rho = self.get_property('density')
 
         E = self.E
         nu = self.nu
         lam = self.lam
         mu = self.mu
+        rho = self.rho
 
         if hypo == "3D":
             self.D = bm.tensor([[2 * mu + lam, lam, lam, 0, 0, 0],
@@ -124,32 +130,37 @@ class LinearElasticMaterial(ElasticMaterial):
     
     @property
     def elastic_modulus(self) -> float:
-        """获取弹性模量"""
+        """Get Young's modulus"""
         return self.E
 
     @property
     def poisson_ratio(self) -> float:
-        """获取泊松比"""
+        """Get Poisson's ratio"""
         return self.nu
 
     @property
     def lame_lambda(self) -> float:
-        """获取拉梅常数 λ"""
+        """Get Lame's first parameter λ"""
         return self.lam
 
     @property
     def shear_modulus(self) -> float:
-        """获取剪切模量 μ"""
+        """Get shear modulus μ (Lame's second parameter)"""
         return self.mu
 
     @property
     def bulk_modulus(self) -> float:
-        """获取体积模量 K"""
+        """Get bulk modulus K"""
         return self.calculate_bulk_modulus()
     
     @property
+    def density(self) -> float:
+        """Get material density"""
+        return self.rho
+
+    @property
     def hypothesis(self) -> str:
-        """获取平面假设"""
+        """Get the plane hypothesis type"""
         return self.hypo
 
     def elastic_matrix(self, bcs: Optional[TensorLike] = None) -> TensorLike:
@@ -346,4 +357,3 @@ class LinearElasticMaterial(ElasticMaterial):
     
 
     
-

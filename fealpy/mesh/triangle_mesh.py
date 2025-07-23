@@ -1136,7 +1136,20 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @brief 找到定点 point 所在的单元，并计算其重心坐标 
         """
-        pass
+        index = self.location(point)
+        node = self.node
+        cell = self.entity('cell')
+        cm = self.cell_area()[index]
+        point = point[:, bm.newaxis, :]
+        v = node[cell[index]] - point
+        a0 = 0.5 * bm.abs(bm.cross(v[:, 1, :], v[:, 2, :]))
+        a1 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 2, :]))
+        a2 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 1, :]))
+        result = bm.zeros((index.shape[0], 3))
+        result[:, 0] = a0 / cm
+        result[:, 1] = a1 / cm
+        result[:, 2] = a2 / cm
+        return index, result
 
     def mark_interface_cell(self, phi):
         """
@@ -1165,18 +1178,91 @@ class TriangleMesh(SimplexMesh, Plotable):
         pass
 
     @classmethod
-    def show_lattice(cls, p=1, shownltiindex=False):
+    def show_lattice(cls, p=1, showmultiindex=False):
         """
         @berif 展示三角形上的单纯形格点
         """
-        pass
+        import matplotlib.pyplot as plt
+        import matplotlib.tri as mtri
+        if showmultiindex:
+            n = 3
+        else:
+            n = 2
+
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
+        node = mesh.entity('node')
+        ips = mesh.interpolation_points(p)
+        c2p = mesh.cell_to_ipoint(p)
+        ips = ips[c2p].reshape(-1, 2)
+
+        fig = plt.figure()
+        axes = fig.add_subplot(1, n, 1)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True, fontcolor='k')
+
+        axes = fig.add_subplot(1, n, 2)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, node=ips, showindex=True)
+        triangulation = mtri.Triangulation(ips[:, 0], ips[:, 1])
+        axes.triplot(triangulation, color='black', linestyle='dashed')
+        plt.show()
+
 
     @classmethod
     def show_shape_function(cls, p=1, funtype='L'):
         """
         @brief 可视化展示三角形单元上的 p 次基函数
         """
-        pass
+        import matplotlib.pyplot as plt
+
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
+        TD = mesh.top_dimension()
+        ldof = mesh.number_of_local_ipoints(p)
+
+        if p % 2 == 0:
+            m = (p + 2) // 2
+            n = p + 1
+        else:
+            m = (p + 1) // 2
+            n = p + 2
+
+        node = mesh.entity('node')
+        ips = mesh.interpolation_points(p)
+        c2p = mesh.cell_to_ipoint(p)
+        ips = ips[c2p].reshape(-1, 2)
+        bcs = mesh.multi_index_matrix(10 * p, TD) / 10 / p
+        ps = mesh.bc_to_point(bcs).reshape(len(bcs), -1)
+        if funtype == 'L':
+            phi = mesh.shape_function(bcs, p)
+        elif funtype == 'B':
+            phi = mesh._bernstein_shape_function(bcs, p)
+        fig = plt.figure()
+        for i in range(ldof):
+            axes = fig.add_subplot(m, n, i + 1, projection='3d')
+            axes.plot_trisurf(node[:, 0], node[:, 1], bm.zeros(3),
+                              color='#99BBF6', alpha=0.5)
+
+            for j in range(3):
+                axes.scatter(node[j, 0], node[j, 1], 0.0, color='k')
+                axes.text(node[j, 0], node[j, 1], 0.0, f'$x_{j}$', color='k')
+
+            axes.scatter(ips[i, 0], ips[i, 1], 1.0, color='r')
+            axes.text(ips[i, 0], ips[i, 1], 1 + 0.02, f'$p_{i}$', color='r')
+
+            axes.plot([ips[i, 0], ips[i, 0]], [ips[i, 1], ips[i, 1]], [0.0,
+                                                                       1.0], 'r--')
+
+            axes.plot_trisurf(ps[:, 0], ps[:, 1], phi[:, i], cmap='viridis',
+                              linewidths=0)
+            if p == 1:
+                axes.set_title(f'$\phi_{{{i}}}=\lambda_{{{i}}}$')
+            else:
+                axes.set_title(f'$\phi_{{{i}}}$')
+            axes.set_xlabel('X')
+            axes.set_ylabel('Y')
+            axes.set_zlabel('Z')
+        plt.show()
+
 
     @classmethod
     def show_global_basis_function(cls, p=3):
@@ -1664,4 +1750,137 @@ class TriangleMesh(SimplexMesh, Plotable):
 
 TriangleMesh.set_ploter('2d')
 
+class TriangleMeshWithInfinityNode(TriangleMesh):
+    def __init__(self, mesh, bc=True):
+        node = mesh.node
+        cell = mesh.cell
+        super().__init__(node, cell)
 
+        edge = mesh.edge
+        bdEdgeIdx = mesh.boundary_face_index()
+        NBE = len(bdEdgeIdx)
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
+
+        newCell = bm.zeros((NC + NBE, 3), dtype=self.itype)
+        newCell[:NC, :] = mesh.cell
+        newCell[NC:, 0] = NN
+        newCell[NC:, 1:3] = bm.flip(edge[bdEdgeIdx, 0:2],axis=1)
+
+        node = mesh.node
+        self.node = bm.concatenate([bm.tensor(node),bm.tensor([[bm.inf,
+                                                               bm.inf]])], axis=0)
+        self.cell = newCell
+        
+        self.construct()
+
+        if bc:
+            self.center = bm.concatenate((mesh.entity_barycenter('cell'),
+                                    0.5 * (node[edge[bdEdgeIdx, 0], :] +
+                                           node[edge[bdEdgeIdx, 1], :])), axis=0)
+        else:
+            self.center = bm.append(mesh.circumcenter(),
+                                    0.5 * (node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
+
+        self.meshtype = 'tri'
+
+    def is_infinity_cell(self):
+        N = self.number_of_nodes()
+        cell = self.cell
+        return cell[:, 0] == N - 1
+
+    def is_boundary_edge(self):
+        NE = self.number_of_edges()
+        cell2edge = self.cell_to_edge()
+        isInfCell = self.is_infinity_cell()
+        isBdEdge = bm.zeros(NE, dtype=bm.bool)
+        isBdEdge[cell2edge[isInfCell, 0]] = True
+        return isBdEdge
+
+    def is_boundary_node(self):
+        N = self.number_of_nodes()
+        edge = self.edge
+        isBdEdge = self.is_boundary_edge()
+        isBdNode = bm.zeros(N, dtype=bm.bool)
+        isBdNode[edge[isBdEdge, :]] = True
+        return isBdNode
+    def node_to_cell(self, return_local=False):
+        "false 是 bool"
+        NN = self.node.shape[0]
+        cell = self.cell 
+        NC = self.number_of_cells()
+        I = self.cell.reshape(-1)
+        J = bm.repeat(bm.arange(NC), 3)
+        if not return_local: # bool
+            val = bm.ones(NC*3, dtype=bm.bool)
+            return csr_matrix((val, (I, J)), shape=(self.number_of_nodes(),
+                                                    self.number_of_cells()))
+        else: # num
+            val = bm.tile(bm.arange(3, dtype=self.itype)+1,(NC,))
+            return csr_matrix((val, (I, J)), shape=(self.number_of_nodes(),
+                                                    self.number_of_cells()))
+            
+
+    def to_polygonmesh(self):
+        """
+
+        Notes
+        -----
+        把一个三角形网格转化为多边形网格。
+        """
+        isBdNode = self.is_boundary_node()
+        NB = isBdNode.sum()
+
+        nodeIdxMap = bm.zeros(isBdNode.shape, dtype=self.itype)
+        nodeIdxMap[isBdNode] = self.center.shape[0] + bm.arange(NB,dtype=self.itype)
+
+        pnode = bm.concatenate((self.center, self.node[isBdNode]), axis=0)
+        PN = pnode.shape[0]
+
+        node2cell = self.node_to_cell(return_local=True).toarray()
+        NV = bm.asarray((node2cell > 0).sum(axis=1)).reshape(-1)
+        NV[isBdNode] += 1
+        NV = NV[:-1]
+
+        PNC = len(NV)
+        pcell = bm.zeros(NV.sum(), dtype=self.itype)
+        pcellLocation = bm.zeros(PNC + 1, dtype=self.itype)
+        pcellLocation[1:] = bm.cumsum(bm.tensor(NV,),axis=0)
+
+        isBdEdge = self.is_boundary_edge()
+        NC = self.number_of_cells() - isBdEdge.sum()
+        cell = self.cell
+        currentCellIdx = bm.zeros(PNC, dtype=self.itype)
+        currentCellIdx[cell[:NC, 0]] = bm.arange(NC,dtype=self.itype)
+        currentCellIdx[cell[:NC, 1]] = bm.arange(NC,dtype=self.itype)
+        currentCellIdx[cell[:NC, 2]] = bm.arange(NC,dtype=self.itype)
+        pcell[pcellLocation[:-1]] = currentCellIdx
+
+        currentIdx = pcellLocation[:-1]
+        N = self.number_of_nodes() - 1
+        currentNodeIdx = bm.arange(N, dtype=self.itype)
+        endIdx = pcellLocation[1:]
+        cell2cell = self.cell_to_cell()
+        isInfCell = self.is_infinity_cell()
+        pnext = bm.array([1, 2, 0], dtype=self.itype)
+        while True:
+            isNotOK = (currentIdx + 1) < endIdx
+            currentIdx = currentIdx[isNotOK]
+            currentNodeIdx = currentNodeIdx[isNotOK]
+            currentCellIdx = pcell[currentIdx]
+            endIdx = endIdx[isNotOK]
+            if len(currentIdx) == 0:
+                break
+            localIdx = bm.asarray(node2cell[currentNodeIdx, currentCellIdx]) - 1
+            cellIdx = bm.asarray(cell2cell[currentCellIdx, pnext[localIdx]]).reshape(-1)
+            isBdCase = isInfCell[currentCellIdx] & isInfCell[cellIdx]
+            if bm.any(isBdCase):
+                pcell[currentIdx[isBdCase] + 1] = nodeIdxMap[currentNodeIdx[isBdCase]]
+                currentIdx[isBdCase] += 1
+            pcell[currentIdx + 1] = cellIdx
+            currentIdx += 1
+        pcell = (pcell.reshape(-1),pcellLocation)
+        return pnode, pcell

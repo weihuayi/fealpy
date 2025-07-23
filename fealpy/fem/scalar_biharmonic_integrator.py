@@ -20,11 +20,12 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
                  index: Index = _S,
                  batched: bool = False,
                  method: Literal['fast', 'nonlinear', 'isopara', None] = None) -> None:
-        super().__init__(method=method)
+        super().__init__()
         self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -73,7 +74,3 @@ class ScalarBiharmonicIntegrator(LinearInt, OpInt, CellInt):
         TODO: 加入 assert
         """
         pass
-
-    @assembly.selector
-    def assembly(self):
-        return self.method

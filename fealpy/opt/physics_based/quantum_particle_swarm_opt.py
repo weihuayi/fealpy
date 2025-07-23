@@ -49,10 +49,10 @@ class QuantumParticleSwarmOpt(Optimizer):
             self.D_pl_pt(it)
             
             # Compute the contraction-expansion coefficient alpha
-            alpha = bm.array(alpha_max - (alpha_max - alpha_min) * (it + 1) / self.MaxIT)
+            alpha = bm.array(alpha_max - (alpha_max - alpha_min) * (it + 1) / self.MaxIT, dtype=bm.float64)
             
             # Compute the average of all particle best positions (mbest) for global search
-            mbest = bm.sum(pbest, axis=0) / self.N
+            mbest = bm.sum(pbest, axis=0, dtype=bm.float64) / self.N
             
             # Generate random factors to simulate quantum behavior
             phi = bm.random.rand(self.N, self.dim)  # Random factor
