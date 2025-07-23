@@ -126,25 +126,5 @@ class ModelManager:
 
 class PDEModelManager(ModelManager):
     _registry = {
-        "poisson": "fealpy.model.poisson",
-        "diffusion": "fealpy.model.diffusion",
-        "diffusion_convection": "fealpy.model.diffusion_convection",
-        "diffusion_convection_reaction": "fealpy.model.diffusion_convection_reaction",
-        "diffusion_reaction": "fealpy.model.diffusion_reaction",
-        "parabolic": "fealpy.model.parabolic",
-        "wave": "fealpy.model.wave",
-        "hyperbolic":"fealpy.model.hyperbolic",
-        "interface_poisson":"fealpy.model.interface_poisson",
-        "ion_flow":"fealpy.model.ion_flow",
-        "nonlinear":"fealpy.model.nonlinear",
-        "linear_elasticity": "fealpy.model.linear_elasticity",
-        "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
-        "polyharmonic": "fealpy.model.polyharmonic",
-        "stokes": "fealpy.model.stokes",
-        "linear_elasticity": "fealpy.model.linear_elasticity",
-        "allen_cahn": "fealpy.model.allen_cahn",
-        "optimal_control": "fealpy.model.optimal_control",
-        "helmholtz": "fealpy.model.helmholtz",
-        "surface_poisson": "fealpy.model.surface_poisson",
-        "curlcurl":"fealpy.model.curlcurl"
+        "stationary_incompressible_navier_stokes": "fealpy.cfd.model.test.stationary_incompressible_navier_stokes"
     }

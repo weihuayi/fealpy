@@ -1,6 +1,8 @@
 from fealpy.backend import backend_manager as bm
+from fealpy.cfd.equation.stationary_incompressible_ns import StationaryIncompressibleNS
 from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
-import sympy as sp
+from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
+from fealpy.cfd.model.test import PDEModelManager
 import argparse
 
 ## 参数解析
@@ -12,22 +14,10 @@ parser = argparse.ArgumentParser(description=
 parser.add_argument('--backend',
     default='numpy', type=str,
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
-
-parser.add_argument('--GD',
-    default='2d', type=str,
-    help="Geometry dimension, default is 2d. You can also choose 3d.")
     
 parser.add_argument('--pde',
-    default='sinsin', type=str,
-    help="Name of the PDE model, default is sinsin")
-
-parser.add_argument('--rho',
-    default=1.0, type=float,
-    help="Density of the fluid, default is 1.0")
-
-parser.add_argument('--mu',
-    default=1.0, type=float,
-    help="Viscosity of the fluid, default is 1.0")
+    default= 1, type=str,
+    help="Name of the PDE model, default is exp0001")
 
 parser.add_argument('--init_mesh',
     default='tri', type=str,
@@ -73,4 +63,11 @@ parser.add_argument('--tol',
 options = vars(parser.parse_args())
 
 bm.set_backend(options['backend'])
-model = StationaryIncompressibleNSLFEMModel(options)
+manager = PDEModelManager('stationary_incompressible_navier_stokes')
+pde = manager.get_example(options['pde'])
+print(f"Using PDE: {type(pde)}")
+equation = StationaryIncompressibleNS(pde=pde)
+fem = None
+mesh = None
+
+model = StationaryIncompressibleNSLFEMModel(equation, options)

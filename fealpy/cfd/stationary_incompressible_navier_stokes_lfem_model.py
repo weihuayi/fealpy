@@ -10,18 +10,20 @@ from fealpy.utils import timer
 import time
 
 class StationaryIncompressibleNSLFEMModel(ComputationalModel):
-    def __init__(self, options):
+    def __init__(self, equation, options):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.set_pde[options['GD']](options['pde'], rho=options['rho'], mu=options['mu'])
+        self.options = options
+        self.equation = equation
+        self.pde = equation.pde
+        # self.set_pde[options['GD']](options['pde'], rho=options['rho'], mu=options['mu'])
         
-        set_init_mesh = self.set_init_mesh[options['GD']]
-        if options['GD'] == '2d':
-            set_init_mesh(options['init_mesh'], options['nx'], options['ny'])
-        else:  # '3d'
-            set_init_mesh(options['init_mesh'], options['nx'], options['ny'], options['nz'])
+        # set_init_mesh = self.set_init_mesh[options['GD']]
+        # if options['GD'] == '2d':
+        #     set_init_mesh(options['init_mesh'], options['nx'], options['ny'])
+        # else:  # '3d'
+        #     set_init_mesh(options['init_mesh'], options['nx'], options['ny'], options['nz'])
         
         self.solve.set(options['solve'])
-        self.equation = StationaryIncompressibleNS(self.pde)
         self.fem = self.method[options['method']]()
 
         run = self.run[options['run']]
@@ -30,55 +32,55 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         else:  # 'one_step' 或其他
             run(maxstep=options['maxstep'], tol=options['tol'])
         
-    @variantmethod("2d")
-    def set_pde(self, pde = "sinsin", rho = 1.0, mu = 1.0):
-        """
-        Set the PDE data for the model.
-        """
-        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
-        self.pde = FromSympy(rho=rho, mu=mu)
-        self.pde.select_pde[pde]()
+    # @variantmethod("2d")
+    # def set_pde(self, pde = "sinsin", rho = 1.0, mu = 1.0):
+    #     """
+    #     Set the PDE data for the model.
+    #     """
+    #     from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
+    #     self.pde = FromSympy(rho=rho, mu=mu)
+    #     self.pde.select_pde[pde]()
 
-    @set_pde.register("3d")
-    def set_pde(self, pde = "poly3d", rho = 1.0, mu = 1.0):
-        """
-        Set the PDE data for the model in 3D.
-        """
-        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_3d import FromSympy
-        self.pde = FromSympy(rho=rho, mu=mu)
-        self.pde.select_pde[pde]()
+    # @set_pde.register("3d")
+    # def set_pde(self, pde = "poly3d", rho = 1.0, mu = 1.0):
+    #     """
+    #     Set the PDE data for the model in 3D.
+    #     """
+    #     from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_3d import FromSympy
+    #     self.pde = FromSympy(rho=rho, mu=mu)
+    #     self.pde.select_pde[pde]()
     
-    @variantmethod("2d")
-    def set_init_mesh(self, mesh = "tri", nx=8, ny=8):
-        """
-        Set the initial mesh for the model.
-        """
-        if isinstance(mesh, str):
-            mesh = self.pde.init_mesh[mesh](nx=nx, ny=ny)
-        else:
-            mesh = mesh
+    # @variantmethod("2d")
+    # def set_init_mesh(self, mesh = "tri", nx=8, ny=8):
+    #     """
+    #     Set the initial mesh for the model.
+    #     """
+    #     if isinstance(mesh, str):
+    #         mesh = self.pde.init_mesh[mesh](nx=nx, ny=ny)
+    #     else:
+    #         mesh = mesh
 
-        NN = self.pde.mesh.number_of_nodes()
-        NE = self.pde.mesh.number_of_edges()
-        NF = self.pde.mesh.number_of_faces()
-        NC = self.pde.mesh.number_of_cells()
-        # self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+    #     NN = self.pde.mesh.number_of_nodes()
+    #     NE = self.pde.mesh.number_of_edges()
+    #     NF = self.pde.mesh.number_of_faces()
+    #     NC = self.pde.mesh.number_of_cells()
+    #     # self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
     
-    @set_init_mesh.register("3d")
-    def set_init_mesh(self, mesh = "tet", nx=8, ny=8, nz=8):
-        """
-        Set the initial mesh for the model in 3D.
-        """
-        if isinstance(mesh, str):
-            mesh = self.pde.init_mesh[mesh](nx=nx, ny=ny, nz=nz)
-        else:
-            mesh = mesh
+    # @set_init_mesh.register("3d")
+    # def set_init_mesh(self, mesh = "tet", nx=8, ny=8, nz=8):
+    #     """
+    #     Set the initial mesh for the model in 3D.
+    #     """
+    #     if isinstance(mesh, str):
+    #         mesh = self.pde.init_mesh[mesh](nx=nx, ny=ny, nz=nz)
+    #     else:
+    #         mesh = mesh
 
-        NN = self.pde.mesh.number_of_nodes()
-        NE = self.pde.mesh.number_of_edges()
-        NF = self.pde.mesh.number_of_faces()
-        NC = self.pde.mesh.number_of_cells()
-        # self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+    #     NN = self.pde.mesh.number_of_nodes()
+    #     NE = self.pde.mesh.number_of_edges()
+    #     NF = self.pde.mesh.number_of_faces()
+    #     NC = self.pde.mesh.number_of_cells()
+    #     # self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
     @variantmethod("Newton")
     def method(self): 
