@@ -58,4 +58,3 @@ options['ny'] = n * 2
 options['nz'] = n * 2
 model = LinearElasticityEigenLFEMModel(options)
 model.solve()
-model.show_mesh()

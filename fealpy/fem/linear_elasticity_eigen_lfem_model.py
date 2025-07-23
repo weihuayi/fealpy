@@ -174,7 +174,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         """
         # Implementation of the linear system construction goes here
         GD = self.mesh.geo_dimension()
-        self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
+        self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(-1, GD))
 
         bform = BilinearForm(self.space)
         integrator = LinearElasticityIntegrator(self.pde.material)
@@ -214,6 +214,8 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         k = self.options.get('neign', 6)
         val, vec = eigsh(S, k=k, M=M, which='SM', tol=1e-6, maxiter=1000)
 
+        self.show_modal(val, vec)
+
 
     def show_mesh(self):
         from matplotlib import pyplot as plt
@@ -230,5 +232,27 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
     def show_modal(self, val, vec):
         from matplotlib import pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
+
+        GD = self.mesh.geo_dimension()
+        node = self.mesh.entity('node')
+        node0 = node.copy()
+        isBdNode = self.pde.is_displacement_boundary(node)
+
+        fig = plt.figure()
+        start = 231
+        axes = fig.add_subplot(start, projection='3d')
+        self.mesh.add_plot(axes)
+        self.mesh.find_node(axes, index=isBdNode)
+
+        for i in range(2, 7):
+            start += 1
+            u = vec[:, i - 2].reshape(-1, GD)
+            node[:] += 0.01 * u
+            print(u[isBdNode, :])
+            axes = fig.add_subplot(start, projection='3d')
+            self.mesh.add_plot(axes)
+            node[:] = node0
+        plt.show()
+           
 
 
