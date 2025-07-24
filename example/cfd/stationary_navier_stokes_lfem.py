@@ -1,6 +1,5 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
-import sympy as sp
 import argparse
 
 ## 参数解析

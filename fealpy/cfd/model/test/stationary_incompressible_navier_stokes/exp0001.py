@@ -7,7 +7,7 @@ import sympy as sp
 
 class Exp0001(BoxMesher2d):
     """
-    2D steady incompressible Navier-Stokes problem for a Newtonian fluid:
+    2D stationay incompressible Navier-Stokes problem for a Newtonian fluid:
 
         ρ[(u · ∇)u] = ∇·σ + ρ·f,       in Ω × (0, T]
               ∇·u = 0,                in Ω × (0, T]
@@ -42,7 +42,7 @@ class Exp0001(BoxMesher2d):
 
         Ω = (0, 1) × (0, 1)
     
-    Parameter setting:
+    Parameters
 
         ρ = 1.0       # Fluid density
         μ = 1.0       # Dynamic viscosity
@@ -50,7 +50,7 @@ class Exp0001(BoxMesher2d):
     This exact solution represents a smooth, divergence-free flow field,
     designed to validate numerical solvers via the method of manufactured solutions.
 
-    Reference:
+    Reference
         https://www.sciencedirect.com/science/article/abs/pii/S0045782508004222
     """
     def __init__(self, options: dict = {}):
@@ -63,6 +63,20 @@ class Exp0001(BoxMesher2d):
         self._init_expr()
         super().__init__(box=self.box)
 
+    def __str__(self) -> str:
+        """Return a nicely formatted, multi-line summary of the PDE configuration."""
+        s = f"{self.__class__.__name__}(\n"
+        s += f"  problem            : 2D stationary incompressible Navier-Stokes\n"
+        s += f"  domain             : {self.box}\n"
+        s += f"  mesh size          : nx = {self.nx}, ny = {self.ny}\n"
+        s += f"  density (ρ)        : {self.rho}\n"
+        s += f"  viscosity (μ)      : {self.mu}\n"
+        s += f"  exact_velocity_x   : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
+        s += f"  exact_velocity_y   : u_2(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²\n"
+        s += f"  exact_pressure     : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
+        s += f")"
+        return s
+
     def get_dimension(self) -> int: 
         """Return the geometric dimension of the domain."""
         return 2
@@ -73,6 +87,8 @@ class Exp0001(BoxMesher2d):
     
     def init_mesh(self, nx, ny):
         mesh = super().init_mesh['uniform_tri'](nx=nx, ny=ny)
+        self.nx = nx
+        self.ny = ny
         return mesh
     
     @cartesian
