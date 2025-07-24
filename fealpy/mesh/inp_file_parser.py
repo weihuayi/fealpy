@@ -83,8 +83,58 @@ class ElementSection(Section):
         self.cell = bm.array(self._cell)
 
 
+class ElsetSection(Section):
+    """
+    Parses the *Elset section, storing named element sets.
+    """
+    keyword = 'ELSET'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.name = options.get('elset', '')
+        self.generate = options.get('generate', '').lower() == 'true'
+        self._id: List[int] = []
+        self.id: Optional[Any] = None
+
+    def parse_line(self, line: str) -> None:
+        parts = re.split(r'\s*,\s*', line)
+        if self.generate:
+            # e.g., 1, 10, 1  means: 1 2 3 ... 10
+            start, stop, step = map(int, parts[:3])
+            self._id.extend(range(start, stop + 1, step))
+        else:
+            for p in parts:
+                if p:
+                    self._id.append(int(p))
+
+    def finalize(self) -> None:
+        self.id = bm.array(self._id)
+
+
+class NsetSection(Section):
+    """
+    Parses the *Nset section, storing named node sets.
+    """
+    keyword = 'NSET'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.name = options.get('nset', '')
+        self._id: List[int] = []
+        self.id: Optional[Any] = None
+
+    def parse_line(self, line: str) -> None:
+        parts = re.split(r'\s*,\s*', line)
+        for p in parts:
+            if p:
+                self._id.append(int(p))
+
+    def finalize(self) -> None:
+        self.id = bm.array(self._id)
+
+
 # Registry of available section handlers
-SECTION_REGISTRY: List[Type[Section]] = [NodeSection, ElementSection]
+SECTION_REGISTRY: List[Type[Section]] = [NodeSection, ElementSection, ElsetSection, NsetSection]
 
 
 class InpFileParser:
@@ -122,9 +172,13 @@ class InpFileParser:
         keyword = parts[0]
         options: Dict[str, str] = {}
         for part in parts[1:]:
+            if not part.strip():
+                continue  # 跳过空字符串
             if '=' in part:
                 k, v = part.split('=', 1)
                 options[k.strip()] = v.strip()
+            else:
+                options[part.strip().lower()] = 'true'
         # find matching section handler
         for sec_cls in SECTION_REGISTRY:
             if sec_cls.match_keyword(keyword):
@@ -137,6 +191,9 @@ class InpFileParser:
                 return sec
         return None
 
+    def get_sections(self, section_type: Type[Section]) -> List[Section]:
+        return [sec for sec in self.sections if isinstance(sec, section_type)]
+  
     def to_mesh(self, mesh_type):
         ns = self.get_section(NodeSection)
         es = self.get_section(ElementSection)
@@ -146,7 +203,7 @@ class InpFileParser:
 
 # Example usage:
 if __name__ == '__main__':
-    parser = AbaqusInpParser()
+    parser = InpFileParser()
     parser.parse('/home/why/fealpy/data/LANXIANG_KETI_0506.inp')
     nodes = parser.get_section(NodeSection)
     elems = parser.get_section(ElementSection)

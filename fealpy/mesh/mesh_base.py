@@ -48,10 +48,6 @@ class Mesh(MeshDS):
                                'has not been assigned.')
         return node.shape[-1]
 
-    def __str__(self) -> str:
-        """String representation of the mesh."""
-        pass
-
     GD = property(geo_dimension)
 
     def multi_index_matrix(self, p: int, etype: int, dtype=None, device=None) -> TensorLike:
