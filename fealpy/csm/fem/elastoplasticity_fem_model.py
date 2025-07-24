@@ -1,5 +1,5 @@
 from ...backend import backend_manager as bm
-from ..model import ComputationalModel
+from ...model import ComputationalModel
 from ..model import CSMModelManager
 from ...fem import BilinearForm
 from ...fem import LinearForm
