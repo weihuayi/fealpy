@@ -18,9 +18,9 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     """
     A class to represent a surface Poisson problem using the Lagrange finite element method (LFEM).
     
-    Attributes:
+    Attributes
         mesh: The mesh of the domain.                                           
-    Reference:
+    Reference
         https://wnesm678i4.feishu.cn/wiki/SsOKwQiVqi241WkusA9cn9ylnPf
     """
     
@@ -32,14 +32,14 @@ class SurfacePoissonLFEMModel(ComputationalModel):
        self.set_init_mesh(options['mesh_degree'], options['init_mesh']) 
        self.set_space_degree(options['space_degree']) 
     
-    def set_pde(self, pde: Union[SurfacePDEDataT, str] = "exp0001") -> None:
-        if isinstance(pde, str):
-            self.pde = PDEModelManager("surface_poisson").get_example(1)
+    def set_pde(self, pde: Union[SurfacePDEDataT, int] = 1) -> None:
+        if isinstance(pde, int):
+            self.pde = PDEModelManager("surface_poisson").get_example(pde)
         else:
             self.pde = pde
 
     def set_init_mesh(self, p:int, mesh:Union[Mesh, str] = "ltri", **kwargs):
-        if isinstance(mesh,str):
+        if isinstance(mesh, str):
             self.mesh = self.pde.init_mesh[mesh](p, **kwargs)
         else:
             self.mesh = mesh
@@ -48,8 +48,6 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
         NC = self.mesh.number_of_cells()
-        #fname = f"sphere_test.vtu"
-        #self.mesh.to_vtk(fname=fname)
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
     def set_space_degree(self, p: int) -> None:
@@ -59,7 +57,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         """
         Construct the linear system for the surface problem.
 
-        Returns:
+        Returns
             The diffusion matrix and source matrix.
         """
         self.space = ParametricLagrangeFESpace(self.mesh, self.p)

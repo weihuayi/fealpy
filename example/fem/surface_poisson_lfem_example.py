@@ -11,8 +11,8 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='sphere', type=str,
-                    help='Name of the PDE model, default is sphere')
+                    default=1, type=int,
+                    help='id of the PDE model, default is 1')
 
 parser.add_argument('--init_mesh',
                     default='ltri', type=str,
@@ -42,5 +42,3 @@ bm.set_backend(options['backend'])
 from fealpy.fem import SurfacePoissonLFEMModel
 model = SurfacePoissonLFEMModel(options)
 model.solve['cg']()
-model.run()
-#model.run['uniform_refine']()
