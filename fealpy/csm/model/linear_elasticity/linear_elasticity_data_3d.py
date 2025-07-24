@@ -1,13 +1,13 @@
 from typing import Optional
 
-from ....backend import bm
-from ....typing import TensorLike
-from ....decorator import cartesian
-from ....material import LinearElasticMaterial
-from ....mesher import BoxMesher3d
+from fealpy.backend import bm
+from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
+from fealpy.material import LinearElasticMaterial
+from fealpy.mesher import BoxMesher3d
 
 
-class Exp0001(BoxMesher3d):
+class LinearElasticityData3D(BoxMesher3d):
     """Example class defining a 3D box mesh and physical parameters for test case Exp0001.
 
     This class inherits from BoxMesher3d to generate a unit box mesh in 3D,
@@ -28,7 +28,7 @@ class Exp0001(BoxMesher3d):
     def __init__(self, options = {'L':1.0, 'W':0.2}):
         self.L = options['L']
         self.W = options['W']
-        super().__init__(box=[0, L, 0, W , 0, W])
+        super().__init__(box=[0, self.L, 0, self.W, 0, self.W])
 
         delta = self.W / self.L  # aspect ratio
         self.g = 0.4 * delta**2  # gravity acceleration
