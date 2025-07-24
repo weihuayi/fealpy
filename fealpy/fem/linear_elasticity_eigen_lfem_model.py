@@ -145,16 +145,13 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
 
     def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tet", **kwargs):
         """
+        TODO: update this interface to set_mesh
         """
         if isinstance(mesh, str):
             self.mesh = self.pde.init_mesh[mesh](**kwargs)
         else:
             self.mesh = mesh
-        NN = self.mesh.number_of_nodes()
-        NE = self.mesh.number_of_edges()
-        NF = self.mesh.number_of_faces()
-        NC = self.mesh.number_of_cells()
-        self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+        self.logger.info(self.mesh)
 
     def set_pde(self, pde: Union[LinearElasticityPDEDataT, int] = 1) -> None:
         if isinstance(pde, int):
@@ -198,9 +195,13 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
                 self.space,
                 gd=self.pde.displacement_bc,
                 threshold=self.pde.is_displacement_boundary)
-        self.bc.apply_matrix(S)
-        self.bc.apply_matrix(M)
-        return S.to_scipy(), M.to_scipy()
+        isFreeDof = bm.logical_not(self.bc.is_boundary_dof)
+        S = S.to_scipy()[isFreeDof, :][:, isFreeDof]
+        M = M.to_scipy()[isFreeDof, :][:, isFreeDof]
+        #self.bc.apply_matrix(S)
+        #self.bc.apply_matrix(M)
+        #return S.to_scipy(), M.to_scipy()
+        return S, M
 
     def solve(self):
         """
@@ -213,6 +214,8 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         S, M = self.apply_bc(S, M)
         k = self.options.get('neign', 6)
         val, vec = eigsh(S, k=k, M=M, which='SM', tol=1e-6, maxiter=1000)
+
+        self.logger.info(f"Eigenvalues: {val}")
 
         self.show_modal(val, vec)
 
@@ -237,6 +240,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         node = self.mesh.entity('node')
         node0 = node.copy()
         isBdNode = self.pde.is_displacement_boundary(node)
+        isFreeNode = bm.logical_not(isBdNode)
 
         fig = plt.figure()
         start = 231
@@ -247,8 +251,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         for i in range(2, 7):
             start += 1
             u = vec[:, i - 2].reshape(-1, GD)
-            node[:] += 0.01 * u
-            print(u[isBdNode, :])
+            node[isFreeNode] += 0.02 * u
             axes = fig.add_subplot(start, projection='3d')
             self.mesh.add_plot(axes)
             node[:] = node0
