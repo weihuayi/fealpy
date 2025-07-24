@@ -19,9 +19,6 @@ class Newton(FEM):
         FEM.__init__(self, equation)
         self.threshold = boundary_threshold
 
-    def simulation(self):
-        pass
-
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
@@ -32,11 +29,16 @@ class Newton(FEM):
         self.u_BM = ScalarMassIntegrator(q=q)
         self.u_BM_netwon = ScalarMassIntegrator(q=q)
         self.u_BC = ScalarConvectionIntegrator(q=q)
-        self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        self.u_BVW = ViscousWorkIntegrator(q=q)
+        # self.u_BVW = ScalarDiffusionIntegrator(q = q)
+        #self.u_BFBF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold)
+        #self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        
         A00.add_integrator(self.u_BM)
         A00.add_integrator(self.u_BM_netwon)
         A00.add_integrator(self.u_BC)
         A00.add_integrator(self.u_BVW)
+        #A00.add_integrator(self.u_BFBF)
         
         A01 = BilinearForm((pspace, uspace))
         self.u_BPW = PressWorkIntegrator(q=q)
@@ -46,9 +48,7 @@ class Newton(FEM):
         self.p_BPW = PressWorkIntegrator(q=q)
         A10.add_integrator(self.p_BPW)
         
-        A11 = BilinearForm(pspace)
-        A11.add_integrator(ScalarMassIntegrator(coef=1e-12))
-        A = BlockForm([[A00, A01], [A10.T, A11]]) 
+        A = BlockForm([[A00, A01], [A10.T, None]]) 
         return A
         
     def LForm(self):

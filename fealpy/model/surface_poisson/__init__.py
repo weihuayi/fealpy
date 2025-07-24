@@ -1,4 +1,4 @@
-from typing import Protocol, overload, TypeVar
+from typing import Protocol, Sequence, TypeVar
 from ...typing import TensorLike
 
 class SurfaceLeveLSetPDEDataProtocol(Protocol):
@@ -20,9 +20,7 @@ class SurfaceLeveLSetPDEDataProtocol(Protocol):
         - hessian(p): (..., 3, 3)
     """
 
-    def init_mesh(self): ...
-
-    @overload
+    def geo_dimension(self) -> int: ...
     def solution(self, p: TensorLike) -> TensorLike: ...
     def gradient_of_solution(self, p: TensorLike) -> TensorLike: ...
     def source(self, p: TensorLike) -> TensorLike: ...
@@ -38,5 +36,5 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "sphere": ("surface_level_set_data", "SurfaceLevelSetData")
+    1: ("exp0001", "Exp0001")
 }

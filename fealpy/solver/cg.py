@@ -40,8 +40,7 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         This implementation assumes that A is a symmetric positive-definite matrix,
         which is a common requirement for the Conjugate Gradient method to work correctly.
     """
- 
-
+     
     assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
         assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"
@@ -76,7 +75,9 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
 
 def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul, atol, rtol, maxit):
     # initialize
-    info = {}
+    info = {'residual': 0.0, 'niter': 0}
+    if bm.linalg.norm(b) < 1e-15:
+        return bm.zeros_like(b), info
     x = x0              # (dof, batch)
     r = b - A @ x       # (dof, batch)
     z = M @ r if M is not None else r
@@ -100,6 +101,7 @@ def _cg_impl(A: SupportsMatmul, b: TensorLike, x0: TensorLike, M: SupportsMatmul
         n_iter += 1
         info['residual'] = r_norm_new
         info['niter'] = n_iter
+
         if r_norm_new < atol:
             logger.info(f"CG: converged in {n_iter} iterations, "
                         "stopped by absolute tolerance.")
