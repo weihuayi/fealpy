@@ -1,11 +1,11 @@
 ### Cell Operator
-from .beam_diffusion_integrator import BeamDiffusionIntegrator
-from .beam_uniform_source_integrator import BeamSourceIntegrator
-from .beam_concentrated_source_integrator import BeamPLSourceIntegrator
+from .euler_bernoulli_beam_diffusion_integrator import EulerBernoulliBeamDiffusionIntegrator
+from .euler_bernoulli_beam_uniform_source_integrator   import EulerBernoulliBeamSourceIntegrator
+from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliBeamPLSourceIntegrator
 
 
 ### Model Operator
-from .beam_fem_model import BeamFEMModel
+from .euler_bernoulli_beam_fem_model import EulerBernoulliBeamFEMModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
 from .elastoplastic_integrator import ElastoplasticIntegrator
 

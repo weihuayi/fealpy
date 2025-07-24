@@ -4,14 +4,31 @@ from fealpy.backend import TensorLike
 from typing import Tuple
 from fealpy.mesh import TriangleMesh
 
-class exp1():
+class ElastoplasticityData2D:
     """
     2D Elasto-Plastic Beam with von Mises Yield and Ziegler Hardening
 
-    Domain: (0, 1) x (0, 0.25) dm
-    Left and bottom boundaries are symmetric (clamped),
-    Neumann traction applies on the top boundary (y=0.25),
-    with time-dependent loading.
+    Attributes
+        E : float
+            Young's modulus (MPa).
+        nu : float
+            Poisson's ratio.
+        a : float
+            Hardening modulus (MPa).
+        sigma_y0 : float
+            Initial yield stress (MPa).
+        H : float
+            Ziegler hardening parameter.
+        dim : int
+            Spatial dimension (2 for 2D).
+        Ft_max : float
+            Maximum traction force (N).
+        n : int
+            Mesh refinement level.
+
+    Domain: (0, 1) x (0, 0.25) dm.
+    The left and bottom boundaries are clamped (zero displacement).
+    A time-dependent Neumann traction is applied on the top boundary (y=0.25).
     """
 
     def __init__(self):
@@ -27,6 +44,18 @@ class exp1():
 
         self.lam = self.compute_lambda()
         self.mu = self.compute_mu()
+        
+    def __str__(self) -> str:
+        """Return a multi-line summary including PDE type and key params."""
+        return (
+            f"\n  elastoplasticity (2D Elasto-Plastic)\n"
+            f"  Box dimensions: L = 5.0, W = 5.0 dm\n"
+            f"  Young's modulus: E = {self.E} MPa\n"
+            f"  Poisson's ratio: nu = {self.nu}\n"
+            f"  Hardening modulus: a = {self.a} MPa\n"
+            f"  Initial yield stress: sigma_y0 = {self.sigma_y0} MPa\n"
+            f"  Ziegler hardening parameter: H = {self.H}\n"
+        )
 
     def compute_lambda(self):
         return self.E * self.nu / ((1 + self.nu) * (1 - 2 * self.nu))
