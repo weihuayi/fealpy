@@ -362,12 +362,16 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
         F = self.vector_assembly()
         
         bd_condition = self.boundary_move()
-        self.bc.gd = bd_condition
-        H,F = self.bc.apply(H,F)
+        F_new = bm.zeros((self.NN,self.GD),**self.kwargs0)
+        H0 = H.copy()
+        for i in range(self.GD):
+            self.bc.gd = bd_condition[:,i]
+            H, F0 = self.bc.apply(H0, F[:,i])
+            F_new[:,i] = F0
 
         H_bar = bmat([[H, None],
                  [None, H]],format='csr')
-        F_flat = F.T.flatten()
+        F_flat = F_new.T.flatten()
         x = spsolve(H_bar,F_flat,solver='scipy')
         TD = self.TD
         NN = self.NN
@@ -444,13 +448,14 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
             
             error = bm.max(bm.linalg.norm(node - self.node,axis=1))
             print(f"iteration {i} , error: {error}")
-            
-            if i>=2 and error < self.tol:
-                break
-
             self.linear_interpolate(node)
             old_M = self.M.copy()
             self.construct(node)
+            
+            if error < self.tol:
+                break
+
+            
             
     def preprocessor(self,fun_solver =None):
         """

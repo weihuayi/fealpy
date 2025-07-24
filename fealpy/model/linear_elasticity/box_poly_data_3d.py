@@ -2,7 +2,7 @@ from typing import Optional
 from ...backend import backend_manager as bm
 from ...decorator import cartesian, variantmethod
 from ...typing import  TensorLike
-from ..box_domain_mesher import BoxDomainMesher3d
+from ..domain_mesher.box_domain_mesher import BoxDomainMesher3d
 
 class BoxPolyData3d(BoxDomainMesher3d):
     """
@@ -42,6 +42,10 @@ class BoxPolyData3d(BoxDomainMesher3d):
         """Second Lamé parameter μ (shear modulus) = 4e5 MPa."""
         return 4e5
     @property
+    def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
+        """Material density ρ = 1e4 kg/m³."""
+        return 1e4
+
     def rho(self, p: Optional[TensorLike] = None) -> TensorLike:
         """Material density ρ = 1e4 kg/m³."""
         return 1e4
