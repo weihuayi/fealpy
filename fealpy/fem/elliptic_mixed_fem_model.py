@@ -1,6 +1,6 @@
 from typing import Optional, Union
 from ..model import ComputationalModel
-from ..model.elliptic import EllipticPDEDataT
+# from ..model.elliptic import EllipticPDEDataT
 
 from ..functionspace import RaviartThomasFESpace2d
 from ..functionspace import LagrangeFESpace
@@ -10,7 +10,7 @@ from ..fem import DivIntegrator
 from ..fem import BlockForm
 from ..backend import backend_manager as bm
 from ..fem import DirichletBC
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ..decorator import variantmethod
 from ..mesh import Mesh
 
@@ -70,12 +70,12 @@ class EllipticMixedFEMModel(ComputationalModel):
         self.run.set(options['run'])
         
 
-    def set_pde(self, pde: Union[EllipticPDEDataT, str]="coscos"):
+    def set_pde(self, pde: Union[str]="coscos"):
         """
         Set the PDE data for the model.
         """
         if isinstance(pde, str):
-            self.pde = PDEDataManager('elliptic').get_example(pde)
+            self.pde = PDEModelManager('elliptic').get_example(pde)
         else:
             self.pde = pde
 

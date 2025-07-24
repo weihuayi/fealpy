@@ -90,7 +90,6 @@ class Ossen(FEM):
         @barycentric
         def u_LSI_coef(bcs, index):
             ctdcoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
-            cccoef = cc(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
             
             result = ctdcoef * u00(bcs, index) / dt
