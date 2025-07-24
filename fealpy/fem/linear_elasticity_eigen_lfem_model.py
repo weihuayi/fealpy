@@ -14,7 +14,6 @@ from ..fem import LinearElasticityIntegrator
 from ..fem import ScalarMassIntegrator as MassIntegrator
 
 from ..fem import DirichletBC
-from scipy.sparse.linalg import eigsh
 
 class LinearElasticityEigenLFEMModel(ComputationalModel):
     """Model for linear elasticity eigenvalue problems using the LFEM.
@@ -203,13 +202,14 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         #return S.to_scipy(), M.to_scipy()
         return S, M
 
+    @variantmethod('scipy')
     def solve(self):
-        """
-        Solve the eigenvalue problem using the finite element method.
+        """Solve the eigenvalue problem using eigsh in scipy.
 
-        Returns:
+        Returns
             Eigenvalues and eigenvectors of the system.
         """
+        from scipy.sparse.linalg import eigsh
         S, M = self.linear_system()
         S, M = self.apply_bc(S, M)
         k = self.options.get('neign', 6)
@@ -219,6 +219,38 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
 
         self.show_modal(val, vec)
 
+    @solve.register('slepc')
+    def solve(self):
+        """Solve the eigenvalue problem using SLEPc.
+        """
+        S, M = self.linear_system()
+        S, M = self.apply_bc(S, M)
+
+        S = PETSc.Mat().createAIJ(
+                size=S.shape, 
+                csr=(S.indptr, S.indices, S.data))
+        S.assembly()
+        M = PETSc.Mat().createAIJ(
+                size=M.shape, 
+                csr=(M.indptr, M.indices, M.data))
+        M.assembly()
+
+        eps = SLEPc.EPS().create()
+        eps.setOperators(K, M)
+        eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
+        eps.setDimensions(k)
+        eps.setWhichEigenpairs(SLEPc.EPS.Which.SMALLEST_REAL if which == 'SM' else SLEPc.EPS.Which.LARGEST_REAL)
+        eps.setFromOptions()
+        eps.solve()
+
+        eigvecs = []
+
+        vr, vi = eps.getOperators()[0].getVecs()
+        for i in range(min(k, eps.getConverged())):
+            val = eps.getEigenpair(i, vr, vi)
+            eigvals.append(val.real)
+            eigvecs.append(vr.getArray().copy())
+        return bm.array(eigvals), bm.column_stack(eigvecs)
 
     def show_mesh(self):
         from matplotlib import pyplot as plt
