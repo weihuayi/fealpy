@@ -219,7 +219,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         p = self.p if p is None else p
         h = self.cellsize
         NC = self.mesh.number_of_cells()
-
+        if isinstance(point, tuple):
+            point = point[0]    
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         if p == 0:
             shape = len(point.shape)*(1, )

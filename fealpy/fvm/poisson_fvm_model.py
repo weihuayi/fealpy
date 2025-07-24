@@ -34,7 +34,7 @@ class PoissonFVMModel(ComputationalModel):
             self.pde = pde
 
     def set_mesh(self, nx: int = 10, ny: int = 10):
-        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)    
+        self.mesh = self.pde.init_mesh['uniform_qrad'](nx=nx, ny=ny)    
 
     def set_space(self, degree: int = 0):
         self.p = degree
@@ -51,7 +51,7 @@ class PoissonFVMModel(ComputationalModel):
         f = lform.assembly()
 
         dbc = DirichletBC(self.mesh, self.pde.dirichlet)
-        A, f = dbc.apply(A, f)
+        A, f = dbc.DiffusionApply(A, f)
         return A, f
 
     def compute_cross_diffusion(self, uh):

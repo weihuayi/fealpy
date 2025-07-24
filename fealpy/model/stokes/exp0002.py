@@ -5,22 +5,21 @@ from ..mesher import BoxMesher2d
 from typing import Sequence
 
 
-class Exp0001(BoxMesher2d):
+class Exp0002(BoxMesher2d):
     """
-    Analytic solution to the 2D Stokes equations:
+    Analytic solution to a 2D flow problem with non-zero divergence:
 
         -μ Δu + ∇p = f  in Ω = [0,1]^2
-        ∇·u = 0         in Ω
         u = g           on ∂Ω
 
     With manufactured solution:
-        u₁(x, y) = -cos(πx) sin(πy)
-        u₂(x, y) =  sin(πx) cos(πy)
-        p(x, y)  =  sin(πx) sin(πy)
-        f =(cos(πx)sin(πy)(π-2μπ^2),
-            sin(πx)cos(πy)(π + 2μπ^2))
+        u₁(x, y) = x^2
+        u₂(x, y) = y^2
+        p(x, y)  = xy
+        f = (-2 + y, -2 + x)
+        ∇·u = 2x + 2y (non-zero divergence)
 
-    The body force f is computed accordingly.
+    The body force f is computed to satisfy -μ Δu + ∇p = f with μ = 1.
     """
 
     def __init__(self, option: dict = {}):
@@ -40,36 +39,30 @@ class Exp0001(BoxMesher2d):
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         x, y = p[..., 0], p[..., 1]
-        mu = self.mu
-        pi = bm.pi
-
-        fx = bm.cos(pi * x) * bm.sin(pi * y) * (pi - 2 * mu * pi ** 2)
-        fy = bm.sin(pi * x) * bm.cos(pi * y) * (pi + 2 * mu * pi ** 2)
-
+        fx = -2 + y
+        fy = -2 + x
         return bm.stack([fx, fy], axis=-1)
 
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
         x, y = p[..., 0], p[..., 1]
-        u1 = -bm.cos(bm.pi * x) * bm.sin(bm.pi * y)
-        u2 =  bm.sin(bm.pi * x) * bm.cos(bm.pi * y)
+        u1 = x * x
+        u2 = y * y
         return bm.stack([u1, u2], axis=-1)
 
     @cartesian
     def pressure(self, p: TensorLike) -> TensorLike:
         x, y = p[..., 0], p[..., 1]
-        return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
+        return x * y
 
     @cartesian
     def grad_velocity(self, p: TensorLike) -> TensorLike:
         # Returns ∇u: shape (..., 2, 2)
         x, y = p[..., 0], p[..., 1]
-        pi = bm.pi
-        du1_dx = pi * bm.sin(pi * x) * bm.sin(pi * y)
-        du1_dy = -pi * bm.cos(pi * x) * bm.cos(pi * y)
-        du2_dx = pi * bm.cos(pi * x) * bm.cos(pi * y)
-        du2_dy = -pi * bm.sin(pi * x) * bm.sin(pi * y)
-
+        du1_dx = 2 * x
+        du1_dy = 0
+        du2_dx = 0
+        du2_dy = 2 * y
         return bm.stack([
             bm.stack([du1_dx, du1_dy], axis=-1),
             bm.stack([du2_dx, du2_dy], axis=-1),
@@ -79,9 +72,8 @@ class Exp0001(BoxMesher2d):
     def grad_pressure(self, p: TensorLike) -> TensorLike:
         # Returns ∇p = (∂p/∂x, ∂p/∂y): shape (..., 2)
         x, y = p[..., 0], p[..., 1]
-        pi = bm.pi
-        dp_dx = pi * bm.cos(pi * x) * bm.sin(pi * y)
-        dp_dy = pi * bm.sin(pi * x) * bm.cos(pi * y)
+        dp_dx = y
+        dp_dy = x
         return bm.stack([dp_dx, dp_dy], axis=-1)
     
     @cartesian
@@ -98,3 +90,13 @@ class Exp0001(BoxMesher2d):
         eps = 1e-12
         return (bm.abs(x - 0.0) < eps) | (bm.abs(x - 1.0) < eps) | \
                (bm.abs(y - 0.0) < eps) | (bm.abs(y - 1.0) < eps)
+
+    @cartesian
+    def div_velocity(self, p: TensorLike) -> TensorLike:
+        """
+        Compute the divergence of the velocity field: ∇·u = ∂u₁/∂x + ∂u₂/∂y
+        Returns a scalar field with shape (...): 2x + 2y
+        """
+        x, y = p[..., 0], p[..., 1]
+        div_u = 2 * x + 2 * y
+        return div_u

@@ -4,7 +4,7 @@ class GradientReconstruct:
     def __init__(self, mesh):
         self.mesh = mesh
 
-    def reconstruct(self, uh):
+    def AverageGradientreconstruct(self, uh):
         Sf = self.mesh.edge_normal()  
         e2c = self.mesh.edge_to_cell()  
         cell_measure = self.mesh.entity_measure('cell')  
@@ -18,6 +18,11 @@ class GradientReconstruct:
         mask = e2c[:, 0] != e2c[:, 1]  # 非边界边
         bm.add.at(grad_u, e2c[mask, 1], -uh_f[mask, None] * Sf[mask])
         grad_u /= cell_measure[:, None]  # (NC, 2)
+        return grad_u
+
+    def reconstruct(self, uh):
+        grad_u = self.AverageGradientreconstruct(uh)
+        e2c = self.mesh.edge_to_cell()
         grad_i = grad_u[e2c[:, 0]]  # (NE, 2)
         grad_j = grad_u[e2c[:, 1]]  # (NE, 2)
         grad_f = 0.5 * (grad_i + grad_j)  # (NE, 2)
