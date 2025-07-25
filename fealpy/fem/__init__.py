@@ -31,6 +31,7 @@ from .jump_penalty_intergrator import JumpPenaltyIntergrator
 from .spacetime_residual_integrator import SpaceTimeResidualIntegrator
 from .spacetime_source_residual_integrator import SpaceTimeSourceResidualIntegrator
 from .coupling_mass_integrator import CouplingMassIntegrator
+from .grad_pressure_integrator import GradPressureIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator

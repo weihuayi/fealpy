@@ -95,12 +95,15 @@ class CosCosData2D:
     def neumann(self, p: TensorLike, n: TensorLike) -> TensorLike:
         """Neumann boundary condition: u·n."""
         u = self.velocity(p)
-        return bm.sum(u * n, axis=-1)
+        if n.ndim == 2:
+            n = bm.expand_dims(n, axis=1)
+        return bm.einsum("fqd,fqd->fq", u, n)
 
     @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Indicator for Dirichlet boundary: none specified."""
-        return bm.zeros_like(p[..., 0], dtype=bm.bool)
+        #return bm.zeros_like(p[..., 0], dtype=bm.bool)
+        return None
 
     @cartesian
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
