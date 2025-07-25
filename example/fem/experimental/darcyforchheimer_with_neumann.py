@@ -26,7 +26,7 @@ q = 4
 pde = CosCosData2D()
 domain = pde.domain()
 
-mesh = TriangleMesh.from_box(domain, nx=40, ny=40)
+mesh = TriangleMesh.from_box(domain, nx=160, ny=160)
 
 pspace = LagrangeFESpace(mesh, p=pdegree)
 space = LagrangeFESpace(mesh, p=udegree, ctype='D')
@@ -47,6 +47,9 @@ u_bform = BilinearForm(uspace)
 M = ScalarMassIntegrator(coef=pde.mu, q=q)
 u_bform.add_integrator(M)
 
+Mu = ScalarMassIntegrator(q=q)
+u_bform.add_integrator(Mu)
+
 p_bform = BilinearForm(pspace,uspace)
 D = GradPressureIntegrator(q=q)
 p_bform.add_integrator(D)
@@ -64,22 +67,52 @@ plform.add_integrator(g)
 plform.add_integrator(gn)
 bform = LinearBlockForm([ulform, plform])
 
-def u_norm_coef(bcs, index, uh0=u0):
-        return pde.beta*bm.sqrt(uh0(bcs, index)**2)
+
+
+# def lagrange_multiplier(A, b):
+#         """
+#         Enforce a global constraint on pressure (e.g., zero mean) using a Lagrange multiplier.
+#         """
+#         from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
+#         from fealpy.sparse import COOTensor
+
+#         LagLinearForm = LinearForm(pspace)
+#         LagLinearForm.add_integrator(SourceIntegrator(source=1))
+#         LagA = LagLinearForm.assembly()
+#         LagA = bm.concatenate([bm.zeros(uspace.number_of_global_dofs()), LagA], axis=0)
+
+#         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
+#                                  bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
+
+
+#         A = BlockForm([[A, A1.T], [A1, None]])
+#         A = A.assembly_sparse_matrix(format='csr')
+#         b0 = bm.array([0])
+#         b  = bm.concatenate([b, b0], axis=0)
+
+#         return A, b
+    
     
 
 for i in range(maxstep):
     m = bm.sum(u0[:] - uh[:])
+    
+    @barycentric
+    def u_norm_coef(bcs, index):
+        u_val = u0(bcs, index)    
+        norm_u = bm.sqrt(bm.sum(u_val**2, axis=-1))  # Euclidean norm
+        return pde.beta * norm_u
+    
     ## BilinearForm
-    Mu = ScalarMassIntegrator(coef=u_norm_coef, q=q)
-    u_bform.add_integrator(Mu)
+    Mu.coef = u_norm_coef
     
     BForm = BlockForm([[u_bform, p_bform],
                     [p_bform.T, None]])
 
     b = bform.assembly()
     A = BForm.assembly()
-
+    
+    
     # Modify matrix
     threshold = bm.zeros(gdof, dtype=bm.bool)
     threshold[ugdof] = True
@@ -87,9 +120,12 @@ for i in range(maxstep):
     gd[ugdof] = 1
     BC = DirichletBC((uspace,pspace), gd=gd, 
                     threshold=threshold, method='interp')
-
-
     A,b = BC.apply(A,b)
+
+
+    #A, b = lagrange_multiplier(A, b)
+
+    
 
     x = spsolve(A, b, solver='scipy')
     uh[:] = x[:ugdof]
@@ -104,11 +140,9 @@ for i in range(maxstep):
     
     res_u = mesh.error(u0, uh)
     res_p = mesh.error(p0, ph)
-    print('res_u', res_u)
-    print('res_p', res_p)
     
     if res_u + res_p < 1e-5:
-        print(i+1)
+        print("number of iterations: ", i+1)
         break
     u0[:] = uh
     p0[:] = ph

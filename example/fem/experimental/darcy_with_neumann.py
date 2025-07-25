@@ -24,7 +24,7 @@ q = 4
 pde = CosCosData2D()
 domain = pde.domain()
 
-mesh = TriangleMesh.from_box(domain, nx=80, ny=80)
+mesh = TriangleMesh.from_box(domain, nx= 160, ny=160)
 
 pspace = LagrangeFESpace(mesh, p=pdegree)
 space = LagrangeFESpace(mesh, p=udegree, ctype='D')

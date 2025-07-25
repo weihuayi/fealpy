@@ -41,7 +41,7 @@ class CosCosData2D:
     @cartesian
     def g(self, p: TensorLike) -> TensorLike:
         """Source term g(x,y) = 0."""
-        return bm.zeros_like(p[..., 0])
+        return -bm.zeros_like(p[..., 0])
 
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
