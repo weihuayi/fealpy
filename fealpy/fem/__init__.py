@@ -68,3 +68,4 @@ from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
 from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
 from .helmholtz_lfem_model import HelmholtzLFEMModel
 from .curlcurl_lfem_model import CurlCurlLFEMModel
+from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel

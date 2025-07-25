@@ -1,6 +1,6 @@
 from ...backend import backend_manager as bm
 from ..model import ComputationalModel
-from ..model import PDEModelManager
+from ..model import CSMModelManager
 from ...fem import BilinearForm
 from ...fem import LinearForm
 from ...functionspace import LagrangeFESpace, TensorFunctionSpace
