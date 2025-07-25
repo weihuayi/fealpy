@@ -1,6 +1,6 @@
 import argparse
 from fealpy.backend import backend_manager as bm
-from fealpy.csm.fem import BeamFEMModel
+from fealpy.csm.fem import EulerBernoulliBeamFEMModel
 
 # 参数解析
 parser = argparse.ArgumentParser(description="""
@@ -40,15 +40,15 @@ parser.add_argument('--beam_type',
                     help='梁的类型, 可选值为 "euler_bernoulli_2d", "normal_2d", "euler_bernoulli_3d".')
 
 parser.add_argument('--pde',
-                    default='beam2d', type=str,
-                    help='PDE 示例名称, 默认为 "beam2d".')
+                    default=1, type=int,
+                    help='PDE 示例名称, 默认为1.')
 
 # 解析参数
 options = vars(parser.parse_args())
 
 bm.set_backend('numpy')
 
-beammodel = BeamFEMModel(options)
+beammodel = EulerBernoulliBeamFEMModel(options)
 uh = beammodel.run()
 # 打印结果
 print("位移解向量 (uh):")
