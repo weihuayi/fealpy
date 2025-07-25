@@ -15,6 +15,10 @@ class GearBoxModel:
         self.parser = InpFileParser()
         self.parser.parse(options['mesh_file'])
 
+        self.coupling = self.parser.to_coupling()
+        self.material = self.parser.to_material()
+        self.boundary = self.parser.to_boundary()
+
     def __str__(self) -> str:
         """
         Return a human-readable summary of the model configuration.
@@ -34,3 +38,51 @@ class GearBoxModel:
         """
         """
         return self.parser.to_mesh(TetrahedronMesh)
+    
+    def elsets(self):
+        """"""
+        pass
+
+    def nsets(self):
+        """
+        """
+        pass
+
+    def solid(self):
+        """
+        """
+        pass
+
+    def surface(self):
+        """
+        """
+        pass
+
+    def coupling(self):
+        """
+        """
+        pass
+
+    def density(self):
+        """
+        """
+        den = self.material[0]['density']
+        return den
+    
+    def young(self):
+        """
+        Young's Modulus
+        """
+        E = self.material[0]['elastic'][0]
+        return E
+
+    def poissonratio(self):
+        '''
+        '''
+        v = self.material[0]['elastic'][1]
+        return v
+    
+    def boundary(self):
+        """
+        """
+        return self.parser.to_boundary()

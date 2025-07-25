@@ -1,11 +1,17 @@
 import re
-from typing import List, Dict, Type, Optional, Any
+from typing import List, Tuple, Dict, Type, Optional, Any
 from ..backend import bm
 
 
 class Section:
     """
-    Base class for inp file sections. Subclasses should define `keyword`, implement `parse_line`, and optionally `finalize`.
+    Base class for .inp file sections.
+
+    Attributes
+        options : Dict[str, str]
+            Stores the parsed keyword arguments provided to this section.
+        keyword : str
+            The keyword name associated with the section. Subclasses must define this.
     """
     keyword: str = ''
 
@@ -19,6 +25,9 @@ class Section:
     def parse_line(self, line: str) -> None:
         raise NotImplementedError(f"parse_line must be implemented by {self.__class__.__name__}")
 
+    def build(self, meshdata: Dict[str, Any]):
+        pass
+
     def finalize(self) -> None:
         """
         Optional: convert stored lists to bm.array
@@ -28,7 +37,23 @@ class Section:
 
 class NodeSection(Section):
     """
-    Parses the *Node section, storing node IDs and coordinates separately, then converts to bm.array.
+    Parses the *Node section, storing node IDs and coordinates separately, then converts to `bm.array`.
+
+    Parameters
+        options : Dict[str, str]
+            Keyword options parsed from the section header line, passed from the base class.
+
+    Attributes
+        _id : List[int]
+            List of node IDs parsed from the file.
+        _node : List[List[float]]
+            List of node coordinates, each as a list of floats.
+        id : bm.array, optional
+            Array of node IDs.
+        node : bm.array, optional
+            Array of node coordinates with shape (num_nodes, dim).
+        imap : bm.array, optional
+            Index mapping from node ID to row index in the node array. Shape: (max_id + 1,)
     """
     keyword = 'NODE'
 
@@ -39,7 +64,7 @@ class NodeSection(Section):
         # final arrays
         self.id: Optional[Any] = None
         self.node: Optional[Any] = None
-        self.imap: Optional[Any] = None
+        self.node_map: Optional[Any] = None
 
     def parse_line(self, line: str) -> None:
         parts = [s.strip() for s in line.split(',')]
@@ -51,15 +76,31 @@ class NodeSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
         self.node = bm.array(self._node)
-
         N = bm.max(self.id) + 1
-        self.imap = bm.zeros((N,), dtype=bm.int32)
-        bm.set_at(self.imap, self.id, bm.arange(len(self.id), dtype=bm.int32))
+        self.node_map = bm.zeros((N,), dtype=bm.int32)
+        bm.set_at(self.node_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
+
+    def build(self, meshdata: Dict[str, Any]) -> None:
+        meshdata['node_map'] = self.node_map  # 存入共享数据字典
 
 
 class ElementSection(Section):
-    """
-    Parses the *Element section, storing element(cell) IDs and connectivity separately, then converts to bm.array.
+    """Parses the *Element section, storing element (cell) IDs and connectivity separately, 
+    then converts to `bm.array`.
+
+    Parameters
+        options : Dict[str, str]
+            Keyword options parsed from the section header line, passed from the base class.
+
+    Attributes
+        _id : List[int]
+            List of element (cell) IDs parsed from the file.
+        _cell : List[List[int]]
+            List of element connectivity, where each entry contains node indices of the element.
+        id : bm.array, optional
+            Array of element IDs.
+        cell : bm.array, optional
+            Array of element connectivities. Shape: (num_elements, num_nodes_per_element)
     """
     keyword = 'ELEMENT'
 
@@ -70,6 +111,7 @@ class ElementSection(Section):
         # final arrays
         self.id: Optional[Any] = None
         self.cell: Optional[Any] = None
+        self.cell_map: Optional[Any] = None
 
     def parse_line(self, line: str) -> None:
         parts = [s.strip() for s in line.split(',')]
@@ -80,7 +122,13 @@ class ElementSection(Section):
 
     def finalize(self) -> None:
         self.id = bm.array(self._id)
+        N = bm.max(self.id) + 1
+        self.cell_map = bm.zeros((N,), dtype=bm.int32)
+        bm.set_at(self.cell_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
         self.cell = bm.array(self._cell)
+
+    def build(self, meshdata: Dict[str, Any]) -> None:
+        meshdata['cell_map'] = self.cell_map  # 存入共享数据字典
 
 
 class ElsetSection(Section):
@@ -110,6 +158,12 @@ class ElsetSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
 
+    def build(self, meshdata: Dict[str, Any]) -> None:
+        if 'elset' not in meshdata:
+            meshdata['elset'] = {}
+        cell_map = meshdata['cell_map']
+        meshdata['elset'][self.name] = cell_map[self.id]
+
 
 class NsetSection(Section):
     """
@@ -132,9 +186,158 @@ class NsetSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
 
+    def build(self, meshdata: Dict[str, Any]) -> None:
+        if 'nset' not in meshdata:
+            meshdata['nset'] = {}
+        node_map = meshdata['node_map']
+        meshdata['nset'][self.name] = node_map[self.id]
+
+
+class SolidSection(Section):
+    """
+    Parses the *Solid Section definition, extracting elset and material.
+    """
+    keyword = 'SOLID SECTION'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.elset: Optional[str] = options.get('elset', '')
+        self.material: Optional[str] = options.get('material', '')
+
+    def parse_line(self, line: str) -> None:
+        # Usually no data to parse; solid section info is in the header
+        pass
+    
+    def build(self, meshdata: Dict[str, Any]) -> None:
+        if 'solid' not in meshdata:
+            meshdata['solid'] = {}
+        meshdata['solid'] = {
+            'elset': self.elset,
+            'material': self.material
+        }
+
+
+class SystemSection(Section):
+    keyword = 'SYSTEM'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.data = []
+
+    def parse_line(self, line: str) -> None:
+        self.data.append(line.strip())
+
+
+class SurfaceSection(Section):
+    keyword = 'SURFACE'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.name = options.get('name', '')
+        self.type = options.get('type', '')
+        self.assignments: List[Tuple[str, float]] = []
+
+    def parse_line(self, line: str) -> None:
+        parts = re.split(r'\s*,\s*', line.strip())
+        if len(parts) >= 2:
+            self.assignments.append((parts[0], float(parts[1])))
+
+    def build(self, meshdata: Dict[str, Any]):
+        if 'surface' not in meshdata:
+            meshdata['surface'] = {}
+        meshdata['surface'][self.name] = {
+            'type': self.type,
+            'assignments': self.assignments,
+        }
+
+
+class CouplingSection(Section):
+    keyword = 'COUPLING'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.name = options.get('constraint name', '')
+        self.ref_node = options.get('ref node', '')
+        self.surface = options.get('surface', '')
+        self.type = None  # To be set by subsequent *KINEMATIC or *DISTRIBUTING
+
+    def parse_line(self, line: str) -> None:
+        pass  # No data expected; coupling info is in header
+
+    def set_type(self, coupling_type: str) -> None:
+        self.type = coupling_type
+
+    def build(self, meshdata: Dict[str, Any]):
+        idx = len(meshdata)  # 以已有键数量作为新编号
+        meshdata[idx] = {
+            'name': self.name,
+            'type': 'COUPLING',
+            'ref_node': self.ref_node,
+            'surface': self.surface,
+            'coupling_type': self.type,
+        }
+
+
+class MaterialSection(Section):
+    keyword = 'MATERIAL'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.name = options.get('name', '')
+        self.density: Optional[float] = None
+        self.elastic: Optional[Tuple[float, float]] = None
+        self._next = None  # internal flag for line parsing
+
+    def parse_line(self, line: str) -> None:
+        if self._next == 'DENSITY':
+            self.density = float(line.strip().split(',')[0])
+            self._next = None
+        elif self._next == 'ELASTIC':
+            parts = [float(x) for x in line.strip().split(',') if x]
+            if len(parts) >= 2:
+                self.elastic = (parts[0], parts[1])
+            self._next = None
+        else:
+            if line.upper().startswith("*DENSITY"):
+                self._next = 'DENSITY'
+            elif line.upper().startswith("*ELASTIC"):
+                self._next = 'ELASTIC'
+
+    def build(self, meshdata: Dict[str, Any]):
+        idx = len(meshdata)  # 以已有键数量作为新编号
+        meshdata[idx] = {
+            'name': self.name,
+            'density': self.density,
+            'elastic': self.elastic,
+        }
+
+
+class BoundarySection(Section):
+    keyword = 'BOUNDARY'
+
+    def __init__(self, options: Dict[str, str]):
+        super().__init__(options)
+        self.boundaries: List[Tuple[str, int, int]] = []
+
+    def parse_line(self, line: str) -> None:
+        parts = re.split(r'\s*,\s*', line.strip())
+        if len(parts) >= 3:
+            name = parts[0].upper()
+            dof_start = int(parts[1])
+            dof_end = int(parts[2])
+            self.boundaries.append((name, dof_start, dof_end))
+
+    def build(self, meshdata: Dict[str, Any]):
+        if 'boundary' not in meshdata:
+            meshdata['boundary'] = []
+        meshdata['boundary'].extend(self.boundaries)
+
 
 # Registry of available section handlers
-SECTION_REGISTRY: List[Type[Section]] = [NodeSection, ElementSection, ElsetSection, NsetSection]
+SECTION_REGISTRY: List[Type[Section]] = [NodeSection, ElementSection, ElsetSection, 
+                                         NsetSection, SolidSection, SystemSection,
+                                         SurfaceSection, CouplingSection, MaterialSection,
+                                         BoundarySection]
 
 
 class InpFileParser:
@@ -154,6 +357,16 @@ class InpFileParser:
                     continue
                 if line.startswith('*'):
                     # start a new section
+                    keyword = line[1:].split(',')[0].strip()
+                    if keyword in ('Kinematic', 'distributing'):
+                        if isinstance(current_section, CouplingSection):
+                            current_section.set_type(keyword)
+                        continue
+                    if isinstance(current_section, MaterialSection) and keyword.upper() in ('DENSITY', 'ELASTIC'):
+                        # 交由 MaterialSection 内部处理
+                        current_section.parse_line(line)
+                        continue
+                    # 否则是新的 Section
                     current_section = self._start_section(line)
                     if current_section:
                         self.sections.append(current_section)
@@ -198,8 +411,33 @@ class InpFileParser:
         ns = self.get_section(NodeSection)
         es = self.get_section(ElementSection)
         node = ns.node
-        cell = ns.imap[es.cell]
-        return mesh_type(node, cell) 
+        cell = ns.node_map[es.cell]
+        mesh = mesh_type(node, cell)
+
+        for section in self.sections:
+            section.build(mesh.meshdata)
+        return mesh
+
+    def to_coupling(self) -> Dict[str, Any]:
+        coupling = {}
+        for section in self.sections:
+            if isinstance(section, CouplingSection):
+                section.build(coupling)
+        return coupling
+
+    def to_material(self) -> Dict[str, Any]:
+        material = {}
+        for section in self.sections:
+            if isinstance(section, MaterialSection):
+                section.build(material)
+        return material
+
+    def to_boundary(self) -> Dict[str, Any]:
+        boundary = {}
+        for section in self.sections:
+            if isinstance(section, BoundarySection):
+                section.build(boundary)
+        return boundary
 
 # Example usage:
 if __name__ == '__main__':
