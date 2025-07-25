@@ -27,6 +27,7 @@ from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator
 from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
 from .jump_penalty_intergrator import JumpPenaltyIntergrator
+from .grad_pressure_integrator import GradPressureIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
