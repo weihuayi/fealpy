@@ -8,3 +8,5 @@ from .beam_concentrated_source_integrator import BeamPLSourceIntegrator
 from .beam_fem_model import BeamFEMModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
 from .elastoplastic_integrator import ElastoplasticIntegrator
+
+from .gear_box_modal_lfem_model import GearBoxModalLFEMModel

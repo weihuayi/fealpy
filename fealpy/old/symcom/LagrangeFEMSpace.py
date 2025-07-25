@@ -196,20 +196,13 @@ class LagrangeFEMSpace:
         return S
 if __name__ == "__main__":
     from sympy import *
-<<<<<<< HEAD
     space = LagrangeFEMSpace(GD=3)
-=======
-<<<<<<< HEAD
-    space = LagrangeFEMSpace(2)
+    # space = LagrangeFEMSpace(2)
     M = space.gphi_gphi_matrix(1,1)
     print(M)
-||||||| ee57c3c1
     space = LagrangeFEMSpace(2)
     M = space.gphi_gphi_phi_matrix(2, 2, 2)
     print(M)
-=======
     space = LagrangeFEMSpace(GD=2)
->>>>>>> upstream/master
     M = space.gphi_gphi_phi_matrix(1, 1, 1)
     print("M:", M.shape, "\n", M)
->>>>>>> upstream/master

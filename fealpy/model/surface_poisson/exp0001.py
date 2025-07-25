@@ -1,7 +1,6 @@
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import  TensorLike
-from ...geometry import SphereSurface
 from ...mesher import SphereSurfaceMesher
 
 
@@ -31,20 +30,19 @@ class Exp0001(SphereSurfaceMesher):
     """
 
     def __init__(self):
-        # self.surface = SphereSurface(center=[0.0, 0.0, 0.0], radius=1.0) 
         super().__init__()
         
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        return x * y
+        return x*y
     
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute gradient of solution."""
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        denom = x**2 + y**2 +z**2
+        denom = x**2 + y**2 + z**2
         scale = 2*x*y / denom
 
         grad_x = y - scale * x
@@ -57,8 +55,8 @@ class Exp0001(SphereSurfaceMesher):
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
         x, y, z = p[..., 0], p[..., 1], p[..., 2]
-        denom = x**2 + y**2 +z**2
-        return - 6*x*y / denom
+        denom = x**2 + y**2 + z**2
+        return 6*x*y / denom
     
     @cartesian
     def neumann(self, p: TensorLike, n: int) -> TensorLike:
