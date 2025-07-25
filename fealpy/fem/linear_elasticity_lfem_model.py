@@ -1,7 +1,3 @@
-<<<<<<< Updated upstream
-=======
-<<<<<<< HEAD
->>>>>>> Stashed changes
 from typing import Union
 from ..backend import bm
 from ..model import PDEModelManager, ComputationalModel
@@ -11,11 +7,7 @@ from ..decorator import variantmethod
 # FEM imports
 from ..functionspace import LagrangeFESpace, TensorFunctionSpace
 from ..fem import BilinearForm, LinearForm
-<<<<<<< Updated upstream
 from ..fem import LinearElasticityIntegrator, VectorSourceIntegrator
-=======
-from ..fem import LinearElasticIntegrator, VectorSourceIntegrator
->>>>>>> Stashed changes
 from ..material import LinearElasticMaterial
 
 class LinearElasticityLFEMModel(ComputationalModel):
@@ -23,14 +15,14 @@ class LinearElasticityLFEMModel(ComputationalModel):
         super().__init__(pbar_log=True, log_level="INFO")
         self.pdm = PDEModelManager("linear_elasticity")
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly"):
-        if isinstance(pde, str):
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, int]=1):
+        if isinstance(pde, int):
             self.pde = self.pdm.get_example(pde)
         else:
             self.pde = pde
 
-    def set_init_mesh(self, meshtype: str = "hex", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+    def set_init_mesh(self, meshtype: str, **kwargs):
+        self.mesh = self.pde.init_mesh(**kwargs)
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -38,24 +30,16 @@ class LinearElasticityLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
     def set_space_degree(self, p: int = 1) -> None:    
         self.p = p
 
     def linear_system(self, mesh, p):
         self.space= LagrangeFESpace(mesh, p=p)
-<<<<<<< Updated upstream
         gd = self.pde.geo_dimension()
         if gd == 2:
             self.tspace = TensorFunctionSpace(self.space, shape=(-1, 2))
         elif gd == 3:
             self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
-=======
-        self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
->>>>>>> Stashed changes
 
         LDOF = self.tspace.number_of_local_dofs()
         GDOF = self.tspace.number_of_global_dofs()
@@ -64,20 +48,12 @@ class LinearElasticityLFEMModel(ComputationalModel):
 
         LEM = LinearElasticMaterial(
                                 name='E1nu025',
-                                lame_lambda=self.pde.lam(), shear_modulus=self.pde.mu(), 
-<<<<<<< Updated upstream
+                                lame_lambda=self.pde.lam, shear_modulus=self.pde.mu,
                                 hypo=self.pde.hypo, device=bm.get_device(self.uh[:])
                             )
         
         bform = BilinearForm(self.tspace)
         LEI = LinearElasticityIntegrator(
-=======
-                                hypo='3D', device=bm.get_device(self.uh[:])
-                            )
-        
-        bform = BilinearForm(self.tspace)
-        LEI = LinearElasticIntegrator(
->>>>>>> Stashed changes
                                 material=LEM, q=self.p+3, method=None
                             )
         bform.add_integrator(LEI)
@@ -154,10 +130,6 @@ class LinearElasticityLFEMModel(ComputationalModel):
     def run(self):
         pass
 
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
     @variantmethod("error")
     def postprocess(self):
         l2 = self.mesh.error(self.pde.displacement, self.uh)
