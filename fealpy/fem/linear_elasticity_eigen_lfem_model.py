@@ -1,19 +1,20 @@
 from typing import Any, Optional, Union
-from ..backend import bm
-from ..typing import TensorLike
-from ..decorator import variantmethod
-from ..model import ComputationalModel
-from ..model.linear_elasticity import LinearElasticityPDEDataT
 
-from ..mesh import Mesh
-from ..functionspace import functionspace 
-from ..material import LinearElasticMaterial
+from fealpy.backend import bm
+from fealpy.typing import TensorLike
+from fealpy.decorator import variantmethod
+from fealpy.model import ComputationalModel
+from fealpy.model.linear_elasticity import LinearElasticityPDEDataT
 
-from ..fem import BilinearForm
-from ..fem import LinearElasticityIntegrator
-from ..fem import ScalarMassIntegrator as MassIntegrator
+from fealpy.mesh import Mesh
+from fealpy.functionspace import functionspace 
+from fealpy.material import LinearElasticMaterial
 
-from ..fem import DirichletBC
+from fealpy.fem import BilinearForm
+from fealpy.fem import LinearElasticityIntegrator
+from fealpy.fem import ScalarMassIntegrator as MassIntegrator
+
+from fealpy.fem import DirichletBC
 
 class LinearElasticityEigenLFEMModel(ComputationalModel):
     """Model for linear elasticity eigenvalue problems using the LFEM.
