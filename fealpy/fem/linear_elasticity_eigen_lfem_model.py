@@ -204,7 +204,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         return S, M
 
     @variantmethod('scipy')
-    def solve(self):
+    def solve(self, which: str = 'SM'):
         """Solve the eigenvalue problem using eigsh in scipy.
 
         Returns
@@ -221,37 +221,65 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.show_modal(val, vec)
 
     @solve.register('slepc')
-    def solve(self):
+    def solve(self, which: str ='SM'):
         """Solve the eigenvalue problem using SLEPc.
+        
         """
+        from petsc4py import PETSc
+        from slepc4py import SLEPc
         S, M = self.linear_system()
         S, M = self.apply_bc(S, M)
 
         S = PETSc.Mat().createAIJ(
                 size=S.shape, 
                 csr=(S.indptr, S.indices, S.data))
-        S.assembly()
+        S.assemble()
         M = PETSc.Mat().createAIJ(
                 size=M.shape, 
                 csr=(M.indptr, M.indices, M.data))
-        M.assembly()
+        M.assemble()
 
         eps = SLEPc.EPS().create()
-        eps.setOperators(K, M)
+        eps.setOperators(S, M)
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-        eps.setDimensions(k)
-        eps.setWhichEigenpairs(SLEPc.EPS.Which.SMALLEST_REAL if which == 'SM' else SLEPc.EPS.Which.LARGEST_REAL)
+
+        eps.setTolerances(tol=1e-6, max_it=1000)
+        eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+
+        st = eps.getST()
+        st.setType(SLEPc.ST.Type.SINVERT)
+        st.setShift(1e-4)  # 目标 shift，通常为目标最小特征值附近
+
+        ksp = st.getKSP()
+        ksp.setType('cg')  # 或 'gmres'
+        def my_ksp_monitor(ksp, its, rnorm):
+            print(f"KSP iter {its}, residual norm = {rnorm}")
+        ksp.setMonitor(my_ksp_monitor)
+        pc = ksp.getPC()
+        pc.setType('gamg')  # 或 'gamg' 若使用 AMG
+
+        k = self.options.get('neign', 6)
+        eps.setDimensions(nev=k, ncv=4*k)
+
+        eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
+        eps.setTarget(0.0)  # 目标特征值，通常为最小或最大特征值
+
         eps.setFromOptions()
         eps.solve()
 
+        eigvals = []
         eigvecs = []
 
         vr, vi = eps.getOperators()[0].getVecs()
+        print(f"Number of eigenvalues converged: {eps.getConverged()}")
         for i in range(min(k, eps.getConverged())):
             val = eps.getEigenpair(i, vr, vi)
             eigvals.append(val.real)
             eigvecs.append(vr.getArray().copy())
-        return bm.array(eigvals), bm.column_stack(eigvecs)
+        val = bm.array(eigvals)
+        vec = bm.stack(eigvecs, axis=1)
+        self.logger.info(f"Eigenvalues: {val}")
+        self.show_modal(val, vec)
 
     def show_mesh(self):
         from matplotlib import pyplot as plt
