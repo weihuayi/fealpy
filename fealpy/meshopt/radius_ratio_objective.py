@@ -25,7 +25,6 @@ class RadiusRatioSumObjective(SumObjective):
         super().__init__(mesh_quality)
         isFreeNode = ~mesh_quality.mesh.boundary_node_flag()
         node = mesh_quality.mesh.entity('node')
-        #self.x0 = bm.array(node[isFreeNode,:].T.flatten())
         self.x0 = node[isFreeNode,:].T.flatten()
         A = self.hess(mesh_quality.mesh.node)
         row = A.row
@@ -73,7 +72,6 @@ class RadiusRatioSumObjective(SumObjective):
         newcol[ND:2*ND] = col + NI
         newcol[2*ND:] = col + 2*NI
         '''
-        #A = A[np.ix_(isFreeNode,isFreeNode)]
         self.indice = bm.stack([newrow,newcol],axis=0)
         self.P = COOTensor(self.indice,newdata,spshape=(3*NI,3*NI))
 
@@ -179,7 +177,6 @@ class RadiusRatioSumObjective(SumObjective):
             I = bm.broadcast_to(cell[:,:,None],(NC,4,4))
             J = bm.broadcast_to(cell[:,None,:],(NC,4,4))
             indice = bm.stack([I.flatten(),J.flatten()],axis=0)
-            #data = bm.array(A.flatten())
             data = A.flatten()
             A = COOTensor(indice,data,spshape=(NN,NN))
             return A

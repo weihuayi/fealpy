@@ -428,7 +428,6 @@ class PoissonPINNModel(ComputationalModel):
         import matplotlib.pyplot as plt
 
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 6))
-        print(type(self.Loss), len(self.Loss))
         Loss = bm.log10(bm.tensor(self.Loss)).numpy()
 
         # 绘制损失曲线

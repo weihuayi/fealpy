@@ -18,9 +18,6 @@ class Ossen(FEM):
         FEM.__init__(self, equation)
         self.threshold = boundary_threshold
 
-    def simulation(self):
-        return ossen_simulation(self)
-
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
@@ -53,8 +50,8 @@ class Ossen(FEM):
         q = self.q
 
         L0 = LinearForm(uspace)
-        self.u_LSI = SourceIntegrator(q=q)
-        L0.add_integrator(self.u_LSI) 
+        self.u_source_LSI = SourceIntegrator(q=q)
+        L0.add_integrator(self.u_source_LSI) 
         L1 = LinearForm(pspace)
         L = LinearBlockForm([L0, L1])
         return L
@@ -78,65 +75,5 @@ class Ossen(FEM):
         self.u_BC.coef = u_BC_coef
 
         ## LinearForm 
-        @barycentric
-        def u_LSI_coef(bcs, index):
-            cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
-            result = cbfcoef 
-            return result
-        self.u_LSI.source = u_LSI_coef
+        self.u_source_LSI.source = cbf
        
-
-class ossen_simulation(SimulationBase):
-    def __init__(self, method):
-        super().__init__(method)
-
-    def _initialize_variables(self):
-        pass
-
-    def run_one_step(self, u0, p0):
-        equation = self.equation
-        pde = equation.pde
-        uspace = self.method.uspace
-        pspace = self.method.pspace
-        ugdof = uspace.number_of_global_dofs()
-        BC = DirichletBC(
-            (uspace, pspace), 
-            gd=(pde.velocity, pde.pressure), 
-            threshold=(pde.is_u_boundary, pde.is_p_boundary), 
-            method='interp'  
-        )
-        source = self.method.uspace.interpolate(pde.source)
-        equation.set_coefs(body_force=source)
-        self.BC = BC
-        A = self.method.BForm()
-        b = self.method.LForm()
-        self.method.update(u0)
-        A = A.assembly()
-        b = b.assembly()
-        A, b = BC.apply(A, b)
-        x = spsolve(A, b, solver='mumps')
-        u0[:] = x[:ugdof]
-        p0[:] = x[ugdof:]
-
-        return u0, p0
-
-    def run(self, u0, p0):
-        pde = self.equation.pde
-        u0, p0 = self.run_one_step(u0, p0)
-        uerror1 = 0
-        perror1 = 0
-        tol = self.method.tol
-        for i  in range(self.method.max_iter):
-            
-            u0, p0 = self.run_one_step(u0, p0)
-            uerror0 = pde.mesh.error(pde.velocity, u0)
-            perror0 = pde.mesh.error(pde.pressure, p0)
-            res_u = bm.abs(uerror1 - uerror0)
-            res_p = bm.abs(perror1 - perror0)
-            if res_u < tol and res_p < tol:
-                print("Converged at iteration", i+1)
-                break
-            uerror1 = uerror0
-            perror1 = perror0
-        print("uerror",uerror0)
-        print("perror",perror0)
