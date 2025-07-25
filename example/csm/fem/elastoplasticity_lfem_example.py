@@ -9,6 +9,10 @@ parser.add_argument('--pde',
                     default=1, type=int,
                     help='Index of the elastoplasticity model, default is 1.')
 
+parser.add_argument('--space_degree',
+                    default=1, type=int,
+                    help='Polynomial degree for the finite element space.')
+
 parser.add_argument('--pbar_log',
                     default=False, action='store_true',
                     help='Show progress bar log.')
@@ -24,7 +28,8 @@ bm.set_backend('numpy')
 
 from fealpy.csm.fem import ElastoplasticityFEMModel
 model = ElastoplasticityFEMModel(options)
-mesh = model.mesh
+model.solve()
+
 '''
 # 网格可视化
 from matplotlib import pyplot as plt
