@@ -1,17 +1,22 @@
+
+from typing import Union
+
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
-from ..model import CSMModelManager
+
+from fealpy.mesh import Mesh
+from fealpy.functionspace import functionspace
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.material import LinearElasticMaterial
+
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
-from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.mesh import Mesh
-from fealpy.solver import spsolve
-from typing import Union
-from ..model.elastoplasticity import ElastoplasticityPDEDataT
 from fealpy.fem import VectorSourceIntegrator
-from fealpy.material import LinearElasticMaterial
+
+from ..model import CSMModelManager
 from ..material import ElastoplasticMaterial
-from ...functionspace import functionspace
+from ..model.elastoplasticity import ElastoplasticityPDEDataT
+
 
 class ElastoplasticityFEMModel(ComputationalModel):
     """

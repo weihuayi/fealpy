@@ -1,7 +1,9 @@
+
+from typing import Tuple
+
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
-from fealpy.backend import TensorLike
-from typing import Tuple
+
 from fealpy.mesh import TriangleMesh
 
 class ElastoplasticityData2D:

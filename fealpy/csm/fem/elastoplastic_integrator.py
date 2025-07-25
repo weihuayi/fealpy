@@ -1,16 +1,12 @@
-#from typing import Optional
 
 from fealpy.backend import backend_manager as bm
-from fealpy.typing import TensorLike, Index, _S
+from fealpy.typing import TensorLike
 
 from fealpy.mesh import TensorMesh
 from fealpy.functionspace.space import FunctionSpace as _FS
-from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
-from fealpy.fem.integrator import (
-    LinearInt, OpInt, CellInt
-)
+
 from fealpy.fem import LinearElasticityIntegrator
-from fealpy.fem.linear_form import LinearForm
+
 
 class ElastoplasticIntegrator(LinearElasticityIntegrator):
     '''

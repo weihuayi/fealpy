@@ -1,4 +1,5 @@
 ### Cell Operator
+from .elastoplastic_integrator import ElastoplasticIntegrator
 from .euler_bernoulli_beam_diffusion_integrator import EulerBernoulliBeamDiffusionIntegrator
 from .euler_bernoulli_beam_uniform_source_integrator   import EulerBernoulliBeamSourceIntegrator
 from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliBeamPLSourceIntegrator
@@ -7,6 +8,4 @@ from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliB
 ### Model Operator
 from .euler_bernoulli_beam_fem_model import EulerBernoulliBeamFEMModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
-from .elastoplastic_integrator import ElastoplasticIntegrator
-
 from .gear_box_modal_lfem_model import GearBoxModalLFEMModel
