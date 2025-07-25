@@ -2716,7 +2716,8 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         """
         if isinstance(x, (float, int)) and isinstance(y, (float, int)):
             return x == y
-
+        if not isinstance(x, ti.Field) or not isinstance(y, ti.Field):
+            raise TypeError("Both inputs must be ti.Field or scalar")
         if x.shape != y.shape:  # TODO 未实现广播操作
             raise ValueError("Input fields must have the same shape")
 
