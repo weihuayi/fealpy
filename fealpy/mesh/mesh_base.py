@@ -23,7 +23,7 @@ class Mesh(MeshDS):
     across different mesh types, including geometric calculations, shape functions,
     and visualization capabilities.
     
-    Attributes:
+    Attributes
         GD : int
             Geometric dimension of the mesh (property)
         itype : dtype
@@ -36,10 +36,10 @@ class Mesh(MeshDS):
     def geo_dimension(self) -> int:
         """Get the geometric dimension of the mesh.
         
-        Returns:
+        Returns
             int: The geometric dimension (such as 2 for 2D, 3 for 3D)
             
-        Raises:
+        Raises
             RuntimeError: If nodes are not assigned
         """
         node = self.entity(0)
@@ -47,6 +47,10 @@ class Mesh(MeshDS):
             raise RuntimeError('Can not get the geometrical dimension as the node '
                                'has not been assigned.')
         return node.shape[-1]
+
+    def __str__(self) -> str:
+        """String representation of the mesh."""
+        pass
 
     GD = property(geo_dimension)
 

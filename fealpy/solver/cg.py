@@ -41,7 +41,6 @@ def cg(A: SupportsMatmul, b: TensorLike, x0: Optional[TensorLike]=None, M: Optio
         which is a common requirement for the Conjugate Gradient method to work correctly.
     """
      
-    b = bm.tensor(b)
     assert isinstance(b, TensorLike), "b must be a Tensor"
     if x0 is not None:
         assert isinstance(x0, TensorLike), "x0 must be a Tensor if not None"

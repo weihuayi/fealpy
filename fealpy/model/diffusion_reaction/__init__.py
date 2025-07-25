@@ -13,7 +13,8 @@ class DiffusionReactionPDEDataProtocol(Protocol):
                 the node coordinate tensor p can be omitted in method calls.)
         3. Equation terms methods (exact solution, grdient, flux and source terms)
         4. Boundary condition methods (Dirichlet, Neumann, Robin types)
-
+        5. The caling_function is a function that satisfies the boundary conditions.
+        
     Notes:  
         This protocol serves as a development guideline - implementing classes are encouraged to:
         - Provide implementations for the declared methods
@@ -41,6 +42,7 @@ class DiffusionReactionPDEDataProtocol(Protocol):
     def source(self, p: TensorLike) -> TensorLike: ...
     def dirichlet(self, p: TensorLike) -> TensorLike: ...
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike: ...
+    def scaling_function(p: TensorLike) -> TensorLike: ...
 
 DiffusionReactionPDEDataT = TypeVar('DiffusionReactionPDEDataT', bound=DiffusionReactionPDEDataProtocol)
 
@@ -50,5 +52,6 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    1: ("exp0001", "Exp0001"),
+    1: ("exp0001", "Exp0001"), 
+    2: ("exp0002", "Exp0002"),
 }

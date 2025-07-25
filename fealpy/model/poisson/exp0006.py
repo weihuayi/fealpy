@@ -2,7 +2,7 @@ from typing import Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher import BoxMesher3d
+from ...mesher import BoxMesher3d
 
 class Exp0006(BoxMesher3d):
     """
@@ -72,3 +72,6 @@ class Exp0006(BoxMesher3d):
             (bm.abs(y - 1.0) < atol) | (bm.abs(y) < atol) |
             (bm.abs(z - 1.0) < atol) | (bm.abs(z) < atol)
         )
+    def scaling_function(self, p: TensorLike) -> TensorLike:
+        """Compute scaling function that satisfies the boundary conditions."""
+        return bm.zeros_like(p[..., 0])

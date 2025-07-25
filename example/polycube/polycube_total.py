@@ -1,6 +1,6 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import TriangleMesh, TetrahedronMesh
-from fealpy.polycube import PolyCubeProcessor
+from fealpy.mesher.polycube import PolyCubeProcessor
 
 import pickle
 import json
@@ -50,7 +50,7 @@ parser.add_argument('--laplacian_smooth_alpha',
                     default=0.3, type=float,
         help='Alpha for Laplacian smoothing in polycube segmentation')
 parser.add_argument('--laplacian_smooth_max_iter',
-                    default=100, type=int,
+                    default=3, type=int,
         help='Maximum iterations for Laplacian smoothing in polycube segmentation')
 parser.add_argument('--normal_alignment_gamma',
                     default=1e3, type=float,
@@ -110,7 +110,11 @@ for i in range(10):
         error_threshold=options['normal_alignment_error_threshold'],
         weights= options['normal_alignment_weights']
     )
+    origin_mesh = normal_alignment_mesh
 
 # 导出网格
-normal_alignment_mesh.to_vtk(fname="./data/total_mesh.vtu")
+origin_mesh.to_vtk(fname="./data/total_mesh.vtu")
+bd_mesh = processor.segmentator.surface_mesh
+bd_mesh.celldata['chart'] = bm.copy(processor.segmentator.face2chart)
+bd_mesh.to_vtk(fname="./data/polycube_bd.vtu")
 print("All processes are done!!")

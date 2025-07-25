@@ -1,8 +1,8 @@
 from typing import Sequence
-from fealpy.decorator import cartesian, variantmethod
-from fealpy.backend import backend_manager as bm
-from fealpy.backend import TensorLike
-from ..mesher import BoxMesher2d
+from ...decorator import cartesian, variantmethod
+from ...backend import backend_manager as bm
+from ...backend import TensorLike
+from ...mesher import BoxMesher2d
 
 class Exp0001(BoxMesher2d):
     """

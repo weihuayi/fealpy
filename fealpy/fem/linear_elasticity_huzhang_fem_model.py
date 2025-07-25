@@ -9,7 +9,7 @@ from ..fem import BilinearForm, LinearForm, BlockForm
 from ..fem import VectorSourceIntegrator
 from ..fem.huzhang_stress_integrator import HuZhangStressIntegrator
 from ..fem.huzhang_mix_integrator import HuZhangMixIntegrator
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 from ..decorator import variantmethod
 from ..solver import spsolve,LinearElasticityHZFEMFastSolver
@@ -33,7 +33,7 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
 
     def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxtri2d"):
         if isinstance(pde, str):
-            self.pde = PDEDataManager('linear_elasticity').get_example(pde)
+            self.pde = PDEModelManager('linear_elasticity').get_example(pde)
             self.logger.info(f"PDE initialized from string: '{pde}'")
         else:
             self.pde = pde
@@ -59,7 +59,7 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
     def set_material_parameters(self, lam: float, mu: float):
         self.material = LinearElasticMaterial("isoparametric", lame_lambda=lam, shear_modulus=mu)
         self.logger.info(f"Material parameters set: λ (Lamé first parameter) = {lam}, μ (shear modulus) = {mu}")
-<<<<<<< HEAD
+
 
 
     def set_space_degree(self, p: int):
@@ -148,12 +148,6 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
         show_error_table(h, errorType, errorMatrix)
         showmultirate(plt, 2, h, errorMatrix,  errorType, propsize=20)
         plt.show()
-
-    
-
-
-=======
-
 
     def set_space_degree(self, p: int):
         self.p = p
@@ -318,4 +312,3 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
                 it = results[m]['iters'][i]
                 row += f'| {it if it is not None else "   N/A":6} '
             print(row)
->>>>>>> 2eda85e9f2470a4a38a7ba1c9160938776b2fd84
