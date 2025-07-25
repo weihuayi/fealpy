@@ -1,5 +1,9 @@
 from .grad import gradient
-# from .modules.module import Solution
+from .sampler.sampler import Sampler
+from .modules.module import Solution
 from .tools import proj, mkfs, use_mkfs, as_tensor_func
 from .torch_mapping import optimizers, activations
-from .model.model_manager import PDEModelManager
+from .poisson_penn_model import PoissonPENNModel
+from .poisson_pinn_model import PoissonPINNModel
+from .helmholtz_pinn_model import HelmholtzPINNModel
+

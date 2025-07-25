@@ -1,19 +1,19 @@
-
 import torch.nn as nn
-# from torch.optim import Adam, SGD
 from torch.optim.lr_scheduler import StepLR
+from typing import Union, Optional
 
 from ..backend import bm
 from ..utils import timer
-
-from typing import Union, Optional
 from ..typing import TensorLike
 from ..model import ComputationalModel, PDEModelManager
-from ..model.poisson import PoissonPDEDataT
+from ..model.helmholtz import HelmholtzPDEDataT
+
 from . import gradient
-from ..mesh import TriangleMesh, UniformMesh, Mesh
+from . import optimizers, activations
+
 from .modules import Solution
 from .sampler import BoxBoundarySampler, ISampler
+
 
 
 class HelmholtzPINNModel(ComputationalModel):
@@ -26,20 +26,24 @@ class HelmholtzPINNModel(ComputationalModel):
     
     Parameters
         options : dict
+            If None, default parameters from get_options() will be used.
             Configuration dictionary containing:
-            - pde: PDE definition (str or PoissonPDEDataT);
-            - meshtype: Type of mesh ('tri' or 'uni');
-            - lr: Learning rate;
-            - epochs: Number of training epochs;
-            - hidden_sizes: List of hidden layer sizes;
-            - npde: Number of PDE collocation points;
-            - nbc: Number of boundary collocation points;
-            - activation: Activation function;
-            - loss: Loss function;
-            - optimizer: Optimization algorithm;
-            - sampling_mode: Sampling strategy ('linspace' or 'random');
-            - complex: Boolean flag for complex-valued solutions;
-            - wave: Wave number k for Helmholtz equation.
+            - pde: PDE definition (int or HelmholtzPDEDataT);
+            - lr: Learning rate (float);
+            - epochs: Number of training epochs (int);
+            - weights: Weight for the equation loss and boundary loss (tuple);
+            - hidden_size: Tuple of hidden layer sizes (tuple);
+            - npde: Number of PDE collocation points (int);
+            - nbc: Number of boundary collocation points (int);
+            - activation: Activation function (str, options: 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax');
+            - optimizer: Optimization algorithm (str, options: 'Adam', 'SGD');
+            - sampling_mode: Sampling strategy (str, options: 'linspace' or 'random');
+            - complex: Boolean flag for complex-valued solutions (bool);
+            - wave: Wave number k for Helmholtz equation (float).
+            - step_size: Period of learning rate decay (int);
+            - gamma: Multiplicative factor of learning rate decay (float).
+            - pbar_log: Whether to use progress bar for logging (bool);
+            - log_level: Logging level (str, options: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
         
     Attributes
         pde : PoissonPDEDataT
@@ -70,9 +74,6 @@ class HelmholtzPINNModel(ComputationalModel):
             Flag indicating complex-valued solutions
         k : float
             Wave number for Helmholtz equation
-    
-    Reference
-        https://wnesm678i4.feishu.cn/wiki/U219wwT18iH4v7kNTOacxl8cnXb?from=from_copylink
     
     Methods
         set_pde(pde)
@@ -107,66 +108,165 @@ class HelmholtzPINNModel(ComputationalModel):
         - Residual calculation: Separate computation for real and imaginary components
         - Loss function: Weighted sum of real and imaginary PDE/boundary losses
         - Error evaluation: Separate error calculation for real and imaginary components
+    
+    Reference
+        https://wnesm678i4.feishu.cn/wiki/U219wwT18iH4v7kNTOacxl8cnXb?from=from_copylink
         
     Examples
-        >>> options = {
-        ...     'pde': 1,  # Built-in example ID
-        ...     'meshtype': 'uniform_tri',
-        ...     'lr': 0.001,
-        ...     'epochs': 1000,
-        ...     'hidden_sizes': (32, 32, 16),
-        ...     'npde': 400,
-        ...     'nbc': 100,
-        ...     'activation': nn.Tanh(),
-        ...     'loss': nn.MSELoss(),
-        ...     'optimizer': torch.optim.Adam,
-        ...     'sampling_mode': 'random',
-        ...     'complex': True,  # Enable complex-valued solution
-        ...     'wave': 1.0  # Wave number k
-        ... }
-        >>> model = HelmholtzPINNModel(options)
-        >>> model.run()
-        >>> model.show()
+        >>> from fealpy.backend import bm  
+        >>> bm.set_backend('pytorch')  # Set the backend to PyTorch  
+        >>> from fealpy.ml import HelmholtzPINNModel  
+        >>> options = HelmholtzPINNModel.get_options()  # Get the default options of the network  
+        >>> model = HelmholtzPINNModel(options=options)  
+        >>> model.run()   # Train the network  
+        >>> model.show()   # Show the results of the network training  
     """
-    def __init__(self, options):
-        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
-        self.options = options
-        self.complex = self.options['complex']
-        self.k = self.options['wave']
+    def __init__(self, options: Optional[dict] = None):
+        if options is None:
+            self.options = self.get_options()
+        else:
+            self.options = options
+        
+        self.pbar_log = self.options.get('pbar_log', True)
+        self.log_level = self.options.get('log_level', 'INFO')
+        super().__init__(pbar_log=self.pbar_log, log_level=self.log_level)
+        
+        self.complex = self.options.get('complex', False)
+        self.k = self.options.get('wave', 1.0)
 
-        self.set_pde(self.options['pde'])
+        self.set_pde(self.options.get('pde', 1))
         self.gd = self.pde.geo_dimension()
         self.domain = self.pde.domain()
-        self.set_mesh(self.options['meshtype'])
+        self.set_mesh(self.options.get('mesh_size', 30))
         
 
         # 采样器
-        self.sampler_pde = ISampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
-        self.sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
+        self.sampler_pde = ISampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
+        self.sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
 
-        # 网络超参数、采样点数、激活函数
-        self.lr = self.options['lr']
-        self.epochs = self.options['epochs']
-        self.hidden_sizes = self.options['hidden_sizes']
-        self.npde = self.options['npde']
-        self.nbc = self.options['nbc']
-        self.activation = self.options['activation']
+        # 网络超参数、激活函数、采样点数、权重
+        self.lr = self.options.get('lr', 0.005)
+        self.epochs = self.options.get('epochs', 1000)
+        self.hidden_size = self.options.get('hidden_size', (50, 50, 50, 50))
+        self.activation = activations[self.options.get('activation', "Tanh")]
+        self.npde = self.options.get('npde', 400)
+        self.nbc = self.options.get('nbc')
+        self.weights = self.options.get('weights', (1, 30))
 
         # 损失函数
-        self.loss = self.options['loss']
+        self.loss = nn.MSELoss(reduction='mean')
 
         # 网络
         self.set_network()
 
         # 优化器与学习率调度器
-        self.optimizer = self.options["optimizer"](params=self.net.parameters(), lr=self.lr)
-        self.steplr = StepLR(self.optimizer, self.options['step_size'], self.options['gamma'])
+        opt = optimizers[self.options.get('optimizer', 'Adam')]
+        self.optimizer = opt(params=self.net.parameters(), lr=self.lr)
         
-    def set_pde(self, pde: Union[PoissonPDEDataT, int]=1):
+        # 学习率调度器
+        step_size = self.options.get('step_size', 0)
+        gamma = self.options.get('gamma', 0.99)
+        self.set_steplr(step_size, gamma)
+
+        self.tmr = timer()  # 计时器
+    
+    @classmethod
+    def get_options(cls):
+        """Get default configuration parameters for the model.
+        
+        Defines and returns default configurations for the model through a command-line argument parser,
+        including PDE problem number, grid size, network structure, and optimizer parameters.
+        
+        Returns
+            options : dict
+                Dictionary containing all configuration parameters with parameter names as keys and default values
+        """
+
+        import argparse
+        parser = argparse.ArgumentParser(description=
+                """
+                A simple example of using PINN to solve Poisson equation.
+                """)
+
+        parser.add_argument('--pde',default=1, type=int,
+                            help="Built-in PDE example ID for different Helmholtz problems, default is 1.")
+        
+        parser.add_argument('--mesh_size',
+                            default=30, type=int,
+                            help='Number of grid points along each dimension, default is 30.')
+
+        parser.add_argument('--complex', 
+                            default=True, type=bool,
+                            help="Enable complex-valued solution modeling, default is True")
+
+        parser.add_argument('--wave', 
+                            default=1.0, type=float,
+                            help="Wave number k for Helmholtz equation (Δu + k²u + f = 0), default is 1.0")
+
+        parser.add_argument('--sampling_mode', 
+                            default='random', type=str,
+                            help="Sampling method for collocation points: 'random' or 'linspace', default is 'random'")
+
+        parser.add_argument('--npde',
+                            default=1500, type=int,
+                            help='Number of PDE samples, default is 400.')
+
+        parser.add_argument('--nbc',
+                            default=300, type=int,
+                            help='Number of boundary condition samples, default is 100.')
+        
+        parser.add_argument('--weights',
+                            default=(1, 30), type=tuple,
+                            help='The first value is the weight for the equation loss, and the second ' \
+                            'value is the weight for the boundary loss., default is (1, 30).')
+
+        parser.add_argument('--hidden_size',
+                            default=(50, 50, 50, 50), type=tuple,
+                            help='Default hidden sizes, default is (50, 50, 50, 50).')
+
+        parser.add_argument('--loss',
+                            default=nn.MSELoss(reduction='mean'), type=callable,
+                            help='Loss function to use, default is nn.MSELoss')
+
+        parser.add_argument('--optimizer', 
+                            default="Adam",  type=str,
+                            help='Optimizer to use for training, default is Adam')
+
+        parser.add_argument('--activation',
+                            default="Tanh", type=str,
+                            help='Activation function, default is Tanh')
+
+        parser.add_argument('--lr',
+                            default=0.001, type=float,
+                            help='Learning rate for the optimizer, default is 0.001.')
+
+        parser.add_argument('--step_size',
+                            default=1000, type=int,
+                            help='Period of learning rate decay, default is 0.')
+
+        parser.add_argument('--gamma',
+                            default=0.99, type=float,
+                            help='Multiplicative factor of learning rate decay. Default: 0.99.')
+
+        parser.add_argument('--epochs',
+                            default=3000, type=int,
+                            help='Number of training epochs, default is 3000.')
+
+        parser.add_argument('--pbar_log',
+                            default=True, type=bool,
+                            help='Whether to show progress bar, default is True')
+
+        parser.add_argument('--log_level',
+                            default='INFO', type=str,
+                            help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
+        options = vars(parser.parse_args())
+        return options
+        
+    def set_pde(self, pde: Union[HelmholtzPDEDataT, int]=1):
         """Initialize the PDE problem definition.
         
         Parameters
-            pde : Union[PoissonPDEDataT, int]
+            pde : Union[[HelmholtzPDEDataT, int]
                 PDE object or built-in example ID.
         """
         if isinstance(pde, int):
@@ -189,11 +289,11 @@ class HelmholtzPINNModel(ComputationalModel):
         """
         if net == None:
             layers = []
-            sizes = (self.gd,) + self.hidden_sizes
+            sizes = (self.gd,) + self.hidden_size
             for i in range(len(sizes)-1):
                 layers.append(nn.Linear(sizes[i], sizes[i+1], dtype=bm.float64))
                 if i < len(sizes)-1:  
-                    layers.append(self.activation)
+                    layers.append(self.activation())
                     
             if self.complex:
                 layers.append(nn.Linear(sizes[-1], 2, dtype=bm.float64))
@@ -203,20 +303,35 @@ class HelmholtzPINNModel(ComputationalModel):
             
         self.net = Solution(net, self.complex)
 
-    def set_mesh(self, mesh: Union[Mesh, str] = "uniform_tri"):
+    def set_mesh(self, mesh_size: int):
         """Create computational mesh.
         
-        Args:
-            mesh: Mesh instance or mesh type name string
+        Creates a computational mesh over the domain defined by the PDE based on the specified mesh size.
+        
+        Parameters
+            mesh_size : tuple of int
+                Number of nodes in each dimension.
         """
-        if isinstance(mesh, str):
-            if self.gd == 2:
-                self.mesh = self.pde.init_mesh[mesh](30, 30)
-            elif self.gd ==3:
-                self.mesh = self.pde.init_mesh[mesh](30, 30, 30)
+        self.mesh_size = (mesh_size, ) * self.gd
+        cell_size = tuple(x - 1 for x in self.mesh_size)
+        self.mesh = self.pde.init_mesh(*cell_size)
+
+    def set_steplr(self, step_size: int=0, gamma: float=0.9):
+        """Create learning rate scheduler
+        
+        Initializes a learning rate scheduler for decaying the learning rate periodically during training.
+        
+        Parameters
+            step_size : int, optional, default=0
+                Period for learning rate decay, i.e., decay every step_size epochs. No scheduler is used if step_size = 0.
+            gamma : float, optional, default=0.9
+                Multiplicative factor for learning rate decay, new_lr = current_lr * gamma
+        """
+        if step_size == 0:
+            self.steplr = None
         else:
-            self.mesh = mesh
-            
+            self.steplr = StepLR(self.optimizer, step_size, gamma)
+
     def set_n(self, p: TensorLike) -> TensorLike:
         """Compute normal vectors at boundary points (for rectangular domains)
         
@@ -298,7 +413,7 @@ class HelmholtzPINNModel(ComputationalModel):
         Notes
             Supported boundary conditions:
             1. Dirichlet: u - g = 0
-            2. Robin: αu + β∂u/∂n - γ = 0
+            2. Robin: i*k*u + ∂u/∂n - g = 0, i serves as the imaginary unit.
         """
         u = self.net(p).flatten()
         if hasattr(self.pde, 'dirichlet'):
@@ -332,6 +447,7 @@ class HelmholtzPINNModel(ComputationalModel):
         self.Loss = []
         self.error_real= []
         self.error_imag = []
+        w = self.weights
 
         mesh = self.mesh
 
@@ -362,31 +478,32 @@ class HelmholtzPINNModel(ComputationalModel):
                 bc_i = bm.imag(bc_res)
                 mse_pde_i = self.loss(pde_i, bm.zeros_like(pde_i))
                 mse_bc_i = self.loss(bc_i, bm.zeros_like(bc_i))
-                loss = 1.0 * mse_pde_r + 1.0 * mse_pde_i + 1.0 * mse_bc_r + 1.0 * mse_bc_i
+                loss = w[0]* (mse_pde_r + mse_pde_i) + w[1] * (mse_bc_r + mse_bc_i)
             else:
-                loss = 1.0 * mse_pde_r + 1.0 * mse_bc_r
+                loss = w[0] * mse_pde_r + w[1]* mse_bc_r
 
             loss.backward()            
             self.optimizer.step()    # 更新参数
-            self.steplr.step()
-
+            if self.steplr is not None:
+                self.steplr.step()
 
             if epoch % 100 == 0:
                 error = self.net.estimate_error(self.pde.solution, mesh, coordtype='c', compare='real')
                 self.error_real.append(error.detach().numpy())
-                self.Loss.append(loss.detach().numpy())
+                self.Loss.append(loss.item())
+                self.logger.info(f"epoch: {epoch}, Loss: {loss.item():.6f}")  
 
                 if self.complex:
                     error_i = self.net.estimate_error(self.pde.solution, mesh, coordtype='c', compare='imag')
                     self.error_imag.append(error_i.detach().numpy()) 
-                    self.logger.info(f"epoch: {epoch}, mse_pde_r: {mse_pde_r:.6f}, mse_bc_r: {mse_bc_r:.6f}, "
-                                    f"mse_pde_i: {mse_pde_i:.6f}, mse_bc_i: {mse_bc_i:.6f}, "
-                                    f"loss: {loss.item():.6f}, error_real: {error.item():.4f}, error_imag: {error_i.item():.4f}")
-                else:
-                    self.logger.info(f"epoch: {epoch}, mse_pde_r: {mse_pde_r:.6f}, mse_bc_r: {mse_bc_r:.6f}, "                                    
-                                    f"loss: {loss.item():.6f}, error_real: {error.item():.4f}")
-        
-        tmr.send(f'Training completed time')
+                #     self.logger.info(f"epoch: {epoch}, mse_pde_r: {mse_pde_r:.6f}, mse_bc_r: {mse_bc_r:.6f}, "
+                #                     f"mse_pde_i: {mse_pde_i:.6f}, mse_bc_i: {mse_bc_i:.6f}, "
+                #                     f"loss: {loss.item():.6f}, error_real: {error.item():.4f}, error_imag: {error_i.item():.4f}")
+               
+                    # self.logger.info(f"epoch: {epoch}, mse_pde: {mse_pde_r:.6f}, mse_bc: {mse_bc_r:.6f}, "                                    
+                    #                 f"loss: {loss.item():.6f}, error_real: {error.item():.4f}")
+                    # self.logger.info(f"epoch: {epoch}, Loss: {loss.item():.6f}")        
+        tmr.send(f'PINN training time')
         next(tmr)
 
     def predict(self, p: TensorLike) -> TensorLike:
@@ -418,29 +535,28 @@ class HelmholtzPINNModel(ComputationalModel):
         import matplotlib.pyplot as plt
 
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 6))
+        Loss = bm.log10(bm.tensor(self.Loss)).numpy()
 
-        # 绘制损失曲线 (顶部子图)
-        axes[0].plot(self.Loss, 'r-', linewidth=2)
+        # 绘制损失曲线
+        axes[0].plot(Loss, 'r-', linewidth=2)
         axes[0].set_title('Training Loss', fontsize=12)
-        axes[0].set_ylabel('Loss Value', fontsize=10)
+        axes[0].set_xlabel('training epochs*100', fontsize=10)
+        axes[0].set_ylabel('log10(Loss)', fontsize=10)
         axes[0].grid(True)
 
-        # 绘制实部上PINN vs FEM误差 (中间子图)
-        axes[1].plot(self.error_real, 'b--', linewidth=2)
-        axes[1].set_title('Error of Real between PINN and FEM Solution', fontsize=12)
-        axes[1].set_ylabel('Error Real', fontsize=10)
-        axes[1].grid(True)
-
-        # 2. 绘制实部和虚部误差曲线 (右子图)
-        axes[1].plot(self.error_real, 'b-', linewidth=2, label='Real Part Error')
+        # 绘制实部和虚部误差曲线
+        error_real = bm.log10(bm.tensor(self.error_real)).numpy()
+        error_imag = bm.log10(bm.tensor(self.error_imag)).numpy()
+        axes[1].plot(error_real, 'b-', linewidth=2, label='Real Part Error')
         if self.error_imag != []:
-            axes[1].plot(self.error_imag, 'g--', linewidth=2, label='Imaginary Part Error')
-        axes[1].set_title('PINN vs FEM Solution Errors', fontsize=12)
-        axes[1].set_ylabel('Error Value', fontsize=10)
+            axes[1].plot(error_imag, 'g--', linewidth=2, label='Imag Part Error')
+        axes[1].set_title('L2 Error between PINN Solution and Exact Solution', fontsize=12)
+        axes[1].set_ylabel('log10(Error)', fontsize=10)
+        axes[1].set_xlabel('training epochs*100', fontsize=10)
         axes[1].grid(True)
         axes[1].legend()
 
-        if (self.gd <= 2) and (self.complex):
+        if self.gd <= 2:
             mesh = self.mesh
             node = mesh.entity('node')
 
@@ -449,58 +565,110 @@ class HelmholtzPINNModel(ComputationalModel):
             u_true = self.pde.solution(node)   # 解析解
             node = node.detach().numpy()
 
+            u_pred_r = bm.real(u_pred).detach().numpy().flatten()
+            u_true_r = bm.real(u_true).detach().numpy().flatten()
+            if self.error_imag != []:
+                u_pred_i = bm.imag(u_pred).detach().numpy().flatten()
+                u_true_i = bm.imag(u_true).detach().numpy().flatten()
+
             # fig = plt.figure()
             if self.gd == 1:
                 fig = plt.figure()
                 # 绘制真实解和预测解
-                plt.plot(node, u_true, 'b-', linewidth=3, label='Analytical Solution')
-                plt.plot(node, u_pred, 'r--', linewidth=2, label='PINN Prediction')
-
+                plt.plot(node, u_true_r, 'b-', linewidth=3, label='Real Part of Exact  Solution')
+                plt.plot(node, u_pred_r, 'r--', linewidth=2, label='Real Part of PINN Prediction')
+                if self.error_imag != []:
+                    plt.plot(node, u_true_i, 'g-', linewidth=3, label='Imag Part of Exact  Solution')
+                    plt.plot(node, u_pred_i, 'y--', linewidth=2, label='Imag Part of PINN Prediction')
                 # 图形修饰
                 plt.xlabel('x', fontsize=12)
                 plt.ylabel('u(x)', fontsize=12)
-                plt.title('Comparison between PINN and Analytical Solution', fontsize=14)
+                plt.title('Comparison between PINN and Exact Solution', fontsize=14)
                 plt.legend(fontsize=12)
                 plt.grid(True, linestyle=':')
             else:
-                u_pred_r = bm.real(u_pred).detach().numpy().flatten()
-                u_pred_i = bm.imag(u_pred).detach().numpy().flatten()
-                u_true_r = bm.real(u_true).detach().numpy().flatten()
-                u_true_i = bm.imag(u_true).detach().numpy().flatten()
-                fig, axes = plt.subplots(2, 2)
-                axes[0, 0].set_title('Real Part of True Solution')
-                axes[0, 1].set_title('Imag Part of True Solution')
-                axes[1, 0].set_title("Real Part of Pinn Module's Solution")
-                axes[1, 1].set_title("Imag Part of Pinn Module's Solution")
+                # fig, axes = plt.subplots(2, 2)
+                # axes[0, 0].set_title('Real Part of Exact Solution')
+                # axes[0, 1].set_title('Imag Part of Exact Solution')
+                # axes[1, 0].set_title("Real Part of PINN Solution")
+                # axes[1, 1].set_title("Imag Part of PINN Solution")
 
-                mesh.add_plot(axes[0, 0], cellcolor=u_true_r, linewidths=0, aspect=1)
-                mesh.add_plot(axes[0, 1], cellcolor=u_true_i, linewidths=0, aspect=1)
-                mesh.add_plot(axes[1, 0], cellcolor=u_pred_r, linewidths=0, aspect=1)
-                mesh.add_plot(axes[1, 1], cellcolor=u_pred_i, linewidths=0, aspect=1)
+                # mesh.add_plot(axes[0, 0], cellcolor=u_true_r, linewidths=0, aspect=1)
+                # mesh.add_plot(axes[0, 1], cellcolor=u_true_i, linewidths=0, aspect=1)
+                # mesh.add_plot(axes[1, 0], cellcolor=u_pred_r, linewidths=0, aspect=1)
+                # mesh.add_plot(axes[1, 1], cellcolor=u_pred_i, linewidths=0, aspect=1)
 
-                # # 子图1：PINN预测解
+                #  PINN预测解的实部
                 fig = plt.figure()
-                ax1_3d = fig.add_subplot(121, projection='3d')
+                ax1_3d = fig.add_subplot(131, projection='3d')
                 surf1 = ax1_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_pred_r,
                     cmap='viridis', edgecolor='k', linewidth=0.2, alpha=0.8)
-                ax1_3d.set_title('PINN Predicted Solution of Real')
+                ax1_3d.set_title('PINN Solution of Real')
                 ax1_3d.set_xlabel('X')
                 ax1_3d.set_ylabel('Y')
                 ax1_3d.set_zlabel('u(x,y)')
                 fig.colorbar(surf1, ax=ax1_3d, shrink=0.5, label='Value')
 
-                # 子图2：真解
-                ax2_3d = fig.add_subplot(122, projection='3d')
+                # 真解的实部
+                ax2_3d = fig.add_subplot(132, projection='3d')
                 surf2 = ax2_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_true_r,
                     cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
-                ax2_3d.set_title('Analytical True Solution of Real')
+                ax2_3d.set_title('Exact Solution of Real')
                 ax2_3d.set_xlabel('X')
                 ax2_3d.set_ylabel('Y')
                 ax2_3d.set_zlabel('u(x,y)')
                 fig.colorbar(surf2, ax=ax2_3d, shrink=0.5, label='Value')
-                plt.suptitle('Solution Comparison: PINN vs Analytical')
+
+                # 实部的误差
+                ax3_3d = fig.add_subplot(133, projection='3d')
+                surf3 = ax3_3d.plot_trisurf(
+                    node[:, 0], node[:, 1], u_pred_r-u_true_r,
+                    cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
+                ax3_3d.set_title('Error: PINN - Exact')
+                ax3_3d.set_xlabel('X')
+                ax3_3d.set_ylabel('Y')
+                ax3_3d.set_zlabel('u(x,y)')
+                fig.colorbar(surf3, ax=ax3_3d, shrink=0.5, label='Value')
+
+                plt.suptitle('Comparison between PINN and Exact Solution of Real')
+
+                if self.error_imag != []:
+                    fig = plt.figure()
+                    ax1_3d = fig.add_subplot(131, projection='3d')
+                    surf1 = ax1_3d.plot_trisurf(
+                        node[:, 0], node[:, 1], u_pred_i,
+                        cmap='viridis', edgecolor='k', linewidth=0.2, alpha=0.8)
+                    ax1_3d.set_title('PINN Solution of Imag')
+                    ax1_3d.set_xlabel('X')
+                    ax1_3d.set_ylabel('Y')
+                    ax1_3d.set_zlabel('u(x,y)')
+                    fig.colorbar(surf1, ax=ax1_3d, shrink=0.5, label='Value')
+
+                    # 真解的虚部
+                    ax2_3d = fig.add_subplot(132, projection='3d')
+                    surf2 = ax2_3d.plot_trisurf(
+                        node[:, 0], node[:, 1], u_true_i,
+                        cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
+                    ax2_3d.set_title('Exact   Solution of Imag')
+                    ax2_3d.set_xlabel('X')
+                    ax2_3d.set_ylabel('Y')
+                    ax2_3d.set_zlabel('u(x,y)')
+                    fig.colorbar(surf2, ax=ax2_3d, shrink=0.5, label='Value')
+
+                    # 虚部的误差
+                    ax3_3d = fig.add_subplot(133, projection='3d')
+                    surf3 = ax3_3d.plot_trisurf(
+                        node[:, 0], node[:, 1], u_pred_i-u_true_i,
+                        cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
+                    ax3_3d.set_title('Error: PINN - Exact')
+                    ax3_3d.set_xlabel('X')
+                    ax3_3d.set_ylabel('Y')
+                    ax3_3d.set_zlabel('u(x,y)')
+                    fig.colorbar(surf3, ax=ax3_3d, shrink=0.5, label='Value')
+
+                    plt.suptitle('Comparison between PINN and Exact Solution of Imag')
 
         plt.tight_layout()      
         plt.show()  # 显示第二个Figure

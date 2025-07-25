@@ -83,10 +83,6 @@ class ModelManager:
 
         Returns:
             None
-
-        Examples:
-            >>> manager = ModelManager("poisson")
-            >>> manager.show_examples()
         """
         print(f"Available examples for type '{self.model_type}':")
         print("\n examples name: (file_name, class_name)")
@@ -102,9 +98,6 @@ class ModelManager:
 
         Returns:
             instance(object): An instance of the selected model class.
-
-        Examples:
-            >>> model = ModelManager("poisson").get_example(1)
         """
         if key not in self.data_table:
             raise ValueError(f"[Error] Unknown key: '{key}'. Use .show_examples() to view valid keys.")

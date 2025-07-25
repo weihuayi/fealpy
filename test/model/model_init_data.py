@@ -22,6 +22,12 @@ init_model_data = [
     {"PDE": "poisson",
      "example_name": 7
      },
+    {"PDE": "poisson",
+     "example_name": 8
+     },
+    {"PDE": "poisson",
+     "example_name": 9
+     },
     # {"PDE": "diffusion",
     #  "example_name": 1
     #  },
@@ -33,6 +39,9 @@ init_model_data = [
      },
     {"PDE": "diffusion_reaction",
      "example_name": 1
+     },
+     {"PDE": "diffusion_reaction",
+     "example_name": 2
      },
     {"PDE": "parabolic",
      "example_name": 1

@@ -10,7 +10,8 @@ class PoissonPDEDataProtocol(Protocol):
         1. Domain specification methods (geometry,computational domain)
         2. Equation terms methods (exact solution, grdient and source terms)
         3. Boundary condition methods (Dirichlet, Neumann, Robin types)
-
+        4. scaling_function is a function that satisfies the boundary conditions.
+        
     Notes:  
         This protocol serves as a development guideline - implementing classes are encouraged to:
         - Provide implementations for the declared methods
@@ -28,6 +29,7 @@ class PoissonPDEDataProtocol(Protocol):
     def is_neumann_boundary(self, p: TensorLike) -> TensorLike: ...
     def robin(self, p: TensorLike) -> TensorLike: ...
     def is_robin_boundary(self, p: TensorLike) -> TensorLike: ...
+    def scaling_function(p: TensorLike) -> TensorLike: ...
 
 PoissonPDEDataT = TypeVar('PoissonPDEDataT', bound=PoissonPDEDataProtocol)
 """
@@ -43,5 +45,7 @@ DATA_TABLE = {
     5: ("exp0005", "Exp0005"),
     6: ("exp0006", "Exp0006"),
     7: ("exp0007", "Exp0007"),
+    8: ("exp0008", "Exp0008"),
+    9: ("exp0009", "Exp0009")
    
 }

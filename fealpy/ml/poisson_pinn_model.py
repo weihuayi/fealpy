@@ -1,18 +1,18 @@
-import time
 import torch.nn as nn
-# from torch.optim import Adam, SGD
 from torch.optim.lr_scheduler import StepLR
+from typing import Union, Optional
 
 from ..backend import bm
-from typing import Union, Optional
+from ..utils import timer
 from ..typing import TensorLike
 from ..model import ComputationalModel, PDEModelManager
 from ..model.poisson import PoissonPDEDataT
+
 from . import gradient
-from ..mesh import TriangleMesh, UniformMesh
+from . import optimizers, activations
+
 from .modules import Solution
 from .sampler import BoxBoundarySampler, ISampler
-
 
 class PoissonPINNModel(ComputationalModel):
     """A Physics-Informed Neural Network (PINN) model for solving Poisson equations.
@@ -23,18 +23,22 @@ class PoissonPINNModel(ComputationalModel):
     
     Parameters
         options : dict
+            If None, default parameters from get_options() will be used.
             Configuration dictionary containing:
-            - pde: PDE definition (str or PoissonPDEDataT);
-            - meshtype: Type of mesh ('tri' or 'uni');
-            - lr: Learning rate;
-            - epochs: Number of training epochs;
-            - hidden_sizes: List of hidden layer sizes;
-            - npde: Number of PDE collocation points;
-            - nbc: Number of boundary collocation points;
-            - activation: Activation function;
-            - loss: Loss function;
-            - optimizer: Optimization algorithm;
-            - sampling_mode: Sampling strategy ('linspace' or 'random').
+            - pde: PDE definition (int or HelmholtzPDEDataT);
+            - lr: Learning rate (float);
+            - epochs: Number of training epochs (int);
+            - weights: Weight for the equation loss and boundary loss (tuple);
+            - hidden_size: Tuple of hidden layer sizes (tuple);
+            - npde: Number of PDE collocation points (int);
+            - nbc: Number of boundary collocation points (int);
+            - activation: Activation function (str, options: 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax');
+            - optimizer: Optimization algorithm (str, options: 'Adam', 'SGD');
+            - sampling_mode: Sampling strategy (str, options: 'linspace' or 'random');
+            - step_size: Period of learning rate decay (int);
+            - gamma: Multiplicative factor of learning rate decay (float);
+            - pbar_log: Whether to use progress bar for logging (bool);
+            - log_level: Logging level (str, options: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
         
     Attributes
         pde : PoissonPDEDataT
@@ -60,9 +64,6 @@ class PoissonPINNModel(ComputationalModel):
         options : dict
             Configuration dictionary passed during initialization.
             
-    Reference:
-        https://wnesm678i4.feishu.cn/wiki/Me8lw5ryxigAMbkcnL8cWVQpn4g?from=from_copylink
-
     Methods
         set_pde(pde)
             Initialize the PDE problem.
@@ -87,55 +88,149 @@ class PoissonPINNModel(ComputationalModel):
         2. Backpropagation during training;
         The loss function combines PDE residual and boundary condition terms.
     
+    Reference
+        https://wnesm678i4.feishu.cn/wiki/Me8lw5ryxigAMbkcnL8cWVQpn4g?from=from_copylink
+
     Examples
-        >>> options = {
-        ...     'pde': 'sin',
-        ...     'meshtype': 'tri',
-        ...     'lr': 0.001,
-        ...     'epochs': 1000,
-        ...     'hidden_sizes': (32, 32, 16),
-        ...     'npde': 400,
-        ...     'nbc': 100,
-        ...     'activation': nn.Tanh(),
-        ...     'loss': nn.MSELoss(),
-        ...     'optimizer': torch.optim.Adam,
-        ...     'sampling_mode': 'random'
-        ... }
-        >>> model = PoissonPINNModel(options)
-        >>> model.train()
-        >>> model.show()
+        >>> from fealpy.backend import bm  
+        >>> bm.set_backend('pytorch')   # Set the backend to PyTorch  
+        >>> from fealpy.ml import PoissonPINNModel  
+        >>> options = PoissonPINNModel.get_options()    # Get the default options of the network  
+        >>> model = PoissonPINNModel(options=options)  
+        >>> model.run()   # Train the network  
+        >>> model.show()   # Show the results of the network training  )
     """
-    def __init__(self, options):
-        self.options = options
-        self.set_pde(self.options['pde'])
+    def __init__(self, options: Optional[dict] = None):
+        if options is None:
+            self.options = self.get_options()
+        else:
+            self.options = options
+        
+        self.pbar_log = self.options.get('pbar_log', True)
+        self.log_level = self.options.get('log_level', 'INFO')
+        super().__init__(pbar_log=self.pbar_log, log_level=self.log_level)
+        
+        self.set_pde(self.options.get('pde', 1))
 
         self.gd = self.pde.geo_dimension()
         self.domain = self.pde.domain()
-        self.set_mesh(self.options['meshtype'])
+        self.set_mesh(self.options.get('mesh_size', 30))
 
         # 采样器
-        self.sampler_pde = ISampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
-        self.sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
+        self.sampler_pde = ISampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
+        self.sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
 
-        # 网络超参数、采样点数、激活函数
-        self.lr = self.options['lr']
-        self.epochs = self.options['epochs']
-        self.hidden_sizes = self.options['hidden_sizes']
-        self.npde = self.options['npde']
-        self.nbc = self.options['nbc']
-        self.activation = self.options['activation']
+        # 网络超参数、激活函数、采样点数、权重
+        self.lr = self.options.get('lr', 0.005)
+        self.epochs = self.options.get('epochs', 1000)
+        self.hidden_size = self.options.get('hidden_size', (32, 32, 16))
+        self.activation = activations[self.options.get('activation', "Tanh")]
+        self.npde = self.options.get('npde', 400)
+        self.nbc = self.options.get('nbc')
+        self.weights = self.options.get('weights', (1, 30))
+
 
         # 损失函数
-        self.loss = self.options['loss']
+        self.mse = nn.MSELoss(reduction='mean')
 
         # 网络
         self.set_network()
 
         # 优化器与学习率调度器
-        self.optimizer = self.options["optimizer"](params=self.net.parameters(), lr=self.lr)
-
+        opt = optimizers[self.options.get('optimizer', 'Adam')]
+        self.optimizer = opt(params=self.net.parameters(), lr=self.lr)
         
-    def set_pde(self, pde: Union[PoissonPDEDataT, str]='sin'):
+        # 学习率调度器
+        step_size = self.options.get('step_size', 0)
+        gamma = self.options.get('gamma', 0.99)
+        self.set_steplr(step_size, gamma)
+
+        self.tmr = timer()  # 计时器
+
+    @classmethod
+    def get_options(cls):
+        """Get default configuration parameters for the model.
+        
+        Defines and returns default configurations for the model through a command-line argument parser,
+        including PDE problem number, grid size, network structure, and optimizer parameters.
+        
+        Returns
+            options : dict
+                Dictionary containing all configuration parameters with parameter names as keys and default values
+        """
+
+        import argparse
+
+        # Argument parsing
+        parser = argparse.ArgumentParser(description=
+                """
+                A simple example of using PINN to solve Poisson equation.
+                """)
+
+        parser.add_argument('--pde',default=1, type=int,
+                            help="Built-in PDE example ID for different Poisson problems, default is 1.")
+        
+        parser.add_argument('--mesh_size',
+                            default=30, type=int,
+                            help='Number of grid points along each dimension, default is 30.')
+
+        parser.add_argument('--sampling_mode', 
+                            default='random', type=str,
+                            help="Sampling method for collocation points: 'random' or 'linspace', default is 'random'")
+
+        parser.add_argument('--npde',
+                            default=400, type=int,
+                            help='Number of PDE samples, default is 400.')
+
+        parser.add_argument('--nbc',
+                            default=100, type=int,
+                            help='Number of boundary condition samples, default is 100.')
+    
+        parser.add_argument('--weights',
+                            default=(1, 30), type=tuple,
+                            help='The first value is the weight for the equation loss, and the second ' \
+                            'value is the weight for the boundary loss., default is (1, 30).')
+        
+        parser.add_argument('--hidden_size',
+                            default=(32, 32, 16), type=tuple,
+                            help='Default hidden sizes, default is (32, 32, 16).')
+
+        parser.add_argument('--optimizer', 
+                            default="Adam",  type=str,
+                            help="Optimizer to use for training, default is Adam, options are 'Adam' , 'SGD'.")
+
+        parser.add_argument('--activation',
+                            default="Tanh", type=str,
+                            help="Activation function, default is Tanh, " \
+                            "options are 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax'.")
+
+        parser.add_argument('--lr',
+                            default=0.001, type=float,
+                            help='Learning rate for the optimizer, default is 0.001.')
+        
+        parser.add_argument('--step_size',
+                            default=1000, type=int,
+                            help='Period of learning rate decay, default is 0.')
+
+        parser.add_argument('--gamma',
+                            default=0.99, type=float,
+                            help='Multiplicative factor of learning rate decay. Default: 0.99.')
+
+        parser.add_argument('--epochs',
+                            default=4000, type=int,
+                            help='Number of training epochs, default is 4000.')
+        
+        parser.add_argument('--pbar_log',
+                            default=True, type=bool,
+                            help='Whether to show progress bar, default is True')
+
+        parser.add_argument('--log_level',
+                            default='INFO', type=str,
+                            help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
+        options = vars(parser.parse_args())
+        return options
+    
+    def set_pde(self, pde: Union[PoissonPDEDataT, int]=1):
         """Initialize the PDE problem definition.
         
         Parameters
@@ -143,7 +238,7 @@ class PoissonPINNModel(ComputationalModel):
                 Either a predefined PDE object or string identifier for built-in examples.
                 Defaults to 'sin' example problem.
         """
-        if isinstance(pde, str):
+        if isinstance(pde, int):
             self.pde = PDEModelManager('poisson').get_example(pde)
         else:
             self.pde = pde 
@@ -158,32 +253,42 @@ class PoissonPINNModel(ComputationalModel):
         """
         if net == None:
             layers = []
-            sizes = (self.gd,) + self.hidden_sizes + (1,)
+            sizes = (self.gd,) + self.hidden_size + (1,)
             for i in range(len(sizes)-1):
                 layers.append(nn.Linear(sizes[i], sizes[i+1], dtype=bm.float64))
                 if i < len(sizes)-2:  
-                    layers.append(self.activation)
+                    layers.append(self.activation())
             net = nn.Sequential(*layers)
         self.net = Solution(net)
 
-    
-
-    def set_mesh(self, type:str='tri'):
-        """Initialize the computational mesh for error estimation.
+    def set_mesh(self, mesh_size: int):
+        """Create computational mesh.
         
-        Creates either triangular mesh (for dimensions > 1) or uniform mesh based on configuration.
+        Creates a computational mesh over the domain defined by the PDE based on the specified mesh size.
         
         Parameters
-            type : str, optional, default='tri'
-                Mesh type specification ('tri' for triangular, 'uni' for uniform).
+            mesh_size : tuple of int
+                Number of nodes in each dimension.
         """
-        if self.gd > 1:
-            if type == "tri":
-                self.mesh = TriangleMesh.from_box(self.domain, nx=30, ny=30)
-            elif type == 'uni':
-                 self.mesh = UniformMesh(self.domain, (0, 30)*self.gd)
+        self.mesh_size = (mesh_size, ) * self.gd
+        cell_size = tuple(x - 1 for x in self.mesh_size)
+        self.mesh = self.pde.init_mesh(*cell_size)
+
+    def set_steplr(self, step_size: int=0, gamma: float=0.9):
+        """Create learning rate scheduler
+        
+        Initializes a learning rate scheduler for decaying the learning rate periodically during training.
+        
+        Parameters
+            step_size : int, optional, default=0
+                Period for learning rate decay, i.e., decay every step_size epochs. No scheduler is used if step_size = 0.
+            gamma : float, optional, default=0.9
+                Multiplicative factor for learning rate decay, new_lr = current_lr * gamma
+        """
+        if step_size == 0:
+            self.steplr = None
         else:
-            self.mesh = UniformMesh(self.domain, (0, 30)*self.gd)
+            self.steplr = StepLR(self.optimizer, step_size, gamma)
 
     def pde_residual(self, p: TensorLike) -> TensorLike:
         """Compute PDE residual (Laplacian(u) + f).
@@ -250,10 +355,12 @@ class PoissonPINNModel(ComputationalModel):
             
             The loss function combines PDE residual and boundary condition terms.
         """
-        start_time = time.time()
+        tmr = timer()
+        next(tmr)
         self.Loss = []
         self.error_fem = []
         self.error_true = []
+        w = self.weights
 
         mesh = self.mesh
 
@@ -275,23 +382,24 @@ class PoissonPINNModel(ComputationalModel):
             bc_res = self.bc_residual(sbc)
 
             # 计算损失
-            mse_pde = self.loss(pde_res, bm.zeros_like(pde_res))
-            mse_bc = self.loss(bc_res, bm.zeros_like(bc_res))
+            mse_pde = self.mse(pde_res, bm.zeros_like(pde_res))
+            mse_bc = self.mse(bc_res, bm.zeros_like(bc_res))
 
-            loss = 1.0 * mse_pde + 1.0 * mse_bc
+            loss = w[0] * mse_pde + w[1] * mse_bc
             loss.backward()
             # 更新参数
             self.optimizer.step()
 
-
             if epoch % 100 == 0:
+                # L²误差
                 error = self.net.estimate_error(self.pde.solution, mesh, coordtype='c')
-                self.error_fem.append(error.detach().numpy())
-                self.Loss.append(loss.detach().numpy())
-                print(f"epoch: {epoch}, mse_pde: {mse_pde:.4f}, mse_bc: {mse_bc:.4f}, loss: {loss.item():.4f}, error_fem: {error.item():.4f}")
+                self.error_fem.append(error.item())
+                self.Loss.append(loss.item())
+                self.logger.info(f"epoch: {epoch}, Loss: {loss.item():.6f}")  
+                # self.logger.info(f"epoch: {epoch}, mse_pde: {mse_pde:.4f}, mse_bc: {mse_bc:.4f}, loss: {loss.item():.4f}, error_fem: {error.item():.4f}")
                
-        end_time = time.time()
-        print(f'Training completed in {end_time - start_time:.2f} seconds.')
+        tmr.send(f'PINN training time')
+        next(tmr)
 
     def predict(self, p: TensorLike) -> TensorLike:
         """Make predictions using the trained network.
@@ -320,17 +428,22 @@ class PoissonPINNModel(ComputationalModel):
         import matplotlib.pyplot as plt
 
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 6))
+        print(type(self.Loss), len(self.Loss))
+        Loss = bm.log10(bm.tensor(self.Loss)).numpy()
 
-        # 绘制损失曲线 (顶部子图)
-        axes[0].plot(self.Loss, 'r-', linewidth=2)
+        # 绘制损失曲线
+        axes[0].plot(Loss, 'r-', linewidth=2)
         axes[0].set_title('Training Loss', fontsize=12)
-        axes[0].set_ylabel('Loss Value', fontsize=10)
+        axes[0].set_xlabel('training epochs*100', fontsize=10)
+        axes[0].set_ylabel('log10(Loss)', fontsize=10)
         axes[0].grid(True)
 
-        # 绘制PINN vs FEM误差 (中间子图)
-        axes[1].plot(self.error_fem, 'b--', linewidth=2)
-        axes[1].set_title('Error between PINN and FEM Solution', fontsize=12)
-        axes[1].set_ylabel('Error', fontsize=10)
+        # 绘制PINN vs exact 误差 
+        error = bm.log10(bm.tensor(self.error_fem)).numpy()
+        axes[1].plot(error, 'b--', linewidth=2)
+        axes[1].set_title('L2 Error between PINN Solution and Exact Solution', fontsize=12)
+        axes[1].set_ylabel('log10(Error)', fontsize=10)
+        axes[1].set_xlabel('training epochs*100', fontsize=10)
         axes[1].grid(True)
 
         if self.gd <= 2:
@@ -343,38 +456,48 @@ class PoissonPINNModel(ComputationalModel):
             fig = plt.figure()
             if self.gd == 1:
                 # 绘制真实解和预测解
-                plt.plot(node, u_true, 'b-', linewidth=3, label='Analytical Solution')
-                plt.plot(node, u_pred, 'r--', linewidth=2, label='PINN Prediction')
+                plt.plot(node, u_true, 'b-', linewidth=3, label='Exact Solution')
+                plt.plot(node, u_pred, 'g--', linewidth=2, label='PINN Prediction')
+                plt.plot(node, u_pred-u_true, 'r-', linewidth=2, label='Error: PINN-Exact')
 
                 # 图形修饰
                 plt.xlabel('x', fontsize=12)
                 plt.ylabel('u(x)', fontsize=12)
-                plt.title('Comparison between PINN and Analytical Solution', fontsize=14)
+                plt.title('Comparison between PINN and Exact Solution', fontsize=14)
                 plt.legend(fontsize=12)
                 plt.grid(True, linestyle=':')
             else:
                 # 子图1：PINN预测解
-                ax1_3d = fig.add_subplot(121, projection='3d')
+                ax1_3d = fig.add_subplot(131, projection='3d')
                 surf1 = ax1_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_pred,
                     cmap='viridis', edgecolor='k', linewidth=0.2, alpha=0.8)
-                ax1_3d.set_title('PINN Predicted Solution')
+                ax1_3d.set_title('PINN Solution')
                 ax1_3d.set_xlabel('X')
                 ax1_3d.set_ylabel('Y')
                 ax1_3d.set_zlabel('u(x,y)')
                 fig.colorbar(surf1, ax=ax1_3d, shrink=0.5, label='Value')
 
                 # 子图2：真解
-                ax2_3d = fig.add_subplot(122, projection='3d')
+                ax2_3d = fig.add_subplot(132, projection='3d')
                 surf2 = ax2_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_true,
                     cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
-                ax2_3d.set_title('Analytical True Solution')
+                ax2_3d.set_title('Exact Solution')
                 ax2_3d.set_xlabel('X')
                 ax2_3d.set_ylabel('Y')
                 ax2_3d.set_zlabel('u(x,y)')
                 fig.colorbar(surf2, ax=ax2_3d, shrink=0.5, label='Value')
-                plt.suptitle('Solution Comparison: PINN vs Analytical')
+
+                ax4 = fig.add_subplot(133, projection="3d")
+                surf3 = ax4.plot_trisurf(node[:, 0], node[:, 1],
+                                        u_pred - u_true, cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
+                ax4.set_title('Error: PINN - Exact', fontsize=12)
+                ax4.set_xlabel('x', fontsize=10)
+                ax4.set_ylabel('y', fontsize=10)    
+                ax4.set_zlabel('u(x,y)', fontsize=10)
+                fig.colorbar(surf3, ax=ax4, shrink=0.5, label='value')
+                plt.suptitle('Comparison between PINN and Exact Solution')
 
         plt.tight_layout()      
         plt.show()  # 显示第二个Figure

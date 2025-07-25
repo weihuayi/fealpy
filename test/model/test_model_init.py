@@ -1,7 +1,7 @@
 import pytest
 
 from fealpy.backend import backend_manager as bm
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 from model_init_data import init_model_data
 
 
@@ -12,7 +12,7 @@ class TestPDEModelManager:
         bm.set_backend(backend)
         pde_name = meshdata['PDE']
         example_name = meshdata['example_name']
-        pde = PDEDataManager(pde_name).get_example(example_name)
+        pde = PDEModelManager(pde_name).get_example(example_name)
         print(pde.__doc__)
         mesh = pde.init_mesh()
         NN = mesh.number_of_nodes()
