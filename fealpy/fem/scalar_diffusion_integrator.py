@@ -17,11 +17,12 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
                  region: Optional[TensorLike] = None,
                  batched: bool = False,
                  method: Literal['fast', 'nonlinear', 'isopara', None] = None) -> None:
-        super().__init__(method=method)
+        super().__init__()
         self.coef = coef
         self.q = q
         self.set_region(region)
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS, /, indices=None) -> TensorLike:
@@ -117,7 +118,6 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         mesh = getattr(space, 'mesh', None)
         coef = self.coef
         rm = mesh.reference_cell_measure()
-        cm = mesh.entity_measure('cell', index=index)
 
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
@@ -127,9 +127,16 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, CellInt):
         d = bm.sqrt(bm.linalg.det(G))
         coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         gphi = space.grad_basis(bcs, index=index, variable='x')
-        A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d) * coef
+        if coef is None:
+            A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d)
+        elif isinstance(coef, (int, float)):
+            A = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, gphi, d) * coef
+        elif isinstance(coef, TensorLike):
+            ndim = coef.ndim
+            if ndim == 4:
+                A = bm.einsum('q, cqim, cqjn, cq, cqmn -> cij', ws*rm, gphi, gphi, d, coef)
+            else:
+                A = bm.einsum('q, cqim, cqjm, cq, cq -> cij', ws*rm, gphi, gphi, d, coef)
         return A
 
-    @assembly.selector
-    def assembly(self):
-        return self.method
+

@@ -1,7 +1,7 @@
 
 from typing import (
     Union, Optional, Any, TypeVar, Tuple, List, Dict, Callable,
-    Generic, Protocol
+    Generic, Protocol, overload
 )
 
 from .. import logger
@@ -108,8 +108,7 @@ class Integrator(metaclass=VariantMeta):
     _region: _Region = None
     etype: str
 
-    def __init__(self, method=None, keep_data=False, *args, **kwds) -> None:
-        self.method = method
+    def __init__(self, keep_data=False, *args, **kwds) -> None:
         self._cache: Dict[Tuple[str, int], Any] = {}
         self.keep_data(keep_data)
 
@@ -193,7 +192,7 @@ class Integrator(metaclass=VariantMeta):
         return ConstIntegrator(value, to_gdof)
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.method})"
+        return f"{self.__class__.__name__}"
 
     def __call__(self, *args, **kwargs):
         return self.assembly(*args, **kwargs)
@@ -343,6 +342,10 @@ class GroupIntegrator(Integrator):
             return NotImplemented
         return self
 
+    @property
+    def etype(self) -> str:
+        return self.ints[0].etype
+
     def set_region(self, region: TensorLike, /) -> None:
         for integrator in self.ints:
             integrator.set_region(region)
@@ -353,11 +356,13 @@ class GroupIntegrator(Integrator):
             return self.ints[0].to_global_dof(space)
         return self.ints[0].to_global_dof(space, indices=indices)
 
-    def assembly(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike:
-        ct = self.ints[0](space, indices=indices)
+    @overload
+    def assembly(self, space: _SpaceGroup, /, indices: _OpIndex = None) -> TensorLike: ...
+    def assembly(self, space: _SpaceGroup, /, *args, **kwargs):
+        ct = self.ints[0].assembly(space, *args, **kwargs)
 
         for int_ in self.ints[1:]:
-            new_ct = int_.assembly(space, indices=indices)
+            new_ct = int_.assembly(space, *args, **kwargs)
             fdim = min(ct.ndim, new_ct.ndim)
             if ct.shape[:fdim] != new_ct.shape[:fdim]:
                 raise RuntimeError(f"The output of the integrator {int_.__class__.__name__} "

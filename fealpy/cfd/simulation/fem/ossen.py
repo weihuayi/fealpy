@@ -9,17 +9,14 @@ from ....decorator import barycentric
 from ....fem import BoundaryPressWorkIntegrator
 
 from .fem_base import FEM
-from .interative_method import InterativeMethod
-from .fem_base import FEM
 from ..simulation_base import SimulationBase, SimulationParameters
 
 
-class Ossen(InterativeMethod, FEM):
+class Ossen(FEM):
     """Ossen Interative Method""" 
     
     def __init__(self, equation, boundary_threshold=None):
         FEM.__init__(self, equation)
-        InterativeMethod.__init__(self)
         self.threshold = boundary_threshold
 
     def simulation(self):
@@ -93,7 +90,6 @@ class Ossen(InterativeMethod, FEM):
         @barycentric
         def u_LSI_coef(bcs, index):
             ctdcoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
-            cccoef = cc(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
             
             result = ctdcoef * u00(bcs, index) / dt

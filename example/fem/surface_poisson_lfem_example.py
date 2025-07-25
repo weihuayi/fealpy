@@ -1,126 +1,40 @@
-import ipdb
 import argparse
-import sympy as sp
-import matplotlib.pyplot as plt
-from scipy.sparse import coo_array, csr_array, bmat
-from mpl_toolkits.mplot3d import Axes3D
 
-from fealpy.utils import timer
-from fealpy import logger
-logger.setLevel('WARNING')
-from fealpy.backend import backend_manager as bm
-
-from fealpy.pde.surface_poisson_model import SurfaceLevelSetPDEData
-from fealpy.geometry.implicit_surface import SphereSurface
-from fealpy.mesh import TriangleMesh, QuadrangleMesh
-from fealpy.mesh import LagrangeTriangleMesh, LagrangeQuadrangleMesh
-from fealpy.functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
-from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator
-from fealpy.fem import LinearForm, ScalarSourceIntegrator
-from fealpy.sparse import COOTensor, CSRTensor
-from fealpy.tools.show import showmultirate, show_error_table
-
-# solver
-from fealpy.solver import cg, spsolve
-
-## 参数解析
+# Argument parsing
 parser = argparse.ArgumentParser(description=
         """
-        曲面上的任意次等参有限元方法
+        Arbitrary-order Isoparametric Finite Element Method on Surfaces.
         """)
-
-parser.add_argument('--sdegree',
-        default=1, type=int,
-        help='Lagrange 有限元空间的次数, 默认为 1 次.')
-
-parser.add_argument('--mdegree',
-        default=1, type=int,
-        help='网格的阶数, 默认为 1 次.')
-
-parser.add_argument('--mtype',
-        default='ltri', type=str,
-        help='网格类型， 默认三角形网格.')
 
 parser.add_argument('--backend',
         default='numpy', type=str,
-        help="默认后端为 numpy.")
+        help='Default backend is numpy')
 
-parser.add_argument('--maxit',
-        default=4, type=int,
-        help="默认网格加密求解次数，默认加密求解4次.")
+parser.add_argument('--pde',
+                    default='sphere', type=str,
+                    help='Name of the PDE model, default is sphere')
 
-args = parser.parse_args()
-bm.set_backend(args.backend)
+parser.add_argument('--init_mesh',
+                    default='ltri', type=str,
+                    help='Type of mesh, default is lagrange_triangle_mesh')
 
-sdegree = args.sdegree
-mdegree = args.mdegree
-mtype = args.mtype
-maxit = args.maxit
+parser.add_argument('--space_degree',
+        default=1, type=int,
+        help='Degree of Isoparametric Finite Element Space, default is 1')
 
-if mtype == 'ltri':
-    LinearMesh = TriangleMesh
-    LagrangeMesh = LagrangeTriangleMesh
-elif mtype == 'lquad':
-    LinearMesh = QuadrangleMesh
-    LagrangeMesh = LagrangeQuadrangleMesh
+parser.add_argument('--pbar_log',
+                    default=True, type=bool,
+                    help='Whether to show progress bar, default is True')
 
-x, y, z = sp.symbols('x, y, z', real=True)
-F = x**2 + y**2 + z**2
-u = x * y
-pde = SurfaceLevelSetPDEData(F, u)
+parser.add_argument('--log_level',
+                    default='INFO', type=str,
+                    help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
-p = mdegree
-surface = SphereSurface()
+options = vars(parser.parse_args())
 
-lmesh = LinearMesh.from_unit_sphere_surface()
+from fealpy.backend import backend_manager as bm
+bm.set_backend(options['backend'])
 
-
-errorType = ['$|| u - u_h||_{\\Omega,0}$']
-errorMatrix = bm.zeros((len(errorType), maxit), dtype=bm.float64)
-NDof = bm.zeros(maxit, dtype=bm.int32)
-
-for i in range(maxit):
-    print("The {}-th computation:".format(i))
-    
-    if mtype == 'ltri':
-        mesh = LagrangeMesh.from_triangle_mesh(lmesh, p=mdegree, surface=surface)
-    elif mtype == 'lquad':
-        mesh = LagrangeMesh.from_quadrangle_mesh(lmesh, p=mdegree, surface=surface)
-    
-    space = ParametricLagrangeFESpace(mesh, p=sdegree)
-    NDof[i] = space.number_of_global_dofs()
-
-    uI = space.interpolate(pde.solution)
-
-    bfrom = BilinearForm(space)
-    bfrom.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
-    lfrom = LinearForm(space)
-    lfrom.add_integrator(ScalarSourceIntegrator(pde.source, method='isopara'))
-
-    A = bfrom.assembly(format='coo')
-    F = lfrom.assembly()
-    C = space.integral_basis()
-
-    def coo(A):
-        data = A._values
-        indices = A._indices
-        return coo_array((data, indices), shape=A.shape)
-    A = bmat([[coo(A), C.reshape(-1,1)], [C, None]], format='coo')
-    A = COOTensor(bm.stack([A.row, A.col], axis=0), A.data, spshape=A.shape)
-
-    F = bm.concatenate((F, bm.array([0])))
-    
-    uh = space.function()
-    x = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
-    uh[:] = -x[:-1] 
-
-    errorMatrix[0, i] = mesh.error(pde.solution, uh.value, q=p+3)
-
-    if i < maxit-1:
-        lmesh.uniform_refine()
-
-print("最终误差:", errorMatrix)
-print("order:", bm.log2(errorMatrix[0,:-1]/errorMatrix[0,1:]))
-show_error_table(NDof, errorType, errorMatrix)
-showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
-plt.show()
+from fealpy.fem import SurfacePoissonLFEMModel
+model = SurfacePoissonLFEMModel(options)
+model.set_pde(options['pde'])
