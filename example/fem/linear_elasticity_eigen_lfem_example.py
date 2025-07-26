@@ -52,7 +52,7 @@ from fealpy.csm.model import CSMModelManager
 from fealpy.fem import LinearElasticityEigenLFEMModel
 pde = CSMModelManager("linear_elasticity").get_example(1)
 options['pde'] = pde
-n = 16 
+n = 4 
 options['nx'] = n * 10 
 options['ny'] = n * 2 
 options['nz'] = n * 2
