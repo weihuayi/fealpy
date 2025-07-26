@@ -5,13 +5,13 @@ from itertools import combinations_with_replacement
 from typing import Optional, TypeVar, Union, Generic, Callable
 from ..typing import TensorLike, Index, _S, Threshold
 
+from ..backend import bm
 from ..backend import TensorLike
-from ..backend import backend_manager as bm
+from ..decorator import barycentric, cartesian
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
 from .dofs import LinearMeshCFEDof, LinearMeshDFEDof
 from .function import Function
-from fealpy.decorator import barycentric, cartesian
 
 
 _MT = TypeVar('_MT', bound=Mesh)
