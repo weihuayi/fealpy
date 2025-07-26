@@ -25,7 +25,7 @@ class Section:
     def parse_line(self, line: str) -> None:
         raise NotImplementedError(f"parse_line must be implemented by {self.__class__.__name__}")
 
-    def build(self, meshdata: Dict[str, Any]):
+    def attach(self, meshdata: Dict[str, Any]):
         pass
 
     def finalize(self) -> None:
@@ -80,7 +80,7 @@ class NodeSection(Section):
         self.node_map = bm.zeros((N,), dtype=bm.int32)
         bm.set_at(self.node_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
 
-    def build(self, meshdata: Dict[str, Any]) -> None:
+    def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata['node_map'] = self.node_map  # 存入共享数据字典
 
 
@@ -127,7 +127,7 @@ class ElementSection(Section):
         bm.set_at(self.cell_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
         self.cell = bm.array(self._cell)
 
-    def build(self, meshdata: Dict[str, Any]) -> None:
+    def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata['cell_map'] = self.cell_map  # 存入共享数据字典
 
 
@@ -158,7 +158,7 @@ class ElsetSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
 
-    def build(self, meshdata: Dict[str, Any]) -> None:
+    def attach(self, meshdata: Dict[str, Any]) -> None:
         if 'elset' not in meshdata:
             meshdata['elset'] = {}
         cell_map = meshdata['cell_map']
@@ -186,7 +186,7 @@ class NsetSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
 
-    def build(self, meshdata: Dict[str, Any]) -> None:
+    def attach(self, meshdata: Dict[str, Any]) -> None:
         if 'nset' not in meshdata:
             meshdata['nset'] = {}
         node_map = meshdata['node_map']
@@ -208,7 +208,7 @@ class SolidSection(Section):
         # Usually no data to parse; solid section info is in the header
         pass
     
-    def build(self, meshdata: Dict[str, Any]) -> None:
+    def attach(self, meshdata: Dict[str, Any]) -> None:
         if 'solid' not in meshdata:
             meshdata['solid'] = {}
         meshdata['solid'] = {
@@ -242,7 +242,7 @@ class SurfaceSection(Section):
         if len(parts) >= 2:
             self.assignments.append((parts[0], float(parts[1])))
 
-    def build(self, meshdata: Dict[str, Any]):
+    def attach(self, meshdata: Dict[str, Any]):
         if 'surface' not in meshdata:
             meshdata['surface'] = {}
         meshdata['surface'][self.name] = {
@@ -267,10 +267,10 @@ class CouplingSection(Section):
     def set_type(self, coupling_type: str) -> None:
         self.type = coupling_type
 
-    def build(self, meshdata: Dict[str, Any]):
-        idx = len(meshdata)  # 以已有键数量作为新编号
-        meshdata[idx] = {
-            'name': self.name,
+    def attach(self, meshdata: Dict[str, Any]):
+        if 'coupling' not in meshdata:
+            meshdata['coupling'] = {}
+        meshdata['coupling'][self.name] = {
             'type': 'COUPLING',
             'ref_node': self.ref_node,
             'surface': self.surface,
@@ -303,12 +303,12 @@ class MaterialSection(Section):
             elif line.upper().startswith("*ELASTIC"):
                 self._next = 'ELASTIC'
 
-    def build(self, meshdata: Dict[str, Any]):
-        idx = len(meshdata)  # 以已有键数量作为新编号
-        meshdata[idx] = {
-            'name': self.name,
+    def attach(self, meshdata: Dict[str, Any]):
+        if 'material' not in meshdata:
+            meshdata['material'] = {}
+        meshdata['material'][self.name] = {
             'density': self.density,
-            'elastic': self.elastic,
+            'elastic': self.elastic
         }
 
 
@@ -327,7 +327,7 @@ class BoundarySection(Section):
             dof_end = int(parts[2])
             self.boundaries.append((name, dof_start, dof_end))
 
-    def build(self, meshdata: Dict[str, Any]):
+    def attach(self, meshdata: Dict[str, Any]):
         if 'boundary' not in meshdata:
             meshdata['boundary'] = []
         meshdata['boundary'].extend(self.boundaries)
@@ -415,29 +415,20 @@ class InpFileParser:
         mesh = mesh_type(node, cell)
 
         for section in self.sections:
-            section.build(mesh.meshdata)
+            section.attach(mesh.meshdata)
         return mesh
 
-    def to_coupling(self) -> Dict[str, Any]:
-        coupling = {}
-        for section in self.sections:
-            if isinstance(section, CouplingSection):
-                section.build(coupling)
-        return coupling
+    def to_material(self, Material, name: str):
+        materials = self.get_section(MaterialSection)
+        elastic_modulus, poisson_ratio = materials.elastic
+        density = materials.density
 
-    def to_material(self) -> Dict[str, Any]:
-        material = {}
-        for section in self.sections:
-            if isinstance(section, MaterialSection):
-                section.build(material)
-        return material
-
-    def to_boundary(self) -> Dict[str, Any]:
-        boundary = {}
-        for section in self.sections:
-            if isinstance(section, BoundarySection):
-                section.build(boundary)
-        return boundary
+        return Material(
+            name=name,
+            elastic_modulus=elastic_modulus,
+            poisson_ratio=poisson_ratio,
+            density=density
+        )
 
 # Example usage:
 if __name__ == '__main__':
