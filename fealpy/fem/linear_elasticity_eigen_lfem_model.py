@@ -1,47 +1,46 @@
 from typing import Any, Optional, Union
-from ..backend import bm
-from ..typing import TensorLike
-from ..decorator import variantmethod
-from ..model import ComputationalModel
-from ..model.linear_elasticity import LinearElasticityPDEDataT
 
-from ..mesh import Mesh
-from ..functionspace import functionspace 
-from ..material import LinearElasticMaterial
+from fealpy.backend import bm
+from fealpy.typing import TensorLike
+from fealpy.decorator import variantmethod
+from fealpy.model import ComputationalModel
+from fealpy.model.linear_elasticity import LinearElasticityPDEDataT
 
-from ..fem import BilinearForm
-from ..fem import LinearElasticityIntegrator
-from ..fem import ScalarMassIntegrator as MassIntegrator
+from fealpy.mesh import Mesh
+from fealpy.functionspace import functionspace 
+from fealpy.material import LinearElasticMaterial
 
-from ..fem import DirichletBC
+from fealpy.fem import BilinearForm
+from fealpy.fem import LinearElasticityIntegrator
+from fealpy.fem import ScalarMassIntegrator as MassIntegrator
+
+from fealpy.fem import DirichletBC
 
 class LinearElasticityEigenLFEMModel(ComputationalModel):
-    """Model for linear elasticity eigenvalue problems using the LFEM.
+    """
+    A model for solving linear elasticity eigenvalue problems using the Lagrange finite element method (LFEM).
 
-    This class sets up and solves a linear elasticity eigenvalue problem
-    with arbitrary‐order Lagrange finite elements.  It encapsulates PDE
-    selection, mesh initialization, material parameters, and solver settings.
+    This class constructs and solves a linear elasticity eigenvalue problem with arbitrary-order Lagrange finite elements.
+    It encapsulates the configuration of the PDE model, mesh generation, material properties, and solver setup,
+    providing a modular interface for flexible eigenvalue computations.
 
-    Parameters
-        options : dict
-            Configuration options for the model, as returned by :meth:`get_options`.
+    Parameters:
+        options (dict): A dictionary of configuration options used to initialize the model.
+            Typically obtained from the :meth:`get_options` method.
+            Includes keys such as 'pde', 'mesh_type', mesh division counts, and logging settings.
 
-    Attributes
-        options : dict
-            The configuration options passed to the model.
-        pde : object
-            The PDE data instance selected based on ``options['pde']``.
-        mesh : Mesh
-            The mesh object initialized according to ``options['mesh_type']`` and division counts.
-        space_degree : int
-            Polynomial degree of the finite element space.
-        _private_attr : any
-            (Optional) Example of a private attribute.
+    Attributes:
+        options (dict): The configuration options used to initialize the model.
+        pde (object): The PDE data object selected according to ``options['pde']``.
+        mesh (Mesh): The mesh object constructed based on ``options['mesh_type']`` and resolution parameters.
+        space_degree (int): Polynomial degree of the Lagrange finite element space used for discretization.
+        _private_attr (Any): Example of a private attribute (used internally).
 
-    Methods
-        get_options(...)
-            Return a dict of default options, which users may override.
-    Examples
+    Methods:
+        get_options(**kwargs): 
+            Return a dictionary of default options, which can be overridden by keyword arguments.
+
+    Examples:
         >>> opts = LinearElasticityEigenLFEMModel.get_options(
         ...     mesh_type='uniform_tet',
         ...     nx=20, ny=20, nz=20,
@@ -50,9 +49,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         >>> model = LinearElasticityEigenLFEMModel(opts)
         >>> model.run()
     """
-
     def __init__(self, options):
-
         self.options = options
         super().__init__(
             pbar_log=options['pbar_log'],
@@ -97,36 +94,46 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         pbar_log: bool = True,
         log_level: str = 'INFO',
     ) -> dict:
-        """Generate a dict of default configuration options for the model.
+        """
+        Generate a dictionary of default configuration options for the linear elasticity eigenvalue model.
 
-        Users may call this method and override any subset of parameters
-        to customize model behavior.
+        This method provides a convenient way to initialize the model's configuration.
+        Users may call this method and override any subset of the default parameters to customize behavior,
+        such as mesh resolution, finite element degree, PDE variant, and logging preferences.
 
-        Parameters
-            pde : int, optional, default=1
-                Index of the linear elasticity PDE model to solve.
-            mesh_type : str, optional, default='uniform_tet'
-                Mesh type identifier used in :meth:`set_init_mesh`.
-            nx : int, optional, default=10
-                Number of divisions along the x‐direction for uniform meshes.
-            ny : int, optional, default=10
-                Number of divisions along the y‐direction for uniform meshes.
-            nz : int, optional, default=10
-                Number of divisions along the z‐direction for uniform meshes.
-            space_degree : int, optional, default=1
-                Degree of the Lagrange finite element space.
-            pbar_log : bool, optional, default=True
-                Whether to display a progress bar.
-            log_level : str, optional, default='INFO'
-                Logging level; one of 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
+        Parameters:
+            pde (int, optional): Index of the linear elasticity PDE model to solve.
+                Defaults to 1. The value selects from predefined model variants.
 
-        Returns
-            options : dict
-                A dictionary mapping each option name to its value.
+            mesh_type (str, optional): Type of the mesh used in the model.
+                Defaults to 'uniform_tet'. Must be compatible with :meth:`set_init_mesh`.
 
-        Examples
+            nx (int, optional): Number of subdivisions in the x-direction for mesh generation.
+                Defaults to 10.
+
+            ny (int, optional): Number of subdivisions in the y-direction.
+                Defaults to 10.
+
+            nz (int, optional): Number of subdivisions in the z-direction.
+                Defaults to 10.
+
+            space_degree (int, optional): Polynomial degree of the Lagrange finite element space.
+                Defaults to 1.
+
+            pbar_log (bool, optional): Whether to display a progress bar during execution.
+                Defaults to True.
+
+            log_level (str, optional): Logging verbosity level.
+                Must be one of 'DEBUG', 'INFO', 'WARNING', 'ERROR', or 'CRITICAL'. Defaults to 'INFO'.
+
+        Returns:
+            dict: A dictionary mapping configuration keys to their corresponding values.
+                This dictionary is suitable for passing to the model constructor.
+
+        Examples:
             >>> opts = LinearElasticityEigenLFEMModel.get_options(
-            ...     mesh_type='uniform_quad', nx=20, pbar_log=False
+            ...     mesh_type='uniform_quad',
+            ...     nx=20, pbar_log=False
             ... )
             >>> print(opts['mesh_type'], opts['nx'], opts['pbar_log'])
             uniform_quad 20 False
@@ -203,7 +210,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         return S, M
 
     @variantmethod('scipy')
-    def solve(self):
+    def solve(self, which: str = 'SM'):
         """Solve the eigenvalue problem using eigsh in scipy.
 
         Returns
@@ -220,37 +227,65 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
         self.show_modal(val, vec)
 
     @solve.register('slepc')
-    def solve(self):
+    def solve(self, which: str ='SM'):
         """Solve the eigenvalue problem using SLEPc.
+        
         """
+        from petsc4py import PETSc
+        from slepc4py import SLEPc
         S, M = self.linear_system()
         S, M = self.apply_bc(S, M)
 
         S = PETSc.Mat().createAIJ(
                 size=S.shape, 
                 csr=(S.indptr, S.indices, S.data))
-        S.assembly()
+        S.assemble()
         M = PETSc.Mat().createAIJ(
                 size=M.shape, 
                 csr=(M.indptr, M.indices, M.data))
-        M.assembly()
+        M.assemble()
 
         eps = SLEPc.EPS().create()
-        eps.setOperators(K, M)
+        eps.setOperators(S, M)
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-        eps.setDimensions(k)
-        eps.setWhichEigenpairs(SLEPc.EPS.Which.SMALLEST_REAL if which == 'SM' else SLEPc.EPS.Which.LARGEST_REAL)
+
+        eps.setTolerances(tol=1e-6, max_it=1000)
+        eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+
+        st = eps.getST()
+        st.setType(SLEPc.ST.Type.SINVERT)
+        st.setShift(1e-4)  # 目标 shift，通常为目标最小特征值附近
+
+        ksp = st.getKSP()
+        ksp.setType('cg')  # 或 'gmres'
+        def my_ksp_monitor(ksp, its, rnorm):
+            print(f"KSP iter {its}, residual norm = {rnorm}")
+        ksp.setMonitor(my_ksp_monitor)
+        pc = ksp.getPC()
+        pc.setType('gamg')  # 或 'gamg' 若使用 AMG
+
+        k = self.options.get('neign', 6)
+        eps.setDimensions(nev=k, ncv=4*k)
+
+        eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
+        eps.setTarget(0.0)  # 目标特征值，通常为最小或最大特征值
+
         eps.setFromOptions()
         eps.solve()
 
+        eigvals = []
         eigvecs = []
 
         vr, vi = eps.getOperators()[0].getVecs()
+        print(f"Number of eigenvalues converged: {eps.getConverged()}")
         for i in range(min(k, eps.getConverged())):
             val = eps.getEigenpair(i, vr, vi)
             eigvals.append(val.real)
             eigvecs.append(vr.getArray().copy())
-        return bm.array(eigvals), bm.column_stack(eigvecs)
+        val = bm.array(eigvals)
+        vec = bm.stack(eigvecs, axis=1)
+        self.logger.info(f"Eigenvalues: {val}")
+        self.show_modal(val, vec)
 
     def show_mesh(self):
         from matplotlib import pyplot as plt
