@@ -1,5 +1,6 @@
 from typing import Any, Union, Optional, TypeVar, Tuple, List
 import numpy as np
+
 try:
     import taichi as ti
 except ImportError:
@@ -320,26 +321,26 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         This static method generates an N×M matrix (or square N×N matrix if M is not specified) where elements on the k-th diagonal are 1, and all other elements are 0. The diagonal is determined by the offset `k`.
 
         Args:
-            N (int): 
+            N (int):
                 Number of rows in the output matrix. Must be a positive integer.
-            M (int, optional): 
+            M (int, optional):
                 Number of columns in the output matrix. If None, defaults to N (resulting in a square matrix). Must be a positive integer if specified.
-            k (int, optional): 
+            k (int, optional):
                 Diagonal offset. Defaults to 0 (main diagonal).
                 - k=0: Main diagonal (elements where row index = column index).
                 - k>0: Diagonals above the main diagonal (e.g., k=1 for elements where column index = row index + 1).
                 - k<0: Diagonals below the main diagonal (e.g., k=-1 for elements where column index = row index - 1).
-            dtype (ti.DataType, optional): 
+            dtype (ti.DataType, optional):
                 Data type of the output field. Defaults to `ti.f64`.
 
         Returns:
-            ti.Field: 
+            ti.Field:
                 An N×M Taichi field with 1s on the k-th diagonal and 0s elsewhere.
 
         Raises:
-            TypeError: 
+            TypeError:
                 If N, M, or k are not integers.
-            ValueError: 
+            ValueError:
                 - If N or M is non-positive (≤ 0).
 
         Notes:
@@ -370,7 +371,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         if M is None:
             M = N
 
-        if not isinstance(N, (int)) or not isinstance(M, (int)) or not isinstance(k, (int)):
+        if (
+            not isinstance(N, (int))
+            or not isinstance(M, (int))
+            or not isinstance(k, (int))
+        ):
             raise TypeError(f"{N} and {M} and {k} must be integers.")
 
         if N == 0 or M == 0:
@@ -388,7 +393,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return field
 
     @staticmethod
-    def zeros(shape: Union[int, Tuple[int,...]], dtype=ti.f64) -> ti.Field:
+    def zeros(shape: Union[int, Tuple[int, ...]], dtype=ti.f64) -> ti.Field:
         """
         Creates a Taichi field filled with zeros.
 
@@ -472,15 +477,15 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         This static method constructs a new Taichi field filled with zeros, mirroring the shape and data type of the provided input field. The output field is initialized to zeros implicitly by Taichi's field creation semantics.
 
         Args:
-            field (ti.Field): 
+            field (ti.Field):
                 Input Taichi field whose shape and data type will be mirrored.
 
         Returns:
-            ti.Field: 
+            ti.Field:
                 A new Taichi field with the same shape and data type as `field`, initialized to zeros.
 
         Raises:
-            TypeError: 
+            TypeError:
                 If the input is not a Taichi field.
 
         Notes:
@@ -491,12 +496,12 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         Examples:
             # 2D field example
             >>> x = ti.field(dtype=ti.f32, shape=(3, 4))
-            >>> zeros = MyClass.zeros_like(x)
+            >>> zeros = bm.zeros_like(x)
             # zeros is a ti.f32 field with shape (3, 4), initialized to zeros
 
             # 3D field example
             >>> y = ti.field(dtype=ti.i64, shape=(2, 2, 2))
-            >>> zeros = MyClass.zeros_like(y)
+            >>> zeros = bm.zeros_like(y)
             # zeros is a ti.i64 field with shape (2, 2, 2), initialized to zeros
         """
         if not isinstance(field, ti.Field):
@@ -703,7 +708,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         This static method calculates the arccosine of input data, where the arccosine of a value `x` is the angle whose cosine is `x`. It supports scalar inputs (integers or floats) and Taichi fields, with element-wise computation for fields.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the arccosine.
                 - A Taichi field: Computes arccosine for each element individually.
@@ -733,7 +738,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         """
         if isinstance(x, (int, float)):
             return ti.acos(x)
-        
+
         if isinstance(x, ti.Field):
             shape = x.shape
             out = ti.field(dtype=ti.f64, shape=shape)
@@ -744,7 +749,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                     out[I] = ti.acos(ti.cast(field[I], ti.f64))
 
             fill_acos(x, out)
-          
+
             return out
 
     @staticmethod
@@ -755,7 +760,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         This static method calculates the arcsine of input data, where the arcsine of a value `x` is the angle whose sine is `x`. It supports scalar inputs (integers or floats) and Taichi fields, with element-wise computation for fields.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the arcsine.
                 - A Taichi field: Computes arcsine for each element individually.
@@ -803,12 +808,12 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         """
         Computes the inverse tangent (arctangent) element-wise for scalar values or Taichi fields.
 
-        This static method calculates the arctangent of input data, where the arctangent of a value `x` is the angle whose tangent is `x`. 
-        For scalar inputs, it uses `ti.atan2(x, 1)` (mathematically equivalent to `atan(x)`). 
+        This static method calculates the arctangent of input data, where the arctangent of a value `x` is the angle whose tangent is `x`.
+        For scalar inputs, it uses `ti.atan2(x, 1)` (mathematically equivalent to `atan(x)`).
         For Taichi fields, it performs element-wise computation and returns a new field with results in `ti.f64` precision.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the arctangent.
                 - A Taichi field: Computes arctangent for each element individually.
@@ -865,9 +870,9 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         This static method calculates the arctangent of the quotient y/x, where the result is an angle in radians between -π and π. Unlike `atan`, it uses the signs of both `y` (numerator) and `x` (denominator) to determine the correct quadrant, making it suitable for converting Cartesian coordinates (x, y) to polar angle.
 
         Args:
-            y (Union[int, float, ti.Field]): 
+            y (Union[int, float, ti.Field]):
                 Numerator value(s). Can be a scalar (int/float) or a Taichi field. Scalars are converted to 0D `ti.f64` fields internally.
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Denominator value(s). Can be a scalar (int/float) or a Taichi field. Scalars are converted to 0D `ti.f64` fields internally.
 
         Returns:
@@ -876,7 +881,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 - If inputs are Taichi fields, returns a new `ti.f64` Taichi field with the same shape as `y` and `x`, where each element is the four-quadrant arctangent of the corresponding elements in `y` and `x`.
 
         Raises:
-            ValueError: 
+            ValueError:
                 If the input Taichi fields `y` and `x` have different shapes.
 
         Notes:
@@ -930,7 +935,9 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 if x_field[I] == 0 and y_field[I] == 0:
                     out[I] = ti.math.nan
                 else:
-                    out[I] = ti.atan2(ti.cast(y_field[I], ti.f64), ti.cast(x_field[I], ti.f64))
+                    out[I] = ti.atan2(
+                        ti.cast(y_field[I], ti.f64), ti.cast(x_field[I], ti.f64)
+                    )
 
         fill_atan2(y, x, out)
         return out
@@ -940,12 +947,12 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         """
         Computes the ceiling value element-wise for scalar values or Taichi fields.
 
-        This static method calculates the smallest integer greater than or equal to the input value(s). 
+        This static method calculates the smallest integer greater than or equal to the input value(s).
         For scalar inputs, it uses `ti.ceil` directly. For Taichi fields, it performs element-wise ceiling computation,
         converting elements to `ti.f64` to match Taichi's mathematical function type requirements.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the ceiling.
                 - A Taichi field: Computes ceiling for each element individually.
@@ -1136,7 +1143,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         This static method calculates the cosine of input data, where the cosine of an angle `x` (in radians) is the ratio of the adjacent side to the hypotenuse in a right triangle. It supports scalar inputs (integers or floats) and Taichi fields, with element-wise computation for fields.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the cosine (interpreted as radians).
                 - A Taichi field: Computes cosine for each element individually (elements are interpreted as radians).
@@ -1191,11 +1198,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         Computes the hyperbolic cosine element-wise for scalar values or Taichi fields.
 
         This static method calculates the hyperbolic cosine of input data using the formula:
-        cosh(x) = (exp(x) + exp(-x)) / 2. It supports scalar inputs (integers or floats) and 
+        cosh(x) = (exp(x) + exp(-x)) / 2. It supports scalar inputs (integers or floats) and
         Taichi fields, with element-wise computation for fields.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the hyperbolic cosine.
                 - A Taichi field: Computes hyperbolic cosine for each element individually.
@@ -1203,7 +1210,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         Returns:
             Union[float, ti.Field]:
                 - If input is a scalar, returns the hyperbolic cosine as a float.
-                - If input is a Taichi field, returns a new `ti.f64` Taichi field with the same shape as `x`, 
+                - If input is a Taichi field, returns a new `ti.f64` Taichi field with the same shape as `x`,
                 where each element is the hyperbolic cosine of the corresponding element in `x`.
 
         Notes:
@@ -1234,7 +1241,10 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             @ti.kernel
             def fill_cosh(field: ti.template(), out: ti.template()):
                 for I in ti.grouped(field):
-                    out[I] = (ti.exp(ti.cast(field[I], ti.f64)) + ti.exp(-ti.cast(field[I], ti.f64))) * 0.5
+                    out[I] = (
+                        ti.exp(ti.cast(field[I], ti.f64))
+                        + ti.exp(-ti.cast(field[I], ti.f64))
+                    ) * 0.5
 
             fill_cosh(x, out)
             return out
@@ -1249,7 +1259,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         floor computation, converting elements to `ti.f64` to match Taichi's mathematical function type requirements.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the floor.
                 - A Taichi field: Computes floor for each element individually.
@@ -1262,7 +1272,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         Notes:
             - For Taichi field inputs, elements are cast to `ti.f64` before computing the floor to match Taichi's mathematical function type requirements.
-            - The floor of a value is the largest integer less than or equal to that value 
+            - The floor of a value is the largest integer less than or equal to that value
             (e.g., floor(3.7) = 3.0, floor(-2.3) = -3.0).
             - Uses Taichi's `ti.floor` function for computation, ensuring compatibility with Taichi's backends.
 
@@ -1308,9 +1318,9 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         the result is an integer. Otherwise, the result is a float.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 The dividend (numerator). Can be a scalar or a Taichi field.
-            y (Union[int, float, ti.Field]): 
+            y (Union[int, float, ti.Field]):
                 The divisor (denominator). Can be a scalar or a Taichi field.
 
         Returns:
@@ -1335,11 +1345,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         Example:
             # Scalar usage (integer inputs produce an integer)
-            result_int = MyClass.floor_divide(10, 3)
+            result_int = bm.floor_divide(10, 3)
             # result_int is 3
 
             # Scalar usage (float input produces a float)
-            result_float = MyClass.floor_divide(-10.0, 3)
+            result_float = bm.floor_divide(-10.0, 3)
             # result_float is -4.0
 
             # Field usage
@@ -1348,7 +1358,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             x.from_numpy(np.array([10., -10., 7., 0.]))
             y.from_numpy(np.array([3., 3., -2., 0.]))
 
-            result_field = MyClass.floor_divide(x, y)
+            result_field = bm.floor_divide(x, y)
             # result_field will contain [3.0, -4.0, -4.0, nan]
         """
         if isinstance(x, (int, float)) and isinstance(y, ti.Field) and y.shape == ():
@@ -1360,7 +1370,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 else:
                     return ti.math.inf
             else:
-                return int(ti.floor(x / y[None])) if isinstance(x,int) and isinstance(y[None],int) else ti.floor(x / y[None])
+                return (
+                    int(ti.floor(x / y[None]))
+                    if isinstance(x, int) and isinstance(y[None], int)
+                    else ti.floor(x / y[None])
+                )
         if isinstance(y, (int, float)) and isinstance(x, ti.Field) and x.shape == ():
             if y == 0:
                 if x[None] == 0:
@@ -1370,7 +1384,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 else:
                     return ti.math.inf
             else:
-                return int(ti.floor(x[None] / y)) if isinstance(x[None],int) and isinstance(y,int) else ti.floor(x[None] / y)
+                return (
+                    int(ti.floor(x[None] / y))
+                    if isinstance(x[None], int) and isinstance(y, int)
+                    else ti.floor(x[None] / y)
+                )
         if isinstance(x, (int, float)) and isinstance(y, (int, float)):
             if y == 0:
                 if x == 0:
@@ -1380,7 +1398,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 else:
                     return ti.math.inf
             else:
-                return int(ti.floor(x / y)) if isinstance(x,int) and isinstance(y,int) else ti.floor(x / y)
+                return (
+                    int(ti.floor(x / y))
+                    if isinstance(x, int) and isinstance(y, int)
+                    else ti.floor(x / y)
+                )
         if isinstance(x, ti.Field) and isinstance(y, ti.Field):
             shape = x.shape
             if shape != y.shape:
@@ -1395,10 +1417,10 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                     if x_field[I] == 0 and y_field[I] == 0:
                         out[I] = ti.math.nan
                     else:
-                        if isinstance(x_field[I],int) and isinstance(y_field[I],int):
-                            out[I] = int(ti.floor(x_field[I]/ y_field[I]))
+                        if isinstance(x_field[I], int) and isinstance(y_field[I], int):
+                            out[I] = int(ti.floor(x_field[I] / y_field[I]))
                         else:
-                            out[I] = ti.floor(x_field[I]/ y_field[I])
+                            out[I] = ti.floor(x_field[I] / y_field[I])
 
             fill_floor_divide(x, y, out)
             return out
@@ -1408,12 +1430,12 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         """
         Computes the sine element-wise for scalar values or Taichi fields.
 
-        This static method calculates the sine of input data, where the sine of an angle `x` (in radians) 
-        is the ratio of the opposite side to the hypotenuse in a right triangle. It supports scalar inputs 
+        This static method calculates the sine of input data, where the sine of an angle `x` (in radians)
+        is the ratio of the opposite side to the hypotenuse in a right triangle. It supports scalar inputs
         (integers or floats) and Taichi fields, with element-wise computation for fields.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the sine (interpreted as radians).
                 - A Taichi field: Computes sine for each element individually (elements are interpreted as radians).
@@ -1421,13 +1443,13 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         Returns:
             Union[float, ti.Field]:
                 - If input is a scalar, returns the sine as a float (using `ti.sin`).
-                - If input is a Taichi field, returns a new `ti.f64` Taichi field with the same shape as `x`, 
+                - If input is a Taichi field, returns a new `ti.f64` Taichi field with the same shape as `x`,
                 where each element is the sine of the corresponding element in `x`.
 
         Notes:
-            - For Taichi field inputs, elements are cast to `ti.f64` before computing the sine to match Taichi's mathematical function type requirements. 
+            - For Taichi field inputs, elements are cast to `ti.f64` before computing the sine to match Taichi's mathematical function type requirements.
             - Input values are interpreted as angles in radians (consistent with standard mathematical conventions).
-            - The sine function ranges between -1 and 1 for all real inputs, with periodicity 2π 
+            - The sine function ranges between -1 and 1 for all real inputs, with periodicity 2π
             (i.e., sin(x + 2π) = sin(x)).
             - Uses Taichi's `ti.sin` function for computation, ensuring compatibility with Taichi's backends.
 
@@ -1464,11 +1486,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         Computes the hyperbolic sine element-wise for scalar values or Taichi fields.
 
         This static method calculates the hyperbolic sine of input data using the formula:
-        sinh(x) = (exp(x) - exp(-x)) / 2. It supports scalar inputs (integers or floats) and 
+        sinh(x) = (exp(x) - exp(-x)) / 2. It supports scalar inputs (integers or floats) and
         Taichi fields, with element-wise computation for fields.
 
         Args:
-            x (Union[int, float, ti.Field]): 
+            x (Union[int, float, ti.Field]):
                 Input value or field. Can be:
                 - A scalar (int or float): Directly computes the hyperbolic sine.
                 - A Taichi field: Computes hyperbolic sine for each element individually.
@@ -1476,7 +1498,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         Returns:
             Union[float, ti.Field]:
                 - If input is a scalar, returns the hyperbolic sine as a float.
-                - If input is a Taichi field, returns a new `ti.f64` Taichi field with the same shape as `x`, 
+                - If input is a Taichi field, returns a new `ti.f64` Taichi field with the same shape as `x`,
                 where each element is the hyperbolic sine of the corresponding element in `x`.
 
         Notes:
@@ -1596,28 +1618,28 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         This method extracts the upper triangular portion of a matrix (2D or higher) or constructs an upper triangular matrix from a 1D array. The upper triangular part includes all elements on or above the specified diagonal, with other elements set to 0.
 
         Args:
-            x (Union[ti.Field, list]): 
+            x (Union[ti.Field, list]):
                 Input data. Can be:
                 - A 1D Taichi field or list: Converted to a square matrix where the upper triangular part is filled with elements from the input.
                 - A 2D Taichi field: Treated as a matrix, with the upper triangular part retained.
                 - A Taichi field with >2 dimensions: The last two dimensions are treated as rows and columns, with the upper triangular part of these dimensions retained.
-            k (int, optional): 
+            k (int, optional):
                 Diagonal offset. Defaults to 0 (main diagonal).
                 - k=0: Main diagonal and above.
                 - k>0: Diagonals above the main diagonal (e.g., k=1 skips the main diagonal).
                 - k<0: Diagonals below the main diagonal (treated as part of the upper triangle).
 
         Returns:
-            ti.Field: 
-                Upper triangular part of the input. 
+            ti.Field:
+                Upper triangular part of the input.
                 - If input is a list or 1D field: Returns an MxM matrix (M = length of input) with upper triangular elements filled from the input.
                 - If input is 2D or higher: Returns a field of the same shape with lower triangular elements zeroed.
 
         Raises:
-            ValueError: 
+            ValueError:
                 - If the input Taichi field is None.
                 - If the input field has any zero dimensions (Taichi does not support zero-sized fields).
-            TypeError: 
+            TypeError:
                 - If the input type is not ti.Field or list.
 
         Notes:
@@ -1720,15 +1742,15 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         flattened array preserves the data type of the original field.
 
         Args:
-            field (ti.Field): 
+            field (ti.Field):
                 Input Taichi field to be flattened. Can be of any dimension (1D, 2D, 3D, etc.).
 
         Returns:
-            ti.Field: 
+            ti.Field:
                 A new 1D Taichi field containing all elements from the input field in row-major order.
 
         Raises:
-            TypeError: 
+            TypeError:
                 If the input is not a Taichi field.
 
         Notes:
@@ -1754,9 +1776,9 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         ndim = len(field.shape)
 
         strides = [1] * ndim
-        for i in range(ndim-2, -1, -1):
-            strides[i] = strides[i+1] * field.shape[i+1]
-        
+        for i in range(ndim - 2, -1, -1):
+            strides[i] = strides[i + 1] * field.shape[i + 1]
+
         total_size = 1
         for s in field.shape:
             total_size *= s
@@ -1770,7 +1792,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 for i in ti.static(range(ndim)):
                     flat_idx += multi_idx[i] * strides[i]
                 flat[flat_idx] = field[multi_idx]
-        
+
         flt()
         return flat
 
@@ -1780,7 +1802,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return_index: bool = False,
         return_inverse: bool = False,
         return_counts: bool = False,
-        axis: Optional[int] = None
+        axis: Optional[int] = None,
     ) -> Union[ti.Field, Tuple[ti.Field, ...]]:
         """
         Finds the unique elements of a Taichi field.
@@ -1829,18 +1851,24 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         ndim = len(a.shape)
         if ndim == 1:
             if axis is None or axis == 0:
-                return TaichiBackend._unique_1d(a, a, return_index, return_inverse, return_counts)                
-            raise ValueError("axis is not supported for 1D input.")            
+                return TaichiBackend._unique_1d(
+                    a, a, return_index, return_inverse, return_counts
+                )
+            raise ValueError("axis is not supported for 1D input.")
         if axis is None:
-            a_org=a
-            a=TaichiBackend.flatten(a)
-            return TaichiBackend._unique_1d(a_org, a, return_index, return_inverse, return_counts)
-        return TaichiBackend._unique_generic(a, return_index, return_inverse, return_counts, axis)
-   
+            a_org = a
+            a = TaichiBackend.flatten(a)
+            return TaichiBackend._unique_1d(
+                a_org, a, return_index, return_inverse, return_counts
+            )
+        return TaichiBackend._unique_generic(
+            a, return_index, return_inverse, return_counts, axis
+        )
+
     @staticmethod
     def _unique_1d(
-        a_org: ti.Field,  
-        a: ti.Field,     
+        a_org: ti.Field,
+        a: ti.Field,
         return_index: bool = False,
         return_inverse: bool = False,
         return_counts: bool = False,
@@ -1879,99 +1907,106 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             to remap the inverse indices after sorting can be computationally intensive, as
             it involves a search within the `copy_sorted_results` kernel.
         """
-        n = a.shape[0]  
-        max_unique = n  
+        n = a.shape[0]
+        max_unique = n
 
-        unique_elements = ti.field(a.dtype, shape=max_unique)  
-        inverse = ti.field(ti.i32, shape=n)  
-        counts = ti.field(ti.i32, shape=max_unique)  
-        indices = ti.field(ti.i32, shape=max_unique)  
-        unique_count = ti.field(ti.i32, shape=())  
+        unique_elements = ti.field(a.dtype, shape=max_unique)
+        inverse = ti.field(ti.i32, shape=n)
+        counts = ti.field(ti.i32, shape=max_unique)
+        indices = ti.field(ti.i32, shape=max_unique)
+        unique_count = ti.field(ti.i32, shape=())
         unique_count[None] = 0
 
         @ti.kernel
         def find_unique():
             for i in range(n):
                 element = a[i]
-                is_new = 1 
+                is_new = 1
                 current_unique = unique_count[None]
 
                 for j in range(current_unique):
                     if unique_elements[j] == element:
                         is_new = 0
-                        inverse[i] = j  
-                        ti.atomic_add(counts[j], 1) 
+                        inverse[i] = j
+                        ti.atomic_add(counts[j], 1)
                         break
 
                 if is_new:
                     new_idx = ti.atomic_add(unique_count[None], 1)
                     if new_idx < max_unique:
                         unique_elements[new_idx] = element
-                        indices[new_idx] = i  
+                        indices[new_idx] = i
                         inverse[i] = new_idx
                         counts[new_idx] = 1
 
         find_unique()
-        n_unique = unique_count[None]  
-        sorted_indices = ti.field(ti.i32, shape=n_unique)  
+        n_unique = unique_count[None]
+        sorted_indices = ti.field(ti.i32, shape=n_unique)
 
         @ti.kernel
         def sort_unique():
             for i in range(n_unique):
                 sorted_indices[i] = i
-            
+
             for i in range(n_unique):
                 for j in range(n_unique - 1 - i):
-                    if unique_elements[sorted_indices[j]] > unique_elements[sorted_indices[j + 1]]:
-                        sorted_indices[j], sorted_indices[j + 1] = sorted_indices[j + 1], sorted_indices[j]
+                    if (
+                        unique_elements[sorted_indices[j]]
+                        > unique_elements[sorted_indices[j + 1]]
+                    ):
+                        sorted_indices[j], sorted_indices[j + 1] = (
+                            sorted_indices[j + 1],
+                            sorted_indices[j],
+                        )
 
         sort_unique()
 
-        final_unique = ti.field(a.dtype, shape=n_unique)  
-        final_indices = ti.field(ti.i32, shape=n_unique)  
-        final_counts = ti.field(ti.i32, shape=n_unique)   
-        final_inverse_1d = ti.field(ti.i32, shape=n)  
+        final_unique = ti.field(a.dtype, shape=n_unique)
+        final_indices = ti.field(ti.i32, shape=n_unique)
+        final_counts = ti.field(ti.i32, shape=n_unique)
+        final_inverse_1d = ti.field(ti.i32, shape=n)
+
         @ti.kernel
         def copy_sorted_results():
             for i in range(n_unique):
-                idx = sorted_indices[i] 
+                idx = sorted_indices[i]
                 final_unique[i] = unique_elements[idx]
                 final_indices[i] = indices[idx]
                 final_counts[i] = counts[idx]
-            
+
             if return_inverse:
                 for i in range(n):
-                    old_idx = inverse[i]  
+                    old_idx = inverse[i]
                     for j in range(n_unique):
                         if sorted_indices[j] == old_idx:
-                            final_inverse_1d[i] = j  
+                            final_inverse_1d[i] = j
                             break
 
         copy_sorted_results()
 
-        result = (final_unique, )
+        result = (final_unique,)
 
         if return_index:
-            result += (final_indices, )
+            result += (final_indices,)
 
         if return_inverse:
             final_inverse = ti.field(ti.i32, shape=a_org.shape)
-            
+
             @ti.kernel
             def reshape_inverse():
                 for multi_idx in ti.grouped(final_inverse):
                     flat_idx = 0
                     stride = 1
-                    for i in ti.static(range(len(a_org.shape)-1, -1, -1)):
+                    for i in ti.static(range(len(a_org.shape) - 1, -1, -1)):
                         flat_idx += multi_idx[i] * stride
                         stride *= a_org.shape[i]
                     final_inverse[multi_idx] = final_inverse_1d[flat_idx]
-            
+
             reshape_inverse()
-            result += (final_inverse, )
+            result += (final_inverse,)
 
         if return_counts:
-            result += (final_counts, )
+            result += (final_counts,)
 
         return result[0] if len(result) == 1 else result
 
@@ -1981,7 +2016,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return_index: bool = False,
         return_inverse: bool = False,
         return_counts: bool = False,
-        axis: int = 0
+        axis: int = 0,
     ) -> Union[ti.Field, Tuple[ti.Field, ...]]:
         """
         Internal helper to find unique slices along a specified axis in an N-D field.
@@ -2026,7 +2061,9 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         shape = a.shape
         ndim = len(shape)
         if axis < 0 or axis >= ndim:
-            raise ValueError(f"axis {axis} out of bounds for array with {ndim} dimensions")
+            raise ValueError(
+                f"axis {axis} out of bounds for array with {ndim} dimensions"
+            )
 
         axes_order: List[int] = [axis] + [i for i in range(ndim) if i != axis]
         transposed_shape = tuple(shape[i] for i in axes_order)
@@ -2063,7 +2100,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                     if same:
                         is_new = 0
                         break
-                
+
                 if is_new == 1:
                     new_idx = ti.atomic_add(unique_count[None], 1)
                     if new_idx < max_unique:
@@ -2096,7 +2133,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                 tmp = unique_elements[i, sub_idx]
                 unique_elements[i, sub_idx] = unique_elements[j, sub_idx]
                 unique_elements[j, sub_idx] = tmp
-            
+
             if ti.static(return_index):
                 tmp_idx = indices[i]
                 indices[i] = indices[j]
@@ -2113,6 +2150,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             sort_unique()
 
         if return_inverse or return_counts:
+
             @ti.kernel
             def update_inverse_and_counts():
                 for i in range(n_unique):
@@ -2129,7 +2167,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
                             inverse[i] = j
                             ti.atomic_add(counts[j], 1)
                             break
-            
+
             update_inverse_and_counts()
 
         final_shape = list(a.shape)
@@ -2153,35 +2191,39 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         final_indices = None
         if return_index:
             final_indices = ti.field(ti.i32, shape=n_unique)
+
             @ti.kernel
             def copy_indices():
                 for i in range(n_unique):
                     final_indices[i] = indices[i]
+
             copy_indices()
 
         final_counts = None
         if return_counts:
             final_counts = ti.field(ti.i32, shape=n_unique)
+
             @ti.kernel
             def copy_counts():
                 for i in range(n_unique):
                     final_counts[i] = counts[i]
+
             copy_counts()
-            
+
         final_inverse = None
         if return_inverse:
 
             final_inverse = ti.field(ti.i32, shape=transposed_shape[0])
             final_inverse.copy_from(inverse)
 
-        result = (final_unique, )
+        result = (final_unique,)
         if final_indices is not None:
-            result += (final_indices, )
+            result += (final_indices,)
         if final_inverse is not None:
-            result += (final_inverse, )
+            result += (final_inverse,)
         if final_counts is not None:
-            result += (final_counts, )
-        
+            result += (final_counts,)
+
         return result[0] if len(result) == 1 else result
 
     @staticmethod
@@ -2224,8 +2266,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             isinstance(shape, tuple) and not all(isinstance(dim, int) for dim in shape)
         ):
             raise ValueError("Shape must be an int or a Tuple[int, ...].")
-        if shape == 0 or shape == (0,):
-            raise ValueError("Shape dimensions must be greater than 0.")
+
         x = ti.field(shape=shape, dtype=dtype)
         fill_value = ti.cast(1, dtype)
 
@@ -2285,8 +2326,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             isinstance(shape, tuple) and not all(isinstance(dim, int) for dim in shape)
         ):
             raise ValueError("Shape must be an int or a Tuple[int, ...].")
-        if shape == 0 or shape == (0,):
-            raise ValueError("Shape dimensions must be greater than 0.")
+
         if dtype is None:
             if isinstance(fill_value, bool):
                 dtype = ti.u1  # Boolean type in Taichi
@@ -2413,7 +2453,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return x
 
     @staticmethod
-    def acosh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def acosh(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the inverse hyperbolic cosine (acosh) of the input.
 
@@ -2456,7 +2496,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([2, 3, 4], dtype=np.int32))
             result_field_int = bm.acosh(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             return ti.log(x + ti.sqrt(x * x - 1.0))
 
         if not isinstance(x, ti.Field):
@@ -2464,19 +2504,20 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_acosh(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.log(field[I] + ti.sqrt(field[I] * field[I] - 1.0))
+                u = ti.cast(field[I], ti.f64)
+                result[I] = ti.log(u + ti.sqrt(u * u - 1.0))
 
         compute_acosh(x, result)
 
         return result
 
     @staticmethod
-    def asinh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def asinh(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the inverse hyperbolic sine (asinh) of the input.
 
@@ -2519,7 +2560,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([1, 2, 3], dtype=np.int32))
             result_field_int = bm.asinh(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             return ti.log(x + ti.sqrt(x * x + 1.0))
 
         if not isinstance(x, ti.Field):
@@ -2527,12 +2568,13 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_asinh(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.log(field[I] + ti.sqrt(field[I] * field[I] + 1.0))
+                u = ti.cast(field[I], ti.f64)
+                result[I] = ti.log(u + ti.sqrt(u * u + 1.0))
 
         compute_asinh(x, result)
 
@@ -2540,8 +2582,8 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
     @staticmethod
     def add(
-        x: Union[ti.Field, float, int], y: Union[ti.Field, float, int]
-    ) -> Union[float, int, ti.Field]:
+        x: Union[int, float, ti.Field], y: Union[int, float, ti.Field]
+    ) -> Union[int, float, ti.Field]:
         """
         Adds two values or fields element-wise.
 
@@ -2585,7 +2627,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             result_field = bm.add(field_1, field_2)
 
         """
-        if isinstance(x, (float, int)) and isinstance(y, (float, int)):
+        if isinstance(x, (int, float)) and isinstance(y, (int, float)):
             return x + y
         if not isinstance(x, ti.Field) or not isinstance(y, ti.Field):
             raise TypeError("Both inputs must be ti.Field or scalar")
@@ -2604,7 +2646,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return z
 
     @staticmethod
-    def atanh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def atanh(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the inverse hyperbolic tangent (atanh) of the input.
 
@@ -2642,7 +2684,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             x.from_numpy(np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float64))
             result_field = bm.atanh(x)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
 
             if x == 1.0:
                 return ti.math.inf
@@ -2659,7 +2701,11 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         @ti.kernel
         def compute_atanh(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.log((1.0 + field[I]) / (1.0 - field[I])) / 2.0
+                u = ti.cast(field[I], ti.f64)
+                if u == 1.0:
+                    result[I] = ti.math.inf
+                else:
+                    result[I] = ti.log((1.0 + u) / (1.0 - u)) / 2.0
 
         compute_atanh(x, result)
 
@@ -2667,7 +2713,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
     @staticmethod
     def equal(
-        x: Union[ti.Field, float, int], y: Union[ti.Field, float, int]
+        x: Union[int, float, ti.Field], y: Union[int, float, ti.Field]
     ) -> Union[bool, ti.Field]:  # type: ignore
         """
         Compares two values or fields element-wise for equality.
@@ -2714,7 +2760,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
             result_field = bm.equal(field_1, field_2)
         """
-        if isinstance(x, (float, int)) and isinstance(y, (float, int)):
+        if isinstance(x, (int, float)) and isinstance(y, (int, float)):
             return x == y
         if not isinstance(x, ti.Field) or not isinstance(y, ti.Field):
             raise TypeError("Both inputs must be ti.Field or scalar")
@@ -2732,7 +2778,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return z
 
     @staticmethod
-    def exp(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def exp(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the exponential (e^x) of the input.
 
@@ -2774,7 +2820,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([1, 2, 3], dtype=np.int32))
             result_field_int = bm.exp(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             return ti.exp(x)
 
         if not isinstance(x, ti.Field):
@@ -2782,19 +2828,19 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_exp(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.exp(field[I])
+                result[I] = ti.exp(ti.cast(field[I], ti.f64))
 
         compute_exp(x, result)
 
         return result
 
     @staticmethod
-    def expm1(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def expm1(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the exponential of the input minus one (exp(x) - 1).
 
@@ -2841,7 +2887,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([1, 2, 3], dtype=np.int32))
             result_field_int = bm.expm1(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             if ti.abs(x) < 1e-5:
                 return x * (1 + x * (0.5 + x * (1 / 3)))
             else:
@@ -2852,22 +2898,24 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_expm1(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                if ti.abs(field[I]) < 1e-5:
-                    result[I] = field[I] * (1 + field[I] * (0.5 + field[I] * (1 / 3)))
+                u = ti.cast(field[I], ti.f64)
+                if ti.abs(u) < 1e-5:
+
+                    result[I] = u * (1 + u * (0.5 + u * (1 / 3)))
                 else:
-                    result[I] = ti.exp(field[I]) - 1
+                    result[I] = ti.exp(u) - 1
 
         compute_expm1(x, result)
 
         return result
 
     @staticmethod
-    def log(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def log(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the natural logarithm (logarithm base e) of the input.
 
@@ -2912,7 +2960,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([1, 2, 3], dtype=np.int32))
             result_field_int = bm.log(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             return ti.log(x)
 
         if not isinstance(x, ti.Field):
@@ -2920,19 +2968,19 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_log(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.log(field[I])
+                result[I] = ti.log(ti.cast(field[I], ti.f64))
 
         compute_log(x, result)
 
         return result
 
     @staticmethod
-    def log1p(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def log1p(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the natural logarithm (logarithm base e) of 1 + x.
 
@@ -2977,7 +3025,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([1, 2, 3], dtype=np.int32))
             result_field_int = bm.log1p(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             if ti.abs(x) > 1e-4:
                 return ti.log(1.0 + x)
             else:
@@ -2988,22 +3036,23 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_log1p(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                if ti.abs(field[I]) > 1e-4:
-                    result[I] = ti.log(1.0 + field[I])
+                u = ti.cast(field[I], ti.f64)
+                if ti.abs(u) > 1e-4:
+                    result[I] = ti.log(1.0 + u)
                 else:
-                    result[I] = field[I] * (1 + field[I] * (-0.5 + field[I] * (1 / 3)))
+                    result[I] = u * (1 + u * (-0.5 + u * (1 / 3)))
 
         compute_log1p(x, result)
 
         return result
 
     @staticmethod
-    def sqrt(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def sqrt(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the square root of the input.
 
@@ -3048,7 +3097,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([1, 4, 9], dtype=np.int32))
             result_field_int = bm.sqrt(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             return ti.sqrt(x)
 
         if not isinstance(x, ti.Field):
@@ -3056,19 +3105,19 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_sqrt(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.sqrt(field[I])
+                result[I] = ti.sqrt(ti.cast(field[I], ti.f64))
 
         compute_sqrt(x, result)
 
         return result
 
     @staticmethod
-    def sign(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def sign(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the sign of the input.
 
@@ -3115,7 +3164,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([1, -4, 0], dtype=np.int32))
             result_field_int = bm.sign(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
 
             @ti.kernel
             def compute_sign_scalar(x: ti.template()) -> float:
@@ -3140,7 +3189,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
         return result
 
     @staticmethod
-    def tan(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def tan(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the tangent of the input.
 
@@ -3185,7 +3234,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([0, 1, 2], dtype=np.int32))
             result_field_int = bm.tan(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             return ti.tan(x)
 
         if not isinstance(x, ti.Field):
@@ -3193,19 +3242,19 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_tan(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.tan(field[I])
+                result[I] = ti.tan(ti.cast(field[I], ti.f64))
 
         compute_tan(x, result)
 
         return result
 
     @staticmethod
-    def tanh(x: Union[ti.Field, float, int]) -> Union[ti.Field, float]:
+    def tanh(x: Union[int, float, ti.Field]) -> Union[float, ti.Field]:
         """
         Computes the hyperbolic tangent of the input.
 
@@ -3249,7 +3298,7 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             field_int.from_numpy(np.array([0, 1, 2], dtype=np.int32))
             result_field_int = bm.tanh(field_int)
         """
-        if isinstance(x, (float, int)):
+        if isinstance(x, (int, float)):
             return ti.tanh(x)
 
         if not isinstance(x, ti.Field):
@@ -3257,12 +3306,12 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
 
         shape = x.shape
 
-        result = ti.field(dtype=x.dtype, shape=shape)
+        result = ti.field(dtype=ti.f64, shape=shape)
 
         @ti.kernel
         def compute_tanh(field: ti.template(), result: ti.template()):
             for I in ti.grouped(field):
-                result[I] = ti.tanh(field[I])
+                result[I] = ti.tanh(ti.cast(field[I], ti.f64))
 
         compute_tanh(x, result)
 
@@ -3347,4 +3396,3 @@ class TaichiBackend(BackendProxy, backend_name="taichi"):
             compute_cross_3d(field_1, field_2, result)
 
         return result
-
