@@ -8,7 +8,7 @@ from ..decorator.variantmethod import variantmethod
 from ..fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
 from .vector_decomposition import VectorDecomposition
 
-class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
+class DivIntegrator(LinearInt, OpInt, FaceInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
@@ -19,7 +19,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         self.index = index
         self.batched = batched
         self.assembly.set(method)
-
+        
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
         return space.edge_to_dof()[self.index]
@@ -35,27 +35,22 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         n = mesh.face_unit_normal(index=index)
         facemeasure = mesh.entity_measure('face', index=index)
         Sf = facemeasure[:, None] * n  # (NE, 2)
-        e, d = VectorDecomposition(mesh).centroid_vector_calculation()
         q = self.q
         qf = mesh.quadrature_formula(q, 'face') 
         bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = space.basis(bcs, index=index)
-        return Sf, e, d, index, bcs,  phi
+        return Sf, index, bcs,  
     
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
-        Sf, e, d, index, bcs,phi = self.fetch(space)
-        D = phi.shape[-1]
+        Sf, index, bcs = self.fetch(space)
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        Sf_dot_Sf = bm.einsum('ij,ij->i', Sf, Sf)              
-        e_dot_Sf = bm.einsum('ij,ij->i', e, Sf)                
-        e_norm = bm.einsum('ij,ij->i', e, e)**0.5               
-        # Ef_abs = (|Sf|^2 / (e·Sf)) * |e|
-        Ef_abs = bm.einsum('i,i->i', Sf_dot_Sf / e_dot_Sf, e_norm)
-        direction_matrix = bm.array([[1.0, -1.0], [-1.0, 1.0]], dtype=space.ftype)
-        eye_D = bm.eye(D, dtype=space.ftype, device=bm.get_device(space))
-        base_matrix = bm.einsum('ij,pq->ipjq', eye_D, direction_matrix).reshape(2*D, 2*D)
-        local_matrix = bm.einsum('i,ab->iab', Ef_abs / d, base_matrix)
-        return local_matrix
+        base_block = bm.array([[0.5, 0.5], [-0.5, -0.5]])
+        blocks = Sf[:, :, bm.newaxis, bm.newaxis] * base_block
+        result = bm.zeros((Sf.shape[0], 2*Sf.shape[1], 2*Sf.shape[1]))
+        for i in range(Sf.shape[1]):
+            result[:, 2*i:2*(i+1), 2*i:2*(i+1)] = blocks[:, i]
+        # print(result)
+
+        return result
