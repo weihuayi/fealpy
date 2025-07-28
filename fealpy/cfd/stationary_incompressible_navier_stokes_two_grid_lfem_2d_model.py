@@ -108,7 +108,7 @@ class StationaryIncompressibleNSTwoGridLFEM2DModel(ComputationalModel):
                 self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
                 break
         self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
-        return uh1, ph1 
+        return uh0, ph0 
 
     @run.register('uniform_refine')
     def run(self, maxit = 5, maxstep = 1000, tol = 1e-8):

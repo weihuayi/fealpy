@@ -21,3 +21,4 @@ from .lagrange_triangle_mesh import LagrangeTriangleMesh
 from .lagrange_quadrangle_mesh import LagrangeQuadrangleMesh
 
 from .edge_mesh import EdgeMesh
+from .inp_file_parser import InpFileParser
