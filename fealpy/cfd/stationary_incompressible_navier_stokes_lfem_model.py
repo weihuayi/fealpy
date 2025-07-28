@@ -70,7 +70,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.pde = pde
         self.equation = StationaryIncompressibleNS(pde)
         self.fem = self.method()
-
+        
         if mesh is None:
             if hasattr(pde, 'mesh'):
                 self.mesh = pde.mesh
@@ -78,6 +78,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 raise ValueError("Not found mesh!")
         else:
             self.mesh = mesh
+        
 
         if options is not None:
             self.solve.set(options['solve'])
@@ -275,10 +276,9 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        self.uh1 = uh1
-        self.ph1 = ph1
-        # uerror, perror = self.postprocess[postprocess](uh1, ph1) 
-        # self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
+        print("Asda")
+        uerror, perror = self.postprocess(uh1, ph1) 
+        self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uh1, ph1
 
     @run.register('uniform_refine')
