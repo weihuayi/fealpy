@@ -7,55 +7,65 @@ from typing import Optional, Tuple, List
 from fealpy.material.elastic_material import LinearElasticMaterial
 
 
-class PlasticMaterial(LinearElasticMaterial):
+class ElastoplasticMaterial(LinearElasticMaterial):
     '''
-    PlasticMaterial represents a linear elastoplastic material with optional linear hardening.
-    This class models materials that exhibit both elastic and plastic behavior according to the von Mises yield criterion, with support for linear isotropic hardening. It extends LinearElasticMaterial by adding yield stress and hardening modulus, and provides methods for computing the elastoplastic tangent matrix and related quantities. Suitable for finite element analysis of elastoplastic solids.
+    ElastoplasticMaterial represents a linear elastoplastic material with optional linear hardening.
+    
+    This class models materials that exhibit both elastic and plastic behavior according to the von Mises yield criterion, 
+    with support for linear isotropic hardening. 
+    It extends LinearElasticMaterial by adding yield stress and hardening modulus, 
+    and provides methods for computing the elastoplastic tangent matrix and related quantities. 
+    Suitable for finite element analysis of elastoplastic solids.
+    
     Parameters
-    name : str
-        Name of the material.
-    yield_stress : float
-        Initial yield stress (scalar), i.e., the stress at which plastic deformation begins.
-    hardening_modulus : float, optional, default=0.0
-        Linear hardening modulus (H'), representing the slope of the yield surface in stress-plastic strain space.
-    **kwargs
-        Additional keyword arguments passed to the base LinearElasticMaterial class (e.g., elastic_modulus, poisson_ratio).
+        name : str
+            Name of the material.
+        yield_stress : float
+            Initial yield stress (scalar), i.e., the stress at which plastic deformation begins.
+        hardening_modulus : float, optional, default=0.0
+            Linear hardening modulus (H'), representing the slope of the yield surface in stress-plastic strain space.
+        **kwargs
+            Additional keyword arguments passed to the base LinearElasticMaterial class (e.g., elastic_modulus, poisson_ratio).
+            
     Attributes
-    yield_stress : float
-        Initial yield stress of the material.
-    hardening_modulus : float
-        Linear hardening modulus (H'). If zero, perfect plasticity is assumed.
-    is_hardening : bool
-        Whether the material considers hardening effects (True if hardening_modulus > 0).
+        yield_stress : float
+            Initial yield stress of the material.
+        hardening_modulus : float
+            Linear hardening modulus (H'). If zero, perfect plasticity is assumed.
+        is_hardening : bool
+            Whether the material considers hardening effects (True if hardening_modulus > 0).
     Methods
-    df_dsigma(stress)
-        Compute the derivative of the yield function with respect to the Cauchy stress (for von Mises criterion).
-    deviatoric_stress(stress)
-        Compute the deviatoric (traceless) part of the stress tensor in Voigt notation.
-    elastico_plastic_matrix(stress=None, df_dsigma=None)
-        Compute the elastoplastic tangent matrix D^p at the current stress state.
-    elastico_plastic_hardening_matrix(stress=None, plastic_strain=None, df_dsigma=None)
-        Compute the elastoplastic tangent matrix D^p considering linear hardening.
+        df_dsigma(stress)
+            Compute the derivative of the yield function with respect to the Cauchy stress (for von Mises criterion).
+        deviatoric_stress(stress)
+            Compute the deviatoric (traceless) part of the stress tensor in Voigt notation.
+        elastico_plastic_matrix(stress=None, df_dsigma=None)
+            Compute the elastoplastic tangent matrix D^p at the current stress state.
+        elastico_plastic_hardening_matrix(stress=None, plastic_strain=None, df_dsigma=None)
+            Compute the elastoplastic tangent matrix D^p considering linear hardening.
     Notes
-    - The class assumes small strain theory and uses Voigt notation for stress and strain tensors.
-    - Only linear (isotropic) hardening is supported; nonlinear hardening requires further extension.
-    - The elastoplastic tangent operator is computed using the return mapping algorithm for von Mises plasticity.
-    Examples
-    >>> mat = PlasticMaterial(name="Steel", yield_stress=250.0, elastic_modulus=210e3, poisson_ratio=0.3)
-    >>> stress = np.array([260.0, 240.0, 0.0])
-    >>> df = mat.df_dsigma(stress)
-    >>> Dp = mat.elastico_plastic_matrix(stress=stress)
+        - The class assumes small strain theory and uses Voigt notation for stress and strain tensors.
+        - Only linear (isotropic) hardening is supported; nonlinear hardening requires further extension.
+        - The elastoplastic tangent operator is computed using the return mapping algorithm for von Mises plasticity.
     '''
     def __init__(self, 
                  name: str,
-                 yield_stress: float,          # 初始屈服应力
-                 hardening_modulus: float = 0.0, # 硬化模量 (H')
+                 yield_stress: float,          
+                 hardening_modulus: float = 0.0, 
                  **kwargs):
         """
-        Args:
-            yield_stress: 初始屈服应力 (标量)
-            hardening_modulus: 硬化模量 (H' = dsigma_y/dε_p)
-            **kwargs: 基类参数 (elastic_modulus, poisson_ratio等)
+        Initialize the elastoplastic material with yield stress and optional hardening modulus.
+        
+        Parameters
+            name : str
+                Name of the material.
+            yield_stress : float
+                Initial yield stress (scalar), i.e., the stress at which plastic deformation begins.
+            hardening_modulus : float, optional, default=0.0
+                Linear hardening modulus (H'), representing the slope of the yield surface in stress-plastic strain space.
+            **kwargs
+                Additional keyword arguments passed to the base LinearElasticMaterial class (e.g., elastic_modulus
+                , poisson_ratio).
         """
         super().__init__(name, **kwargs)
         self.yield_stress = yield_stress
@@ -63,15 +73,15 @@ class PlasticMaterial(LinearElasticMaterial):
 
     def df_dsigma(self, stress: TensorLike) -> TensorLike:
         """
-        计算屈服函数对柯西应力的导数 (von Mises准则)
-        
-        Args:
-            stress: 柯西应力张量 (Voigt表示法)
-                - 3D: (..., 6) [sigma_11, sigma_22, sigma_33, sigma_12, sigma_23, sigma_13]
-                - 2D: (..., 3) [sigma_11, sigma_22, sigma_12]
-        
-        Returns:
-            df_dsigma: 导数张量 (与stress同维度)
+        Compute the derivative of the yield function with respect to the Cauchy stress (von Mises criterion).
+
+        Parameters
+            stress: Cauchy stress tensor (Voigt notation)
+            - 3D: (..., 6) [sigma_11, sigma_22, sigma_33, sigma_12, sigma_23, sigma_13]
+            - 2D: (..., 3) [sigma_11, sigma_22, sigma_12]
+
+        Returns
+            df_dsigma: Derivative tensor (same shape as stress)
         """
         # 计算偏应力 (deviatoric stress)
         s = self.deviatoric_stress(stress)
@@ -90,7 +100,7 @@ class PlasticMaterial(LinearElasticMaterial):
 
     def deviatoric_stress(self, stress: TensorLike) -> TensorLike:
         """
-        计算偏应力张量 (Voigt表示法)
+        Compute the deviatoric (traceless) part of the stress tensor in Voigt notation.
         """
         s = stress.copy()
         if self.hypo == "3D":
@@ -110,14 +120,14 @@ class PlasticMaterial(LinearElasticMaterial):
                      stress: Optional[TensorLike] = None, 
                      df_dsigma: Optional[TensorLike] = None) -> TensorLike:
         """
-        计算弹塑性矩阵 D^p
+        Compute the elastoplastic tangent matrix D^p.
 
-        Args:
-            stress: 当前应力张量 (用于自动计算df_dsigma)
-            df_dsigma: 直接提供导数张量 (可选)
+        Parameters
+            stress: Current stress tensor (used to automatically compute df_dsigma)
+            df_dsigma: Directly provide the derivative tensor (optional)
         
-        Returns:
-            Dp: 弹塑性矩阵,形状与基类D矩阵相同,但每个积分点独立计算
+        Returns
+            Dp: Elastoplastic tangent matrix, with the same shape as the base class D matrix, but computed independently for each integration point
         """
         # 获取弹性矩阵
         De = super().elastic_matrix()  # (1,1,N,N)
@@ -148,7 +158,7 @@ class PlasticMaterial(LinearElasticMaterial):
 
     @property
     def is_hardening(self) -> bool:
-        """是否考虑硬化效应"""
+        """Whether hardening effects are considered"""
         return self.hardening_modulus > 0
     
     def elastico_plastic_hardening_matrix(self, 
@@ -156,14 +166,15 @@ class PlasticMaterial(LinearElasticMaterial):
                      plastic_strain: Optional[TensorLike] = None,
                      df_dsigma: Optional[TensorLike] = None) -> TensorLike:
         """
-        计算弹塑性矩阵 D^p
+        Compute the elastoplastic hardening matrix D^p.
 
-        Args:
-            stress: 当前应力张量 (用于自动计算df_dsigma)
-            df_dsigma: 直接提供导数张量 (可选)
-        
-        Returns:
-            Dp: 弹塑性矩阵,形状与基类D矩阵相同,但每个积分点独立计算
+        Parameters
+            stress: Current stress tensor (used to automatically compute df_dsigma)
+            plastic_strain: Current plastic strain tensor (used to compute hardening effects)
+            df_dsigma: Directly provide the derivative tensor (optional)
+
+        Returns
+            Dp: Elastoplastic hardening matrix, with the same shape as the base class D matrix, but computed independently for each integration point
         """
         # 获取弹性矩阵
         De = super().elastic_matrix()  # (1,1,N,N)

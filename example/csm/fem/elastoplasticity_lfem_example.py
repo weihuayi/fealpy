@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser(description="""
         """)
 
 parser.add_argument('--pde',
-                    default='1', type=str,
+                    default=1, type=int,
                     help='选择预设的弹塑性问题示例，默认为"1"')
 
 parser.add_argument('--pbar_log',
