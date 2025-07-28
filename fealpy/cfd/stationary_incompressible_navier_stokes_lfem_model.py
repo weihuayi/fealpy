@@ -98,6 +98,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         s += f"  method         : {self.method_str}\n"
         s += f"  run            : {self.run_str}\n"
         s += f"  solve          : {self.solve_str}\n"
+        s += f"  apply_bc       : {self.apply_bc_str}\n"
         s += f"  maxsteps       : {self.maxstep}\n"
         s += f"  tol            : {self.tol}\n"
         if self.options.get("run") == "uniform_refine":
@@ -157,6 +158,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             threshold=(self.pde.is_velocity_boundary, self.pde.is_pressure_boundary),
             method='interp')
         A, b = BC.apply(A, b)
+        self.apply_bc_str = "dirichlet"
         return A, b
     
     @apply_bc.register("None")
@@ -170,6 +172,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             threshold=(None, None),
             method='interp')
         A, b = BC.apply(A, b)
+        self.apply_bc_str = "None"
         return A, b
 
     @apply_bc.register("neumann")
@@ -178,6 +181,35 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         Apply neumann boundary conditions to velocity and pressure.
         """
         pass
+
+    @apply_bc.register("cylinder")
+    def apply_bc(self, A, b):
+        """
+        Apply boundary conditions for cylinder problems.
+        """
+        BC_flux = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.inlet_velocity, self.pde.outlet_pressure), 
+            threshold=(self.pde.is_inlet_boundary, self.pde.is_outlet_boundary),
+            method='interp')
+        
+        BC_wall = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.wall_velocity, self.pde.pressure), 
+            threshold=(self.pde.is_wall_boundary, None),
+            method='interp')
+        
+        BC_obstacle = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.obstacle_velocity, self.pde.pressure), 
+            threshold=(self.pde.is_obstacle_boundary, None),
+            method='interp')
+        
+        A, b = BC_flux.apply(A, b)
+        A, b = BC_wall.apply(A, b)
+        A, b = BC_obstacle.apply(A, b)
+        self.apply_bc_str = "cylinder"
+        return A, b
     
     def lagrange_multiplier(self, A, b):
         """
@@ -203,7 +235,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         return A, b
 
     @variantmethod('one_step')
-    def run(self, maxstep=1000, tol=1e-10):
+    def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet'):
         """
         """
         self.run_str = 'one_step'
@@ -228,7 +260,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             F = LForm.assembly()
             # tmr.send('右端项组装时间')
             
-            A, F = self.apply_bc(A, F)
+            A, F = self.apply_bc[apply_bc](A, F)
             A, F = self.lagrange_multiplier(A, F)
             # tmr.send('边界处理时间')
             x = self.solve(A, F)
@@ -238,11 +270,10 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             ph1[:] = x[ugdof:-1]
             res_u = self.pde.mesh.error(uh0, uh1)
             res_p = self.pde.mesh.error(ph0, ph1)
-            
-            # self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
+            self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
             if res_u + res_p < tol:
                 self.logger.info(f"Converged at iteration {i+1}")
-                break
+                break 
             uh0[:] = uh1
             ph0[:] = ph1
         print("Asda")
@@ -252,14 +283,14 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
 
 
     @run.register('uniform_refine')
-    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10):
+    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10, apply_bc = 'dirichlet'):
         self.run_str = 'uniform_refine'
         self.maxit = maxit
         self.maxstep = maxstep
         self.tol = tol
         for i in range(maxit):
             self.logger.info(f"mesh: {self.pde.mesh.number_of_cells()}")
-            self.run['one_step'](maxstep, tol)
+            self.run['one_step'](maxstep, tol, apply_bc)
             self.pde.mesh.uniform_refine()
             self.equation = StationaryIncompressibleNS(self.pde)
 
@@ -289,3 +320,18 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         perror = self.pde.mesh.error(self.pde.pressure, ph)
         #print(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror
+    
+    @postprocess.register('res')
+    def postprocess(self, uh0, ph0, uh1, ph1):
+        """
+        Compute the residuals of the velocity and pressure fields.
+        """
+        self.postprocess_str = 'res'
+        uerror = self.pde.mesh.error(uh0, uh1)
+        perror = self.pde.mesh.error(ph0, ph1)
+        return uerror, perror
+    
+    @postprocess.register('plot')
+    def postprocess(self, uh, ph):
+        self.postprocess_str = 'plot'
+        import matplotlib.pyplot as plt

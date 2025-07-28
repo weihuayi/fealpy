@@ -43,6 +43,10 @@ parser.add_argument('--solve',
     default = 'direct', type = str,
     help = "Type of solver, default is direct, options are direct, iterative")
 
+parser.add_argument('--apply_bc',
+    default = 'dirichlet', type = str,
+    help = "Type of boundary condition application, default is dirichlet, options are dirichlet, neumann, cylinder, None")
+
 parser.add_argument('--run',
     default = 'uniform_refine', type = str,
     help = "Type of refinement strategy, default is uniform_refine")
@@ -71,4 +75,4 @@ equation = StationaryIncompressibleNS(pde=pde)
 model = StationaryIncompressibleNSLFEMModel(equation, options)
 # print(model.fem.params)
 # print(model.equation)
-# model.__str__()
+model.__str__()
