@@ -1,6 +1,7 @@
-from ..backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
+from fealpy.sparse import spdiags
+
 from .vector_decomposition import VectorDecomposition
-from ..sparse import spdiags
 
 class DirichletBC():
     def __init__(self, mesh, gd):

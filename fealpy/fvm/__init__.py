@@ -7,6 +7,5 @@ from .gradient_reconstruct import GradientReconstruct
 from .dirichlet_bc import DirichletBC
 from .vector_decomposition import VectorDecomposition
 
-
 from .poisson_fvm_model import PoissonFVMModel
 from .stokes_fvm_model import StokesFVMModel

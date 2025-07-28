@@ -1,11 +1,15 @@
 from typing import Optional
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S, CoefLike
-from ..mesh import HomogeneousMesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
-from ..decorator.variantmethod import variantmethod
-from ..fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, Index, _S, CoefLike
+from fealpy.decorator import variantmethod
+from fealpy.utils import process_coef_func
+
+from fealpy.mesh import HomogeneousMesh
+from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
+
 from .vector_decomposition import VectorDecomposition
 
 class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):

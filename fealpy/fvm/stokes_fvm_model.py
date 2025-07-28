@@ -1,7 +1,7 @@
 from typing import Union, Tuple
-from ..backend import backend_manager as bm
-from ..model import PDEModelManager, ComputationalModel
-from ..functionspace import ScaledMonomialSpace2d, TensorFunctionSpace
+from fealpy.backend import backend_manager as bm
+from fealpy.model import PDEModelManager, ComputationalModel
+from fealpy.functionspace import ScaledMonomialSpace2d, TensorFunctionSpace
 from ..fvm import (
     ScalarDiffusionIntegrator,
     ScalarSourceIntegrator,
@@ -9,8 +9,8 @@ from ..fvm import (
     GradientReconstruct,
     DirichletBC,
 )
-from ..fem import BilinearForm, LinearForm
-from ..solver import spsolve
+from fealpy.fem import BilinearForm, LinearForm
+from fealpy.solver import spsolve
 
 class StokesFVMModel(ComputationalModel):
     """
