@@ -1,12 +1,12 @@
-from fealpy.backend import backend_manager as bm
-from ..decorator import variantmethod
 from typing import Union
-from ..model import ComputationalModel
-from ..fem import DirichletBC
-from .equation.stationary_incompressible_ns import StationaryIncompressibleNS
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import variantmethod
+from fealpy.model import ComputationalModel
+from fealpy.fem import DirichletBC
 from fealpy.mesh import Mesh
 from fealpy.utils import timer
-import time
+
+from .equation import StationaryIncompressibleNS
 
 class StationaryIncompressibleNSLFEMModel(ComputationalModel):
     """
@@ -64,20 +64,30 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
     >>> model = StationaryIncompressibleNSLFEMModel(equation, options)
     >>> model.__str__()
     """
-    def __init__(self, equation, options):
+    def __init__(self, pde, mesh=None, options=None):
         super().__init__(pbar_log=True, log_level="INFO")
         self.options = options
-        self.equation = equation
-        self.pde = equation.pde
-        
-        self.solve.set(options['solve'])
-        self.fem = self.method[options['method']]()
+        self.pde = pde
+        self.equation = StationaryIncompressibleNS(pde)
+        self.fem = self.method()
 
-        run = self.run[options['run']]
-        if options['run'] == 'uniform_refine':
-            run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'])
-        else:  # 'one_step' 或其他
-            run(maxstep=options['maxstep'], tol=options['tol'])
+        if mesh is None:
+            if hasattr(pde, 'mesh'):
+                self.mesh = pde.mesh
+            else:
+                raise ValueError("Not found mesh!")
+        else:
+            self.mesh = mesh
+
+        if options is not None:
+            self.solve.set(options['solve'])
+            self.fem = self.method[options['method']]()
+
+            run = self.run[options['run']]
+            if options['run'] == 'uniform_refine':
+                run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'])
+            else:  # 'one_step' 或其他
+                run(maxstep=options['maxstep'], tol=options['tol'])
     
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
@@ -236,6 +246,8 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             ph0[:] = ph1
         uerror, perror = self.postprocess(uh1, ph1) 
         self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
+        return uh1, ph1
+
 
     @run.register('uniform_refine')
     def run(self, maxit = 5, maxstep = 1000, tol = 1e-10):
