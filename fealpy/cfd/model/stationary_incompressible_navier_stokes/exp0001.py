@@ -84,7 +84,7 @@ class Exp0001(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = 4 * y * (1 - y)
+        result[..., 0] = 6 * y * (0.41 - y)/(0.41**2)
         result[..., 1] = bm.array(0.0)
         return result
     
