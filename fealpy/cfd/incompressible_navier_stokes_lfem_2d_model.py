@@ -1,7 +1,9 @@
 from fealpy.backend import backend_manager as bm
-from ..decorator import variantmethod,cartesian
-from ..model import ComputationalModel
-from ..fem import DirichletBC
+from fealpy.decorator import variantmethod,cartesian
+from fealpy.model import ComputationalModel
+
+from fealpy.fem import DirichletBC
+
 from .simulation.fem import Newton
 from .equation import IncompressibleNS
 

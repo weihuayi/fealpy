@@ -1,10 +1,14 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.old.timeintegratoralg import UniformTimeLine
-from fealpy.decorator import cartesian,variantmethod
 from typing import Union, Callable, Dict
-from fealpy.mesh import TriangleMesh
-from fealpy.model.mesher.box_mesher import BoxMesher2d
+
 import sympy as sp
+
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import cartesian,variantmethod
+
+from fealpy.old.timeintegratoralg import UniformTimeLine
+from fealpy.mesh import TriangleMesh
+from fealpy.mesher.box_mesher import BoxMesher2d
+
 CoefType = Union[int, float, Callable]
 
 class NSLFEMChannelPDE:

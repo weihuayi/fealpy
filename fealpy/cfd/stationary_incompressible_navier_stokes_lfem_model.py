@@ -1,13 +1,17 @@
-from fealpy.backend import backend_manager as bm
-from ..decorator import variantmethod
 from typing import Union
-from ..model import ComputationalModel
-from ..fem import DirichletBC
+import time
+
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import variantmethod
+from fealpy.utils import timer
+from fealpy.model import ComputationalModel
+
+from fealpy.mesh import Mesh
+
+from fealpy.fem import DirichletBC
+
 from .simulation.fem.stationary_incompressible_ns import Stokes, Newton, Ossen
 from .equation.stationary_incompressible_ns import StationaryIncompressibleNS
-from fealpy.mesh import Mesh
-from fealpy.utils import timer
-import time
 
 class StationaryIncompressibleNSLFEMModel(ComputationalModel):
     def __init__(self, options):
