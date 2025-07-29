@@ -16,7 +16,7 @@ parser.add_argument('--backend',
     help = "Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
     
 parser.add_argument('--pde',
-    default = 1, type = str,
+    default = 3, type = str,
     help = "Name of the PDE model, default is exp0001")
 
 parser.add_argument('--init_mesh',
@@ -52,7 +52,7 @@ parser.add_argument('--run',
     help = "Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
-    default = 1, type = int,
+    default = 5, type = int,
     help = "Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',

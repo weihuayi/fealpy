@@ -61,7 +61,7 @@ class Exp0001(BoxMesher2d):
         """Compute exact solution of pressure."""
         x = p[..., 0]
         y = p[..., 1]
-        return bm.array(self.p(x, y))
+        return self.pressure(p, self.t0)
     
     @cartesian
     def pressure(self, p, t):
@@ -89,8 +89,9 @@ class Exp0001(BoxMesher2d):
     @cartesian
     def is_pressure_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point where pressure is defined is on boundary."""
-        result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        return result
+        # result = bm.zeros_like(p[..., 0], dtype=bm.bool)
+        # return result
+        return None
 
     @cartesian
     def velocity_gradient(self, p: TensorLike) -> TensorLike:
@@ -101,12 +102,17 @@ class Exp0001(BoxMesher2d):
         pass
 
     @cartesian
-    def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
-        pass
+    def velocity_dirichlet(self, p: TensorLike, t) -> TensorLike:
+        x = p[..., 0]
+        y = p[..., 1]
+        result = bm.zeros(p.shape, dtype=bm.float64)
+        return result
     
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
-        pass
+    def pressure_dirichlet(self, p: TensorLike, t) -> TensorLike:
+        x = p[..., 0]
+        y = p[..., 1]
+        return None
 
     def _init_expr(self):
         x, y, t = sp.symbols('x, y, t')

@@ -91,6 +91,9 @@ options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
+print(pde.mesh.number_of_nodes())
+print(pde.mesh.number_of_cells())
+print(pde.mesh.number_of_edges())
 model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
 # print(model.fem.params)
 # model.plot(uh = model.uh1, ph = model.ph1)
@@ -98,14 +101,14 @@ model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
 # 可视化
 mesh = pde.mesh
 uh, ph = model.uh1, model.ph1
+print(uh)
 ugdof = model.fem.uspace.number_of_global_dofs()
-points = mesh.entity_barycenter('node')
+points = mesh.entity_barycenter('edge')
 points = points.astype(bm.float64)
 triang = tri.Triangulation(points[:, 0], points[:, 1])
-uh = bm.sum(uh(points), axis = 0).T
-# print(points)
-print(uh)
-
+# uh = bm.sum(uh(points[:2]), axis = 0).T
+print(type(points))
+print(uh.space.cell_to_dof().shape)
 
 exit()
 plt.figure(figsize=(15, 3))

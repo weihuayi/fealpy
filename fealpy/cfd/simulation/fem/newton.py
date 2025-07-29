@@ -65,7 +65,7 @@ class Newton(FEM):
 
     def update(self, u0, u00): 
         equation = self.equation
-        dt = self.dt
+        dt = equation.pde.dt
         ctd = equation.coef_time_derivative 
         cv = equation.coef_viscosity
         cc = equation.coef_convection

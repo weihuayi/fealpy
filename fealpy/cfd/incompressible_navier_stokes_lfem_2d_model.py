@@ -10,8 +10,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         super().__init__(pbar_log = True, log_level = "INFO")
         self.pde = pde
         self.equation = IncompressibleNS(self.pde)
-        self.fem = self.method[options['method']]()
         self.init_timeline = self.pde.init_timeline(options['T0'], options['T1'], options['nt'])
+        self.fem = self.method[options['method']]()
         self.fem.dt = self.pde.dt
 
         if mesh is None:
@@ -129,12 +129,12 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
         if self.method_str == "IPCS":
             BCu = DirichletBC(space=fem.uspace, 
-                gd = cartesian(lambda p : pde.velocity(p, self.t)), 
+                gd = cartesian(lambda p : pde.velocity_dirichlet(p, self.t)), 
                 threshold=pde.is_velocity_boundary, 
                 method='interp')
 
             BCp = DirichletBC(space=fem.pspace, 
-                gd = cartesian(lambda p : pde.pressure(p, self.t)), 
+                gd = cartesian(lambda p : pde.pressure_dirichlet(p, self.t)), 
                 threshold=pde.is_pressure_boundary, 
                 method='interp')
             
@@ -192,9 +192,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         # u0 = fem.uspace.function()
         # p0 = fem.pspace.function()
 
-
         for i in range(nt):
-            self.t = t0 + (i+1)*self.fem.dt
+            self.t = t0 + (i+1)*self.pde.dt
             # print(f"第{i+1}步")
             # print("time=", self.t)
             u1,p1 = self.run['one_step'](u0, p0, maxstep, tol, apply_bc)

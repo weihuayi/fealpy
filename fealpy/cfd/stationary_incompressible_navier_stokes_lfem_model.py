@@ -276,9 +276,11 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
+        self.uh1 = uh1
+        self.ph1 = ph1
         print("Asda")
-        uerror, perror = self.postprocess(uh1, ph1) 
-        self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
+        # uerror, perror = self.postprocess(uh1, ph1) 
+        # self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uh1, ph1
 
     @run.register('uniform_refine')
