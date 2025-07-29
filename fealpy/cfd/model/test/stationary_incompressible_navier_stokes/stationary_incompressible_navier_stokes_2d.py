@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian,variantmethod
 from typing import Union, Callable, Dict
-from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh, QuadrangleMesh
 import sympy as sp
 from fealpy.mesher.box_mesher import BoxMesher2d 
 
@@ -151,6 +151,13 @@ class FromSympy(BoxMesher2d):
         self.mesh = mesh
         return mesh
     
+    @init_mesh.register("quad")
+    def init_mesh(self, nx=8, ny=8):
+        box = self.box
+        mesh = QuadrangleMesh.from_box(box, nx=nx, ny=ny)
+        self.mesh = mesh
+        return mesh
+
     @cartesian
     def is_pressure_boundary(self, p):
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
