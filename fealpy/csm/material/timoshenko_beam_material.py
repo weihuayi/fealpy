@@ -5,13 +5,34 @@ from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
 
+from ..model.beam.timoshenko_beam_data_3d import TimoshenkoBeamData3D
+
 
 class TimoshenkoBeamMaterial(LinearElasticMaterial):
 
-    def __init__(self, name: str, model: str):
+    def __init__(self, name: str, model) -> None:
         super().__init__(name)
-        self.model = model
-        self 
+
+        self._model = model
+
+        self._E = self.get_property('elastic_modulus')
+        self._nu = self.get_property('shear_modulus')
+
+
+    def cal_A(self):
+        Ax, Ay, Az = self._model._cal_A()
+        return Ax, Ay, Az
+    
+    def cal_I(self):
+        Iy, Iz, Ix = self._model._cal_I()
+        return Iy, Iz, Ix
+    
+    def shear_factor(self):
+        FSY, FSZ = self._model._FSY, self._model._FSZ
+        return FSY, FSZ
+    
+
+
     
     def stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for Timoshenko beam material."""

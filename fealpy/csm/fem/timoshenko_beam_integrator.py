@@ -32,9 +32,12 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
     def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
     
-    @enable_cache
-    def coord_transfrom():
-        return R
+    def _coord_transfrom(self):
+        # TODO 
+        pass
+    
+    def _bars_length(self):
+        pass
     
     @variantmethod
     def assembly(self, D, R, LBM) -> TensorLike:
@@ -55,18 +58,11 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
             The stiffness matrix is derived from Euler-Bernoulli beam theory and is suitable for small deformation linear elastic analysis.
         """
         E = self.material.E
-        G = self.material.G
+        nu = self.material.nu
 
-        FSY = 10/9 
-        FSZ = 10/9
-
-        AX = bm.pi * D**2/4
-        AY = AX / FSY
-        AZ = AX / FSZ
-
-        Iy = bm.pi * D**4 / 64
-        Iz = Iy
-        Ix = Iy + Iz
+        AX, AY, AZ = self.material.cal_A()
+        Iy, Iz, Ix = self.material.cal_I()
+        FSY, FSZ = self.material.shear_factor()
 
         FY = 12 * E * Iz / G / AY / (LBM**2)  # Phi_y
         FZ = 12 * E * Iy / G / AZ / (LBM**2)  # Phi_x
