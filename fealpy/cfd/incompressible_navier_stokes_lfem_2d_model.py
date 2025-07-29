@@ -1,60 +1,35 @@
 from fealpy.backend import backend_manager as bm
-from ..decorator import variantmethod,cartesian
-from ..model import ComputationalModel
-from ..fem import DirichletBC
+from fealpy.decorator import variantmethod,cartesian
+from fealpy.model import ComputationalModel
+from fealpy.fem import DirichletBC
 from .simulation.fem import Newton
 from .equation import IncompressibleNS
 
 class IncompressibleNSLFEM2DModel(ComputationalModel):
-    def __init__(self, options):
+    def __init__(self, pde, mesh=None, options = None):
         super().__init__(pbar_log = True, log_level = "INFO")
-        self.set_pde[options['GD']](options['pde'], rho=options['rho'], mu=options['mu'])
-        self.set_init_timeline(options['T0'], options['T1'], options['nt'])
-
-        set_init_mesh = self.set_init_mesh[options['GD']]
-        if options['GD'] == '2d':
-            set_init_mesh(options['init_mesh'], options['nx'], options['ny'])
-        else:  # '3d'
-            set_init_mesh(options['init_mesh'], options['nx'], options['ny'], options['nz'])
-
-        self.solve.set(options['solve'])
+        self.pde = pde
         self.equation = IncompressibleNS(self.pde)
         self.fem = self.method[options['method']]()
+        self.init_timeline = self.pde.init_timeline(options['T0'], options['T1'], options['nt'])
         self.fem.dt = self.pde.dt
 
-        run = self.run[options['run']]
-        if options['run'] == 'uniform_refine':
-            run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'])
-        else:  # 'one_step' or other
-            run(maxstep=options['maxstep'], tol=options['tol'])
-
-    @variantmethod("2d")
-    def set_pde(self, pde = "channel", rho = 1.0, mu = 1.0):
-        """
-        Set the PDE data for the model.
-        """
-        from fealpy.cfd.model.test.incompressible_navier_stokes.incompressible_navier_stokes_2d import FromSympy
-        self.pde = FromSympy(rho=rho, mu=mu)
-        self.pde.select_pde[pde]()
-
-    @variantmethod("2d")
-    def set_init_mesh(self, mesh = "tri", nx=8, ny=8):
-        """
-        Set the initial mesh for the model.
-        """
-        if isinstance(mesh, str):
-            mesh = self.pde.init_mesh[mesh](nx=nx, ny=ny)
+        if mesh is None:
+            if hasattr(pde, 'mesh'):
+                self.mesh = pde.mesh
+            else:
+                raise ValueError("Not found mesh!")
         else:
-            mesh = mesh
-        self.pde.mesh = mesh
-        return mesh
-    
-    def set_init_timeline(self, T0 = 0.0, T1 = 0.5, nt = 1000):
-        """
-        Set the initial timeline for the model.
-        """
-        timeline = self.pde.init_timeline(T0, T1, nt)
-        self.pde.timeline = timeline
+            self.mesh = mesh
+        if options is not None:
+            self.solve.set(options['solve'])
+            self.fem = self.method[options['method']]()
+
+            run = self.run[options['run']]
+            if options['run'] == 'uniform_refine':
+                run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
+            else:  # 'one_step' 或其他
+                run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
 
     def lagrange_multiplier(self, A, b):
         from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
@@ -148,7 +123,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         pass
 
     @variantmethod('one_step_iter')
-    def run(self, u0, p0, maxstep=10, tol=1e-12):
+    def run(self, u0, p0, maxstep=10, tol=1e-12, apply_bc = 'dirichlet'):
         fem = self.fem
         pde = self.pde
 
@@ -193,7 +168,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 
                 A = BForm.assembly()
                 b = LForm.assembly()
-                A,b = self.apply_bc(A, b)
+                A,b = self.apply_bc[apply_bc](A, b)
                 # A, b = self.lagrange_multiplier(A, b)
             
                 x = self.solve(A, b, 'mumps')
@@ -208,7 +183,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             return u1, p1
 
     @run.register('time_step')
-    def run(self, t0 = 0,nt = 300, maxstep = 10, tol = 1e-10):
+    def run(self, t0 = 0,nt = 300, maxstep = 10, tol = 1e-10, apply_bc = 'dirichlet', postprocess = 'error'):
         fem = self.fem
         pde = self.pde
 
@@ -222,7 +197,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             self.t = t0 + (i+1)*self.fem.dt
             # print(f"第{i+1}步")
             # print("time=", self.t)
-            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)
+            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol, apply_bc)
 
             u0[:] = u1
             p0[:] = p1
@@ -234,15 +209,15 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             # perror = self.pde.mesh.error(self.pde.pressure, p1)
             # print("uerror:", uerror)
             # print("perror:", perror)
-        uerror, perror = self.postprocess(u1, p1) 
+        uerror, perror = self.postprocess[postprocess](u1, p1) 
         self.logger.info(f"final uerror: {uerror}, final perror: {perror}")
 
     @run.register('uniform_refine')
-    def run(self, maxit=5, t0 = 0, nt = 300, maxstep = 10, tol = 1e-12):
+    def run(self, maxit=5, t0 = 0, nt = 300, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'):
         fem = self.fem
         for i in range(maxit):
             self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
-            self.run['time_step'](t0, nt, maxstep, tol)
+            self.run['time_step'](t0, nt, maxstep, tol,apply_bc, postprocess)
             self.pde.mesh.uniform_refine()
             self.equation = IncompressibleNS(self.pde)
 

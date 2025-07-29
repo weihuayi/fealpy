@@ -86,9 +86,9 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
 
             run = self.run[options['run']]
             if options['run'] == 'uniform_refine':
-                run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'])
+                run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
             else:  # 'one_step' 或其他
-                run(maxstep=options['maxstep'], tol=options['tol'])
+                run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
     
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
@@ -235,7 +235,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         return A, b
 
     @variantmethod('one_step')
-    def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet'):
+    def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet', postprocess='error'):
         """
         """
         self.run_str = 'one_step'
@@ -280,9 +280,8 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uh1, ph1
 
-
     @run.register('uniform_refine')
-    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10, apply_bc = 'dirichlet'):
+    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10, apply_bc = 'dirichlet', postprocess = 'error'):
         self.run_str = 'uniform_refine'
         self.maxit = maxit
         self.maxstep = maxstep
@@ -319,17 +318,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         perror = self.pde.mesh.error(self.pde.pressure, ph)
         #print(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror
-    
-    @postprocess.register('res')
-    def postprocess(self, uh0, ph0, uh1, ph1):
-        """
-        Compute the residuals of the velocity and pressure fields.
-        """
-        self.postprocess_str = 'res'
-        uerror = self.pde.mesh.error(uh0, uh1)
-        perror = self.pde.mesh.error(ph0, ph1)
-        return uerror, perror
-    
+
     @postprocess.register('plot')
     def postprocess(self, uh, ph):
         self.postprocess_str = 'plot'
