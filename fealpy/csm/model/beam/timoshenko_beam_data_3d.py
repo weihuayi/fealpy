@@ -2,12 +2,14 @@ from fealpy.typing import Optional, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 
-from fealpy.material import Material
+from fealpy.material import (
+        LinearElasticMaterial,
+        )
 from fealpy.mesh import EdgeMesh
 
 class TimoshenkoBeamData3D:
     """
-    3D Timoshenko beam problem:
+    3D Timoshenko beam problem.
     """
 
     def __init__(self):
@@ -27,21 +29,36 @@ class TimoshenkoBeamData3D:
             [120, 141, 2]
         ])
         self.L = bm.sum(self.para[:, 1])  # 总长度
+        self._D = self.para[:, 0]
+        self._FSY = 10/9
+        self._FSZ = 10/9
+        self._AX, self._AY, self._AZ = self._cal_A()
+        self._Iy, self._Iz, self._Ix = self._cal_I()
         self.mesh = self.init_mesh()
 
     @property
-    def E(self, p: Optional[TensorLike] = None) -> TensorLike:
-        # Young's modulus in Pascals
-        return 2.07e11 
+    def D(self) -> TensorLike:
+        return self._D
     
-    @property
-    def nu(self, p: Optional[TensorLike] = None) -> TensorLike:
-        # Poisson's ratio
-        return 0.276 
     @property
     def k_lunzhou(self, p: Optional[TensorLike] = None) -> TensorLike:
         #N/mm equivalent node stiffness for the axle, identical in all three translational directions.
         return 1.976e6 
+    
+
+    def _cal_A(self):
+        AX = bm.pi * self._D**2/4
+        AY = AX / self._FSY
+        AZ = AX / self._FSZ
+        
+        return AX, AY, AZ
+
+    def _cal_I(self):
+        Iy = bm.pi * self._D**4 / 64
+        Iz = Iy
+        Ix = Iy + Iz
+
+        return Iy, Iz, Ix
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -83,8 +100,8 @@ class TimoshenkoBeamData3D:
         The load applied to the node.
         load = [node_index, x, y, z, theta_x theta_y theta_z]
         """
-        x = self.mesh.node[:, 0]
-        dofs = 6 * len(x)
+        #x = self.mesh.node[:, 0]
+        #dofs = 6 * len(x)
         load = bm.array([[1, 0, 0, -88200, 0, 0 , 0],
                          [21, 0, 0, -88200, 0, 0, 0],
                          [11, 3140, 0, 0, 14000e3, 0, 0]], dtype=bm.float64)
