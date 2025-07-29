@@ -147,6 +147,10 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         LForm = self.fem.LForm()
         return BForm, LForm
     
+    def update_mesh(self, mesh):
+        self.fem.update_mesh(mesh)
+        self.mesh = mesh
+
     @variantmethod("dirichlet")
     def apply_bc(self, A, b):
         """
@@ -231,14 +235,15 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         A = A.assembly_sparse_matrix(format='csr')
         b0 = bm.array([0])
         b  = bm.concatenate([b, b0], axis=0)
-
         return A, b
+    
 
-    @variantmethod('one_step')
+
+    @variantmethod('main')
     def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet', postprocess='error'):
         """
         """
-        self.run_str = 'one_step'
+        self.run_str = 'main'
         self.maxstep = maxstep
         self.tol = tol
         uh0 = self.fem.uspace.function()
@@ -249,6 +254,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         ugdof = self.fem.uspace.number_of_global_dofs()
         
         BForm, LForm = self.linear_system()
+        
         for i in range(maxstep):
             # self.logger.info(f"iteration: {i+1}")
             # tmr = timer()
@@ -279,6 +285,25 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         uerror, perror = self.postprocess(uh1, ph1) 
         self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uh1, ph1
+    
+    @run.register('one_step')
+    def run(self, uh, apply_bc: str = 'dirichlet', postprocess: str = 'error'):
+        self.run_str = 'one_step'
+
+        BForm, LForm = self.linear_system() 
+        self.fem.update(uh)
+        A = BForm.assembly() 
+        b = LForm.assembly()
+        A, b = self.apply_bc[apply_bc](A, b)
+        A, b = self.lagrange_multiplier(A, b)
+        x = self.solve(A, b)
+
+        ugdof = self.fem.uspace.number_of_global_dofs()
+        u = self.fem.uspace.function()
+        p = self.fem.pspace.function()
+        u[:] = x[:ugdof]
+        p[:] = x[ugdof:-1] 
+        return u, p
 
     @run.register('uniform_refine')
     def run(self, maxit = 5, maxstep = 1000, tol = 1e-10, apply_bc = 'dirichlet', postprocess = 'error'):
@@ -293,7 +318,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             self.equation = StationaryIncompressibleNS(self.pde)
 
     @variantmethod('direct')
-    def solve(self, A, F, solver='scipy'):
+    def solve(self, A, F, solver='mumps'):
         from fealpy.solver import spsolve
         self.solve_str = 'direct'
         return spsolve(A, F, solver = solver)
