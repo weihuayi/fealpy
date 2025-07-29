@@ -2,12 +2,14 @@ from fealpy.typing import Optional, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 
-from fealpy.material import Material
+from fealpy.material import (
+        LinearElasticMaterial,
+        )
 from fealpy.mesh import EdgeMesh
 
 class TimoshenkoBeamData3D:
     """
-    3D Timoshenko beam problem:
+    3D Timoshenko beam problem.
     """
 
     def __init__(self):
@@ -38,6 +40,7 @@ class TimoshenkoBeamData3D:
     def nu(self, p: Optional[TensorLike] = None) -> TensorLike:
         # Poisson's ratio
         return 0.276 
+    
     @property
     def k_lunzhou(self, p: Optional[TensorLike] = None) -> TensorLike:
         #N/mm equivalent node stiffness for the axle, identical in all three translational directions.
