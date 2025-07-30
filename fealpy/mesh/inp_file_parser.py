@@ -1,6 +1,7 @@
 import re
 from typing import List, Tuple, Dict, Type, Optional, Any
 from ..backend import bm
+from ..typing import TensorLike
 from .inp_file_sections import *
 
 
@@ -39,6 +40,10 @@ class InpFileParser:
     """
     def __init__(self) -> None:
         self.sections: List[Section] = []
+        self.nsets: Dict[str, TensorLike] = {}
+        self.esets: Dict[str, TensorLike] = {}
+        self.surfaces: Dict[str, SurfaceSection] = {}
+        self.couplings: Dict[str, CouplingSection] = {}
 
     def parse(self, filename: str) -> 'InpFileParser':
         current_section: Optional[Section] = None
@@ -70,6 +75,19 @@ class InpFileParser:
         # finalize all sections (convert to bm.array)
         for sec in self.sections:
             sec.finalize()
+            if isinstance(sec, NsetSection):
+                name = sec.name
+                self.nsets[name] = sec.id
+            elif isinstance(sec, ElsetSection): 
+                name = sec.name
+                self.esets[name] = sec.id
+            elif isinstance(sec, SurfaceSection):
+                name = sec.name
+                self.surfaces[name] = sec
+            elif isinstance(sec, CouplingSection):
+                name = sec.name
+                self.couplings[name] = sec
+
         return self
 
     def _start_section(self, header: str) -> Optional[Section]:
@@ -104,11 +122,12 @@ class InpFileParser:
         ns = self.get_section(NodeSection)
         es = self.get_section(ElementSection)
         node = ns.node
-        cell = ns.node_map[es.cell]
+        cell = ns.id_map[es.cell]
         mesh = mesh_type(node, cell)
 
-        for section in self.sections:
-            section.attach(mesh.meshdata)
+        #for section in self.sections:
+        #    section.attach(mesh.meshdata)
+
         return mesh
 
     def to_material(self, Material, name: str):

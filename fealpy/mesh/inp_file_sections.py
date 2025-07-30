@@ -2,6 +2,7 @@
 import re
 from typing import List, Tuple, Dict, Type, Optional, Any
 from ..backend import bm
+from ..typing import TensorLike
 
 class Section:
     """
@@ -42,7 +43,7 @@ class Section:
     def parse_line(self, line: str) -> None:
         raise NotImplementedError(f"parse_line must be implemented by {self.__class__.__name__}")
 
-    def attach(self, meshdata: Dict[str, Any]):
+    def attach(self, meshdata: Dict[str, Any], parser):
         pass
 
     def finalize(self) -> None:
@@ -81,7 +82,7 @@ class NodeSection(Section):
         self._node: List[List[float]] = []
         self.id: Optional[Any] = None
         self.node: Optional[Any] = None
-        self.node_map: Optional[Any] = None
+        self.id_map: Optional[Any] = None
 
     def parse_line(self, line: str) -> None:
         parts = [s.strip() for s in line.split(',')]
@@ -94,11 +95,11 @@ class NodeSection(Section):
         self.id = bm.array(self._id)
         self.node = bm.array(self._node)
         N = bm.max(self.id) + 1
-        self.node_map = bm.zeros((N,), dtype=bm.int32)
-        bm.set_at(self.node_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
+        self.id_map = bm.zeros((N,), dtype=bm.int32)
+        bm.set_at(self.id_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
 
-    def attach(self, meshdata: Dict[str, Any]) -> None:
-        meshdata['node_map'] = self.node_map
+    def attach(self, meshdata: Dict[str, Any], parser) -> None:
+        meshdata['nid_map'] = self.id_map
 
 class ElementSection(Section):
     """
@@ -131,7 +132,7 @@ class ElementSection(Section):
         # final arrays
         self.id: Optional[Any] = None
         self.cell: Optional[Any] = None
-        self.cell_map: Optional[Any] = None
+        self.id_map: Optional[Any] = None
 
     def parse_line(self, line: str) -> None:
         parts = [s.strip() for s in line.split(',')]
@@ -143,12 +144,13 @@ class ElementSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
         N = bm.max(self.id) + 1
-        self.cell_map = bm.zeros((N,), dtype=bm.int32)
-        bm.set_at(self.cell_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
+        self.id_map = bm.zeros((N,), dtype=bm.int32)
+        bm.set_at(self.id_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
         self.cell = bm.array(self._cell)
 
-    def attach(self, meshdata: Dict[str, Any]) -> None:
-        meshdata['cell_map'] = self.cell_map  # 存入共享数据字典
+    def attach(self, meshdata: Dict[str, Any], parser) -> None:
+        meshdata['cid_map'] = self.id_map
+
 
 class ElsetSection(Section):
     """
@@ -192,12 +194,6 @@ class ElsetSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
 
-    def attach(self, meshdata: Dict[str, Any]) -> None:
-        if 'elset' not in meshdata:
-            meshdata['elset'] = {}
-        cell_map = meshdata['cell_map']
-        meshdata['elset'][self.name] = cell_map[self.id]
-
 class NsetSection(Section):
     """
     Parses the *NSET section from an ABAQUS .inp file.
@@ -236,12 +232,6 @@ class NsetSection(Section):
 
     def finalize(self) -> None:
         self.id = bm.array(self._id)
-
-    def attach(self, meshdata: Dict[str, Any]) -> None:
-        if 'nset' not in meshdata:
-            meshdata['nset'] = {}
-        node_map = meshdata['node_map']
-        meshdata['nset'][self.name] = node_map[self.id]
 
 
 class SolidSection(Section):
@@ -343,15 +333,6 @@ class SurfaceSection(Section):
         if len(parts) >= 2:
             self.assignments.append((parts[0], float(parts[1])))
 
-    def attach(self, meshdata: Dict[str, Any]):
-        if 'surface' not in meshdata:
-            meshdata['surface'] = {}
-        meshdata['surface'][self.name] = {
-            'type': self.type,
-            'assignments': self.assignments,
-        }
-
-
 class CouplingSection(Section):
     """
     Parses the *COUPLING section from an ABAQUS .inp file.
@@ -389,15 +370,29 @@ class CouplingSection(Section):
     def set_type(self, coupling_type: str) -> None:
         self.type = coupling_type
 
-    def attach(self, meshdata: Dict[str, Any]):
-        if 'coupling' not in meshdata:
-            meshdata['coupling'] = {}
-        meshdata['coupling'][self.name] = {
-            'type': 'COUPLING',
-            'ref_node': self.ref_node,
-            'surface': self.surface,
-            'coupling_type': self.type,
-        }
+    def attach(self, meshdata: Dict[str, Any], parser):
+        nid_map = meshdata.get('nid_map', None)
+        cid_map = meshdata.get('cid_map', None)
+
+        rnode = self.ref_node
+        if rnode in parser.nsets:
+            rnode_id = nid_map[parser.nsets[rnode]]
+        else:
+            raise ValueError(f"Reference node '{rnode}' not found in nsets for coupling '{coupling.name}'.")
+
+        sname = coupling.surface
+        if sname in self.surfaces:
+            surface = self.surfaces[sname]
+            name = surface.assignments[0][0] # typically the first assignment
+            if name in parser.nsets:
+                nset = parser.nsets[name]
+                snode_ids = nid_map[nset]
+            else:
+                raise ValueError(f"Nset '{nsetName}' not found for coupling '{name}'.")
+        else:
+            raise ValueError(f"Surface '{sname}' not found for coupling '{name}'.")
+
+
 
 
 class MaterialSection(Section):

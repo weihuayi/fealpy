@@ -1,19 +1,44 @@
 from typing import Optional
 
-from ....backend import bm
-from ....typing import TensorLike
-from ....decorator import cartesian
+from fealpy.backend import bm
+from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
 
+from fealpy.material import (
+        LinearElasticMaterial,
+        )
 from fealpy.mesh import (
         TetrahedronMesh,
         InpFileParser,
         )
 
-from fealpy.material import (
-        LinearElasticMaterial,
-        )
-
 class GearBoxModel:
+    """
+    A model class representing a gearbox structure.
+
+    This class loads mesh and material data from an ABAQUS `.inp` file using the
+    `InpFileParser`, and provides access to geometry dimension and initialized mesh.
+
+    Parameters:
+        options (dict): A dictionary containing model configuration options.
+            Required key:
+                'mesh_file' (str): Path to the input `.inp` file describing the geometry and material.
+
+    Attributes:
+        options (dict): Configuration dictionary passed to the constructor.
+        parser (InpFileParser): Internal parser used to read the `.inp` file and extract sections.
+        material (LinearElasticMaterial): Material model parsed from the input file.
+
+    Methods:
+        __str__() -> str:
+            Returns a human-readable summary of the model configuration.
+
+        geo_dimension() -> int:
+            Returns the spatial dimension of the model (always 3 for gearbox).
+
+        init_mesh() -> TetrahedronMesh:
+            Builds and returns a mesh object initialized from the `.inp` file.
+    """
 
     def __init__(self, options):
         self.options = options
@@ -27,7 +52,7 @@ class GearBoxModel:
         """
         mesh_file = self.options.get('mesh_file', '<unset>')
         return (
-            f"GearBoxModel(\n"
+            f"\nGearBoxModel(\n"
             f"  mesh_file = '{mesh_file}',\n"
             f"  dimension = 3D,\n"
             f")"
