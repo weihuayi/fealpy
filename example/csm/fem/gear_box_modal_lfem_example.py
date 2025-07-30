@@ -15,7 +15,7 @@ parser.add_argument('--pde',
                     help='index of the linear elasticity  model, default is 1')
 
 parser.add_argument('--mesh_file',
-                    default='/home/why/fealpy/data/LANXIANG_KETI_0506.inp', type=str,
+                    default='/home/zjx/py/LANXIANG_KETI_0506.inp', type=str,
                     help='Type of mesh, default is uniform_tet')
 
 parser.add_argument('--space_degree',
@@ -40,11 +40,7 @@ from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import GearBoxModalLFEMModel
-moddel = GearBoxModalLFEMModel(options)
+model = GearBoxModalLFEMModel(options)
 
-model.mesh.to_vtk('gear_box.vtk')
-
-
-
-
+model.mesh.to_vtk('gear_box.vtu')
 

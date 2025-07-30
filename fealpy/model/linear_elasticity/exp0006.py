@@ -2,11 +2,11 @@ from typing import Optional, Sequence
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ...mesher import BoxMesher2d
 
 
 
-class BoxMixedData2d(BoxDomainMesher2d):
+class Exp0006(BoxMesher2d):
     def __init__(self, box: Optional[Sequence[float]] = None):
         
         if box is None:
