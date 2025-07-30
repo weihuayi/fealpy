@@ -134,6 +134,7 @@ class PDEModelManager(ModelManager):
         "parabolic": "fealpy.model.parabolic",
         "wave": "fealpy.model.wave",
         "hyperbolic":"fealpy.model.hyperbolic",
+        "darcyforchheimer":"fealpy.model.darcyforchheimer",
         "interface_poisson":"fealpy.model.interface_poisson",
         "ion_flow":"fealpy.model.ion_flow",
         "nonlinear":"fealpy.model.nonlinear",
@@ -146,5 +147,6 @@ class PDEModelManager(ModelManager):
         "optimal_control": "fealpy.model.optimal_control",
         "helmholtz": "fealpy.model.helmholtz",
         "surface_poisson": "fealpy.model.surface_poisson",
-        "curlcurl":"fealpy.model.curlcurl"
+        "curlcurl":"fealpy.model.curlcurl",
+        "darcyforchheimer": "fealpy.model.darcyforchheimer"
     }

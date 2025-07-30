@@ -127,7 +127,20 @@ class LinearElasticMaterial(ElasticMaterial):
                                 [0, 0, mu]], dtype=bm.float64, device=device)
         else:
             raise NotImplementedError("Only 3D, plane_stress, and plane_strain are supported.")
-    
+
+    def __str__(self) -> str:
+        """Return a nicely formatted, multi-line summary of the material."""
+        return (
+            f"Material '{self.name}':\n"
+            f"  E (Young's modulus):      {self.E:.3g}\n"
+            f"  ν (Poisson's ratio):      {self.nu:.3g}\n"
+            f"  λ (Lame's first param):   {self.lam:.3g}\n"
+            f"  μ (Shear modulus):        {self.mu:.3g}\n"
+            f"  ρ (Density):              {self.rho:.3g}\n"
+            f"  Hypothesis:               {self.hypo}\n"
+            f"  Device:                   {self.device}"
+        )
+
     @property
     def elastic_modulus(self) -> float:
         """Get Young's modulus"""

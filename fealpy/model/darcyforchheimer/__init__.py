@@ -21,14 +21,17 @@ follow the existing examples to register them in the registry.
 """
 
 DATA_TABLE = {
-    "sin": ("sin_data_1d", "SinData1D"),
-    "post1":("postdata1","PostData1"),
-    "post2":("postdata2","PostData2"),
-    "post3":("postdata1","PostData3"),
-    "post4":("postdata4","PostData4"),
-    "post5":("postdata5","PostData5"),
-    "exp":("exp_data_2d","ExpData2D"),
-    "coscos":("cos_cos_data_2d","CosCosData2D"),
-    "arctan":("arctan_data_2d","ArctanData2D"),
-
+    # example name: (file_name, class_name)
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
+    3: ("exp0003", "Exp0003"),
+    3: ("exp0003", "Exp0003"),
+    4: ("exp0004", "Exp0004"),
+    5: ("exp0005", "Exp0005"),
+    6: ("exp0006", "Exp0006"),
+    7: ("exp0007", "Exp0007"),
+    8: ("exp0008", "Exp0008"),
+    9: ("exp0009", "Exp0009"),
+    10: ("exp0010", "Exp0010"),
 }
+

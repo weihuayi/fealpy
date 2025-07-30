@@ -119,6 +119,7 @@ class GAMGSolver():
                     break
             end_time = time.time()
             logger.info(f"Coarsening time: {end_time-start_time}")
+         
             # # 计算最粗矩阵最大和最小特征值
             # A = self.A[-1].toarray()
             # emax, _ = eigs(A, 1, which='LM')

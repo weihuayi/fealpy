@@ -1,6 +1,6 @@
 from ...backend import backend_manager as bm
 from ..model import ComputationalModel
-from ..model import PDEModelManager
+from ..model import CSMModelManager
 from ...fem import BilinearForm
 from ...fem import LinearForm
 from ...functionspace import LagrangeFESpace, TensorFunctionSpace
@@ -100,7 +100,7 @@ class BeamFEMModel(ComputationalModel):
             >>> model.set_pde(new_pde)
         '''
         if isinstance(pde, str):
-            self.pde = PDEModelManager('beam').get_example(pde)
+            self.pde = CSModelManager('beam').get_example(pde)
         else:
             self.pde = pde
         self.mesh = self.pde.init_mesh()

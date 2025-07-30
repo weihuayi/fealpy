@@ -13,7 +13,6 @@ def rs_cf_splitting(Sp, Sj, Tp, Tj, n_nodes):
     interval_ptr = bm.zeros(n_nodes + 1, dtype=int)
     # 有bug，默认连接点不超过n个
     interval_count = bm.zeros(n_nodes, dtype=int)
-
     interval_count[:max(lambda_vals) + 1] = bm.bincount(lambda_vals)
     interval_ptr[1:] = bm.cumsum(interval_count)
 

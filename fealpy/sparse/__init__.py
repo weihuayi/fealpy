@@ -8,7 +8,7 @@ from .sparse_tensor import SparseTensor
 from .coo_tensor import COOTensor
 from .csr_tensor import CSRTensor
 
-from .ops import spdiags, speye
+from .ops import spdiags, speye, vstack, hstack, bmat
 
 
 

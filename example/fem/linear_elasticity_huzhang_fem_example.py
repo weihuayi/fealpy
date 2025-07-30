@@ -11,15 +11,15 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='boxtri2d', type=str,
-                    help='Name of the PDE model, default is boxtri2d')
+                    default='3', type=int,
+                    help='Name of the PDE model, default is 1')
 
 parser.add_argument('--init_mesh',
                     default='uniform_tri', type=str,
                     help='Type of mesh, default is uniform_tri')
 
 parser.add_argument('--space_degree',
-                    default=3, type=int,
+                    default=4, type=int,
                     help='Degree of Lagrange finite element space, default is 3')
 
 parser.add_argument('--pbar_log',
@@ -38,4 +38,4 @@ bm.set_backend(options['backend'])
 
 from fealpy.fem.linear_elasticity_huzhang_fem_model import LinearElasticityHuzhangFEMModel
 model = LinearElasticityHuzhangFEMModel(options)
-model.run['uniform_refine']()
+model.run['onestep']()
