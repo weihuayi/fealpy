@@ -2,20 +2,16 @@ import math
 import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
 from typing import Union, Optional
-# import warnings
-# warnings.filterwarnings("ignore", category=UserWarning)
 
-from ..backend import  bm
-from ..utils import timer
-from ..typing import TensorLike
-from ..model import ComputationalModel, PDEModelManager
-from ..model.poisson import PoissonPDEDataT
 
-from . import gradient
-from . import optimizers, activations
+from fealpy.backend import  bm
+from fealpy.utils import timer
+from fealpy.typing import TensorLike
+from fealpy.model import ComputationalModel, PDEModelManager
+from fealpy.model.poisson import PoissonPDEDataT
 
-from .modules import Solution
-
+from fealpy.ml import gradient, optimizers, activations
+from fealpy.ml.modules import Solution
 
 
 class PoissonPENNModel(ComputationalModel):
