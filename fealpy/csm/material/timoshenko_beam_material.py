@@ -39,12 +39,19 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
             Placeholder method for calculating the strain matrix (currently not implemented).
     """
 
-    def __init__(self, name: str, model) -> None:
-        super().__init__(name)
+    def __init__(self, name: str,
+                model,
+                elastic_modulus: Optional[float] = None,
+                poisson_ratio: Optional[float] = None,
+            ) -> None:
+        super().__init__(name=name, 
+                        elastic_modulus=elastic_modulus, 
+                        poisson_ratio=poisson_ratio)
 
         self._model = model
 
         self._E = self.get_property('elastic_modulus')
+        self._nu = self.get_property('poisson_ratio')
         self._mu = self.get_property('shear_modulus')
 
     def calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:

@@ -1,4 +1,6 @@
-from fealpy.typing import Optional, Tuple, TensorLike
+from typing import Optional
+
+from fealpy.typing import Tuple, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 
