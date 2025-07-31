@@ -8,6 +8,7 @@ from fealpy.material import (
         LinearElasticMaterial,
         )
 from fealpy.mesh import (
+        MeshData,
         TetrahedronMesh,
         InpFileParser,
         )
@@ -44,7 +45,9 @@ class GearBoxModel:
         self.options = options
         self.parser = InpFileParser()
         self.parser.parse(options['mesh_file'])
-        self.material = self.parser.to_material(LinearElasticMaterial, 'gearbox')
+        self.mesh = self.parser.to_mesh(TetrahedronMesh, MeshData)
+        for name, data in self.mesh.data['materials'].items():
+            self.material = LinearElasticMaterial(name, **data) 
 
     def __str__(self) -> str:
         """
@@ -64,6 +67,6 @@ class GearBoxModel:
     def init_mesh(self):
         """
         """
-        return self.parser.to_mesh(TetrahedronMesh)
+        return self.mesh 
     
     

@@ -4,6 +4,19 @@ from typing import List, Tuple, Dict, Type, Optional, Any
 from ..backend import bm
 from ..typing import TensorLike
 
+
+ABAQUS_TYPE_DOF_MAP = {
+    'ENCASTRE': [1, 2, 3, 4, 5, 6],
+    'PINNED': [1, 2, 3],
+    'XSYMM': [1, 5, 6],
+    'YSYMM': [2, 4, 6],
+    'ZSYMM': [3, 4, 5],
+    'XASYMM': [2, 3, 4],
+    'YASYMM': [1, 3, 5],
+    'ZASYMM': [1, 2, 6],
+    # 其它可扩展...
+}
+
 class Section:
     """
     Abstract base class for all parsed ABAQUS *.inp file sections.
@@ -43,7 +56,7 @@ class Section:
     def parse_line(self, line: str) -> None:
         raise NotImplementedError(f"parse_line must be implemented by {self.__class__.__name__}")
 
-    def attach(self, meshdata: Dict[str, Any], parser):
+    def attach(self, meshdata: Dict[str, Any]):
         pass
 
     def finalize(self) -> None:
@@ -82,7 +95,6 @@ class NodeSection(Section):
         self._node: List[List[float]] = []
         self.id: Optional[Any] = None
         self.node: Optional[Any] = None
-        self.id_map: Optional[Any] = None
 
     def parse_line(self, line: str) -> None:
         parts = [s.strip() for s in line.split(',')]
@@ -94,12 +106,9 @@ class NodeSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
         self.node = bm.array(self._node)
-        N = bm.max(self.id) + 1
-        self.id_map = bm.zeros((N,), dtype=bm.int32)
-        bm.set_at(self.id_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
 
-    def attach(self, meshdata: Dict[str, Any], parser) -> None:
-        meshdata['nid_map'] = self.id_map
+    def attach(self, meshdata: Dict[str, Any]) -> None:
+        meshdata.add_node_data("id", self.id)
 
 class ElementSection(Section):
     """
@@ -132,7 +141,6 @@ class ElementSection(Section):
         # final arrays
         self.id: Optional[Any] = None
         self.cell: Optional[Any] = None
-        self.id_map: Optional[Any] = None
 
     def parse_line(self, line: str) -> None:
         parts = [s.strip() for s in line.split(',')]
@@ -143,13 +151,10 @@ class ElementSection(Section):
 
     def finalize(self) -> None:
         self.id = bm.array(self._id)
-        N = bm.max(self.id) + 1
-        self.id_map = bm.zeros((N,), dtype=bm.int32)
-        bm.set_at(self.id_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
         self.cell = bm.array(self._cell)
 
-    def attach(self, meshdata: Dict[str, Any], parser) -> None:
-        meshdata['cid_map'] = self.id_map
+    def attach(self, meshdata: Dict[str, Any]) -> None:
+        meshdata.add_cell_data("id", self.id)
 
 
 class ElsetSection(Section):
@@ -194,6 +199,9 @@ class ElsetSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
 
+    def attach(self, meshdata: Dict[str, Any]):
+        meshdata.add_cell_set(self.name, self.id)
+
 class NsetSection(Section):
     """
     Parses the *NSET section from an ABAQUS .inp file.
@@ -233,6 +241,9 @@ class NsetSection(Section):
     def finalize(self) -> None:
         self.id = bm.array(self._id)
 
+    def attach(self, meshdata: Dict[str, Any]):
+        meshdata.add_node_set(self.name, self.id)
+
 
 class SolidSection(Section):
     """
@@ -265,13 +276,12 @@ class SolidSection(Section):
         # Usually no data to parse; solid section info is in the header
         pass
 
-    def attach(self, meshdata: Dict[str, Any], parser) -> None:
-        if 'solid' not in meshdata:
-            meshdata['solid'] = {}
-        meshdata['solid'] = {
-            'elset': self.elset,
-            'material': self.material
-        }
+    def attach(self, meshdata: Dict[str, Any]) -> None:
+        meshdata.add_physics_resions(
+                self.elset+self.material, 
+                self.elset,
+                self.material
+                )
 
 
 class SystemSection(Section):
@@ -326,12 +336,19 @@ class SurfaceSection(Section):
         super().__init__(options)
         self.name = options.get('name', '')
         self.type = options.get('type', '')
-        self.assignments: List[Tuple[str, float]] = []
+        self.data: List[Tuple[str, str]] = []
 
     def parse_line(self, line: str) -> None:
         parts = re.split(r'\s*,\s*', line.strip())
         if len(parts) >= 2:
-            self.assignments.append((parts[0], float(parts[1])))
+            self.data.append((parts[0], float(parts[1])))
+
+    def attach(self, meshdata: Dict[str, Any]) -> None:
+        meshdata.add_surface(
+                self.name,
+                self.type,
+                self.data
+                )
 
 class CouplingSection(Section):
     """
@@ -370,31 +387,11 @@ class CouplingSection(Section):
     def set_type(self, coupling_type: str) -> None:
         self.type = coupling_type
 
-    def attach(self, meshdata: Dict[str, Any], parser):
-        nid_map = meshdata.get('nid_map', None)
-        cid_map = meshdata.get('cid_map', None)
-
-        rnode = self.ref_node
-        if rnode in parser.nsets:
-            rnode_id = nid_map[parser.nsets[rnode]]
-        else:
-            raise ValueError(f"Reference node '{rnode}' not found in nsets for coupling '{coupling.name}'.")
-
-        sname = self.surface
-        if sname in parser.surfaces:
-            surface = parser.surfaces[sname]
-            name = surface.assignments[0][0] # typically the first assignment
-            if name in parser.nsets:
-                nset = parser.nsets[name]
-                snode_ids = nid_map[nset]
-            else:
-                raise ValueError(f"Nset '{nsetName}' not found for coupling '{name}'.")
-        else:
-            raise ValueError(f"Surface '{sname}' not found for coupling '{name}'.")
-
-        if 'coupling' not in meshdata:
-            meshdata['coupling'] = {}
-        meshdata['coupling'][self.name] = (rnode_id, snode_ids, self.type) 
+    def attach(self, meshdata: Dict[str, Any]):
+        meshdata.add_coupling(self.name, 
+                              self.surface, 
+                              self.ref_node,
+                              self.type)
 
 
 class MaterialSection(Section):
@@ -442,14 +439,11 @@ class MaterialSection(Section):
             elif line.upper().startswith("*ELASTIC"):
                 self._next = 'ELASTIC'
 
-    def attach(self, meshdata: Dict[str, Any], parser):
-        if 'material' not in meshdata:
-            meshdata['material'] = {}
-        meshdata['material'][self.name] = {
-            'density': self.density,
-            'elastic': self.elastic
-        }
-
+    def attach(self, meshdata: Dict[str, Any]):
+        meshdata.add_material(self.name, 
+                              elastic_modulus=self.elastic[0],
+                              poisson_ratio=self.elastic[1],
+                              density=self.density)
 
 class BoundarySection(Section):
     """
@@ -459,35 +453,40 @@ class BoundarySection(Section):
     used for boundary conditions.
 
     Parameters:
-        options (Dict[str, str]): Keyword arguments extracted from the section header.
 
     Attributes:
-        boundaries (List[Tuple[str, int, int]]): List of boundary constraints in the format
-            (node_set_name, dof_start, dof_end).
 
     Methods:
-        parse_line(line: str): Parses a constraint definition line.
-        attach(meshdata: Dict[str, Any]): Appends all boundary constraints to meshdata.
+
     """
+
     keyword = 'BOUNDARY'
 
     def __init__(self, options: Dict[str, str]):
         super().__init__(options)
-        self.boundaries: List[Tuple[str, int, int]] = []
+        self.options = options
+        self.type = options.get('type','DISPLACEMENT').upper()
+        self.data = []
 
     def parse_line(self, line: str) -> None:
-        parts = re.split(r'\s*,\s*', line.strip())
-        if len(parts) >= 3:
-            name = parts[0].upper()
-            dof_start = int(parts[1])
-            dof_end = int(parts[2])
-            self.boundaries.append((name, dof_start, dof_end))
+        # 跳过空行和注释
+        if not line.strip() or line.strip().startswith('**'):
+            return
 
-    def attach(self, meshdata: Dict[str, Any], parser):
-        if 'boundary' not in meshdata:
-            meshdata['boundary'] = []
-        meshdata['boundary'].extend(self.boundaries)
+        parts = [p.strip() for p in line.strip().split(',')]
+        nset = parts[0]
+        dof_start = int(parts[1]) - 1
+        dof_end = int(parts[2]) 
+        magnitude = float(parts[3]) if len(parts) > 3 else 0.0
+        self.data.append((nset, dof_start, dof_end, magnitude))
 
+    def attach(self, meshdata: Dict[str, Any]):
+        """
+        Attach boundary conditions to meshdata under the 'boundary_conditions' key.
+        Each condition is a dict containing region, type, dofs, magnitude, options, etc.
+        """
+        for bc in self.data:
+            meshdata.add_boundary_condition(bc)
 
 
 # Registry of available section handlers

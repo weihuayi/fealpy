@@ -75,19 +75,6 @@ class InpFileParser:
         # finalize all sections (convert to bm.array)
         for sec in self.sections:
             sec.finalize()
-            if isinstance(sec, NsetSection):
-                name = sec.name
-                self.nsets[name] = sec.id
-            elif isinstance(sec, ElsetSection): 
-                name = sec.name
-                self.esets[name] = sec.id
-            elif isinstance(sec, SurfaceSection):
-                name = sec.name
-                self.surfaces[name] = sec
-            elif isinstance(sec, CouplingSection):
-                name = sec.name
-                self.couplings[name] = sec
-
         return self
 
     def _start_section(self, header: str) -> Optional[Section]:
@@ -118,26 +105,18 @@ class InpFileParser:
     def get_sections(self, section_type: Type[Section]) -> List[Section]:
         return [sec for sec in self.sections if isinstance(sec, section_type)]
   
-    def to_mesh(self, mesh_type):
+    def to_mesh(self, mesh_type, meshdata_type):
+        """
+        """
+        meshdata  = meshdata_type() 
+        for section in self.sections:
+            section.attach(meshdata)
+
         ns = self.get_section(NodeSection)
         es = self.get_section(ElementSection)
         node = ns.node
-        cell = ns.id_map[es.cell]
+        cell = meshdata.update_node_id(es.cell)
         mesh = mesh_type(node, cell)
-
-        for section in self.sections:
-            section.attach(mesh.meshdata, self)
+        mesh.data = meshdata 
 
         return mesh
-
-    def to_material(self, Material, name: str):
-        materials = self.get_section(MaterialSection)
-        elastic_modulus, poisson_ratio = materials.elastic
-        density = materials.density
-
-        return Material(
-            name=name,
-            elastic_modulus=elastic_modulus,
-            poisson_ratio=poisson_ratio,
-            density=density
-        )

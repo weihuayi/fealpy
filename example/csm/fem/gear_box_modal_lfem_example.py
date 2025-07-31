@@ -43,6 +43,5 @@ from fealpy.csm.fem import GearBoxModalLFEMModel
 model = GearBoxModalLFEMModel(options)
 
 #model.mesh.to_vtk('gear_box.vtu')
-model.logger.info(model.mesh.meshdata['coupling'])
-model.logger.info(model.mesh.meshdata['boundary'])
+model.logger.info(model.mesh.data)
 
