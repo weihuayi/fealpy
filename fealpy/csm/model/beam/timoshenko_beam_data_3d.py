@@ -1,4 +1,4 @@
-from fealpy.typing import Optional, TensorLike
+from fealpy.typing import Optional, Tuple, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 
@@ -14,9 +14,27 @@ class TimoshenkoBeamData3D:
 
     def __init__(self):
         """
-        Initialize beam parameters.
+        A data structure class representing beam parameters and properties, including geometry characteristics.
+
+        Parameters:
+            para(Tensor): A list or tensor containing the axle structure parameters: [phi diameter, length, number of segments].
+            D(float): Diameter of the beam.
+            L(float): Length of the beam.
+            FSY(float): Shear correction factor in the y-direction.
+            FSZ(float): Shear correction factor in the z-direction.
+            AX(float): Cross-sectional area in the x-direction.
+            AY(float): Cross-sectional area in the y-direction.
+            AZ(float): Cross-sectional area in the z-direction.
+            Iy(float): Moment of inertia about the y-axis.
+            Iz(float): Moment of inertia about the z-axis.
+            Ix(float): Polar moment of inertia (for torsional effects).
+            mesh(EdgeMesh): An `EdgeMesh` object representing the geometry of the beam.
+            k_lunzhou(float): Equivalent node stiffness for the axle, which characterizes the rigidity of the beam.
+        
+        Notes:
+            FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
         """
-        # Axle structure parameters [phi diameter, length, number of segments]
+        
         self.para = bm.array([
             [120, 141, 2],
             [150, 28, 2],
@@ -28,12 +46,12 @@ class TimoshenkoBeamData3D:
             [150, 28, 2], 
             [120, 141, 2]
         ])
-        self.L = bm.sum(self.para[:, 1])  # 总长度
+        self.L = bm.sum(self.para[:, 1])
         self._D = self.para[:, 0]
         self._FSY = 10/9
         self._FSZ = 10/9
-        self._AX, self._AY, self._AZ = self._cal_A()
-        self._Iy, self._Iz, self._Ix = self._cal_I()
+        self._AX, self._AY, self._AZ = self._calculate_cross_sectional_areas()
+        self._Iy, self._Iz, self._Ix = self._calculate_moments_of_inertia()
         self.mesh = self.init_mesh()
 
     @property
@@ -42,18 +60,17 @@ class TimoshenkoBeamData3D:
     
     @property
     def k_lunzhou(self, p: Optional[TensorLike] = None) -> TensorLike:
-        #N/mm equivalent node stiffness for the axle, identical in all three translational directions.
+        """N/mm equivalent node stiffness for the axle, identical in all three translational directions."""
         return 1.976e6 
-    
 
-    def _cal_A(self):
+    def _calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:
         AX = bm.pi * self._D**2/4
         AY = AX / self._FSY
         AZ = AX / self._FSZ
         
         return AX, AY, AZ
 
-    def _cal_I(self):
+    def _calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike]:
         Iy = bm.pi * self._D**4 / 64
         Iz = Iy
         Ix = Iy + Iz
