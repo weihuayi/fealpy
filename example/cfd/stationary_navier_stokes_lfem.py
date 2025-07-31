@@ -98,7 +98,7 @@ model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
 
 
 
-exit()
+
 # 可视化
 mesh = pde.mesh
 uh, ph = model.uh1, model.ph1
@@ -112,7 +112,16 @@ plt.tricontourf(points[:, 0], points[:, 1], mesh.cell, uh[..., 0], levels = 50, 
 plt.colorbar(label = 'uh')
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Velocity u1')
+plt.title('Velocity uh0')
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(18, 3))
+plt.tricontourf(points[:, 0], points[:, 1], mesh.cell, uh[..., 1], levels = 50, cmap='viridis')
+plt.colorbar(label = 'uh')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Velocity uh1')
 plt.grid(True)
 plt.show()
 

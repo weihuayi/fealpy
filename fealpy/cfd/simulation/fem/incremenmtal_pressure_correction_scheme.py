@@ -83,7 +83,7 @@ class IPCS(ProjectionMethod, FEM):
         self.predict_BVW = ScalarDiffusionIntegrator(q=q)
         
         Bform.add_integrator(self.predict_BM)
-        Bform.add_integrator(self.predict_BF)
+        # Bform.add_integrator(self.predict_BF)
         Bform.add_integrator(self.predict_BVW)
         return Bform
     
@@ -95,7 +95,7 @@ class IPCS(ProjectionMethod, FEM):
         
         Lform = LinearForm(uspace) 
         self.predict_LS = SourceIntegrator(q=q)
-        self.predict_LS_f = SourceIntegrator(q=q)
+        # self.predict_LS_f = SourceIntegrator(q=q)
         self.predict_LGS = GradSourceIntegrator(q=q)
         self.predict_LBFS = BoundaryFaceSourceIntegrator(q=q, threshold=threshold)
         
@@ -106,7 +106,7 @@ class IPCS(ProjectionMethod, FEM):
     
     def predict_velocity_update(self, u0, p0): 
         equation = self.equation
-        dt = self.dt
+        dt = equation.pde.dt
         ctd = equation.coef_time_derivative 
         cv = equation.coef_viscosity
         cc = equation.coef_convection
@@ -114,8 +114,8 @@ class IPCS(ProjectionMethod, FEM):
         cbf = equation.coef_body_force
 
         self.predict_BM.coef = ctd/dt
-        self.predict_BF.coef = -cv
-        self.predict_BVW.coef = cv
+        self.predict_BF.coef = -cv/2
+        self.predict_BVW.coef = cv/2
         
         @barycentric
         def LS_coef(bcs, index):
@@ -134,6 +134,8 @@ class IPCS(ProjectionMethod, FEM):
             result = bm.repeat(p0(bcs,index)[...,bm.newaxis], self.mesh.GD, axis=-1)
             result = bm.expand_dims(result, axis=-1) * I
             result *= pc(bcs, index) if callable(pc) else pc
+            cvcoef = cv(bcs, index)[..., bm.newaxis]/2 if callable(cv) else cv
+            result -= cvcoef * bm.trace(u0.grad_value(bcs, index))
             return result
         self.predict_LGS.source = LGS_coef
         
@@ -141,9 +143,11 @@ class IPCS(ProjectionMethod, FEM):
         def LBFS_coef(bcs, index):
             result = -bm.einsum('...i, ...j->...ij', p0(bcs, index), self.mesh.face_unit_normal(index=index))
             result *= pc(bcs, index) if callable(pc) else pc
+            # cvcoef = cv(bcs, index)[..., bm.newaxis]/2 if callable(cv) else cv
+            # result += cvcoef * bm.trace(u0.grad_value(bcs, index))
             return result
         self.predict_LBFS.source = LBFS_coef
-        
+
 
     def pressure_BForm(self):
         """压力泊松方程左端项"""
@@ -170,11 +174,11 @@ class IPCS(ProjectionMethod, FEM):
     
     def pressure_update(self, us, p0): 
         equation = self.equation
-        dt = self.dt
+        dt = equation.pde.dt
         pc = equation.coef_pressure
         ctd = equation.coef_time_derivative 
         
-        self.pressure_BD.coef = pc
+        self.pressure_BD.coef = -pc
 
         @barycentric
         def LS_coef(bcs, index=None):
@@ -186,7 +190,7 @@ class IPCS(ProjectionMethod, FEM):
         @barycentric
         def LGS_coef(bcs, index=None):
             result = p0.grad_value(bcs, index)
-            result *= pc(bcs, index) if callable(pc) else pc
+            result *= -pc(bcs, index) if callable(pc) else pc
             return result
         self.pressure_LGS.source = LGS_coef
     
@@ -212,7 +216,7 @@ class IPCS(ProjectionMethod, FEM):
 
     def correct_velocity_update(self, us, p0, p1):
         equation = self.equation
-        dt = self.dt
+        dt = equation.pde.dt
         ctd = equation.coef_time_derivative
         cp = equation.coef_pressure
 
