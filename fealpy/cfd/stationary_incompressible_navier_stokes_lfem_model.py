@@ -236,8 +236,6 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         b0 = bm.array([0])
         b  = bm.concatenate([b, b0], axis=0)
         return A, b
-    
-
 
     @variantmethod('main')
     def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet', postprocess='error'):
@@ -257,21 +255,13 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         
         for i in range(maxstep):
             # self.logger.info(f"iteration: {i+1}")
-            # tmr = timer()
-            # next(tmr)
-            # start = time.time()
             self.update(uh0)
             A = BForm.assembly()
-            # tmr.send('迭代左端项矩阵组装时间')
             F = LForm.assembly()
-            # tmr.send('右端项组装时间')
             
             A, F = self.apply_bc[apply_bc](A, F)
             A, F = self.lagrange_multiplier(A, F)
-            # tmr.send('边界处理时间')
             x = self.solve(A, F)
-            # tmr.send('矩阵求解时间')
-            # next(tmr)
             uh1[:] = x[:ugdof]
             ph1[:] = x[ugdof:-1]
             res_u = self.pde.mesh.error(uh0, uh1)
@@ -282,8 +272,10 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        uerror, perror = self.postprocess(uh1, ph1) 
-        self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
+        self.uh1 = uh1
+        self.ph1 = ph1
+        # uerror, perror = self.postprocess(uh1, ph1) 
+        # self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uh1, ph1
     
     @run.register('one_step')
