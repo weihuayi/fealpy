@@ -265,7 +265,7 @@ class SolidSection(Section):
         # Usually no data to parse; solid section info is in the header
         pass
 
-    def attach(self, meshdata: Dict[str, Any]) -> None:
+    def attach(self, meshdata: Dict[str, Any], parser) -> None:
         if 'solid' not in meshdata:
             meshdata['solid'] = {}
         meshdata['solid'] = {
@@ -380,9 +380,9 @@ class CouplingSection(Section):
         else:
             raise ValueError(f"Reference node '{rnode}' not found in nsets for coupling '{coupling.name}'.")
 
-        sname = coupling.surface
-        if sname in self.surfaces:
-            surface = self.surfaces[sname]
+        sname = self.surface
+        if sname in parser.surfaces:
+            surface = parser.surfaces[sname]
             name = surface.assignments[0][0] # typically the first assignment
             if name in parser.nsets:
                 nset = parser.nsets[name]
@@ -392,7 +392,9 @@ class CouplingSection(Section):
         else:
             raise ValueError(f"Surface '{sname}' not found for coupling '{name}'.")
 
-
+        if 'coupling' not in meshdata:
+            meshdata['coupling'] = {}
+        meshdata['coupling'][self.name] = (rnode_id, snode_ids, self.type) 
 
 
 class MaterialSection(Section):
@@ -440,7 +442,7 @@ class MaterialSection(Section):
             elif line.upper().startswith("*ELASTIC"):
                 self._next = 'ELASTIC'
 
-    def attach(self, meshdata: Dict[str, Any]):
+    def attach(self, meshdata: Dict[str, Any], parser):
         if 'material' not in meshdata:
             meshdata['material'] = {}
         meshdata['material'][self.name] = {
@@ -481,7 +483,7 @@ class BoundarySection(Section):
             dof_end = int(parts[2])
             self.boundaries.append((name, dof_start, dof_end))
 
-    def attach(self, meshdata: Dict[str, Any]):
+    def attach(self, meshdata: Dict[str, Any], parser):
         if 'boundary' not in meshdata:
             meshdata['boundary'] = []
         meshdata['boundary'].extend(self.boundaries)

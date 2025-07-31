@@ -125,8 +125,8 @@ class InpFileParser:
         cell = ns.id_map[es.cell]
         mesh = mesh_type(node, cell)
 
-        #for section in self.sections:
-        #    section.attach(mesh.meshdata)
+        for section in self.sections:
+            section.attach(mesh.meshdata, self)
 
         return mesh
 
