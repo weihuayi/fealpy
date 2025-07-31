@@ -254,13 +254,20 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         BForm, LForm = self.linear_system()
         
         for i in range(maxstep):
+<<<<<<< HEAD
             # self.logger.info(f"iteration: {i+1}")
+=======
+>>>>>>> 734f7cd13de97de8d4b613a2d279c76e9f3c830e
             self.update(uh0)
             A = BForm.assembly()
             F = LForm.assembly()
             
             A, F = self.apply_bc[apply_bc](A, F)
             A, F = self.lagrange_multiplier(A, F)
+<<<<<<< HEAD
+=======
+           
+>>>>>>> 734f7cd13de97de8d4b613a2d279c76e9f3c830e
             x = self.solve(A, F)
             uh1[:] = x[:ugdof]
             ph1[:] = x[ugdof:-1]
@@ -282,7 +289,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
     def run(self, uh, apply_bc: str = 'dirichlet', postprocess: str = 'error'):
         self.run_str = 'one_step'
 
-        BForm, LForm = self.linear_system() 
+        BForm, LForm = self.linear_system()  
         self.fem.update(uh)
         A = BForm.assembly() 
         b = LForm.assembly()

@@ -10,7 +10,7 @@ class BarData1D:
         E A du/dx = f(x),    x ∈ (0, L)
         f(x) = constant axial force
 
-    Parameters:
+    Parameters
         E: Young's modulus
         A: Cross-sectional area (used if axial terms are present)
         f: load 
@@ -36,7 +36,7 @@ class BarData1D:
         """
         Construct a 1D EdgeMesh for the bar domain.
 
-        Returns:
+        Returns
             EdgeMesh: 1D mesh from x=0 to x=L.
         """
         node = bm.array([[0], [0.1],[0.2], [0.3]], dtype=bm.float64)
@@ -48,10 +48,10 @@ class BarData1D:
         """
         Compute the load vector f(x) based on the external forces applied at specific nodes.
 
-        Args:
+        Parameters
             x: Spatial coordinate(s).
 
-        Returns:
+        Returns
             Tensor: Load vector f at x.
         """
         
@@ -61,11 +61,11 @@ class BarData1D:
         """
        The indices of degrees of freedom (DOFs) where Dirichlet boundary conditions are applied.
         
-        Parameters:
+        Parameters
             total_dof : int
             Total number of global degrees of freedom.
 
-        Returns:
+        Returns
             Tensor[int]: Indices of boundary DOFs.
         """
         return bm.array([0, 1, 2, 3])  
@@ -75,10 +75,10 @@ class BarData1D:
         """
         Compute the Dirichlet boundary condition.
 
-        Args:
+        Parameters
             x: Spatial coordinate(s).
 
-        Returns:
+        Returns
             Tensor: Dirichlet boundary condition at x.
         """
         return bm.zeros((x.shape[0], 3))

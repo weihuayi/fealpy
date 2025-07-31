@@ -109,6 +109,46 @@ class HollowBlockMesher:
 
         return tuple(self.holes[i] for i in flags)
 
+    def get_coupling_lines(self, flags: Union[int, Tuple[int]]) -> Union[TensorLike, Tuple[TensorLike]]:
+        """Return REP2 lines: center to each surface node on hole(s).
+
+        Parameters
+            flags : int or tuple of int
+                Index or indices of the holes.
+
+        Returns
+            lines : (N, 2, 3) array or tuple of such arrays
+                Each line connects a center point to a surface node.
+        """
+
+        holes = self.get_holes(flags)
+        block = self.options['block']
+        thickness = self.options['thickness']
+        cylinders = self.options['cylinders']
+        width = block['width']
+        hy = thickness['hy']
+        
+        if isinstance(flags, int):
+            h = 0.5*hy if (flags % 2 == 0) else width - 0.5*hy
+            center = bm.array(cylinders[flags//2][0], dtype=bm.float64) + bm.array([0, h, 0], dtype=bm.float64)
+            lines = bm.concatenate([
+                bm.broadcast_to(center, (len(holes), 1, 3)),
+                holes[:, None, :]], axis=1)
+            
+            return lines
+        
+        results = []
+        for i in range(len(flags)):
+            flag = flags[i]
+            h = 0.5*hy if (flag % 2 == 0) else width - 0.5*hy
+            center = bm.array(cylinders[flag//2][0], dtype=bm.float64) + bm.array([0, h, 0], dtype=bm.float64)
+            lines = bm.concatenate([
+                bm.broadcast_to(center, (len(holes[i]), 1, 3)),
+                holes[i][:, None, :]], axis=1)
+            results.append(lines)
+
+        return tuple(results)
+    
     def get_options(self) -> dict:
         options = {
             'block': {

@@ -41,7 +41,7 @@ class GearBoxModalLFEMModel(ComputationalModel):
         else:
             self.pde = pde
         self.logger.info(self.pde)
-        #self.logger.info(self.pde.material)
+        self.logger.info(self.pde.material)
 
     def set_mesh(self, mesh: Mesh) -> None:
         self.mesh = mesh
