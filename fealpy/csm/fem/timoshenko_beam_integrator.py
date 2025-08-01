@@ -73,19 +73,12 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         # 构造12x12旋转变换矩阵 R
         O = bm.zeros((NC, 3, 3))
-        # R = bm.block([
-        #     [T0, O,  O,  O],
-        #     [O,  T0, O,  O],
-        #     [O,  O,  T0, O],
-        #     [O,  O,  O,  T0]])
-        # # 构造每一行块矩阵：4 个 block 横向拼接 (32, 3, 12)
         row1 = bm.concatenate([T0, O,  O,  O], axis=2)
         row2 = bm.concatenate([O,  T0, O,  O], axis=2)
         row3 = bm.concatenate([O,  O,  T0, O], axis=2)
         row4 = bm.concatenate([O,  O,  O,  T0], axis=2)
 
-        # 然后将四行按纵向拼接 (32, 12, 12)
-        R = bm.concatenate([row1, row2, row3, row4], axis=1)  # shape: (32, 12, 12)
+        R = bm.concatenate([row1, row2, row3, row4], axis=1)  #shape: (32, 12, 12)
         return R
  
     @variantmethod
@@ -111,7 +104,8 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         mu = self.material.mu
 
         mesh = self.space.mesh
-        l = mesh.entity_measure('cell')
+        bar_length = mesh.entity_measure('cell')
+        l = bar_length[0:22]
 
         AX, AY, AZ = self.material.calculate_cross_sectional_areas()
         Iy, Iz, Ix = self.material.calculate_moments_of_inertia()

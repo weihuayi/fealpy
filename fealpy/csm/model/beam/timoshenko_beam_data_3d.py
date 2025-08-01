@@ -49,7 +49,8 @@ class TimoshenkoBeamData3D:
             [120, 141, 2]
         ])
         self.L = bm.sum(self.para[:, 1])
-        self._D = self.para[:, 0]
+        #self._D = self.para[:, 0]
+        self._D = bm.repeat(self.para[:, 0], self.para[:, 2].astype(int))
         self._FSY = 10/9
         self._FSZ = 10/9
         self._AX, self._AY, self._AZ = self._calculate_cross_sectional_areas()
@@ -66,7 +67,7 @@ class TimoshenkoBeamData3D:
         return 1.976e6 
 
     def _calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:
-        AX = bm.pi * self._D**2/4
+        AX = bm.pi * self.D**2/4
         AY = AX / self._FSY
         AZ = AX / self._FSZ
         
