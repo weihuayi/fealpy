@@ -79,12 +79,18 @@ class IPCS(ProjectionMethod, FEM):
         Bform = BilinearForm(uspace)
         self.predict_BM = ScalarMassIntegrator(q=q)
         self.predict_BF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold)
-        # self.predict_BVW = ViscousWorkIntegrator(q=q)
-        self.predict_BVW = ScalarDiffusionIntegrator(q=q)
         
         Bform.add_integrator(self.predict_BM)
-        Bform.add_integrator(self.predict_BF)
-        Bform.add_integrator(self.predict_BVW)
+        
+        if self.equation.constitutive.value == 1:
+            self.predict_BVW = ScalarDiffusionIntegrator(q=q)
+            Bform.add_integrator(self.predict_BVW)
+        elif self.equation.constitutive.value == 2:
+            self.predict_BVW = ViscousWorkIntegrator(q=q)
+            Bform.add_integrator(self.predict_BVW)
+            Bform.add_integrator(self.predict_BF)
+        else :
+            raise ValueError(f"未知的粘性模型")
         return Bform
     
     def predict_velocity_LForm(self):
@@ -112,7 +118,7 @@ class IPCS(ProjectionMethod, FEM):
         cc = equation.coef_convection
         pc = equation.coef_pressure
         cbf = equation.coef_body_force
-
+        
         self.predict_BM.coef = ctd/dt
         self.predict_BF.coef = -cv
         self.predict_BVW.coef = cv
