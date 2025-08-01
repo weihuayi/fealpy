@@ -25,7 +25,7 @@ error_H = mesh.error(pde.velocity, uH)
 print("粗网格误差", error_H)
 tmr.send("粗网格求解结束")
 
-uh_refine, ph_refine = model.refine_and_interpolate(10, uH, pH)
+uh_refine, ph_refine = model.refine_and_interpolate(6, uH, pH)
 model.fine_model.update_mesh(mesh)
 mesh.to_vtk('h.vtu')
 tmr.send("细网格插值结束")

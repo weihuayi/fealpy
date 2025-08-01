@@ -1,9 +1,10 @@
 from typing import Sequence
 from fealpy.decorator import cartesian
-from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 from fealpy.mesher import BoxMesher2d
+
+from ....simulation.time import UniformTimeLine
 import sympy as sp
 
 class Exp0001(BoxMesher2d):

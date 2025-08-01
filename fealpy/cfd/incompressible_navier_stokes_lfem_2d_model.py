@@ -2,18 +2,20 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod,cartesian
 from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
+
 from .simulation.fem import Newton
 from .equation import IncompressibleNS
+from .simulation.time import UniformTimeLine
+
 
 class IncompressibleNSLFEM2DModel(ComputationalModel):
     def __init__(self, pde, mesh=None, options = None):
         super().__init__(pbar_log = True, log_level = "INFO")
         self.pde = pde
         self.equation = IncompressibleNS(self.pde)
-        self.init_timeline = self.pde.init_timeline(options['T0'], options['T1'], options['nt'])
-        self.fem = self.method[options['method']]()
-        self.fem.dt = self.pde.dt
-
+        self.timeline = UniformTimeLine(0, 1, 100)
+        self.fem = self.method()
+        
         if mesh is None:
             if hasattr(pde, 'mesh'):
                 self.mesh = pde.mesh
@@ -21,9 +23,11 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 raise ValueError("Not found mesh!")
         else:
             self.mesh = mesh
+
         if options is not None:
             self.solve.set(options['solve'])
             self.fem = self.method[options['method']]()
+            self.timeline = UniformTimeLine(options['T0'], options['T1'], options['nt'])
 
             run = self.run[options['run']]
             if options['run'] == 'uniform_refine':
@@ -31,28 +35,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             else:  # 'one_step' 或其他
                 run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
 
-    def lagrange_multiplier(self, A, b):
-        from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
-        from fealpy.sparse import COOTensor
-
-        LagLinearForm = LinearForm(self.fem.pspace)
-        LagLinearForm.add_integrator(SourceIntegrator(source=1))
-        LagA = LagLinearForm.assembly()
-        LagA = bm.concatenate([bm.zeros(self.fem.uspace.number_of_global_dofs()), LagA], axis=0)
-
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                                 bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
-
-        A = BlockForm([[A, A1.T], [A1, None]])
-        A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([0])
-        b  = bm.concatenate([b, b0], axis=0)
-
-        return A, b
-
     @variantmethod("Newton")
     def method(self):
         self.fem = Newton(self.equation)
+        self.fem.dt = self.timeline.dt
         self.method_str = "Newton"
         return self.fem
     
@@ -60,6 +46,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     def method(self):
         from .simulation.fem import Ossen
         self.fem = Ossen(self.equation)
+        self.fem.dt = self.timeline.dt
         self.method_str = "Ossen"
         return self.fem
     
@@ -67,6 +54,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     def method(self):
         from .simulation.fem import IPCS
         self.fem = IPCS(self.equation)
+        self.fem.dt = self.timeline.dt
         self.method_str = "IPCS"
         return self.fem
     
@@ -110,7 +98,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         pass
 
     @variantmethod('direct')
-    def solve(self, A, F, solver = 'scipy'):
+    def solve(self, A, F, solver = 'mumps'):
         from fealpy.solver import spsolve
         return spsolve(A, F, solver=solver)
 
@@ -121,20 +109,47 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     @solve.register('pcg')
     def solve(self, A, F):
         pass
+    
+    @variantmethod('main')
+    def run(self, maxstep = 10, tol = 1e-10, apply_bc = 'dirichlet', postprocess = 'error'):
+        
+        mesh = self.mesh         
+        fem = self.fem
+        pde = self.pde
+        timeline = self.timeline
 
-    @variantmethod('one_step_iter')
+        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = timeline.T0)))
+        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = timeline.T0)))
+
+        for i in range(timeline.NL):
+            t  = timeline.current_time()
+            print("time=", t)
+            
+            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol, apply_bc)
+
+            u0[:] = u1
+            p0[:] = p1
+            
+            mesh.nodedata['u'] = u1.reshape(2,-1).T
+            pde.mesh.nodedata['p'] = p1
+
+            self.postprocess['error'](u1, p1, t = timeline.next_time()) 
+        uerror, perror = self.postprocess['error'](u1, p1, t= timeline.T1) 
+        self.logger.info(f"final uerror: {uerror}, final perror: {perror}")
+    
+    @run.register('one_step')
     def run(self, u0, p0, maxstep=10, tol=1e-12, apply_bc = 'dirichlet'):
         fem = self.fem
         pde = self.pde
 
         if self.method_str == "IPCS":
             BCu = DirichletBC(space=fem.uspace, 
-                gd = cartesian(lambda p : pde.velocity_dirichlet(p, self.t)), 
+                gd = cartesian(lambda p : pde.velocity_dirichlet(p, self.timeline.next_time())), 
                 threshold=pde.is_velocity_boundary, 
                 method='interp')
 
             BCp = DirichletBC(space=fem.pspace, 
-                gd = cartesian(lambda p : pde.pressure_dirichlet(p, self.t)), 
+                gd = cartesian(lambda p : pde.pressure_dirichlet(p, self.timeline.next_time())), 
                 threshold=pde.is_pressure_boundary, 
                 method='interp')
             
@@ -181,35 +196,9 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                     u1[:] = inneru_1
                     break
             return u1, p1
+    
 
-    @run.register('time_step')
-    def run(self, t0 = 0,nt = 300, maxstep = 10, tol = 1e-10, apply_bc = 'dirichlet', postprocess = 'error'):
-        fem = self.fem
-        pde = self.pde
 
-        u0 = fem.uspace.interpolate(pde.velocity_0)
-        p0 = fem.pspace.interpolate(pde.pressure_0)
-        # u0 = fem.uspace.function()
-        # p0 = fem.pspace.function()
-
-        for i in range(nt):
-            self.t = t0 + (i+1)*self.pde.dt
-            # print(f"第{i+1}步")
-            # print("time=", self.t)
-            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol, apply_bc)
-
-            u0[:] = u1
-            p0[:] = p1
-            
-            self.pde.mesh.nodedata['u'] = u1.reshape(2,-1).T
-            self.pde.mesh.nodedata['p'] = p1
-
-            # uerror = self.pde.mesh.error(self.pde.velocity, u1)
-            # perror = self.pde.mesh.error(self.pde.pressure, p1)
-            # print("uerror:", uerror)
-            # print("perror:", perror)
-        uerror, perror = self.postprocess[postprocess](u1, p1) 
-        self.logger.info(f"final uerror: {uerror}, final perror: {perror}")
 
     @run.register('uniform_refine')
     def run(self, maxit=5, t0 = 0, nt = 300, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'):
@@ -222,8 +211,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
         
     @variantmethod('error')
-    def postprocess(self, uh, ph):
-        uerror = self.pde.mesh.error(lambda p : self.pde.velocity(p, t = self.t), uh)
-        perror = self.pde.mesh.error(lambda p : self.pde.pressure(p, t = self.t), ph)
-        # self.logger.info(f"uerror: {uerror}, perror: {perror}")
+    def postprocess(self, uh, ph, t):
+        uerror = self.pde.mesh.error(cartesian(lambda p : self.pde.velocity(p, t = t)), uh)
+        perror = self.pde.mesh.error(cartesian(lambda p : self.pde.pressure(p, t = t)), ph)
+        self.logger.info(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror

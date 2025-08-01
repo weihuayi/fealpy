@@ -1,7 +1,8 @@
 from typing import Union, Dict
 from fealpy.backend import backend_manager as bm
-from ....functionspace.space import FunctionSpace
-from ....functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
+from fealpy.sparse import COOTensor
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace, FunctionSpace
 
 class FEMParameters:
     """全局有限元默认参数基类"""
@@ -92,6 +93,22 @@ class FEM:
             return LagrangeFESpace(self.mesh, p=config['p'])
         # 其他空间类型...
         raise ValueError(f"不支持的空间类型: {space_type}")  
+    
+    def lagrange_multiplier(self, A, b):
+
+        LagLinearForm = LinearForm(self.pspace)
+        LagLinearForm.add_integrator(SourceIntegrator(source=1))
+        LagA = LagLinearForm.assembly()
+        LagA = bm.concatenate([bm.zeros(self.uspace.number_of_global_dofs()), LagA], axis=0)
+
+        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
+                                 bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
+
+        A = BlockForm([[A, A1.T], [A1, None]])
+        A = A.assembly_sparse_matrix(format='csr')
+        b0 = bm.array([0])
+        b  = bm.concatenate([b, b0], axis=0)
+        return A, b
 
     class Set:
         """参数设置子类（同步修改参数和空间）"""

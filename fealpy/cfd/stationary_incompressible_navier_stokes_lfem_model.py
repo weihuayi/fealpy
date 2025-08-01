@@ -215,28 +215,6 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.apply_bc_str = "cylinder"
         return A, b
     
-    def lagrange_multiplier(self, A, b):
-        """
-        Enforce a global constraint on pressure (e.g., zero mean) using a Lagrange multiplier.
-        """
-        from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
-        from fealpy.sparse import COOTensor
-
-        LagLinearForm = LinearForm(self.fem.pspace)
-        LagLinearForm.add_integrator(SourceIntegrator(source=1))
-        LagA = LagLinearForm.assembly()
-        LagA = bm.concatenate([bm.zeros(self.fem.uspace.number_of_global_dofs()), LagA], axis=0)
-
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                                 bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
-
-
-        A = BlockForm([[A, A1.T], [A1, None]])
-        A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([0])
-        b  = bm.concatenate([b, b0], axis=0)
-        return A, b
-
     @variantmethod('main')
     def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet', postprocess='error'):
         """
@@ -254,14 +232,13 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         BForm, LForm = self.linear_system()
         
         for i in range(maxstep):
-            # self.logger.info(f"iteration: {i+1}")
             self.update(uh0)
             A = BForm.assembly()
             F = LForm.assembly()
             
             A, F = self.apply_bc[apply_bc](A, F)
-            A, F = self.lagrange_multiplier(A, F)
-           
+            A, F = self.fem.lagrange_multiplier(A, F)
+            
             x = self.solve(A, F)
             uh1[:] = x[:ugdof]
             ph1[:] = x[ugdof:-1]
@@ -273,10 +250,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        self.uh1 = uh1
-        self.ph1 = ph1
-        # uerror, perror = self.postprocess(uh1, ph1) 
-        # self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
+        uerror, perror = self.postprocess(uh1, ph1) 
         return uh1, ph1
     
     @run.register('one_step')
@@ -288,7 +262,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         A = BForm.assembly() 
         b = LForm.assembly()
         A, b = self.apply_bc[apply_bc](A, b)
-        A, b = self.lagrange_multiplier(A, b)
+        A, b = self.fem.lagrange_multiplier(A, b)
         x = self.solve(A, b)
 
         ugdof = self.fem.uspace.number_of_global_dofs()
@@ -334,7 +308,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.postprocess_str = 'error'
         uerror = self.pde.mesh.error(self.pde.velocity, uh)
         perror = self.pde.mesh.error(self.pde.pressure, ph)
-        #print(f"uerror: {uerror}, perror: {perror}")
+        self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uerror, perror
 
     @postprocess.register('plot')
