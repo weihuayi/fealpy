@@ -1,0 +1,26 @@
+MODEL:
+  META_ARCHITECTURE: "GeneralizedRCNN" # 使用通用的RCNN架构
+  RPN_ONLY: True # 为了兼容性和代码复用，并不代表FCOS真的用到了RPN
+  FCOS_ON: True # 启用FCOS模块
+  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  FCOS:
+    NUM_CLASSES: 10  # 背景+类别数
+  BACKBONE:
+    CONV_BODY: "R-50-FPN-RETINANET" 
+  RESNETS:
+    BACKBONE_OUT_CHANNELS: 128 # Backbone输出通道数
+DATASETS:
+  TRAIN: ("coco_Basketball_train", "coco_Basketball_val")
+  TEST: ("coco_Basketball_test",)
+INPUT:
+  MIN_SIZE_TRAIN: (800,)
+  MAX_SIZE_TRAIN: 1333
+  MIN_SIZE_TEST: 800
+  MAX_SIZE_TEST: 1333
+DATALOADER:
+  SIZE_DIVISIBILITY: 32 # 确保输入尺寸是32的倍数，适用于FP
+SOLVER:
+  BASE_LR: 0.01 # 基础学习率
+  MAX_ITER: 1000 # 迭代次数
+  IMS_PER_BATCH: 16 # 每个GPU的批次大小
+OUTPUT_DIR: "/content/drive/MyDrive/FCOS/FCOS/output_Basketball"
