@@ -21,9 +21,9 @@ class NSLFEMChannelPDE:
     def domain(self):
         return [0, 1, 0, 1]
 
-    def set_mesh(self, n=16):
+    def set_mesh(self, nx=16, ny=16):
         box = [0, 1, 0, 1]
-        mesh = TriangleMesh.from_box(box, nx=n, ny=n)
+        mesh = TriangleMesh.from_box(box, nx=16, ny=16)
         self.mesh = mesh
         return mesh
     
@@ -155,7 +155,7 @@ class FromSympy(BoxMesher2d):
         return self.box
     
     @variantmethod("tri")
-    def init_mesh(self, nx = 8, ny = 8):
+    def set_mesh(self, nx = 8, ny = 8):
         box = self.box
         mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         self.mesh = mesh
@@ -171,27 +171,11 @@ class FromSympy(BoxMesher2d):
     
     @cartesian
     def is_pressure_boundary(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        atol = 1e-12
-        # 检查是否接近 x=±1 或 y=±1
-        on_boundary = (
-            (bm.abs(x - 0.) < atol) | (bm.abs(x - 1.) < atol) |
-            (bm.abs(y - 0.) < atol) | (bm.abs(y - 1.) < atol)
-        )
-        return on_boundary
+        return None
     
     @cartesian
     def is_velocity_boundary(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        atol = 1e-12
-        # 检查是否接近 x=±1 或 y=±1
-        on_boundary = (
-            (bm.abs(x - 0.) < atol) | (bm.abs(x - 1.) < atol) |
-            (bm.abs(y - 0.) < atol) | (bm.abs(y - 1.) < atol)
-        )
-        return on_boundary
+        return None
     
     @cartesian
     def source(self, p, t):
@@ -211,11 +195,6 @@ class FromSympy(BoxMesher2d):
         result[..., 1] = bm.array(self.u2(x, y, t))
         return result
     
-    @cartesian
-    def velocity_0(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        return self.velocity(p, self.t0)
     
     @cartesian
     def pressure(self, p, t):
@@ -224,7 +203,9 @@ class FromSympy(BoxMesher2d):
         return bm.array(self.p(x, y, t))
     
     @cartesian
-    def pressure_0(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        return self.pressure(p, self.t0)
+    def velocity_dirichlet(self, p, t):
+        return self.velocity(p, t)
+    
+    @cartesian
+    def pressure_dirichlet(self, p, t):
+        return self.pressure(p, t)

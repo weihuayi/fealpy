@@ -43,8 +43,6 @@ class Newton(FEM):
         A01.add_integrator(self.u_BPW)
        
         A11 = BilinearForm(pspace)
-        #A11.add_integrator(ScalarMassIntegrator(coef=1e-10))
-        #A = BlockForm([[A00, A01], [A01.T, A11]]) 
         A = BlockForm([[A00, A01], [A01.T, None]]) 
         return A
         
