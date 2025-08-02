@@ -1,0 +1,26 @@
+MODEL:
+  META_ARCHITECTURE: "GeneralizedRCNN" 
+  RPN_ONLY: True 
+  FCOS_ON: True 
+  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
+  FCOS:
+    NUM_CLASSES: 10  
+  BACKBONE:
+    CONV_BODY: "R-50-FPN-RETINANET" 
+  RESNETS:
+    BACKBONE_OUT_CHANNELS: 128 
+DATASETS:
+  TRAIN: ("coco_Basketball_train", "coco_Basketball_val")
+  TEST: ("coco_Basketball_test",)
+INPUT:
+  MIN_SIZE_TRAIN: (800,)
+  MAX_SIZE_TRAIN: 1333
+  MIN_SIZE_TEST: 800
+  MAX_SIZE_TEST: 1333
+DATALOADER:
+  SIZE_DIVISIBILITY: 32 
+SOLVER:
+  BASE_LR: 0.01 
+  MAX_ITER: 1000 
+  IMS_PER_BATCH: 16 
+OUTPUT_DIR: "fealpy/vision/fcos_resources/output_Basketball"
