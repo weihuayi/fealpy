@@ -29,16 +29,21 @@ class Newton(FEM):
         self.u_BM = ScalarMassIntegrator(q=q)
         self.u_BM_netwon = ScalarMassIntegrator(q=q)
         self.u_BC = ScalarConvectionIntegrator(q=q)
-        self.u_BVW = ViscousWorkIntegrator(q=q)
-        # self.u_BVW = ScalarDiffusionIntegrator(q = q)
-        #self.u_BFBF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold)
-        #self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        #self.u_BF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold) 
         
+        if self.equation.constitutive.value == 1:
+            self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        elif self.equation.constitutive.value == 2:
+            self.u_BVW = ViscousWorkIntegrator(q=q)
+        else:
+            raise ValueError(f"未知的粘性模型")
+
         A00.add_integrator(self.u_BM)
         A00.add_integrator(self.u_BM_netwon)
         A00.add_integrator(self.u_BC)
         A00.add_integrator(self.u_BVW)
-        #A00.add_integrator(self.u_BFBF)
+        #A00.add_integrator(self.u_BF)
+        
         
         A01 = BilinearForm((pspace, uspace))
         self.u_BPW = PressWorkIntegrator(q=q)
@@ -63,9 +68,9 @@ class Newton(FEM):
         L = LinearBlockForm([L0, L1])
         return L
 
-    def update(self, u0, u00): 
+    def update(self, uk, u0): 
         equation = self.equation
-        dt = equation.pde.dt
+        dt = self.dt
         ctd = equation.coef_time_derivative 
         cv = equation.coef_viscosity
         cc = equation.coef_convection
@@ -96,7 +101,7 @@ class Newton(FEM):
             ctdcoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
             cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
-            result = ctdcoef * u00(bcs, index) / dt
+            result = ctdcoef * uk(bcs, index) / dt
             result += cccoef*bm.einsum('...j, ...ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
             result += cbfcoef 
             return result

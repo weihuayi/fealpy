@@ -30,19 +30,11 @@ class Exp0001(BoxMesher2d):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
     
-    def init_mesh(self, nx, ny):
+    def set_mesh(self, nx, ny):
         mesh = super().init_mesh['uniform_tri'](nx=nx, ny=ny)
-        self.nx = nx
-        self.ny = ny
+        self.mesh = mesh 
         return mesh
-    
-    def init_timeline(self, T0 = 0.0, T1 = 0.5, nt = 1000):
-        self.t0 = T0
-        self.nt = nt
-        timeline = UniformTimeLine(T0, T1, nt)
-        self.dt = timeline.dt
-        return timeline
-    
+     
     @cartesian
     def velocity(self, p: TensorLike, t) -> TensorLike:
         """Compute exact solution of velocity."""
