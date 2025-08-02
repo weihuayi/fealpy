@@ -2,18 +2,16 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
 from typing import Union, Optional
 
-from ..backend import bm
-from ..utils import timer
-from ..typing import TensorLike
-from ..model import ComputationalModel, PDEModelManager
-from ..model.helmholtz import HelmholtzPDEDataT
+from fealpy.backend import bm
+from fealpy.utils import timer
+from fealpy.typing import TensorLike
+from fealpy.model import ComputationalModel, PDEModelManager
+from fealpy.model.helmholtz import HelmholtzPDEDataT
 
-from . import gradient
-from . import optimizers, activations
+from fealpy.ml import gradient, optimizers, activations
 
-from .modules import Solution
-from .sampler import BoxBoundarySampler, ISampler
-
+from fealpy.ml.modules import Solution
+from fealpy.ml.sampler import BoxBoundarySampler, ISampler
 
 
 class HelmholtzPINNModel(ComputationalModel):

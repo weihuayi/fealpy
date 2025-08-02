@@ -1,12 +1,12 @@
-
 from functools import reduce
 from itertools import combinations_with_replacement
 from typing import Sequence, Literal, Optional
-import torch
-from torch import Tensor, float64
+
+from ...backend import backend_manager as bm
+from ...typing import TensorLike
 
 
-def random_weights(m: int, n: int, dtype=float64, device=None) -> Tensor:
+def random_weights(m: int, n: int, dtype=bm.float64, device=None) -> TensorLike:
     """Generate random samples with features summing to 1.0.
     
     This function creates m random samples, each with n features, where the sum
@@ -20,7 +20,7 @@ def random_weights(m: int, n: int, dtype=float64, device=None) -> Tensor:
             The number of features in each sample. Must be >= 2.
 
     Returns
-        samples : Tensor
+        samples : TensorLike
             A tensor of shape (m, n) containing the generated samples. Each row
             represents a sample where the sum of its elements is 1.0.
 
@@ -37,20 +37,21 @@ def random_weights(m: int, n: int, dtype=float64, device=None) -> Tensor:
     Examples
         >>> samples = random_weights(5, 3)
         >>> samples.shape
-        torch.Size([5, 3])
-        >>> torch.allclose(samples.sum(dim=1), torch.ones(5))
+        bm.Size([5, 3])
+        >>> bm.allclose(samples.sum(dim=1), bm.ones(5))
         True
     """
     m, n = int(m), int(n)
     if n < 2:
         raise ValueError(f'Integer `n` should be larger than 1 but got {n}.')
-    u = torch.zeros((m, n+1), dtype=dtype, device=device)
+    u = bm.zeros((m, n+1), dtype=dtype, device=device)
     u[:, n] = 1.0
-    u[:, 1:n] = torch.sort(torch.rand(m, n-1, dtype=dtype), dim=1).values
+    # u[:, 1:n] = bm.sort(bm.rand(m, n-1, dtype=dtype), dim=1).values
+    u[:, 1:n] = bm.sort(bm.random.rand(m, n-1), axis=1)
     return u[:, 1:n+1] - u[:, 0:n]
 
 
-def multi_index(p: int, n: int, device=None) -> Tensor:
+def multi_index(p: int, n: int, device=None) -> TensorLike:
     """Return a tensor of multi-indices.
 
     This function generates a tensor containing all possible combinations with
@@ -65,7 +66,7 @@ def multi_index(p: int, n: int, device=None) -> Tensor:
             The number of elements in each combination. Must be >= 1.
 
     Returns
-        indices : Tensor
+        indices : TensorLike
             A tensor of shape (num_combinations, n), where num_combinations is
             the number of combinations with replacement of (n-1) elements from p.
             Each row represents a multi-index.
@@ -89,17 +90,17 @@ def multi_index(p: int, n: int, device=None) -> Tensor:
     """
     assert p >= 1, "`p` should be a positive integer."
     assert n >= 1, "`n` should be a positive integer."
-    sep = torch.tensor(
+    sep = bm.tensor(
         tuple(combinations_with_replacement(range(p), n-1)),
-        dtype=torch.int
+        dtype=bm.int64
     )
-    raw = torch.zeros((sep.shape[0], n+1), dtype=torch.int, device=device)
+    raw = bm.zeros((sep.shape[0], n+1), dtype=bm.int64, device=device)
     raw[:, -1] = p - 1
     raw[:, 1:-1] = sep
     return raw[:, 1:] - raw[:, :-1]
 
 
-def linspace_weights(p: int, n: int, dtype=float64, device=None) -> Tensor:
+def linspace_weights(p: int, n: int, rm_ends: bool=False, dtype=bm.float64, device=None) -> TensorLike:
     """Generate uniformly spaced weights.
 
     This function creates a tensor of weights that are uniformly distributed.
@@ -108,13 +109,19 @@ def linspace_weights(p: int, n: int, dtype=float64, device=None) -> Tensor:
     weight vector with all zeros except the first element, which is 1.0.
 
     Parameters
-        p : int
-            The number of points to divide the interval into. Must be >= 1.
-        n : int
-            The number of features/weights in each sample. Must be >= 1.
+        p(int): The number of points to divide the interval into. Must be >= 1.
+
+        n(int): The number of features/weights in each sample. Must be >= 1.
+
+        rm_ends(bool): If True, removes the first and last weight vectors from the result. Default is False.
+
+        dtype(dtype): The desired data type of the output tensor. Default is bm.float64.
+
+        device(device): The desired device of the output tensor (e.g., 'cpu' or 'cuda'). 
+                       If None, uses the current default device. Default is None.
 
     Returns
-        weights : Tensor
+        weights : TensorLike
             A tensor of shape (num_samples, n), where num_samples depends on p
             and n. If p >= 2, num_samples is the number of combinations with
             replacement of (n-1) elements from p. If p == 1, num_samples is 1.
@@ -131,26 +138,29 @@ def linspace_weights(p: int, n: int, dtype=float64, device=None) -> Tensor:
     Examples
         >>> weights = linspace_weights(3, 2)
         >>> weights
-        tensor([[0.0000, 0.0000],
-                [0.5000, 0.0000],
+        tensor([[0.0000, 1.0000],
+                [0.5000, 0.5000],
                 [1.0000, 0.0000]])
         >>> weights = linspace_weights(1, 3)
         >>> weights
         tensor([[1., 0., 0.]])
     """
     if p >= 2:
-        return multi_index(p, n, device=device).to(dtype=dtype) / (p-1)
+        if rm_ends:
+            weights = bm.astype(multi_index(p+2, n, device=device), dtype) / (p + 1)
+            return weights[1:-1]
+        return bm.astype(multi_index(p, n, device=device), dtype) / (p - 1)
     elif p >= 1:
-        ret = torch.zeros((1, n), dtype=dtype, device=device)
+        ret = bm.zeros((1, n), dtype=dtype, device=device)
         ret[:, 0] = 1.0
         return ret
     else:
         raise ValueError("`p` should be a positive integer.")
 
 
-def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
+def multiply(*bcs: TensorLike, mode: Literal['dot', 'cross'],
              order: Optional[Sequence[int]]=None,
-             dtype=float64, device=None) -> Tensor:
+             dtype=bm.float64, device=None) -> TensorLike:
     """Multiply boundary conditions (bcs) in different directions.
 
     This function performs tensor multiplication (contraction) on a variable
@@ -159,7 +169,7 @@ def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
     product). The result can be reordered along the last dimension.
 
     Parameters
-        *bcs : Tensor
+        *bcs : TensorLike
             Variable number of input tensors to be multiplied. Each tensor
             should have the same number of dimensions (rank).
         mode : Literal['dot', 'cross']
@@ -171,13 +181,13 @@ def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
             Default is None.
         dtype : dtype, optional
             The desired data type of the output tensor. Ignored if no bcs are
-            provided. Default is float64.
+            provided. Default is bm.float64.
         device : device, optional
             The desired device of the output tensor. Ignored if no bcs are
             provided. Default is None.
 
     Returns
-        result : Tensor
+        result : TensorLike
             The result of the multiplication operation. If no bcs are provided,
             returns a tensor of ones with shape (1, 1). Otherwise, the shape
             depends on the input shapes and the mode.
@@ -189,29 +199,29 @@ def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
             If `p` is less than 1.
 
     Notes
-        The function uses `torch.einsum` for efficient tensor operations.
-        The 'dot' mode is equivalent to sequentially applying `torch.tensordot`
+        The function uses `bm.einsum` for efficient tensor operations.
+        The 'dot' mode is equivalent to sequentially applying `bm.tensordot`
         along adjacent dimensions, while 'cross' mode is similar to a generalized
         outer product. The `order` parameter allows reordering the resulting
         dimensions for specific applications.
 
     Examples
-        >>> a = torch.rand(2, 3)
-        >>> b = torch.rand(3, 4)
-        >>> c = torch.rand(4, 5)
+        >>> a = bm.rand(2, 3)
+        >>> b = bm.rand(3, 4)
+        >>> c = bm.rand(4, 5)
         >>> # Dot product mode
         >>> result_dot = multiply(a, b, c, mode='dot')
         >>> result_dot.shape
-        torch.Size([2, 5])
+        bm.Size([2, 5])
         >>> # Cross product mode
         >>> result_cross = multiply(a, b, c, mode='cross')
         >>> result_cross.shape
-        torch.Size([2, 3, 4, 5])
+        bm.Size([2, 3, 4, 5])
         >>> # With order
         >>> order = [2, 0, 1, 3] # Reorder dimensions of result_cross
         >>> result_reordered = multiply(a, b, c, mode='cross', order=order)
         >>> result_reordered.shape
-        torch.Size([4, 2, 3, 5])
+        bm.Size([4, 2, 3, 5])
         >>> # No bcs
         >>> multiply()
         tensor([[1.]])
@@ -219,7 +229,7 @@ def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
     D = len(bcs)
     assert D <= 5
     if D == 0:
-        return torch.ones((1, 1), dtype=dtype, device=device)
+        return bm.ones((1, 1), dtype=dtype, device=device)
     NVC = reduce(lambda x,y: x*y, (bc.shape[-1] for bc in bcs), 1)
     desp1 = 'mnopq'
     desp2 = 'abcde'
@@ -229,7 +239,7 @@ def multiply(*bcs: Tensor, mode: Literal['dot', 'cross'],
     elif mode == "cross":
         string = ", ".join([desp1[i]+desp2[i] for i in range(D)])
         string += " -> " + desp1[:D] + desp2[:D]
-    bc = torch.einsum(string, *bcs).reshape(-1, NVC)
+    bc = bm.einsum(string, *bcs).reshape(-1, NVC)
     if order is None:
         return bc
     else:
