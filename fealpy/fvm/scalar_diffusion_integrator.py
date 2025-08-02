@@ -58,8 +58,11 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         e_norm = bm.einsum('ij,ij->i', e, e)**0.5               
         # Ef_abs = (|Sf|^2 / (e·Sf)) * |e|
         Ef_abs = bm.einsum('i,i->i', Sf_dot_Sf / e_dot_Sf, e_norm)
+        if coef is None:
+            coef = bm.ones_like(Ef_abs, dtype=space.ftype)
+        integrator  = bm.einsum('i,i->i', Ef_abs / d, coef)
         direction_matrix = bm.array([[1.0, -1.0], [-1.0, 1.0]], dtype=space.ftype)
         eye_D = bm.eye(D, dtype=space.ftype, device=bm.get_device(space))
         base_matrix = bm.einsum('ij,pq->ipjq', eye_D, direction_matrix).reshape(2*D, 2*D)
-        local_matrix = bm.einsum('i,ab->iab', Ef_abs / d, base_matrix)
+        local_matrix = bm.einsum('i,ab->iab', integrator, base_matrix)
         return local_matrix

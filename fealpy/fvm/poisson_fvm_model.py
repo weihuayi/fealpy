@@ -1,13 +1,11 @@
 from typing import Union
 
+from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.model import PDEModelManager, ComputationalModel
 
 from fealpy.functionspace import ScaledMonomialSpace2d
-from fealpy.fem import (
-    BilinearForm,
-    LinearForm
-)
+from fealpy.fem import BilinearForm, LinearForm
 
 from fealpy.solver import spsolve
 
@@ -57,7 +55,7 @@ class PoissonFVMModel(ComputationalModel):
             f"  PDE type: {type(self.pde).__name__}\n"
         )
 
-    def set_pde(self, pde: Union[str, object]):
+    def set_pde(self, pde: Union[str, object]) -> None:
         if isinstance(pde, int):
             self.pde = PDEModelManager('poisson').get_example(pde)
         else:
@@ -65,14 +63,14 @@ class PoissonFVMModel(ComputationalModel):
 
         self.logger.info(self.pde)
 
-    def set_mesh(self, nx: int = 10, ny: int = 10):
-        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)    
+    def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
+        self.mesh = self.pde.init_mesh['uniform_quad'](nx=nx, ny=ny)    
 
-    def set_space(self, degree: int = 0):
+    def set_space(self, degree: int = 0) -> None:
         self.p = degree
         self.space = ScaledMonomialSpace2d(self.mesh, self.p)
     
-    def assemble_base_system(self):
+    def assemble_base_system(self) -> tuple:
         """
         Assemble the base linear system A·u = f without nonlinear terms.
 
@@ -92,7 +90,7 @@ class PoissonFVMModel(ComputationalModel):
         A, f = dbc.DiffusionApply(A, f)
         return A, f
 
-    def compute_cross_diffusion(self, uh):
+    def compute_cross_diffusion(self, uh) -> TensorLike:
         """
         Assemble the nonlinear cross-diffusion term.
 
@@ -106,7 +104,7 @@ class PoissonFVMModel(ComputationalModel):
         lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, q=self.p + 2))
         return lform.assembly()
 
-    def solve(self, max_iter=6, tol=1e-6):
+    def solve(self, max_iter=6, tol=1e-6) -> TensorLike:
         """
         Iteratively solve the linear system including cross-diffusion.
 
@@ -136,7 +134,7 @@ class PoissonFVMModel(ComputationalModel):
         self.uh = uh
         return uh
 
-    def compute_error(self):
+    def compute_error(self) -> float:
         """
         Compute the L2 error against the exact solution.
 
@@ -148,7 +146,7 @@ class PoissonFVMModel(ComputationalModel):
         error = bm.sqrt(bm.sum(self.mesh.entity_measure('cell') * (u_exact - self.uh)**2))
         return error
 
-    def plot(self):
+    def plot(self) -> None:
         """
         Plot the numerical and exact solution using matplotlib.
         """

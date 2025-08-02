@@ -10,9 +10,9 @@ def main():
     parser.add_argument('--pde', default=3, type=int,
                         help='PDE example ID from Poisson PDE manager.')
 
-    parser.add_argument('--nx', default=20, type=int,
+    parser.add_argument('--nx', default=40, type=int,
                         help='Number of cells in x-direction.')
-    parser.add_argument('--ny', default=20, type=int,
+    parser.add_argument('--ny', default=40, type=int,
                         help='Number of cells in y-direction.')
 
     parser.add_argument('--space_degree', default=0, type=int,
@@ -40,8 +40,8 @@ def main():
 
     model = PoissonFVMModel(options)
     print(model)
-    model.solve(max_iter=options["max_iter"], tol=options["tol"])
 
+    model.solve(max_iter=options["max_iter"], tol=options["tol"])
     l2_error = model.compute_error()
     print(f"L2 error = {l2_error:.4e}")
     
