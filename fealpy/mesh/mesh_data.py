@@ -7,17 +7,31 @@ class MeshData(dict):
     """
     def update_node_id(self, cell):
         """
+        Update the node ids in the cell data to match the current node ids.
         """
         nids = self.get_node_data('id')
         N = bm.max(nids) + 1
         idmap = bm.zeros(N, dtype=bm.int32)
         idmap = bm.set_at(idmap, nids, bm.arange(len(nids), dtype=bm.int32))
         cell = idmap[cell]
-
+        # Update node ids in the node sets
         for name, data in self.get("node_sets", {}).items():
-            self.add_node_data(name, idmap[data])
-
+            self.add_node_set(name, idmap[data])
         return cell
+
+    def get_rbe2_edge(self): 
+        """
+        """
+        rbe2 = []
+        for name, data in self.get('couplings', {}).items():
+            surface = self.get_surface(data['surface'])
+            nset = self.get_node_set(surface['entity_set'][0][0])
+            rnode = self.get_node_set(data['ref_node'])
+            edge = bm.stack([bm.full_like(nset, rnode[0]), nset], axis=1)
+            rbe2.append(edge)
+
+        return bm.concat(rbe2, axis=0)
+
         
     def add_node_data(self, name, data):
         self.setdefault("node_datas", {})[name] = data

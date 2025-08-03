@@ -40,10 +40,6 @@ class InpFileParser:
     """
     def __init__(self) -> None:
         self.sections: List[Section] = []
-        self.nsets: Dict[str, TensorLike] = {}
-        self.esets: Dict[str, TensorLike] = {}
-        self.surfaces: Dict[str, SurfaceSection] = {}
-        self.couplings: Dict[str, CouplingSection] = {}
 
     def parse(self, filename: str) -> 'InpFileParser':
         current_section: Optional[Section] = None
