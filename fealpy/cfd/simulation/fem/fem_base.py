@@ -1,7 +1,9 @@
 from typing import Union, Dict
+
 from fealpy.backend import backend_manager as bm
-from ....functionspace.space import FunctionSpace
-from ....functionspace import LagrangeFESpace, TensorFunctionSpace
+
+from fealpy.functionspace.space import FunctionSpace
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 
 class FEMParameters:
     """全局有限元默认参数基类"""

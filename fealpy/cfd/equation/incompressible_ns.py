@@ -1,5 +1,7 @@
-from .base import BaseEquation
 from typing import Union, Callable, Dict
+
+from .base import BaseEquation
+
 CoefType = Union[int, float, Callable]
 
 class IncompressibleNS(BaseEquation):

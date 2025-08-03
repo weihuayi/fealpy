@@ -1,17 +1,20 @@
 import inspect
 
-from ....backend import backend_manager as bm
-from ....backend import TensorLike
-from ....fem import LinearForm, BilinearForm
-from ....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator, 
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
+from fealpy.decorator import barycentric
+
+from fealpy.functionspace import Function
+
+from fealpy.fem import LinearForm, BilinearForm
+from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator, 
                      ViscousWorkIntegrator, SourceIntegrator, GradSourceIntegrator, 
                      BoundaryFaceSourceIntegrator, ScalarDiffusionIntegrator)
+from fealpy.fem import DirichletBC
+
 from .fem_base import FEM
 from .project_method import ProjectionMethod
-from ....fem import DirichletBC
 from ..simulation_base import SimulationBase, SimulationParameters
-from ....functionspace import Function
-from ....decorator import barycentric
 
 class IPCS(ProjectionMethod, FEM):
     """IPCS分裂投影法"""

@@ -1,5 +1,5 @@
-from fealpy.backend import backend_manager as bm
 from abc import ABC, abstractmethod
+from fealpy.backend import backend_manager as bm
 
 class ProjectionMethod(ABC):
     """投影算法抽象基类"""

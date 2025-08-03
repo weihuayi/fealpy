@@ -1,13 +1,16 @@
+import time
+
 from fealpy.backend import backend_manager as bm
-from ..decorator import variantmethod
-from ..model import ComputationalModel
-from ..fem import DirichletBC
+from fealpy.decorator import variantmethod
+from fealpy.utils import timer
+from fealpy.model import ComputationalModel
+
+from fealpy.fem import DirichletBC
+
 from .simulation.fem.stationary_incompressible_ns import Stokes
 from .simulation.fem.stationary_incompressible_ns import Newton
 from .simulation.fem.stationary_incompressible_ns import Ossen
 from .equation.stationary_incompressible_ns import StationaryIncompressibleNS
-from fealpy.utils import timer
-import time
 
 class StationaryIncompressibleNSTwoGridLFEM2DModel(ComputationalModel):
     def __init__(self, pde):

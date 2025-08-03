@@ -1,12 +1,15 @@
-from .....backend import backend_manager as bm
-from .....fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
-from .....fem import DirichletBC
-from .....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import barycentric
+
+from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
+from fealpy.fem import DirichletBC
+from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
                      ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
                      ViscousWorkIntegrator, SourceIntegrator, BoundaryFaceSourceIntegrator)
-from .....decorator import barycentric
-from .....fem import BoundaryPressWorkIntegrator
-from .....solver import spsolve
+from fealpy.fem import BoundaryPressWorkIntegrator
+
+from fealpy.solver import spsolve
+
 from ..fem_base import FEM
 from ...simulation_base import SimulationBase, SimulationParameters
 
