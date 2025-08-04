@@ -18,7 +18,7 @@ parser.add_argument('--backend',
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
 parser.add_argument('--pde',
-    default = 1, type=str,
+    default = 2, type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -26,7 +26,7 @@ parser.add_argument('--rho',
     help="Density of the fluid, default is 1.0")
 
 parser.add_argument('--mu',
-    default=1.0, type=float,
+    default=1e-3, type=float,
     help="Viscosity of the fluid, default is 1.0")
 
 parser.add_argument('--init_mesh',
@@ -35,22 +35,24 @@ parser.add_argument('--init_mesh',
 
 parser.add_argument('--box',
     default = [0.0, 2.2, 0.0, 0.41], type=int,
-    help="Number of divisions in the x direction, default is 8")
+    help="N")
 
 parser.add_argument('--center',
-    default = (0.5, 0.205), type=int,
-    help="Number of divisions in the y direction, default is 8")
+    default = [(0.2, 0.06), (0.2, 0.2), (0.2, 0.34), 
+               (1.2, 0.06), (1.2, 0.2), (1.2, 0.34), 
+               (0.7, 0.06),(0.7, 0.2), (0.7, 0.34)], type=int,
+    help="N")
 
 parser.add_argument('--radius',
-    default = 0.05, type=int,
-    help="Number of divisions in the z direction, default is 8 (only for 3D problems)")
+    default = 0.04, type=int,
+    help="N")
 
 parser.add_argument('--n_circle',
-    default = 100, type=int,
+    default = 300, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--h',
-    default = 0.05, type=float,
+    default = 0.005, type=float,
     help="Mesh size, default is 0.05")
 
 parser.add_argument('--method',
@@ -98,26 +100,45 @@ model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
 
 
 
-exit()
+
 # 可视化
 mesh = pde.mesh
 uh, ph = model.uh1, model.ph1
 uh = uh.reshape(2, -1).T
-points = model.fem.uspace.interpolation_points()
-print(model.fem.uspace.interpolation_points())
-triang = tri.Triangulation(points[:, 0], points[:, 1])
+points_u = model.fem.uspace.interpolation_points()
+points_p = model.fem.pspace.interpolation_points()
+# print(model.fem.uspace.interpolation_points())
+# triang = tri.Triangulation(points_u[:, 0], points_u[:, 1])
 
 plt.figure(figsize=(18, 3))
-plt.tricontourf(points[:, 0], points[:, 1], mesh.cell, uh[..., 0], levels = 50, cmap='viridis')
-plt.colorbar(label = 'uh')
+plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 0], levels = 50, cmap='viridis')
+plt.colorbar(label = 'uh0')
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Velocity u1')
+plt.title('Velocity uh0')
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(18, 3))
+plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 1], levels = 50, cmap='viridis')
+plt.colorbar(label = 'uh1')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Velocity uh1')
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(18, 3))
+plt.tricontourf(points_p[:, 0], points_p[:, 1], mesh.cell, ph, levels = 50, cmap='viridis')
+plt.colorbar(label = 'ph')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.title('Pressure ph')
 plt.grid(True)
 plt.show()
 
 from scipy.interpolate import griddata
-x, y = points[:, 0], points[:, 1]
+x, y = points_u[:, 0], points_u[:, 1]
 
 # 创建规则网格
 xi = bm.linspace(x.min(), x.max(), 200)
@@ -125,8 +146,8 @@ yi = bm.linspace(y.min(), y.max(), 200)
 X, Y = bm.meshgrid(xi, yi)
 
 # 插值速度分量到规则网格上
-Ui = griddata(points, uh[..., 0], (X, Y), method='linear')
-Vi = griddata(points, uh[..., 1], (X, Y), method='linear')
+Ui = griddata(points_u, uh[..., 0], (X, Y), method='linear')
+Vi = griddata(points_u, uh[..., 1], (X, Y), method='linear')
 
 # 绘制流线图
 plt.figure(figsize=(8, 6))

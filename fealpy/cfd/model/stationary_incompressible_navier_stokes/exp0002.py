@@ -5,7 +5,7 @@ from fealpy.backend import TensorLike
 from fealpy.mesher import BoxMesher2d
 import sympy as sp
 
-class Exp0001(BoxMesher2d):
+class Exp0002(BoxMesher2d):
     def __init__(self, options: dict = {}):
         self.options = options
         self.box = [0.0, 1.0, 0.0, 1.0]
@@ -13,7 +13,7 @@ class Exp0001(BoxMesher2d):
         self.mu = 1e-3
         self.rho = 1.0
         self.mesh = self.init_mesh(box = options.get('box', [0.0, 2.2, 0.0, 0.41]), 
-                                   center = options.get('center', (0.2, 0.2)),
+                                   centers = options.get('center', (0.2, 0.2)),
                                    radius = options.get('radius', 0.05),
                                    n_circle = options.get('n_circle', 1000),
                                    h = options.get('h', 0.005))
@@ -28,9 +28,9 @@ class Exp0001(BoxMesher2d):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
     
-    def init_mesh(self, box, center, radius, n_circle=60, h=0.05):
+    def init_mesh(self, box, centers, radius, n_circle=60, h=0.05):
         self.box = box
-        self.center = center
+        self.centers = centers
         self.radius = radius
         self.n_circle = n_circle
         self.h = h
@@ -41,43 +41,32 @@ class Exp0001(BoxMesher2d):
             (box[0], box[2]),
             (box[1], box[2]),
             (box[1], box[3]),
-            (box[0], box[3])
-        ]
-
-        # 矩形边界
+            (box[0], box[3])]
         facets = [[0, 1], [1, 2], [2, 3], [3, 0]]
 
-        # 圆的离散点
-        cx, cy = center
-        theta = bm.linspace(0, 2*bm.pi, n_circle, endpoint=False)
-        circle_points = [(cx + radius*bm.cos(t), cy + radius*bm.sin(t)) for t in theta]
+        hole_points = []
+        for center in centers:
+            cx, cy = center
+            theta = bm.linspace(0, 2*bm.pi, n_circle, endpoint=False)
+            circle_pts = [(cx + radius*bm.cos(t), cy + radius*bm.sin(t)) for t in theta]
+            offset = len(points)
+            circle_facets = [[i + offset, (i + 1) % n_circle + offset] for i in range(n_circle)]
 
-        # 圆的边界：顺时针编号（meshpy 要求空洞边界为顺时针）
-        circle_facets = [[i, (i+1) % n_circle] for i in range(n_circle)]
+            points.extend(circle_pts)
+            facets.extend(circle_facets)
+            hole_points.append([cx, cy])  # 每个圆心都添加为空洞内点
 
-        # 合并点和边界
-        circle_offset = len(points)
-        all_points = points + circle_points
-        all_facets = facets + [[i[0]+circle_offset, i[1]+circle_offset] for i in circle_facets]
-
-        # 设置空洞区域（空洞内一点）
-        hole_point = [cx, cy]
-
-        # meshpy 生成三角网格
+        # 构建 meshpy 网格
         mesh_info = MeshInfo()
-        mesh_info.set_points(all_points)
-        mesh_info.set_facets(all_facets)
-        mesh_info.set_holes([hole_point])  # 空洞位置
+        mesh_info.set_points(points)
+        mesh_info.set_facets(facets)
+        mesh_info.set_holes(hole_points)
 
         mesh = build(mesh_info, max_volume=h**2)
-
         node = bm.array(mesh.points)
         cell = bm.array(mesh.elements)
-
-        # 转为 FEALPy 的 TriangleMesh
         return TriangleMesh(node, cell)
         
-    
     @cartesian
     def inlet_velocity(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity."""
@@ -179,11 +168,13 @@ class Exp0001(BoxMesher2d):
         """Check if point where velocity is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        cx, cy = self.center
         radius = self.radius
         atol = 1e-12
         # 检查是否接近圆的边界
-        on_boundary = bm.abs((x - cx)**2 + (y - cy)**2 - radius**2) < atol
+        on_boundary = bm.zeros_like(x, dtype=bool)
+        for center in self.centers:
+            cx, cy = center
+            on_boundary |= bm.abs((x - cx)**2 + (y - cy)**2 - radius**2) < atol
         return on_boundary
         
     @cartesian

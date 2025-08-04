@@ -54,11 +54,11 @@ parser.add_argument('--T1',
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=100, type=int,
+    default=1000, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--method',
-    default='Newton', type=str,
+    default='IPCS', type=str,
     help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',

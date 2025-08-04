@@ -23,35 +23,38 @@ class Exp0001(BoxMesher2d):
         τ = 2μ·ε
         ε = 0.5·(∇u + ∇ᵗu)
 
-    Physical quantities:
-        u     : velocity vector field
-        p     : pressure scalar field
-        ρ     : fluid density
-        μ     : dynamic viscosity
-        f     : external body force (acceleration)
-        g_u   : prescribed velocity on the Dirichlet boundary Γ_u
-        u₀    : initial velocity (in time-dependent problems)
+    Physical variables:
+        u(x, y)   : velocity vector field
+        p(x, y)   : pressure scalar field
+        ρ         : fluid density
+        μ         : dynamic viscosity
+        f(x, y)   : external body force
+        g_u       : prescribed velocity on Dirichlet boundary
 
-    Exact solution (manufactured):
-
-        u(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)
-        v(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²
-        p(x, y) = 10·(2x - 1)·(2y - 1)
-
-    Computational domain:
-
+    Domain:
         Ω = (0, 1) × (0, 1)
-    
-    Parameters
 
-        ρ = 1.0       # Fluid density
-        μ = 1.0       # Dynamic viscosity
+    Exact (manufactured) solution:
 
-    This exact solution represents a smooth, divergence-free flow field,
-    designed to validate numerical solvers via the method of manufactured solutions.
+        u₁(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)
+        u₂(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²
+        p(x, y)  = 10·(2x - 1)·(2y - 1)
 
-    Reference
-        https://www.sciencedirect.com/science/article/abs/pii/S0045782508004222
+    Properties:
+        - Velocity field is divergence-free (∇·u = 0)
+        - Smooth solution suitable for convergence testing
+
+    Parameters:
+        ρ = 1.0    # Fluid density
+        μ = 1.0    # Dynamic viscosity
+
+    This represents an evanescent wave propagating in the y-direction,
+    and exponentially decaying in the x-direction.
+
+    Reference:
+        E. Burman, P. Hansbo. "Numerical modeling of weakly enforced boundary conditions in the Navier-Stokes equations",
+        Comput. Methods Appl. Mech. Engrg., 2008. 
+        https://doi.org/10.1016/j.cma.2008.01.024
     """
     def __init__(self, options: dict = {}):
         self.options = options
@@ -59,7 +62,7 @@ class Exp0001(BoxMesher2d):
         self.eps = 1e-10
         self.mu = 1.0
         self.rho = 1.0
-        self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
+        self.mesh = self.init_mesh['uniform_tri'](nx=options.get('nx', 8), ny=options.get('ny', 8))
         self._init_expr()
         super().__init__(box=self.box)
 
@@ -84,12 +87,6 @@ class Exp0001(BoxMesher2d):
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
-    
-    def init_mesh(self, nx, ny):
-        mesh = super().init_mesh['uniform_tri'](nx=nx, ny=ny)
-        self.nx = nx
-        self.ny = ny
-        return mesh
     
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
@@ -133,21 +130,26 @@ class Exp0001(BoxMesher2d):
 
     @cartesian
     def velocity_gradient(self, p: TensorLike) -> TensorLike:
+        """Optional: placeholder for velocity gradient (∇u) if needed."""
         pass
     
     @cartesian
     def pressure_gradient(self):
+        """Optional: placeholder for pressure gradient (∇p) if needed."""
         pass
 
     @cartesian
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
+        """Optional: prescribed velocity on boundary, if needed explicitly."""
         pass
     
     @cartesian
     def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
+        """Optional: prescribed pressure on boundary (usually for stability)."""
         pass
 
     def _init_expr(self):
+        """Initialize symbolic expressions for velocity, pressure, and source."""
         x, y = sp.symbols('x, y')
         u1 = 10 * x ** 2 * (x - 1) ** 2 * y * (y - 1) * (2 * y - 1)
         u2 = -10 * x * (x - 1) * (2 * x - 1) * y ** 2 * (y - 1) ** 2

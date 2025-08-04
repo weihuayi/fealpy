@@ -5,8 +5,7 @@ from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
 from fealpy.mesh import Mesh
 from fealpy.utils import timer
-
-from .equation import StationaryIncompressibleNS
+from fealpy.cfd.equation import StationaryIncompressibleNS
 
 class StationaryIncompressibleNSLFEMModel(ComputationalModel):
     """
@@ -86,9 +85,9 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
 
             run = self.run[options['run']]
             if options['run'] == 'uniform_refine':
-                run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
+                self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
             else:  # 'one_step' 或其他
-                run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
+                self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
     
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
@@ -191,10 +190,16 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         """
         Apply boundary conditions for cylinder problems.
         """
-        BC_flux = DirichletBC(
+        BC_influx = DirichletBC(
             (self.fem.uspace, self.fem.pspace), 
-            gd=(self.pde.inlet_velocity, self.pde.outlet_pressure), 
-            threshold=(self.pde.is_inlet_boundary, self.pde.is_outlet_boundary),
+            gd=(self.pde.inlet_velocity, self.pde.pressure), 
+            threshold=(self.pde.is_inlet_boundary, None),
+            method='interp')
+        
+        BC_outflux = DirichletBC(
+            (self.fem.uspace, self.fem.pspace),
+            gd = (self.pde.outlet_velocity, self.pde.outlet_pressure),
+            threshold=(self.pde.is_outlet_boundary, self.pde.is_outlet_boundary),
             method='interp')
         
         BC_wall = DirichletBC(
@@ -209,7 +214,8 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             threshold=(self.pde.is_obstacle_boundary, None),
             method='interp')
         
-        A, b = BC_flux.apply(A, b)
+        A, b = BC_influx.apply(A, b)
+        A, b = BC_outflux.apply(A, b)
         A, b = BC_wall.apply(A, b)
         A, b = BC_obstacle.apply(A, b)
         self.apply_bc_str = "cylinder"
@@ -250,7 +256,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        uerror, perror = self.postprocess(uh1, ph1) 
+        # uerror, perror = self.postprocess(uh1, ph1) 
         return uh1, ph1
     
     @run.register('one_step')
@@ -311,7 +317,4 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uerror, perror
 
-    @postprocess.register('plot')
-    def postprocess(self, uh, ph):
-        self.postprocess_str = 'plot'
-        import matplotlib.pyplot as plt
+    

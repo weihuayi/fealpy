@@ -141,6 +141,8 @@ class IPCS(ProjectionMethod, FEM):
             result = bm.repeat(p0(bcs,index)[...,bm.newaxis], self.mesh.GD, axis=-1)
             result = bm.expand_dims(result, axis=-1) * I
             result *= pc(bcs, index) if callable(pc) else pc
+            # cvcoef = cv(bcs, index)[..., bm.newaxis]/2 if callable(cv) else cv
+            # result -= cvcoef * bm.trace(u0.grad_value(bcs, index))
             return result
         self.predict_LGS.source = LGS_coef
         
@@ -148,9 +150,11 @@ class IPCS(ProjectionMethod, FEM):
         def LBFS_coef(bcs, index):
             result = -bm.einsum('...i, ...j->...ij', p0(bcs, index), self.mesh.face_unit_normal(index=index))
             result *= pc(bcs, index) if callable(pc) else pc
+            # cvcoef = cv(bcs, index)[..., bm.newaxis]/2 if callable(cv) else cv
+            # result += cvcoef * bm.trace(u0.grad_value(bcs, index))
             return result
         self.predict_LBFS.source = LBFS_coef
-        
+
 
     def pressure_BForm(self):
         """压力泊松方程左端项"""
