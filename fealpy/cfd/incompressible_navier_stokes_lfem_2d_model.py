@@ -38,7 +38,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     @variantmethod("Newton")
     def method(self):
         self.fem = Newton(self.equation, self.pde.is_pressure_boundary)
-        self.fem.dt = self.timeline.dt
         self.method_str = "Newton"
         return self.fem
     
@@ -46,7 +45,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     def method(self):
         from .simulation.fem import Ossen
         self.fem = Ossen(self.equation)
-        self.fem.dt = self.timeline.dt
         self.method_str = "Ossen"
         return self.fem
     
@@ -54,7 +52,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     def method(self):
         from .simulation.fem import IPCS
         self.fem = IPCS(self.equation)
-        self.fem.dt = self.timeline.dt
         self.method_str = "IPCS"
         return self.fem
     
@@ -117,13 +114,14 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         fem = self.fem
         pde = self.pde
         timeline = self.timeline
+        fem.dt = timeline.dt
 
         u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = timeline.T0)))
         p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = timeline.T0)))
         
         u0 = fem.uspace.function()
         p0 = fem.pspace.function()
-        for i in range(timeline.NL):
+        for i in range(timeline.NL-1):
             t  = timeline.current_time()
             print("time=", t)
             
@@ -131,14 +129,12 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
             u0[:] = u1
             p0[:] = p1
-            
-            mesh.nodedata['u'] = u1.reshape(2,-1).T
-            pde.mesh.nodedata['p'] = p1
 
-            self.error(u1, p1, t = timeline.next_time())
+            uerror, perror = self.error(u0, p0, t= timeline.next_time()) 
+            print("asdasd",timeline.next_time())
             timeline.advance()
-        uerror, perror = self.error(u1, p1, t= timeline.T1) 
-        self.logger.info(f"final uerror: {uerror}, final perror: {perror}")
+        uerror, perror = self.error(u0, p0, t= timeline.T1)  
+        return u0, p0
     
     @run.register('one_step')
     def run(self, u0, p0, maxstep=10, tol=1e-12):
@@ -159,12 +155,16 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uh1 = u0.space.function()
             uhs = u0.space.function()
             ph1 = p0.space.function()
-
+            
+            
+            self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
+            
             A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
             uhs[:] = self.solve(A0, b0)
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
-            ph1[:] = self.solve(A1, b1)
+            #A1, b1 = self.fem.pressure(uhs, p0, return_form=False)
+            ph1[:] = self.solve(A1, b1)[:-1]
 
             A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, return_form=False)
             uh1[:] = self.solve(A2, b2)
@@ -180,16 +180,17 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             pk = p0.space.function()
 
             for j in range(maxstep): 
+                self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
                 fem.update(uk0, u0)
                 
                 A = BForm.assembly()
                 b = LForm.assembly()
-                A,b = self.apply_bc(A, b)
-                # A, b = self.lagrange_multiplier(A, b)
+                A, b = self.apply_bc(A, b)
+                A, b = self.fem.lagrange_multiplier(A, b,4)
             
                 x = self.solve(A, b, 'mumps')
                 uk1[:] = x[:ugdof]
-                pk[:] = x[ugdof:]
+                pk[:] = x[ugdof:-1]
                 
                 res_u = pde.mesh.error(uk0, uk1)
                 print(res_u)

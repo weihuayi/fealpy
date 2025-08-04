@@ -94,7 +94,7 @@ class FEM:
         # 其他空间类型...
         raise ValueError(f"不支持的空间类型: {space_type}")  
     
-    def lagrange_multiplier(self, A, b):
+    def lagrange_multiplier(self, A, b, c=0):
 
         LagLinearForm = LinearForm(self.pspace)
         LagLinearForm.add_integrator(SourceIntegrator(source=1))
@@ -106,7 +106,7 @@ class FEM:
 
         A = BlockForm([[A, A1.T], [A1, None]])
         A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([0])
+        b0 = bm.array([c])
         b  = bm.concatenate([b, b0], axis=0)
         return A, b
 

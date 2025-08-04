@@ -63,7 +63,10 @@ class Newton(FEM):
 
         L0 = LinearForm(uspace)
         self.u_LSI = SourceIntegrator(q=q)
+        self.u_LSI_f = SourceIntegrator(q=q)
         L0.add_integrator(self.u_LSI) 
+        L0.add_integrator(self.u_LSI_f)
+
         L1 = LinearForm(pspace)
         L = LinearBlockForm([L0, L1])
         return L
@@ -100,11 +103,9 @@ class Newton(FEM):
         def u_LSI_coef(bcs, index):
             ctdcoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
             result = ctdcoef * uk(bcs, index) / dt
             result += cccoef*bm.einsum('...j, ...ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
-            result += cbfcoef 
             return result
         self.u_LSI.source = u_LSI_coef
-       
+        self.u_LSI_f.source = cbf 
 

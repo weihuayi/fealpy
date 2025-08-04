@@ -23,7 +23,7 @@ class NSLFEMChannelPDE:
 
     def set_mesh(self, nx=16, ny=16):
         box = [0, 1, 0, 1]
-        mesh = TriangleMesh.from_box(box, nx=16, ny=16)
+        mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
         self.mesh = mesh
         return mesh
     
@@ -50,13 +50,12 @@ class NSLFEMChannelPDE:
         tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
         tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
         return tag_left | tag_right
-
+    
     @cartesian
     def is_velocity_boundary(self, p):
         tag_up = bm.abs(p[..., 1] - 1.0) < self.eps
         tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
         return tag_up | tag_down
-    
     
     @cartesian
     def source(self, p, t):
@@ -88,7 +87,7 @@ class FromSympy(BoxMesher2d):
     
     @variantmethod("channel")
     def select_pde(self):
-        x, y, t = sp.symbols('x, y, t')
+        x, y, t = self.x, self.y, self.t
         self.u1 =  4 * y * (1-y)
         self.u2 = sp.sympify(0)
         self.p = 8 * (1-x)
@@ -96,7 +95,7 @@ class FromSympy(BoxMesher2d):
 
     @select_pde.register("polycos")
     def select_pde(self):
-        x, y, t = sp.symbols('x, y, t')
+        x, y, t = self.x, self.y, self.t
         self.u1 = 10 * x ** 2 * (x - 1) ** 2 * y * (y - 1) * (2 * y - 1) * sp.cos(t)
         self.u2 = -10 * x * (x - 1) * (2 * x - 1) * y ** 2 * (y - 1) ** 2 * sp.cos(t)
         self.p = 10 * (2 * x - 1) * (2 * y - 1) * sp.cos(t)
@@ -104,10 +103,18 @@ class FromSympy(BoxMesher2d):
 
     @select_pde.register("poly2d")
     def select_pde(self):
-        x, y, t = sp.symbols('x, y, t')
+        x, y, t = self.x, self.y, self.t
         self.u1 = 0.05 * sp.exp(-t) * x **2 * (x-1)**2 * (4 * y**3 - 6 * y**2 + 2*y)
         self.u2 = -0.05 * sp.exp(-t) * (4 * x**3 - 6 * x**2 + 2 * x) * y**2 * (y - 1)**2
         self.p = 0.05 * sp.exp(-t) * (x**2 + y**2 - 2/3)
+        self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
+    
+    @select_pde.register("sinsincos")
+    def select_pde(self):
+        x, y, t = sp.symbols('x, y, t')
+        self.u1 = 2* sp.pi *sp.sin(t) * sp.sin(sp.pi*x)**2 * sp.sin(sp.pi*y) * sp.cos(sp.pi*y)
+        self.u2 = -2* sp.pi *sp.sin(t) * sp.sin(sp.pi*x) * sp.cos(sp.pi*x) * sp.sin(sp.pi*y)**2
+        self.p = 20*sp.sin(t)*(x**2*y-1/6)
         self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
 
 
@@ -141,14 +148,14 @@ class FromSympy(BoxMesher2d):
         diffusion2 = sp.diff(gradu2x, x) + sp.diff(gradu2y, y)
         gradpx = p.diff(x)
         gradpy = p.diff(y)
-        force11 = - mu*diffusion1 + rho*convection1 + gradpx + time_derivative1
-        force22 = - mu*diffusion2 + rho*convection2 + gradpy + time_derivative2
+        force1 = - mu*diffusion1 + rho*convection1 + gradpx + rho*time_derivative1
+        force2 = - mu*diffusion2 + rho*convection2 + gradpy + rho*time_derivative2
 
         self.u1 = sp.lambdify((x, y, t), u1, 'numpy')
         self.u2 = sp.lambdify((x, y, t), u2, 'numpy')
         self.p = sp.lambdify((x, y, t), p, 'numpy')
-        self.fx = sp.lambdify((x, y, t), force11, 'numpy')
-        self.fy = sp.lambdify((x, y, t),force22, 'numpy')
+        self.fx = sp.lambdify((x, y, t), force1, 'numpy')
+        self.fy = sp.lambdify((x, y, t),force2, 'numpy')
 
 
     def domain(self):
@@ -161,7 +168,6 @@ class FromSympy(BoxMesher2d):
         self.mesh = mesh
         return mesh
     
-    @variantmethod("unitime")
     def init_timeline(self, T0 = 0.0, T1 = 0.5, nt = 1000):
         self.t0 = T0
         self.nt = nt
@@ -171,11 +177,25 @@ class FromSympy(BoxMesher2d):
     
     @cartesian
     def is_pressure_boundary(self, p):
-        return None
+        return bm.zeros_like(p[...,1],dtype=bm.bool)
     
     @cartesian
     def is_velocity_boundary(self, p):
         return None
+    
+    '''
+    @cartesian
+    def is_pressure_boundary(self, p):
+        tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
+        tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
+        return tag_left | tag_right
+    
+    @cartesian
+    def is_velocity_boundary(self, p):
+        tag_up = bm.abs(p[..., 1] - 1.0) < self.eps
+        tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
+        return tag_up | tag_down
+    '''
     
     @cartesian
     def source(self, p, t):

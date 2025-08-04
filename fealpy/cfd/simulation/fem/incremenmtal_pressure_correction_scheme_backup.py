@@ -14,7 +14,7 @@ from ....functionspace import Function
 from ....decorator import barycentric
 
 class IPCS(ProjectionMethod, FEM):
-    """IPCS分裂投影法"""
+    """IPCS分裂投影法 Crank-Nicolson时间步进"""
     def __init__(self, equation, boundary_threshold=None):
         FEM.__init__(self, equation)
         ProjectionMethod.__init__(self)
@@ -49,7 +49,6 @@ class IPCS(ProjectionMethod, FEM):
         if return_form is False:
             A = Bform.assembly()
             b = Lform.assembly()
-            A,b = self.lagrange_multiplier(A, b, 0)
             #if BC is not None:
             #    A, b = BC.apply(A, b)
             return A, b
@@ -109,7 +108,6 @@ class IPCS(ProjectionMethod, FEM):
         Lform.add_integrator(self.predict_LS)
         Lform.add_integrator(self.predict_LGS)
         Lform.add_integrator(self.predict_LBFS)
-        Lform.add_integrator(self.predict_LS_f)
         return Lform
     
     def predict_velocity_update(self, u0, p0): 
@@ -131,9 +129,10 @@ class IPCS(ProjectionMethod, FEM):
             result = 1/dt*masscoef*u0(bcs, index)
             ccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
             result -= ccoef * bm.einsum('...j, ...ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
+            cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
+            result += cbfcoef
             return result
         self.predict_LS.source = LS_coef
-        self.predict_LS_f.source = cbf
 
         @barycentric
         def LGS_coef(bcs, index):
@@ -232,9 +231,6 @@ class IPCS(ProjectionMethod, FEM):
             result -= dt*(p1.grad_value(bcs, index) - p0.grad_value(bcs, index))
             return result
         self.correct_LS.source = BM_coef
-
-
-
 
 
 
