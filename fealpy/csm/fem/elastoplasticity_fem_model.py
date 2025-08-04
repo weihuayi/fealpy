@@ -28,11 +28,11 @@ class ElastoplasticityFEMModel(ComputationalModel):
     It relies on PDEModelManager for physical parameters and boundary conditions, making it suitable for teaching, 
     research, and preliminary engineering analysis.
     
-    Parameters
+    Parameters:
         example : str, optional, default='elastoplasticity2d'
             Selects a preset elastoplasticity problem example for initializing PDE parameters and mesh.
             
-    Attributes
+    Attributes:
         pde : object
             Object returned by PDEModelManager containing physical parameters and boundary conditions.
         mesh : object
@@ -48,7 +48,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         l : float
             Characteristic length of the domain.
             
-    Methods
+    Methods:
         run()
             Executes the FEM solution process and returns the displacement vector.
         linear_system()
@@ -102,10 +102,10 @@ class ElastoplasticityFEMModel(ComputationalModel):
         Initialize the finite element mesh based on the PDE parameters.
         This method generates the mesh according to the domain and boundary conditions defined in the PDE data.
         
-        Parameters
+        Parameters:
             mesh (Mesh): The mesh object to be initialized.
-            
-        Returns
+
+        Returns:
             Mesh: The initialized mesh object.
         '''
         self.mesh = mesh
@@ -129,12 +129,9 @@ class ElastoplasticityFEMModel(ComputationalModel):
         """
         Set the material parameters for the elastoplasticity model.
         
-        Parameters
+        Parameters:
             E (float): Young's modulus in MPa.
             nu (float): Poisson's ratio.
-            
-        Raises
-            ValueError: If the material parameters are invalid or not set correctly.
         """
         self.cm = LinearElasticMaterial("elastic", elastic_modulus=E, poisson_ratio=nu, 
                                               hypo='plane_stress', device=bm.get_device(self.mesh))
@@ -152,10 +149,10 @@ class ElastoplasticityFEMModel(ComputationalModel):
         """
         Get the mapping from cell indices to global degree of freedom (dof) numbers.
 
-        Parameters
+        Parameters:
             stress: Stress tensor for the cells.    
             
-        Returns
+        Returns:
             TensorLike: A tensor containing the global dof numbers for each cell.
         """
         stress = stress[self.space.cell_to_dof()]
@@ -193,13 +190,13 @@ class ElastoplasticityFEMModel(ComputationalModel):
         '''
         Construct the linear system for the elastoplasticity problem.
         
-        Parameters
+        Parameters:
             source (callable): Function defining the external load vector.
             D_ep (TensorLike): Elastoplastic material stiffness matrix.
-            stress (TensorLike): Stress tensor for the cells.       
-            
-        Returns
-            Tuple[TensorLike, TensorLike, TensorLike]:  
+            stress (TensorLike): Stress tensor for the cells.
+
+        Returns:
+            Tuple[TensorLike, TensorLike, TensorLike]:
                 - K (TensorLike): Assembled stiffness matrix.
                 - F_int (TensorLike): Internal force vector.
                 - F_ext (TensorLike): External force vector.    

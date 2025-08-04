@@ -16,7 +16,7 @@ class ElastoplasticDiffusionIntegrator(LinearElasticityIntegrator):
     internal force computation, and tangent stiffness matrix assembly. 
     It is designed for use in computational solid mechanics simulations where both elastic and plastic material responses are present.
     
-    Parameters
+    Parameters:
         D_ep : array-like
             Elastoplastic material stiffness matrix, typically of shape (n_cells, n_qp, n_strain, n_strain).
         material : Material
@@ -28,22 +28,23 @@ class ElastoplasticDiffusionIntegrator(LinearElasticityIntegrator):
         method : str or None, optional, default=None
             Integration method or scheme to be used.
         
-    Attributes
+    Attributes:
         D_ep : array-like
             Elastoplastic material stiffness matrix used in tangent computations.
         space : FunctionSpace
             The finite element function space associated with the integrator.
         equivalent_plastic_strain : array-like
             Stores the equivalent plastic strain at each integration point.
-        Methods
+     
+    Methods:
+        assembly(space)
+            Assemble the global tangent stiffness matrix for the elastoplastic material.
         compute_internal_force(uh, plastic_strain, index=_FS)
             Compute the internal force vector considering plastic strain effects.
         constitutive_update(uh, plastic_strain_old, material, yield_stress, strain_total_e)
             Perform constitutive integration and return updated state variables.
         update_elastoplastic_matrix(material, n, yield_mask)
             Construct the consistent elastoplastic tangent matrix.
-        assembly(space)
-            Assemble the global tangent stiffness matrix for the current state.
     '''
     def __init__(self, D_ep, material, q, method=None):
         super().__init__(material, q, method=method)
@@ -53,10 +54,11 @@ class ElastoplasticDiffusionIntegrator(LinearElasticityIntegrator):
         """
         Assemble the global tangent stiffness matrix for the elastoplastic material.
         
-        Parameters
+        Parameters:
             space : _FS
                 The finite element function space.
-        Returns
+
+        Returns:
             TensorLike: Assembled global tangent stiffness matrix of shape (NC, tdof, tdof).
         """
         mesh = getattr(space, 'mesh', None)

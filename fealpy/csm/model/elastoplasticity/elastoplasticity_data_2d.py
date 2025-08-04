@@ -11,7 +11,7 @@ class ElastoplasticityData2D:
     """
     2D Elasto-Plastic Beam with von Mises Yield and Ziegler Hardening
 
-    Attributes
+    Attributes:
         E : float
             Young's modulus (MPa).
         nu : float
@@ -105,8 +105,9 @@ class ElastoplasticityData2D:
         Time-dependent source term for the body force.
         This is a placeholder and can be modified as needed.
         
-        Args:
+        Parameters:
             t (float): Time variable.   
+            
         Returns:
             float: Source term value.
         """
@@ -138,9 +139,13 @@ class ElastoplasticityData2D:
 
     def dirichlet_boundary(self, x):
         """
-        Check if the point is on the Dirichlet boundary.
-        The Dirichlet boundary is defined as the left edge (x = -5) and
-        the bottom edge (y = -5).
+        Check if points are on the Dirichlet boundary (left and bottom edges).
+        
+        Parameters:
+            x (TensorLike): Points in the domain.
+            
+        Returns:
+            TensorLike: Boolean array indicating if points are on the Dirichlet boundary.
         """
         return bm.abs(x[:, 0] + 5) < 1e-12 | bm.abs(x[:, 1] + 5) < 1e-12
     
@@ -152,13 +157,8 @@ class ElastoplasticityData2D:
         
         Parameters:
             p (TensorLike): Points in the domain.
+            
         Returns:
             TensorLike: Zero displacement for the Dirichlet boundary.
-        Notes:
-            This function assumes that the Dirichlet boundary is defined as the left and bottom edges of
-            the domain, where the displacement is fixed to zero.
-        Examples:
-            >>> p = bm.array([[0.0, 0.0], [1.0, 1.0]])
-            >>> dirichlet_values = dirichlet(p)
         """
         return bm.zeros_like(p)  # 固定边界条件为零位移

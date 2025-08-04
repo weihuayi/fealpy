@@ -16,7 +16,7 @@ class ElastoplasticitySourceIntIntegrator(LinearInt, SrcInt, CellInt):
     This class is used for assembling and integrating internal source terms in elastoplastic problems based on function spaces on homogeneous meshes. 
     It is suitable for elastoplastic mechanics simulation in the finite element method, supporting batch processing and multiple integration methods.
     
-    Parameters
+    Parameters:
         strain_matrix : TensorLike
             Strain matrix describing the strain distribution within the element.
         stress : SourceLike, optional, default=None
@@ -30,7 +30,7 @@ class ElastoplasticitySourceIntIntegrator(LinearInt, SrcInt, CellInt):
         method : Literal['isopara', None], optional, default=None
             Integration method selection, supports 'isopara' or None.
             
-    Attributes
+    Attributes:
         strain_matrix : TensorLike
             Strain matrix within the element.
         stress : SourceLike or None
@@ -42,10 +42,10 @@ class ElastoplasticitySourceIntIntegrator(LinearInt, SrcInt, CellInt):
         region : TensorLike or None
             Integration region.
             
-    Methods
+    Methods:
         to_global_dof(space, indices=None)
             Get global degree of freedom numbers.
-        fetch(space, inidces=None)
+        fetch(space, indices=None)
             Get basis functions, weights, measures, and other information required for integration.
         assembly(space, indices=None)
             Assemble the internal source term for elastoplasticity.
@@ -74,13 +74,13 @@ class ElastoplasticitySourceIntIntegrator(LinearInt, SrcInt, CellInt):
         """
         Fetch the necessary data for integration, including basis functions, weights, and measures.
         
-        Parameters
+        Parameters:
             space : _FS
                 The finite element function space.
             indices : Index, optional
                 Indices of the entities to fetch data for, default is None for all entities.
                 
-        Returns
+        Returns:
             Tuple[TensorLike, TensorLike, TensorLike, TensorLike, Index]:   
                 - bcs: Quadrature points in the reference element.
                 - ws: Quadrature weights.
@@ -104,18 +104,17 @@ class ElastoplasticitySourceIntIntegrator(LinearInt, SrcInt, CellInt):
         """
         Assemble the internal source term for elastoplasticity.
         
-        Parameters
+        Parameters:
             space : _FS
                 The finite element function space.
             indices : Index, optional
                 Indices of the entities to assemble for, default is None for all entities.
                 
-        Returns
+        Returns:
             TensorLike: Assembled internal source term vector of shape (NC, tdof).
         """
         mesh = getattr(space, 'mesh', None)
         bcs, ws, phi, cm, index = self.fetch(space, indices)
-        F_int = bm.einsum('q, c, cqij,cqi->cj', 
-                                ws, cm, self.strain_matrix, self.stress) # (NC, tdof)
+        F_int = bm.einsum('q, c, cqij,cqi->cj', ws, cm, self.strain_matrix, self.stress) # (NC, tdof)
 
         return F_int
