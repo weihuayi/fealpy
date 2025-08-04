@@ -6,7 +6,7 @@ from fealpy.decorator import cartesian
 from fealpy.fem import DirichletBC
 
 pde = NSLFEMChannelPDE()
-pde.set_mesh(n=16)
+pde.set_mesh(nx=16, ny=16)
 model = IncompressibleNSLFEM2DModel(pde)
 model.method['IPCS']()
 

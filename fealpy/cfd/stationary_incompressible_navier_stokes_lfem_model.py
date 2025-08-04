@@ -311,7 +311,4 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
         return uerror, perror
 
-    @postprocess.register('plot')
-    def postprocess(self, uh, ph):
-        self.postprocess_str = 'plot'
-        import matplotlib.pyplot as plt
+    

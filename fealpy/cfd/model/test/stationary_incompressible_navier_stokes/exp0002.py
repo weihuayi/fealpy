@@ -6,14 +6,71 @@ from fealpy.mesher import BoxMesher2d
 import sympy as sp
 
 class Exp0002(BoxMesher2d):
-    
+    """
+    2D stationay incompressible Navier-Stokes problem for a Newtonian fluid:
+
+        ρ[(u · ∇)u] = ∇·σ + ρ·f,       in Ω × (0, T]
+              ∇·u = 0,                in Ω × (0, T]
+               u = g_u,               on Γ_u × (0, T]
+           u(x, 0) = u₀(x),           in Ω
+
+    The Cauchy stress tensor σ is decomposed as:
+
+        σ = τ - p·I
+
+    where τ is the deviatoric (viscous) stress tensor given by:
+
+        τ = 2μ·ε
+        ε = 0.5·(∇u + ∇ᵗu)
+
+    Physical variables:
+        u(x, y)   : velocity vector field
+        p(x, y)   : pressure scalar field
+        ρ         : fluid density
+        μ         : dynamic viscosity
+        f(x, y)   : external body force
+        g_u       : prescribed velocity on Dirichlet boundary
+
+    Domain:
+        Ω = (0, 1) × (0, 1)
+
+    Exact (manufactured) solution:
+
+        u₁(x, y) = (0.1 / 2π)·exp(0.1·y)/(exp(0.1)-1) · 
+                   sin(2π·(exp(0.1·y) - 1)/(exp(0.1) - 1)) · 
+                   (1 - cos(2π·(exp(3·x) - 1)/(exp(3) - 1)))
+
+        u₂(x, y) = -(3 / 2π)·exp(3·x)/(exp(3)-1) · 
+                   sin(2π·(exp(3·x) - 1)/(exp(3) - 1)) · 
+                   (1 - cos(2π·(exp(0.1·y) - 1)/(exp(0.1) - 1)))
+
+        p(x, y) = 0.3·exp(3·x)·exp(0.1·y)/[(exp(3)-1)(exp(0.1)-1)] · 
+                  sin(2π·(exp(3·x) - 1)/(exp(3) - 1)) · 
+                  sin(2π·(exp(0.1·y) - 1)/(exp(0.1) - 1)) · 
+                  (1 - sin(2π·(exp(3·x) - 1)/(exp(3) - 1)))
+
+    Properties:
+        - Divergence-free velocity field
+        - Pressure is smooth but nontrivial
+        - Exponential mapping introduces strong local gradients
+
+    Parameters:
+        ρ = 1.0    # Fluid density
+        μ = 1.0    # Dynamic viscosity
+
+    This test case provides a more challenging benchmark than simple polynomials,
+    as it contains nonlinearity in both exponential and trigonometric form.
+
+    Reference:
+        https://www.sciencedirect.com/science/article/abs/pii/S0045782502005133
+    """
     def __init__(self, options: dict = {}):
         self.options = options
         self.box = [0.0, 1.0, 0.0, 1.0]
         self.eps = 1e-10
         self.mu = 1.0
         self.rho = 1.0
-        self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
+        self.mesh = self.init_mesh['uniform_tri'](nx=options.get('nx', 8), ny=options.get('ny', 8))
         self._init_expr()
         super().__init__(box=self.box)
 
@@ -38,12 +95,6 @@ class Exp0002(BoxMesher2d):
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
-    
-    def init_mesh(self, nx, ny):
-        mesh = super().init_mesh['uniform_tri'](nx=nx, ny=ny)
-        self.nx = nx
-        self.ny = ny
-        return mesh
     
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
@@ -87,21 +138,26 @@ class Exp0002(BoxMesher2d):
 
     @cartesian
     def velocity_gradient(self, p: TensorLike) -> TensorLike:
+        """Optional: placeholder for velocity gradient (∇u) if needed."""
         pass
     
     @cartesian
     def pressure_gradient(self):
+        """Optional: placeholder for pressure gradient (∇p) if needed."""
         pass
 
     @cartesian
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
+        """Optional: prescribed velocity on boundary, if needed explicitly."""
         pass
     
     @cartesian
     def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
+        """Optional: prescribed pressure on boundary (usually for stability)."""
         pass
 
     def _init_expr(self):
+        """Initialize symbolic expressions for velocity, pressure, and source."""
         x, y = sp.symbols('x, y')
         u1 = 0.1/(2 * sp.pi) * sp.exp(0.1*y)/(sp.exp(0.1)-1)*sp.sin(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1))*(1-sp.cos(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1)))
         u2 = -3/(2 * sp.pi) * sp.exp(3*x)/(sp.exp(3)-1)*sp.sin(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1))*(1-sp.cos(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1)))
