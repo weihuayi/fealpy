@@ -1,18 +1,20 @@
+
 from fealpy.backend import backend_manager as bm
-from ..model import CSMModelManager
 from fealpy.model import ComputationalModel
+
+from fealpy.mesh import Mesh
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
+
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
-from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem import DirichletBC
+
+from fealpy.solver import spsolve
+
+from ..model import CSMModelManager
+
 from . import EulerBernoulliBeamSourceIntegrator
 from . import EulerBernoulliBeamDiffusionIntegrator
-from fealpy.solver import spsolve
-from typing import Union
-from ..model.beam import BeamPDEDataT
-from fealpy.mesh import Mesh
-
-import matplotlib.pyplot as plt
 
 class EulerBernoulliBeamFEMModel(ComputationalModel):
     """
