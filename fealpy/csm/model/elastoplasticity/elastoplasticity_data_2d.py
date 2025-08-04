@@ -37,8 +37,8 @@ class ElastoplasticityData2D:
         self.yield_stress = 450 * (2/3)**0.5  # Initial yield stress in MPa
 
         self.dim = 2
-        self.Ft_max = 2e5           # N: max traction force
-        self.n = 1                  # Mesh refine level
+        self.Ft_max = 200         # N: max traction force
+        self.n = 2                  # Mesh refine level
 
         self.lam = self.compute_lambda()
         self.mu = self.compute_mu()
@@ -94,33 +94,10 @@ class ElastoplasticityData2D:
         f1 = bm.zeros(shape)       
         f2 = self.Ft_max * bm.ones(shape) 
         return bm.stack([f1, f2], axis=-1)
-
-    @cartesian
-    def source_term(self, t: float) -> float:
-        """
-        Time-dependent source term for the body force.
-        This is a placeholder and can be modified as needed.
-        
-        Parameters:
-            t (float): Time variable.   
-            
-        Returns:
-            float: Source term value.
-        """
-        if 0.0 <= t < 1.0:
-            return 200 * t
-        elif 1.0 <= t < 2.0:
-            return 200 * (2 - t)
-        elif 2.0 <= t < 3.0:
-            return 200 * (2.0 - t)
-        elif 3.0 <= t <= 4.0:
-            return 200 * (t - 4.0)
-        else:
-            return 0.0
         
     @cartesian
-    def neumann_boundary(self, x):
-        y = x[:, 1]
+    def neumann_boundary(self, p):
+        y = p[:, 1]
         return bm.abs(y - 5.0) < 1e-12
 
     @cartesian
@@ -133,18 +110,18 @@ class ElastoplasticityData2D:
         f2 = self.Ft_max * bm.ones(shape)/10.0  # y 方向
         return bm.stack([f1, f2], axis=-1)
 
-    def dirichlet_boundary(self, x):
+    def dirichlet_boundary(self, p):
         """
         Check if points are on the Dirichlet boundary (left and bottom edges).
         
         Parameters:
-            x (TensorLike): Points in the domain.
-            
+            p (TensorLike): Points in the domain.
+
         Returns:
             TensorLike: Boolean array indicating if points are on the Dirichlet boundary.
         """
-        return bm.abs(x[:, 0] + 5) < 1e-12 | bm.abs(x[:, 1] + 5) < 1e-12
-    
+        return (bm.abs(p[:, 0] - 5) < 1e-12) | (bm.abs(p[:, 1] + 5) < 1e-12)
+
     @cartesian
     def dirichlet(self, p):
         """

@@ -230,7 +230,7 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         return self.hardening_modulus > 0
 
         
-    def material_point_update(self, delta_strain, strain_pl_n, strain_e_n):
+    def material_point_update(self, strain_total, strain_pl_n, strain_e_n):
         '''
         Perform the elastoplastic constitutive update for a material point.
         
@@ -267,7 +267,6 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         
         De = self.elastic_matrix()  # (NC, NQ, 3, 3)
 
-        strain_total = delta_strain + strain_pl_n  # (NC, NQ, 3)
         sigma_trial = bm.einsum('...ij,...j->...i', De, strain_total)  # (NC, NQ, 3)
         s_trial = self.deviatoric_stress(sigma_trial)  # (NC, NQ, 3)
         stress_trial_e = bm.sqrt(3.0 / 2.0) * bm.sqrt(bm.sum(s_trial ** 2, axis=-1))  # (NC, NQ)
