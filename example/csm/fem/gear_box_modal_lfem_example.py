@@ -16,7 +16,11 @@ parser.add_argument('--pde',
 
 parser.add_argument('--mesh_file',
                     default='/home/why/fealpy/data/LANXIANG_KETI_0506.inp', type=str,
-                    help='Type of mesh, default is uniform_tet')
+                    help='mesh file name')
+
+parser.add_argument('--shaft_system_file',
+                    default='/home/why/fealpy/data/matlab-total-shaft.mat', type=str,
+                    help='the stiffness and mass matrix of the shaft')
 
 parser.add_argument('--space_degree',
         default=1, type=int,
@@ -41,6 +45,4 @@ bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import GearBoxModalLFEMModel
 model = GearBoxModalLFEMModel(options)
-
-model.set_node_flag()
-
+model.solve()

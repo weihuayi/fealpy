@@ -13,9 +13,8 @@ from fealpy.functionspace import functionspace
 from fealpy.fem import (
         BilinearForm,
         LinearElasticityIntegrator, 
-        DirichletBC
+        ScalarMassIntegrator as MassIntegrator
         )
-from fealpy.fem import ScalarMassIntegrator as MassIntegrator
 
 from fealpy.sparse import coo_matrix
 
@@ -35,6 +34,7 @@ class GearBoxModalLFEMModel(ComputationalModel):
         mesh = self.pde.init_mesh()
         self.set_mesh(mesh)
         self.set_node_flag()
+        self.set_space_degree(options['space_degree'])
 
     def set_pde(self, pde = 2) -> None:
         if isinstance(pde, int):
@@ -49,6 +49,11 @@ class GearBoxModalLFEMModel(ComputationalModel):
     def set_mesh(self, mesh: Mesh) -> None:
         self.mesh = mesh
         self.logger.info(self.mesh)
+
+    def set_space_degree(self, p: int):
+        """
+        """
+        self.p = p
 
     def set_node_flag(self): 
         """
@@ -77,8 +82,6 @@ class GearBoxModalLFEMModel(ComputationalModel):
 
         self.G = self.rbe2_matrix(redges, rnodes)
 
-        self.logger.info(self.G)
-
 
     def rbe2_matrix(self, redges, rnodes):
         """
@@ -87,7 +90,6 @@ class GearBoxModalLFEMModel(ComputationalModel):
 
         isRefNodes = self.mesh.data.get_node_data('isRefNodes') 
         isSurfaceNodes = self.mesh.data.get_node_data('isSurfaceNodes')
-        # 顺序一致性
         ridx = bm.where(isRefNodes)[0]
         sidx = bm.where(isSurfaceNodes)[0]
         rmap = bm.zeros(NN, dtype=bm.int32)
@@ -106,24 +108,122 @@ class GearBoxModalLFEMModel(ComputationalModel):
         NS = redges.shape[0] # number of surface nodes
         NR = rnodes.shape[0] # number of reference nodes
 
-        G = coo_matrix((3*NS, 6*NR), ftype=bm.float64)
+        self.logger.info(f"RBE2 matrix: {NS} surface nodes, {NR} reference nodes")
+
+        G = coo_matrix((3*NS, 6*NR), dtype=bm.float64)
         ones = bm.ones(NS, dtype=bm.float64)
 
-        G += coo_matrix((    ones, (3*I+0, 6*J+0)), shape=G.shape, ftype=bm.float64)
-        G += coo_matrix((-v[:, 2], (3*I+0, 6*J+4)), shape=G.shape, ftype=bm.float64)
-        G += coo_matrix(( v[:, 1], (3*I+0, 6*J+5)), shape=G.shape, ftype=bm.float64)
+        G += coo_matrix((    ones, (3*I+0, 6*J+0)), shape=G.shape, dtype=bm.float64)
+        G += coo_matrix((-v[:, 2], (3*I+0, 6*J+4)), shape=G.shape, dtype=bm.float64)
+        G += coo_matrix(( v[:, 1], (3*I+0, 6*J+5)), shape=G.shape, dtype=bm.float64)
 
-        G += coo_matrix((    ones, (3*I+1, 6*J+1)), shape=G.shape, ftype=bm.float64)
-        G += coo_matrix(( v[:, 2], (3*I+1, 6*J+3)), shape=G.shape, ftype=bm.float64)
-        G += coo_matrix((-v[:, 0], (3*I+1, 6*J+5)), shape=G.shape, ftype=bm.float64)
+        G += coo_matrix((    ones, (3*I+1, 6*J+1)), shape=G.shape, dtype=bm.float64)
+        G += coo_matrix(( v[:, 2], (3*I+1, 6*J+3)), shape=G.shape, dtype=bm.float64)
+        G += coo_matrix((-v[:, 0], (3*I+1, 6*J+5)), shape=G.shape, dtype=bm.float64)
 
-        G += coo_matrix((    ones, (3*I+2, 6*J+2)), shape=G.shape, ftype=bm.float64)
-        G += coo_matrix((-v[:, 1], (3*I+2, 6*J+3)), shape=G.shape, ftype=bm.float64)
-        G += coo_matrix(( v[:, 0], (3*I+2, 6*J+4)), shape=G.shape, ftype=bm.float64)
+        G += coo_matrix((    ones, (3*I+2, 6*J+2)), shape=G.shape, dtype=bm.float64)
+        G += coo_matrix((-v[:, 1], (3*I+2, 6*J+3)), shape=G.shape, dtype=bm.float64)
+        G += coo_matrix(( v[:, 0], (3*I+2, 6*J+4)), shape=G.shape, dtype=bm.float64)
 
-        return G.tocsr()
+        return G.tocsr().to_scipy()
 
 
+    def linear_system(self):
+        """
+        """
+        # Implementation of the linear system construction goes here
+        GD = self.mesh.geo_dimension()
+        self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(-1, GD))
+
+        bform = BilinearForm(self.space)
+        integrator = LinearElasticityIntegrator(self.pde.material)
+        integrator.assembly.set('fast')
+        bform.add_integrator(integrator)
+        S = bform.assembly()
+
+        bform = BilinearForm(self.space)
+        integrator = MassIntegrator(self.pde.material.density)
+        bform.add_integrator(integrator)
+        M = bform.assembly()
+
+        return S, M
+
+    def apply_bc(self, S, M):
+        """
+        """
+
+        S = S.to_scipy()
+        M = M.to_scipy()
+        # 自由点不是参考点，不是固定点，不是曲面上的点（依赖点） 
+        isRefNodes = self.mesh.data.get_node_data('isRefNodes')
+        isFixedNodes = self.mesh.data.get_node_data('isFixedNodes')
+        isSurfaceNodes = self.mesh.data.get_node_data('isSurfaceNodes')
+        isFreeNodes = ~(isRefNodes | isFixedNodes | isSurfaceNodes) 
+        isFreeDofs = bm.repeat(isFreeNodes, 3)
+
+        isSurfaceDofs = bm.repeat(isSurfaceNodes, 3)
+
+        S0 = S[isFreeDofs, :]
+        S1 = S[isSurfaceDofs, :]
+        M0 = M[isFreeDofs, :]
+        M1 = M[isSurfaceDofs, :]
+
+        S00 = S0[:, isFreeDofs]
+        S01 = S0[:, isSurfaceDofs] @ self.G
+        S11 = self.G.T @ S1[:, isSurfaceDofs] @ self.G 
+
+        M00 = M0[:, isFreeDofs]
+        M01 = M0[:, isSurfaceDofs] @ self.G
+        M11 = self.G.T @ M1[:, isSurfaceDofs] @ self.G
+
+        return [[S00, S01], [S01.T, S11]], [[M00, M01], [M01.T, M11]] 
+
+    def load_shaft_system(self):
+        """
+        """
+        from scipy.io import loadmat
+        from scipy.sparse import csr_matrix
+        shaft_system = loadmat(self.options['shaft_system_file'])
+        self.logger.info(f"Sucsess load shaft system from {self.options['shaft_system_file']}")
+
+        S = csr_matrix(shaft_system['stiffness_total_system_spectrum'])
+        M = csr_matrix(shaft_system['mass_total_system'])
+
+        self.logger.info(f"shaft system stiffness matrix: {S.shape}")
+        self.logger.info(f"shaft system mass matrix: {M.shape}")
+
+        d0 = [
+            [1,  5,  21.5, -1.1, 350250],
+            [1, 13,  75.5, -1.1, 350251],
+            [3,  4,  12.5, -1.1, 350247],
+            [3, 17,  129, -1.1, 350248],
+            [4,  7,  100.8, -1.1, 350243],
+            [4, 25,  253.6, -1.1, 350244],
+            [4,  4,  70, -1.1, 350241],
+        ]
+
+        d0 = bm.array(d0)
+        d1 = [[1, 1.1, 1.2, 2, 2.1, 2.2, 3, 4, 5], [17, 5, 3, 7, 3, 3, 18, 26, 8]]
+        d1 = bm.array(d1).T
+
+        NN = d1[:, 1].sum() 
+        self.logger.info(f"Number of nodes in the shaft system: {NN}")
+
+
+
+
+
+    @variantmethod('scipy')
+    def solve(self, which: str ='SM'):
+        """Solve the eigenvalue problem using SLEPc.
+        
+        """
+        from petsc4py import PETSc
+        from slepc4py import SLEPc
+        #S, M = self.linear_system()
+        #S, M = self.apply_bc(S, M)
+
+        self.load_shaft_system()
 
         
 

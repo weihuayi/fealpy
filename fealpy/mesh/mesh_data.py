@@ -17,6 +17,8 @@ class MeshData(dict):
         # Update node ids in the node sets
         for name, data in self.get("node_sets", {}).items():
             self.add_node_set(name, idmap[data])
+
+        self['nidmap'] = idmap
         return cell
 
     def get_rbe2_edge(self): 
