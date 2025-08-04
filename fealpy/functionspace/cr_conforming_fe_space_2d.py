@@ -340,6 +340,32 @@ class CrConformingFESpace2d(FunctionSpace, Generic[_MT]):
         bgmphi = self.bspace.grad_m_basis(bcs, m)
         return bm.einsum('cil, cqlg->cqig', coeff, bgmphi)
 
+    def boundary_edge_basis(self, bcs):
+        coeff = self.coeff
+        mesh = self.mesh 
+        isbdedge = mesh.boundary_edge_flag()
+        edge2cell = mesh.edge_to_cell()
+        coeff = coeff[edge2cell[isbdedge,0]]
+        bphi = self.bspace.boundary_edge_basis(bcs)
+        return bm.einsum('cil, cql->cqi', coeff, bphi)
+
+
+    def grad_m_boundary_edge_basis(self, bcs, m):
+        coeff = self.coeff
+        mesh = self.mesh 
+        isbdedge = mesh.boundary_edge_flag()
+        edge2cell = mesh.edge_to_cell()
+        coeff = coeff[edge2cell[isbdedge,0]]
+        bgmphi = self.bspace.grad_m_boundary_edge_basis(bcs, m)
+        return bm.einsum('cil, cqlg->cqig', coeff, bgmphi)
+
+
+    def hess_basis(self, bcs):
+        coeff = self.coeff
+        bhessphi = self.bspace.hess_basis(bcs)
+        return bm.einsum('cil, cqlkg->cqikg', coeff, bhessphi)
+
+
 
     def boundary_interpolate(self, gd, uh, threshold=None, method="interp"):
         '''
