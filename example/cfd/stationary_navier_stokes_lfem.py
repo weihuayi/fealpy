@@ -18,7 +18,7 @@ parser.add_argument('--backend',
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
 parser.add_argument('--pde',
-    default = 2, type=str,
+    default = 1, type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -38,17 +38,21 @@ parser.add_argument('--box',
     help="N")
 
 parser.add_argument('--center',
-    default = [(0.2, 0.06), (0.2, 0.2), (0.2, 0.34), 
-               (1.2, 0.06), (1.2, 0.2), (1.2, 0.34), 
-               (0.7, 0.06),(0.7, 0.2), (0.7, 0.34)], type=int,
+    default = (0.2, 0.2), type=int,
     help="N")
 
+# parser.add_argument('--center',
+#     default = [(0.2, 0.06), (0.2, 0.2), (0.2, 0.34), 
+#                (1.2, 0.06), (1.2, 0.2), (1.2, 0.34), 
+#                (0.7, 0.06),(0.7, 0.2), (0.7, 0.34)], type=int,
+#     help="N")
+
 parser.add_argument('--radius',
-    default = 0.04, type=int,
+    default = 0.05, type=int,
     help="N")
 
 parser.add_argument('--n_circle',
-    default = 300, type=int,
+    default = 1000, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--h',
