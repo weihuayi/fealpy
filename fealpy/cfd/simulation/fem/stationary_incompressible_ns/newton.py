@@ -1,23 +1,17 @@
-from .....backend import backend_manager as bm
-from .....backend import TensorLike
-from .....fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
-from .....fem import DirichletBC
-from .....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
+from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
+from fealpy.fem import DirichletBC
+from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
                      ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
                      ViscousWorkIntegrator, SourceIntegrator, BoundaryFaceSourceIntegrator)
-from .....decorator import barycentric
+from fealpy.decorator import barycentric
 
-from ..fem_base import FEM
-from ...simulation_base import SimulationBase, SimulationParameters
-from .....solver import spsolve
+from ..iterative_method import IterativeMethod 
 
-
-class Newton(FEM):
+class Newton(IterativeMethod):
     """Newton Interative Method""" 
     
-    def __init__(self, equation):
-        FEM.__init__(self, equation)
-
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace

@@ -1,28 +1,21 @@
-from .....backend import backend_manager as bm
-from .....fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
-from .....fem import DirichletBC
-from .....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
+from fealpy.backend import backend_manager as bm
+from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
+from fealpy.fem import DirichletBC
+from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
                      ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
                      ViscousWorkIntegrator, SourceIntegrator, BoundaryFaceSourceIntegrator)
-from .....decorator import barycentric
-from .....fem import BoundaryPressWorkIntegrator
-from .....solver import spsolve
-from ..fem_base import FEM
-from ...simulation_base import SimulationBase, SimulationParameters
+from fealpy.decorator import barycentric
+
+from ..iterative_method import IterativeMethod 
 
 
-class Ossen(FEM):
-    """Ossen Interative Method""" 
+class Ossen(IterativeMethod):
+    """Ossen Iterative Method""" 
     
-    def __init__(self, equation, boundary_threshold=None):
-        FEM.__init__(self, equation)
-        self.threshold = boundary_threshold
-
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
         q = self.q
-        threshold = self.threshold
         
         A00 = BilinearForm(uspace)
         self.u_BC = ScalarConvectionIntegrator(q=q)
