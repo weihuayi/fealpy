@@ -2,6 +2,7 @@ from typing import Union
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
+from fealpy.fem import DirichletBC
 from fealpy.mesh import Mesh
 from fealpy.utils import timer
 from fealpy.cfd.equation import StationaryIncompressibleNS
@@ -51,7 +52,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         Solve the resulting linear system.
     lagrange_multiplier()
         Augment the linear system with a global pressure constraint.
-    error()
+    postprocess()
         Compute errors in velocity and pressure.
 
     Notes
@@ -67,16 +68,15 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.options = options
         self.pde = pde
         self.equation = StationaryIncompressibleNS(pde)
+        self.fem = self.method()
         
         if mesh is None:
-            if hasattr(pde, 'init_mesh'):
-                self.mesh = pde.init_mesh(5,5)
+            if hasattr(pde, 'mesh'):
+                self.mesh = pde.mesh
             else:
                 raise ValueError("Not found mesh!")
         else:
             self.mesh = mesh
-        
-        self.fem = self.method()
         
 
         if options is not None:
@@ -85,9 +85,9 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
 
             run = self.run[options['run']]
             if options['run'] == 'uniform_refine':
-                self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
+                self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
             else:  # 'one_step' 或其他
-                self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
+                self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
     
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
@@ -111,24 +111,17 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         Use Newton iteration method to solve the Navier-Stokes equations.
         """
         from .simulation.fem.stationary_incompressible_ns import Newton
-        self.fem = Newton(self.equation, self.mesh)
+        self.fem = Newton(self.equation)
         self.method_str = "Newton"
         return self.fem
     
-    def update_mesh(self, mesh):
-        """
-        Update the mesh used in the model.
-        """
-        self.mesh = mesh
-        self.fem.update_mesh(mesh)
-
     @method.register("Ossen")
     def method(self): 
         """
         Use Oseen iteration method to solve the Navier-Stokes equations.
         """
         from .simulation.fem.stationary_incompressible_ns import Ossen
-        self.fem = Ossen(self.equation, self.mesh)
+        self.fem = Ossen(self.equation)
         self.method_str = "Ossen"
         return self.fem
     
@@ -138,7 +131,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         Use Stokes iteration method to solve the system.
         """
         from .simulation.fem.stationary_incompressible_ns import Stokes
-        self.fem = Stokes(self.equation, self.mesh)
+        self.fem = Stokes(self.equation)
         self.method_str = "Stokes"
         return self.fem
     
@@ -153,9 +146,83 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         LForm = self.fem.LForm()
         return BForm, LForm
     
+    def update_mesh(self, mesh):
+        self.fem.update_mesh(mesh)
+        self.mesh = mesh
+
+    @variantmethod("dirichlet")
+    def apply_bc(self, A, b):
+        """
+        Apply dirichlet boundary conditions to velocity and pressure.
+        """
+        BC = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.velocity, self.pde.pressure), 
+            threshold=(self.pde.is_velocity_boundary, self.pde.is_pressure_boundary),
+            method='interp')
+        A, b = BC.apply(A, b)
+        self.apply_bc_str = "dirichlet"
+        return A, b
+    
+    @apply_bc.register("None")
+    def apply_bc(self, A, b):
+        """
+        Apply no boundary conditions to velocity and pressure.
+        """
+        BC = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.velocity, self.pde.pressure), 
+            threshold=(None, None),
+            method='interp')
+        A, b = BC.apply(A, b)
+        self.apply_bc_str = "None"
+        return A, b
+
+    @apply_bc.register("neumann")
+    def apply_bc(self, A, b):
+        """
+        Apply neumann boundary conditions to velocity and pressure.
+        """
+        pass
+
+    @apply_bc.register("cylinder")
+    def apply_bc(self, A, b):
+        """
+        Apply boundary conditions for cylinder problems.
+        """
+        BC_influx = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.inlet_velocity, self.pde.pressure), 
+            threshold=(self.pde.is_inlet_boundary, None),
+            method='interp')
+        
+        BC_outflux = DirichletBC(
+            (self.fem.uspace, self.fem.pspace),
+            gd = (self.pde.outlet_velocity, self.pde.outlet_pressure),
+            threshold=(self.pde.is_outlet_boundary, self.pde.is_outlet_boundary),
+            method='interp')
+        
+        BC_wall = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.wall_velocity, self.pde.pressure), 
+            threshold=(self.pde.is_wall_boundary, None),
+            method='interp')
+        
+        BC_obstacle = DirichletBC(
+            (self.fem.uspace, self.fem.pspace), 
+            gd=(self.pde.obstacle_velocity, self.pde.pressure), 
+            threshold=(self.pde.is_obstacle_boundary, None),
+            method='interp')
+        
+        A, b = BC_influx.apply(A, b)
+        A, b = BC_outflux.apply(A, b)
+        A, b = BC_wall.apply(A, b)
+        A, b = BC_obstacle.apply(A, b)
+        self.apply_bc_str = "cylinder"
+        return A, b
     
     @variantmethod('main')
-    def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet', error='error'):
+    def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet', postprocess='error'):
         """
         """
         self.run_str = 'main'
@@ -175,33 +242,33 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             A = BForm.assembly()
             F = LForm.assembly()
             
-            A, F = self.fem.apply_bc[apply_bc](A, F, self.pde)
+            A, F = self.apply_bc[apply_bc](A, F)
             A, F = self.fem.lagrange_multiplier(A, F)
-
+            
             x = self.solve(A, F)
             uh1[:] = x[:ugdof]
             ph1[:] = x[ugdof:-1]
-            res_u = self.mesh.error(uh0, uh1)
-            res_p = self.mesh.error(ph0, ph1)
+            res_u = self.pde.mesh.error(uh0, uh1)
+            res_p = self.pde.mesh.error(ph0, ph1)
             self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
             if res_u + res_p < tol:
                 self.logger.info(f"Converged at iteration {i+1}")
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        uerror, perror = self.error(uh1, ph1) 
+        uerror, perror = self.postprocess(uh1, ph1) 
         self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
         return uh1, ph1
     
     @run.register('one_step')
-    def run(self, uh, apply_bc: str = 'dirichlet', error: str = 'error'):
+    def run(self, uh, apply_bc: str = 'dirichlet', postprocess: str = 'error'):
         self.run_str = 'one_step'
 
         BForm, LForm = self.linear_system()  
         self.fem.update(uh)
         A = BForm.assembly() 
         b = LForm.assembly()
-        A, b = self.fem.apply_bc[apply_bc](A, b, self.pde)
+        A, b = self.apply_bc[apply_bc](A, b)
         A, b = self.fem.lagrange_multiplier(A, b)
         x = self.solve(A, b)
 
@@ -213,15 +280,16 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         return u, p
 
     @run.register('uniform_refine')
-    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10, apply_bc = 'dirichlet', error = 'error'):
+    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10, apply_bc = 'dirichlet', postprocess = 'error'):
         self.run_str = 'uniform_refine'
         self.maxit = maxit
         self.maxstep = maxstep
         self.tol = tol
         for i in range(maxit):
-            self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
+            self.logger.info(f"mesh: {self.pde.mesh.number_of_cells()}")
             self.run['main'](maxstep, tol, apply_bc)
-            self.mesh.uniform_refine()
+            self.pde.mesh.uniform_refine()
+            self.equation = StationaryIncompressibleNS(self.pde)
 
     @variantmethod('direct')
     def solve(self, A, F, solver='mumps'):
@@ -230,13 +298,14 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         return spsolve(A, F, solver = solver)
 
         
-    def error(self, uh, ph):
+    @variantmethod('error')
+    def postprocess(self, uh, ph):
         """
         Post-process the numerical solution to compute the error in L2 norm.
         """
-        self.error_str = 'error'
-        uerror = self.mesh.error(self.pde.velocity, uh)
-        perror = self.mesh.error(self.pde.pressure, ph)
+        self.postprocess_str = 'error'
+        uerror = self.pde.mesh.error(self.pde.velocity, uh)
+        perror = self.pde.mesh.error(self.pde.pressure, ph)
         return uerror, perror
 
     

@@ -1,7 +1,5 @@
 from typing import Union, Dict
 from fealpy.backend import backend_manager as bm
-from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
-from fealpy.sparse import COOTensor
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace, FunctionSpace
 
 class FEMParameters:
@@ -50,9 +48,9 @@ class FEMParameters:
 
 
 class FEM:
-    def __init__(self, equation, params: FEMParameters = None):
+    def __init__(self, equation, mesh, params: FEMParameters = None):
         self.equation = equation
-        self.mesh = equation.pde.mesh
+        self.mesh = mesh
         self.params = params if params else FEMParameters()         
         self.set = self.Set(self)
         
@@ -94,21 +92,6 @@ class FEM:
         # 其他空间类型...
         raise ValueError(f"不支持的空间类型: {space_type}")  
     
-    def lagrange_multiplier(self, A, b, c=0):
-
-        LagLinearForm = LinearForm(self.pspace)
-        LagLinearForm.add_integrator(SourceIntegrator(source=1))
-        LagA = LagLinearForm.assembly()
-        LagA = bm.concatenate([bm.zeros(self.uspace.number_of_global_dofs()), LagA], axis=0)
-
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                                 bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
-
-        A = BlockForm([[A, A1.T], [A1, None]])
-        A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([c])
-        b  = bm.concatenate([b, b0], axis=0)
-        return A, b
 
     class Set:
         """参数设置子类（同步修改参数和空间）"""

@@ -3,7 +3,7 @@ from fealpy.decorator import variantmethod,cartesian
 from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
 
-from .simulation.fem import Newton
+from .simulation.fem.incompressible_ns import Newton
 from .equation import IncompressibleNS
 from .simulation.time import UniformTimeLine
 

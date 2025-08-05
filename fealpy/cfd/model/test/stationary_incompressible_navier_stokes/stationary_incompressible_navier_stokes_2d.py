@@ -14,7 +14,6 @@ class StationaryNSLFEMPolynomialPDE:
         self.eps = 1e-10
         self.rho = 1.0
         self.mu = 1.0
-        self.mesh = self.set_mesh()
     
     @cartesian
     def velocity(self, p):
@@ -28,7 +27,7 @@ class StationaryNSLFEMPolynomialPDE:
     def domain(self):
         return [0, 1, 0, 1]
 
-    def set_mesh(self, n=16):
+    def init_mesh(self, n=16):
         box = self.domain()
         mesh = TriangleMesh.from_box(box, nx=n, ny=n)
         self.mesh = mesh
@@ -69,7 +68,6 @@ class FromSympy(BoxMesher2d):
         self.rho = rho
         self.x, self.y = sp.symbols('x, y')
         self.select_pde["sinsin"]()        
-        self.mesh = self.init_mesh()
     
     @variantmethod("sinsin")
     def select_pde(self):
@@ -143,25 +141,11 @@ class FromSympy(BoxMesher2d):
 
     def domain(self):
         return self.box
-    
-    @variantmethod("tri")
-    def init_mesh(self, nx=8, ny=8):
-        box = self.box
-        mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
-        self.mesh = mesh
-        return mesh
-    
-    @init_mesh.register("quad")
-    def init_mesh(self, nx=8, ny=8):
-        box = self.box
-        mesh = QuadrangleMesh.from_box(box, nx=nx, ny=ny)
-        self.mesh = mesh
-        return mesh
-
+   
     @cartesian
     def is_pressure_boundary(self, p):
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        return result
+        #return result
     
     @cartesian
     def is_velocity_boundary(self, p):

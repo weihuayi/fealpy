@@ -13,7 +13,7 @@ from ..simulation_base import SimulationBase, SimulationParameters
 from ....functionspace import Function
 from ....decorator import barycentric
 
-class IPCS(ProjectionMethod, FEM):
+class IPCS(ProjectionMethod):
     """IPCS分裂投影法"""
     def __init__(self, equation, boundary_threshold=None):
         FEM.__init__(self, equation)
