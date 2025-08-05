@@ -3,7 +3,6 @@ from fealpy.decorator import variantmethod,cartesian
 from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
 
-from .simulation.fem.incompressible_ns import Newton
 from .equation import IncompressibleNS
 from .simulation.time import UniformTimeLine
 
@@ -14,7 +13,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         self.pde = pde
         self.equation = IncompressibleNS(self.pde)
         self.timeline = UniformTimeLine(0, 1, 100)
-        self.fem = self.method()
         
         if mesh is None:
             if hasattr(pde, 'mesh'):
@@ -23,6 +21,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 raise ValueError("Not found mesh!")
         else:
             self.mesh = mesh
+        
+        self.fem = self.method()
 
         if options is not None:
             self.solve.set(options['solve'])
@@ -37,28 +37,29 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
     @variantmethod("Newton")
     def method(self):
-        self.fem = Newton(self.equation, self.pde.is_pressure_boundary)
+        from .simulation.fem.incompressible_ns import Newton
+        self.fem = Newton(self.equation, self.mesh)
         self.method_str = "Newton"
         return self.fem
     
     @method.register("Ossen")
     def method(self):
         from .simulation.fem import Ossen
-        self.fem = Ossen(self.equation)
+        self.fem = Ossen(self.equation, self.mesh)
         self.method_str = "Ossen"
         return self.fem
     
     @method.register("IPCS")
     def method(self):
-        from .simulation.fem import IPCS
-        self.fem = IPCS(self.equation)
+        from .simulation.fem.incompressible_ns import IPCS
+        self.fem = IPCS(self.equation, self.mesh)
         self.method_str = "IPCS"
         return self.fem
     
     @method.register("BDF2")
     def method(self):
         from .simulation.fem import BDF2
-        self.fem = BDF2(self.equation)
+        self.fem = BDF2(self.equation, self.mesh)
         self.method_str = "BDF2"
         return self.fem
 
@@ -70,43 +71,12 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         LForm = self.fem.LForm()
         return BForm, LForm
     
-    @variantmethod("dirichlet")
-    def apply_bc(self, A, b):
-        BC = DirichletBC(
-            (self.fem.uspace, self.fem.pspace), 
-            gd=(lambda p: self.pde.velocity(p, self.timeline.next_time()), lambda p: self.pde.pressure(p, self.timeline.next_time())), 
-            threshold=(self.pde.is_velocity_boundary, self.pde.is_pressure_boundary),
-            method='interp')
-        A, b = BC.apply(A, b)
-        return A, b
-    
-    @apply_bc.register("None")
-    def apply_bc(self, A, b):
-        BC = DirichletBC(
-            (self.fem.uspace, self.fem.pspace), 
-            gd=(lambda p: self.pde.velocity(p, self.timeline.next_time()), lambda p: self.pde.pressure(p, self.timeline.next_time())), 
-            threshold=(None, None),
-            method='interp')
-        A, b = BC.apply(A, b)
-        return A, b
-
-    @apply_bc.register("neumann")
-    def apply_bc(self, A, b):
-        pass
 
     @variantmethod('direct')
     def solve(self, A, F, solver = 'mumps'):
         from fealpy.solver import spsolve
         return spsolve(A, F, solver=solver)
 
-    @solve.register('amg')
-    def solve(self, A, F):
-        raise NotImplementedError("AMG solver not yet implemented.")
-
-    @solve.register('pcg')
-    def solve(self, A, F):
-        pass
-    
     @variantmethod('main')
     def run(self, maxstep = 10, tol = 1e-10, postprocess = 'error'):
         
@@ -131,7 +101,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             p0[:] = p1
 
             uerror, perror = self.error(u0, p0, t= timeline.next_time()) 
-            print("asdasd",timeline.next_time())
             timeline.advance()
         uerror, perror = self.error(u0, p0, t= timeline.T1)  
         return u0, p0
@@ -159,12 +128,12 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             
             self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
             
-            A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
+            A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False, threshold=pde.is_pressure_boundary)
             uhs[:] = self.solve(A0, b0)
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
             #A1, b1 = self.fem.pressure(uhs, p0, return_form=False)
-            ph1[:] = self.solve(A1, b1)[:-1]
+            ph1[:] = self.solve(A1, b1)
 
             A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, return_form=False)
             uh1[:] = self.solve(A2, b2)
@@ -185,14 +154,14 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 
                 A = BForm.assembly()
                 b = LForm.assembly()
-                A, b = self.apply_bc(A, b)
-                A, b = self.fem.lagrange_multiplier(A, b,4)
+                A, b = self.fem.apply_bc(A, b, self.pde, t=self.timeline.next_time())
+                #A, b = self.fem.lagrange_multiplier(A, b,4)
             
                 x = self.solve(A, b, 'mumps')
                 uk1[:] = x[:ugdof]
-                pk[:] = x[ugdof:-1]
+                pk[:] = x[ugdof]
                 
-                res_u = pde.mesh.error(uk0, uk1)
+                res_u = self.mesh.error(uk0, uk1)
                 print(res_u)
                 if res_u < tol:
                     break
@@ -212,7 +181,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         
     @variantmethod('L2')
     def error(self, uh, ph, t):
-        uerror = self.pde.mesh.error(cartesian(lambda p : self.pde.velocity(p, t = t)), uh)
-        perror = self.pde.mesh.error(cartesian(lambda p : self.pde.pressure(p, t = t)), ph)
+        uerror = self.mesh.error(cartesian(lambda p : self.pde.velocity(p, t = t)), uh)
+        perror = self.mesh.error(cartesian(lambda p : self.pde.pressure(p, t = t)), ph)
         self.logger.info(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror

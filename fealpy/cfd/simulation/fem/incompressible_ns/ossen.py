@@ -15,13 +15,6 @@ from ..simulation_base import SimulationBase, SimulationParameters
 class Ossen(FEM):
     """Ossen Interative Method""" 
     
-    def __init__(self, equation, boundary_threshold=None):
-        FEM.__init__(self, equation)
-        self.threshold = boundary_threshold
-
-    def simulation(self):
-        pass
-
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace

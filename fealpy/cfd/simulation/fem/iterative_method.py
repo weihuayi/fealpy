@@ -5,6 +5,7 @@ from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
 from fealpy.sparse import COOTensor
 from fealpy.decorator import variantmethod
 from fealpy.fem import DirichletBC
+from fealpy.decorator import cartesian
 
 from .fem_base import FEM
 
@@ -57,14 +58,26 @@ class IterativeMethod(FEM, ABC):
         b  = bm.concatenate([b, b0], axis=0)
         return A, b
     
-    def apply_bc(self, A, b, pde):
+    @variantmethod('dirichlet') 
+    def apply_bc(self, A, b, pde, t=None):
         """
         Apply dirichlet boundary conditions to velocity and pressure.
         """
-        BC = DirichletBC(
-            (self.uspace, self.pspace), 
-            gd=(pde.velocity_dirichlet, pde.pressure_dirichlet), 
-            threshold=(pde.is_velocity_boundary, pde.is_pressure_boundary),
-            method='interp')
-        A, b = BC.apply(A, b)
+        if t is None:
+            BC = DirichletBC(
+                (self.uspace, self.pspace), 
+                gd=(pde.velocity_dirichlet, pde.pressure_dirichlet), 
+                threshold=(pde.is_velocity_boundary, pde.is_pressure_boundary),
+                method='interp')
+            A, b = BC.apply(A, b)
+        else:
+            gd_v = cartesian(lambda p:pde.velocity_dirichlet(p, t))
+            gd_p = cartesian(lambda p:pde.pressure_dirichlet(p, t))
+            gd = (gd_v, gd_p)
+            BC = DirichletBC(
+                (self.uspace, self.pspace), 
+                gd=gd, 
+                threshold=(pde.is_velocity_boundary, pde.is_pressure_boundary),
+                method='interp')
+            A, b = BC.apply(A, b)
         return A, b
