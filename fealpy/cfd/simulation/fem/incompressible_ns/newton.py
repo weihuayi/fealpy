@@ -12,7 +12,12 @@ from ..iterative_method import IterativeMethod
 
 class Newton(IterativeMethod):
     """Newton Interative Method""" 
-    
+    def __init__(self, equation, mesh):
+        super().__init__(equation, mesh)
+        
+        if self.equation.pressure_neumann == False:
+            self.threshold = self.equation.pde.is_pressure_boundary
+
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
@@ -82,13 +87,13 @@ class Newton(IterativeMethod):
         @barycentric
         def u_BC_coef(bcs, index):
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            return cccoef * u0(bcs, index)
+            return cccoef * uk(bcs, index)
         self.u_BC.coef = u_BC_coef
 
         @barycentric
         def u_BM_netwon_coef(bcs,index):
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            return cccoef * u0.grad_value(bcs, index)
+            return cccoef * uk.grad_value(bcs, index)
         self.u_BM_netwon.coef = u_BM_netwon_coef
 
         ## LinearForm 
@@ -96,9 +101,9 @@ class Newton(IterativeMethod):
         def u_LSI_coef(bcs, index):
             ctdcoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            result = ctdcoef * uk(bcs, index) / dt
-            result += cccoef*bm.einsum('...j, ...ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
+            result = ctdcoef * u0(bcs, index) / dt
+            result += cccoef*bm.einsum('...j, ...ij -> ...i', uk(bcs, index), uk.grad_value(bcs, index))
             return result
         self.u_LSI.source = u_LSI_coef
         self.u_LSI_f.source = cbf 
-
+    
