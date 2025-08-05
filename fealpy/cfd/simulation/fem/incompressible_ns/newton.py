@@ -12,6 +12,11 @@ from ..iterative_method import IterativeMethod
 
 class Newton(IterativeMethod):
     """Newton Interative Method""" 
+    def __init__(self, equation, mesh):
+        super().__init__(equation, mesh)
+        
+        if self.equation.pressure_neumann == False:
+            self.threshold = self.equation.pde.is_pressure_boundary
 
     def BForm(self):
         pspace = self.pspace

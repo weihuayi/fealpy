@@ -18,8 +18,8 @@ fem = model.fem
 equation = model.equation
 timeline = model.timeline
 timeline.set_timeline(0, 1, 500)
-model.method['IPCS']()
-#model.method['Newton']()
+#model.method['IPCS']()
+model.method['Newton']()
 
 u1,p = model.run(maxstep=1)
 mesh = model.mesh

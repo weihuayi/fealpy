@@ -59,11 +59,7 @@ class FEM:
         self._uspace = TensorFunctionSpace(uspace, (self.mesh.GD,-1))
         self._tspace = self._create_space('tspace') 
         
-        self._q = self.params.assembly['quadrature_order']
-        
-        if self.equation.pressure_neumann == False:
-            self.threshold = self.equation.pde.is_pressure_boundary
-
+        self._q = self.params.assembly['quadrature_order'] 
     
     def update_mesh(self, mesh):
         self.mesh = mesh

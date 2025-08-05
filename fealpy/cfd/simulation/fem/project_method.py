@@ -10,7 +10,13 @@ from .fem_base import FEM
 
 class ProjectionMethod(FEM, ABC):
     """投影算法抽象基类"""
-    
+    def __init__(self, equation, mesh):
+        super().__init__(equation, mesh)
+        
+        if self.equation.pressure_neumann == False:
+            self.threshold = self.equation.pde.is_pressure_boundary
+
+
     @abstractmethod
     def predict_velocity(self):
         """速度预测步"""
