@@ -16,11 +16,6 @@ mesh = model.init_mesh()
 sspace = LagrangeFESpace(mesh=mesh, p=1, ctype='C')
 tspace = TensorFunctionSpace(scalar_space=sspace, shape=(6, -1))
 integrator = TimoshenkoBeamIntegrator(space=tspace, material=material)
-    
-#est = integrator._coord_transfrom()
-#print('iiiii', test)
-
-#matrix = integrator.assembly()
 
 bform = BilinearForm(tspace)
 bform.add_integrator(TimoshenkoBeamIntegrator(space=tspace, material=material))

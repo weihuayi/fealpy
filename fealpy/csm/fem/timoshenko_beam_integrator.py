@@ -105,7 +105,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         mu = self.material.mu
 
         mesh = space.mesh
-        bar_length = mesh.entity_measure('cell')
+        l = mesh.entity_measure('cell')
         NC = mesh.number_of_cells()
 
         AX, AY, AZ = self.material.calculate_cross_sectional_areas()
@@ -113,52 +113,52 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         R = self._coord_transfrom()
 
-        FY = 12 * E * Iz / mu / AY / (bar_length**2)  # Phi_y
-        FZ = 12 * E * Iy / mu / AZ / (bar_length**2)  # Phi_x
+        phi_y = 12 * E * Iz / mu / AY / (l**2)  # Phi_y
+        phi_z = 12 * E * Iy / mu / AZ / (l**2)  # Phi_x
 
         KE = bm.zeros((NC, 12, 12))
 
-        for i in range(NC):
-            ke = bm.zeros((12, 12))
-            li = bar_length[i]
-            axi, ayi, azi =  AX[i], AY[i], AZ[i]
-            iyi, izi, ixi = Iy[i], Iz[i], Ix[i]
-            fy = FY[i]
-            fz = FZ[i]
+        Ke = bm.zeros((NC, 12, 12))
 
-            ke[0, 0] = E * axi / li
-            ke[0, 6] = -ke[0, 0]
-            ke[1, 1] = 12 * E * izi / (1 + fy) / (li**3)
-            ke[1, 5] = 6 * E * izi / (1 + fy) / (li**2)
-            ke[1, 7] = -ke[1, 1]
-            ke[1, 11] = ke[1, 5]
-            ke[2, 2] = 12 * E * iyi / (1 + fz) / (li**3)
-            ke[2, 4] = -6 * E * iyi / (1 + fz) / (li**2)
-            ke[2, 8] = -ke[2, 2]
-            ke[2, 10] = ke[2, 4]
-            ke[3, 3] = mu * ixi / li
-            ke[3, 9] = -ke[3, 3]
-            ke[4, 4] = (4 + fz) * E * iyi / (1 + fz) / li
-            ke[4, 8] = 6 * E * iyi / (1 + fz) / (li**2)
-            ke[4, 10] = (2 - fz) * E * iyi / (1 + fz) / li
-            ke[5, 5] = (4 + fy) * E * izi / (1 + fy) / li
-            ke[5, 7] = -6 * E * izi / (1 + fy) / (li**2)
-            ke[5, 11] = (2 - fy) * E * izi / (1 + fy) / li
-            ke[6, 6] = ke[0, 0]
-            ke[7, 7] = -ke[1, 7]
-            ke[7, 11] = -ke[1, 11]
-            ke[8, 8] = -ke[2, 8]
-            ke[8, 10] = -ke[2, 10]
-            ke[9, 9] = ke[3, 3]
-            ke[10, 10] = ke[4, 4]
-            ke[11, 11] = ke[5, 5]
+        Ke[:, 0, 0] = E * AX / l
+        Ke[:, 0, 6] = -Ke[:, 0, 0]
 
-            # Symmetrize
-            for j in range(11):
-                for k in range(j + 1, 12):
-                    ke[k, j] = ke[j, k]
+        Ke[:, 1, 1] = 12 * E * Iz / (1+phi_y) /(l**3)
+        Ke[:, 1, 5] = 6 * E *Iz / (1+phi_y) / (l**2)
+        Ke[:, 1, 7] = -Ke[:, 1, 1]
+        Ke[:, 1, 11] = -Ke[:, 1, 5]
 
-            # Apply transformation
-            KE[i] = R[i].T @ ke @ R[i]
+        Ke[:, 2, 2] = 12 * E * Iy / (1+phi_z) /(l**3)
+        Ke[:, 2, 4] = -6 * E *Iy / (1+phi_z) / (l**2)
+        Ke[:, 2, 8] = -Ke[:, 2, 2]
+        Ke[:, 2, 10] = Ke[:, 2, 4]
+
+        Ke[:, 3, 3] = mu * Ix / l
+        Ke[:, 3, 9] = -Ke[:, 3, 3]
+
+        Ke[:, 4, 4] = (4+phi_z) * E * Iy / (1+phi_z) / l
+        Ke[:, 4, 8] = 6 * E * Iy / (1+phi_z) /(l**2)
+        Ke[:, 4, 10] = (2-phi_z) * E * Iy / (1+phi_z) / l
+
+        Ke[:, 5, 5] = (4+phi_y) * E * Iz / (1+phi_y) / l
+        Ke[:, 5, 7] = -6 * E * Iz / (1+phi_y) / (l**2)
+        Ke[:, 5, 11] = (2-phi_y) * E * Iz / (1+phi_y) / l
+
+        Ke[:, 6, 6] = Ke[:, 0, 0]
+        Ke[:, 7, 7] = -Ke[:, 1, 7]
+        Ke[:, 7, 11] = -Ke[:, 1, 11]
+
+        Ke[:, 8, 8] = -Ke[:, 2, 8]
+        Ke[:, 8, 10] = -Ke[:, 2, 10]
+        Ke[:, 9, 9] = Ke[:, 3, 3]
+        Ke[:, 10, 10] = Ke[:, 4, 4]
+        Ke[:, 11, 11] = Ke[:, 6, 6]
+
+        # Symmetrize
+        for j in range(11):
+            for k in range(j + 1, 12):
+                Ke[:, k, j] = Ke[:, j, k]
+
+        KE = bm.einsum('cji, cjl, clj -> cij', R, Ke, R)
 
         return KE
