@@ -22,10 +22,6 @@ parser.add_argument('--shaft_system_file',
                     default='/home/why/fealpy/data/matlab-total-shaft.mat', type=str,
                     help='the stiffness and mass matrix of the shaft')
 
-parser.add_argument('--space_degree',
-        default=1, type=int,
-        help='Degree of Lagrange finite element space, default is 1')
-
 parser.add_argument('--neigen',
         default=6, type=int,
         help='Number of eigenvalues to compute, default is 6')
