@@ -128,24 +128,12 @@ class Exp0001(BoxMesher2d):
         return result
 
     @cartesian
-    def velocity_gradient(self, p: TensorLike) -> TensorLike:
-        """Optional: placeholder for velocity gradient (∇u) if needed."""
-        pass
-    
-    @cartesian
-    def pressure_gradient(self):
-        """Optional: placeholder for pressure gradient (∇p) if needed."""
-        pass
-
-    @cartesian
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
-        """Optional: prescribed velocity on boundary, if needed explicitly."""
-        pass
+        return self.velocity(p)
     
     @cartesian
     def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
-        """Optional: prescribed pressure on boundary (usually for stability)."""
-        pass
+        return self.pressure(p)
 
     def _init_expr(self):
         """Initialize symbolic expressions for velocity, pressure, and source."""

@@ -18,7 +18,7 @@ parser.add_argument('--backend',
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
 parser.add_argument('--pde',
-    default = 1, type=str,
+    default = 2, type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
