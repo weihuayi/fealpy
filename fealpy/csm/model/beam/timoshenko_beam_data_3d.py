@@ -49,13 +49,14 @@ class TimoshenkoBeamData3D:
             [120, 141, 2]
         ])
         self.L = bm.sum(self.para[:, 1])
-        #self._D = self.para[:, 0]
         self._D = bm.repeat(self.para[:, 0], self.para[:, 2].astype(int))
+        self._beam_index = bm.arange(sum(self.para[:, 2].astype(int)))
         self._FSY = 10/9
         self._FSZ = 10/9
+        self.mesh = self.init_mesh()
         self._AX, self._AY, self._AZ = self._calculate_cross_sectional_areas()
         self._Iy, self._Iz, self._Ix = self._calculate_moments_of_inertia()
-        self.mesh = self.init_mesh()
+        
 
     @property
     def D(self) -> TensorLike:
@@ -65,20 +66,37 @@ class TimoshenkoBeamData3D:
     def k_lunzhou(self, p: Optional[TensorLike] = None) -> TensorLike:
         """N/mm equivalent node stiffness for the axle, identical in all three translational directions."""
         return 1.976e6 
+    
+    def _calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        NC = self.mesh.number_of_cells()
+        AX = bm.ones(NC)
+        AY = bm.ones(NC)
+        AZ = bm.ones(NC)
 
-    def _calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:
-        AX = bm.pi * self.D**2/4
-        AY = AX / self._FSY
-        AZ = AX / self._FSZ
-        
+        AX_beam = bm.pi * self.D**2 / 4
+        AY_beam = AX_beam / self._FSY
+        AZ_beam = AX_beam / self._FSZ
+
+        AX[self._beam_index] = AX_beam
+        AY[self._beam_index] = AY_beam
+        AZ[self._beam_index] = AZ_beam
+
         return AX, AY, AZ
+    
+    def _calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        NC = self.mesh.number_of_cells()
+        Iy = bm.ones(NC)
+        Iz = bm.ones(NC)
+        Ix = bm.ones(NC)
 
-    def _calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike]:
-        Iy = bm.pi * self._D**4 / 64
-        Iz = Iy
-        Ix = Iy + Iz
+        # 梁单元的惯性矩
+        Iy_val = bm.pi * self.D**4 / 64
+        Iy[self._beam_index] = Iy_val
+        Iz[self._beam_index] = Iy_val
+        Ix[self._beam_index] = 2 * Iy_val
 
-        return Iy, Iz, Ix
+        return Ix, Iy, Iz
+
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""

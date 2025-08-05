@@ -15,14 +15,13 @@ mesh = model.init_mesh()
     
 sspace = LagrangeFESpace(mesh=mesh, p=1, ctype='C')
 tspace = TensorFunctionSpace(scalar_space=sspace, shape=(6, -1))
+integrator = TimoshenkoBeamIntegrator(space=tspace, material=material)
     
-#bars_length = integrator._bars_length()
-#test = integrator._coord_transfrom()
+#est = integrator._coord_transfrom()
+#print('iiiii', test)
 
-#integrator = TimoshenkoBeamIntegrator(space=tspace, material=material)
-    #matrix = integrator.assembly()
+#matrix = integrator.assembly()
 
 bform = BilinearForm(tspace)
 bform.add_integrator(TimoshenkoBeamIntegrator(space=tspace, material=material))
-K = bform.assembly()
-print('iiii')
+K = bform.assembly().toarray()

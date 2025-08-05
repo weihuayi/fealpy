@@ -33,12 +33,14 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
     def _coord_transfrom(self) -> TensorLike:
         """Construct the coordinate transformation matrix for 3D beam elements."""
         mesh = self.space.mesh
-        node = mesh.entity('node')
-        #c2n = mesh.cell_to_node()
+        node= mesh.entity('node')
+        cell = mesh.entity('cell')
+        bar_nodes = node[cell]
+        
         NC = mesh.number_of_cells()
-        x = node[..., 0]
-        y = node[..., 1]
-        z = node[..., 2]
+        x = bar_nodes[..., 0]
+        y = bar_nodes[..., 1]
+        z = bar_nodes[..., 2]
 
         bars_length = mesh.entity_measure('cell')
         
@@ -47,13 +49,12 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         T12 = (y[..., 1] - y[..., 0]) / bars_length
         T13 = (z[..., 1] - z[..., 0]) / bars_length
 
-
         vy = bm.array([0, 1, 0], dtype=bm.float64)
         k1, k2, k3 = vy
 
         # 计算第二行方向向量（垂直于杆轴方向的 y 方向局部坐标单位向量）
         A = bm.sqrt((T12 * k3 - T13 * k2)**2 + (T13 * k1 - T11 * k3)**2 + (T11 * k2 - T12 * k1)**2)
-        
+
         T21 = -(T12 * k3 - T13 * k2) / A
         T22 = -(T13 * k1 - T11 * k3) / A
         T23 = -(T11 * k2 - T12 * k1) / A
@@ -73,7 +74,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         # 构造12x12旋转变换矩阵 R
         O = bm.zeros((NC, 3, 3))
-        row1 = bm.concatenate([T0, O,  O,  O], axis=2)
+        row1 = bm.concatenate([T0   , O,  O,  O], axis=2)
         row2 = bm.concatenate([O,  T0, O,  O], axis=2)
         row3 = bm.concatenate([O,  O,  T0, O], axis=2)
         row4 = bm.concatenate([O,  O,  O,  T0], axis=2)
@@ -82,7 +83,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         return R
  
     @variantmethod
-    def assembly(self) -> TensorLike:
+    def assembly(self, space: _FS) -> TensorLike:
         """Construct the stiffness matrix for 3D beam elements.This function computes the (12, 12) stiffness matrix for each element.
         
         Parameters:
@@ -99,27 +100,27 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Returns:
             Ke(ndarray),The 3D beam element stiffness matrix, shape (NC, 12, 12).
         """
+        assert space is self.space  
         E = self.material.E
         mu = self.material.mu
 
-        space = self.space
         mesh = space.mesh
         bar_length = mesh.entity_measure('cell')
-        l = bar_length[0:22]
+        NC = mesh.number_of_cells()
 
         AX, AY, AZ = self.material.calculate_cross_sectional_areas()
         Iy, Iz, Ix = self.material.calculate_moments_of_inertia()
 
-        R = self._coord_transfrom()[:22]
+        R = self._coord_transfrom()
 
-        FY = 12 * E * Iz / mu / AY / (l**2)  # Phi_y
-        FZ = 12 * E * Iy / mu / AZ / (l**2)  # Phi_x
+        FY = 12 * E * Iz / mu / AY / (bar_length**2)  # Phi_y
+        FZ = 12 * E * Iy / mu / AZ / (bar_length**2)  # Phi_x
 
-        KE = bm.zeros((22, 12, 12))
+        KE = bm.zeros((NC, 12, 12))
 
-        for i in range(22):
+        for i in range(NC):
             ke = bm.zeros((12, 12))
-            li = l[i]
+            li = bar_length[i]
             axi, ayi, azi =  AX[i], AY[i], AZ[i]
             iyi, izi, ixi = Iy[i], Iz[i], Ix[i]
             fy = FY[i]
