@@ -14,7 +14,7 @@ mesh = pde.init_mesh()
 #pde.select_pde['sinsinexp']()
 
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh=mesh)
-model.method['Newton']()
+model.method['Stokes']()
 model.run['main']()
 
 #mesh = pde.init_mesh(20,20)

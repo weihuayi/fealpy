@@ -97,7 +97,6 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         s += f"  method         : {self.method_str}\n"
         s += f"  run            : {self.run_str}\n"
         s += f"  solve          : {self.solve_str}\n"
-        s += f"  apply_bc       : {self.apply_bc_str}\n"
         s += f"  maxsteps       : {self.maxstep}\n"
         s += f"  tol            : {self.tol}\n"
         if self.options.get("run") == "uniform_refine":
@@ -189,8 +188,8 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        uerror, perror = self.error(uh1, ph1) 
-        self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
+        # uerror, perror = self.error(uh1, ph1) 
+        # self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
         return uh1, ph1
     
     @run.register('one_step')

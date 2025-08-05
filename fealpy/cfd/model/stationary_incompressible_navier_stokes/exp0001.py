@@ -18,9 +18,16 @@ class Exp0001():
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return self.box
+        return self.options['box']
     
-    def init_mesh(self, box=[0, 2.2, 0 , 0.41], center=(0.2, 0.2), radius=0.05, n_circle=60, h=0.05):
+    def init_mesh(self):
+        options = self.options
+        box = options['box']
+        center = options['center']
+        radius = options['radius']
+        n_circle = options['n_circle'] 
+        h = options['h']
+
         self.box = box
         self.center = center
         self.radius = radius
@@ -144,8 +151,6 @@ class Exp0001():
         result[is_outlet] = outlet[is_outlet]
         return result
 
-
-
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
@@ -164,8 +169,8 @@ class Exp0001():
         atol = 1e-12
         # 检查是否接近 x=±1 或 y=±1
         on_boundary = (
-            (bm.abs(x - 0.) < atol) &
-            (y > 0.) & (y < 0.41))
+            (bm.abs(x - self.box[0]) < atol) &
+            (y > self.box[2]) & (y < self.box[3]))
         return on_boundary
 
     @cartesian
@@ -174,7 +179,7 @@ class Exp0001():
         x = p[..., 0]
         y = p[..., 1]
         atol = 1e-12
-        on_boundary = (bm.abs(x - 2.2) < atol)
+        on_boundary = (bm.abs(x - self.box[1]) < atol)
         return on_boundary
     
     @cartesian
@@ -184,7 +189,7 @@ class Exp0001():
         y = p[..., 1]
         atol = 1e-12
         on_boundary = (
-            (bm.abs(y - 0.) < atol) | (bm.abs(y - 0.41) < atol))
+            (bm.abs(y - self.box[2]) < atol) | (bm.abs(y - self.box[3]) < atol))
         return on_boundary
     
     @cartesian

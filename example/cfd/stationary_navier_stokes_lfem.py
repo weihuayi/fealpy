@@ -41,22 +41,40 @@ parser.add_argument('--center',
     default = (0.2, 0.2), type=int,
     help="N")
 
-# parser.add_argument('--center',
-#     default = [(0.2, 0.06), (0.2, 0.2), (0.2, 0.34), 
-#                (1.2, 0.06), (1.2, 0.2), (1.2, 0.34), 
-#                (0.7, 0.06),(0.7, 0.2), (0.7, 0.34)], type=int,
-#     help="N")
+parser.add_argument('--start_center',
+    default = (0.015, 0.015), type=int,
+    help="N")
 
 parser.add_argument('--radius',
     default = 0.05, type=int,
     help="N")
 
+parser.add_argument('--nx',
+    default = 7, type=int,
+    help="N")
+
+parser.add_argument('--ny',
+    default = 7, type=int,
+    help="N")
+
+parser.add_argument('--dx',
+    default = 0.09, type=int,
+    help="N")
+
+parser.add_argument('--dy',
+    default = 0.06, type=int,
+    help="N")
+
+parser.add_argument('--shift_angle',
+    default = 7, type=int,
+    help="N")
+
 parser.add_argument('--n_circle',
-    default = 1000, type=int,
+    default = 100, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--h',
-    default = 0.005, type=float,
+    default = 0.05, type=float,
     help="Mesh size, default is 0.05")
 
 parser.add_argument('--method',
@@ -97,7 +115,8 @@ options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
-model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
+mesh = pde.init_mesh()
+model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
 
 
 
@@ -106,7 +125,7 @@ model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
 
 
 # 可视化
-mesh = pde.mesh
+mesh = model.mesh
 uh, ph = model.uh1, model.ph1
 uh = uh.reshape(2, -1).T
 points_u = model.fem.uspace.interpolation_points()

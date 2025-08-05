@@ -62,7 +62,6 @@ class Exp0001(BoxMesher2d):
         self.eps = 1e-10
         self.mu = 1.0
         self.rho = 1.0
-        self.mesh = self.init_mesh['uniform_tri'](nx=options.get('nx', 8), ny=options.get('ny', 8))
         self._init_expr()
         super().__init__(box=self.box)
 
@@ -74,9 +73,9 @@ class Exp0001(BoxMesher2d):
         s += f"  mesh size          : nx = {self.nx}, ny = {self.ny}\n"
         s += f"  density (ρ)        : {self.rho}\n"
         s += f"  viscosity (μ)      : {self.mu}\n"
-        s += f"  exact_velocity_x   : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
-        s += f"  exact_velocity_y   : u_2(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²\n"
-        s += f"  exact_pressure     : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
+        s += f"  velocity_x   : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
+        s += f"  velocity_y   : u_2(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²\n"
+        s += f"  pressure     : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
         s += f")"
         return s
 

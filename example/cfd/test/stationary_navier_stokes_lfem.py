@@ -69,6 +69,6 @@ options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 manager = CFDTestModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
-
+# mesh = pde.init_mesh()
 model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
 model.__str__()
