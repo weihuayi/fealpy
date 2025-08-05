@@ -175,7 +175,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             A = BForm.assembly()
             F = LForm.assembly()
             
-            A, F = self.fem.apply_bc[apply_bc](A, F, self.pde)
+            A, F = self.fem.apply_bc(A, F, self.pde)
             A, F = self.fem.lagrange_multiplier(A, F)
 
             x = self.solve(A, F)

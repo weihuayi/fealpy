@@ -5,20 +5,12 @@ from fealpy.backend import TensorLike
 from fealpy.mesher import BoxMesher2d
 import sympy as sp
 
-class Exp0001(BoxMesher2d):
+class Exp0001():
     def __init__(self, options: dict = {}):
         self.options = options
-        self.box = [0.0, 1.0, 0.0, 1.0]
         self.eps = 1e-10
         self.mu = 1e-3
         self.rho = 1.0
-        self.mesh = self.init_mesh(box = options.get('box', [0.0, 2.2, 0.0, 0.41]), 
-                                   center = options.get('center', (0.2, 0.2)),
-                                   radius = options.get('radius', 0.05),
-                                   n_circle = options.get('n_circle', 1000),
-                                   h = options.get('h', 0.005))
-        self._init_expr()
-        super().__init__(box=self.box)
 
     def get_dimension(self) -> int: 
         """Return the geometric dimension of the domain."""
@@ -28,7 +20,7 @@ class Exp0001(BoxMesher2d):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
     
-    def init_mesh(self, box, center, radius, n_circle=60, h=0.05):
+    def init_mesh(self, box=[0, 2.2, 0 , 0.41], center=(0.2, 0.2), radius=0.05, n_circle=60, h=0.05):
         self.box = box
         self.center = center
         self.radius = radius
@@ -117,6 +109,16 @@ class Exp0001(BoxMesher2d):
         return result
     
     @cartesian
+    def is_velocity_boundary(self, p):
+        return None
+    
+    @cartesian
+    def is_pressure_boundary(self, p):
+        is_out = self.is_outlet_boundary(p)
+        return is_out
+
+
+    @cartesian
     def obstacle_velocity(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity on obstacle."""
         x = p[..., 0]
@@ -127,12 +129,23 @@ class Exp0001(BoxMesher2d):
         return result
     
     @cartesian
-    def pressure(self, p: TensorLike) -> TensorLike:
-        x = p[..., 0]
-        y = p[..., 1]
-        result = bm.array(0.0)
+    def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
+        return self.outlet_pressure(p)
+   
+    @cartesian
+    def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
+        inlet = self.inlet_velocity(p)
+        outlet = self.outlet_velocity(p)
+        is_inlet = self.is_inlet_boundary(p)
+        is_outlet = self.is_outlet_boundary(p)
+        
+        result = bm.zeros_like(p, dtype=p.dtype)
+        result[is_inlet] = inlet[is_inlet]
+        result[is_outlet] = outlet[is_outlet]
         return result
-    
+
+
+
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
@@ -186,44 +199,4 @@ class Exp0001(BoxMesher2d):
         on_boundary = bm.abs((x - cx)**2 + (y - cy)**2 - radius**2) < atol
         return on_boundary
         
-    @cartesian
-    def velocity_gradient(self, p: TensorLike) -> TensorLike:
-        pass
-    
-    @cartesian
-    def pressure_gradient(self):
-        pass
-
-    @cartesian
-    def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
-        pass
-    
-    @cartesian
-    def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
-        pass
-
-    def _init_expr(self):
-        x, y = sp.symbols('x, y')
-        u1 = 10 * x ** 2 * (x - 1) ** 2 * y * (y - 1) * (2 * y - 1)
-        u2 = -10 * x * (x - 1) * (2 * x - 1) * y ** 2 * (y - 1) ** 2
-        p = 10 * (2 * x - 1) * (2 * y - 1)
-        mu = self.mu
-        rho = self.rho
-        u = sp.Matrix([u1, u2])
-        gradu1x = u1.diff(x)
-        gradu1y = u1.diff(y)
-        gradu2x = u2.diff(x)
-        gradu2y = u2.diff(y)
-
-        # 不可压缩性
-        assert sp.simplify(gradu1x + gradu2y) == 0  
-
-        convection = sp.Matrix([u1 * gradu1x + u2 * gradu1y, u1 * gradu2x + u2 * gradu2y])
-        diffusion = sp.Matrix([sp.diff(gradu1x, x) + sp.diff(gradu1y, y), sp.diff(gradu2x, x) + sp.diff(gradu2y, y)])
-        gradp = sp.Matrix([p.diff(x), p.diff(y)])
-        force = - mu*diffusion + rho*convection + gradp
-        
-        self.u = sp.lambdify([x, y], u, 'numpy')
-        self.p = sp.lambdify([x, y], p, 'numpy')
-        self.force = sp.lambdify([x, y], force, 'numpy')
 

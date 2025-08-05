@@ -9,57 +9,6 @@ from fealpy.mesher.box_mesher import BoxMesher2d
 CoefType = Union[int, float, Callable]
 
 
-class StationaryNSLFEMPolynomialPDE:
-    def __init__(self):
-        self.eps = 1e-10
-        self.rho = 1.0
-        self.mu = 1.0
-    
-    @cartesian
-    def velocity(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = bm.zeros(p.shape)
-        val[..., 0] = 10*x**2*(x-1)**2*y*(y-1)*(2*y-1)
-        val[..., 1] = -10*x*(x-1)*(2*x-1)*y**2*(y-1)**2
-        return val
-    
-    def domain(self):
-        return [0, 1, 0, 1]
-
-    def init_mesh(self, n=16):
-        box = self.domain()
-        mesh = TriangleMesh.from_box(box, nx=n, ny=n)
-        self.mesh = mesh
-        return mesh
-    
-    @cartesian
-    def pressure(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = 10*(2*x-1)*(2*y-1)
-        return val
-    
-    @cartesian
-    def source(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = bm.zeros(p.shape)
-        val[..., 0] = -(20*x**2*(x - 1)**2*(6*y - 3) + 20*y*(y - 1)*(2*y - 1)*(x**2 + 4*x*(x - 1) + (x - 1)**2)) + 10*x**2*y*(x - 1)**2*(y - 1)*(2*y - 1)*(10*x**2*y*(2*x - 2)*(y - 1)*(2*y - 1) + 20*x*y*(x - 1)**2*(y - 1)*(2*y - 1)) - 10*x*y**2*(x - 1)*(2*x - 1)*(y - 1)**2*(20*x**2*y*(x - 1)**2*(y - 1) + 10*x**2*y*(x - 1)**2*(2*y - 1) + 10*x**2*(x - 1)**2*(y - 1)*(2*y - 1)) + 40*y - 20
-        val[..., 1] = -(-20*x*(x - 1)*(2*x - 1)*(y**2 + 4*y*(y - 1) + (y - 1)**2) - 20*y**2*(6*x - 3)*(y - 1)**2) + 10*x**2*y*(x - 1)**2*(y - 1)*(2*y - 1)*(-20*x*y**2*(x - 1)*(y - 1)**2 - 10*x*y**2*(2*x - 1)*(y - 1)**2 - 10*y**2*(x - 1)*(2*x - 1)*(y - 1)**2) - 10*x*y**2*(x - 1)*(2*x - 1)*(y - 1)**2*(-10*x*y**2*(x - 1)*(2*x - 1)*(2*y - 2) - 20*x*y*(x - 1)*(2*x - 1)*(y - 1)**2) + 40*x - 20
-        return val   
-
-    @cartesian
-    def is_pressure_boundary(self, p):
-        result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        return result
-
-    @cartesian
-    def is_velocity_boundary(self, p):
-        result = bm.ones_like(p[..., 0], dtype=bm.bool)
-        return result
-
-
 class FromSympy(BoxMesher2d):
     def __init__(self, rho=1.0, mu=1.0) -> None:
         self.eps = 1e-10
@@ -145,7 +94,7 @@ class FromSympy(BoxMesher2d):
     @cartesian
     def is_pressure_boundary(self, p):
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        #return result
+        return result
     
     @cartesian
     def is_velocity_boundary(self, p):
@@ -175,3 +124,10 @@ class FromSympy(BoxMesher2d):
         y = p[..., 1]
         return bm.array(self.p(x, y))
     
+    @cartesian
+    def velocity_dirichlet(self, p):
+        return self.velocity(p)
+    
+    @cartesian
+    def pressure_dirichlet(self, p):
+        return self.pressure(p)

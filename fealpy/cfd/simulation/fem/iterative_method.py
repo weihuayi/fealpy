@@ -63,45 +63,8 @@ class IterativeMethod(FEM, ABC):
         """
         BC = DirichletBC(
             (self.uspace, self.pspace), 
-            gd=(pde.velocity, pde.pressure), 
+            gd=(pde.velocity_dirichlet, pde.pressure_dirichlet), 
             threshold=(pde.is_velocity_boundary, pde.is_pressure_boundary),
             method='interp')
         A, b = BC.apply(A, b)
         return A, b
-    ''' 
-    @apply_bc.register("cylinder")
-    def apply_bc(self, A, b, pde):
-        """
-        Apply boundary conditions for cylinder problems.
-        """
-        BC_influx = DirichletBC(
-            (self.uspace, self.pspace), 
-            gd=(pde.inlet_velocity, pde.pressure), 
-            threshold=(pde.is_inlet_boundary, None),
-            method='interp')
-        
-        BC_outflux = DirichletBC(
-            (self.uspace, self.pspace),
-            gd = (pde.outlet_velocity, pde.outlet_pressure),
-            threshold=(pde.is_outlet_boundary, pde.is_outlet_boundary),
-            method='interp')
-        
-        BC_wall = DirichletBC(
-            (self.uspace, self.pspace), 
-            gd=(pde.wall_velocity, pde.pressure), 
-            threshold=(pde.is_wall_boundary, None),
-            method='interp')
-        
-        BC_obstacle = DirichletBC(
-            (self.uspace, self.pspace), 
-            gd=(pde.obstacle_velocity, pde.pressure), 
-            threshold=(pde.is_obstacle_boundary, None),
-            method='interp')
-        
-        A, b = BC_influx.apply(A, b)
-        A, b = BC_outflux.apply(A, b)
-        A, b = BC_wall.apply(A, b)
-        A, b = BC_obstacle.apply(A, b)
-        self.apply_bc_str = "cylinder"
-        return A, b
-        '''
