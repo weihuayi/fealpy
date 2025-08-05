@@ -50,11 +50,6 @@ class GearBoxModalLFEMModel(ComputationalModel):
         self.mesh = mesh
         self.logger.info(self.mesh)
 
-    def set_space_degree(self, p: int):
-        """
-        """
-        self.p = p
-
     def set_node_flag(self): 
         """
         Set node flags for the gear box model.
@@ -62,8 +57,10 @@ class GearBoxModalLFEMModel(ComputationalModel):
         the node flags is the base for the dofs flag
         """
         redges, rnodes = self.mesh.data.get_rbe2_edge()
+
         isRefNodes = bm.zeros(self.mesh.number_of_nodes(), dtype=bm.bool)
         isRefNodes[rnodes] = True
+
         isGearNodes = bm.logical_not(isRefNodes)
         isSurfaceNodes = bm.zeros(self.mesh.number_of_nodes(), dtype=bm.bool)
         isSurfaceNodes[redges[:, 1]] = True
@@ -133,7 +130,7 @@ class GearBoxModalLFEMModel(ComputationalModel):
         """
         # Implementation of the linear system construction goes here
         GD = self.mesh.geo_dimension()
-        self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(-1, GD))
+        self.space = functionspace(self.mesh, ('Lagrange', 1), shape=(-1, GD))
 
         bform = BilinearForm(self.space)
         integrator = LinearElasticityIntegrator(self.pde.material)
@@ -186,8 +183,8 @@ class GearBoxModalLFEMModel(ComputationalModel):
         shaft_system = loadmat(self.options['shaft_system_file'])
         self.logger.info(f"Sucsess load shaft system from {self.options['shaft_system_file']}")
 
-        S = csr_matrix(shaft_system['stiffness_total_system_spectrum'])
-        M = csr_matrix(shaft_system['mass_total_system'])
+        S = shaft_system['stiffness_total_system_spectrum']
+        M = shaft_system['mass_total_system']
 
         self.logger.info(f"shaft system stiffness matrix: {S.shape}")
         self.logger.info(f"shaft system mass matrix: {M.shape}")
@@ -201,15 +198,48 @@ class GearBoxModalLFEMModel(ComputationalModel):
             [4, 25,  253.6, -1.1, 350244],
             [4,  4,  70, -1.1, 350241],
         ]
+        d0 = bm.array(d0, dtype=bm.float64)
 
-        d0 = bm.array(d0)
+
         d1 = [[1, 1.1, 1.2, 2, 2.1, 2.2, 3, 4, 5], [17, 5, 3, 7, 3, 3, 18, 26, 8]]
         d1 = bm.array(d1).T
 
-        NN = d1[:, 1].sum() 
+        NN = int(d1[:, 1].sum())
         self.logger.info(f"Number of nodes in the shaft system: {NN}")
 
+        offset = [0] + [int(a) for a in bm.cumsum(d1[:, 1])] 
+        self.logger.info(f"Offset for the nodes: {offset}")
 
+        nidmap = self.mesh.data['nidmap']
+
+        imap = {str(a[0]) : a[1] for a in zip(d1[:, 0], range(d1.shape[0]))}
+
+        self.logger.info(imap)
+        
+        # Create a boolean array to mark coupling nodes
+        isCouplingNodes = bm.zeros(NN, dtype=bm.bool)
+        for i, j in d0[:, :2]:
+            idx = imap[str(i)] + int(j) - 1
+            isCouplingNodes[idx] = True
+
+        isCouplingDofs = bm.repeat(isCouplingNodes, 6)
+
+        S0 = S[bm.logical_not(isCouplingDofs), :]
+        S1 = S[isCouplingDofs, :]
+
+        S00 = S0[:, bm.logical_not(isCouplingDofs)]
+        S01 = S0[:, isCouplingDofs]
+        S11 = S1[:, isCouplingDofs]
+
+        M0 = M[bm.logical_not(isCouplingDofs), :]
+        M1 = M[isCouplingDofs, :]
+
+        M00 = M0[:, bm.logical_not(isCouplingDofs)]
+        M01 = M0[:, isCouplingDofs]
+        M11 = M1[:, isCouplingDofs]
+
+        cnode = nidmap[d0[:, -1].astype(bm.int32)]
+        self.logger.info(f"Coupling nodes: {cnode}")
 
 
 
