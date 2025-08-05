@@ -33,12 +33,14 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
     def _coord_transfrom(self) -> TensorLike:
         """Construct the coordinate transformation matrix for 3D beam elements."""
         mesh = self.space.mesh
-        node = mesh.entity('node')
-        #c2n = mesh.cell_to_node()
+        node= mesh.entity('node')
+        cell = mesh.entity('cell')
+        bar_nodes = node[cell]
+        
         NC = mesh.number_of_cells()
-        x = node[..., 0]
-        y = node[..., 1]
-        z = node[..., 2]
+        x = bar_nodes[..., 0]
+        y = bar_nodes[..., 1]
+        z = bar_nodes[..., 2]
 
         bars_length = mesh.entity_measure('cell')
         
@@ -47,13 +49,12 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         T12 = (y[..., 1] - y[..., 0]) / bars_length
         T13 = (z[..., 1] - z[..., 0]) / bars_length
 
-
         vy = bm.array([0, 1, 0], dtype=bm.float64)
         k1, k2, k3 = vy
 
         # 计算第二行方向向量（垂直于杆轴方向的 y 方向局部坐标单位向量）
         A = bm.sqrt((T12 * k3 - T13 * k2)**2 + (T13 * k1 - T11 * k3)**2 + (T11 * k2 - T12 * k1)**2)
-        
+
         T21 = -(T12 * k3 - T13 * k2) / A
         T22 = -(T13 * k1 - T11 * k3) / A
         T23 = -(T11 * k2 - T12 * k1) / A
@@ -73,7 +74,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         # 构造12x12旋转变换矩阵 R
         O = bm.zeros((NC, 3, 3))
-        row1 = bm.concatenate([T0, O,  O,  O], axis=2)
+        row1 = bm.concatenate([T0   , O,  O,  O], axis=2)
         row2 = bm.concatenate([O,  T0, O,  O], axis=2)
         row3 = bm.concatenate([O,  O,  T0, O], axis=2)
         row4 = bm.concatenate([O,  O,  O,  T0], axis=2)
@@ -82,7 +83,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         return R
  
     @variantmethod
-    def assembly(self) -> TensorLike:
+    def assembly(self, space: _FS) -> TensorLike:
         """Construct the stiffness matrix for 3D beam elements.This function computes the (12, 12) stiffness matrix for each element.
         
         Parameters:
@@ -99,78 +100,65 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Returns:
             Ke(ndarray),The 3D beam element stiffness matrix, shape (NC, 12, 12).
         """
+        assert space is self.space  
         E = self.material.E
-        # E = self.material.E
         mu = self.material.mu
 
-        mesh = self.space.mesh
-        bar_length = mesh.entity_measure('cell')
-        l = bar_length[0:22]
+        mesh = space.mesh
+        l = mesh.entity_measure('cell')
+        NC = mesh.number_of_cells()
 
         AX, AY, AZ = self.material.calculate_cross_sectional_areas()
         Iy, Iz, Ix = self.material.calculate_moments_of_inertia()
 
         R = self._coord_transfrom()
 
-        FY = 12 * E * Iz / mu / AY / (l**2)  # Phi_y
-        FZ = 12 * E * Iy / mu / AZ / (l**2)  # Phi_x
+        phi_y = 12 * E * Iz / mu / AY / (l**2)  # Phi_y
+        phi_z = 12 * E * Iy / mu / AZ / (l**2)  # Phi_x
 
-        KE = bm.zeros((12, 12))
+        KE = bm.zeros((NC, 12, 12))
 
-        KE[0, 0] = E * AX / l
-        KE[0, 6] = -KE[0, 0]
-        KE[1, 1] = 12 * E * Iz / (1 + FY) / (l**3)
-        KE[1, 5] = 6 * E * Iz / (1 + FY) / (l**2)
-        KE[1, 7] = -KE[1, 1]
-        KE[1, 11] = KE[1, 5]
-        KE[2, 2] = 12 * E * Iy / (1 + FZ) / (l**3)
-        KE[2, 4] = -6 * E * Iy / (1 + FZ) / (l**2)
-        KE[2, 8] = -KE[2, 2]
-        KE[2, 10] = KE[2, 4]
-        KE[3, 3] = mu * Ix / l
-        KE[3, 9] = -KE[3, 3]
-        KE[4, 4] = (4 + FZ) * E * Iy / (1 + FZ) / l
-        KE[4, 8] = 6 * E * Iy / (1 + FZ) / (l**2)
-        KE[4, 10] = (2 - FZ) * E * Iy / (1 + FZ) / l
-        KE[5, 5] = (4 + FY) * E * Iz / (1 + FY) / l
-        KE[5, 7] = -6 * E * Iz / (1 + FY) / (l**2)
-        KE[5, 11] = (2 - FY) * E * Iz / (1 + FY) / l
-        KE[6, 6] = KE[0, 0]
-        KE[7, 7] = -KE[1, 7]
-        KE[7, 11] = -KE[1, 11]
-        KE[8, 8] = -KE[2, 8]
-        KE[8, 10] = -KE[2, 10]
-        KE[9, 9] = KE[3, 3]
-        KE[10, 10] = KE[4, 4]
-        KE[11, 11] = KE[5, 5]
+        Ke = bm.zeros((NC, 12, 12))
 
-        # Symmetry of KE matrix
+        Ke[:, 0, 0] = E * AX / l
+        Ke[:, 0, 6] = -Ke[:, 0, 0]
+
+        Ke[:, 1, 1] = 12 * E * Iz / (1+phi_y) /(l**3)
+        Ke[:, 1, 5] = 6 * E *Iz / (1+phi_y) / (l**2)
+        Ke[:, 1, 7] = -Ke[:, 1, 1]
+        Ke[:, 1, 11] = -Ke[:, 1, 5]
+
+        Ke[:, 2, 2] = 12 * E * Iy / (1+phi_z) /(l**3)
+        Ke[:, 2, 4] = -6 * E *Iy / (1+phi_z) / (l**2)
+        Ke[:, 2, 8] = -Ke[:, 2, 2]
+        Ke[:, 2, 10] = Ke[:, 2, 4]
+
+        Ke[:, 3, 3] = mu * Ix / l
+        Ke[:, 3, 9] = -Ke[:, 3, 3]
+
+        Ke[:, 4, 4] = (4+phi_z) * E * Iy / (1+phi_z) / l
+        Ke[:, 4, 8] = 6 * E * Iy / (1+phi_z) /(l**2)
+        Ke[:, 4, 10] = (2-phi_z) * E * Iy / (1+phi_z) / l
+
+        Ke[:, 5, 5] = (4+phi_y) * E * Iz / (1+phi_y) / l
+        Ke[:, 5, 7] = -6 * E * Iz / (1+phi_y) / (l**2)
+        Ke[:, 5, 11] = (2-phi_y) * E * Iz / (1+phi_y) / l
+
+        Ke[:, 6, 6] = Ke[:, 0, 0]
+        Ke[:, 7, 7] = -Ke[:, 1, 7]
+        Ke[:, 7, 11] = -Ke[:, 1, 11]
+
+        Ke[:, 8, 8] = -Ke[:, 2, 8]
+        Ke[:, 8, 10] = -Ke[:, 2, 10]
+        Ke[:, 9, 9] = Ke[:, 3, 3]
+        Ke[:, 10, 10] = Ke[:, 4, 4]
+        Ke[:, 11, 11] = Ke[:, 6, 6]
+
+        # Symmetrize
         for j in range(11):
-            for i in range(j + 1, 12):
-                KE[i, j] = KE[j, i]
+            for k in range(j + 1, 12):
+                Ke[:, k, j] = Ke[:, j, k]
 
-        Ke = R.T @ KE @ R  # Matrix multiplication with R
+        KE = bm.einsum('cji, cjl, clj -> cij', R, Ke, R)
 
-        return Ke
-    
-    
-if __name__ == "__main__":
-    from fealpy.csm.model.beam.timoshenko_beam_data_3d import TimoshenkoBeamData3D
-    from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
-    from fealpy.csm.material.timoshenko_beam_material import TimoshenkoBeamMaterial
-
-    # Example usage
-    model = TimoshenkoBeamData3D()
-    material = TimoshenkoBeamMaterial(name="TimoshenkoBeam",
-                                      model=model, 
-                                      elastic_modulus=2.07e11,
-                                      poisson_ratio=0.276)
-    mesh = model.init_mesh()
-    
-    sspace = LagrangeFESpace(mesh=mesh, p=1, ctype='C')
-    tspace = TensorFunctionSpace(scalar_space=sspace, shape=(6, -1))
-    integrator = TimoshenkoBeamIntegrator(space=tspace, material=material)
-    
-    # bars_length = integrator._bars_length()
-    #test = integrator._coord_transfrom()
-    matrix = integrator.assembly()
+        return KE
