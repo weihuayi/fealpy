@@ -8,21 +8,15 @@ from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
 from fealpy.decorator import barycentric
 from fealpy.fem import BoundaryPressWorkIntegrator
 
-from ..fem_base import FEM
+from ..iterative_method import IterativeMethod 
 
-
-class Newton(FEM):
+class Newton(IterativeMethod):
     """Newton Interative Method""" 
     
-    def __init__(self, equation, boundary_threshold=None):
-        FEM.__init__(self, equation)
-        self.threshold = boundary_threshold
-
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
         q = self.q
-        threshold = self.threshold
         
         A00 = BilinearForm(uspace)
         self.u_BM = ScalarMassIntegrator(q=q)

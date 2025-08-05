@@ -1,23 +1,20 @@
 import inspect
 
-from ....backend import backend_manager as bm
-from ....backend import TensorLike
-from ....fem import LinearForm, BilinearForm
-from ....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator, 
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
+from fealpy.fem import LinearForm, BilinearForm
+from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator, 
                      ViscousWorkIntegrator, SourceIntegrator, GradSourceIntegrator, 
                      BoundaryFaceSourceIntegrator, ScalarDiffusionIntegrator)
-from .fem_base import FEM
-from .project_method import ProjectionMethod
-from ....fem import DirichletBC
-from ..simulation_base import SimulationBase, SimulationParameters
-from ....functionspace import Function
-from ....decorator import barycentric
+from fealpy.functionspace import Function
+from fealpy.decorator import barycentric
+from fealpy.fem import DirichletBC
+
+from ..project_method import ProjectionMethod
+from ...simulation_base import SimulationBase, SimulationParameters
 
 class IPCS(ProjectionMethod):
     """IPCS分裂投影法"""
-    def __init__(self, equation, mesh, boundary_threshold=None):
-        super.__init__(equation, mesh)
-        self.threshold = boundary_threshold
     
     def simulation(self):
         """返回当前的仿真对象"""
@@ -48,9 +45,9 @@ class IPCS(ProjectionMethod):
         if return_form is False:
             A = Bform.assembly()
             b = Lform.assembly()
-            A,b = self.lagrange_multiplier(A, b, 0)
-            #if BC is not None:
-            #    A, b = BC.apply(A, b)
+            #A,b = self.lagrange_multiplier(A, b, 0)
+            if BC is not None:
+                A, b = BC.apply(A, b)
             return A, b
         else:
             return Bform, Lform 
@@ -140,8 +137,6 @@ class IPCS(ProjectionMethod):
             result = bm.repeat(p0(bcs,index)[...,bm.newaxis], self.mesh.GD, axis=-1)
             result = bm.expand_dims(result, axis=-1) * I
             result *= pc(bcs, index) if callable(pc) else pc
-            # cvcoef = cv(bcs, index)[..., bm.newaxis]/2 if callable(cv) else cv
-            # result -= cvcoef * bm.trace(u0.grad_value(bcs, index))
             return result
         self.predict_LGS.source = LGS_coef
         
@@ -149,8 +144,6 @@ class IPCS(ProjectionMethod):
         def LBFS_coef(bcs, index):
             result = -bm.einsum('...i, ...j->...ij', p0(bcs, index), self.mesh.face_unit_normal(index=index))
             result *= pc(bcs, index) if callable(pc) else pc
-            # cvcoef = cv(bcs, index)[..., bm.newaxis]/2 if callable(cv) else cv
-            # result += cvcoef * bm.trace(u0.grad_value(bcs, index))
             return result
         self.predict_LBFS.source = LBFS_coef
 

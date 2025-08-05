@@ -9,71 +9,6 @@ from fealpy.mesher.box_mesher import BoxMesher2d
 from ....simulation.time import UniformTimeLine
 CoefType = Union[int, float, Callable]
 
-class NSLFEMChannelPDE:
-    def __init__(self, eps=1e-10, rho=1, mu=1, R=None):
-        self.eps = eps
-        self.rho = rho
-        self.mu = mu
-        self.mesh = self.set_mesh()
-        if R is None:
-            self.R = rho/mu
-    
-    def domain(self):
-        return [0, 1, 0, 1]
-
-    def set_mesh(self, nx=16, ny=16):
-        box = [0, 1, 0, 1]
-        mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
-        self.mesh = mesh
-        return mesh
-    
-    @cartesian
-    def velocity(self, p, t):
-        x = p[...,0]
-        y = p[...,1]
-        value = bm.zeros(p.shape, dtype=bm.float64)
-        if t != 0:
-            value[...,0] = 4*y*(1-y)
-        return value
-    
-    @cartesian
-    def pressure(self, p, t):
-        x = p[..., 0]
-        if t == 0:
-            val = bm.zeros_like(x, dtype=p.dtype)
-        else:
-            val = 8*(1-x) 
-        return val
-    
-    @cartesian
-    def is_pressure_boundary(self, p):
-        tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
-        tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
-        return tag_left | tag_right
-    
-    @cartesian
-    def is_velocity_boundary(self, p):
-        tag_up = bm.abs(p[..., 1] - 1.0) < self.eps
-        tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
-        return tag_up | tag_down
-    
-    @cartesian
-    def source(self, p, t):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = bm.zeros(p.shape)
-        return val   
-   
-    @cartesian
-    def velocity_dirichlet(self, p, t):
-        return self.velocity(p, t)
-    
-    @cartesian
-    def pressure_dirichlet(self, p, t):
-        return self.pressure(p, t)
-
-
-
 class FromSympy(BoxMesher2d):
     def __init__(self, rho=1.0, mu=1.0) -> None:
         self.eps = 1e-10
@@ -82,8 +17,6 @@ class FromSympy(BoxMesher2d):
         self.rho = rho
         self.x, self.y, self.t = sp.symbols('x, y, t')
         self.select_pde["channel"]()        
-        self.mesh = self.init_mesh()
-        self.timeline = self.init_timeline()
     
     @variantmethod("channel")
     def select_pde(self):
@@ -157,33 +90,17 @@ class FromSympy(BoxMesher2d):
         self.fx = sp.lambdify((x, y, t), force1, 'numpy')
         self.fy = sp.lambdify((x, y, t),force2, 'numpy')
 
-
-    def domain(self):
-        return self.box
-    
-    @variantmethod("tri")
-    def set_mesh(self, nx = 8, ny = 8):
-        box = self.box
-        mesh = TriangleMesh.from_box(box, nx=nx, ny=ny)
-        self.mesh = mesh
-        return mesh
-    
-    def init_timeline(self, T0 = 0.0, T1 = 0.5, nt = 1000):
-        self.t0 = T0
-        self.nt = nt
-        timeline = UniformTimeLine(T0, T1, nt)
-        self.dt = timeline.dt
-        return timeline
-    
+    '''
     @cartesian
     def is_pressure_boundary(self, p):
         return bm.zeros_like(p[...,1],dtype=bm.bool)
+        #return None
     
     @cartesian
     def is_velocity_boundary(self, p):
         return None
     
-    '''
+    ''' 
     @cartesian
     def is_pressure_boundary(self, p):
         tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
@@ -195,7 +112,6 @@ class FromSympy(BoxMesher2d):
         tag_up = bm.abs(p[..., 1] - 1.0) < self.eps
         tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
         return tag_up | tag_down
-    '''
     
     @cartesian
     def source(self, p, t):
@@ -221,11 +137,6 @@ class FromSympy(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         return bm.array(self.p(x, y, t))
-    
-    @cartesian
-    def velocity_dirichlet(self, p, t):
-        return self.velocity(p, t)
-    
-    @cartesian
-    def pressure_dirichlet(self, p, t):
-        return self.pressure(p, t)
+
+    velocity_dirichlet = velocity
+    pressure_dirichlet = pressure 
