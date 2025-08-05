@@ -199,7 +199,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         BC_outflux = DirichletBC(
             (self.fem.uspace, self.fem.pspace),
             gd = (self.pde.outlet_velocity, self.pde.outlet_pressure),
-            threshold=(self.pde.is_outlet_boundary, self.pde.is_outlet_boundary),
+            threshold=(self.pde.is_outlet_boundary, None),
             method='interp')
         
         BC_wall = DirichletBC(
@@ -286,7 +286,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.tol = tol
         for i in range(maxit):
             self.logger.info(f"mesh: {self.pde.mesh.number_of_cells()}")
-            self.run['one_step'](maxstep, tol, apply_bc)
+            self.run['main'](maxstep, tol, apply_bc)
             self.pde.mesh.uniform_refine()
             self.equation = StationaryIncompressibleNS(self.pde)
 

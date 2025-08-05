@@ -16,7 +16,7 @@ parser.add_argument('--backend',
     help = "Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
     
 parser.add_argument('--pde',
-    default = 3, type = str,
+    default = 1, type = str,
     help = "Name of the PDE model, default is exp0001")
 
 parser.add_argument('--init_mesh',
