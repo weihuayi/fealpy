@@ -28,14 +28,16 @@ bm.set_backend('numpy')
 
 from fealpy.csm.fem import ElastoplasticityFEMModel
 model = ElastoplasticityFEMModel(options)
-model.solve()
-
 '''
 # 网格可视化
 from matplotlib import pyplot as plt
 fig = plt.figure()
 axes = fig.add_subplot(111)
+mesh = model.mesh
 mesh.add_plot(axes) # 画出网格背景
 mesh.find_cell(axes, showindex=True) # 找到单元重心
 plt.show()
 '''
+model.solve()
+
+

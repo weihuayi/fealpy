@@ -142,7 +142,9 @@ class ElastoplasticityFEMModel(ComputationalModel):
         self.D = self.cm.elastic_matrix()
         self.pfcm = ElastoplasticMaterial(name='elastoplastic',
                                 elastic_modulus=E, poisson_ratio=nu,
-                                yield_stress=self.pde.yield_stress, hardening_modulus=self.pde.hardening_modulus, hypo='plane_stress', device=bm.get_device(self.mesh))
+                                yield_stress=self.pde.yield_stress, 
+                                hardening_modulus=self.pde.hardening_modulus, 
+                                hypo='plane_stress', device=bm.get_device(self.mesh))
 
     def cell2dof(self, stress):
         """
@@ -157,22 +159,6 @@ class ElastoplasticityFEMModel(ComputationalModel):
         stress = stress[self.space.cell_to_dof()]
         return stress
     
-    def compute_stress(self, displacement, plastic_strain):
-        """
-        Compute the stress field based on the current displacement field.
-        """
-        node = self.mesh.entity('node')
-        kwargs = bm.context(node)
-        cell2dof = self.space.cell_to_dof()
-        uh = bm.array(displacement,**kwargs)
-        uh_cell = uh[cell2dof]
-        strain_total = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
-        strain_elastic = strain_total - plastic_strain
-
-        # Compute stress
-        stress = bm.einsum('cqij,cqj->cqi', self.D, strain_elastic)
-        return stress
-    
     def compute_strain(self, displacement):
         """
         Compute the strain field based on the current displacement field.
@@ -185,12 +171,12 @@ class ElastoplasticityFEMModel(ComputationalModel):
         strain = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
         return strain
 
-    def linear_system(self, source, D_ep, stress):
+    def linear_system(self, loading_source, loading_neumann, D_ep, stress):
         '''
         Construct the linear system for the elastoplasticity problem.
         
         Parameters:
-            source (callable): Function defining the external load vector.
+            loading_source (callable): Function defining the external load vector.
             D_ep (TensorLike): Elastoplastic material stiffness matrix.
             stress (TensorLike): Stress tensor for the cells.
 
@@ -207,9 +193,9 @@ class ElastoplasticityFEMModel(ComputationalModel):
         K = bform.assembly(format='csr')
 
         lform = LinearForm(self.space) 
-        lform.add_integrator(ScalarSourceIntegrator(source=source))
+        lform.add_integrator(ScalarSourceIntegrator(source=loading_source))
         lform.add_integrator(ScalarNeumannBCIntegrator(
-            source=self.pde.neumann,
+            source=loading_neumann,
             threshold=self.pde.neumann_boundary,
             q=self.space.scalar_space.p + 3
         ))
@@ -223,59 +209,106 @@ class ElastoplasticityFEMModel(ComputationalModel):
         F_int = lform2.assembly()
 
         return K , F_int, F_ext
-      
-    
+       
     def solve(self):
-        # 初始化
-        u = self.space.function()  # 初始位移
+        
+        u = self.space.function()  # 总位移
         strain_pl = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
-        stress = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)  # 初始应力
-        strain_e = bm.zeros((self.NC, self.NQ), dtype=bm.float64)  # 初始等效塑性应变
+        stress = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
+        strain_e = bm.zeros((self.NC, self.NQ), dtype=bm.float64)
+        strain_total = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
+
         tol = 1e-8
-        D_ep = self.pfcm.elastic_matrix()  # 弹塑性矩阵
         N = self.N
 
-        # 循环荷载步
         for n in range(N):
-            delta_u = 0
+            delta_u = bm.zeros_like(u)
             converged = False
-            print(f"Load step {N}, solving...")
+            print(f"Load step {n+1}/{N}, solving...")
+
+            # 固定的加载项
+            from fealpy.decorator import cartesian
+            @cartesian
+            def loading_source(p):
+                coef = (n + 1) / N
+                return coef * self.pde.source(p)
+
+            @cartesian
+            def loading_neumann(p):
+                coef = (n + 1) / N
+                return coef * self.pde.neumann(p)
+
+            # 记录状态
+            strain_pl_old = strain_pl.copy()
+            strain_e_old = strain_e.copy()
+
+            iter_count = 0
             while not converged:
-                from fealpy.decorator import cartesian
-                @cartesian
-                def loading(p):
-                    coef = (n + 1) / N
-                    val = coef * self.pde.source(p)
-                    return val
-                K, F_int, F_ext = self.linear_system(source=loading, D_ep=D_ep, stress=stress)
-                R = F_int - F_ext
-                print(F_int.max(), F_ext.max()) #F_int一直在变大
-                if bm.linalg.norm(R) > 10e6:
-                    exit()
-                from fealpy.solver import spsolve
-                delta_u = spsolve(K, -R,'scipy')
-
-                # 更新位移增量 Δu ← Δu + δΔu
-                delta_u += delta_u
-                
+                # 计算当前试应变
                 delta_strain = self.compute_strain(delta_u)
+                strain_total_trial = strain_total + delta_strain
 
-                # 更新所有积分点状态
-                stress, strain_pl, strain_e, D_ep, is_plastic = self.pfcm.material_point_update(delta_strain, strain_pl, strain_e)
-                strain_e += strain_e
 
-                # 检查残差和位移增量是否满足收敛条件
-                if bm.linalg.norm(R) < tol and bm.linalg.norm(delta_u) < tol:
+                stress_trial, strain_pl_trial, strain_e_trial, Ctang_trial, is_plastic = \
+                    self.pfcm.material_point_update(strain_total_trial, strain_pl_old, strain_e_old)
+                    
+                num_plastic = is_plastic.astype(bm.uint8).sum()
+                num_total = is_plastic.size
+
+                if num_plastic == 0:
+                    print("====== 当前为纯弹性阶段 ======")
+                else:
+                    print(f"====== 当前为塑性阶段：{num_plastic}/{num_total} 个点屈服 ======")
+
+                K, F_int, F_ext = self.linear_system(loading_source=loading_source,
+                                                    loading_neumann=loading_neumann,
+                                                    D_ep=Ctang_trial,
+                                                    stress=stress_trial)
+
+                from fealpy.fem import DirichletBC
+                R = F_int - F_ext
+                K, R = DirichletBC(self.space, gd=self.pde.dirichlet,
+                                threshold=self.pde.dirichlet_boundary).apply(K, R)
+
+                if bm.linalg.norm(R) > 1e6:
+                    print("Residual too large. Exiting.")
+                    exit()
+
+                from fealpy.solver import spsolve
+                delta_du = spsolve(K, -R, 'scipy')
+                delta_u += delta_du  # 累加位移增量
+
+                norm_R = bm.linalg.norm(R)
+                norm_du = bm.linalg.norm(delta_du)
+                print(f"  Iter {iter_count:02d}: ||R|| = {norm_R:.3e}, ||du|| = {norm_du:.3e}")
+
+                if norm_R < tol and norm_du < tol:
                     converged = True
+                    
+                    stress = stress_trial
+                    strain_pl = strain_pl_trial
+                    strain_e = strain_e_trial
+                    strain_total = strain_total_trial
+                iter_count += 1
 
             # 更新总位移
             u += delta_u
-            
-            
-        # 返回最终结果或状态
+            print(f"  u.max = {u.max():.4e}, u.min = {u.min():.4e}")
+            self.show(displacement=u, n=n)
+
         return u, stress, strain_pl, strain_e
+    
+    def show(self, displacement, n):
+        """
+        Visualize the mesh and the displacement field.
+        """
+        save_path = "../elastoplastic_result"
+        self.mesh.nodedata['displacement'] = displacement
+        self.mesh.to_vtk(f"{save_path}/incremental_iter_{n:03d}.vtu")
 
     def save_data(self, filename):
         pass
+
+    
 
        

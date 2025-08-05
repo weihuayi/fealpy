@@ -68,13 +68,11 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         compute the von Mises yield function value
 
         Parameters:
-            stress : TensorLike
-                Cauchy stress tensor (NC, NQ, N)
-            alpha : TensorLike
-                Equivalent plastic strain (NC, NQ)
+            stress(Tensor): Cauchy stress tensor (NC, NQ, N)
+            alpha(Tensor): Equivalent plastic strain (NC, NQ)
                 
         Returns:
-            f :  TensorLike
+            f(Tensor): Yield function value (NC, NQ)
         """
         s = self.deviatoric_stress(stress)
         norm_s = bm.sqrt(bm.sum(s**2, axis=-1))
@@ -89,10 +87,10 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         N = sqrt(3/2) * s / ||s||, where s is the deviatoric stress.
 
         Parameters:
-            stress: Current stress tensor (NC, NQ, N)
+            stress(Tensor): Current stress tensor (NC, NQ, N)
 
         Returns:
-            N: Unit normal vector to the yield surface (NC, NQ, N)
+            N(Tensor): Unit normal vector to the yield surface (NC, NQ, N)
         """
         s = self.deviatoric_stress(stress)
         norm_s = bm.sqrt(bm.sum(s**2, axis=-1))
@@ -103,7 +101,6 @@ class ElastoplasticMaterial(LinearElasticMaterial):
 
     def df_dsigma(self, stress: TensorLike) -> TensorLike:
         """
-        Compute the derivative of the yield function with respect to Cauchy stress (von Mises criterion).
         Compute the derivative of the yield function with respect to Cauchy stress (von Mises criterion).
 
         Parameters:
@@ -135,12 +132,10 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         This removes the hydrostatic part of the stress tensor, leaving only the deviatoric component.
         
         Parameters:
-            stress: Cauchy stress tensor (NC, NQ, N) in Voigt
+            stress(Tensor): Cauchy stress tensor (NC, NQ, N) in Voigt
 
         Returns:
-            deviatoric_stress: Deviatoric stress tensor (NC, NQ, N)
-        Compute the deviatoric stress tensor.
-        This removes the hydrostatic part of the stress tensor, leaving only the deviatoric component.
+            deviatoric_stress(Tensor): Deviatoric stress tensor (NC, NQ, N)
         """
         s = stress.copy()
         if self.hypo == "3D":
@@ -163,11 +158,11 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         Compute the elastoplastic tangent matrix D^p.
 
         Parameters:
-            stress: Current stress tensor (used to automatically compute df_dsigma)
-            df_dsigma: Directly provide the derivative tensor (optional)
+            stress(Tensor): Current stress tensor (used to automatically compute df_dsigma)
+            df_dsigma(Tensor): Directly provide the derivative tensor (optional)
             
         Returns:
-            Dp: Elastoplastic tangent matrix, same shape as the base class D matrix, computed independently for each integration point
+            Dp(Tensor): Elastoplastic tangent matrix, same shape as the base class D matrix, computed independently for each integration point
         """
         E = self.elastic_modulus
         nu = self.poisson_ratio
@@ -190,11 +185,11 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         Compute the elastoplastic tangent matrix D^p.
 
         Parameters:
-            stress: Current stress tensor (used to automatically compute df_dsigma)
-            df_dsigma: Directly provide the derivative tensor (optional)
+            stress(Tensor): Current stress tensor (used to automatically compute df_dsigma)
+            df_dsigma(Tensor): Directly provide the derivative tensor (optional)
 
         Returns:
-            Dp: Elastoplastic tangent matrix, same shape as the base class D matrix, computed independently for each integration point
+            Dp(Tensor): Elastoplastic tangent matrix, same shape as the base class D matrix, computed independently for each integration point
         """
         De = super().elastic_matrix()  # (1,1,N,N)
         
@@ -225,12 +220,12 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         Check if the material has hardening behavior.
         
         Returns:
-            bool: True if hardening_modulus > 0, False otherwise.
+            bool(Bool): True if hardening_modulus > 0, False otherwise.
         """
         return self.hardening_modulus > 0
 
         
-    def material_point_update(self, delta_strain, strain_pl_n, strain_e_n):
+    def material_point_update(self, strain_total, strain_pl_n, strain_e_n):
         '''
         Perform the elastoplastic constitutive update for a material point.
         
@@ -238,27 +233,24 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         and equivalent plastic strain based on the current strain increment and previous state variables.
         
         Parameters:
-            delta_strain : TensorLike
-                Incremental strain tensor (NC, NQ, 3) at the current time step.
-            strain_pl_n : TensorLike
-                Previous plastic strain tensor (NC, NQ, 3).
-            strain_e_n : TensorLike
-                Previous equivalent plastic strain (scalar) at the current time step (NC, NQ).
-                
-            delta_strain : TensorLike
-                Incremental strain tensor (NC, NQ, 3) at the current time step.
-            strain_pl_n : TensorLike
-                Previous plastic strain tensor (NC, NQ, 3).
-            strain_e_n : TensorLike
-                Previous equivalent plastic strain (scalar) at the current time step (NC, NQ).
+            delta_strain(TensorLike):
+                Incremental strain tensor (NC, NQ, 3) at the current time step
+            strain_pl_n(TensorLike):
+                Previous plastic strain tensor (NC, NQ, 3)
+            strain_e_n(TensorLike):
+                Previous equivalent plastic strain (scalar) at the current time step (NC, NQ)
                 
         Returns:
-            Tuple[TensorLike, TensorLike, TensorLike, TensorLike, TensorLike]:
-                - sigma_np1: Updated stress tensor (NC, NQ, 3).
-                - strain_pl_n1: Updated plastic strain tensor (NC, NQ, 3).  
-                - strain_e_n1: Updated equivalent plastic strain (scalar) at the current time step (NC, NQ).
-                - Ctang: Tangent stiffness matrix (NC, NQ, 3, 3).
-                - is_plastic: Boolean mask indicating whether plastic deformation occurred (NC, NQ).
+            sigma_np1(TensorLike):
+                Updated Cauchy stress tensor (NC, NQ, 3)
+            strain_pl_n1(TensorLike):
+                Updated plastic strain tensor (NC, NQ, 3)
+            strain_e_n1(TensorLike):
+                Updated equivalent plastic strain (scalar) at the current time step (NC, NQ)
+            Ctang(TensorLike):
+                Elastoplastic tangent matrix (NC, NQ, 3, 3)
+            is_plastic(TensorLike):
+                Boolean mask indicating whether the point is in the plastic regime (NC, NQ)
         '''
         E = self.elastic_modulus
         nu = self.poisson_ratio
@@ -267,7 +259,6 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         
         De = self.elastic_matrix()  # (NC, NQ, 3, 3)
 
-        strain_total = delta_strain + strain_pl_n  # (NC, NQ, 3)
         sigma_trial = bm.einsum('...ij,...j->...i', De, strain_total)  # (NC, NQ, 3)
         s_trial = self.deviatoric_stress(sigma_trial)  # (NC, NQ, 3)
         stress_trial_e = bm.sqrt(3.0 / 2.0) * bm.sqrt(bm.sum(s_trial ** 2, axis=-1))  # (NC, NQ)
@@ -301,7 +292,6 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         NQ = sigma_np1.shape[1]
         Ctang = bm.broadcast_to(De, (NC, NQ, 3, 3))  # (NC, NQ, 3, 3)
        
-
         # Compute Ctang for plastic points
         if bm.any(is_plastic):
             sigma_pl = bm.where(is_plastic[..., None], sigma_np1, 0.0)  # (NC, NQ, 3)
