@@ -7,26 +7,24 @@ from fealpy.mesh import TriangleMesh
 from fealpy.mesher.box_mesher import BoxMesher2d
 
 from ....simulation.time import UniformTimeLine
-CoefType = Union[int, float, Callable]
 
 class FromSympy(BoxMesher2d):
+    """
+    需要压力积分等于0
+    """
+
     def __init__(self, rho=1.0, mu=1.0) -> None:
         self.eps = 1e-10
         self.box = [0, 1, 0, 1]
         self.mu = mu
         self.rho = rho
         self.x, self.y, self.t = sp.symbols('x, y, t')
-        self.select_pde["channel"]()        
+        self.select_pde["polycos"]()
     
-    @variantmethod("channel")
-    def select_pde(self):
-        x, y, t = self.x, self.y, self.t
-        self.u1 =  4 * y * (1-y)
-        self.u2 = sp.sympify(0)
-        self.p = 8 * (1-x)
-        self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
 
-    @select_pde.register("polycos")
+    
+
+    @variantmethod("polycos")
     def select_pde(self):
         x, y, t = self.x, self.y, self.t
         self.u1 = 10 * x ** 2 * (x - 1) ** 2 * y * (y - 1) * (2 * y - 1) * sp.cos(t)
@@ -50,6 +48,14 @@ class FromSympy(BoxMesher2d):
         self.p = 20*sp.sin(t)*(x**2*y-1/6)
         self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
 
+    @select_pde.register("channel")
+    def select_pde(self):
+        x, y, t = self.x, self.y, self.t
+        self.u1 =  4 * y * (1-y)
+        self.u2 = sp.sympify(0)
+        self.p = 8 * (1-x)
+        self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
+        print("注意该压力积分不为0，可能会导致压力边界条件不满足")
 
     @select_pde.register("custom")
     def select_pde(self, u1, u2, p, mu, rho):
@@ -90,28 +96,16 @@ class FromSympy(BoxMesher2d):
         self.fx = sp.lambdify((x, y, t), force1, 'numpy')
         self.fy = sp.lambdify((x, y, t),force2, 'numpy')
 
-    '''
-    @cartesian
-    def is_pressure_boundary(self, p):
-        return bm.zeros_like(p[...,1],dtype=bm.bool)
-        #return None
+    @cartesian    
+    def is_pressure_boundary(self, p=None):
+        '''
+        需要压力积分等于0
+        '''
+        return 0
     
     @cartesian
     def is_velocity_boundary(self, p):
         return None
-    
-    ''' 
-    @cartesian
-    def is_pressure_boundary(self, p):
-        tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
-        tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
-        return tag_left | tag_right
-    
-    @cartesian
-    def is_velocity_boundary(self, p):
-        tag_up = bm.abs(p[..., 1] - 1.0) < self.eps
-        tag_down = bm.abs(p[..., 1] - 0.0) < self.eps
-        return tag_up | tag_down
     
     @cartesian
     def source(self, p, t):
@@ -136,7 +130,7 @@ class FromSympy(BoxMesher2d):
     def pressure(self, p, t):
         x = p[..., 0]
         y = p[..., 1]
-        return bm.array(self.p(x, y, t))
+        return bm.array(self.p(x, y, t), dtype=bm.float64)
 
     velocity_dirichlet = velocity
-    pressure_dirichlet = pressure 
+    pressure_dirichlet = pressure

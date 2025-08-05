@@ -5,11 +5,10 @@ from fealpy.cfd.model.incompressible_navier_stokes.poiseuille_2d import Poiseuil
 
 
 pde = FromSympy()
-#pde.select_pde['channel']()
 #pde.select_pde['poly2d']()
-pde.select_pde['sinsincos']()
-#
-#pde = Poiseuille2D()
+pde.select_pde['polycos']()
+#pde.select_pde['sinsincos']()
+#pde.select_pde['channel']()
 
 mesh = pde.init_mesh['uniform_tri'](10, 10)
 model = IncompressibleNSLFEM2DModel(pde, mesh=mesh)
@@ -18,7 +17,7 @@ model.equation.set_constitutive(2)
 fem = model.fem
 equation = model.equation
 timeline = model.timeline
-timeline.set_timeline(0, 10, 300)
+timeline.set_timeline(0, 1, 500)
 model.method['IPCS']()
 #model.method['Newton']()
 

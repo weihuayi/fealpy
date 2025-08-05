@@ -128,12 +128,14 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             
             self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
             
-            A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False, threshold=pde.is_pressure_boundary)
+            A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
             uhs[:] = self.solve(A0, b0)
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
-            #A1, b1 = self.fem.pressure(uhs, p0, return_form=False)
-            ph1[:] = self.solve(A1, b1)
+            if self.equation.pressure_neumann == True:
+                ph1[:] = self.solve(A1, b1)[:-1]
+            else:
+                ph1[:] = self.solve(A1, b1)
 
             A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, return_form=False)
             uh1[:] = self.solve(A2, b2)
@@ -155,11 +157,11 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 A = BForm.assembly()
                 b = LForm.assembly()
                 A, b = self.fem.apply_bc(A, b, self.pde, t=self.timeline.next_time())
-                #A, b = self.fem.lagrange_multiplier(A, b,4)
+                A, b = self.fem.lagrange_multiplier(A,b, 0)
             
                 x = self.solve(A, b, 'mumps')
                 uk1[:] = x[:ugdof]
-                pk[:] = x[ugdof]
+                pk[:] = x[ugdof:-1]
                 
                 res_u = self.mesh.error(uk0, uk1)
                 print(res_u)

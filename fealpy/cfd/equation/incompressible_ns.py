@@ -1,4 +1,6 @@
 from typing import Union, Callable, Dict
+from fealpy.backend import backend_manager as bm
+
 from .base import BaseEquation
 
 
@@ -21,6 +23,11 @@ class IncompressibleNS(BaseEquation):
         self.pde = pde
         if init_variables:
             self.initialize_from_pde(pde)
+        
+        if pde.is_pressure_boundary() == 0 :
+            self.pressure_neumann = True
+        else:
+            self.pressure_neumann = False
 
 
     def initialize_from_pde(self, pde):

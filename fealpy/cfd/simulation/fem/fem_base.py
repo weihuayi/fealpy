@@ -60,6 +60,9 @@ class FEM:
         self._tspace = self._create_space('tspace') 
         
         self._q = self.params.assembly['quadrature_order']
+        
+        if self.equation.pressure_neumann == False:
+            self.threshold = self.equation.pde.is_pressure_boundary
 
     
     def update_mesh(self, mesh):

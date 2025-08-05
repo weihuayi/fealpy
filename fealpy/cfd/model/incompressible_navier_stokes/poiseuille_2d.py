@@ -6,7 +6,6 @@ from fealpy.decorator import cartesian,variantmethod
 from fealpy.mesh import TriangleMesh
 from fealpy.mesher.box_mesher import BoxMesher2d
 
-CoefType = Union[int, float, Callable]
 
 class Poiseuille2D(BoxMesher2d):
     def __init__(self, eps=1e-10, rho=1, mu=1, R=None):
@@ -36,7 +35,9 @@ class Poiseuille2D(BoxMesher2d):
         return val
     
     @cartesian
-    def is_pressure_boundary(self, p):
+    def is_pressure_boundary(self, p=None):
+        if p is None:
+            return 1
         tag_left = bm.abs(p[..., 0] - 0.0) < self.eps
         tag_right = bm.abs(p[..., 0] - 1.0) < self.eps
         return tag_left | tag_right
