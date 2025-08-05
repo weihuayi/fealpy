@@ -15,9 +15,8 @@ from ....decorator import barycentric
 
 class IPCS(ProjectionMethod):
     """IPCS分裂投影法"""
-    def __init__(self, equation, boundary_threshold=None):
-        FEM.__init__(self, equation)
-        ProjectionMethod.__init__(self)
+    def __init__(self, equation, mesh, boundary_threshold=None):
+        super.__init__(equation, mesh)
         self.threshold = boundary_threshold
     
     def simulation(self):
