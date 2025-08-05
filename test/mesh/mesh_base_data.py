@@ -12,8 +12,8 @@ sub_mesh_class1 = [
 ]
 
 sub_mesh_class2 = [
-    # {"class_name": "UniformMesh2d",
-    #  "sub_class_name": "IntervalMesh"},
+    {"class_name": "UniformMesh2d",
+     "sub_class_name": "IntervalMesh"},
     {"class_name": "UniformMesh3d",
      "sub_class_name": "QuadrangleMesh"},
 ]
