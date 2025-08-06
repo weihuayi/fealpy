@@ -34,7 +34,7 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--box',
-    default = [0.0, 2.2, 0.0, 0.41], type=int,
+    default = [0.0, 0.75, 0.0, 0.41], type=int,
     help="N")
 
 parser.add_argument('--center',
@@ -46,7 +46,7 @@ parser.add_argument('--start_center',
     help="N")
 
 parser.add_argument('--radius',
-    default = 0.05, type=int,
+    default = 0.02, type=int,
     help="N")
 
 parser.add_argument('--nx',

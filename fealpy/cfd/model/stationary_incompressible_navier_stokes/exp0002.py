@@ -31,8 +31,10 @@ class Exp0002(BoxMesher2d):
         dy = options['dy']
         shift_angle = options['shift_angle']
         n_circle = options['n_circle']
-        h = options['h']        
+        h = options['h']    
 
+        self.box = box   
+        self.radius = radius 
         from meshpy.triangle import MeshInfo, build
         from fealpy.mesh import TriangleMesh    
         # 矩形顶点
@@ -175,9 +177,7 @@ class Exp0002(BoxMesher2d):
         y = p[..., 1]
         atol = 1e-12
         # 检查是否接近 x=±1 或 y=±1
-        on_boundary = (
-            (bm.abs(x - 0.) < atol) &
-            (y > 0.) & (y < 0.41))
+        on_boundary = (bm.abs(x - self.box[0]) < atol)
         return on_boundary
 
     @cartesian
@@ -186,7 +186,7 @@ class Exp0002(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         atol = 1e-12
-        on_boundary = (bm.abs(x - 0.75) < atol)
+        on_boundary = (bm.abs(x - self.box[1]) < atol)
         return on_boundary
     
     @cartesian
@@ -196,7 +196,7 @@ class Exp0002(BoxMesher2d):
         y = p[..., 1]
         atol = 1e-12
         on_boundary = (
-            (bm.abs(y - 0.) < atol) | (bm.abs(y - 0.41) < atol))
+            (bm.abs(y - self.box[2]) < atol) | (bm.abs(y - self.box[3]) < atol))
         return on_boundary
     
     @cartesian
