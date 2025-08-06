@@ -7,4 +7,4 @@ from .interval_mesher import IntervalMesher
 from .sphere_shell_mesher import SphereShellMesher
 from .hollowblock_mesher import HollowBlockMesher
 from .interface_mesher import InterfaceFittedMesher2d
-
+from .chip_mesher import ChipMesher
