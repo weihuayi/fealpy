@@ -15,11 +15,11 @@ parser.add_argument('--pde',
                     help='index of the linear elasticity  model, default is 1')
 
 parser.add_argument('--mesh_file',
-                    default='/home/why/fealpy/data/LANXIANG_KETI_0506.inp', type=str,
+                    default='/home/why/fealpy/data/gear/box_case1.inp', type=str,
                     help='mesh file name')
 
 parser.add_argument('--shaft_system_file',
-                    default='/home/why/fealpy/data/matlab-total-shaft.mat', type=str,
+                    default='/home/why/fealpy/data/gear/shaft_case1.mat', type=str,
                     help='the stiffness and mass matrix of the shaft')
 
 parser.add_argument('--neigen',

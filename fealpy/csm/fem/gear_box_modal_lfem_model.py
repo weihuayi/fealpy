@@ -191,40 +191,29 @@ class GearBoxModalLFEMModel(ComputationalModel):
         shaft_system = loadmat(self.options['shaft_system_file'])
         S = shaft_system['stiffness_total_system_spectrum']
         M = shaft_system['mass_total_system']
+        layout = shaft_system['component_bearing_layout'][:, 1:]
+        section = shaft_system['order_section_shaft']
 
         self.logger.info(
                 f"Sucsess load shaft system from {self.options['shaft_system_file']}"
                 f"shaft system stiffness matrix: {S.shape}"
                 f"shaft system mass matrix: {M.shape}")
 
-        d0 = [
-            [1,  5,  21.5, -1.1, 350250],
-            [1, 13,  75.5, -1.1, 350251],
-            [3,  4,  12.5, -1.1, 350247],
-            [3, 17,  129, -1.1, 350248],
-            [4,  7,  100.8, -1.1, 350243],
-            [4, 25,  253.6, -1.1, 350244],
-            [4,  4,  70, -1.1, 350241],
-        ]
-        d0 = bm.array(d0, dtype=self.ftype)
-
-        d1 = [[1, 1.1, 1.2, 2, 2.1, 2.2, 3, 4, 5], [17, 5, 3, 7, 3, 3, 18, 26, 8]]
-        d1 = bm.array(d1).T
-
-        NN = int(d1[:, 1].sum()) # 轴系节点总数
+        NN = int(section[1].sum()) # 轴系节点总数
         # 轴系节点排序偏移数组
-        offset = [0] + [int(a) for a in bm.cumsum(d1[:, 1])]  
+        offset = [0] + [int(a) for a in bm.cumsum(section[1])]  
         self.logger.info(
                 f"Number of nodes in the shaft system: {NN}"
                 f"Offset for the nodes: {offset}")
 
         nidmap = self.mesh.data['nidmap']
         # 轴原始编号到自然数编号的映射
-        imap = {str(a[0]) : a[1] for a in zip(d1[:, 0], range(d1.shape[0]))}
+        imap = {f"{a[0]:.1f}" : a[1] for a in zip(section[0], range(section.shape[1]))}
+        self.logger.info(f"Node map: {imap}")
         # 轴系与齿轮箱的耦合节点的标记数组
         isCNode = bm.zeros(NN, dtype=bm.bool)
-        for i, j in d0[:, :2]:
-            idx = imap[str(i)] + int(j) - 1
+        for i, j in layout[:, :2]:
+            idx = imap[f"{i:.1f}"] + int(j) - 1
             isCNode[idx] = True
 
         # 轴系的耦合节点的自由度标记数组
@@ -251,7 +240,7 @@ class GearBoxModalLFEMModel(ComputationalModel):
 
         # 变速箱壳体模型增加耦合节点的标记数组 
         # 为壳体建模提供耦合节点的标记
-        cnode = nidmap[d0[:, -1].astype(self.itype)]
+        cnode = nidmap[layout[:, -1].astype(self.itype)]
         isCNode = bm.zeros(self.mesh.number_of_nodes(), dtype=bm.bool)
         isCNode = bm.set_at(isCNode, cnode, True)
         self.mesh.data.add_node_data('isCNode', isCNode)
@@ -270,19 +259,80 @@ class GearBoxModalLFEMModel(ComputationalModel):
 
 
 
-    @variantmethod('scipy')
+    @variantmethod('slepc')
     def solve(self, which: str ='SM'):
         """Solve the eigenvalue problem using SLEPc.
         
         """
         from petsc4py import PETSc
         from slepc4py import SLEPc
+        from scipy.sparse import bmat
 
         # 获取
         S0, M0 = self.shaft_linear_system()
         self.rbe2_matrix()
         S1, M1 = self.box_linear_system()
 
+        S = bmat([[S0[0][0], None, S0[0][1]],
+                  [None, S1[0][0], S1[0][1]],
+                  [S0[1][0], S1[1][0], S0[1][1] + S1[1][1]]]).tocsr()
+        
+        M = bmat([[M0[0][0], None, M0[0][1]],
+                  [None, M1[0][0], M1[0][1]],
+                  [M0[1][0], M1[1][0], M0[1][1] + M1[1][1]]]).tocsr()
+
+        self.logger.info(f"Global system: {S.shape}, {M.shape}")
+
+        S = PETSc.Mat().createAIJ(
+                size=S.shape, 
+                csr=(S.indptr, S.indices, S.data))
+        S.assemble()
+        M = PETSc.Mat().createAIJ(
+                size=M.shape, 
+                csr=(M.indptr, M.indices, M.data))
+        M.assemble()
+
+        eps = SLEPc.EPS().create()
+        eps.setOperators(S, M)
+        eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
+
+        eps.setTolerances(tol=1e-6, max_it=10000)
+        eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+
+        st = eps.getST()
+        st.setType(SLEPc.ST.Type.SINVERT)
+        st.setShift(1e-4)  # 目标 shift，通常为目标最小特征值附近
+
+        ksp = st.getKSP()
+        ksp.setTolerances(rtol=1e-8, atol=1e-08, max_it=1000)
+        ksp.setType('gmres')  # 或 'gmres'
+        def my_ksp_monitor(ksp, its, rnorm):
+            print(f"KSP iter {its}, residual norm = {rnorm}")
+        ksp.setMonitor(my_ksp_monitor)
+        pc = ksp.getPC()
+        pc.setType('gamg')  # 或 'gamg' 若使用 AMG
+
+        k = self.options.get('neign', 1)
+        eps.setDimensions(nev=k, ncv=4*k)
+
+        eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
+        eps.setTarget(0.0)  # 目标特征值，通常为最小或最大特征值
+
+        #eps.setFromOptions()
+        eps.solve()
+
+        eigvals = []
+        eigvecs = []
+
+        vr, vi = eps.getOperators()[0].getVecs()
+        print(f"Number of eigenvalues converged: {eps.getConverged()}")
+        for i in range(min(k, eps.getConverged())):
+            val = eps.getEigenpair(i, vr, vi)
+            eigvals.append(val.real)
+            eigvecs.append(vr.getArray().copy())
+        val = bm.array(eigvals)
+        #vec = bm.stack(eigvecs, axis=1)
+        self.logger.info(f"Eigenvalues: {val}")
 
         
 
