@@ -161,6 +161,16 @@ class CSRTensor(SparseTensor):
         return self
 
     ### 4. Object Conversion ###
+    def to_petsc(self):
+        from petsc4py import PETSc
+
+        if self.dense_ndim != 0:
+            raise ValueError("Only CSRTensor with 0 dense dimension "
+                             "can be converted to scipy sparse matrix")
+
+        return PETSc.Mat().createAIJ(
+                size=self._spshape, csr=(self._crow, self._col, self._values))
+
     def to_scipy(self):
         from scipy.sparse import csr_matrix
 
