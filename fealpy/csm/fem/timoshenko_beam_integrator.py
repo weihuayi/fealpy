@@ -113,8 +113,8 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         R = self._coord_transfrom()
 
-        phi_y = 12 * E * Iz / mu / AY / (l**2)  # Phi_y
-        phi_z = 12 * E * Iy / mu / AZ / (l**2)  # Phi_x
+        phi_y = 12 * E * Iz / mu / AY / (l**2) 
+        phi_z = 12 * E * Iy / mu / AZ / (l**2) 
 
         KE = bm.zeros((NC, 12, 12))
 
@@ -137,7 +137,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ke[:, 3, 9] = -Ke[:, 3, 3]
 
         Ke[:, 4, 4] = (4+phi_z) * E * Iy / (1+phi_z) / l
-        Ke[:, 4, 8] = 6 * E * Iy / (1+phi_z) /(l**2)
+        Ke[:, 4, 8] = 6 * E * Iy / (1+phi_z) / (l**2)
         Ke[:, 4, 10] = (2-phi_z) * E * Iy / (1+phi_z) / l
 
         Ke[:, 5, 5] = (4+phi_y) * E * Iz / (1+phi_y) / l

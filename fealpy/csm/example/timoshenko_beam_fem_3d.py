@@ -1,5 +1,6 @@
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
 from fealpy.fem import BilinearForm
+from fealpy.fem import DirichletBC
 
 from fealpy.csm.model.beam.timoshenko_beam_data_3d import TimoshenkoBeamData3D
 from fealpy.csm.material.timoshenko_beam_material import TimoshenkoBeamMaterial
@@ -20,3 +21,11 @@ integrator = TimoshenkoBeamIntegrator(space=tspace, material=material)
 bform = BilinearForm(tspace)
 bform.add_integrator(TimoshenkoBeamIntegrator(space=tspace, material=material))
 K = bform.assembly().toarray()
+
+F = model.body_force()
+F1 = F.reshape(-1)
+
+test = mesh.boundary_face_flag()
+
+dbc = DirichletBC(space=tspace, gd=model.dirichlet, threshold=model.dirichlet_node_index)
+K, F = dbc.apply(A=K, f=F)

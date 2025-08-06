@@ -51,7 +51,6 @@ class TimoshenkoBeamData3D:
         ])
         self.L = bm.sum(self.para[:, 1])
         self._D = bm.repeat(self.para[:, 0], self.para[:, 2].astype(int))
-        #self._beam_index = bm.arange(sum(self.para[:, 2].astype(int)))
         self._FSY = 10/9
         self._FSZ = 10/9
         self.mesh = self.init_mesh()
@@ -69,23 +68,15 @@ class TimoshenkoBeamData3D:
         return 1.976e6 
     
     def _calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        #NC = self.mesh.number_of_cells()
-        #AX = bm.ones(NC)
-        #AY = bm.ones(NC)
-        #AZ = bm.ones(NC)
-
+        """Cross-sectional area of the beam element."""
         AX = bm.pi * self.D**2 / 4
         AY = AX / self._FSY
         AZ = AX / self._FSZ
 
-        #AX[self._beam_index] = AX_beam
-        #AY[self._beam_index] = AY_beam
-        #AZ[self._beam_index] = AZ_beam
-
         return AX, AY, AZ
     
     def _calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        # 梁单元的惯性矩
+        """Moment of inertia for the beam element."""
         Iy  = bm.pi * self.D**4 / 64
         Iz = Iy
         Ix = Iy + Iz
@@ -128,29 +119,30 @@ class TimoshenkoBeamData3D:
         return EdgeMesh(node, cell)
     
     @cartesian
-    def load(self):
+    def F(self) -> TensorLike:
         """
         The load applied to the node.
         load = [node_index, x, y, z, theta_x theta_y theta_z]
         """
-        #x = self.mesh.node[:, 0]
-        #dofs = 6 * len(x)
-        load = bm.array([[1, 0, 0, -88200, 0, 0 , 0],
-                         [21, 0, 0, -88200, 0, 0, 0],
-                         [11, 3140, 0, 0, 14000e3, 0, 0]], dtype=bm.float64)
+        NN = self.mesh.number_of_nodes()
+        F = bm.zeros((NN, 6))
 
-        return load
+        F[1, 2] = -88200
+        F[11, 0] = 3140
+        F[11, 3] = 1.4e6
+        F[21, 2] = -88200
+
+        return F 
     
-    
-    def dirichlet_dof_index(self) -> TensorLike:
+    def dirichlet_node_index(self) -> TensorLike:
         """
-        Return the indices of degrees of freedom (DOFs) where Dirichlet boundary conditions are applied.
+        Return the indices of node where Dirichlet boundary conditions are applied.
+        Each node has 6 DOFs: [u, v, w, θx, θy, θz]
         """
+
         return bm.array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32])
     
     @cartesian
-    def dirichlet(self, x):
-        """
-        Compute the Dirichlet boundary condition.
-        """
+    def dirichlet(self):
+        """Compute the Dirichlet boundary condition."""
         return 0
