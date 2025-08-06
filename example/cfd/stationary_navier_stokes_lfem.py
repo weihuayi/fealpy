@@ -117,7 +117,7 @@ manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
-
+model.__str__()
 
 
 

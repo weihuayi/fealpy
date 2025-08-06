@@ -82,9 +82,8 @@ class Exp0001(BoxMesher2d):
     @cartesian
     def is_pressure_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point where pressure is defined is on boundary."""
-        # result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        # return result
-        return None
+        result = bm.zeros_like(p[..., 0], dtype=bm.bool)
+        return result
 
     @cartesian
     def velocity_gradient(self, p: TensorLike) -> TensorLike:

@@ -219,8 +219,9 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.tol = tol
         for i in range(maxit):
             self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
-            self.run['main'](maxstep, tol, apply_bc)
+            uh1, ph1 = self.run['main'](maxstep, tol, apply_bc)
             self.mesh.uniform_refine()
+        return uh1, ph1
 
     @variantmethod('direct')
     def solve(self, A, F, solver='mumps'):
