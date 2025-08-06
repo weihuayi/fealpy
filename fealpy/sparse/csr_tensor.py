@@ -166,7 +166,7 @@ class CSRTensor(SparseTensor):
 
         if self.dense_ndim != 0:
             raise ValueError("Only CSRTensor with 0 dense dimension "
-                             "can be converted to scipy sparse matrix")
+                             "can be converted to PETSc sparse matrix")
 
         return PETSc.Mat().createAIJ(
                 size=self._spshape, csr=(self._crow, self._col, self._values))
