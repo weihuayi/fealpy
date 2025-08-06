@@ -2,8 +2,9 @@ from fealpy.typing import Optional, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 
-from fealpy.material import Material
 from fealpy.mesh import EdgeMesh
+from fealpy.material import Material
+
 
 class TimoshenkoBeamData3D:
     """

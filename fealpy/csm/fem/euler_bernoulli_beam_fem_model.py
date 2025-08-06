@@ -1,21 +1,24 @@
-from ...backend import backend_manager as bm
-from ..model import ComputationalModel
+
+from fealpy.backend import backend_manager as bm
+from fealpy.model import ComputationalModel
+
+from fealpy.mesh import Mesh
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
+
+from fealpy.fem import BilinearForm
+from fealpy.fem import LinearForm
+from fealpy.fem import DirichletBC
+
+from fealpy.solver import spsolve
+
 from ..model import CSMModelManager
-from ...fem import BilinearForm
-from ...fem import LinearForm
-from ...functionspace import LagrangeFESpace, TensorFunctionSpace
-from ...fem import DirichletBC
-from ..fem import BeamDiffusionIntegrator
-from ..fem import BeamSourceIntegrator
-from ...solver import spsolve
-from typing import Union
-from ..model.beam import BeamPDEDataT
 
-import matplotlib.pyplot as plt
+from . import EulerBernoulliBeamSourceIntegrator
+from . import EulerBernoulliBeamDiffusionIntegrator
 
-class BeamFEMModel(ComputationalModel):
+class EulerBernoulliBeamFEMModel(ComputationalModel):
     """
-    BeamFEMModel is a finite element model for solving static problems of beam structures.
+    EulerBernoulliBeamFEMModel is a finite element model for solving static problems of beam structures.
 
     This class implements a finite element method (FEM) solver for the static analysis of beams, 
     suitable for force and deformation analysis. By specifying material parameters, 
@@ -53,25 +56,20 @@ class BeamFEMModel(ComputationalModel):
         This class assumes the provided PDEModelManager example defines all necessary parameters and boundary conditions.
         Supports custom loads and boundary conditions for various beam problems.
         Depends on external finite element spaces, integrators, and linear solvers.
-    Examples
-        >>> model = BeamFEMModel(example='beam2d')
-        >>> displacement = model.run()
-        >>> print(displacement)
-        [0.0, 0.0012, 0.0023, ...]
     """
 
     def __init__(self, options):
         '''
         Initializes the PoissonFDMModel with the specified example.
-        Parameters:
+        Parameters
             example (str): The name of the beam problem example to use. Default is 'beam2d'.
             Initializes the PDE parameters, mesh, and material properties based on the example.
-        Raises:
+        Raises
             ValueError: If the example is not recognized or cannot be initialized.
-        Notes:
+        Notes
             The example should be a valid key in the PDEModelManager for beam problems.
             It must define all necessary parameters and boundary conditions.
-        Examples:
+        Examples
             >>> model = PoissonFDMModel(example='beam2d')
             >>> print(model.pde)
             <PDEModelManager object with beam parameters>
@@ -85,31 +83,33 @@ class BeamFEMModel(ComputationalModel):
         self.I = options['inertia']
         self.f = options['load']
         self.l = options['length']
-        self.mesh = self.pde.init_mesh()
+        mesh = self.pde.init_mesh()
+        self.set_mesh(mesh)
+    
+    def set_mesh(self, mesh: Mesh) -> None:
+        self.mesh = mesh
         
-    def set_pde(self, pde:Union[BeamPDEDataT, str]='beam2d'):
+    def set_pde(self, pde=1) -> None:
         '''
         Set the PDE parameters for the beam problem.
-        Parameters:
+        Parameters
             pde (PDEModelManager): The PDE data manager containing beam parameters and boundary conditions.
-        Raises:
+        Raises
             ValueError: If the provided pde is not valid or does not contain necessary parameters.
-        Notes:
+        Notes
             This method updates the model's physical parameters and mesh based on the provided PDE data.
-        Examples:
-            >>> model.set_pde(new_pde)
         '''
-        if isinstance(pde, str):
-            self.pde = CSModelManager('beam').get_example(pde)
+        if isinstance(pde, int):
+            self.pde = CSMModelManager('beam').get_example(pde)
         else:
             self.pde = pde
-        self.mesh = self.pde.init_mesh()
+        self.logger.info(self.pde)
 
 
     def run(self):
         '''
         Run the finite element method for the beam problem.
-        Returns:
+        Returns
             uh (ndarray): Displacement solution vector.
         '''
         uh = self.solve()
@@ -119,7 +119,7 @@ class BeamFEMModel(ComputationalModel):
     def linear_system(self):
         '''
         Construct the linear system for the beam problem.
-        Returns:
+        Returns
             K (csr_matrix): Stiffness matrix.
             F (ndarray): Load vector.
         '''
@@ -132,11 +132,11 @@ class BeamFEMModel(ComputationalModel):
         scalar_space = LagrangeFESpace(mesh, 1)
         tensor_space = TensorFunctionSpace(scalar_space=scalar_space, shape=(-1, 2))
         bform = BilinearForm(tensor_space)
-        beamintegrator = BeamDiffusionIntegrator(tensor_space, self.beam_type, E, A=A, I=I, l=l)
+        beamintegrator = EulerBernoulliBeamDiffusionIntegrator(tensor_space, self.beam_type, E, A=A, I=I, l=l)
         bform.add_integrator(beamintegrator)
         K = bform.assembly()
         lform = LinearForm(tensor_space)
-        FF  = BeamSourceIntegrator(tensor_space, self.beam_type, source=-f, l=l)
+        FF  = EulerBernoulliBeamSourceIntegrator(tensor_space, self.beam_type, source=-f, l=l)
         lform.add_integrator(FF)
         F = lform.assembly()
         return K, F

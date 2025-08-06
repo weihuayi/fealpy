@@ -1,7 +1,9 @@
-from fealpy.mesh import EdgeMesh
+
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.backend import TensorLike
+
+from fealpy.mesh import EdgeMesh
 
 class Truss2D:
     """
@@ -10,7 +12,7 @@ class Truss2D:
         E A du/dx = f(x),    x ∈ (0, L)
         f(x) = constant axial force
 
-    Parameters:
+    Parameters
         E: Young's modulus
         A: Cross-sectional area (used if axial terms are present)
         f: load 
@@ -36,7 +38,7 @@ class Truss2D:
         """
         Construct a 2D EdgeMesh for the truss domain.
 
-        Returns:
+        Returns
             EdgeMesh: 2D mesh from x=0 to x=L.
         """
         node = bm.array([[0, 0], [0 , 0.4],[0.4, 0.3], [0, 0.3]], dtype=bm.float64)
@@ -48,10 +50,10 @@ class Truss2D:
         """
         Compute the distributed load f(x).
 
-        Args:
+        Parameters
             x: Spatial coordinate(s).
 
-        Returns:
+        Returns
             Tensor: Distributed load at x.
         """
         return bm.ones_like(x) * self.f
@@ -60,11 +62,11 @@ class Truss2D:
         """
         Return the indices of degrees of freedom (DOFs) where Dirichlet boundary conditions are applied.
 
-        Parameters:
+        Parameters
             total_dof : int
             Total number of global degrees of freedom.
 
-        Returns:
+        Returns
             Tensor[int]: Indices of boundary DOFs.
         """
         return bm.array([0, 1, 2, 3])
@@ -74,10 +76,10 @@ class Truss2D:
         """
         Compute the Dirichlet boundary condition.
 
-        Args:
+        Parameters
             x: Spatial coordinate(s).
 
-        Returns:
+        Returns
             Tensor: Dirichlet boundary condition at x.
         """
         return bm.zeros()

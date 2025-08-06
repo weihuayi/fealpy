@@ -1,31 +1,31 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
-from fealpy.typing import TensorLike, Index, _S, SourceLike
+
 from typing import Optional, Literal
-from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, SourceLike
 from fealpy.decorator import variantmethod
 
-class BeamPLSourceIntegrator(LinearInt, SrcInt, CellInt):
+from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
+
+
+
+class EulerBernoulliBeamPLSourceIntegrator(LinearInt, SrcInt, CellInt):
     """
     Beam element source term integrator.
 
-    Supported beam types:
-    - Pure bending beam: 2 DOFs per node [w, theta]
-    - 2D beam: 3 DOFs per node [u, w, theta]
-    - 3D beam: 6 DOFs per node [u, v, w, theta_x, theta_y, theta_z]
-
     Parameters
-    ----------
-    space : FunctionSpace
-        Finite element space.
-    beam_type : str
-        Beam type: 'euler_bernoulli_2d', 'normal_2d', or 'euler_bernoulli_3d'.
-    source : SourceLike
-        Source term function.
-    l : array_like
-        Beam element length (NC,).
-    method : str, optional
-        Integration method (default 'assembly').
+        space : FunctionSpace
+            Finite element space.
+        beam_type : str
+            Beam type: 'euler_bernoulli_2d', 'normal_2d', or 'euler_bernoulli_3d'.
+        source : SourceLike
+            Source term function.
+        l : array_like
+            Beam element length (NC,).
+        method : str, optional
+            Integration method (default 'assembly').
     """
     def __init__(self, 
                  space: _FS,
@@ -49,10 +49,7 @@ class BeamPLSourceIntegrator(LinearInt, SrcInt, CellInt):
     @variantmethod("euler_bernoulli_2d")
     def assembly_pointload(self, space: _FS) -> TensorLike:
         """
-        Assemble nodal concentrated force for pure bending beam (2 DOFs per node: [w, theta]).
-        Concentrated force is scalar: q = [f]
-        Return vector shape: (NC, 4)
-        Only acts on the right node.
+        Assemble nodal concentrated force for 2D beam (2 DOFs per node: [u, w]).
         """
         q = self.ft  # shape (NC, 1)
         zero = bm.zeros_like(q)
@@ -62,8 +59,6 @@ class BeamPLSourceIntegrator(LinearInt, SrcInt, CellInt):
     def assembly_pointload(self, space: _FS) -> TensorLike:
         """
         Assemble nodal concentrated force for 2D beam (3 DOFs per node: [u, w, theta]).
-        q: shape (NC, 2), [fx, fy]
-        Return vector shape: (NC, 6)
         """
         q = self.ft
         fx = q[:, 0:1]
@@ -75,8 +70,6 @@ class BeamPLSourceIntegrator(LinearInt, SrcInt, CellInt):
     def assembly_pointload(self, space: _FS) -> TensorLike:
         """
         Assemble nodal concentrated force for 3D beam (6 DOFs per node: [u, v, w, θx, θy, θz]).
-        q: shape (NC, 3), [fx, fy, fz]
-        Return vector shape: (NC, 12)
         """
         q = self.ft
         fx = q[:, 0:1]

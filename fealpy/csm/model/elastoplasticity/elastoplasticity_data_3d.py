@@ -1,13 +1,26 @@
-import numpy as np
-from fealpy.backend import backend_manager as bm
-from fealpy.decorator import cartesian
 from typing import Tuple
 
-class exp2():
+from fealpy.backend import backend_manager as bm
+from fealpy.decorator import cartesian
+
+
+class ElastoplasticityData3D:
     """
     3D Elasto-Plastic Block specimen with pure isotropic hardening.
 
-    Geometry: (0,10)x(0,10)x(0,20) mm³
+    Inherits from BoxMesher3d to generate a unit box mesh in 3D, and sets up material and body force parameters
+    for a simple linear elasticity eigenvalue example (Exp0001).
+
+    Attributes
+        L : float
+            Length of the box in the x-direction.
+        W : float
+            Width of the box in the y- and z-directions.
+        g : float
+            Scaled gravity acceleration based on aspect ratio.
+        d : TensorLike
+            Gravity direction vector.
+        Geometry: (0,10)x(0,10)x(0,20) mm³
     Material:
         - E = 2.1e5 MPa
         - nu = 0.3
@@ -25,7 +38,7 @@ class exp2():
 
         # Experimental yield stress - plastic strain data
         # Columns: [step, yield_stress (MPa), plastic_strain]
-        self.yield_table = np.array([
+        self.yield_table = bm.array([
             [1,  50.2, 0.0000],
             [2,  96.0, 0.0235],
             [3, 144.0, 0.0474],
@@ -106,7 +119,7 @@ class exp2():
         """
         plastic_strain_table = self.yield_table[:, 2]
         yield_stress_table = self.yield_table[:, 1]
-        return np.interp(plastic_strain, plastic_strain_table, yield_stress_table)
+        return bm.interp(plastic_strain, plastic_strain_table, yield_stress_table)
 
     def yield_function(self, sigma, alpha):
         """
