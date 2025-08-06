@@ -1,4 +1,6 @@
 
+from typing import Union
+
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
 
@@ -70,8 +72,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        mesh = self.pde.init_mesh()
-        self.set_mesh(mesh)
+        self.set_init_mesh(options['init_mesh'])
         self.set_space_degree(options['space_degree'])
         self.set_space()
         self.set_material_parameters(E=2.069e5, nu=0.29)  # Set material parameters
@@ -97,7 +98,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         '''
         self.p = p
 
-    def set_mesh(self, mesh: Mesh) -> Mesh:
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "tri_threshold", **kwargs ):
         '''
         This method generates the mesh according to the domain and boundary conditions defined in the PDE data.
         
@@ -107,7 +108,10 @@ class ElastoplasticityFEMModel(ComputationalModel):
         Returns:
             Mesh: The initialized mesh object.
         '''
-        self.mesh = mesh
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh[mesh](big_box=(-5,5,-5,5), small_box=(-5,0,-5,0), nx=8, ny=8)
+        else:
+            self.mesh = mesh
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()

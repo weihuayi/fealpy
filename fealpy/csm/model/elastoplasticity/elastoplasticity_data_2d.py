@@ -5,9 +5,9 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.backend import TensorLike
 
-from fealpy.mesh import TriangleMesh
+from fealpy.mesher import LshapeMesher
 
-class ElastoplasticityData2D:
+class ElastoplasticityData2D(LshapeMesher):
     """
     2D Elasto-Plastic Beam with von Mises Yield and Ziegler Hardening
 
@@ -25,7 +25,7 @@ class ElastoplasticityData2D:
         n : int
             Mesh refinement level.
 
-    Domain: (0, 1) x (0, 0.25) dm.
+    Domain: 
     The left and bottom boundaries are clamped (zero displacement).
     A time-dependent Neumann traction is applied on the top boundary (y=0.25).
     """
@@ -65,25 +65,8 @@ class ElastoplasticityData2D:
         return self.E / (2 * (1 + self.nu))
 
     def domain(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
-        return (0.0, 1.0), (0.0, 0.25)  # [0,1] x [0,0.25] dm
-
-    def init_mesh(self):
-        node = bm.array([
-            [-5, -5], [0, -5], [-5, 0],
-            [0, 0], [5, 0], [-5, 5],
-            [0, 5], [5, 5]
-        ], dtype=bm.float64)
-
-        cell = bm.array([
-            [1, 3, 0], [2, 0, 3],
-            [3, 6, 2], [5, 2, 6],
-            [4, 7, 3], [6, 3, 7]
-        ], dtype=bm.int32)
-
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(self.n)
-        return mesh
-
+        return self.box  
+     
     @cartesian
     def body_force(self, x):
         return bm.zeros((x.shape[0], self.dim))  # No body force
@@ -120,7 +103,7 @@ class ElastoplasticityData2D:
         Returns:
             TensorLike: Boolean array indicating if points are on the Dirichlet boundary.
         """
-        return (bm.abs(p[:, 0] - 5) < 1e-12) | (bm.abs(p[:, 1] + 5) < 1e-12)
+        return (bm.abs(p[:, 0] + 5) < 1e-12) | (bm.abs(p[:, 1] + 5) < 1e-12)
 
     @cartesian
     def dirichlet(self, p):
