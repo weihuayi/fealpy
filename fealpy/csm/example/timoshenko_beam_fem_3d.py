@@ -1,31 +1,46 @@
-from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.fem import BilinearForm
-from fealpy.fem import DirichletBC
+import argparse
 
-from fealpy.csm.model.beam.timoshenko_beam_data_3d import TimoshenkoBeamData3D
-from fealpy.csm.material.timoshenko_beam_material import TimoshenkoBeamMaterial
-from fealpy.csm.fem.timoshenko_beam_integrator import TimoshenkoBeamIntegrator
+# Argument parsing
+parser = argparse.ArgumentParser(description=
+        """
+        Finite Element Solution for 3D Timoshenko Beam.
+        """)
 
-# Example usage
-model = TimoshenkoBeamData3D()
-material = TimoshenkoBeamMaterial(name="TimoshenkoBeam",
-                                      model=model, 
-                                      elastic_modulus=2.07e11,
-                                      poisson_ratio=0.276)
-mesh = model.init_mesh()
-    
-sspace = LagrangeFESpace(mesh=mesh, p=1, ctype='C')
-tspace = TensorFunctionSpace(scalar_space=sspace, shape=(6, -1))
-integrator = TimoshenkoBeamIntegrator(space=tspace, material=material)
+parser.add_argument('--backend',
+        default='numpy', type=str,
+        help='Default backend is numpy')
 
-bform = BilinearForm(tspace)
-bform.add_integrator(TimoshenkoBeamIntegrator(space=tspace, material=material))
-K = bform.assembly().toarray()
+parser.add_argument('--pde',
+                    default=2, type=int,
+                    help='id of the PDE model, default is 2')
 
-F = model.body_force()
-F1 = F.reshape(-1)
+parser.add_argument('--init_mesh',
+                    default='edgemesh', type=str,
+                    help='Type of mesh, default is EdgeMesh')
 
-test = mesh.boundary_face_flag()
+parser.add_argument('--E',
+                    default=2.07e11, type=float,
+                    help='Type of mesh, default is Young modulus')
 
-dbc = DirichletBC(space=tspace, gd=model.dirichlet, threshold=model.dirichlet_node_index)
-K, F = dbc.apply(A=K, f=F)
+parser.add_argument('--nu',
+                    default=0.276, type=float,
+                    help='Type of mesh, default is Poisson ratio')
+
+
+parser.add_argument('--pbar_log',
+                    default=True, type=bool,
+                    help='Whether to show progress bar, default is True')
+
+parser.add_argument('--log_level',
+                    default='INFO', type=str,
+                    help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
+
+options = vars(parser.parse_args())
+
+from fealpy.backend import backend_manager as bm
+bm.set_backend(options['backend'])
+
+from fealpy.csm.fem import TimoshenkoBeamModel
+model = TimoshenkoBeamModel(options)
+#model.__str__()
+#model.solve['cg']()

@@ -4,10 +4,8 @@ from fealpy.typing import Tuple, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 
-from fealpy.material import (
-        LinearElasticMaterial,
-        )
 from fealpy.mesh import EdgeMesh
+
 
 class TimoshenkoBeamData3D:
     """
@@ -57,15 +55,9 @@ class TimoshenkoBeamData3D:
         self._AX, self._AY, self._AZ = self._calculate_cross_sectional_areas()
         self._Iy, self._Iz, self._Ix = self._calculate_moments_of_inertia()
         
-
     @property
     def D(self) -> TensorLike:
         return self._D
-    
-    @property
-    def k_lunzhou(self, p: Optional[TensorLike] = None) -> TensorLike:
-        """N/mm equivalent node stiffness for the axle, identical in all three translational directions."""
-        return 1.976e6 
     
     def _calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
         """Cross-sectional area of the beam element."""
@@ -82,7 +74,6 @@ class TimoshenkoBeamData3D:
         Ix = Iy + Iz
 
         return Ix, Iy, Iz
-
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -119,28 +110,46 @@ class TimoshenkoBeamData3D:
         return EdgeMesh(node, cell)
     
     @cartesian
-    def F(self) -> TensorLike:
-        """
-        The load applied to the node.
-        load = [node_index, x, y, z, theta_x theta_y theta_z]
+    def external_load(self) -> TensorLike:
+        """The load applied to the node.
+        Notes:
+            Each node has 6 DOFs: [u, v, w, θx, θy, θz].
+            dof_map = {'u': 0,'v': 1,'w': 2,'θx': 3,'θy': 4,'θz': 5}
         """
         NN = self.mesh.number_of_nodes()
-        F = bm.zeros((NN, 6))
+        dofs_per_node = 6
+        n_dofs = NN * dofs_per_node
+        F = bm.zeros(n_dofs)
 
-        F[1, 2] = -88200
-        F[11, 0] = 3140
-        F[11, 3] = 1.4e6
-        F[21, 2] = -88200
+        external_load = bm.array([-88200, 3140, 1.4e6, -88200])
+
+        F[1 * dofs_per_node + 2] = external_load[0]
+        F[11 * dofs_per_node] = external_load[1]
+        F[11 * dofs_per_node + 3] = external_load[2]
+        F[21 * dofs_per_node + 2] = external_load[3]
 
         return F 
     
-    def dirichlet_node_index(self) -> TensorLike:
-        """
-        Return the indices of node where Dirichlet boundary conditions are applied.
-        Each node has 6 DOFs: [u, v, w, θx, θy, θz]
-        """
+    def dirichlet_dof_index(self) -> TensorLike:
+        """Dirichlet boundary conditions are applied.
 
-        return bm.array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32])
+        Returns:
+            A 1D tensor containing the global DOF indices corresponding to 
+        the fixed boundary nodes.
+
+        Notes:
+            Each node has 6 DOFs: [u, v, w, θx, θy, θz].
+            Global DOF index for a given node `n` and local DOF `i` is calculated as `n * 6 + i`.
+            The fixed nodes here are nodes 23 through 32 inclusive.
+        """
+        fixed_nodes = bm.arange(23, 33) # 节点23到32
+        dofs_per_node = 6
+
+        bd_idx = []
+        for node  in fixed_nodes:
+            for i in range(dofs_per_node):
+                bd_idx.append(node * dofs_per_node + i)
+        return bm.array(bd_idx)
     
     @cartesian
     def dirichlet(self):
