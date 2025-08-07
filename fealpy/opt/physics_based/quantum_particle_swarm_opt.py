@@ -45,6 +45,7 @@ class QuantumParticleSwarmOpt(Optimizer):
         self.gbest_f = pbest_f[gbest_index]
         
         for it in range(0, self.MaxIT):
+            print(it)
             # Update auxiliary data structures (defined elsewhere)
             self.D_pl_pt(it)
             

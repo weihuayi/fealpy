@@ -17,7 +17,7 @@ from .improved import (CuckooQuantumParticleSwarmOpt, DifferentialSquirrelSearch
 from .music_based import HarmonySearchAlg
 from .math_based import ExponentialTrigonometricOptAlg, SineCosineAlg
 from .human_based import DifferentialtedCreativeSearch, TeachingLearningBasedAlg
-from .bio_based import PlantRhizomeGrowthBasedOpt, InvasiveWeedOpt
+from .bio_based import AnimatedOatOpt, PlantRhizomeGrowthBasedOpt, InvasiveWeedOpt
 from .chaos import *
 from .evolutionary_based import (GeneticAlg, DifferentialEvolution)
 from .PLBFGSAlg import PLBFGS

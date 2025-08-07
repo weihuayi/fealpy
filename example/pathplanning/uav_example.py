@@ -1,4 +1,4 @@
-from fealpy.opt.UAV_Pathplanning import UAVPathPlanning, TerrainLoader
+from fealpy.pathplanning import UAVPathPlanning, TerrainLoader
 from fealpy.backend import backend_manager as bm
 from fealpy.opt import *
 
@@ -21,9 +21,9 @@ threats = bm.array([
 
 # 起点、终点
 start_pos = bm.array([300, 300, 150])
-end_pos = bm.array([800, 450, 150])
+end_pos = bm.array([800, 500, 150])
 
-model = UAVPathPlanning(threats, terrain_data, start_pos, end_pos, QuantumParticleSwarmOpt)
+model = UAVPathPlanning(threats, terrain_data, start_pos, end_pos, AnimatedOatOpt)
 sol, f = model.opt(n=10)
-model.optimizer.print_optimal_result()
-model.plot_solution(sol)
+# model.optimizer.print_optimal_result()
+model.output_solution(sol)
