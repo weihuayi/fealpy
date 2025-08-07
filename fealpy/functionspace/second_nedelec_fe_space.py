@@ -3,17 +3,17 @@ class SecondNedelecFESpace:
     Factory for creating second-kind Nédélec finite element space objects in 2D or 3D,
     with automatic dimension detection and appropriate class selection.
 
-    Parameters:
+    Parameters
         mesh:
             The computational mesh object providing geometric information.
         p (int):
             The degree of the finite element space (typically 1 for second-kind Nédélec).
 
-    Returns:
+    Returns
         Instance of either SecondNedelecFiniteElementSpace2d or SecondNedelecFiniteElementSpace3d,
         matching the geometric dimension of the input mesh.
 
-    Raises:
+    Raises
         ValueError:
             - If geometric dimension is 1 (unsupported)
             - If geometric dimension is neither 2 nor 3
