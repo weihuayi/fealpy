@@ -78,15 +78,7 @@ class Exp0001(BoxMesher2d):
         s += f"  pressure     : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
         s += f")"
         return s
-
-    def get_dimension(self) -> int: 
-        """Return the geometric dimension of the domain."""
-        return 2
-
-    def domain(self) -> Sequence[float]:
-        """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return self.box
-    
+ 
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity."""
