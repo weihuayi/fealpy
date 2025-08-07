@@ -1,23 +1,18 @@
-from fealpy.opt import GreyWolfOpt, initialize
+from fealpy.opt import QuantumParticleSwarmOpt, initialize
 from fealpy.opt.optimizer_base import opt_alg_options
+from fealpy.opt.benchmark.constrained_benchmark import constrained_benchmark_data as data
 
-def penalty(value):
-    return 0 + ((0 < value) * (value < 1)) * value + (value >= 1) * (value ** 2)
+num = 0
+fobj = data[num]["objective"]
+lb = data[num]["lb"]
+ub = data[num]["ub"]
+dim = data[num]["ndim"]
+N = 100
+T = 10000
 
-def fobj(x):
-    def f(x):
-        return (1 - x[:, 0]) ** 2 + 100 * (x[:, 1] - x[:, 0] ** 2) ** 2
-    def g1(x):
-        return (x[:, 0] - 1) ** 3 - x[:, 1] + 1
-    def g2(x):
-        return x[:, 0] + x[:, 1] - 2
-    return f(x) + penalty(g1(x)) + penalty(g2(x))
-
-lb = [-1.5, -0.5]
-ub = [1.5, 2.5]
-x0 = initialize(50, 2, ub, lb)
-option = opt_alg_options(x0, fobj, (lb, ub), 50, MaxIters=100)
-optimizer = GreyWolfOpt(option)
+x0 = initialize(N, dim, ub, lb)
+option = opt_alg_options(x0, fobj, (lb, ub), N, MaxIters=T)
+optimizer = QuantumParticleSwarmOpt(option)
 optimizer.run()
 optimizer.print_optimal_result()
 optimizer.plot_curve("Grey Wolf Optimizer")

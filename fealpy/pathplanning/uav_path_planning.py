@@ -1,6 +1,6 @@
-from ...backend import backend_manager as bm
-from ...opt import *
-from ...opt.optimizer_base import opt_alg_options
+from ..backend import backend_manager as bm
+from ..opt import *
+from ..opt.optimizer_base import opt_alg_options
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from scipy.interpolate import UnivariateSpline
@@ -81,7 +81,7 @@ class UAVPathPlanning():
         self.ax.set_facecolor('white')
         plt.tight_layout()
 
-    def plot_solution(self, sol, smooth=1):
+    def output_solution(self, sol, smooth=1):
         """
         Visualizes the optimized UAV path over the 3D environment.
 
@@ -112,6 +112,15 @@ class UAVPathPlanning():
                 bm.array([[self.end_pos[2]]])
             ], axis=1
         )
+
+        route = bm.stack([x_all, y_all, z_all], axis=-1).squeeze()
+        diff = route[:-1] - route[1:]
+        total_distance = bm.sum(bm.linalg.norm(diff, axis=1))
+
+        print('UAV Route: ')
+        print(route)
+        print('Total Route Distance: ', total_distance)
+
         H = self.terrain_data
         y_index = bm.round(y_all).astype(int)
         x_index = bm.round(x_all).astype(int)
@@ -133,10 +142,8 @@ class UAVPathPlanning():
             linewidth=1,     
             marker=None,      
         )
-        h1 = self.ax.plot([x_all[0]], [y_all[0]], [z_all[0]],
-                    'go', markersize=7, markerfacecolor='g', label='Start')[0]
-        h2 = self.ax.plot([x_all[-1]], [y_all[-1]], [z_all[-1]],
-                    'p', color='r', markersize=7, markerfacecolor='r', label='End')[0]
+        self.ax.scatter([x_all[0][0]], [y_all[0][0]], [z_all[0][0]], color='blue', label='Start')
+        self.ax.scatter([x_all[-1][-1]], [y_all[-1][-1]], [z_all[-1][-1]], color='red', label='End')
         self.ax.legend(loc='upper right') 
         plt.show()
 
@@ -361,7 +368,7 @@ class UAVPathPlanning():
         Parameters:
             angle_range (float): Maximum allowed deviation from initial direction, default is pi/4.
         """
-        r_max = 2 * bm.linalg.norm(self.start_pos - self.end_pos) / self.n
+        r_max = bm.linalg.norm(self.start_pos - self.end_pos) 
         r_min = 0
         psi_max = angle_range
         psi_min = -angle_range

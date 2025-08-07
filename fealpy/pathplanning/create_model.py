@@ -1,10 +1,6 @@
 import os
 import imageio.v3 as iio
-from ...backend import backend_manager as bm
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from mpl_toolkits.mplot3d import Axes3D
-from ...typing import TensorLike
+from ..backend import backend_manager as bm
 
 class TerrainLoader:
     """
