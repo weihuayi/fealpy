@@ -5,13 +5,13 @@ from itertools import combinations_with_replacement
 from typing import Optional, TypeVar, Union, Generic, Callable
 from ..typing import TensorLike, Index, _S, Threshold
 
+from ..backend import bm
 from ..backend import TensorLike
-from ..backend import backend_manager as bm
+from ..decorator import barycentric, cartesian
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
 from .dofs import LinearMeshCFEDof, LinearMeshDFEDof
 from .function import Function
-from fealpy.decorator import barycentric, cartesian
 
 
 _MT = TypeVar('_MT', bound=Mesh)
@@ -66,6 +66,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = bm.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
+
+    def edge_to_dof(self, p=None):
+        mesh = self.mesh
+        return mesh.face_to_cell()[:,:2]
 
     def number_of_local_dofs(self, p=None, doftype='cell'):
         p = self.p if p is None else p
@@ -215,7 +219,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         p = self.p if p is None else p
         h = self.cellsize
         NC = self.mesh.number_of_cells()
-
+        if isinstance(point, tuple):
+            point = point[0]    
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         if p == 0:
             shape = len(point.shape)*(1, )

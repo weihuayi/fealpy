@@ -1,7 +1,7 @@
-from ..base import Node
+from ..nodetype import CNodeType, PortConf, DataType
 
 
-class Error(Node):
+class Error(CNodeType):
     r"""Error estimator on mesh.
 
     Args:
@@ -17,20 +17,20 @@ class Error(Node):
     Outputs:
         out (Tensor): Error between u and v.
     """
-    def __init__(
-            self,
-            *,
-            celltype: bool = False
-    ):
-        super().__init__()
-        self.cell_type = celltype
-        self.kwargs = {'celltype': celltype}
-        self.add_input("mesh")
-        self.add_input("u")
-        self.add_input("v")
-        self.add_input("q", default=3)
-        self.add_input("power", default=2)
-        self.add_output("out")
+    TITLE = "Error Estimation"
+    PATH = "mesh"
+    INPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH),
+        PortConf("u", DataType.FUNCTION),
+        PortConf("v", DataType.FUNCTION),
+        PortConf("q", DataType.INT, default=0, min_val=0, max_val=17),
+        PortConf("power", DataType.INT, default=2, min_val=0),
+        PortConf("celltype", DataType.BOOL, default=False)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("out", DataType.TENSOR)
+    ]
 
-    def run(self, mesh, u, v, q, power):
-        return mesh.error(u, v, q=q, power=power, **self.kwargs)
+    @staticmethod
+    def run(mesh, u, v, q, power, celltype):
+        return mesh.error(u, v, q=q, power=power, celltype=celltype)

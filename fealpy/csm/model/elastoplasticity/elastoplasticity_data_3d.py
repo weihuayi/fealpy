@@ -1,7 +1,8 @@
-import numpy as np
+from typing import Tuple
+
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
-from typing import Tuple
+
 
 class ElastoplasticityData3D:
     """
@@ -37,7 +38,7 @@ class ElastoplasticityData3D:
 
         # Experimental yield stress - plastic strain data
         # Columns: [step, yield_stress (MPa), plastic_strain]
-        self.yield_table = np.array([
+        self.yield_table = bm.array([
             [1,  50.2, 0.0000],
             [2,  96.0, 0.0235],
             [3, 144.0, 0.0474],
@@ -118,7 +119,7 @@ class ElastoplasticityData3D:
         """
         plastic_strain_table = self.yield_table[:, 2]
         yield_stress_table = self.yield_table[:, 1]
-        return np.interp(plastic_strain, plastic_strain_table, yield_stress_table)
+        return bm.interp(plastic_strain, plastic_strain_table, yield_stress_table)
 
     def yield_function(self, sigma, alpha):
         """

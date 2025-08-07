@@ -44,6 +44,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         self.facedata = {} 
         self.celldata = {}
         self.meshdata = {}
+        self.data = {}
 
     def cell_to_face_permutation(self, locFace = None):
         """
