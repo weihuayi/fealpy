@@ -4,7 +4,7 @@
 >>>>>>> Stashed changes
 from typing import Union
 from ..backend import bm
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 from ..decorator import variantmethod
 
@@ -21,7 +21,7 @@ from ..material import LinearElasticMaterial
 class LinearElasticityLFEMModel(ComputationalModel):
     def __init__(self):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("linear_elasticity")
+        self.pdm = PDEModelManager("linear_elasticity")
 
     def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly"):
         if isinstance(pde, str):

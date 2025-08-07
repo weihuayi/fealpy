@@ -32,8 +32,6 @@ class LinearElasticityPDEDataProtocol(Protocol):
     def geo_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
 
-    def init_mesh(self): ...
-
     # --- Material properties ---
     def lam(self, p: TensorLike) -> TensorLike: ...
     def mu(self, p: TensorLike) -> TensorLike: ...
@@ -63,9 +61,9 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "boxpoly3d": ("box_poly_data_3d", "BoxPolyData3d"),
-    "boxpoly2d": ("box_poly_data_2d", "BoxPolyData2d"),
-    "boxsinsin2d": ("box_sinsin_data_2d", "BoxSinSinData2d"),
-    "boxtri2d": ("box_tri_data_2d", "BoxTriData2d"),
-    "boxmixed2d": ("box_mixed_data_2d", "BoxMixedData2d"),
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
+    3: ("exp0003", "Exp0003"),
+    4: ("exp0004", "Exp0004"),
+    5: ("exp0005", "Exp0005")
 }

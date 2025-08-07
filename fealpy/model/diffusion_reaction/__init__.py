@@ -2,14 +2,14 @@ from typing import Protocol, Sequence, TypeVar,Optional, overload
 from ...backend import TensorLike
 
 class DiffusionReactionPDEDataProtocol(Protocol):
-    """Protocol interface for Diffusion-Reaction PDE data components.
+    """Protocol interface for Diffusion-Reaction PDE data components with diffusion and reaction terms.
     
     Defines the recommended protocol interface for elliptic partial differential equation solvers.
 
     This protocol suggests four main categories of methods that implementing classes may provide:
         1. Domain specification methods (geometry and computational domain)
-        2. PDE coefficient methods (diffusion, convection, reaction terms)
-        (Notes:When coefficients (diffusion, convection, reaction) are tensor-valued,
+        2. PDE coefficient methods (diffusion and reaction terms)
+        (Notes:When coefficients (diffusion, reaction) are tensor-valued,
                 the node coordinate tensor p can be omitted in method calls.)
         3. Equation terms methods (exact solution, grdient, flux and source terms)
         4. Boundary condition methods (Dirichlet, Neumann, Robin types)
@@ -20,8 +20,19 @@ class DiffusionReactionPDEDataProtocol(Protocol):
         - Maintain consistent method signatures and return types
         - Implement methods relevant to their use case
     """
-    diffusion_coef 
-    reaction_coef
+    def geo_dimension(self) -> int: ...
+    def domain(self) -> Sequence[float]: ...
+    @overload
+    def diffusion_coef(self, p: Optional[TensorLike]) -> TensorLike: ...
+    @overload
+    def diffusion_coef(self) -> TensorLike: ...
+    def diffusion_coef_inv(self, p: Optional[TensorLike] = None) -> TensorLike: ...
+
+    @overload
+    def reaction_coef(self, p: TensorLike) -> TensorLike: ...
+    @overload
+    def reaction_coef(self) -> TensorLike: ...
+
     def geo_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
     def solution(self, p: TensorLike) -> TensorLike: ...
@@ -39,6 +50,5 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "coscos": ("cos_cos_data_2d", "CosCosData2D"),
-    "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
+    1: ("exp0001", "Exp0001"),
 }

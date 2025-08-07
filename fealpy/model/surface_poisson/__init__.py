@@ -20,8 +20,6 @@ class SurfaceLeveLSetPDEDataProtocol(Protocol):
         - hessian(p): (..., 3, 3)
     """
 
-    def init_mesh(self): ...
-
     @overload
     def solution(self, p: TensorLike) -> TensorLike: ...
     def gradient_of_solution(self, p: TensorLike) -> TensorLike: ...
@@ -38,5 +36,5 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "sphere": ("surface_level_set_data", "SurfaceLevelSetData")
+    1: ("exp0001", "Exp0001")
 }
