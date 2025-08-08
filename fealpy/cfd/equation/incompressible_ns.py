@@ -1,7 +1,7 @@
 from typing import Union, Callable, Dict
 from fealpy.backend import backend_manager as bm
 
-from .base import BaseEquation
+from fealpy.cfd.equation.base import BaseEquation
 
 
 CoefType = Union[int, float, Callable]

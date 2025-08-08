@@ -15,7 +15,7 @@ class Exp0001(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
-        self._init_expr()
+        # self._init_expr()
         super().__init__(box=self.box)
 
     def __str__(self) -> str:
@@ -41,8 +41,8 @@ class Exp0001(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = bm.array(self.u1(x, y, t))
-        result[..., 1] = bm.array(self.u2(x, y, t))
+        result[..., 0] = 10 * x ** 2 * (x - 1) ** 2 * y * (y - 1) * (2 * y - 1) * bm.cos(t)
+        result[..., 1] = -10 * x * (x - 1) * (2 * x - 1) * y ** 2 * (y - 1) ** 2 * bm.cos(t)
         return result
     
     @cartesian
@@ -60,7 +60,7 @@ class Exp0001(BoxMesher2d):
     def pressure(self, p, t):
         x = p[..., 0]
         y = p[..., 1]
-        return bm.array(self.p(x, y, t))
+        return 10 * (2 * x - 1) * (2 * y - 1) * bm.cos(t)
     
     @cartesian
     def source(self, p: TensorLike, t) -> TensorLike:
@@ -68,8 +68,8 @@ class Exp0001(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = bm.array(self.fx(x, y, t))
-        result[..., 1] = bm.array(self.fy(x, y, t))
+        result[..., 0] = 10.0*x**2*y*(x - 1)**2*(y - 1)*(2*y - 1)*(10*x**2*y*(2*x - 2)*(y - 1)*(2*y - 1)*bm.cos(t) + 20*x*y*(x - 1)**2*(y - 1)*(2*y - 1)*bm.cos(t))*bm.cos(t) - 10*x**2*y*(x - 1)**2*(y - 1)*(2*y - 1)*bm.sin(t) - 40.0*x**2*y*(x - 1)**2*bm.cos(t) - 20.0*x**2*y*(y - 1)*(2*y - 1)*bm.cos(t) - 40.0*x**2*(x - 1)**2*(y - 1)*bm.cos(t) - 20.0*x**2*(x - 1)**2*(2*y - 1)*bm.cos(t) - 10.0*x*y**2*(x - 1)*(2*x - 1)*(y - 1)**2*(20*x**2*y*(x - 1)**2*(y - 1)*bm.cos(t) + 10*x**2*y*(x - 1)**2*(2*y - 1)*bm.cos(t) + 10*x**2*(x - 1)**2*(y - 1)*(2*y - 1)*bm.cos(t))*bm.cos(t) - 40.0*x*y*(2*x - 2)*(y - 1)*(2*y - 1)*bm.cos(t) - 20.0*y*(x - 1)**2*(y - 1)*(2*y - 1)*bm.cos(t) + 20*(2*y - 1)*bm.cos(t)
+        result[..., 1] = 10.0*x**2*y*(x - 1)**2*(y - 1)*(2*y - 1)*(-20*x*y**2*(x - 1)*(y - 1)**2*bm.cos(t) - 10*x*y**2*(2*x - 1)*(y - 1)**2*bm.cos(t) - 10*y**2*(x - 1)*(2*x - 1)*(y - 1)**2*bm.cos(t))*bm.cos(t) - 10.0*x*y**2*(x - 1)*(2*x - 1)*(y - 1)**2*(-10*x*y**2*(x - 1)*(2*x - 1)*(2*y - 2)*bm.cos(t) - 20*x*y*(x - 1)*(2*x - 1)*(y - 1)**2*bm.cos(t))*bm.cos(t) + 10*x*y**2*(x - 1)*(2*x - 1)*(y - 1)**2*bm.sin(t) + 20.0*x*y**2*(x - 1)*(2*x - 1)*bm.cos(t) + 40.0*x*y**2*(y - 1)**2*bm.cos(t) + 40.0*x*y*(x - 1)*(2*x - 1)*(2*y - 2)*bm.cos(t) + 20.0*x*(x - 1)*(2*x - 1)*(y - 1)**2*bm.cos(t) + 40.0*y**2*(x - 1)*(y - 1)**2*bm.cos(t) + 20.0*y**2*(2*x - 1)*(y - 1)**2*bm.cos(t) + 2*(20*x - 10)*bm.cos(t)
         return result
 
     @cartesian
@@ -80,19 +80,9 @@ class Exp0001(BoxMesher2d):
         return None
 
     @cartesian
-    def is_pressure_boundary(self, p: TensorLike) -> TensorLike:
+    def is_pressure_boundary(self, p: TensorLike = None) -> TensorLike:
         """Check if point where pressure is defined is on boundary."""
-        # result = bm.zeros_like(p[..., 0], dtype=bm.bool)
-        # return result
-        return None
-
-    @cartesian
-    def velocity_gradient(self, p: TensorLike) -> TensorLike:
-        pass
-    
-    @cartesian
-    def pressure_gradient(self):
-        pass
+        return 0
 
     @cartesian
     def velocity_dirichlet(self, p: TensorLike, t) -> TensorLike:
@@ -135,6 +125,8 @@ class Exp0001(BoxMesher2d):
         gradpy = p.diff(y)
         force11 = - mu*diffusion1 + rho*convection1 + gradpx + time_derivative1
         force22 = - mu*diffusion2 + rho*convection2 + gradpy + time_derivative2
+        print(force11)
+        print(force22)
 
         self.u1 = sp.lambdify((x, y, t), u1, 'numpy')
         self.u2 = sp.lambdify((x, y, t), u2, 'numpy')

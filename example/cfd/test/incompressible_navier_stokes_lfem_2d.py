@@ -18,7 +18,7 @@ parser.add_argument('--GD',
     help="Geometry dimension, default is 2d. You can also choose 3d.")
     
 parser.add_argument('--pde',
-    default=1, type=str,
+    default=2, type=int,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -34,11 +34,11 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--nx',
-    default=8, type=int,
+    default=128, type=int,
     help="Number of divisions in the x direction, default is 8")
 
 parser.add_argument('--ny',
-    default=8, type=int,
+    default=128, type=int,
     help="Number of divisions in the y direction, default is 8")
 
 parser.add_argument('--nz',
@@ -54,7 +54,7 @@ parser.add_argument('--T1',
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=1000, type=int,
+    default=12800, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--method',
@@ -70,7 +70,7 @@ parser.add_argument('--apply_bc',
     help="Type of boundary condition application, default is dirichlet, options are dirichlet, neumann, cylinder, None")
 
 parser.add_argument('--run',
-    default='uniform_refine', type=str,
+    default='main', type=str,
     help="Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',

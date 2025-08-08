@@ -33,7 +33,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             if options['run'] == 'uniform_refine':
                 run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
             else:  # 'one_step' 或其他
-                run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
+                run(maxstep=options['maxstep'], tol=options['tol'], postprocess=options.get('postprocess', 'error'))
 
     @variantmethod("Newton")
     def method(self):
@@ -44,7 +44,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
     @method.register("Ossen")
     def method(self):
-        from .simulation.fem import Ossen
+        from .simulation.fem.incompressible_ns.ossen import Ossen
         self.fem = Ossen(self.equation, self.mesh)
         self.method_str = "Ossen"
         return self.fem
@@ -176,7 +176,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         fem = self.fem
         for i in range(maxit):
             self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
-            self.run['time_step'](t0, nt, maxstep, tol,apply_bc, postprocess)
+            self.run['main']( maxstep, tol, postprocess)
             self.pde.mesh.uniform_refine()
             self.equation = IncompressibleNS(self.pde)
 

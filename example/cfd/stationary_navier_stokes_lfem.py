@@ -18,7 +18,7 @@ parser.add_argument('--backend',
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
 parser.add_argument('--pde',
-    default = 2, type=str,
+    default = 1, type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -70,11 +70,11 @@ parser.add_argument('--shift_angle',
     help="N")
 
 parser.add_argument('--n_circle',
-    default = 100, type=int,
+    default = 1000, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--h',
-    default = 0.05, type=float,
+    default = 0.005, type=float,
     help="Mesh size, default is 0.05")
 
 parser.add_argument('--method',
@@ -117,7 +117,7 @@ manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
-
+model.__str__()
 
 
 
