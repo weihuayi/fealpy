@@ -46,11 +46,11 @@ class TimoshenkoBeamModel(ComputationalModel):
                 self.pde = CSMModelManager("timoshenko_beam").get_example(pde)
              else:
                 self.pde = pde
-             self.logger.info(self.pde)
+             #self.logger.info(self.pde)
                 
         def set_mesh(self, mesh: Mesh) -> None:
               self.mesh = mesh
-              self.logger.info(self.mesh)
+              #self.logger.info(self.mesh)
 
         def timo_beam_system(self, mesh, p: int):
                 """"Construct the linear system for the 3D timoshenko beam problem.

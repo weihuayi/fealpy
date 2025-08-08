@@ -8,6 +8,6 @@ class CSMModelManager(ModelManager):
     _registry = {
         "linear_elasticity": "fealpy.csm.model.linear_elasticity",
         "beam": "fealpy.csm.model.beam",
-        "timoshenko_beam": "fealpy.csm.model.beam.timoshenko_beam_data_3d",
+        "timoshenko_beam": "fealpy.csm.model.beam",
         "elastoplasticity": "fealpy.csm.model.elastoplasticity",
     }
