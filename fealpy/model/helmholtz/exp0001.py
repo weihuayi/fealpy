@@ -32,7 +32,8 @@ class Exp0001(BoxMesher2d):
 
     Exact solution:
         u(x, y) = (cos(k·r) - c·J0(k·r)) / k
-        where r = sqrt(x^2 + y^2), c = (cos(k) + i·sin(k)) / (J0(k) + i·J1(k))
+        where r = sqrt(x^2 + y^2), c = (cos(k) + i·sin(k)) / (J0(k) + i·J1(k)),
+        J0 and J1 are Bessel functions.
 
     Source:
         f(x, y) = sin(k·r)/r

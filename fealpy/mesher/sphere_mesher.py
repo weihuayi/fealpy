@@ -28,14 +28,14 @@ class SphereSurfaceMesher:
         return 3
 
     @variantmethod('ltri')
-    def init_mesh(self, p:int):
+    def init_mesh(self, p:int = 1):
         """Create a LagrangeTriangleMesh from a triangle mesh."""
         lmesh = TriangleMesh.from_unit_sphere_surface()
         mesh = LagrangeTriangleMesh.from_triangle_mesh(lmesh, p=p, surface=self.surface)
         return mesh
     
     @init_mesh.register('lquad')
-    def init_mesh(self, p:int):
+    def init_mesh(self, p:int = 1):
         """Create a LagrangeQuadrangleMesh from a quadrangle mesh."""
         lmesh = QuadrangleMesh.from_unit_sphere_surface()
         mesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(lmesh, p=p, surface=self.surface)

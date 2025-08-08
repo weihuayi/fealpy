@@ -28,6 +28,9 @@ init_model_data = [
     {"PDE": "poisson",
      "example_name": 9
      },
+    {"PDE": "poisson",
+     "example_name": 10
+     },
     # {"PDE": "diffusion",
     #  "example_name": 1
     #  },
@@ -132,6 +135,9 @@ init_model_data = [
      },
     {"PDE": "helmholtz",
      "example_name": 5
+     },
+    {"PDE": "helmholtz",
+     "example_name": 6
      },
     {"PDE": "surface_poisson",
      "example_name": 1
