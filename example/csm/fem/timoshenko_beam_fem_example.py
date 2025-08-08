@@ -26,7 +26,6 @@ parser.add_argument('--nu',
                     default=0.276, type=float,
                     help='Type of mesh, default is Poisson ratio')
 
-
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True')
@@ -35,12 +34,12 @@ parser.add_argument('--log_level',
                     default='INFO', type=str,
                     help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
-options = vars(parser.parse_args())
+options = vars(parser.parse_args()) 
 
 from fealpy.backend import backend_manager as bm
 bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import TimoshenkoBeamModel
 model = TimoshenkoBeamModel(options)
-#model.__str__()
+model.__str__()
 #model.solve['cg']()

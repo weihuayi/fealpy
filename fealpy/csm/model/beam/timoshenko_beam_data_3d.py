@@ -3,8 +3,9 @@ from typing import Optional
 from fealpy.typing import Tuple, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
-
 from fealpy.mesh import EdgeMesh
+
+from ...material import TimoshenkoBeamMaterial
 
 
 class TimoshenkoBeamData3D:
@@ -52,32 +53,44 @@ class TimoshenkoBeamData3D:
         self._FSY = 10/9
         self._FSZ = 10/9
         self.mesh = self.init_mesh()
-        self._AX, self._AY, self._AZ = self._calculate_cross_sectional_areas()
-        self._Iy, self._Iz, self._Ix = self._calculate_moments_of_inertia()
         
-    @property
+        self._AX, self._AY, self._AZ = self._cross_sectional_areas()
+        self._Iy, self._Iz, self._Ix = self._moments_of_inertia()
+        
+    def __str__(self) -> str:
+        pass
+    
+    def geo_dimension(self) -> int:
+        """Return the geometric dimension of the domain."""
+        return 3
+    
     def D(self) -> TensorLike:
+        """the diameter of the wheel and axle."""
         return self._D
     
-    def _calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+    def _cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
         """Cross-sectional area of the beam element."""
-        AX = bm.pi * self.D**2 / 4
+        AX = bm.pi * self._D**2 / 4
         AY = AX / self._FSY
         AZ = AX / self._FSZ
 
         return AX, AY, AZ
     
-    def _calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+    def _moments_of_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
         """Moment of inertia for the beam element."""
-        Iy  = bm.pi * self.D**4 / 64
+        Iy  = bm.pi * self._D**4 / 64
         Iz = Iy
         Ix = Iy + Iz
 
         return Ix, Iy, Iz
-
-    def geo_dimension(self) -> int:
-        """Return the geometric dimension of the domain."""
-        return 3
+    
+    def create_material(self, name='timo', E=None, nu=None):
+        if E is None or nu is None:
+            raise ValueError("Elastic modulus (E) and Poisson ratio (nu) must be provided externally.")
+        
+        material = TimoshenkoBeamMaterial(name=name,model=self, 
+                                          elastic_modulus=E, poisson_ratio=nu)
+        return material
     
     def domain(self):
         """Return the computational domain [xmin, xmax]."""

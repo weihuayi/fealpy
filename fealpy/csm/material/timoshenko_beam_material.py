@@ -5,8 +5,6 @@ from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
 
-from ..model.beam.timoshenko_beam_data_3d import TimoshenkoBeamData3D
-
 
 class TimoshenkoBeamMaterial(LinearElasticMaterial):
     """A class representing Timoshenko beam material properties, inheriting from LinearElasticMaterial.

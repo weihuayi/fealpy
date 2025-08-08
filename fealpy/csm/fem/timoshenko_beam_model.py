@@ -39,18 +39,30 @@ class TimoshenkoBeamModel(ComputationalModel):
                self.nu = options['nu']
         
         def __str__(self) -> str:
-             pass
+                """Returns a formatted multi-line string summarizing the configuration of the Timoshenko beam model.
+                Returns:
+                        str: A multi-line string containing the current model configuration,
+                        displaying information such as PDE, mesh, material properties, and more.
+                """
+                s = f"{self.__class__.__name__}(\n"
+                s += f"  pde            : {self.pde.__class__.__name__}\n"  # Assuming pde is a class object
+                s += f"  mesh           : {self.mesh.__class__.__name__}\n"  # Assuming mesh is a class object
+                #s += f"  material       : {self.material}\n"  # Assuming pde has a material attribute
+                s += f"  E (Elastic Modulus)   : {self.E} MPa\n"
+                s += f"  nu (Poisson Ratio)    : {self.nu}\n"
+                s += f"  geo_dimension  : {self.GD}\n"
+                s += ")"
+                self.logger.info(f"\n{s}")
+                return s
                
         def set_pde(self, pde: Union[BeamPDEDataT, int] = 2) -> None:
              if isinstance(pde, int):
                 self.pde = CSMModelManager("timoshenko_beam").get_example(pde)
              else:
                 self.pde = pde
-             #self.logger.info(self.pde)
                 
         def set_mesh(self, mesh: Mesh) -> None:
               self.mesh = mesh
-              #self.logger.info(self.mesh)
 
         def timo_beam_system(self, mesh, p: int):
                 """"Construct the linear system for the 3D timoshenko beam problem.
