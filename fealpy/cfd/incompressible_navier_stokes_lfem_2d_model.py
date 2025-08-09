@@ -12,7 +12,9 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         super().__init__(pbar_log = True, log_level = "INFO")
         self.pde = pde
         self.equation = IncompressibleNS(self.pde)
-        self.timeline = UniformTimeLine(0, 1, 100)
+        self.T0, self.T1, self.nt = 0, 1, 100
+        self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
+        self.options = options
         
         if mesh is None:
             if hasattr(pde, 'mesh'):
@@ -27,7 +29,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         if options is not None:
             self.solve.set(options['solve'])
             self.fem = self.method[options['method']]()
-            self.timeline = UniformTimeLine(options['T0'], options['T1'], options['nt'])
+            self.T0, self.T1, self.nt =options['T0'], options['T1'], options['nt']
+            self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
 
             run = self.run[options['run']]
             if options['run'] == 'uniform_refine':
@@ -83,16 +86,15 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         mesh = self.mesh         
         fem = self.fem
         pde = self.pde
-        timeline = self.timeline
-        fem.dt = timeline.dt
+        fem.dt = self.timeline.dt
 
-        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = timeline.T0)))
-        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = timeline.T0)))
+        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = self.timeline.T0)))
+        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = self.timeline.T0)))
         
         u0 = fem.uspace.function()
         p0 = fem.pspace.function()
-        for i in range(timeline.NL-1):
-            t  = timeline.current_time()
+        for i in range(self.timeline.NL-1):
+            t  = self.timeline.current_time()
             print("time=", t)
             
             u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)
@@ -100,9 +102,9 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             u0[:] = u1
             p0[:] = p1
 
-            uerror, perror = self.error(u0, p0, t= timeline.next_time()) 
-            timeline.advance()
-        uerror, perror = self.error(u0, p0, t= timeline.T1)  
+            uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
+            self.timeline.advance()
+        uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
         return u0, p0
     
     @run.register('one_step')
@@ -172,14 +174,23 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
 
     @run.register('uniform_refine')
-    def run(self, maxit=5, t0 = 0, nt = 300, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'):
-        fem = self.fem
+    def run(self, maxit=5, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'):
+        u_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
+        p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         for i in range(maxit):
             self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
-            self.run['main']( maxstep, tol, postprocess)
-            self.pde.mesh.uniform_refine()
+            self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
+            uh,ph = self.run['main']( maxstep, tol, postprocess)
+            self.nt = self.nt*4
             self.equation = IncompressibleNS(self.pde)
-
+            uerror, perror = self.error(uh, ph, t= self.T1)
+            u_errorMatrix[0, i] = uerror
+            p_errorMatrix[0, i] = perror
+            self.pde.mesh.uniform_refine()
+        print("速度最终误差",u_errorMatrix)
+        print("order : ", bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:]))
+        print("压力最终误差",p_errorMatrix)  
+        print("order : ", bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:]))
         
     @variantmethod('L2')
     def error(self, uh, ph, t):

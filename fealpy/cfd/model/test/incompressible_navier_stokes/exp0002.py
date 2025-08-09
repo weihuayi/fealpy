@@ -15,7 +15,6 @@ class Exp0002(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
-        # self._init_expr()
         super().__init__(box=self.box)
 
     def __str__(self) -> str:

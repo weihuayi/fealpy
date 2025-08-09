@@ -34,11 +34,11 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--nx',
-    default=128, type=int,
+    default=4, type=int,
     help="Number of divisions in the x direction, default is 8")
 
 parser.add_argument('--ny',
-    default=128, type=int,
+    default=4, type=int,
     help="Number of divisions in the y direction, default is 8")
 
 parser.add_argument('--nz',
@@ -54,11 +54,11 @@ parser.add_argument('--T1',
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=12800, type=int,
+    default=25, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--method',
-    default='IPCS', type=str,
+    default='Newton', type=str,
     help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',
@@ -70,7 +70,7 @@ parser.add_argument('--apply_bc',
     help="Type of boundary condition application, default is dirichlet, options are dirichlet, neumann, cylinder, None")
 
 parser.add_argument('--run',
-    default='main', type=str,
+    default='uniform_refine', type=str,
     help="Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
@@ -88,8 +88,6 @@ parser.add_argument('--tol',
 # 解析参数
 options = vars(parser.parse_args())
 
-bm.set_backend(options['backend'])
-# pde = FromSympy(rho=options['rho'], mu=options['mu'])
 bm.set_backend(options['backend'])
 manager = CFDTestModelManager('incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
