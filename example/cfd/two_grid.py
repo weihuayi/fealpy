@@ -4,14 +4,14 @@ from fealpy.cfd import TwoGridModel
 from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
 from fealpy.utils import timer
 
-pde = FromSympy(mu=1, rho=1)
+pde = FromSympy(mu=0.01, rho=1)
 pde.select_pde["sinsin"]()
-pde.init_mesh(nx=4, ny=4)
+mesh = pde.init_mesh['uniform_tri'](nx=8, ny=8)
 tmr = timer()
 next(tmr)
 
-coarsen_model = StationaryIncompressibleNSLFEMModel(pde)
-fine_model = StationaryIncompressibleNSLFEMModel(pde)
+coarsen_model = StationaryIncompressibleNSLFEMModel(pde, mesh)
+fine_model = StationaryIncompressibleNSLFEMModel(pde, mesh)
 mesh = coarsen_model.mesh
 mesh.bisect()
 model = TwoGridModel(fine_model, coarsen_model)
@@ -25,7 +25,7 @@ error_H = mesh.error(pde.velocity, uH)
 print("粗网格误差", error_H)
 tmr.send("粗网格求解结束")
 
-uh_refine, ph_refine = model.refine_and_interpolate(6, uH, pH)
+uh_refine, ph_refine = model.refine_and_interpolate(4, uH, pH)
 model.fine_model.update_mesh(mesh)
 mesh.to_vtk('h.vtu')
 tmr.send("细网格插值结束")
