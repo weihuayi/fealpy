@@ -137,8 +137,8 @@ class TwoGridModel(ComputationalModel):
         u_source_LSI.source = cbf 
         b = LForm.assembly()
 
-        A, b = fine_model.apply_bc[fine_model.apply_bc](A, b)
-        A, b = fine_model.lagrange_multiplier(A, b)
+        A, b = fine_model.fem.apply_bc(A, b, fine_model.pde)
+        A, b = fine_model.fem.lagrange_multiplier(A, b)
         x = fine_model.solve(A, b)
 
         ugdof = fine_model.fem.uspace.number_of_global_dofs()
