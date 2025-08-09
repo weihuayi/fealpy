@@ -22,3 +22,4 @@ from .lagrange_quadrangle_mesh import LagrangeQuadrangleMesh
 
 from .edge_mesh import EdgeMesh
 from .inp_file_parser import InpFileParser
+from .bdf_file_parser import BdfFileParser, NodeSection, ElementSection
