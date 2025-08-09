@@ -60,6 +60,8 @@ class HelmholtzPINNModel(ComputationalModel):
             Neural network model
         optimizer : torch.optim.Optimizer
             Training optimizer
+        mse : nn.MSELoss
+            Mean-squared error loss function.
         Loss : list
             Training loss history
         error_real : list
@@ -129,7 +131,7 @@ class HelmholtzPINNModel(ComputationalModel):
         self.log_level = self.options.get('log_level', 'INFO')
         super().__init__(pbar_log=self.pbar_log, log_level=self.log_level)
         
-        self.complex = self.options.get('complex', False)
+        self.complex = self.options.get('complex', True)
         self.k = self.options.get('wave', 1.0)
 
         self.set_pde(self.options.get('pde', 1))
@@ -143,16 +145,16 @@ class HelmholtzPINNModel(ComputationalModel):
         self.sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
 
         # 网络超参数、激活函数、采样点数、权重
-        self.lr = self.options.get('lr', 0.005)
-        self.epochs = self.options.get('epochs', 1000)
+        self.lr = self.options.get('lr', 0.001)
+        self.epochs = self.options.get('epochs', 3000)
         self.hidden_size = self.options.get('hidden_size', (50, 50, 50, 50))
         self.activation = activations[self.options.get('activation', "Tanh")]
         self.npde = self.options.get('npde', 400)
-        self.nbc = self.options.get('nbc')
+        self.nbc = self.options.get('nbc', 100)
         self.weights = self.options.get('weights', (1, 30))
 
         # 损失函数
-        self.loss = nn.MSELoss(reduction='mean')
+        self.mse = nn.MSELoss(reduction='mean')
 
         # 网络
         self.set_network()
@@ -206,11 +208,11 @@ class HelmholtzPINNModel(ComputationalModel):
                             help="Sampling method for collocation points: 'random' or 'linspace', default is 'random'")
 
         parser.add_argument('--npde',
-                            default=1500, type=int,
+                            default=400, type=int,
                             help='Number of PDE samples, default is 400.')
 
         parser.add_argument('--nbc',
-                            default=300, type=int,
+                            default=100, type=int,
                             help='Number of boundary condition samples, default is 100.')
         
         parser.add_argument('--weights',
@@ -221,10 +223,6 @@ class HelmholtzPINNModel(ComputationalModel):
         parser.add_argument('--hidden_size',
                             default=(50, 50, 50, 50), type=tuple,
                             help='Default hidden sizes, default is (50, 50, 50, 50).')
-
-        parser.add_argument('--loss',
-                            default=nn.MSELoss(reduction='mean'), type=callable,
-                            help='Loss function to use, default is nn.MSELoss')
 
         parser.add_argument('--optimizer', 
                             default="Adam",  type=str,
@@ -239,7 +237,7 @@ class HelmholtzPINNModel(ComputationalModel):
                             help='Learning rate for the optimizer, default is 0.001.')
 
         parser.add_argument('--step_size',
-                            default=1000, type=int,
+                            default=0, type=int,
                             help='Period of learning rate decay, default is 0.')
 
         parser.add_argument('--gamma',
@@ -383,18 +381,23 @@ class HelmholtzPINNModel(ComputationalModel):
         """
         u = self.net(p)
         f = self.pde.source(p).flatten()
-        
         # 一阶导数计算
-        grad_u = gradient(u, p, create_graph=True)  ## (npde, dim)
+        grad_u = gradient(u.real, p, create_graph=True)  ## (npde, dim)
         laplacian = bm.zeros(u.shape[0])    # 拉普拉斯项初始化
         
         for i in range(p.shape[-1]):
             u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # 计算 ∂²u/∂x_i²
             laplacian += u_ii.flatten()
-
-        assert f.shape == laplacian.shape, \
-            f"Shape mismatch: f.shape={f.shape}, laplacian.shape={laplacian.shape}."
-        val = laplacian + self.pde.k * u.flatten() + f
+        
+        if self.complex:
+            grad_u_imag = gradient(u.imag, p, create_graph=True)
+            laplacian_imag = bm.zeros(u.shape[0])
+            for i in range(p.shape[-1]):
+                u_ii = gradient(grad_u_imag[..., i], p, create_graph=True, split=True)[i]
+                laplacian_imag += u_ii.flatten()
+            laplacian = laplacian + 1j * laplacian_imag
+        assert f.shape == laplacian.shape, f"Shape mismatch: f.shape={f.shape}, laplacian.shape={laplacian.shape}."
+        val = laplacian + self.k**2 * u.flatten() + f
         return val
 
     def bc_residual(self, p: TensorLike) -> TensorLike:
@@ -415,14 +418,21 @@ class HelmholtzPINNModel(ComputationalModel):
         """
         u = self.net(p).flatten()
         if hasattr(self.pde, 'dirichlet'):
-            bc = self.pde.dirichlet(p)
+            g = self.pde.dirichlet(p).flatten()
+            assert u.shape == g.shape, f"Shape mismatch: u.shape={u.shape}, g.shape={g.shape}."
+            val = u - g
         elif hasattr(self.pde, 'robin'):
             n = self.set_n(p)
-            bc = self.pde.robin(p, n)
+            g = self.pde.robin(p, n)
+            grad_u_real = gradient(u.real, p, create_graph=True, split=False)
+            grad_u_imag = gradient(u.imag, p, create_graph=True, split=False)
+            grad_u = grad_u_real + 1j * grad_u_imag
+            kappa = bm.tensor(0.0 + 1j * self.k)
+            g_hat = (grad_u * n).sum(dim=-1) + kappa * u
+           
+            assert g_hat.shape == g.shape, f"Shape mismatch: g_hat.shape={g_hat.shape}, g.shape={g.shape}."
+            val = g_hat - g
 
-        assert u.shape == bc.shape, \
-            f"Shape mismatch: u.shape={u.shape}, bc.shape={bc.shape}."
-        val = u - bc
         return val
 
     def run(self):
@@ -468,14 +478,14 @@ class HelmholtzPINNModel(ComputationalModel):
             bc_res = self.bc_residual(sbc)
             pde_r = bm.real(pde_res)
             bc_r = bm.real(bc_res)
-            mse_pde_r = self.loss(pde_r, bm.zeros_like(pde_r))
-            mse_bc_r = self.loss(bc_r, bm.zeros_like(bc_r))
+            mse_pde_r = self.mse(pde_r, bm.zeros_like(pde_r))
+            mse_bc_r = self.mse(bc_r, bm.zeros_like(bc_r))
 
             if self.complex:
                 pde_i =  bm.imag(pde_res)
                 bc_i = bm.imag(bc_res)
-                mse_pde_i = self.loss(pde_i, bm.zeros_like(pde_i))
-                mse_bc_i = self.loss(bc_i, bm.zeros_like(bc_i))
+                mse_pde_i = self.mse(pde_i, bm.zeros_like(pde_i))
+                mse_bc_i = self.mse(bc_i, bm.zeros_like(bc_i))
                 loss = w[0]* (mse_pde_r + mse_pde_i) + w[1] * (mse_bc_r + mse_bc_i)
             else:
                 loss = w[0] * mse_pde_r + w[1]* mse_bc_r
@@ -498,9 +508,8 @@ class HelmholtzPINNModel(ComputationalModel):
                 #                     f"mse_pde_i: {mse_pde_i:.6f}, mse_bc_i: {mse_bc_i:.6f}, "
                 #                     f"loss: {loss.item():.6f}, error_real: {error.item():.4f}, error_imag: {error_i.item():.4f}")
                
-                    # self.logger.info(f"epoch: {epoch}, mse_pde: {mse_pde_r:.6f}, mse_bc: {mse_bc_r:.6f}, "                                    
-                    #                 f"loss: {loss.item():.6f}, error_real: {error.item():.4f}")
-                    # self.logger.info(f"epoch: {epoch}, Loss: {loss.item():.6f}")        
+                # self.logger.info(f"epoch: {epoch}, mse_pde: {mse_pde_r:.6f}, mse_bc: {mse_bc_r:.6f}, "                                    
+                #                 f"loss: {loss.item():.6f}, error_real: {error.item():.4f}")      
         tmr.send(f'PINN training time')
         next(tmr)
 
@@ -573,11 +582,13 @@ class HelmholtzPINNModel(ComputationalModel):
             if self.gd == 1:
                 fig = plt.figure()
                 # 绘制真实解和预测解
-                plt.plot(node, u_true_r, 'b-', linewidth=3, label='Real Part of Exact  Solution')
-                plt.plot(node, u_pred_r, 'r--', linewidth=2, label='Real Part of PINN Prediction')
+                plt.plot(node, u_true_r, 'b-', linewidth=2, label='Real Part of Exact  Solution')
+                plt.plot(node, u_pred_r, 'g--', linewidth=2, label='Real Part of PINN Prediction')
+                plt.plot(node, u_pred_r-u_true_r, 'r--', linewidth=2, label='Real Error: PINN - Exact')
                 if self.error_imag != []:
-                    plt.plot(node, u_true_i, 'g-', linewidth=3, label='Imag Part of Exact  Solution')
+                    plt.plot(node, u_true_i, 'g-', linewidth=2, label='Imag Part of Exact  Solution')
                     plt.plot(node, u_pred_i, 'y--', linewidth=2, label='Imag Part of PINN Prediction')
+                    plt.plot(node, u_pred_i-u_true_i, 'r--', linewidth=2, label='Imag Error: PINN - Exact')
                 # 图形修饰
                 plt.xlabel('x', fontsize=12)
                 plt.ylabel('u(x)', fontsize=12)
@@ -585,17 +596,6 @@ class HelmholtzPINNModel(ComputationalModel):
                 plt.legend(fontsize=12)
                 plt.grid(True, linestyle=':')
             else:
-                # fig, axes = plt.subplots(2, 2)
-                # axes[0, 0].set_title('Real Part of Exact Solution')
-                # axes[0, 1].set_title('Imag Part of Exact Solution')
-                # axes[1, 0].set_title("Real Part of PINN Solution")
-                # axes[1, 1].set_title("Imag Part of PINN Solution")
-
-                # mesh.add_plot(axes[0, 0], cellcolor=u_true_r, linewidths=0, aspect=1)
-                # mesh.add_plot(axes[0, 1], cellcolor=u_true_i, linewidths=0, aspect=1)
-                # mesh.add_plot(axes[1, 0], cellcolor=u_pred_r, linewidths=0, aspect=1)
-                # mesh.add_plot(axes[1, 1], cellcolor=u_pred_i, linewidths=0, aspect=1)
-
                 #  PINN预测解的实部
                 fig = plt.figure()
                 ax1_3d = fig.add_subplot(131, projection='3d')

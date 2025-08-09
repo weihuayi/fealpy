@@ -57,6 +57,8 @@ class PoissonPINNModel(ComputationalModel):
             Neural network .
         optimizer : torch.optim
             Training optimizer.
+        mse : nn.MSELoss
+            Mean-squared error loss function.
         Loss : list
             Training loss history.
         error_fem : list
@@ -121,12 +123,12 @@ class PoissonPINNModel(ComputationalModel):
         self.sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
 
         # 网络超参数、激活函数、采样点数、权重
-        self.lr = self.options.get('lr', 0.005)
-        self.epochs = self.options.get('epochs', 1000)
+        self.lr = self.options.get('lr', 0.001)
+        self.epochs = self.options.get('epochs', 2000)
         self.hidden_size = self.options.get('hidden_size', (32, 32, 16))
         self.activation = activations[self.options.get('activation', "Tanh")]
         self.npde = self.options.get('npde', 400)
-        self.nbc = self.options.get('nbc')
+        self.nbc = self.options.get('nbc', 100)
         self.weights = self.options.get('weights', (1, 30))
 
 
@@ -209,7 +211,7 @@ class PoissonPINNModel(ComputationalModel):
                             help='Learning rate for the optimizer, default is 0.001.')
         
         parser.add_argument('--step_size',
-                            default=1000, type=int,
+                            default=0, type=int,
                             help='Period of learning rate decay, default is 0.')
 
         parser.add_argument('--gamma',
@@ -217,8 +219,8 @@ class PoissonPINNModel(ComputationalModel):
                             help='Multiplicative factor of learning rate decay. Default: 0.99.')
 
         parser.add_argument('--epochs',
-                            default=4000, type=int,
-                            help='Number of training epochs, default is 4000.')
+                            default=2000, type=int,
+                            help='Number of training epochs, default is 2000.')
         
         parser.add_argument('--pbar_log',
                             default=True, type=bool,
@@ -234,7 +236,7 @@ class PoissonPINNModel(ComputationalModel):
         """Initialize the PDE problem definition.
         
         Parameters
-            pde : Union[PoissonPDEDataT, str]
+            pde : Union[PoissonPDEDataT, int]
                 Either a predefined PDE object or string identifier for built-in examples.
                 Defaults to 'sin' example problem.
         """
@@ -358,8 +360,7 @@ class PoissonPINNModel(ComputationalModel):
         tmr = timer()
         next(tmr)
         self.Loss = []
-        self.error_fem = []
-        self.error_true = []
+        self.error = []
         w = self.weights
 
         mesh = self.mesh
@@ -393,7 +394,7 @@ class PoissonPINNModel(ComputationalModel):
             if epoch % 100 == 0:
                 # L²误差
                 error = self.net.estimate_error(self.pde.solution, mesh, coordtype='c')
-                self.error_fem.append(error.item())
+                self.error.append(error.item())
                 self.Loss.append(loss.item())
                 self.logger.info(f"epoch: {epoch}, Loss: {loss.item():.6f}")  
                 # self.logger.info(f"epoch: {epoch}, mse_pde: {mse_pde:.4f}, mse_bc: {mse_bc:.4f}, loss: {loss.item():.4f}, error_fem: {error.item():.4f}")
@@ -438,7 +439,7 @@ class PoissonPINNModel(ComputationalModel):
         axes[0].grid(True)
 
         # 绘制PINN vs exact 误差 
-        error = bm.log10(bm.tensor(self.error_fem)).numpy()
+        error = bm.log10(bm.tensor(self.error)).numpy()
         axes[1].plot(error, 'b--', linewidth=2)
         axes[1].set_title('L2 Error between PINN Solution and Exact Solution', fontsize=12)
         axes[1].set_ylabel('log10(Error)', fontsize=10)

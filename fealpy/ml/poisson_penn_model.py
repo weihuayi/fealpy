@@ -430,11 +430,11 @@ class PoissonPENNModel(ComputationalModel):
         Notes
             q=1, p=q+2, where p is the polynomial degree of the finite element space.
         """
-        from ..functionspace import LagrangeFESpace
-        from ..fem import BilinearForm, LinearForm
-        from ..fem import ScalarDiffusionIntegrator, ScalarSourceIntegrator
+        from fealpy.functionspace import LagrangeFESpace
+        from fealpy.fem import BilinearForm, LinearForm
+        from fealpy.fem  import ScalarDiffusionIntegrator, ScalarSourceIntegrator
         from fealpy.fem import DirichletBC
-        from ..solver import spsolve
+        from fealpy.solver import spsolve
 
         pde = self.pde
         mesh_size = tuple(x - 1 for x in self.mesh_size)
@@ -442,7 +442,6 @@ class PoissonPENNModel(ComputationalModel):
         p = 1
         q = p + 2
         space = LagrangeFESpace(mesh, p)
-        # uh = bm.zeros(space.number_of_global_dofs)
         S = BilinearForm(space)
         S.add_integrator(ScalarDiffusionIntegrator(q=q))
         A = S.assembly()
