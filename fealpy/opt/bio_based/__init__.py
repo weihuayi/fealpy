@@ -1,3 +1,4 @@
 from .plant_rhizome_growth_based_opt import PlantRhizomeGrowthBasedOpt
 from .invasive_weed_opt import InvasiveWeedOpt
 from .moss_growth_opt import MossGrowthOpt
+from .animated_oat_opt import AnimatedOatOpt

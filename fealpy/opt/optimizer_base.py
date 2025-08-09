@@ -199,7 +199,6 @@ def opt_alg_options(
     ngrid = None,
     PF = None,
     Preconditioner = None,
-    update_Preconditioner = None,
     MaxIters: int = 1000,
     MaxFunEvals: int = 10000,
     NormGradTol: float = 1e-6,
@@ -219,7 +218,6 @@ def opt_alg_options(
         domain (optional): Domain constraints for the optimization problem. Defaults to None.
         NP (int, optional): Number of solution points (population size). Defaults to 1.
         Preconditioner (optional): Preconditioner for the optimization algorithm. Defaults to None.
-        update_Preconditioner(optional): Function to update the preconditioner. Defaults to None.
         MaxIters (int, optional): Maximum number of iterations. Defaults to 1000.
         MaxFunEvals (int, optional): Maximum number of function evaluations. Defaults to 10000.
         NormGradTol (float, optional): Tolerance for the norm of the gradient. Defaults to 1e-6.
@@ -240,7 +238,6 @@ def opt_alg_options(
             "ndim": x0.shape[-1],
             "domain": domain,
             "Preconditioner": Preconditioner,
-            "update_Preconditioner": update_Preconditioner,
             "NR": NR,
             "PF": PF,
             "ngrid": ngrid,
