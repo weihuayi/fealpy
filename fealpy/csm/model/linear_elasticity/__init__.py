@@ -5,6 +5,7 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    1: ("exp0001", "Exp0001"),
+    1: ("cantilever_beam_model", "CantileverBeamModel"),
     2: ("gear_box_model", "GearBoxModel"),
+    3: ("linear_elasticity_data_3d", "LinearElasticityData3D"),
 }

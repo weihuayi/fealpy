@@ -48,6 +48,6 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # Add beam PDE models here (file_name, class_name)
-    "beam2d": ("beam_data_2d", "BeamData2D"),
-    "beam3d": ("beam_data_3d", "BeamData3D"),
+    1: ("euler_bernoulli_beam_data_2d", "EulerBernoulliBeamData2D"),
+    2: ("timoshenko_beam_data_3d", "TimoshenkoBeamData3D"),
 }

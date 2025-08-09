@@ -16,11 +16,12 @@ class ComputationalModel:
         self.logger.propagate = False
         self.logger.setLevel(log_level)
 
-        if pbar_log:
-            self.logger.addHandler(TqdmLoggingHandler())
-        else:
-            from ..logs import handler
-            self.logger.addHandler(handler)
+        if not self.logger.hasHandlers():
+            if pbar_log:
+                self.logger.addHandler(TqdmLoggingHandler())
+            else:
+                from ..logs import handler
+                self.logger.addHandler(handler)
 
     @staticmethod
     def _get_func_params(func):

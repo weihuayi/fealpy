@@ -4,7 +4,7 @@ from .scalar_source_integrator import ScalarSourceIntegrator
 from .div_integrator import DivIntegrator
 
 from .gradient_reconstruct import GradientReconstruct
-from.staggered_mesh_manager import StaggeredMeshManager
+from .staggered_mesh_manager import StaggeredMeshManager
 from .div_reconstruct import DivergenceReconstruct
 from .dirichlet_bc import DirichletBC
 from .vector_decomposition import VectorDecomposition
