@@ -5,7 +5,7 @@ from typing import Optional, Literal
 from fealpy.functionspace.space import FunctionSpace as _FS
 from fealpy.decorator import variantmethod
 
-class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
+class EulerBernoulliBeamSourceIntegrator(LinearInt, SrcInt, CellInt):
     """
     Integrator for computing source terms for various types of beam elements
 
@@ -48,10 +48,10 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
     def assembly(self, space: _FS) -> TensorLike:
         """
         Pure bending beam (2 DOFs per node: [w, theta])
-        Uniform distributed load q = [f], where f is the bending load.
-        The source term is computed as:
-        f1 = q * l / 2
-        f2 = q * l**2 / 12
+        
+        Parameters
+            space : _FS
+                The finite element function space
         Returns:
             TensorLike: Assembled source vector of shape (NC, 4) for pure bending beam.
         """
@@ -66,10 +66,9 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
         """
         2D Beam (3 DOFs per node: [u, w, theta])
         Uniform distributed load q = [fx, fy], where fx is the load in the x direction and fy is the load in the y direction.
-        The source term is computed as:
-        fx1 = fx * l / 2
-        fy1 = fy * l / 2
-        fy2 = fy * l**2 / 12
+        Parameters
+            space : _FS
+                The finite element function space.
         Returns:
             TensorLike: Assembled source vector of shape (NC, 6) for 2D beam.
         """
@@ -92,12 +91,10 @@ class BeamSourceIntegrator(LinearInt, SrcInt, CellInt):
         """
         3D Beam (6 DOFs per node: [u, v, w, θx, θy, θz])
         Uniform distributed load q = [fx, fy, fz], where fx, fy, fz are the loads in the x, y, and z directions respectively.
-        The source term is computed as:
-        fx1 = fx * l / 2
-        fy1 = fy * l / 2
-        fy2 = fy * l**2 / 12
-        fz1 = fz * l / 2
-        fz2 = fz * l**2 / 12
+        
+        Parameters
+            space : _FS
+                The finite element function space.
         Returns:
             TensorLike: Assembled source vector of shape (NC, 12) for 3D beam.
         """

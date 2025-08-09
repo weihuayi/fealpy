@@ -48,10 +48,6 @@ class Mesh(MeshDS):
                                'has not been assigned.')
         return node.shape[-1]
 
-    def __str__(self) -> str:
-        """String representation of the mesh."""
-        pass
-
     GD = property(geo_dimension)
 
     def multi_index_matrix(self, p: int, etype: int, dtype=None, device=None) -> TensorLike:
@@ -607,6 +603,42 @@ class HomogeneousMesh(Mesh):
         else:
             e = bm.pow(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
+
+    def get_boundary_mesh(self, return_idx:bool=True):
+        """
+        Get the boundary mesh from self.
+
+        Parameters:
+            return_idx : bool, default=True
+                If True, return the index of the nodes and cells
+                in the face mesh within original mesh.
+        Returns:
+            node: array, the nodes of face mesh.
+            face: array, the cells of face mesh,
+                also the boundary faces of original mesh.
+            node_idx: array, the index of nodes in the face mesh
+                within nodes of original mesh.
+            face_idx: array, the index of cells in the face mesh
+                within faces of original mesh.
+        """
+        # TODO: 兼容三棱柱网格
+        # TODO: 兼容非单质网格
+        # TODO: 优化结构化网格
+        bd_face_idx = self.boundary_face_index()
+        node = self.node
+        face = self.face
+        if self.meshtype == 'UniformMesh3d':
+            face = face[:, bm.array([0, 2, 3, 1])]
+        bd_node_idx = self.boundary_node_index()
+        bd_node = node[bd_node_idx]
+        idx_map = bm.zeros(node.shape[0], dtype=bd_node_idx.dtype)
+        idx_map[bd_node_idx] = bm.arange(bd_node_idx.shape[0], dtype=bd_node_idx.dtype)
+        bd_cell = idx_map[face[bd_face_idx]]
+
+        if return_idx:
+            return bd_node, bd_cell, bd_node_idx, bd_face_idx
+        else:
+            return bd_node, bd_cell
 
 
 class SimplexMesh(HomogeneousMesh):

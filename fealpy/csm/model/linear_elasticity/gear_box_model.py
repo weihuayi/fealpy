@@ -1,3 +1,8 @@
+from typing import Optional
+
+from ....backend import bm
+from ....typing import TensorLike
+from ....decorator import cartesian
 
 from fealpy.mesh import (
         TetrahedronMesh,
@@ -14,6 +19,7 @@ class GearBoxModel:
         self.options = options
         self.parser = InpFileParser()
         self.parser.parse(options['mesh_file'])
+        self.material = self.parser.to_material(LinearElasticMaterial, 'gearbox')
 
     def __str__(self) -> str:
         """
@@ -34,3 +40,5 @@ class GearBoxModel:
         """
         """
         return self.parser.to_mesh(TetrahedronMesh)
+    
+    
