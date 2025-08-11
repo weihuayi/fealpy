@@ -66,7 +66,14 @@ class TriangleMesh(SimplexMesh, Plotable):
                 return bm.sqrt(bm.sum(nv ** 2, axis=1)) / 2.0
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
-  
+    
+    def reference_cell_measure(self):
+        """
+        Calculate the measure of the reference cell.
+        The measure of the reference triangle in 2D is 0.5
+        """
+        return 0.5
+    
     # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
                            qtype: str='legendre'): # TODO: other qtype
