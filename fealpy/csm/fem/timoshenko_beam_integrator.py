@@ -108,8 +108,8 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         l = mesh.entity_measure('cell')
         NC = mesh.number_of_cells()
 
-        AX, AY, AZ = self.material.calculate_cross_sectional_areas()
-        Iy, Iz, Ix = self.material.calculate_moments_of_inertia()
+        AX, AY, AZ = self.material.cross_sectional_areas()
+        Iy, Iz, Ix = self.material.moments_of_inertia()
 
         R = self._coord_transfrom()
 

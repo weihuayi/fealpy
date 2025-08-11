@@ -7,36 +7,15 @@ from fealpy.material.elastic_material import LinearElasticMaterial
 
 
 class TimoshenkoBeamMaterial(LinearElasticMaterial):
-    """A class representing Timoshenko beam material properties, inheriting from LinearElasticMaterial.
+    """Material properties for 3D Timoshenko beams.
 
     Parameters:
         name (str): The name of the material.
         model (object): The model containing the beam's geometric and material properties.
-
-    Attributes:
-        _model (object): An instance of the model, providing access to the beam's geometric properties.
-        _E (float): The elastic modulus of the material.
-        _mu (float): The shear modulus of the material.
-
-    Methods:
-        __init__(name: str, model): Initializes the Timoshenko beam material with the given properties.
-
-        calculate_cross_sectional_areas() -> Tuple[TensorLike, TensorLike]:
-            Calculates and returns the cross-sectional areas in the x, y, and z directions.
-
-        calculate_moments_of_inertia() -> Tuple[TensorLike, TensorLike]:
-            Calculates and returns the moments of inertia about the y, z, and polar axes.
-        
-        shear_factor() -> Tuple[TensorLike, TensorLike]:
-            Returns the shear correction factors (FSY, FSZ) for the y and z directions.
-        
-        stress_matrix() -> TensorLike:
-            Returns the stress matrix for the Timoshenko beam material, incorporating elastic modulus and shear effects.
-        
-        strain_matrix() -> TensorLike:
-            Placeholder method for calculating the strain matrix (currently not implemented).
+        E (float): The elastic modulus of the material.
+        mu (float): The shear modulus of the material.
     """
-
+    
     def __init__(self, name: str,
                 model,
                 elastic_modulus: Optional[float] = None,
@@ -46,28 +25,36 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                         elastic_modulus=elastic_modulus, 
                         poisson_ratio=poisson_ratio)
 
-        self._model = model
+        self.model = model
 
-        self._E = self.get_property('elastic_modulus')
-        self._nu = self.get_property('poisson_ratio')
-        self._mu = self.get_property('shear_modulus')
+        self.E = self.get_property('elastic_modulus')
+        self.nu = self.get_property('poisson_ratio')
+        self.mu = self.get_property('shear_modulus')
+        
+    def __str__(self) -> str:
+        s = f"{self.__class__.__name__}(\n"
+        s += f"  Name              : {self.get_property('name')}\n"
+        s += f"  E (Elastic Mod.)  : {self.E}\n"
+        s += f"  nu (Poisson)      : {self.nu}\n"
+        s += f"  mu (Shear Mod.)   : {self.mu}\n"
+        s += f"  Shear Factors     : {self.model.FSY}, {self.model.FSZ}\n"
+        s += f"  AX, AY, AZ        : {self.model.AX.tolist()}, {self.model.AY.tolist()}, {self.model.AZ.tolist()}\n"
+        s += f"  Iy, Iz, Ix        : {self.model.Iy.tolist()}, {self.model.Iz.tolist()}, {self.model.Ix.tolist()}\n)"
+        return s
 
-    def calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:
-        Ax, Ay, Az = self._model._calculate_cross_sectional_areas()
-        return Ax, Ay, Az
+    def cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:
+        return self.model.AX, self.model.AY, self.model.AZ
     
-    def calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike]:
-        Iy, Iz, Ix = self._model._calculate_moments_of_inertia()
-        return Iy, Iz, Ix
+    def moments_of_inertia(self) -> Tuple[TensorLike, TensorLike]:
+        return self.model.Iy, self.model.Iz, self.model.Ix
     
     def shear_factor(self) -> Tuple[TensorLike, TensorLike]:
-        FSY, FSZ = self._model._FSY, self._model._FSZ
-        return FSY, FSZ
+        return self.model.FSY, self.model.FSZ
     
     def stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for Timoshenko beam material."""
-        E = self._E
-        mu = self._mu
+        E = self.E
+        mu = self.mu
 
         D = bm.array([[E, 0, 0],
                       [0, mu, 0],
