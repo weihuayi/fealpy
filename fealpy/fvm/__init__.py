@@ -1,10 +1,12 @@
 from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 from .scalar_cross_diffusion_integrator import ScalarCrossDiffusionIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
+from .div_integrator import DivIntegrator
 
 from .gradient_reconstruct import GradientReconstruct
 from .dirichlet_bc import DirichletBC
 from .vector_decomposition import VectorDecomposition
 
 
-from .poisson_fvm_model import PoissonFvmModel
+from .poisson_fvm_model import PoissonFVMModel
+from .stokes_fvm_model import StokesFVMModel

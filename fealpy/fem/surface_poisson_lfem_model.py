@@ -18,9 +18,9 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     """
     A class to represent a surface Poisson problem using the Lagrange finite element method (LFEM).
     
-    Attributes:
+    Attributes
         mesh: The mesh of the domain.                                           
-    Reference:
+    Reference
         https://wnesm678i4.feishu.cn/wiki/SsOKwQiVqi241WkusA9cn9ylnPf
     """
     
@@ -29,19 +29,18 @@ class SurfacePoissonLFEMModel(ComputationalModel):
        self.options = options
        super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
        self.set_pde(options['pde'])
-       self.set_init_mesh(options['init_mesh']) 
+       self.set_init_mesh(options['mesh_degree'], options['init_mesh']) 
        self.set_space_degree(options['space_degree']) 
-       
-
-    def set_pde(self, pde: Union[SurfacePDEDataT, str] = "sphere"):
-        if isinstance(pde, str):
+    
+    def set_pde(self, pde: Union[SurfacePDEDataT, int] = 1) -> None:
+        if isinstance(pde, int):
             self.pde = PDEModelManager("surface_poisson").get_example(pde)
         else:
             self.pde = pde
 
-    def set_init_mesh(self, mesh: Union[Mesh, str] = "ltri", **kwargs):
-        if isinstance(mesh,str):
-            self.mesh = self.pde.init_mesh[mesh](**kwargs)
+    def set_init_mesh(self, p:int, mesh:Union[Mesh, str] = "ltri", **kwargs):
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh[mesh](p, **kwargs)
         else:
             self.mesh = mesh
 
@@ -51,7 +50,6 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-
     def set_space_degree(self, p: int) -> None:
         self.p = p
 
@@ -59,28 +57,24 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         """
         Construct the linear system for the surface problem.
 
-        Returns:
+        Returns
             The diffusion matrix and source matrix.
         """
         self.space = ParametricLagrangeFESpace(self.mesh, self.p)
         self.uh = self.space.function()
 
         bform = BilinearForm(self.space)
-        SDI = ScalarDiffusionIntegrator(method='isopara')
-        bform.add_integrator(SDI)
-
+        bform.add_integrator(ScalarDiffusionIntegrator(method='isopara'))
         lform = LinearForm(self.space)
-        SSI = ScalarSourceIntegrator(self.pde.source, method='isopara')
-        lform.add_integrator(SSI)
-
+        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, method='isopara'))
+        
         A = bform.assembly(format='coo')
         F = lform.assembly()
-
         C = self.space.integral_basis()
-
+        
         def coo(A):
             data = A._values
-            indices = A._indices   
+            indices = A._indices
             return coo_array((data, indices), shape=A.shape)
     
         A = bmat([[coo(A), C.reshape(-1,1)], [C[None,:], None]], format='coo')
@@ -101,27 +95,24 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     @solve.register('cg')
     def solve(self):
         A, F = self.surface_poisson_system()
-        self.uh, info = cg(A, F, maxiter=5000, atol=1e-14, rtol=1e-14).reshape(-1)
-        self.uh[:] = -self.uh[:-1]
-        res = info['residual']
-        self.logger.info(f"CG solver finished with residual: {res}")
-
+        x = cg(A, F, maxit=5000, atol=1e-14, rtol=1e-14).reshape(-1)
+        self.uh[:] = x[:-1]  # Exclude the last element which
+        l2 = self.postprocess()
+        self.logger.info(f"L2 Error: {l2}.")
+    
     @variantmethod('onestep')
     def run(self):
-        """
-        """
-        A, F = self.surface_poisson_system()
-        self.uh[:] = self.solve(A, F)
+        self.uh[:] = self.solve()[:-1]
         l2 = self.postprocess()
         self.logger.info(f"L2 Error: {l2}.")
 
     @run.register('uniform_refine')
     def run(self, maxit=4):
         for i in range(maxit):
-            A, F = self.surface_poisson_system()
-            self.uh[:] = self.solve(A, F)
+            A,F = self.surface_poisson_system()
+            self.uh[:] = self.solve()[:-1]
             l2 = self.postprocess()
-            self.logger.info(f"{i}-th step with  L2 Error: {l2}.")
+            self.logger.info(f"{1}-th step with  L2 Error: {l2}.")
             if i < maxit - 1:
                 self.logger.info(f"Refining mesh {i+1}/{maxit}.")
                 self.mesh.uniform_refine()
