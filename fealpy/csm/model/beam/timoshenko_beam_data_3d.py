@@ -35,7 +35,6 @@ class TimoshenkoBeamData3D:
             [120, 141, 2], [1.976e6 , 100, 10]
         ], dtype=bm.float64)
         
-        self.L = float(bm.sum(self.para[:, 1]))
         self._D = bm.repeat(self.para[:, 0], self.para[:, 2].astype(int))
         self.FSY = FSY
         self.FSZ = FSZ
@@ -43,7 +42,9 @@ class TimoshenkoBeamData3D:
         self.mesh = self.init_mesh()
         
         self.AX, self.AY, self.AZ = self.calculate_cross_sectional_areas()
-        self.Iy, self.Iz, self.Ix = self.calculate_moments_of_inertia()
+        self.Ix, self.Iy, self.Iz = self.calculate_moments_of_inertia()
+
+        self.lunzhou_E, self.lunzhou_mu = self.lunzhou_para()
         
     def __str__(self) -> str:
         """Returns a formatted multi-line string summarizing the configuration of the 3D Timoshenko beam data.
@@ -65,6 +66,11 @@ class TimoshenkoBeamData3D:
         """Return the geometric dimension of the domain."""
         return 3
     
+    def lunzhou_para(self): 
+        lunzhou_E, lunzhou_mu = 1.976e6, 1.976e6
+
+        return lunzhou_E, lunzhou_mu 
+    
     def calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
         """Return cross-sectional areas Ax, Ay, Az."""
         AX = bm.pi * self._D**2 / 4
@@ -80,10 +86,6 @@ class TimoshenkoBeamData3D:
         Ix = Iy + Iz
 
         return Ix, Iy, Iz
-    
-    def domain(self):
-        """Return the computational domain [xmin, xmax]."""
-        return [0.0, self.L]
 
     def init_mesh(self):
         """Construct a mesh for the beam.

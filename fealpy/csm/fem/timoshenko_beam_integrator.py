@@ -7,8 +7,6 @@ from fealpy.fem.integrator import (
     enable_cache)
 from fealpy.functionspace.space import FunctionSpace as _FS
 
-# from ..material.timoshenko_beam_material import TimoshenkoBeamMaterial
-
 
 class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
     """
@@ -106,10 +104,18 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
             Ke(ndarray),The 3D beam element stiffness matrix, shape (NC, 12, 12).
         """
         assert space is self.space  
-        E = self.material.E
-        mu = self.material.mu
+
+        beam_E, beam_mu = self.material.E, self.material.mu
+        lunzhou_E, lunzhou_mu = self.material.lunzhou_material_paras()
 
         mesh = space.mesh
+
+        lunzhou_node = mesh.entity('node')[-10:, :]
+        node = mesh.entity('node')
+        # if (node[:, 2] - (-100)) < 1e-12:
+        #     pass
+        NN_beam = 22
+        NN_lumzhou = 10
         l = mesh.entity_measure('cell')
         NC = mesh.number_of_cells()
 
@@ -118,6 +124,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         R = self._coord_transfrom()
 
+        E = bm.concecated()
         phi_y = 12 * E * Iz / mu / AY / (l**2) 
         phi_z = 12 * E * Iy / mu / AZ / (l**2) 
 

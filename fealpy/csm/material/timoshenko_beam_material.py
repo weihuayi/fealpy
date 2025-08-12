@@ -37,16 +37,20 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         s += f"  E (Elastic Mod.)  : {self.E}\n"
         s += f"  nu (Poisson)      : {self.nu}\n"
         s += f"  mu (Shear Mod.)   : {self.mu}\n"
-        s += f"  Shear Factors     : {self.model.FSY}, {self.model.FSZ}\n"
-        s += f"  AX, AY, AZ        : {self.model.AX.tolist()}, {self.model.AY.tolist()}, {self.model.AZ.tolist()}\n"
-        s += f"  Iy, Iz, Ix        : {self.model.Iy.tolist()}, {self.model.Iz.tolist()}, {self.model.Ix.tolist()}\n)"
+        # s += f"  Shear Factors     : {self.model.FSY}, {self.model.FSZ}\n"
+        # s += f"  AX, AY, AZ        : {self.model.AX.tolist()}, {self.model.AY.tolist()}, {self.model.AZ.tolist()}\n"
+        # s += f"  Iy, Iz, Ix        : {self.model.Iy.tolist()}, {self.model.Iz.tolist()}, {self.model.Ix.tolist()}\n)"
+        
         return s
+    
+    def lunzhou_material_paras(self):
+        return self.model.lunzhou_E, self.model.lunzhou_mu
 
     def cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:
         return self.model.AX, self.model.AY, self.model.AZ
     
     def moments_of_inertia(self) -> Tuple[TensorLike, TensorLike]:
-        return self.model.Iy, self.model.Iz, self.model.Ix
+        return self.model.Ix, self.model.Iy, self.model.Iz
     
     def shear_factor(self) -> Tuple[TensorLike, TensorLike]:
         return self.model.FSY, self.model.FSZ

@@ -108,5 +108,10 @@ class TimoshenkoBeamModel(ComputationalModel):
         @variantmethod("direct")
         def solve(self):
                 K, F = self.timo_beam_system()
+                Kdense = K.toarray()
+                Ktest = Kdense[-1, -1]
+                print("kkk", K.toarray())
+                print('kkkkkk')
                 K, F = self.apply_bc(K, F)
+                #print(spsolve(K, F, solver='scipy'))
                 return  spsolve(K, F, solver='scipy') 
