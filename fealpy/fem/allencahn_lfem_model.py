@@ -269,7 +269,7 @@ class AllenCahnLFEMModel(ComputationalModel):
             phi_val = phi0(bcs)
             fphi = self.pde.nonlinear_source(phi_val)
     
-            result = gamma * fphi
+            result = -gamma * fphi
             result += phi_force(bcs)
             result += gamma* self.laplace_phi(bcs)
             
@@ -313,7 +313,7 @@ class AllenCahnLFEMModel(ComputationalModel):
             phi_val = phi0(bcs)
             fphi = self.pde.nonlinear_source(phi_val)
     
-            result = gamma * fphi
+            result = -gamma * fphi
             result += phi_force(bcs)
             result += gamma* self.laplace_phi(bcs)
             mesh_result = self.move_vector(bcs) - uh0(bcs)

@@ -5,23 +5,29 @@ from itertools import combinations_with_replacement
 from typing import Optional, TypeVar, Union, Generic, Callable
 from ..typing import TensorLike, Index, _S, Threshold
 
+from ..backend import bm
 from ..backend import TensorLike
-from ..backend import backend_manager as bm
+from ..decorator import barycentric, cartesian
 from ..mesh.mesh_base import Mesh
 from .space import FunctionSpace
 from .dofs import LinearMeshCFEDof, LinearMeshDFEDof
 from .function import Function
-from fealpy.decorator import barycentric, cartesian
 
 
 _MT = TypeVar('_MT', bound=Mesh)
 
 class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
+    """
+    The Scaled Monomial Space in R^2
+    """
     def __init__(self, mesh, p, q=None, bc=None):
         """
-        The Scaled Momomial Space in R^2
+        Parameters:
+           mesh: Mesh 
+           p: the degree of the polynomial space
+           q: the index of the quadrature formula
+           bc: cell barycenter, shape:(NC, 2)
         """
-
         self.mesh = mesh
         self.device = mesh.device
         self.ikwargs = bm.context(mesh.cell[0]) if mesh.meshtype =='polygon' else bm.context(mesh.cell)
@@ -44,7 +50,12 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         """
         Compute the natural correspondence from the one-dimensional index
         starting from 0.
-
+        
+        Parameters:
+            p : int
+                the degree of the polynomial space
+        Returns:
+            multiIndex : ndarray 
         Notes
         -----
 
@@ -56,18 +67,33 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         idx = bm.arange(0, ldof)
         idx0 = bm.floor((-1 + bm.sqrt(1 + 8*idx))/2)
         multiIndex = bm.zeros((ldof, 2), dtype=bm.int32)
-        multiIndex[:, 1] = idx - idx0*(idx0 + 1)/2
-        multiIndex[:, 0] = idx0 - multiIndex[:, 1]
+        multiIndex = bm.set_at(multiIndex, (...,1), idx - idx0*(idx0 + 1)//2)
+        multiIndex = bm.set_at(multiIndex, (...,0), idx0 - multiIndex[...,1])
         return multiIndex
 
     def cell_to_dof(self, p=None):
+        """
+        Compute the mapping from cell degrees of freedom to global degrees of freedom.
+        Parameters:
+           p : int the degree
+        """
         mesh = self.mesh
         NC = mesh.number_of_cells()
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = bm.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
+    def edge_to_dof(self, p=None):
+        mesh = self.mesh
+        return mesh.face_to_cell()[:,:2]
+
     def number_of_local_dofs(self, p=None, doftype='cell'):
+        """
+        Compute the number of local degrees of freedom.
+        Parameters:
+           p : int the degree
+           doftype : str the type of degrees of freedom ('cell', 'face','edge', 'node')
+        """
         p = self.p if p is None else p
         if doftype in {'cell', 2}:
             return (p+1)*(p+2)//2
@@ -77,6 +103,12 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             return 0
 
     def number_of_global_dofs(self, p=None, doftype='cell'):
+        """
+        Compute the number of global degrees of freedom.
+        Parameters:
+           p : int the degree
+           doftype : str the type of degrees of freedom ('cell', 'face', 'edge')
+        """
         ldof = self.number_of_local_dofs(p=p, doftype=doftype)
         if doftype in {'cell', 2}:
             N = self.mesh.number_of_cells()
@@ -84,18 +116,18 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             N = self.mesh.number_of_edges()
         return N*ldof
 
-
-
     def diff_index_1(self, p=None):
         """
-
-        Notes
-        -----
-        对基函数求一阶导后非零项的编号，及系数
+        Compute the first derivative index.
+        The indices and coefficients of the non-zero terms after taking the first derivative of the basis functions.
+        Parameters:
+              p : int the degree
+        Returns:
+              dict : {'x':(index, coefficient), 'y':(index, coefficient)}
         """
         p = self.p if p is None else p
         #index = multi_index_matrix2d(p)
-        index = self.mesh.multi_index_matrix(p, 2)
+        index = bm.multi_index_matrix(p, 2)
 
         x, = bm.nonzero(index[:, 1] > 0) # 关于 x 求导非零的缩放单项式编号
         y, = bm.nonzero(index[:, 2] > 0) # 关于 y 求导非零的缩放单项式编号
@@ -106,14 +138,16 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def diff_index_2(self, p=None):
         """
-
-        Notes
-        -----
-        对基函数求二阶导后非零项的编号，及系数
+        Compute the second derivative index.
+        The indices and coefficients of the non-zero terms after taking the second derivative of the basis functions.
+        Parameters:
+            p : int the degree
+        Returns:
+            dict : {'xx':(index, coefficient), 'yy':(index, coefficient), 'xy':(index, coefficient)}
         """
         p = self.p if p is None else p
         #index = multi_index_matrix2d(p)
-        index = self.mesh.multi_index_matrix(p, 2)
+        index = bm.multi_index_matrix(p, 2)
 
         xx, = bm.nonzero(index[:, 1] > 1)
         yy, = bm.nonzero(index[:, 2] > 1)
@@ -127,9 +161,12 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def face_index_1(self, p=None):
         """
-        Parameters
-        ----------
-        p : >= 1
+        Compute the first derivative index for face degrees of freedom.
+        
+        Parameters:
+            p:int  >= 1
+        Returns:
+            dict : {'x':(index, coefficient), 'y':(index, coefficient)}
         """
         p = self.p if p is None else p
         #index = multi_index_matrix1d(p)
@@ -140,9 +177,11 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def edge_index_1(self, p=None):
         """
-        Parameters
-        ----------
-        p : >= 1
+        Compute the first derivative index for edge degrees of freedom.
+        Parameters:
+            p : >= 1
+        Returns:
+            dict : {'x':(index, coefficient), 'y':(index, coefficient)}
         """
         p = self.p if p is None else p
         index = self.mesh.multi_index_matrix(p, 1)
@@ -152,10 +191,26 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return {'x': x, 'y':y}
 
     def geo_dimension(self):
+        """
+        Compute the geometric dimension.
+        Returns:
+            int : The geometric dimension of the space.
+        """
         return self.GD
 
     @cartesian
     def edge_basis(self, point, index=_S, p=None):
+        """
+        Compute the basis values at points on edges
+        
+        Parameters:
+            point : ndarray  The shape of point is (NE, ..., 2), NE is the number of edges
+                    the points should be on the edges and always quadrature points
+            index : slice or ndarray  The index of edges
+            p : int
+        Returns:
+            phi : ndarray  The shape of `phi` is (NE, ..., p+1)
+        """
         p = self.p if p is None else p
         if p == 0:
             shape = len(point.shape)*(1, )
@@ -170,19 +225,24 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
                      axis=-1)/eh[:, None][index] #(NE, NQ, GD)
         phi = bm.ones(val.shape + (p+1,), **self.fkwargs) #(NE, NQ, GD, p+1)
         if p == 1:
-            phi[..., 1] = val
+            phi = bm.set_at(phi, (..., 1), val)
         else:
-            phi[..., 1:] = val[..., bm.newaxis]
-            #bm.multiply.accumulate(phi, axis=-1, out=phi)
+            phi = bm.set_at(phi, (..., slice(1, None)), val[..., bm.newaxis])
             bm.cumprod(phi, axis=-1, out=phi)
         return phi
 
     @barycentric
     def edge_basis_with_barycentric(self, bcs, p=None):
-        """!
-        @brief 边上的重心坐标函数和缩放单项式函数有一定的关系
-        @param bcs : (..., 2)
-        @return phi : (..., p+1)
+        """
+        The barycentric coordinate functions on the edges 
+        have a certain relationship with the scaled monomial functions.
+        
+        Parameters:
+            bcs : ndarray barycentric coordinates
+                The shape of bcs is (..., 2)
+            p : int  
+        Returns:
+            phi : ndarray (..., p+1)
         """
         p = self.p if p is None else p
         if p == 0:
@@ -191,7 +251,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         else:
             shape = bcs.shape[:-1]+(p+1, )
             phi = bm.ones(shape, **self.fkwargs)
-            phi[..., 1:] = bcs[..., 1, None]-0.5
+            phi = bm.set_at(phi, (..., slice(1, None)), bcs[..., 1, None]-0.5)
             #bm.multiply.accumulate(phi, axis=-1, out=phi)
             bm.cumprod(phi, axis=-1, out=phi)
             return phi
@@ -200,22 +260,22 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     def basis(self, point, index=_S, p=None):
         """
         Compute the basis values at point
-
-        Parameters
-        ----------
-        point : ndarray
-            The shape of point is (M, ..., 2), M is the number of cells
-
-        Returns
-        -------
-        phi : ndarray
-            The shape of `phi` is (M, ..., ldof)
-
+        
+        Parameters:
+            point : ndarray
+                The shape of point is (NC, ..., 2)
+                the points should be on the cell and always quadrature points
+            index : slice or ndarray
+            p : int
+        Returns:
+            phi : ndarray
+                The shape of `phi` is (NC, ..., ldof)
         """
         p = self.p if p is None else p
         h = self.cellsize
         NC = self.mesh.number_of_cells()
-
+        if isinstance(point, tuple):
+            point = point[0]    
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         if p == 0:
             shape = len(point.shape)*(1, )
@@ -223,24 +283,35 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
         shape = point.shape[:-1]+(ldof,)
         phi = bm.ones(shape, **self.fkwargs)  # (..., M, ldof)
-
-        phi[..., 1:3] = (point -
-                         self.cellbarycenter.reshape((NC,)+(1,)*int(point.ndim-2)+(2,))[index])/h[index].reshape((-1,)+(1,)*int(point.ndim-1))
+        cbshape = (NC,) + (1,)*int(point.ndim-2) + (2,)
+        hshape = (-1,)+(1,)*int(point.ndim-1)
+        phi = bm.set_at(phi, (..., slice(1, 3)), 
+                        (point - self.cellbarycenter.reshape(cbshape)[index])/h[index].reshape(hshape))
         if p > 1:
             start = 3
             for i in range(2, p+1):
-                phi[..., start:start+i] = phi[..., start-i:start]*phi[..., [1]]
-                phi[..., start+i] = phi[..., start-1]*phi[..., 2]
+                phi = bm.set_at(phi, (..., slice(start, start+i)), 
+                                phi[..., start-i:start]*phi[..., [1]])
+                phi = bm.set_at(phi, (..., start+i), 
+                                phi[..., start-1]*phi[..., 2])
                 start += i+1
         return phi
 
     @cartesian
     def grad_basis(self, point, index=_S, p=None, scaled=True):
         """
-
-        p >= 0
+        Compute the gradient of the basis functions at a set of 'point'
+        
+        Parameters:
+            point : ndarray
+                The shape of point is (NC, ..., 2)
+            index : slice or ndarray
+            p : int
+            scaled : bool if True, return the scaled gradient
+        Returns:
+            gphi : ndarray
+                The shape of gphi is (NC, ..., ldof, 2)
         """
-
         p = self.p if p is None else p
         h = self.cellsize
 
@@ -257,8 +328,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         idx = self.diff_index_1(p=p)
         xidx = idx['x']
         yidx = idx['y']
-        gphi[..., xidx[0], 0] = bm.einsum('i, ...i->...i', xidx[1], phi)
-        gphi[..., yidx[0], 1] = bm.einsum('i, ...i->...i', yidx[1], phi)
+        gphi = bm.set_at(gphi, (..., xidx[0], 0),
+                         bm.einsum('i, ...i->...i', xidx[1], phi))
+        gphi = bm.set_at(gphi, (..., yidx[0], 1),
+                         bm.einsum('i, ...i->...i', yidx[1], phi))
         if scaled:
             return gphi/h[index].reshape((-1,)+(1,)*int(gphi.ndim-1))
         else:
@@ -275,6 +348,20 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     @cartesian
     def laplace_basis(self, point, index=_S, p=None, scaled=True):
+        """
+        Compute the value of the laplace of the basis at a set of 'point'
+        
+        Parameters:
+            point : numpy array
+                The shape of point is (NC, ..., 2)
+            index : slice or ndarray
+            p : int
+            scaled : bool
+                if True, return the scaled laplace
+        Returns:
+            lphi : numpy array
+                the shape of lphi is (NC,..., ldof)
+        """
         p = self.p if p is None else p
 
         area = self.cellmeasure
@@ -284,8 +371,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
             idx = self.diff_index_2(p=p)
-            lphi[..., idx['xx'][0]] += bm.einsum('i, ...i->...i', idx['xx'][1], phi)
-            lphi[..., idx['yy'][0]] += bm.einsum('i, ...i->...i', idx['yy'][1], phi)
+            bm.index_add(lphi, idx['xx'][0],bm.einsum('i, ...i->...i', idx['xx'][1], phi),axis=-1)
+            bm.index_add(lphi, idx['yy'][0],bm.einsum('i, ...i->...i', idx['yy'][1], phi),axis=-1)
 
         if scaled:
             return lphi/area[index].reshape((-1,)+(1,)*(point.ndim-1))
@@ -297,15 +384,12 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         """
         Compute the value of the hessian of the basis at a set of 'point'
 
-        Parameters
-        ----------
-        point : numpy array
-            The shape of point is (NC, ..., 2)
-
-        Returns
-        -------
-        hphi : numpy array
-            the shape of hphi is (NC, ldof, 2, 2)
+        Parameters:
+            point : numpy array
+                The shape of point is (NC, ..., 2)
+        Returns:
+            hphi : numpy array
+                the shape of hphi is (NC,..., ldof, 2, 2)
         """
         p = self.p if p is None else p
 
@@ -316,10 +400,13 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
             idx = self.diff_index_2(p=p)
-            hphi[..., idx['xx'][0], 0, 0] = bm.einsum('i, ...i->...i', idx['xx'][1], phi)
-            hphi[..., idx['xy'][0], 0, 1] = bm.einsum('i, ...i->...i', idx['xy'][1], phi)
-            hphi[..., idx['yy'][0], 1, 1] = bm.einsum('i, ...i->...i', idx['yy'][1], phi)
-            hphi[..., 1, 0] = hphi[..., 0, 1]
+            hphi = bm.set_at(hphi, (..., idx['xx'][0], 0, 0),
+                             bm.einsum('i, ...i->...i', idx['xx'][1], phi))
+            hphi = bm.set_at(hphi, (..., idx['xy'][0], 0, 1),
+                             bm.einsum('i, ...i->...i', idx['xy'][1], phi))
+            hphi = bm.set_at(hphi, (..., idx['yy'][0], 1, 1),
+                             bm.einsum('i, ...i->...i', idx['yy'][1], phi))
+            hphi = bm.set_at(hphi, (..., 1, 0),hphi[..., 0, 1])
 
         if scaled:
             return hphi/area[index].reshape((-1,)+(1,)*int(hphi.ndim-1))
@@ -345,12 +432,21 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             M = bm.copy(P[idx[i, 0]])
             for j in range(1, m):
                 M = bm.einsum("cij, cjk->cik", M, P[idx[i, j]])
-            gmphi[..., i] = bm.einsum('cli, c...l->c...i', M, phi)
+            gmphi = bm.set_at(gmphi, (..., i),bm.einsum('cli, c...l->c...i', M, phi))
         return gmphi
 
     def partial_matrix(self, p=None, index=_S):
         """
-        \partial m = mP
+        Compute the partial derivative matrix. It is a linear mapping.
+        \partial m = mP 
+        
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+            index : slice or ndarray, optional
+                The index of the cells to compute the partial derivative matrix.   
+        Returns:
+            Px, Py : tuple of ndarray  
         """
         p = p or self.p
         #mindex = multi_index_matrix2d(p)
@@ -362,16 +458,22 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
         I, = bm.where(mindex[:, 1] > 0)
         Px = bm.zeros([NC, N, N], **self.fkwargs)
-        Px[:, bm.arange(len(I)), I] = mindex[None, I, 1]/h[:, None]
+        Px = bm.set_at(Px, (...,bm.arange(len(I)), I), mindex[None, I, 1]/h[:, None])
 
         I, = bm.where(mindex[:, 2] > 0)
         Py = bm.zeros([NC, N, N], **self.fkwargs)
-        Py[:, bm.arange(len(I)), I] = mindex[None, I, 2]/h[:, None]
+        Py = bm.set_at(Py, (...,bm.arange(len(I)), I), mindex[None, I, 2]/h[:, None])
         return Px[index], Py[index]
 
     def cell_mass_matrix(self, p=None):
         """
         Cell mass matrix, shape:(NC, ldof, ldof)
+        
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            ndarray : The cell mass matrix. shape is (NC, ldof, ldof)
         """
         #M = self.matrix_H(p=p)
         p = self.p if p is None else p
@@ -381,6 +483,15 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return self.integral(f) # 积分
 
     def cell_stiff_matrix(self, p=None):
+        """
+        Cell stiffness matrix, shape:(NC, ldof, ldof)
+        
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            ndarray : The cell stiffness matrix. shape is (NC, ldof, ldof)
+        """
         p = self.p if p is None else p
         M = self.cell_mass_matrix()
         Px, Py = self.partial_matrix()
@@ -388,8 +499,16 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         S2 = bm.einsum("cji, cjk, ckl -> cil", Py, M, Py)
         return S1 + S2
 
-
     def edge_integral(self, f):
+        """
+        Compute the integral of a function on the edges of the mesh.
+        
+        Parameters:
+            f : callable
+                The function to integrate. It should have the signature f(x, index),
+        Returns:
+            ndarray : The integral of the function on each cell. shape is (NC, ...)
+        """
         mesh = self.mesh
         p = self.p
         node = mesh.entity('node')
@@ -401,24 +520,27 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         NC = mesh.number_of_cells()
         qf = mesh.quadrature_formula(p+3, etype='edge', qtype='legendre') # NQ
         bcs, ws = qf.quadpts, qf.weights # (NQ, 2)  (NQ,)
-        ps = bm.einsum('ij, kjm->kim', bcs, node[edge]) # (NQ, 2) (NE, 2, 2)
-        f1 = f(ps, index=edge2cell[:, 0]) # (NE, NQ, ldof)
+        ps = bm.einsum('ij, kjm->kim', bcs, node[edge]) # (NQ, 2) (NE, 2, 2) -> (NE, NQ, 2)
+        f1 = f(ps, index=edge2cell[:, 0]) # (NE, NQ, ...)
         measure = mesh.entity_measure('edge')
-        H0 = bm.einsum('eq..., q, e-> e...', f1, ws, measure) # (NC, 2, 2)
+        H0 = bm.einsum('eq..., q, e-> e...', f1, ws, measure) # (NE,...)
         f2 = f(ps, index=edge2cell[:, 1])
-        H1 = bm.einsum('eq..., q, e-> e...', f2[isInEdge], ws, measure[isInEdge]) # (NC, 2, 2)
-        H = bm.zeros((NC,)+ f1.shape[2:], **mesh.fkwargs)
+        H1 = bm.einsum('eq..., q, e-> e...', f2[isInEdge], ws, measure[isInEdge]) # (inNE,...)
+        H = bm.zeros((NC,)+ f1.shape[2:], **self.fkwargs)
         bm.index_add(H, edge2cell[:, 0], H0)
         bm.index_add(H, edge2cell[isInEdge, 1], H1)
         return H
 
-
-
-
-
     def integral(self, f):
         """
-        homogenous function integral, applicable to arbitrary polygonal meshes
+        The integration process of homogeneous functions is applicable to arbitrary polygonal meshes,
+        where the volume integral is transformed into a boundary integral.
+        
+        Parameters:
+            f : callable
+                The function to integrate. It should have the signature f(x, index),      
+        Returns:
+            ndarray : The integral of the function on each cell. shape is (NC, ...)
         """
         mesh = self.mesh
         p = self.p
@@ -434,15 +556,15 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         NC = mesh.number_of_cells()
         qf = mesh.quadrature_formula(p+3, etype='edge', qtype='legendre') # NQ
         bcs, ws = qf.quadpts, qf.weights # (NQ, 2)  (NQ,)
-        ps = bm.einsum('ij, kjm->kim', bcs, node[edge]) # (NQ, 2) (NE, 2, 2)
+        ps = bm.einsum('ij, kjm->kim', bcs, node[edge]) # (NQ, 2) (NE, 2, 2) -> (NE, NQ, 2)
         f1 = f(ps, index=edge2cell[:, 0]) # (NE, NQ, ldof)
         nm = mesh.edge_normal()
         b = node[edge[:, 0]] - cellbarycenter[edge2cell[:, 0]]
-        H0 = bm.einsum('eq..., q, ed, ed-> e...', f1, ws, b, nm) # (NC, 2, 2)
+        H0 = bm.einsum('eq..., q, ed, ed-> e...', f1, ws, b, nm) # (NE,...)
         f2 = f(ps, index=edge2cell[:, 1])
         b = node[edge[isInEdge, 0]] - cellbarycenter[edge2cell[isInEdge, 1]]
-        H1 = bm.einsum('eq..., q, ed, ed-> e...', f2[isInEdge], ws, b, -nm[isInEdge]) # (NC, 2, 2)
-        H = bm.zeros((NC,)+ f1.shape[2:], **mesh.fkwargs)
+        H1 = bm.einsum('eq..., q, ed, ed-> e...', f2[isInEdge], ws, b, -nm[isInEdge]) # (inNE,...)
+        H = bm.zeros((NC,)+ f1.shape[2:], **self.fkwargs)
         bm.index_add(H, edge2cell[:, 0], H0)
         bm.index_add(H, edge2cell[isInEdge, 1], H1)
         multiIndex = self.multi_index_matrix(p=p)
@@ -454,6 +576,16 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return H
 
     def partial_matrix_on_edge(self, p=None):
+        """
+        Compute the partial derivative matrix on edges.
+        
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.      
+        Returns:
+            P : ndarray
+                The partial derivative matrix on edges. The shape is (NE, p+1, p+1).
+        """
         p = p or self.p
         I = bm.arange(p)
 
@@ -461,11 +593,24 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         NE = self.mesh.number_of_edges()
 
         P = bm.zeros([NE, p+1, p+1], **self.fkwargs)
-        P[:, I, I+1] = bm.arange(1, p+1)[None, :]/h[:, None]
+        P = bm.set_at(P , (..., I , I+1),bm.arange(1, p+1)[None, :]/h[:, None])
         return P
 
     @cartesian
     def value(self, uh, point, index=_S):
+        """
+        Compute the value of the finite element function at a set of 'point'
+        
+        Parameters:
+            uh : Function
+            point : ndarray
+                The shape of point is (NC, ..., 2)
+            index : slice or ndarray
+                The index of the cells to compute the value.
+        Returns:
+            value : ndarray
+                The shape of value is (NC, ...)
+        """
         phi = self.basis(point, index=index)
         cell2dof = self.cell_to_dof()[index]
         #cell2dof = self.cell2dof[index]
@@ -476,6 +621,19 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     @cartesian
     def grad_value(self, uh, point, index=_S):
+        """
+        Compute the gradient of the finite element function at a set of 'point'
+        
+        Parameters:
+            uh : Function
+            point : ndarray
+                The shape of point is (NC, ..., 2)
+            index : slice or ndarray
+                The index of the cells to compute the gradient.
+        Returns:
+            grad_value : ndarray
+                The shape of grad_value is (NC, ..., 2)
+        """
         gphi = self.grad_basis(point, index=index)
         cell2dof = self.cell_to_dof()
         if (type(index) is TensorLike) and (index.dtype.name == 'bool'):
@@ -494,25 +652,62 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     @cartesian
     def laplace_value(self, uh, point, index=_S):
+        """
+        Compute the laplace of the finite element function at a set of 'point'
+        
+        Parameters:
+            uh : Function
+            point : ndarray
+                The shape of point is (NC, ..., 2)
+            index : slice or ndarray
+                The index of the cells to compute the laplace.
+        Returns:
+            laplace_value : ndarray
+                The shape of laplace_value is (NC, ...)
+        """
         lphi = self.laplace_basis(point, index=index)
         cell2dof = self.cell_to_dof()
         #cell2dof = self.cell2dof
-        return bm.einsum('...ij, ij->...i', lphi, uh[cell2dof[index]])
+        return bm.einsum('i...j, ij->...i', lphi, uh[cell2dof[index]])
 
     @cartesian
     def hessian_value(self, uh, point, index=_S):
-        hphi = self.hessian_basis(point, index=index) #(NQ, NC, ldof, 2, 2)
+        """
+        Compute the hessian of the finite element function at a set of 'point'
+        Parameters:
+            uh : Function
+            point : ndarray
+                The shape of point is (NC, ..., 2)
+            index : slice or ndarray
+                The index of the cells to compute the hessian.
+        Returns:
+            hessian_value : ndarray
+                The shape of hessian_value is (NC, ..., 2, 2)
+        """
+        hphi = self.hessian_basis(point, index=index) #(NC,NQ,ldof, 2, 2)
         #cell2dof = self.cell2dof
         cell2dof = self.cell_to_dof()
-        return bm.einsum('...clij, cl->...cij', hphi, uh[cell2dof[index]])
+        return bm.einsum('c...lij, cl->c...ij', hphi, uh[cell2dof[index]])
 
     @cartesian
     def grad_3_value(self, uh, point, index=_S):
+        """
+        Compute the third order gradient of the finite element function at a set of 'point'
+        Parameters:
+            uh : Function
+            point : ndarray
+                The shape of point is (NC, ..., 2)
+            index : slice or ndarray
+                The index of the cells to compute the third order gradient.
+        Returns:
+            grad_3_value : ndarray
+                The shape of grad_3_value is (NC, ..., 8)
+        """
         #TODO
         gmphi = self.grad_m_basis(3, point, index=index) #(NQ, NC, ldof, 8)
         #cell2dof = self.cell2dof
         cell2dof = self.cell_to_dof()
-        return bm.einsum('...cli, cl->...ci', gmphi, uh[cell2dof[index]])
+        return bm.einsum('c...li, cl->c...i', gmphi, uh[cell2dof[index]])
 
     #def function(self, dim=None, array=None, dtype=None):
     #    ftype = self.ftype if dtype is None else dtype
@@ -532,6 +727,9 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     #    return bm.zeros(shape, dtype=dtype)
 
     def dof_array(self, dim=None):
+        """
+        
+        """
         gdof = self.number_of_global_dofs()
         if dim in {None, 1}:
             shape = gdof
@@ -541,8 +739,21 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
             shape = (gdof, ) + dim
         return bm.zeros(shape, **self.fkwargs)
 
-
     def show_function_image(self, u, uh, t=None, plot_solution=True):
+        """
+        Show the function image of the finite element function `uh` and the true solution `u`.
+        Parameters:
+            u : Function
+                The true solution function.
+            uh : Function
+                The finite element function to be visualized.
+            t : float, optional
+                The time at which to evaluate the true solution. If None, the initial condition is used.
+            plot_solution : bool, optional
+                If True, plot the true solution along with the finite element function.
+        Returns:
+            None
+        """
         mesh = uh.space.mesh
         fig = plt.figure()
         fig.set_facecolor('white')
@@ -577,6 +788,16 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return
 
     def edge_mass_matrix(self, p=None):
+        """
+        Compute the edge mass matrix.
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            H : ndarray
+                The edge mass matrix. The shape is (NE, ldof, ldof), where
+                NE is the number of edges and ldof is the number of local degrees of freedom.
+        """
         p = self.p if p is None else p
         mesh = self.mesh
         NE = mesh.number_of_edges()
@@ -593,6 +814,16 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return H
 
     def edge_mass_matrix_1(self, p=None):
+        """
+        Compute the edge mass matrix using quadrature points.
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            H : ndarray
+                The edge mass matrix. The shape is (NE, ldof, ldof), where
+                NE is the number of edges and ldof is the number of local degrees of freedom.
+        """
         p = self.p if p is None else p
         mesh = self.mesh
         edge = mesh.entity('edge')
@@ -607,6 +838,19 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return H
 
     def edge_cell_mass_matrix(self, p=None, cp=None):
+        """
+        Compute the mixed mass matrix for cells and cell edges.
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space for edges. If None, use the default degree of the space.
+            cp : int, optional
+                The degree of the polynomial space for cells. If None, use p+1.
+        Returns:
+            LM, RM : tuple of ndarray
+                The left and right mixed mass matrices. Each has shape (NC, NQ, eldof, cldof),
+                where NE is the number of edges, NQ is the number of quadrature points,
+                eldof is the number of local degrees of freedom for edges, and cldof is the number of local degrees of freedom for cells.
+        """
         p = self.p if p is None else p
         cp = p+1 if cp is None else cp
 
@@ -631,12 +875,16 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def cell_hessian_matrix(self, p=None):
         """
-
-        Note:
-            这个程序仅用于多边形网格上 (\nabla^2 u, \nabla^2 v)
+        Cell hessian matrix, shape:(NC, ldof, ldof)
+        This program is only applicable to polygon meshes for (\nabla^2 u, \nabla^2 v).
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            A : The cell hessian matrix. shape is (NC, ldof, ldof)
         """
         p = self.p if p is None else p
-
+        
         @cartesian
         def f(x, index):
             hphi = self.hessian_basis(x, index=index, p=p)
@@ -655,9 +903,15 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def cell_grad_m_matrix(self, m, p=None):
         """
-
-        Note:
-            这个程序仅用于多边形网格上 (\nabla^2 u, \nabla^2 v)
+        Cell m-th order gradient matrix, shape:(NC, ldof, ldof)
+        This program is only applicable to polygon meshes for (\nabla^m u, \nabla^m v).
+        Parameters:
+            m : int
+                The order of the gradient.
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            A : The cell m-th order gradient matrix. shape is (NC, ldof, ldof)
         """
         p = self.p if p is None else p
         @cartesian
@@ -670,9 +924,13 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def stiff_matrix(self, p=None):
         """
-
-        Note:
-            这个程序仅用于多边形网格上的刚度矩阵组装
+        Global stiffness matrix, shape:(gdof, gdof)
+        This program is only applicable to polygon meshes for (\nabla^m u, \nabla^m v).
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            A : The stiffness matrix. shape is (gdof, gdof)
         """
         p = self.p if p is None else p
 
@@ -694,6 +952,15 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return A
 
     def mass_matrix(self, p=None):
+        """
+        Global mass matrix, shape:(gdof, gdof)
+        This program is only applicable to polygon meshes for (u, v).
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+        Returns:
+            M : The mass matrix. shape is (gdof, gdof)
+        """
         M = self.cell_mass_matrix(p=p) # 单元质量矩阵
         cell2dof = self.cell_to_dof(p=p)
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
@@ -705,11 +972,15 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def penalty_matrix(self, p=None, index=_S):
         """
-        Notes
-        -----
-
+        Compute the global penalty matrix
         h_e^{-1}<[u], [v]>_e
-
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+            index : slice or ndarray, optional
+                The index of the edges to compute the penalty matrix.
+        Returns:
+            A : csr_matrix shape is (gdof, gdof)
         """
         p = p or self.p
         mesh = self.mesh
@@ -741,13 +1012,17 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         A = csr_matrix((A.flatten(), (I.flatten(), J.flatten())), shape=(gdof, gdof))
         return A
 
-
     def flux_matrix(self, p=None, index=_S):
         '''
-        Notes:
-        ------
+        Compute the global flux matrix 
         <{u_n}, [v]>_e
-
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+            index : slice or ndarray, optional
+                The index of the edges to compute the flux matrix.
+        Returns:
+            A : csr_matrix shape is (gdof, gdof)
         '''
         p = p or self.p
         mesh = self.mesh
@@ -791,10 +1066,15 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def normal_grad_penalty_matrix(self, p=None, index=_S):
         """
-        Notes
-        -----
-
+        Compute the global normal gradient penalty matrix.
         \\beta h_e < [u_n], [v_n]>_e
+        Parameters:
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+            index : slice or ndarray, optional
+                The index of the edges to compute the penalty matrix.
+        Returns:
+            A : csr_matrix shape is (gdof, gdof)
         """
         p = p or self.p
         mesh = self.mesh
@@ -829,14 +1109,19 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return A
 
     def edge_normal_source_vector(self, g, p = None, index=_S):
-
         """
-        Notes
-        -----
-
+        Compute the edge normal source vector.
         h_e^{-1}<g, [v_n]>_e
+        Parameters:
+            g : function
+                A function that takes a point and returns a scalar or vector value.
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+            index : slice or ndarray, optional
+                The index of the edges to compute the source vector.
+        Returns:
+            F : ndarray (gdof,)
         """
-
         p = p or self.p
         mesh = self.mesh
         edge = mesh.entity('edge')
@@ -871,20 +1156,26 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return F
 
     def edge_source_vector(self, g, p = None, index=_S, hpower=-1):
-
         """
-        Notes
-        -----
+        Compute the edge source vector.
+        Where ( g ) can be either a scalar function or a vector function.
 
-        其中 g 可以是标量函数也可以是向量函数, 当是标量函数的时候计算的是:
+        When ( g ) is a scalar function, the computation is:
+        [ h_e^{hpower} <g, [v]>_e ]
 
-        h_e^{hpower}<g, [v]>_e
-
-        当是向量函数的时候计算的是:
-
-        h_e^{hpower}<g_n, [v]>_e
-
-
+        When ( g ) is a vector function, the computation is:
+        [ h_e^{hpower} <g_n, [v]>_e ]
+        Parameters:
+            g : function
+                A function that takes a point and returns a scalar or vector value.
+            p : int, optional
+                The degree of the polynomial space. If None, use the default degree of the space.
+            index : slice or ndarray, optional
+                The index of the edges to compute the source vector.
+            hpower : int, optional
+                The power of the edge length to scale the result. Default is -1.
+        Returns:
+            F : ndarray (gdof,)
         """
         p = p or self.p
         mesh = self.mesh
@@ -1115,12 +1406,16 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def local_projection(self, f, q=None):
         """
-
-        @brief 给定一个函数 f， 把它投影到缩放单项式空间
-        @param[in] f 关于（x, y) 的函数，注意输入是笛卡尔坐标
-
+        Given a function ( f ), project it locally onto the scaled monomial space.
+        This function is designed to work with functions defined in Cartesian coordinates (x, y).
+        Parameters
+            f : function
+                A function that takes a point (x, y) and returns a value.
+            q : int, optional
+        Returns
+            F : function
+                A function representing the projection of ( f ) onto the scaled monomial space.
         """
-
         @cartesian
         def u(x, *args):
             if len(args) == 0:
@@ -1131,7 +1426,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
         b = self.mesh.integral(u, q=q)
         M = self.cell_mass_matrix()
-        F = inv(M)@b[:, :, None]
+        F = bm.linalg.inv(M)@b[:, :, None]
         F = self.function(array=F.reshape(-1))
         return F
 
@@ -1144,7 +1439,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         mspace = F.space
         C = self.matrix_C(mspace)
         H = self.matrix_H()
-        PI0 = inv(H)@C
+        PI0 = bm.linalg.inv(H)@C
         SS = self.function()
         SS[:] = bm.einsum('ikj, ij->ik', PI0, F[self.cell_to_dof()]).reshape(-1)
         return SS
@@ -1171,7 +1466,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
 
     def interpolation(self, sh0, HB):
         """
-         interpolation sh in space into self space.
+        Interpolate sh in space into self space.
         """
         p = self.p
         ldofs = self.number_of_local_dofs(doftype='cell')
@@ -1192,7 +1487,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         c = sh0.reshape(-1, ldofs)
         d = sh1.reshape(-1, ldofs)
 
-        num = bm.zeros(NC, **ikwargs)
+        num = bm.zeros(NC, **self.ikwargs)
         bm.add.at(num, HB[:, 0], 1)
 
         m = HB.shape[0]
@@ -1215,29 +1510,39 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return sh1
 
     def error(self, u, uh):
-        """!
-        @brief 求 H1 误差
         """
-
+        Calculate the error between the exact solution u and the approximate solution uh.
+        This function computes the L2 error.
+        Parameters:
+            u : function
+                The exact solution function.
+            uh : Function
+                The approximate solution function.
+        Returns:
+            err : float
+                The L2 error between u and uh.
+        """
         def f(p, index):
             val = (u(p) - uh.value(p, index))**2
             return val
         err = bm.sqrt(self.integralalg.integral(f))
         return err
+    
     def H1_error(self, u, uh):
-        """!
-        @brief 求 H1 误差
+        """
+        Calculate the H1 error between the exact solution u and the approximate solution uh.
+        
         """
 
         def f(p, index):
-            val = bm.sum((u(p) - uh.grad_value(p, index))**2, axis=-1)
+            val = bm.sum((u(p) - uh.grad_value(p, index))**2, axis=-1) #此处的计算 u(p) 没有梯度存在问题
             return val
         err = bm.sqrt(self.integralalg.integral(f))
         return err
 
     def H2_error(self, u, uh):
-        """!
-        @brief 求 H2 误差
+        """
+        Calculate the H2 error between the exact solution u and the approximate solution uh.
         """
 
         def f(p, index):
@@ -1248,8 +1553,8 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return err
 
     def H3_error(self, u, uh):
-        """!
-        @brief 求 H3 误差
+        """
+        Calculate the H3 error between the exact solution u and the approximate solution uh.
         """
 
         def f(p, index):

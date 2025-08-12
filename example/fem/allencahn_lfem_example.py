@@ -1,6 +1,6 @@
 from fealpy.backend import bm
 import argparse
-from fealpy.fem.allencahn_lfem_model import AllenCahnLFEMModel
+from fealpy.fem import AllenCahnLFEMModel
 
 # Argument parsing
 parser = argparse.ArgumentParser(description=
