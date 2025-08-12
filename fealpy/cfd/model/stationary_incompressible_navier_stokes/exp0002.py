@@ -2,14 +2,13 @@ from typing import Sequence
 from fealpy.decorator import cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
-from fealpy.mesher import BoxMesher2d
 import sympy as sp
 
-class Exp0002(BoxMesher2d):
+class Exp0002():
     def __init__(self, options: dict = {}):
         self.options = options
         self.eps = 1e-10
-        self.mu = 1e-3
+        self.mu = 2e-3
         self.rho = 1.0
 
     def get_dimension(self) -> int: 
@@ -102,7 +101,7 @@ class Exp0002(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = 1.2 * y * (0.41 - y)/(0.41**2)
+        result[..., 0] = 0.3
         result[..., 1] = bm.array(0.0)
         return result
     
@@ -112,7 +111,7 @@ class Exp0002(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = 1.2 * y * (0.41 - y)/(0.41**2)
+        result[..., 0] = 0.3
         result[..., 1] = bm.array(0.0)
         return result
     

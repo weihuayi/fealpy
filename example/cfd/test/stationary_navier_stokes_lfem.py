@@ -1,8 +1,7 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.cfd.equation.stationary_incompressible_ns import StationaryIncompressibleNS
 from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
-from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
-from fealpy.cfd.model.test import CFDTestModelManager
+from fealpy.cfd.model import CFDTestModelManager
 import argparse
 
 ## 参数解析
@@ -24,11 +23,11 @@ parser.add_argument('--init_mesh',
     help = "Type of initial mesh, default is tri")
 
 parser.add_argument('--nx',
-    default = 8, type = int,
+    default = 4, type = int,
     help = "Number of divisions in the x direction, default is 8")
 
 parser.add_argument('--ny',
-    default = 8, type = int,
+    default = 4, type = int,
     help = "Number of divisions in the y direction, default is 8")
 
 parser.add_argument('--nz',
@@ -36,7 +35,7 @@ parser.add_argument('--nz',
     help = "Number of divisions in the z direction, default is 8 (only for 3D problems)")
 
 parser.add_argument('--method',
-    default = 'Newton', type = str,
+    default = 'Ossen', type = str,
     help = "Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',
@@ -56,7 +55,7 @@ parser.add_argument('--maxit',
     help = "Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',
-    default = 1000, type = int,
+    default = 10, type = int,
     help = "Maximum number of steps for the refinement, default is 1000")
 
 parser.add_argument('--tol',
@@ -71,4 +70,5 @@ manager = CFDTestModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
+model.run()
 model.__str__()

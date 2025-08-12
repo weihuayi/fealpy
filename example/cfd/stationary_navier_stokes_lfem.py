@@ -18,7 +18,7 @@ parser.add_argument('--backend',
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
 parser.add_argument('--pde',
-    default = 1, type=str,
+    default = 2, type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -34,7 +34,7 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--box',
-    default = [0.0, 0.75, 0.0, 0.41], type=int,
+    default = [0.0, 15, 0.0, 0.65], type=int,
     help="N")
 
 parser.add_argument('--center',
@@ -46,7 +46,7 @@ parser.add_argument('--start_center',
     help="N")
 
 parser.add_argument('--radius',
-    default = 0.02, type=int,
+    default = 0.015, type=int,
     help="N")
 
 parser.add_argument('--nx',
@@ -58,11 +58,11 @@ parser.add_argument('--ny',
     help="N")
 
 parser.add_argument('--dx',
-    default = 0.09, type=int,
+    default = 0.20, type=int,
     help="N")
 
 parser.add_argument('--dy',
-    default = 0.06, type=int,
+    default = 0.08, type=int,
     help="N")
 
 parser.add_argument('--shift_angle',
@@ -70,11 +70,11 @@ parser.add_argument('--shift_angle',
     help="N")
 
 parser.add_argument('--n_circle',
-    default = 1000, type=int,
+    default = 100, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--h',
-    default = 0.005, type=float,
+    default = 0.05, type=float,
     help="Mesh size, default is 0.05")
 
 parser.add_argument('--method',
@@ -117,7 +117,8 @@ manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
-model.__str__()
+uh, ph = model.run()
+# model.__str__()
 
 
 
@@ -126,7 +127,6 @@ model.__str__()
 
 # 可视化
 mesh = model.mesh
-uh, ph = model.uh1, model.ph1
 uh = uh.reshape(2, -1).T
 points_u = model.fem.uspace.interpolation_points()
 points_p = model.fem.pspace.interpolation_points()

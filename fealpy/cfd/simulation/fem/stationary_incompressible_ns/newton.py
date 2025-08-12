@@ -36,7 +36,6 @@ class Newton(IterativeMethod):
         self.u_BPW = PressWorkIntegrator(q=q)
         A01.add_integrator(self.u_BPW)
        
-        A11 = BilinearForm(pspace)
         A = BlockForm([[A00, A01], [A01.T, None]]) 
         return A
         

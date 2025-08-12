@@ -82,12 +82,17 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         if options is not None:
             self.solve.set(options['solve'])
             self.fem = self.method[options['method']]()
+            self.run.set(options['run'])
+            self.maxit = options.get('maxit', 5)
+            self.maxstep = options.get('maxstep', 10)
+            self.tol = options.get('tol', 1e-10)
+            # self.apply_bc = self.apply_bc[options['apply_bc']]
 
-            run = self.run[options['run']]
-            if options['run'] == 'uniform_refine':
-                self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
-            else:  # 'one_step' 或其他
-                self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
+
+            # if options['run'] == 'uniform_refine':
+            #     self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
+            # else:  # 'one_step' 或其他
+            #     self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
     
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
@@ -154,32 +159,15 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
     
     
     @variantmethod('main')
-    def run(self, maxstep=1000, tol=1e-10, apply_bc= 'dirichlet', error='error'):
-        """
-        """
+    def run(self, maxstep=1000, tol=1e-10):
         self.run_str = 'main'
-        self.maxstep = maxstep
-        self.tol = tol
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
         uh0 = self.fem.uspace.function()
         ph0 = self.fem.pspace.function()
-        uh1 = self.fem.uspace.function()
-        ph1 = self.fem.pspace.function()
-
-        ugdof = self.fem.uspace.number_of_global_dofs()
-        
-        BForm, LForm = self.linear_system()
         
         for i in range(maxstep):
-            self.update(uh0)
-            A = BForm.assembly()
-            F = LForm.assembly()
-            
-            A, F = self.fem.apply_bc[apply_bc](A, F, self.pde)
-            A, F = self.fem.lagrange_multiplier(A, F)
-
-            x = self.solve(A, F)
-            uh1[:] = x[:ugdof]
-            ph1[:] = x[ugdof:-1]
+            uh1, ph1 = self.run['one_step'](uh0)
             res_u = self.mesh.error(uh0, uh1)
             res_p = self.mesh.error(ph0, ph1)
             self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
@@ -193,14 +181,13 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         return uh1, ph1
     
     @run.register('one_step')
-    def run(self, uh, apply_bc: str = 'dirichlet', error: str = 'error'):
+    def run(self, uh):
         self.run_str = 'one_step'
-
         BForm, LForm = self.linear_system()  
         self.fem.update(uh)
         A = BForm.assembly() 
         b = LForm.assembly()
-        A, b = self.fem.apply_bc[apply_bc](A, b, self.pde)
+        A, b = self.fem.apply_bc(A, b, self.pde)
         A, b = self.fem.lagrange_multiplier(A, b)
         x = self.solve(A, b)
 
@@ -212,14 +199,14 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         return u, p
 
     @run.register('uniform_refine')
-    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10, apply_bc = 'dirichlet', error = 'error'):
+    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10):
         self.run_str = 'uniform_refine'
-        self.maxit = maxit
-        self.maxstep = maxstep
-        self.tol = tol
+        maxit = self.maxit if self.options is not None else maxit
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
         for i in range(maxit):
             self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
-            uh1, ph1 = self.run['main'](maxstep, tol, apply_bc)
+            uh1, ph1 = self.run['main'](maxstep, tol)
             self.mesh.uniform_refine()
         return uh1, ph1
 

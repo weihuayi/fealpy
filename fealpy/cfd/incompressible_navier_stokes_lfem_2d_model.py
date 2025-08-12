@@ -31,12 +31,26 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             self.fem = self.method[options['method']]()
             self.T0, self.T1, self.nt =options['T0'], options['T1'], options['nt']
             self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
+            self.run.set(options['run'])
+            self.maxit = options.get('maxit', 5)
+            self.maxstep = options.get('maxstep', 10)
+            self.tol = options.get('tol', 1e-10)
+            # self.apply_bc = self.apply_bc[options['apply_bc']]
 
-            run = self.run[options['run']]
-            if options['run'] == 'uniform_refine':
-                run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], postprocess=options.get('postprocess', 'error'))
-            else:  # 'one_step' 或其他
-                run(maxstep=options['maxstep'], tol=options['tol'], postprocess=options.get('postprocess', 'error'))
+    def __str__(self) -> str:
+        """Return a nicely formatted, multi-line summary of the computational model configuration."""
+        s = f"{self.__class__.__name__}(\n"
+        s += f"  equation       : {self.equation.__class__.__name__}\n"
+        s += f"  pde            : {self.pde.__class__.__name__}\n"
+        s += f"  method         : {self.method_str}\n"
+        # s += f"  run            : {self.run_str}\n"
+        # s += f"  solve          : {self.solve_str}\n"
+        s += f"  maxsteps       : {self.maxstep}\n"
+        s += f"  tol            : {self.tol}\n"
+        if self.options.get("run") == "uniform_refine":
+            s += f"  Max Refinement : {self.maxit}\n"
+        s += ")"
+        self.logger.info(f"\n{s}")
 
     @variantmethod("Newton")
     def method(self):
@@ -81,21 +95,21 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         return spsolve(A, F, solver=solver)
 
     @variantmethod('main')
-    def run(self, maxstep = 10, tol = 1e-10, postprocess = 'error'):
+    def run(self, maxstep = 10, tol = 1e-10):
         
         mesh = self.mesh         
-        fem = self.fem
         pde = self.pde
+        fem = self.fem
         fem.dt = self.timeline.dt
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
 
         u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = self.timeline.T0)))
         p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = self.timeline.T0)))
         
-        u0 = fem.uspace.function()
-        p0 = fem.pspace.function()
         for i in range(self.timeline.NL-1):
             t  = self.timeline.current_time()
-            print("time=", t)
+            self.logger.info(f"time={t}")
             
             u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)
 
@@ -111,6 +125,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     def run(self, u0, p0, maxstep=10, tol=1e-12):
         fem = self.fem
         pde = self.pde
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
 
         if self.method_str == "IPCS":
             BCu = DirichletBC(space=fem.uspace, 
@@ -166,7 +182,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 pk[:] = x[ugdof:-1]
                 
                 res_u = self.mesh.error(uk0, uk1)
-                print(res_u)
+                # print(res_u)
                 if res_u < tol:
                     break
                 uk0[:] = uk1
@@ -174,23 +190,28 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
 
     @run.register('uniform_refine')
-    def run(self, maxit=5, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'):
+    def run(self, maxit=5, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'):        
+        maxit = self.maxit if self.options is not None else maxit
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
         u_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         for i in range(maxit):
             self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
             self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
-            uh,ph = self.run['main']( maxstep, tol, postprocess)
+            uh,ph = self.run['main']( maxstep, tol)
             self.nt = self.nt*4
             self.equation = IncompressibleNS(self.pde)
             uerror, perror = self.error(uh, ph, t= self.T1)
             u_errorMatrix[0, i] = uerror
             p_errorMatrix[0, i] = perror
+            order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
+            order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
             self.pde.mesh.uniform_refine()
-        print("速度最终误差",u_errorMatrix)
-        print("order : ", bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:]))
-        print("压力最终误差",p_errorMatrix)  
-        print("order : ", bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:]))
+        self.logger.info(f"速度最终误差:" + ",".join(f"{uerror:.15e}" for uerror in u_errorMatrix[0,]))
+        self.logger.info(f"order_u: " + ", ".join(f"{order_u:.15e}" for order_u in order_u))
+        self.logger.info(f"压力最终误差:" + ",".join(f"{perror:.15e}" for perror in p_errorMatrix[0,]))  
+        self.logger.info(f"order_p: " + ", ".join(f"{order_p:.15e}" for order_p in order_p))
         
     @variantmethod('L2')
     def error(self, uh, ph, t):

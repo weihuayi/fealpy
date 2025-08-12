@@ -28,11 +28,6 @@ class Exp0002(BoxMesher2d):
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
-    
-    def set_mesh(self, nx, ny):
-        mesh = super().init_mesh['uniform_tri'](nx=nx, ny=ny)
-        self.mesh = mesh 
-        return mesh
      
     @cartesian
     def velocity(self, p: TensorLike, t) -> TensorLike:
@@ -87,11 +82,10 @@ class Exp0002(BoxMesher2d):
     def velocity_dirichlet(self, p: TensorLike, t) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
-        result = bm.zeros(p.shape, dtype=bm.float64)
-        return result
+        return self.velocity(p, t)
     
     @cartesian
     def pressure_dirichlet(self, p: TensorLike, t) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
-        return None
+        return self.pressure(p, t)
