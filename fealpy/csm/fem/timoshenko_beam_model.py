@@ -11,7 +11,8 @@ from fealpy.functionspace import (
         TensorFunctionSpace
         )
 from fealpy.fem import (
-        BilinearForm,
+        BilinearForm,LinearForm,
+        ScalarSourceIntegrator,
         DirichletBC
         )
 from fealpy.solver import spsolve, cg
@@ -33,6 +34,7 @@ class TimoshenkoBeamModel(ComputationalModel):
                self.set_pde(options['pde'])
                mesh = self.pde.init_mesh()
                self.set_mesh(mesh)
+               self.set_space_degree(options['space_degree'])
 
                self.GD = self.pde.geo_dimension()
                self.E = options['E']
@@ -47,7 +49,6 @@ class TimoshenkoBeamModel(ComputationalModel):
                 s = f"{self.__class__.__name__}(\n"
                 s += f"  pde            : {self.pde.__class__.__name__}\n"  # Assuming pde is a class object
                 s += f"  mesh           : {self.mesh.__class__.__name__}\n"  # Assuming mesh is a class object
-                #s += f"  material       : {self.material}\n"  # Assuming pde has a material attribute
                 s += f"  E (Elastic Modulus)   : {self.E} MPa\n"
                 s += f"  nu (Poisson Ratio)    : {self.nu}\n"
                 s += f"  geo_dimension  : {self.GD}\n"
@@ -63,35 +64,49 @@ class TimoshenkoBeamModel(ComputationalModel):
                 
         def set_mesh(self, mesh: Mesh) -> None:
               self.mesh = mesh
+              
+        def set_space_degree(self, p: int) -> None:
+                self.p = p
 
-        def timo_beam_system(self, mesh, p: int):
+        def timo_beam_system(self):
                 """"Construct the linear system for the 3D timoshenko beam problem.
 
                 Parameters:
                     E (float): Young's modulus in MPa.
                     nu (float): Poisson's ratio.
                 """
-                self.space = LagrangeFESpace(mesh, p, ctype='C')
-                model = self.set_pde()
+                self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
                 self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
 
                 TBM = TimoshenkoBeamMaterial(name="timobeam",
-                                      model=model, 
+                                      model=self.pde, 
                                       elastic_modulus=self.E,
                                       poisson_ratio=self.nu)
 
                 bform = BilinearForm(self.tspace)
                 bform.add_integrator(TimoshenkoBeamIntegrator(self.tspace, TBM))
+                
                 K = bform.assembly()
-                F = model.external_load()
+                F = self.pde.external_load()
+
                 return K, F
-
-        @variantmethod('direct')
-        def solve(self):
-             pass
-
-        @solve.register('cg')
-        def solve(self):
-             pass
-
         
+        def apply_bc(self, K, F):
+                """Apply boundary conditions to the linear system."""
+                num_dofs = self.tspace.number_of_global_dofs()
+                threshold = bm.zeros(num_dofs, dtype=bool)
+                
+                fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
+                threshold[fixed_dofs] = True
+                
+                K, F = DirichletBC(space=self.tspace,
+                                gd=self.pde.dirichlet,
+                                threshold=threshold).apply(K, F)
+                return K, F
+        
+        
+        @variantmethod("direct")
+        def solve(self):
+                K, F = self.timo_beam_system()
+                K, F = self.apply_bc(K, F)
+                return  spsolve(K, F, solver='scipy') 

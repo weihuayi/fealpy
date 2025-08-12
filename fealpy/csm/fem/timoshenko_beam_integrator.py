@@ -53,14 +53,19 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         k1, k2, k3 = vy
 
         # 计算第二行方向向量（垂直于杆轴方向的 y 方向局部坐标单位向量）
-        A = bm.sqrt((T12 * k3 - T13 * k2)**2 + (T13 * k1 - T11 * k3)**2 + (T11 * k2 - T12 * k1)**2)
+        A = bm.sqrt((T12 * k3 - T13 * k2)**2 + 
+                    (T13 * k1 - T11 * k3)**2 +
+                    (T11 * k2 - T12 * k1)**2)
 
         T21 = -(T12 * k3 - T13 * k2) / A
         T22 = -(T13 * k1 - T11 * k3) / A
         T23 = -(T11 * k2 - T12 * k1) / A
 
         # 计算第三行方向向量（通过叉乘第一和第二行得到 z 方向单位向量）
-        B = bm.sqrt((T12 * T23 - T13 * T22)**2 + (T13 * T21 - T11 * T23)**2 + (T11 * T22 - T12 * T21)**2)
+        B = bm.sqrt((T12 * T23 - T13 * T22)**2 +
+                    (T13 * T21 - T11 * T23)**2 +
+                    (T11 * T22 - T12 * T21)**2)
+        
         T31 = (T12 * T23 - T13 * T22) / B
         T32 = (T13 * T21 - T11 * T23) / B
         T33 = (T11 * T22 - T12 * T21) / B
@@ -108,8 +113,8 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         l = mesh.entity_measure('cell')
         NC = mesh.number_of_cells()
 
-        AX, AY, AZ = self.material.calculate_cross_sectional_areas()
-        Iy, Iz, Ix = self.material.calculate_moments_of_inertia()
+        AX, AY, AZ = self.material.cross_sectional_areas()
+        Ix, Iy, Iz = self.material.moments_of_inertia()
 
         R = self._coord_transfrom()
 
@@ -127,6 +132,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ke[:, 1, 5] = 6 * E *Iz / (1+phi_y) / (l**2)
         Ke[:, 1, 7] = -Ke[:, 1, 1]
         Ke[:, 1, 11] = -Ke[:, 1, 5]
+        
 
         Ke[:, 2, 2] = 12 * E * Iy / (1+phi_z) /(l**3)
         Ke[:, 2, 4] = -6 * E *Iy / (1+phi_z) / (l**2)
@@ -153,12 +159,12 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ke[:, 9, 9] = Ke[:, 3, 3]
         Ke[:, 10, 10] = Ke[:, 4, 4]
         Ke[:, 11, 11] = Ke[:, 6, 6]
-
+        
         # Symmetrize
         for j in range(11):
             for k in range(j + 1, 12):
                 Ke[:, k, j] = Ke[:, j, k]
-
-        KE = bm.einsum('cji, cjl, clj -> cij', R, Ke, R)
+                   
+        KE = bm.einsum('cij, cjk, clk -> cil', R, Ke, R)
 
         return KE
