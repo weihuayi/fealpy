@@ -102,48 +102,11 @@ class TimoshenkoBeamModel(ComputationalModel):
                 K, F = DirichletBC(space=self.tspace,
                                 gd=self.pde.dirichlet,
                                 threshold=threshold).apply(K, F)
-                
-                print('ddd', self.pde.dirichlet_dof_index())
                 return K, F
         
         
         @variantmethod("direct")
         def solve(self):
                 K, F = self.timo_beam_system()
-                fixed_dofs = self.pde.dirichlet_dof_index()
-                #b = simple_check(K, fixed_dofs)
-                #print('iiii', b)
-                
                 K, F = self.apply_bc(K, F)
-                print('K', K)
-                print("kkkkkkk")
-                return spsolve(K, F, solver='scipy')
-
-# def simple_check(K, fixed_dofs):
-#         """
-#         简单检查刚度矩阵秩和固定自由度数量。
-
-#         参数：
-#         K: 刚度矩阵（稠密或稀疏，最好是稠密矩阵）
-#         fixed_dofs: 已固定自由度索引列表或数组
-
-#         输出：
-#         打印总自由度数，固定自由度数，矩阵秩。
-#         """
-#         import numpy as np
-#         n = K.shape[0]
-#         print(f"Total DOFs: {n}")
-#         print(f"Number of fixed DOFs: {len(fixed_dofs)}")
-
-#         # 转成稠密矩阵（如果是稀疏矩阵）
-#         if hasattr(K, "toarray"):
-#                 K = K.toarray()
-
-#         rank = np.linalg.matrix_rank(K)
-#         print(f"Matrix rank: {rank} / {n}")
-
-#         if rank < n:
-#                 print("Warning: Matrix is rank deficient (singular).")
-#         else:
-#                 print("Matrix is full rank.")
-      
+                return  spsolve(K, F, solver='scipy') 
