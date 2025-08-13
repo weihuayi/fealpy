@@ -37,8 +37,11 @@ class TimoshenkoBeamModel(ComputationalModel):
                self.set_space_degree(options['space_degree'])
 
                self.GD = self.pde.geo_dimension()
-               self.E = options['E']
-               self.nu = options['nu']
+               self.beam_E = options['beam_E']
+               self.beam_nu = options['beam_nu']
+               self.axle_E = options['axle_E']
+               self.axle_mu = options['axle_mu']
+               
         
         def __str__(self) -> str:
                 """Returns a formatted multi-line string summarizing the configuration of the Timoshenko beam model.
@@ -49,8 +52,11 @@ class TimoshenkoBeamModel(ComputationalModel):
                 s = f"{self.__class__.__name__}(\n"
                 s += f"  pde            : {self.pde.__class__.__name__}\n"  # Assuming pde is a class object
                 s += f"  mesh           : {self.mesh.__class__.__name__}\n"  # Assuming mesh is a class object
-                s += f"  E (Elastic Modulus)   : {self.E} MPa\n"
-                s += f"  nu (Poisson Ratio)    : {self.nu}\n"
+                s += f"  beam_E           : {self.beam_E}\n"
+                s += f"  beam_nu          : {self.beam_nu}\n"
+                s += f"  beam_mu          : {self.beam_E/(2*(1+self.beam_nu)):.3e}\n"  # 自动算梁剪切模量
+                s += f"  beam_E           : {self.axle_E}\n"
+                s += f"  beam_mu          : {self.axle_mu}\n"
                 s += f"  geo_dimension  : {self.GD}\n"
                 s += ")"
                 self.logger.info(f"\n{s}")
@@ -80,8 +86,8 @@ class TimoshenkoBeamModel(ComputationalModel):
 
                 TBM = TimoshenkoBeamMaterial(name="timobeam",
                                       model=self.pde, 
-                                      elastic_modulus=self.E,
-                                      poisson_ratio=self.nu)
+                                      elastic_modulus=self.beam_E,
+                                      poisson_ratio=self.beam_nu)
 
                 bform = BilinearForm(self.tspace)
                 bform.add_integrator(TimoshenkoBeamIntegrator(self.tspace, TBM))
@@ -110,8 +116,8 @@ class TimoshenkoBeamModel(ComputationalModel):
                 K, F = self.timo_beam_system()
                 Kdense = K.toarray()
                 Ktest = Kdense[-1, -1]
-                print("kkk", K.toarray())
-                print('kkkkkk')
+                #print("kkk", K.toarray())
+                #print('kkkkkk')
                 K, F = self.apply_bc(K, F)
                 #print(spsolve(K, F, solver='scipy'))
                 return  spsolve(K, F, solver='scipy') 

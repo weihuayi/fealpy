@@ -84,11 +84,10 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         R = bm.concatenate([row1, row2, row3, row4], axis=1)  #shape: (32, 12, 12)
         return R
- 
-    @variantmethod
-    def assembly(self, space: _FS) -> TensorLike:
-        """Construct the stiffness matrix for 3D beam elements.This function computes the (12, 12) stiffness matrix for each element.
-        
+    
+    @enable_cache
+    def fetch(self, space: _FS):
+        """Retrieve material and geometric parameters for the 3D Timoshenko beam.
         Parameters:
             E(float) : Young's modulus.
             mu(float): shear modulus.
@@ -99,40 +98,54 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
             Iy(float): Moment of inertia about the y-axis.
             Iz(float): Moment of inertia about the z-axis.
             Ix(float): Polar moment of inertia (for torsional effects).
-            
-        Returns:
-            Ke(ndarray),The 3D beam element stiffness matrix, shape (NC, 12, 12).
         """
         assert space is self.space  
 
         beam_E, beam_mu = self.material.E, self.material.mu
-        lunzhou_E, lunzhou_mu = self.material.lunzhou_material_paras()
+        axle_E, axle_mu = self.material.axle_material_paras()
 
         mesh = space.mesh
-
-        lunzhou_node = mesh.entity('node')[-10:, :]
-        node = mesh.entity('node')
-        # if (node[:, 2] - (-100)) < 1e-12:
-        #     pass
-        NN_beam = 22
-        NN_lumzhou = 10
+        NC = mesh.number_of_cells()
+        
+        axle_cells = bm.arange(NC - 10, NC)
+        
+        # 构造每个单元的E和mu数组
+        E = bm.full(NC, beam_E, dtype=float)
+        mu = bm.full(NC, beam_mu, dtype=float)
+        E[axle_cells] = axle_E
+        mu[axle_cells] = axle_mu
+        
+        # 几何参数
         l = mesh.entity_measure('cell')
         NC = mesh.number_of_cells()
 
-        AX, AY, AZ = self.material.cross_sectional_areas()
+        Ax, Ay, Az = self.material.cross_sectional_areas()
         Ix, Iy, Iz = self.material.moments_of_inertia()
-
+        
+        # 坐标变换矩阵
         R = self._coord_transfrom()
-
-        E = bm.concecated()
-        phi_y = 12 * E * Iz / mu / AY / (l**2) 
-        phi_z = 12 * E * Iy / mu / AZ / (l**2) 
+        
+        return E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R
+    
+    @variantmethod
+    def assembly(self, space: _FS) -> TensorLike:
+        """Construct the stiffness matrix for 3D beam elements.This function computes the (12, 12) stiffness matrix for each element.
+            
+        Returns:
+            Ke(ndarray),The 3D beam element stiffness matrix, shape (NC, 12, 12).
+        """
+        E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R = self.fetch(space)
+        mesh = space.mesh
+        NC = mesh.number_of_cells()
+        
+        phi_y = 12 * E * Iz / mu / Ay / (l**2) 
+        phi_z = 12 * E * Iy / mu / Az / (l**2) 
 
         KE = bm.zeros((NC, 12, 12))
 
         Ke = bm.zeros((NC, 12, 12))
 
-        Ke[:, 0, 0] = E * AX / l
+        Ke[:, 0, 0] = E * Ax / l
         Ke[:, 0, 6] = -Ke[:, 0, 0]
 
         Ke[:, 1, 1] = 12 * E * Iz / (1+phi_y) /(l**3)

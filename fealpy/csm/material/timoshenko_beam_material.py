@@ -1,9 +1,11 @@
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 from builtins import float, str
 
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
+
+from fealpy.csm.model.beam.timoshenko_beam_data_3d import TimoshenkoBeamData3D
 
 
 class TimoshenkoBeamMaterial(LinearElasticMaterial):
@@ -16,49 +18,64 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         mu (float): The shear modulus of the material.
     """
     
-    def __init__(self, name: str,
-                model,
-                elastic_modulus: Optional[float] = None,
-                poisson_ratio: Optional[float] = None,
-            ) -> None:
+    def __init__(self, name: str, model,
+                 elastic_modulus: Optional[float] = None,
+                 poisson_ratio: Optional[float] = None) -> None:
         super().__init__(name=name, 
-                        elastic_modulus=elastic_modulus, 
+                        elastic_modulus= elastic_modulus, 
                         poisson_ratio=poisson_ratio)
 
         self.model = model
-
-        self.E = self.get_property('elastic_modulus')
-        self.nu = self.get_property('poisson_ratio')
-        self.mu = self.get_property('shear_modulus')
+        
+        # Beam material
+        self.beam_E = self.get_property('elastic_modulus')
+        self.beam_nu = self.get_property('poisson_ratio')
+        self.beam_mu = self.get_property('shear_modulus')
+        
+        # Axle material
+        self.axle_E, self.axle_mu = self.axle_material_paras()
         
     def __str__(self) -> str:
         s = f"{self.__class__.__name__}(\n"
+        s += "  === Material Parameters ===\n"
         s += f"  Name              : {self.get_property('name')}\n"
-        s += f"  E (Elastic Mod.)  : {self.E}\n"
-        s += f"  nu (Poisson)      : {self.nu}\n"
-        s += f"  mu (Shear Mod.)   : {self.mu}\n"
-        # s += f"  Shear Factors     : {self.model.FSY}, {self.model.FSZ}\n"
-        # s += f"  AX, AY, AZ        : {self.model.AX.tolist()}, {self.model.AY.tolist()}, {self.model.AZ.tolist()}\n"
-        # s += f"  Iy, Iz, Ix        : {self.model.Iy.tolist()}, {self.model.Iz.tolist()}, {self.model.Ix.tolist()}\n)"
-        
+        s += f"  [Beam]  E           : {self.beam_E}\n"
+        s += f"  [Beam]  nu          : {self.beam_nu}\n"
+        s += f"  [Beam]  mu          : {self.beam_mu}\n"
+        s += f"  [Axle]  E           : {self.axle_E}\n"
+        s += f"  [Axle]  mu          : {self.axle_mu}\n"
+        s += ")"
         return s
     
-    def lunzhou_material_paras(self):
-        return self.model.lunzhou_E, self.model.lunzhou_mu
+    def axle_material_paras(self) -> Tuple[TensorLike, TensorLike]:
+        axle_E = 1.976e6
+        axle_mu = 1.976e6
+        return axle_E, axle_mu
 
-    def cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike]:
-        return self.model.AX, self.model.AY, self.model.AZ
+    def cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        return self.model.Ax, self.model.Ay, self.model.Az
     
-    def moments_of_inertia(self) -> Tuple[TensorLike, TensorLike]:
+    def moments_of_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
         return self.model.Ix, self.model.Iy, self.model.Iz
     
     def shear_factor(self) -> Tuple[TensorLike, TensorLike]:
         return self.model.FSY, self.model.FSZ
     
-    def stress_matrix(self) -> TensorLike:
+    def beam_stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for Timoshenko beam material."""
-        E = self.E
-        mu = self.mu
+        E = self.beam_E
+        mu = self.beam_mu
+
+        D = bm.array([[E, 0, 0],
+                      [0, mu, 0],
+                      [0, 0, mu]], dtype=bm.float64)
+    
+        return D
+    
+    def axle_stress_matrix(self) -> TensorLike:
+        """Returns the stress matrix for axle material."""
+        E = self.axle_E
+        mu = self.axle_mu
 
         D = bm.array([[E, 0, 0],
                       [0, mu, 0],
