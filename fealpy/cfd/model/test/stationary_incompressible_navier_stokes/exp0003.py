@@ -3,7 +3,6 @@ from fealpy.decorator import cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 from fealpy.mesher import BoxMesher2d
-import sympy as sp
 
 class Exp0003(BoxMesher2d):
     
@@ -14,7 +13,6 @@ class Exp0003(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
-        self._init_expr()
         super().__init__(box=self.box)
 
     def __str__(self) -> str:
@@ -22,7 +20,7 @@ class Exp0003(BoxMesher2d):
         s = f"{self.__class__.__name__}(\n"
         s += f"  problem            : 2D stationary incompressible Navier-Stokes\n"
         s += f"  domain             : {self.box}\n"
-        s += f"  mesh size          : nx = {self.nx}, ny = {self.ny}\n"
+        # s += f"  mesh size          : nx = {self.nx}, ny = {self.ny}\n"
         s += f"  density (ρ)        : {self.rho}\n"
         s += f"  viscosity (μ)      : {self.mu}\n"
         s += f"  exact_velocity_x   : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
@@ -39,20 +37,15 @@ class Exp0003(BoxMesher2d):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
     
-    def init_mesh(self, nx, ny):
-        mesh = super().init_mesh['uniform_tri'](nx=nx, ny=ny)
-        self.nx = nx
-        self.ny = ny
-        return mesh
-    
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity."""
         x = p[..., 0]
         y = p[..., 1]
+        pi = bm.pi
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = bm.array(self.u(x, y)[0])
-        result[..., 1] = bm.array(self.u(x, y)[1])
+        result[..., 0] = -bm.cos(2*pi*x) * bm.sin(2*pi*y)
+        result[..., 1] = bm.sin(2*pi*x) * bm.cos(2*pi*y)
         return result
     
     @cartesian
@@ -60,23 +53,25 @@ class Exp0003(BoxMesher2d):
         """Compute exact solution of pressure."""
         x = p[..., 0]
         y = p[..., 1]
-        return bm.array(self.p(x, y))
+        pi = bm.pi
+        return -0.25 * (bm.cos(4*pi*x) + bm.sin(4*pi*y))
     
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
         x = p[..., 0]
         y = p[..., 1]
+        pi = bm.pi
+        sin = bm.sin
+        cos = bm.cos
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = bm.array(self.force(x, y)[0])
-        result[..., 1] = bm.array(self.force(x, y)[1])
+        result[..., 0] = -2.0*pi*sin(2*pi*x)*sin(2*pi*y)**2*cos(2*pi*x) - 2.0*pi*sin(2*pi*x)*cos(2*pi*x)*cos(2*pi*y)**2 + pi*sin(4*pi*x) - 8.0*pi**2*sin(2*pi*y)*cos(2*pi*x)
+        result[..., 1] = -2.0*pi*sin(2*pi*x)**2*sin(2*pi*y)*cos(2*pi*y) + 8.0*pi**2*sin(2*pi*x)*cos(2*pi*y) - 2.0*pi*sin(2*pi*y)*cos(2*pi*x)**2*cos(2*pi*y) - pi*cos(4*pi*y)
         return result
 
     @cartesian
     def is_velocity_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point where velocity is defined is on boundary."""
-        # result = bm.ones_like(p[..., 0], dtype=bm.bool)
-        # return result
         return None
 
     @cartesian
@@ -86,44 +81,11 @@ class Exp0003(BoxMesher2d):
         return result
 
     @cartesian
-    def velocity_gradient(self, p: TensorLike) -> TensorLike:
-        pass
-    
-    @cartesian
-    def pressure_gradient(self):
-        pass
-
-    @cartesian
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
-        pass
+        """Optional: prescribed velocity on boundary, if needed explicitly."""
+        return self.velocity(p)
     
     @cartesian
     def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
-        pass
-
-    def _init_expr(self):
-        x, y = sp.symbols('x, y')
-        u1 = -sp.cos(2*sp.pi * x) * sp.sin(2*sp.pi *y)
-        u2 = sp.sin(2*sp.pi *x) * sp.cos(2*sp.pi *y)
-        p = -0.25 * (sp.cos(4*sp.pi * x) + sp.sin(4*sp.pi * y))
-
-        mu = self.mu
-        rho = self.rho
-        u = sp.Matrix([u1, u2])
-        gradu1x = u1.diff(x)
-        gradu1y = u1.diff(y)
-        gradu2x = u2.diff(x)
-        gradu2y = u2.diff(y)
-
-        # 不可压缩性
-        assert sp.simplify(gradu1x + gradu2y) == 0  
-
-        convection = sp.Matrix([u1 * gradu1x + u2 * gradu1y, u1 * gradu2x + u2 * gradu2y])
-        diffusion = sp.Matrix([sp.diff(gradu1x, x) + sp.diff(gradu1y, y), sp.diff(gradu2x, x) + sp.diff(gradu2y, y)])
-        gradp = sp.Matrix([p.diff(x), p.diff(y)])
-        force = - mu*diffusion + rho*convection + gradp
-        
-        self.u = sp.lambdify([x, y], u, 'numpy')
-        self.p = sp.lambdify([x, y], p, 'numpy')
-        self.force = sp.lambdify([x, y], force, 'numpy')
-
+        """Optional: prescribed pressure on boundary (usually for stability)."""
+        return self.pressure(p)

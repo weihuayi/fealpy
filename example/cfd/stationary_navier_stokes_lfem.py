@@ -1,10 +1,8 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
 from fealpy.cfd.model import CFDPDEModelManager
-from fealpy.cfd.equation.stationary_incompressible_ns import StationaryIncompressibleNS
-from fealpy.functionspace import Function
+from fealpy.mesher.chip_mesher import ChipMesher
 import matplotlib.pyplot as plt
-import matplotlib.tri as tri
 import argparse
 
 ## 参数解析
@@ -34,20 +32,20 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--box',
-    default = [0.0, 15, 0.0, 0.65], type=int,
-    help="N")
+    default = [0.0, 5e-3, 0.0, 2e-3], type=int,
+    help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
 
 parser.add_argument('--center',
-    default = (0.2, 0.2), type=int,
-    help="N")
+    default = (2e-4, 1.5e-4), type=float,
+    help="Center of the first circle, default is (0.1, 0.05).")
 
 parser.add_argument('--start_center',
     default = (0.015, 0.015), type=int,
     help="N")
 
 parser.add_argument('--radius',
-    default = 0.015, type=int,
-    help="N")
+    default = 1e-4, type=int,
+    help="Radius of the circles, default is 0.029.")
 
 parser.add_argument('--nx',
     default = 7, type=int,
@@ -73,9 +71,33 @@ parser.add_argument('--n_circle',
     default = 100, type=int,
     help="Number of divisions in the circle, default is 60")
 
+parser.add_argument('--l1',
+    default = 3e-4, type=float,
+    help="Vertical spacing between circles in a column. Default: 0.1.")
+
+parser.add_argument('--l2',
+    default = 3e-4, type=float,
+    help="Horizontal spacing between circle columns. Default: 0.1.")
+
 parser.add_argument('--h',
-    default = 0.05, type=float,
+    default = 5e-5, type=float,
     help="Mesh size, default is 0.05")
+
+parser.add_argument('--lc',
+    default = 1e-4, type=float,
+    help="Target mesh element size (characteristic length). Default: 0.01.")
+
+parser.add_argument('--hole_lc',
+    default = 8e-6, type=float,
+    help="Mesh size, default is 0.006")
+
+parser.add_argument('--return_mesh',
+    default='True', type=str,
+    help='Whether to generate mesh, default is True')
+
+parser.add_argument('--show_figure',
+    default='False', type=str,
+    help='Whether to show figure in Gmsh, default is True')
 
 parser.add_argument('--method',
     default='Newton', type=str,
@@ -115,14 +137,10 @@ options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
-mesh = pde.init_mesh()
+mesh = pde.mesh
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
 uh, ph = model.run()
 # model.__str__()
-
-
-
-
 
 
 # 可视化
@@ -130,10 +148,8 @@ mesh = model.mesh
 uh = uh.reshape(2, -1).T
 points_u = model.fem.uspace.interpolation_points()
 points_p = model.fem.pspace.interpolation_points()
-# print(model.fem.uspace.interpolation_points())
-# triang = tri.Triangulation(points_u[:, 0], points_u[:, 1])
 
-plt.figure(figsize=(18, 3))
+plt.figure(figsize=(18, 15))
 plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 0], levels = 50, cmap='viridis')
 plt.colorbar(label = 'uh0')
 plt.xlabel('x')
@@ -142,7 +158,7 @@ plt.title('Velocity uh0')
 plt.grid(True)
 plt.show()
 
-plt.figure(figsize=(18, 3))
+plt.figure(figsize=(18, 15))
 plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 1], levels = 50, cmap='viridis')
 plt.colorbar(label = 'uh1')
 plt.xlabel('x')
@@ -151,7 +167,7 @@ plt.title('Velocity uh1')
 plt.grid(True)
 plt.show()
 
-plt.figure(figsize=(18, 3))
+plt.figure(figsize=(18, 15))
 plt.tricontourf(points_p[:, 0], points_p[:, 1], mesh.cell, ph, levels = 50, cmap='viridis')
 plt.colorbar(label = 'ph')
 plt.xlabel('x')
@@ -186,9 +202,6 @@ plt.show()
 fig = plt.figure()
 ax = fig.gca()
 mesh.add_plot(ax)
-# mesh.find_node(ax, showindex=True)
-# mesh.find_edge(ax, showindex=True)
-# mesh.find_cell(ax, showindex=True)
 plt.axis("equal")
 plt.show()
 

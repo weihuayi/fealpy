@@ -15,7 +15,6 @@ class Exp0001(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
-        # self._init_expr()
         super().__init__(box=self.box)
 
     def __str__(self) -> str:
@@ -96,40 +95,3 @@ class Exp0001(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         return None
-
-    def _init_expr(self):
-        x, y, t = sp.symbols('x, y, t')
-        u1 = 10 * x ** 2 * (x - 1) ** 2 * y * (y - 1) * (2 * y - 1) * sp.cos(t)
-        u2 = -10 * x * (x - 1) * (2 * x - 1) * y ** 2 * (y - 1) ** 2 * sp.cos(t)
-        p = 10 * (2 * x - 1) * (2 * y - 1) * sp.cos(t)
-        mu = self.mu
-        rho = self.rho
-        u = sp.Matrix([u1, u2])
-        gradu1t = u1.diff(t)
-        gradu2t = u2.diff(t)
-        gradu1x = u1.diff(x)
-        gradu1y = u1.diff(y)
-        gradu2x = u2.diff(x)
-        gradu2y = u2.diff(y)
-
-        # 不可压缩性
-        assert sp.simplify(gradu1x + gradu2y) == 0  
-
-        time_derivative1 = gradu1t
-        time_derivative2 = gradu2t
-        convection1 = u1 * gradu1x + u2 * gradu1y
-        convection2 =  u1 * gradu2x + u2 * gradu2y
-        diffusion1 = sp.diff(gradu1x, x) + sp.diff(gradu1y, y)
-        diffusion2 = sp.diff(gradu2x, x) + sp.diff(gradu2y, y)
-        gradpx = p.diff(x)
-        gradpy = p.diff(y)
-        force11 = - mu*diffusion1 + rho*convection1 + gradpx + time_derivative1
-        force22 = - mu*diffusion2 + rho*convection2 + gradpy + time_derivative2
-        print(force11)
-        print(force22)
-
-        self.u1 = sp.lambdify((x, y, t), u1, 'numpy')
-        self.u2 = sp.lambdify((x, y, t), u2, 'numpy')
-        self.p = sp.lambdify((x, y, t), p, 'numpy')
-        self.fx = sp.lambdify((x, y, t), force11, 'numpy')
-        self.fy = sp.lambdify((x, y, t),force22, 'numpy')

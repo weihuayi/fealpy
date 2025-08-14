@@ -2,9 +2,9 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod,cartesian
 from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
-
 from .equation import IncompressibleNS
 from .simulation.time import UniformTimeLine
+from fealpy.utils import timer
 
 
 class IncompressibleNSLFEM2DModel(ComputationalModel):
@@ -43,12 +43,13 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         s += f"  equation       : {self.equation.__class__.__name__}\n"
         s += f"  pde            : {self.pde.__class__.__name__}\n"
         s += f"  method         : {self.method_str}\n"
-        # s += f"  run            : {self.run_str}\n"
-        # s += f"  solve          : {self.solve_str}\n"
+        s += f"  run            : {self.run_str}\n"
         s += f"  maxsteps       : {self.maxstep}\n"
         s += f"  tol            : {self.tol}\n"
+        s += f"  solve          : {self.solve_str}\n"
+        s += f"  error          : {self.error_str}\n"
         if self.options.get("run") == "uniform_refine":
-            s += f"  Max Refinement : {self.maxit}\n"
+            s += f"  maxit          : {self.maxit}\n"
         s += ")"
         self.logger.info(f"\n{s}")
 
@@ -91,12 +92,14 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
     @variantmethod('direct')
     def solve(self, A, F, solver = 'mumps'):
+        """Solve the linear system Ax = F."""
+        self.solve_str = "direct"
         from fealpy.solver import spsolve
         return spsolve(A, F, solver=solver)
 
     @variantmethod('main')
     def run(self, maxstep = 10, tol = 1e-10):
-        
+        self.run_str = "main"
         mesh = self.mesh         
         pde = self.pde
         fem = self.fem
@@ -123,6 +126,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
     @run.register('one_step')
     def run(self, u0, p0, maxstep=10, tol=1e-12):
+        self.run_str = "one_step"
         fem = self.fem
         pde = self.pde
         maxstep = self.maxstep if self.options is not None else maxstep
@@ -169,15 +173,23 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             pk = p0.space.function()
 
             for j in range(maxstep): 
+                # tmr = timer()
+                # next(tmr)
                 self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
                 fem.update(uk0, u0)
                 
                 A = BForm.assembly()
+                # tmr.send('左端项组装时间')
                 b = LForm.assembly()
+                # tmr.send('右端项组装时间')
                 A, b = self.fem.apply_bc(A, b, self.pde, t=self.timeline.next_time())
-                A, b = self.fem.lagrange_multiplier(A,b, 0)
+                # tmr.send('边界条件处理时间')
+                A, b = self.fem.lagrange_multiplier(A, b, 0)
+                # tmr.send('拉格朗日乘子处理时间')
             
                 x = self.solve(A, b, 'mumps')
+                # tmr.send('求解线性方程组时间')
+                # next(tmr)
                 uk1[:] = x[:ugdof]
                 pk[:] = x[ugdof:-1]
                 
@@ -190,7 +202,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
 
     @run.register('uniform_refine')
-    def run(self, maxit=5, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'):        
+    def run(self, maxit=5, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'): 
+        self.run_str = "uniform_refine"       
         maxit = self.maxit if self.options is not None else maxit
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
@@ -215,6 +228,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         
     @variantmethod('L2')
     def error(self, uh, ph, t):
+        """Compute the error between numerical solution and exact solution."""
+        self.error_str = "L2"
         uerror = self.mesh.error(cartesian(lambda p : self.pde.velocity(p, t = t)), uh)
         perror = self.mesh.error(cartesian(lambda p : self.pde.pressure(p, t = t)), ph)
         self.logger.info(f"uerror: {uerror}, perror: {perror}")

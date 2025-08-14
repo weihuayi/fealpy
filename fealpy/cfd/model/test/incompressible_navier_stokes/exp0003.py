@@ -7,7 +7,7 @@ from fealpy.mesher import BoxMesher2d
 from ....simulation.time import UniformTimeLine
 import sympy as sp
 
-class Exp0002(BoxMesher2d):
+class Exp0003(BoxMesher2d):
     def __init__(self, options: dict = {}):
         self.options = options
         self.box = [0.0, 1.0, 0.0, 1.0]
@@ -97,6 +97,6 @@ class Exp0002(BoxMesher2d):
     def pressure_dirichlet(self, p: TensorLike, t) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
-        return None
+        return self.pressure(p, t)
 
 

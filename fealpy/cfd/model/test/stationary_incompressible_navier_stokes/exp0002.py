@@ -3,7 +3,6 @@ from fealpy.decorator import cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
 from fealpy.mesher import BoxMesher2d
-import sympy as sp
 
 class Exp0002(BoxMesher2d):
     """
@@ -71,7 +70,6 @@ class Exp0002(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         self.mesh = self.init_mesh['uniform_tri'](nx=options.get('nx', 8), ny=options.get('ny', 8))
-        self._init_expr()
         super().__init__(box=self.box)
 
     def __str__(self) -> str:
@@ -101,9 +99,19 @@ class Exp0002(BoxMesher2d):
         """Compute exact solution of velocity."""
         x = p[..., 0]
         y = p[..., 1]
+        pi = bm.pi
+        exp = bm.exp
+        r1 = 3  
+        r2 = 0.1  
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = bm.array(self.u(x, y)[0])
-        result[..., 1] = bm.array(self.u(x, y)[1])
+        result[..., 0] = (r2 / (2*pi)
+                        * exp(r2 * y) / (exp(r2) - 1)
+                        * bm.sin(2*pi * (exp(r2 * y) - 1) / (exp(r2) - 1))
+                        * (1 - bm.cos(2*pi * (exp(r1 * x) - 1) / (exp(r1) - 1))))
+        result[..., 1] = (-r1 / (2*pi)
+                        * exp(r1 * x) / (exp(r1) - 1)
+                        * bm.sin(2*pi * (exp(r1 * x) - 1) / (exp(r1) - 1))
+                        * (1 - bm.cos(2*pi * (exp(r2 * y) - 1) / (exp(r2) - 1))))
         return result
     
     @cartesian
@@ -111,16 +119,28 @@ class Exp0002(BoxMesher2d):
         """Compute exact solution of pressure."""
         x = p[..., 0]
         y = p[..., 1]
-        return bm.array(self.p(x, y))
+        pi = bm.pi
+        exp = bm.exp
+        r1 = 3  
+        r2 = 0.1
+        return (r1 * r2
+                * exp(r1 * x) * exp(r2 * y)
+                / ((exp(r1) - 1) * (exp(r2) - 1))
+                * bm.sin(2*pi * (exp(r1 * x) - 1) / (exp(r1) - 1))
+                * bm.sin(2*pi * (exp(r2 * y) - 1) / (exp(r2) - 1)))
     
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source """
         x = p[..., 0]
         y = p[..., 1]
+        pi = bm.pi
+        exp = bm.exp
+        cos = bm.cos
+        sin = bm.sin
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = bm.array(self.force(x, y)[0])
-        result[..., 1] = bm.array(self.force(x, y)[1])
+        result[..., 0] = -1.5*(1 - cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10))))*((1 - cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3))))*exp(y/10)*sin(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))/(200*pi*(-1 + exp(1/10))) + (1 - cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3))))*exp(y/5)*cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))/(100*(-1 + exp(1/10))**2))*exp(3*x)*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/(pi*(-1 + exp(3))) + 0.015*(1 - cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3))))*exp(3*x)*exp(y/5)*sin(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))**2*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/(pi*(-1 + exp(1/10))**2*(-1 + exp(3))) + 0.002*pi*(1 - cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3))))*exp(3*y/10)*sin(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))/(-1 + exp(1/10))**3 - 0.0005*(1 - cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3))))*exp(y/10)*sin(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))/(pi*(-1 + exp(1/10))) - 0.003*(1 - cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3))))*exp(y/5)*cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))/(-1 + exp(1/10))**2
+        result[..., 1] = -54.0*pi*(1 - cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10))))*exp(9*x)*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/(-1 + exp(3))**3 + 0.45*(1 - cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10))))*exp(6*x)*exp(y/10)*sin(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))**2/(pi*(-1 + exp(1/10))*(-1 + exp(3))**2) + 81.0*(1 - cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10))))*exp(6*x)*cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/(-1 + exp(3))**2 + 13.5*(1 - cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10))))*exp(3*x)*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/(pi*(-1 + exp(3))) + 0.05*(1 - cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3))))*(-9*(1 - cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10))))*exp(6*x)*cos(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/(-1 + exp(3))**2 - 9*(1 - cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10))))*exp(3*x)*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/(2*pi*(-1 + exp(3))))*exp(y/10)*sin(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))/(pi*(-1 + exp(1/10))) + 0.06*exp(3*x)*exp(y/10)*sin(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))/((-1 + exp(1/10))*(-1 + exp(3))) + 0.12*pi*exp(3*x)*exp(y/5)*sin(2*pi*(exp(3*x) - 1)/(-1 + exp(3)))*cos(2*pi*(exp(y/10) - 1)/(-1 + exp(1/10)))/((-1 + exp(1/10))**2*(-1 + exp(3)))
         return result
 
     @cartesian
@@ -145,31 +165,4 @@ class Exp0002(BoxMesher2d):
     def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
         """Optional: prescribed pressure on boundary (usually for stability)."""
         return self.pressure(p)
-
-    def _init_expr(self):
-        """Initialize symbolic expressions for velocity, pressure, and source."""
-        x, y = sp.symbols('x, y')
-        u1 = 0.1/(2 * sp.pi) * sp.exp(0.1*y)/(sp.exp(0.1)-1)*sp.sin(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1))*(1-sp.cos(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1)))
-        u2 = -3/(2 * sp.pi) * sp.exp(3*x)/(sp.exp(3)-1)*sp.sin(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1))*(1-sp.cos(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1)))
-        p = 0.3*sp.exp(3*x)*sp.exp(0.1*y)/((sp.exp(3)-1)*(sp.exp(0.1)-1)) * sp.sin(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1)) * sp.sin(2*sp.pi*(sp.exp(0.1*y)-1)/(sp.exp(0.1)-1))* (1-sp.sin(2*sp.pi*(sp.exp(3*x)-1)/(sp.exp(3)-1)))
-        
-        mu = self.mu
-        rho = self.rho
-        u = sp.Matrix([u1, u2])
-        gradu1x = u1.diff(x)
-        gradu1y = u1.diff(y)
-        gradu2x = u2.diff(x)
-        gradu2y = u2.diff(y)
-
-        # 不可压缩性
-        assert sp.simplify(gradu1x + gradu2y) == 0  
-
-        convection = sp.Matrix([u1 * gradu1x + u2 * gradu1y, u1 * gradu2x + u2 * gradu2y])
-        diffusion = sp.Matrix([sp.diff(gradu1x, x) + sp.diff(gradu1y, y), sp.diff(gradu2x, x) + sp.diff(gradu2y, y)])
-        gradp = sp.Matrix([p.diff(x), p.diff(y)])
-        force = - mu*diffusion + rho*convection + gradp
-        
-        self.u = sp.lambdify([x, y], u, 'numpy')
-        self.p = sp.lambdify([x, y], p, 'numpy')
-        self.force = sp.lambdify([x, y], force, 'numpy')
 
