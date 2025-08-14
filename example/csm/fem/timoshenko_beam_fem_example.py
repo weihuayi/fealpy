@@ -1,5 +1,6 @@
 import argparse
 
+
 # Argument parsing
 parser = argparse.ArgumentParser(description=
         """
@@ -34,9 +35,9 @@ parser.add_argument('--axle_E',
                     default=1.976e6, type=float,
                     help='Type of mesh, default is the axle Young modulus')
 
-parser.add_argument('--axle_mu',
-                    default=1.976e6, type=float,
-                    help='Type of mesh, default is the axle Shear modulus')
+parser.add_argument('--axle_nu',
+                    default=-0.5, type=float,
+                    help='Type of mesh, default is the axle Poisson ratio')
 
 
 parser.add_argument('--pbar_log',

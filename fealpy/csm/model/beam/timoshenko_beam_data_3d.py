@@ -34,17 +34,23 @@ class TimoshenkoBeamData3D:
             [120, 141, 2]], dtype=bm.float64)
         self.axle_para =  bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
     
-        self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
+        #self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
+        
         # diameter
-        self.D = bm.repeat(self.para[:, 0], self.para[:, 2].astype(int))
+        self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
+        self.axle_D = bm.repeat(self.axle_para[:, 0], self.axle_para[:, 2].astype(int))
         
         self.FSY = FSY
         self.FSZ = FSZ
         self.dofs_per_node = 6
         self.mesh = self.init_mesh()
         
-        self.Ax, self.Ay, self.Az = self.calculate_cross_sectional_areas()
-        self.Ix, self.Iy, self.Iz = self.calculate_moments_of_inertia()
+        # === 独立计算 beam 和 axle 截面 & 惯性矩 ===
+        self.beam_Ax, self.beam_Ay, self.beam_Az = self.calculate_beam_cross_section()
+        self.beam_Ix, self.beam_Iy, self.beam_Iz = self.calculate_beam_inertia()
+        
+        # self.axle_Ax, self.axle_Ay, self.axle_Az = self.calculate_axle_cross_section()
+        # self.axle_Ix, self.axle_Iy, self.axle_Iz = self.calculate_axle_inertia()
         
     def __str__(self) -> str:
         """Returns a formatted multi-line string summarizing the configuration of the 3D Timoshenko beam data.
@@ -61,8 +67,10 @@ class TimoshenkoBeamData3D:
         s += f"  Number of Elements    : {self.mesh.number_of_cells()}\n"
         s += f"  Geo Dimension         : {self.geo_dimension()}\n"
         s += f"  Shear Factors     : {self.FSY}, {self.FSZ}\n"
-        s += f"  Ax, Ay, Az        : {self.Ax.tolist()}, {self.Ay.tolist()}, {self.Az.tolist()}\n"
-        s += f"  Ix, Iy, Iz       : {self.Ix.tolist()}, {self.Iy.tolist()}, {self.Iz.tolist()}\n)"
+        s += f"  beam_Ax, beam_Ay, beam_Az : {self.beam_Ax[:5].tolist()} ...\n"
+        s += f"  beam_Ix, beam_Iy, beam_Iz : {self.beam_Ix[:5].tolist()} ...\n"
+        s += f"  axle_Ax,axle_Ay, axle_Az : {self.axle_Ax[:5].tolist()} ...\n"
+        s += f"  axle_Ix, axle_Iy, axle_Iz : {self.axle_Ix[:5].tolist()} ...\n"
         s += ")"
         return s
     
@@ -70,22 +78,21 @@ class TimoshenkoBeamData3D:
         """the geometric dimension."""
         return 3
     
-    def calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        """cross-sectional areas Ax, Ay, Az."""
-        Ax = bm.pi * self.D**2 / 4
-        Ay = Ax / self.FSY
-        Az = Ax / self.FSZ
+    def calculate_beam_cross_section(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        """Beam cross-sectional areas."""
+        beam_Ax = bm.pi * self.beam_D**2 / 4
+        beam_Ay = beam_Ax / self.FSY
+        beam_Az = beam_Ax / self.FSZ
 
-        return Ax, Ay, Az
+        return beam_Ax, beam_Ay, beam_Az
     
-    def calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        """moments of inertia Iy, Iz, Ix."""
-        Iy  = bm.pi * self.D**4 / 64
-        Iz = Iy
-        Ix = Iy + Iz
-
-        return Ix, Iy, Iz
-
+    def calculate_beam_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+       """Beam moments of inertia."""
+       beam_Iy  = bm.pi * self.beam_D**4 / 64
+       beam_Iz = beam_Iy
+       beam_Ix = beam_Iy + beam_Iz
+       return beam_Ix, beam_Iy, beam_Iz
+    
     def init_mesh(self):
         """Construct a mesh for the beam.
 

@@ -40,7 +40,7 @@ class TimoshenkoBeamModel(ComputationalModel):
                self.beam_E = options['beam_E']
                self.beam_nu = options['beam_nu']
                self.axle_E = options['axle_E']
-               self.axle_mu = options['axle_mu']
+               self.axle_nu = options['axle_nu']
                
         
         def __str__(self) -> str:
@@ -56,7 +56,8 @@ class TimoshenkoBeamModel(ComputationalModel):
                 s += f"  beam_nu          : {self.beam_nu}\n"
                 s += f"  beam_mu          : {self.beam_E/(2*(1+self.beam_nu)):.3e}\n"  # 自动算梁剪切模量
                 s += f"  axle_E           : {self.axle_E}\n"
-                s += f"  axle_mu          : {self.axle_mu}\n"
+                s += f"  axle_nu          : {self.axle_nu}\n"
+                s += f"  axle_mu          : {self.axle_E/(2*(1+self.axle_nu)):.3e}\n"  # 自动算轴承剪切模量
                 s += f"  geo_dimension  : {self.GD}\n"
                 s += ")"
                 self.logger.info(f"\n{s}")
@@ -114,10 +115,5 @@ class TimoshenkoBeamModel(ComputationalModel):
         @variantmethod("direct")
         def solve(self):
                 K, F = self.timo_beam_system()
-                Kdense = K.toarray()
-                Ktest = Kdense[-1, -1]
-                #print("kkk", K.toarray())
-                #print('kkkkkk')
                 K, F = self.apply_bc(K, F)
-                #print(spsolve(K, F, solver='scipy'))
                 return  spsolve(K, F, solver='scipy') 
