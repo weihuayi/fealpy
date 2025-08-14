@@ -63,25 +63,25 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
     
     def beam_stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for Timoshenko beam material."""
-        E = self.beam_E
-        mu = self.beam_mu
+        beam_E = self.beam_E
+        beam_mu = self.beam_mu
 
-        D = bm.array([[E, 0, 0],
-                      [0, mu, 0],
-                      [0, 0, mu]], dtype=bm.float64)
+        beam_D = bm.array([[beam_E, 0, 0],
+                      [0, beam_mu, 0],
+                      [0, 0, beam_mu]], dtype=bm.float64)
     
-        return D
+        return beam_D
     
     def axle_stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for axle material."""
-        E = self.axle_E
-        mu = self.axle_mu
+        axle_E = self.axle_E
+        axle_mu = self.axle_mu
 
-        D = bm.array([[E, 0, 0],
-                      [0, mu, 0],
-                      [0, 0, mu]], dtype=bm.float64)
+        axle_D = bm.array([[axle_E, 0, 0],
+                      [0, axle_mu, 0],
+                      [0, 0, axle_mu]], dtype=bm.float64)
     
-        return D
+        return axle_D
     
     def strain_matrix(self) -> TensorLike:  
         pass

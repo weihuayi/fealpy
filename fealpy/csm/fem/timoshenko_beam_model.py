@@ -55,8 +55,8 @@ class TimoshenkoBeamModel(ComputationalModel):
                 s += f"  beam_E           : {self.beam_E}\n"
                 s += f"  beam_nu          : {self.beam_nu}\n"
                 s += f"  beam_mu          : {self.beam_E/(2*(1+self.beam_nu)):.3e}\n"  # 自动算梁剪切模量
-                s += f"  beam_E           : {self.axle_E}\n"
-                s += f"  beam_mu          : {self.axle_mu}\n"
+                s += f"  axle_E           : {self.axle_E}\n"
+                s += f"  axle_mu          : {self.axle_mu}\n"
                 s += f"  geo_dimension  : {self.GD}\n"
                 s += ")"
                 self.logger.info(f"\n{s}")
