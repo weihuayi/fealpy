@@ -1,11 +1,7 @@
-from typing import Optional
-
 from fealpy.typing import Tuple, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.mesh import EdgeMesh
-
-from ...material import TimoshenkoBeamMaterial
 
 
 class TimoshenkoBeamData3D:
@@ -13,37 +9,48 @@ class TimoshenkoBeamData3D:
     3D Timoshenko beam geometry and boundary/load data container.
     """
 
-    def __init__(self, para: TensorLike=None, FSY: float=10/9, FSZ: float=10/9):
+    def __init__(self, para: TensorLike=None, 
+                 FSY: float=10/9, FSZ: float=10/9):
         """
         A data structure class representing beam parameters and properties, including geometry characteristics.
 
         Parameters:
             para(TensorLike): A list or tensor containing the axle structure parameters: [phi diameter, length, number of segments].
-            D(float): Diameter of the beam.
-            L(float): Length of the beam.
+            D(float): Diameter of the beam and lunzhou.
             FSY(float): Shear correction factor in the y-direction.
             FSZ(float): Shear correction factor in the z-direction.
+            beam_E, beam_nu: beam elastic modulus & poisson_ratio.
+            axle_E, axle_mu: axle elastic modulus & shear modulus.
             dofs_per_node(int): Each node has 6 DOFs,[u, v, w, θx, θy, θz].
         
         Notes:
             FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
         """
         
-        self.para = bm.array(para) if para is not None else bm.array([
+        # 几何参数
+        self.beam_para = bm.array([
             [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
             [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
-            [120, 141, 2], [1.976e6 , 100, 10]
-        ], dtype=bm.float64)
+            [120, 141, 2]], dtype=bm.float64)
+        self.axle_para =  bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
+    
+        #self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
         
-        self.L = float(bm.sum(self.para[:, 1]))
-        self._D = bm.repeat(self.para[:, 0], self.para[:, 2].astype(int))
+        # diameter
+        self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
+        self.axle_D = bm.repeat(self.axle_para[:, 0], self.axle_para[:, 2].astype(int))
+        
         self.FSY = FSY
         self.FSZ = FSZ
         self.dofs_per_node = 6
         self.mesh = self.init_mesh()
         
-        self.AX, self.AY, self.AZ = self.calculate_cross_sectional_areas()
-        self.Iy, self.Iz, self.Ix = self.calculate_moments_of_inertia()
+        # === 独立计算 beam 和 axle 截面 & 惯性矩 ===
+        self.beam_Ax, self.beam_Ay, self.beam_Az = self.calculate_beam_cross_section()
+        self.beam_Ix, self.beam_Iy, self.beam_Iz = self.calculate_beam_inertia()
+        
+        # self.axle_Ax, self.axle_Ay, self.axle_Az = self.calculate_axle_cross_section()
+        # self.axle_Ix, self.axle_Iy, self.axle_Iz = self.calculate_axle_inertia()
         
     def __str__(self) -> str:
         """Returns a formatted multi-line string summarizing the configuration of the 3D Timoshenko beam data.
@@ -52,39 +59,40 @@ class TimoshenkoBeamData3D:
             str: A multi-line string showing key beam parameters, geometry, and mesh info.
     """
         s = f"{self.__class__.__name__}(\n"
+        s += "  === Geometry & Mesh ===\n"
         s += f"  Total Length (L)      : {float(self.L):.3f} mm\n"
         s += f"  Diameters (D)         : {self._D.tolist()} mm\n"
         s += f"  Mesh Type             : {self.mesh.__class__.__name__}\n"
         s += f"  Number of Nodes       : {self.mesh.number_of_nodes()}\n"
         s += f"  Number of Elements    : {self.mesh.number_of_cells()}\n"
         s += f"  Geo Dimension         : {self.geo_dimension()}\n"
+        s += f"  Shear Factors     : {self.FSY}, {self.FSZ}\n"
+        s += f"  beam_Ax, beam_Ay, beam_Az : {self.beam_Ax[:5].tolist()} ...\n"
+        s += f"  beam_Ix, beam_Iy, beam_Iz : {self.beam_Ix[:5].tolist()} ...\n"
+        s += f"  axle_Ax,axle_Ay, axle_Az : {self.axle_Ax[:5].tolist()} ...\n"
+        s += f"  axle_Ix, axle_Iy, axle_Iz : {self.axle_Ix[:5].tolist()} ...\n"
         s += ")"
         return s
     
     def geo_dimension(self) -> int:
-        """Return the geometric dimension of the domain."""
+        """the geometric dimension."""
         return 3
     
-    def calculate_cross_sectional_areas(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        """Return cross-sectional areas Ax, Ay, Az."""
-        AX = bm.pi * self._D**2 / 4
-        AY = AX / self.FSY
-        AZ = AX / self.FSZ
+    def calculate_beam_cross_section(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        """Beam cross-sectional areas."""
+        beam_Ax = bm.pi * self.beam_D**2 / 4
+        beam_Ay = beam_Ax / self.FSY
+        beam_Az = beam_Ax / self.FSZ
 
-        return AX, AY, AZ
+        return beam_Ax, beam_Ay, beam_Az
     
-    def calculate_moments_of_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        """Return moments of inertia Iy, Iz, Ix."""
-        Iy  = bm.pi * self._D**4 / 64
-        Iz = Iy
-        Ix = Iy + Iz
-
-        return Ix, Iy, Iz
+    def calculate_beam_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+       """Beam moments of inertia."""
+       beam_Iy  = bm.pi * self.beam_D**4 / 64
+       beam_Iz = beam_Iy
+       beam_Ix = beam_Iy + beam_Iz
+       return beam_Ix, beam_Iy, beam_Iz
     
-    def domain(self):
-        """Return the computational domain [xmin, xmax]."""
-        return [0.0, self.L]
-
     def init_mesh(self):
         """Construct a mesh for the beam.
 

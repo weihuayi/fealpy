@@ -1,5 +1,6 @@
 import argparse
 
+
 # Argument parsing
 parser = argparse.ArgumentParser(description=
         """
@@ -22,13 +23,22 @@ parser.add_argument('--space_degree',
         default=1, type=int,
         help='Degree of Finite Element Space, default is 1')
 
-parser.add_argument('--E',
+parser.add_argument('--beam_E',
                     default=2.07e11, type=float,
-                    help='Type of mesh, default is Young modulus')
+                    help='Type of mesh, default is the beam Young modulus')
 
-parser.add_argument('--nu',
+parser.add_argument('--beam_nu',
                     default=0.276, type=float,
-                    help='Type of mesh, default is Poisson ratio')
+                    help='Type of mesh, default is the beam Poisson ratio')
+
+parser.add_argument('--axle_E',
+                    default=1.976e6, type=float,
+                    help='Type of mesh, default is the axle Young modulus')
+
+parser.add_argument('--axle_nu',
+                    default=-0.5, type=float,
+                    help='Type of mesh, default is the axle Poisson ratio')
+
 
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
@@ -46,5 +56,5 @@ bm.set_backend(options['backend'])
 from fealpy.csm.fem import TimoshenkoBeamModel
 model = TimoshenkoBeamModel(options)
 model.__str__()
-model.timo_beam_system()
+#model.timo_beam_system()
 model.solve()

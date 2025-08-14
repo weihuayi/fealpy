@@ -37,8 +37,11 @@ class TimoshenkoBeamModel(ComputationalModel):
                self.set_space_degree(options['space_degree'])
 
                self.GD = self.pde.geo_dimension()
-               self.E = options['E']
-               self.nu = options['nu']
+               self.beam_E = options['beam_E']
+               self.beam_nu = options['beam_nu']
+               self.axle_E = options['axle_E']
+               self.axle_nu = options['axle_nu']
+               
         
         def __str__(self) -> str:
                 """Returns a formatted multi-line string summarizing the configuration of the Timoshenko beam model.
@@ -49,8 +52,12 @@ class TimoshenkoBeamModel(ComputationalModel):
                 s = f"{self.__class__.__name__}(\n"
                 s += f"  pde            : {self.pde.__class__.__name__}\n"  # Assuming pde is a class object
                 s += f"  mesh           : {self.mesh.__class__.__name__}\n"  # Assuming mesh is a class object
-                s += f"  E (Elastic Modulus)   : {self.E} MPa\n"
-                s += f"  nu (Poisson Ratio)    : {self.nu}\n"
+                s += f"  beam_E           : {self.beam_E}\n"
+                s += f"  beam_nu          : {self.beam_nu}\n"
+                s += f"  beam_mu          : {self.beam_E/(2*(1+self.beam_nu)):.3e}\n"  # 自动算梁剪切模量
+                s += f"  axle_E           : {self.axle_E}\n"
+                s += f"  axle_nu          : {self.axle_nu}\n"
+                s += f"  axle_mu          : {self.axle_E/(2*(1+self.axle_nu)):.3e}\n"  # 自动算轴承剪切模量
                 s += f"  geo_dimension  : {self.GD}\n"
                 s += ")"
                 self.logger.info(f"\n{s}")
@@ -80,8 +87,8 @@ class TimoshenkoBeamModel(ComputationalModel):
 
                 TBM = TimoshenkoBeamMaterial(name="timobeam",
                                       model=self.pde, 
-                                      elastic_modulus=self.E,
-                                      poisson_ratio=self.nu)
+                                      elastic_modulus=self.beam_E,
+                                      poisson_ratio=self.beam_nu)
 
                 bform = BilinearForm(self.tspace)
                 bform.add_integrator(TimoshenkoBeamIntegrator(self.tspace, TBM))
