@@ -149,10 +149,7 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
 
     def set_init_mesh(self, mesh: Union[Mesh, str] = "uniform_tet", **kwargs):
         """
-<<<<<<< HEAD
-=======
         TODO: update this interface to set_mesh
->>>>>>> 7e7ce4751cea54a6e78e8580ac856fe77ba211c0
         """
         if isinstance(mesh, str):
             self.mesh = self.pde.init_mesh[mesh](**kwargs)
