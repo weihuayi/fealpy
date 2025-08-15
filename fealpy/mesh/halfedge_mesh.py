@@ -52,7 +52,9 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         #self.tree = None      # 网格节点构造树结构
 
         self.reinit(NN=node.shape[0], NC=NC, NV=NV)
-        self.NV = NV if NV.shape[0]==1 else None if NV.shape[0]>1 else None 
+        self.NV = None if NV is None \
+            else NV if NV.shape[0]==1 else None
+        # self.NV = NV if NV.shape[0]==1 else None if NV.shape[0]>1 else None
         #self.NV = NV  # 这里是 None
 
         self.meshtype = 'halfedge2d'
@@ -181,8 +183,8 @@ class HalfEdgeMesh2d(Mesh, Plotable):
 
     def entity(self, etype=2, index=_S):
         if etype in {'cell', 2}:
-            #return self.cell_to_node()[index]
-            return self.halfedge
+            return self.cell_to_node()[index]
+            # return self.halfedge
         elif etype in {'edge', 'face', 1}:
             return self.edge_to_node()[index]
         elif etype in {'halfedge'}:
@@ -324,12 +326,11 @@ class HalfEdgeMesh2d(Mesh, Plotable):
             pass
 
     def grad_lambda(self, index=_S):
+        assert self.NV == 3
         node = self.entity('node')
         cell = self.entity('cell')
         NC = self.number_of_cells() if index is _S else len(index)
         #NC = self.number_of_cells() if index == bm.s_[:] else len(index)
-        import ipdb
-        ipdb.set_trace()
         v0 = node[cell[index, 2]] - node[cell[index, 1]]
         v1 = node[cell[index, 0]] - node[cell[index, 2]]
         v2 = node[cell[index, 1]] - node[cell[index, 0]]
@@ -1015,6 +1016,136 @@ class HalfEdgeMesh2d(Mesh, Plotable):
         halfedge =  self.halfedge 
         isBdHEdge = halfedge[:, 4]==bm.arange(self.NHE)
         return halfedge[isBdHEdge, 1]
+
+    def to_vtk(self, fname:str=None):
+        import pyvista as pv
+
+        node = self.node
+        halfedge = self.halfedge
+        # 步骤 1: 提取唯一的单元及其顶点索引
+        cell_idx = halfedge[:, 1]  # 每条半边的单元索引
+        unique_cells = bm.unique(cell_idx[cell_idx >= 0])  # 忽略无效单元索引
+        cell_vertices = []
+
+        for cell in unique_cells:
+            # 找到属于该单元的所有半边
+            he_indices = bm.where(halfedge[:, 1] == cell)[0]
+            if len(he_indices) == 0:
+                continue
+
+            # 从第一条半边开始
+            start_he = he_indices[0]
+            vertices = []
+            current_he = start_he
+
+            # 遍历半边循环以收集顶点
+            while True:
+                vertices.append(halfedge[current_he, 0])  # 顶点索引
+                current_he = halfedge[current_he, 2]  # 下一半边
+                if current_he == start_he or current_he < 0:
+                    break  # 完成循环或遇到无效半边时停止
+
+            if len(vertices) >= 3:  # 仅包含有效多边形
+                cell_vertices.append(vertices)
+
+        # 步骤 2: 准备 PyVista 的点数据
+        # 确保点数据格式为 (NN, 3)，2D 点补 z=0
+        if node.shape[1] == 2:  # 2D 点，补 z=0
+            z = bm.zeros(len(cell_vertices)).reshape(-1, 1)
+            points = bm.concat([node, z], axis=1)  # 将 z 坐标补为 0
+        else:  # 3D 点
+            points = node
+
+        # 步骤 3: 创建 PyVista UnstructuredGrid
+        # 准备单元连接性和类型
+        cells = []
+        cell_types = []
+
+        for vertices in cell_vertices:
+            # 每个单元以顶点数量开头，后面跟顶点索引
+            cells.append(len(vertices))
+            cells.extend(vertices)
+            cell_types.append(pv.CellType.POLYGON)
+
+        # 转换为数组
+        cells = bm.array(cells, dtype=bm.int64)
+        cell_types = bm.array(cell_types, dtype=bm.uint8)
+
+        # 创建 UnstructuredGrid
+        grid = pv.UnstructuredGrid(cells, cell_types, points)
+
+        # 步骤 4: 保存为 VTU 文件
+        grid.save(fname)
+        print(f"VTU 文件已保存为 {fname}")
+
+    @classmethod
+    def from_bdf(cls, file_path:str):
+        from ..tools.bdf_reader import read_bdf_mesh
+        from collections import defaultdict
+
+        node, cell = read_bdf_mesh(file_path)
+
+        NC = len(cell)
+        face_lens = [len(f) for f in cell]
+        assert all(l in (3, 4) for l in face_lens), "Only triangles and quads supported."
+
+        half_edge_list = []
+        edge_dict = dict()  # edge -> edge_index
+        edge_to_half_edges = defaultdict(list)
+
+        edge_cnt = 0
+        half_edge_idx = 0
+
+        for c, face in enumerate(cell):
+            nf = len(face)
+            for i in range(nf):
+                v0 = face[i]
+                v1 = face[(i + 1) % nf]
+                edge = tuple(sorted((v0, v1)))
+
+                if edge not in edge_dict:
+                    edge_dict[edge] = edge_cnt
+                    edge_cnt += 1
+
+                e = edge_dict[edge]
+
+                half_edge = [-1] * 5
+                half_edge[0] = v1        # vertex
+                half_edge[1] = c         # cell id
+                half_edge_list.append(half_edge)
+                edge_to_half_edges[edge].append(half_edge_idx)
+                half_edge_idx += 1
+
+        half_edge = bm.array(half_edge_list, dtype=int)
+        ND = half_edge.shape[0]
+
+
+        offset = 0
+        for nf in face_lens:
+            for i in range(nf):
+                curr = offset + i
+                next_ = offset + (i + 1) % nf
+                pre_ = offset + (i - 1) % nf
+                half_edge[curr][2] = next_  # next half-edge index
+                half_edge[curr][3] = pre_   # previous half-edge index
+
+            offset += nf
+
+        for dart_indices in edge_to_half_edges.values():
+            if len(dart_indices) == 2:
+                d0, d1 = dart_indices
+                half_edge[d0][4] = d1  # opposite half-edge index
+                half_edge[d1][4] = d0
+
+            elif len(dart_indices) == 1:
+                d = dart_indices[0]
+                half_edge[d][4] = d  # boundary edge
+            else:
+                # warn: non-manifold edge
+                for d in dart_indices:
+                    half_edge[d][5] = -1
+
+        return cls(node, half_edge)
 
 
 

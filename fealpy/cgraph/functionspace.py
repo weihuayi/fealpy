@@ -1,9 +1,12 @@
 from typing import Type
-import importlib
 
-from ..functionspace import Function
-from .base import Node
+from .nodetype import CNodeType, PortConf, DataType
 
+__all__ = [
+    "FunctionSpace",
+    "BoundaryDof",
+    "FEFunction"
+]
 
 SPACE_CLASSES = {
     "bernstein": ("bernstein_fe_space", "BernsteinFESpace"),
@@ -12,32 +15,59 @@ SPACE_CLASSES = {
 
 
 def get_space_class(space_type: str) -> Type:
+    import importlib
     m = importlib.import_module(
         f"fealpy.functionspace.{SPACE_CLASSES[space_type][0]}"
     )
     return getattr(m, SPACE_CLASSES[space_type][1])
 
 
-class FunctionSpace(Node):
-    def __init__(self, space_type: str, ctype: str = "C"):
-        super().__init__()
-        self.SpaceClass = get_space_class(space_type)
-        self.add_input("mesh")
-        self.add_input("p", default=1)
-        self.add_output("space")
-        self.kwargs = {"ctype": ctype}
+class FunctionSpace(CNodeType):
+    TITLE: str = "Function Space"
+    PATH: str = "space.creation"
+    INPUT_SLOTS = [
+        PortConf("type", DataType.MENU, 0, param="space_type", default="lagrange", items=["lagrange", "bernstein"]),
+        PortConf("mesh", DataType.MESH, 1),
+        PortConf("p", DataType.INT, 1)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("space", DataType.SPACE)
+    ]
 
-    def run(self, mesh, p):
-        return self.SpaceClass(mesh, p, **self.kwargs)
+    @staticmethod
+    def run(space_type: str, mesh, p):
+        SpaceClass = get_space_class(space_type)
+        return SpaceClass(mesh, p)
 
 
-class TensorToFEFunction(Node):
-    def __init__(self, coordtype: str = 'barycentric'):
-        super().__init__()
-        self.coordtype = coordtype
-        self.add_input("tensor")
-        self.add_input("space")
-        self.add_output("out")
+class BoundaryDof(CNodeType):
+    TITLE: str = "Boundary Dof"
+    PATH: str = "space.ops"
+    INPUT_SLOTS = [
+        PortConf("space", DataType.SPACE),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("isDDof", DataType.TENSOR)
+    ]
 
-    def run(self, tensor, space):
-        return Function(space, tensor, coordtype=self.coordtype)
+    @staticmethod
+    def run(space):
+        return space.is_boundary_dof()
+
+
+class FEFunction(CNodeType):
+    TITLE: str = "FE Function"
+    PATH: str = "space"
+    INPUT_SLOTS = [
+        PortConf("tensor", DataType.TENSOR),
+        PortConf("space", DataType.SPACE),
+        PortConf("coordtype", DataType.MENU, 0, items=['barycentric', 'cartesian']),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("function", DataType.FUNCTION)
+    ]
+
+    @staticmethod
+    def run(tensor, space, coordtype):
+        from ..functionspace import Function
+        return Function(space, tensor, coordtype=coordtype)

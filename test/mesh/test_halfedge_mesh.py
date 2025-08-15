@@ -367,6 +367,12 @@ class TestHalfEdgeMesh():
         grad_shape_u = grad_shape_u.transpose(1,0,2)
         np.testing.assert_allclose(data['grad_shape_u'], grad_shape_u, atol=1e-12)
 
+    def test_from_bdf_and_to_vtk(self):
+        file_path = 'Sheet_Metal_20250717_Before_Opt_v2.bdf'
+
+        half_edge_mesh = HalfEdgeMesh2d.from_bdf(file_path)
+        half_edge_mesh.to_vtk(fname="halfedge_mesh.vtu")
+
  
 if __name__ == "__main__":
     pytest.main(["-v", "test_halfedge_mesh.py","-k","test_init"])

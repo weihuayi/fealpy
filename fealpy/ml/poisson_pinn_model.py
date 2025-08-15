@@ -6,7 +6,7 @@ from torch.optim.lr_scheduler import StepLR
 from ..backend import bm
 from typing import Union, Optional
 from ..typing import TensorLike
-from ..model import ComputationalModel, PDEDataManager
+from ..model import ComputationalModel, PDEModelManager
 from ..model.poisson import PoissonPDEDataT
 from . import gradient
 from ..mesh import TriangleMesh, UniformMesh
@@ -144,7 +144,7 @@ class PoissonPINNModel(ComputationalModel):
                 Defaults to 'sin' example problem.
         """
         if isinstance(pde, str):
-            self.pde = PDEDataManager('poisson').get_example(pde)
+            self.pde = PDEModelManager('poisson').get_example(pde)
         else:
             self.pde = pde 
 
