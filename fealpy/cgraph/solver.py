@@ -1,17 +1,23 @@
 
-from ..backend import TensorLike as _DT
-from ..solver import cg
-from .base import Node
+from .nodetype import CNodeType, PortConf, DataType
+
+__all__ = ["CGSolver"]
 
 
-class CGSolver(Node):
-    def __init__(self, **kwargs):
-        super().__init__()
-        self._kwargs = kwargs
-        self.add_input("A")
-        self.add_input("b")
-        self.add_input("x0", default=None)
-        self.add_output("out")
+class CGSolver(CNodeType):
+    TITLE: str = "CG Solver"
+    PATH: str = "solver.iterative"
+    INPUT_SLOTS = [
+        PortConf("A", DataType.LINOPS),
+        PortConf("b", DataType.TENSOR),
+        PortConf("x0", DataType.TENSOR, default=None),
+        PortConf("maxit", DataType.INT, default=10000, min_val=1)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("out", DataType.TENSOR)
+    ]
 
-    def run(self, A, b, x0=None) -> _DT:
-        return cg(A, b, x0, **self._kwargs)
+    @staticmethod
+    def run(*args, **kwargs):
+        from ..solver import cg
+        return cg(*args, **kwargs)

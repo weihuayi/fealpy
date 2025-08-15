@@ -256,7 +256,7 @@ class LinearElasticMaterial(ElasticMaterial):
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the material."""
         return (
-            f"Material '{self.name}':\n"
+            f"\n  Material '{self.name}':\n"
             f"  E (Young's modulus):      {self.E:.3g}\n"
             f"  ν (Poisson's ratio):      {self.nu:.3g}\n"
             f"  λ (Lame's first param):   {self.lam:.3g}\n"

@@ -1,6 +1,7 @@
-from typing import Tuple, Type
+from typing import Type
 import importlib
-from ..base import Node
+
+from ..nodetype import CNodeType, PortConf, DataType
 
 
 def get_mesh_class(mesh_type: str) -> Type:
@@ -9,42 +10,34 @@ def get_mesh_class(mesh_type: str) -> Type:
     return getattr(m, mesh_class_name)
 
 
-class Box2d(Node):
+class Box2d(CNodeType):
     r"""Create a mesh in a box-shaped 2D area.
 
-    Args:
-        mesh_type (str): Type of mesh to granerate.
-        itype (dtype | None, optional): Scalar type of integers.
-        ftype (dtype | None, optional): Scalar type of floats.
-        device (device | None, optional): Device.
-
     Inputs:
-        xmin, xmax, ymin, ymax (float, optional): Area.
+        mesh_type (str): Type of mesh to granerate.
+        domain (tuple[float, float, float, float], optional): Domain.
         nx (int, optional): Segments on x direction.
         ny (int, optional): Segments on y direction.
 
     Outputs:
         mesh (MeshType): The mesh object created.
     """
-    def __init__(
-        self,
-        mesh_type: str,
-        *,
-        itype=None,
-        ftype=None,
-        device=None
-    ):
-        super().__init__()
-        self.MeshClass = get_mesh_class(mesh_type)
-        self.kwargs = {"device": device, "itype": itype, "ftype": ftype}
-        self.add_input("xmin", default=0.)
-        self.add_input("xmax", default=1.)
-        self.add_input("ymin", default=0.)
-        self.add_input("ymax", default=1.)
-        self.add_input("nx", default=10)
-        self.add_input("ny", default=10)
-        self.add_output("mesh")
+    TITLE: str = "Box 2D"
+    PATH: str = "mesh.creation"
+    INPUT_SLOTS = [
+        PortConf("mesh_type", DataType.MENU, 0, default="triangle", items=["triangle", "quadrangle"]),
+        PortConf("domain", DataType.NONE),
+        PortConf("nx", DataType.INT, default=10, min_val=1),
+        PortConf("ny", DataType.INT, default=10, min_val=1)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH)
+    ]
 
-    def run(self, xmin, xmax, ymin, ymax, nx, ny):
-        domain = [xmin, xmax, ymin, ymax]
-        return self.MeshClass.from_box(domain, nx=nx, ny=ny, **self.kwargs)
+    @staticmethod
+    def run(mesh_type, domain, nx, ny):
+        MeshClass = get_mesh_class(mesh_type)
+        kwds = {"nx": nx, "ny": ny}
+        if domain is not None:
+            kwds["box"] = domain
+        return MeshClass.from_box(**kwds)
