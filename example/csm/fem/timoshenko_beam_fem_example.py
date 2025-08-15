@@ -56,5 +56,6 @@ bm.set_backend(options['backend'])
 from fealpy.csm.fem import TimoshenkoBeamModel
 model = TimoshenkoBeamModel(options)
 model.__str__()
-#model.timo_beam_system()
+# model.timo_beam_system()
 model.solve()
+# print("u", model.solve())

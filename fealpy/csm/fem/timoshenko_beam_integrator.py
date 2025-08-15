@@ -43,7 +43,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         T11 = (x[..., 1] - x[..., 0]) / bars_length
         T12 = (y[..., 1] - y[..., 0]) / bars_length
         T13 = (z[..., 1] - z[..., 0]) / bars_length
-        
+
         # 固定的参考向量 (全局y方向)
         vy = bm.array([0, 1, 0], dtype=bm.float64)
         k1, k2, k3 = vy
@@ -110,7 +110,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
         # 坐标变换矩阵
         R = self._coord_transfrom()
-
+        
         return beam_E, beam_mu, l, beam_Ax, beam_Ay, beam_Az, beam_Ix, beam_Iy, beam_Iz, R
 
     @variantmethod

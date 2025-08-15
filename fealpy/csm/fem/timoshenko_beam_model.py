@@ -12,7 +12,7 @@ from fealpy.functionspace import (
         )
 from fealpy.fem import (
         BilinearForm,LinearForm,
-        ScalarSourceIntegrator,
+        VectorSourceIntegrator,
         DirichletBC
         )
 from fealpy.solver import spsolve, cg
@@ -92,8 +92,11 @@ class TimoshenkoBeamModel(ComputationalModel):
 
                 bform = BilinearForm(self.tspace)
                 bform.add_integrator(TimoshenkoBeamIntegrator(self.tspace, TBM))
-                
                 K = bform.assembly()
+                
+                # lform = LinearForm(self.tspace)
+                # lform.add_integrator(VectorSourceIntegrator(self.tspace, self.pde.body_force))
+                # F = lform.assembly()
                 F = self.pde.external_load()
 
                 return K, F
@@ -111,9 +114,26 @@ class TimoshenkoBeamModel(ComputationalModel):
                                 threshold=threshold).apply(K, F)
                 return K, F
         
-        
+        def apply_bc_penalty(self, K, F):
+                """Apply Dirichlet boundary conditions using Penalty Method."""
+                penalty = 1e20
+                K = K.toarray()
+                
+                fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
+                print("fixed_dofs", fixed_dofs)
+                
+                for dof in fixed_dofs:
+                        K[dof, dof] *= penalty
+                        F[dof] *= penalty
+                
+                return K, F
+
+
         @variantmethod("direct")
         def solve(self):
                 K, F = self.timo_beam_system()
+                # print(type(K), type(F))
                 K, F = self.apply_bc(K, F)
-                return  spsolve(K, F, solver='scipy') 
+                # K, F = self.apply_bc_penalty(K, F)
+                #print(type(K), type(F))
+                return  spsolve(K, F, solver='scipy')  
