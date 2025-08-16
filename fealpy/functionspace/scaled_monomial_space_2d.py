@@ -20,7 +20,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     """
     The Scaled Monomial Space in R^2
     """
-    def __init__(self, mesh, p, q=None, bc=None):
+    def __init__(self, mesh: _MT, p: int, q: int = None, bc: Optional[TensorLike] = None):
         """
         Parameters:
            mesh: Mesh 
@@ -328,23 +328,12 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         idx = self.diff_index_1(p=p)
         xidx = idx['x']
         yidx = idx['y']
-        gphi = bm.set_at(gphi, (..., xidx[0], 0),
-                         bm.einsum('i, ...i->...i', xidx[1], phi))
-        gphi = bm.set_at(gphi, (..., yidx[0], 1),
-                         bm.einsum('i, ...i->...i', yidx[1], phi))
+        gphi = bm.set_at(gphi, (..., xidx[0], 0), bm.einsum('i, ...i->...i', xidx[1], phi))
+        gphi = bm.set_at(gphi, (..., yidx[0], 1), bm.einsum('i, ...i->...i', yidx[1], phi))
         if scaled:
             return gphi/h[index].reshape((-1,)+(1,)*int(gphi.ndim-1))
         else:
             return gphi
-
-
-        #if scaled:
-        #    if point.shape[-2] == num:
-        #        return gphi/h[index].reshape(-1, 1, 1)
-        #    elif point.shape[0] == num:
-        #        return gphi/h[index].reshape(-1, 1, 1, 1)
-        #else:
-        #    return gphi
 
     @cartesian
     def laplace_basis(self, point, index=_S, p=None, scaled=True):
@@ -438,7 +427,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
     def partial_matrix(self, p=None, index=_S):
         """
         Compute the partial derivative matrix. It is a linear mapping.
-        \partial m = mP 
+        partial m = mP 
         
         Parameters:
             p : int, optional

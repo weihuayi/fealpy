@@ -4,19 +4,16 @@ from ...backend import TensorLike
 from ...backend import backend_manager as bm
 from ...mesher import BoxMesher3d
 
-class Exp0004(BoxMesher3d):
+class Exp0006(BoxMesher3d):
     """
     2D parabolic problem with space-time FEM:
 
-        ∂u/∂t - (∂²u/∂x² + ∂²u/∂y²) = f   (x, y) ∈ (0, 1) x (0, 1), t > 0
+        ∂u/∂t - (∂²u/∂x² + ∂²u/∂y²) + b · ∇u = 1   (x, y) ∈ (0, 1) x (0, 1), t > 0
 
         u(x, 0, t) = u(x, 1, t) = 0,         x ∈ (0, 1), t > 0
         u(0, y, t) = u(1, y, t) = 0,         y ∈ (0, 1), t > 0
-        u(x, y, 0) = sin(πx)·sin(πy),     (x, y) ∈ (0, 1) x (0, 1)
+        u(x, y, 0) = 0,     (x, y) ∈ (0, 1) x (0, 1)
     
-    Exact solution:
-        u(x, y, t) = sin(πx)·sin(πy)·exp(-t)
-        f(x, y, t) = -exp(-t)·sin(πx)·sin(πy) + 2π²·exp(-t)·sin(πx)·sin(πy)
     This example imposes homogeneous Dirichlet boundary conditions on all four edges.
     It is useful for verifying time-dependent solvers with space-time FEM in 2D.
     """
@@ -40,13 +37,16 @@ class Exp0004(BoxMesher3d):
     @cartesian
     def diffusion_coef(self, p: TensorLike = None) -> float:
         """Return the diffusion coefficient (constant in this case)."""
-        return 1.0
+        return 0.3
 
     @cartesian
     def convection_coef(self, p: TensorLike = None) -> TensorLike:
         """Return the convection coefficient (zero in this case)."""
-        gd = self.geo_dimension()
-        b = bm.zeros((gd-1), dtype=bm.float64)
+        t = p[...,-1]
+        shape = p[..., :-1].shape
+        b = bm.zeros(shape, dtype=bm.float64)
+        bx = 100*bm.sin(6*bm.pi*t)
+        b = bm.set_at(b, (..., 0), bx)
         return b
 
     @cartesian
@@ -56,43 +56,28 @@ class Exp0004(BoxMesher3d):
 
     @cartesian
     def init_solution(self, p: TensorLike) -> TensorLike:
-        x = p[..., 0]
-        y = p[..., 1]
-        return bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
+        return bm.zeros(p.shape[:-1], dtype=bm.float64)
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution at time t. """
-        x = p[..., 0]
-        y = p[..., 1]
-        t = p[..., 2]
-        return bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * bm.exp(-t)
+        pass
 
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """Compute spatial gradient of solution at time t."""
-        x = p[..., 0]
-        y = p[..., 1]
-        t = p[..., 2]
-        factor = bm.exp(-t)
-        gx = bm.pi * bm.cos(bm.pi * x) * bm.sin(bm.pi * y) * factor
-        gy = bm.pi * bm.sin(bm.pi * x) * bm.cos(bm.pi * y) * factor
-        gt = -bm.sin(bm.pi * x) * bm.sin(bm.pi * y) * factor
-        return bm.stack([gx, gy, gt], axis=-1)  # shape (..., 3)
+        pass
     
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source at time t. """
-        x = p[..., 0]
-        y = p[..., 1]
-        t = p[..., 2]
-        return (2 * bm.pi ** 2 - 1) * bm.exp(-t) * bm.sin(bm.pi * x) * bm.sin(bm.pi * y)
-    
+        return bm.ones(p.shape , dtype=bm.float64)
+
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         """Dirichlet boundary condition"""
-        return self.solution(p)
-    
+        return bm.zeros(p.shape[:-1], dtype=bm.float64)
+
     @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
