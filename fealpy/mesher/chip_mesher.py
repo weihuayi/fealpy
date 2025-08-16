@@ -33,29 +33,29 @@ class ChipMesher:
         if not options:
             self.options = self.get_options()
 
-        def parse_opt(opt):
-            """If the input is a string, try to convert it to a Python object.
-
-            Parameters
-                opt : Any
-                    Input value, possibly a string representing a Python literal.
-
-            Returns
-                Any
-                    Parsed Python object or the original value.
-            """
-            if isinstance(opt, str):
-                try:
-                    return ast.literal_eval(opt)
-                except Exception:
-                    return opt
-            return opt
-
-        self.options['return_mesh'] = parse_opt(self.options.get('return_mesh'))
-        self.options['show_figure'] = parse_opt(self.options.get('show_figure'))
+        self.options['return_mesh'] = self._parse_opt(self.options.get('return_mesh'))
+        self.options['show_figure'] = self._parse_opt(self.options.get('show_figure'))
 
         self.box = self.options['box']
         self.generate()
+    
+    def _parse_opt(self, opt):
+        """If the input is a string, try to convert it to a Python object.
+
+        Parameters
+            opt : Any
+                Input value, possibly a string representing a Python literal.
+
+        Returns
+            Any
+                Parsed Python object or the original value.
+        """
+        if isinstance(opt, str):
+            try:
+                return ast.literal_eval(opt)
+            except Exception:
+                return opt
+        return opt
     
     def get_options(self) -> dict:
         options = {
@@ -74,6 +74,66 @@ class ChipMesher:
         return options
     
     def generate(self):
+        """生成网格（拆分成三部分）"""
+        method = self.options['hole_method']
+        self._generate_holes[method]()  # 孔洞排序
+        self._generate_gmsh_geometry()  # GMSH建模
+        self._generate_mesh()  # 网格剖分
+
+    @variantmethod("tilted")
+    def _generate_holes(self):
+        option = self.options
+        box = option['box']
+        center = option['center']
+        r = option['radius']
+        l1 = option['l1']
+        l2 = option['l2']
+        h = option['h']
+        x0, x1, y0, y1 = box
+        cx0, cy0 = center
+
+        centers = []
+
+        x_min = x0 - 2 * r
+        x_max = x1 + 2 * r
+        y_min = y0 - 2 * r
+        y_max = y1 + 2 * r
+
+        col_idx = 0
+        x = cx0
+        while x <= x_max:
+            y_start = cy0 + col_idx * h
+            y_up = y_start
+            y_down = y_start - l1
+            while y_up <= y_max:
+                if not (x + r < x0 or x - r > x1 or y_up + r < y0 or y_up - r > y1):
+                    centers.append((x, y_up))
+                y_up += l1
+            while y_down >= y_min:
+                if not (x + r < x0 or x - r > x1 or y_down + r < y0 or y_down - r > y1):
+                    centers.append((x, y_down))
+                y_down -= l1
+            x += l2
+            col_idx += 1
+
+        self.centers = centers
+
+    @_generate_holes.register("aligned")
+    def _generate_holes(self):
+        option = self.options
+        box = option['box']
+        m = option['m']  
+        n = option['n']  
+        x0, x1, y0, y1 = box
+
+        x_vals = bm.linspace(x0, x1, m + 2)[1:-1]
+        y_vals = bm.linspace(y0, y1, n + 2)[1:-1]
+        x_grid, y_grid = bm.meshgrid(x_vals, y_vals)
+
+        centers = bm.stack((x_grid.ravel(), y_grid.ravel())).T
+        self.centers = centers
+
+    def _generate_gmsh_geometry(self):
         option = self.options
         self.box = option['box']
         self.center = option['center']
@@ -84,9 +144,6 @@ class ChipMesher:
         self.lc = option['lc'] 
         self.hole_lc = option['hole_lc'] 
 
-        return_mesh = option['return_mesh']
-        show_figure = option['show_figure']
-
         gmsh.initialize()
         gmsh.model.add("chip")
         
@@ -94,8 +151,6 @@ class ChipMesher:
         x0, x1, y0, y1 = self.box
         rectangle = gmsh.model.occ.addRectangle(x0, y0, 0, x1 - x0, y1 - y0)
 
-        # 生成圆形孔洞的中心位置
-        self.centers = self.generate_circle_centers(self.box, self.center, self.l1, self.l2, self.h)
         circle_tags = []
         for cx, cy in self.centers:
             circle = gmsh.model.occ.addDisk(cx, cy, 0, self.r, self.r)
@@ -103,7 +158,12 @@ class ChipMesher:
 
         gmsh.model.occ.cut([(2, rectangle)], [(2, tag) for tag in circle_tags], removeObject=True, removeTool=True)
         gmsh.model.occ.synchronize()
-
+    
+    def _generate_mesh(self):
+        option = self.options
+        return_mesh = option['return_mesh']
+        show_figure = option['show_figure']
+    
         # 定义距离场，用于孔洞附近网格加密
         f_dist = gmsh.model.mesh.field.add("Distance")
         circle_edges = []
@@ -131,17 +191,17 @@ class ChipMesher:
 
         if return_mesh:
             node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-            node = node_coords.reshape((-1, 3))[:, :2]
+            node = bm.from_numpy(node_coords.reshape((-1, 3))[:, :2])
             nodetags_map = dict({j: i for i, j in enumerate(node_tags)})
             cell_type = 2
             cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
 
             evid = bm.array([nodetags_map[j] for j in cell_connectivity])
             cell = evid.reshape((cell_tags.shape[-1], -1))
-
-            unique, inverse = bm.unique(cell, return_inverse=True)
+            
+            unique, inverse = bm.unique(cell.ravel(), return_inverse=True)
             new_cell = inverse.reshape(cell.shape)
-
+            bm.copy(node)
             self.mesh = TriangleMesh(node[unique], new_cell)
 
         if show_figure:
@@ -150,33 +210,3 @@ class ChipMesher:
             gmsh.fltk.run()
 
         gmsh.finalize()
-
-    def generate_circle_centers(self, box, center, l1, l2, h):
-        x0, x1, y0, y1 = box
-        cx0, cy0 = center
-        r = self.r
-
-        centers = []
-
-        x_min = x0 - 2 * r
-        x_max = x1 + 2 * r
-        y_min = y0 - 2 * r
-        y_max = y1 + 2 * r
-
-        col_idx = 0
-        x = cx0
-        while x <= x_max:
-            y_start = cy0 + col_idx * h
-            y_up = y_start
-            y_down = y_start - l1
-            while y_up <= y_max:
-                if not (x + r < x0 or x - r > x1 or y_up + r < y0 or y_up - r > y1):
-                    centers.append((x, y_up))
-                y_up += l1
-            while y_down >= y_min:
-                if not (x + r < x0 or x - r > x1 or y_down + r < y0 or y_down - r > y1):
-                    centers.append((x, y_down))
-                y_down -= l1
-            x += l2
-            col_idx += 1
-        return centers
