@@ -19,10 +19,7 @@ class FromSympy(BoxMesher2d):
         self.mu = mu
         self.rho = rho
         self.x, self.y, self.t = sp.symbols('x, y, t')
-        self.select_pde["polycos"]()
-    
-
-    
+        self.select_pde["polycos"]() 
 
     @variantmethod("polycos")
     def select_pde(self):

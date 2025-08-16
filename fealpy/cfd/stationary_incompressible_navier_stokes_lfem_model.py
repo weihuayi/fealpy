@@ -70,15 +70,13 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         
         if mesh is None:
             if hasattr(pde, 'init_mesh'):
-                self.mesh = pde.init_mesh(nx=8, ny=8)
+                self.mesh = pde.init_mesh()
             else:
                 raise ValueError("Not found mesh!")
         else:
             self.mesh = mesh
         
         self.fem = self.method()
-        
-
         if options is not None:
             self.solve.set(options['solve'])
             self.fem = self.method[options['method']]()
