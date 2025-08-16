@@ -1,7 +1,6 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.cfd.model import CFDTestModelManager
-from fealpy.cfd.incompressible_navier_stokes_lfem_2d_model import IncompressibleNSLFEM2DModel
 import argparse
+
+from fealpy.backend import backend_manager as bm
 
 
 parser = argparse.ArgumentParser(description=
@@ -88,8 +87,13 @@ parser.add_argument('--tol',
 # 解析参数
 options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
+
+from fealpy.cfd.model import CFDTestModelManager
+from fealpy.cfd.incompressible_navier_stokes_lfem_2d_model import IncompressibleNSLFEM2DModel
+
 manager = CFDTestModelManager('incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 model = IncompressibleNSLFEM2DModel(pde, options = options)
 model.run()
 model.__str__()
+
