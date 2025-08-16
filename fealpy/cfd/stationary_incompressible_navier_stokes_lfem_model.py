@@ -70,7 +70,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         
         if mesh is None:
             if hasattr(pde, 'init_mesh'):
-                self.mesh = pde.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
+                self.mesh = pde.init_mesh(nx=8, ny=8)
             else:
                 raise ValueError("Not found mesh!")
         else:
@@ -86,6 +86,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             self.maxit = options.get('maxit', 5)
             self.maxstep = options.get('maxstep', 10)
             self.tol = options.get('tol', 1e-10)
+            self.mesh = pde.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
             # self.apply_bc = self.apply_bc[options['apply_bc']]
 
 
