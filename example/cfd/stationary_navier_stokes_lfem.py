@@ -34,7 +34,7 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--box',
-    default = [0.0, 3e-3, 0.0, 2e-3], type=int,
+    default = [0.0, 7e-3, 0.0, 2e-3], type=int,
     help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
 
 parser.add_argument('--center',
@@ -46,7 +46,7 @@ parser.add_argument('--start_center',
     help="N")
 
 parser.add_argument('--radius',
-    default = 1e-4, type=int,
+    default = 0.7e-4, type=int,
     help="Radius of the circles, default is 0.029.")
 
 # parser.add_argument('--nx',
@@ -94,10 +94,10 @@ parser.add_argument('--hole_lc',
     help="Mesh size, default is 0.006")
 
 parser.add_argument('--m',
-    default = 10, type=float,
+    default = 7, type=float,
     help="Number of divisions in the x direction, default is 10")
 parser.add_argument('--n',
-    default = 10, type=float,
+    default = 7, type=float,
     help="Number of divisions in the y direction, default is 10")
 parser.add_argument('--hole_method',
     default = 'aligned', type=str,
