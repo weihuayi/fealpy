@@ -13,7 +13,7 @@ def output(mesh, value, path='./', name='result.vtu'):
     for var_name, value in value.items():
         value_space = value.space
         if isinstance(value_space, TensorFunctionSpace):
-            mesh.nodedata[var_name] = value.reshape(value.shape).T
+            mesh.nodedata[var_name] = value.reshape(value_space.shape).T
         else:
             mesh.nodedata[var_name] = value
 
