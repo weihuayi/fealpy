@@ -1,7 +1,6 @@
 from typing import Union, Dict
 from fealpy.backend import backend_manager as bm
-from ....functionspace.space import FunctionSpace
-from ....functionspace import LagrangeFESpace, TensorFunctionSpace
+from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace, FunctionSpace
 
 class FEMParameters:
     """全局有限元默认参数基类"""
@@ -49,9 +48,9 @@ class FEMParameters:
 
 
 class FEM:
-    def __init__(self, equation, params: FEMParameters = None):
+    def __init__(self, equation, mesh, params: FEMParameters = None):
         self.equation = equation
-        self.mesh = equation.pde.mesh
+        self.mesh = mesh
         self.params = params if params else FEMParameters()         
         self.set = self.Set(self)
         
@@ -60,8 +59,7 @@ class FEM:
         self._uspace = TensorFunctionSpace(uspace, (self.mesh.GD,-1))
         self._tspace = self._create_space('tspace') 
         
-        self._q = self.params.assembly['quadrature_order']
-
+        self._q = self.params.assembly['quadrature_order'] 
     
     def update_mesh(self, mesh):
         self.mesh = mesh
@@ -92,6 +90,7 @@ class FEM:
             return LagrangeFESpace(self.mesh, p=config['p'])
         # 其他空间类型...
         raise ValueError(f"不支持的空间类型: {space_type}")  
+    
 
     class Set:
         """参数设置子类（同步修改参数和空间）"""
