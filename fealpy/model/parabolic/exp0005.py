@@ -5,7 +5,7 @@ from ...backend import backend_manager as bm
 from ...mesher import BoxMesher2d
 from ...typing import Union
 
-class Exp0003(BoxMesher2d):
+class Exp0005(BoxMesher2d):
     """
     1D parabolic problem with space-time FEM:
 
@@ -15,16 +15,17 @@ class Exp0003(BoxMesher2d):
 
     Exact solution:
 
-        u(x, t) = cos(πt)·sin(πx)
-        f(x, t) = (π²·cos(πt) - π·sin(πt))·sin(πx)
+        u(x, t) = (1-t)^(alpha)·sin(πx)
+        f(x, t) = (π²-alpha/(1-t))·(1-t)^alpha·sin(πx)
 
     This example imposes homogeneous Dirichlet boundary conditions at both ends.
     It is useful for testing time-dependent solvers with space-time FEM.
     """
     def __init__(self):
-        self.interval = [0.0, 1.0]
-        self.duration = [0.0, 1.0]
-        super().__init__(box=self.interval + self.duration)
+        interval = [0.0, 1.0]
+        duration = [0.0, 1.0]
+        self.alpha = 0.75           # we take alpha = 0.75 as in the paper
+        super().__init__(box=interval + duration)
 
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
@@ -32,7 +33,7 @@ class Exp0003(BoxMesher2d):
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax]."""
-        return self.interval
+        return [0.0, 1.0]
 
     def duration(self) -> Sequence[float]:
         """the time interval [t0, t1]."""
@@ -64,8 +65,8 @@ class Exp0003(BoxMesher2d):
         """Compute exact solution at time t. """
         x = p[..., 0]
         t = p[..., 1]
-        return bm.sin(bm.pi * x) * bm.cos(bm.pi * t)
-
+        return (1-t)**self.alpha * bm.sin(bm.pi * x)
+    
     @cartesian
     def gradient(self, p: TensorLike) -> TensorLike:
         """
@@ -75,10 +76,10 @@ class Exp0003(BoxMesher2d):
         """
         x = p[..., 0]
         t = p[..., 1]
-        g_x = bm.pi * bm.cos(bm.pi * x) * bm.cos(bm.pi * t)
-        g_t = -bm.pi * bm.sin(bm.pi * x) * bm.sin(bm.pi * t)
+        g_x = (1-t)**self.alpha * bm.pi * bm.cos(bm.pi * x)
+        g_t = -self.alpha * (1 - t)**(self.alpha-1) * bm.sin(bm.pi * x)
         return bm.stack([g_x, g_t], axis=-1)
-    
+
     @cartesian
     def sl_solution(self, p: Union[TensorLike, float], t: Union[float, TensorLike]) -> TensorLike:
         """Compute exact solution at time t. """
@@ -90,26 +91,28 @@ class Exp0003(BoxMesher2d):
             t = t[..., 0]
         else:
             t = t
-        return bm.sin(bm.pi * x) * bm.cos(bm.pi * t)
-    
+        return (1-t)**self.alpha * bm.sin(bm.pi * x)
+
     @cartesian
     def sl_gradient(self, p: Union[TensorLike, float], t: Union[float, TensorLike]) -> TensorLike:
         """Compute exact solution at time t. """
         if isinstance(p, TensorLike):
             x = p[..., 0]
             t = t
-            return bm.pi * bm.cos(bm.pi * x) * bm.cos(bm.pi * t)
+            return (1-t)**self.alpha * bm.pi * bm.cos(bm.pi * x)
         if isinstance(t, TensorLike):
             t = t[..., 0]
             x = p
-            return -bm.pi * bm.sin(bm.pi * x) * bm.sin(bm.pi * t)
+            return -self.alpha * (1-t)**(self.alpha-1) * bm.sin(bm.pi * x)
     
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
         """Compute exact source at time t. """
         x = p[..., 0]
         t = p[..., 1]
-        return (bm.pi ** 2 * bm.cos(bm.pi * t) - bm.pi * bm.sin(bm.pi * t)) * bm.sin(bm.pi * x)
+        term1 = -self.alpha * (1 - t)**(self.alpha - 1) * bm.sin(bm.pi * x)
+        term2 = (bm.pi**2) * (1 - t)**self.alpha * bm.sin(bm.pi * x)
+        return term1 + term2
 
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:

@@ -154,7 +154,7 @@ class ParabolicSTFEMModel(ComputationalModel):
         pde = self.pde
         threshold_space = pde.is_dirichlet_boundary
         threshold_time = pde.is_init_boundary
-        gd_space = pde.solution
+        gd_space = pde.dirichlet
         gd_time = pde.init_solution
 
         bc_space = DirichletBC(space=space, gd=gd_space, threshold=threshold_space)
@@ -200,16 +200,28 @@ class ParabolicSTFEMModel(ComputationalModel):
                          f" and relative residual {stop_res:.4e}")
         return uh
     
+    @solve.register("lgmres")
+    def solve(self,A,b):
+        from ..solver import lgmres
+        uh, info = lgmres(A, b, maxit=10000, atol=1e-14, rtol=1e-14)
+        res = info['residual']
+        res_0 = bm.linalg.norm(b)
+        stop_res = res/res_0
+        self.logger.info(f"LGMRES solver with {info['niter']} iterations"
+                         f" and relative residual {stop_res:.4e}")
+        return uh
+
     @variantmethod
-    def run(self):
+    def run(self,show_error=True):
         A, b = self.linear_system()
         A, b = self.apply_bc(A, b)
         self.uh[:] = self.solve(A, b)
         self.logger.info("Run completed.")
-        l2 , h1 = self.error()
-        self.logger.info(f"L2 Error: {l2}, H1 Error: {h1}.")
+        if show_error:
+            l2 , h1 = self.error()
+            self.logger.info(f"L2 Error: {l2}, H1 Error: {h1}.")
 
-    @run.register("uniform_refine")
+    @run.register("refine")
     def run(self,maxit=4,plot_error=False):
         """
         Run the model with uniform mesh refinement.
@@ -227,16 +239,30 @@ class ParabolicSTFEMModel(ComputationalModel):
             error_matrix[i,1] = h1
             if i < maxit - 1:
                 self.logger.info(f"Refining mesh {i+1}/{maxit}.")
-                self.mesh.uniform_refine()
+                ms = self.options['mesh_size']
+                if 'nz' in ms:              # 3D (or has z direction)
+                    ms['ny'] *= 2
+                    ms['nx'] *= 2
+                    ms['nz'] = int(ms['nx']**2*1.2)
+                else:
+                    ms['nx'] *= 2
+                    ms['ny'] = int(ms['nx']**2*1.2)
+                self.mesh = self.pde.init_mesh[self.options['init_mesh']](**ms)
+                self.space = LagrangeFESpace(self.mesh, p=self.p)
                 self.uh = self.space.function()
         if plot_error:
             self.show_order(error_matrix,maxit)
 
     def error(self):
-        l2 = self.mesh.error(self.pde.solution, self.uh,q = self.q)
-        h1 = self.mesh.error(self.pde.gradient, self.uh.grad_value,q = self.q)
+        gradient = lambda p : self.pde.gradient(p)[...,:-1]
+        @barycentric
+        def grad_value(bcs):
+            return self.uh.grad_value(bcs)[...,:-1]
+        
+        l2 = self.mesh.error(self.pde.solution, self.uh, q = self.q)
+        h1 = self.mesh.error(gradient, grad_value, q = self.q)
         return l2, h1
-    
+
     def show_solution(self):
         """
         Visualize the solution using the mesh's plotting capabilities.
@@ -255,7 +281,7 @@ class ParabolicSTFEMModel(ComputationalModel):
         This method plots the convergence order based on the error matrix.
         """
         import matplotlib.pyplot as plt
-        h0 = 0.1 * 1 / 2 ** (1 / 2)
+        h0 = (bm.min(self.mesh.entity_measure('cell')))**(1/self.mesh.TD)
         h = bm.array([h0 / (2 ** i) for i in range(maxit + 1)])
         log2h = bm.log2(h)
 
@@ -285,12 +311,146 @@ class ParabolicSTFEMModel(ComputationalModel):
         # plt.gca().set_aspect('equal')
         plt.show()
 
-    def slicing_error(self,t):
-        node = self.mesh.node
-        time_idx = bm.where(bm.abs(node[:, 1] - t) < 1e-8)[0]
+    def slicing_error(self, t: float=None, p: float=None, *, tol: float=1e-10,
+                      return_error: bool=False):
+        """
+        Compute L2 / H1 errors along a 1D slice of the space-time mesh (either fixing time t to
+        obtain a spatial line, or fixing spatial coordinate x = p to obtain a temporal line),
+        for arbitrary polynomial degree p of space‑time Lagrange elements.
+
+        Parameters:
+            t : float, optional
+                Fixed time value. If provided, a spatial line (varying x) at time t is extracted.
+            p : float, optional
+                Fixed spatial x value. If provided, a temporal line (varying t) at x = p is extracted.
+            tol : float, default 1e-10
+                Tolerance used to identify nodes lying on the slice.
+            return_error : bool, default False
+                If True, return a dictionary of errors; otherwise only log the results.
+        """
+        from fealpy.mesh import IntervalMesh
+
+        node = self.mesh.node                  # (NN,2) 约定: [:,0]=x, [:,1]=t
+        edge = self.mesh.edge                  # (NE,2)
+        results = {}
+
+        def _build_slice(fixed_val: float, fixed_axis: int, label: str):
+            """
+            fixed_axis : 1 表示固定 t, 沿 x 方向; 0 表示固定 x, 沿 t 方向.
+            label      : 't' 或 'x'
+            返回 (IntervalMesh, LagrangeFESpace, 1D 解函数 uh1d)
+            """
+            # 1. 找截线节点
+            idx = bm.where(bm.abs(node[:, fixed_axis] - fixed_val) < tol)[0]
+            # 2. 找截线完整边
+            mask_edge = bm.all(bm.isin(edge, idx), axis=1)
+            slice_edge_ids = bm.where(mask_edge)[0]
+            # 3. 取边并排序 (按可变轴坐标最小值)
+            var_axis = 1 - fixed_axis  # 截线方向坐标轴
+            e_nodes = edge[slice_edge_ids]                  # (E,2)
+            ncoord = node[:, var_axis]
+            key = bm.minimum(ncoord[e_nodes[:,0]], ncoord[e_nodes[:,1]])
+            order = bm.argsort(key)
+            e_nodes = e_nodes[order]
+            slice_edge_ids = slice_edge_ids[order]
+            # 4. 保证边方向 (起点 -> 终点) 在 var_axis 方向单调递增
+            c0 = ncoord[e_nodes[:,0]]
+            c1 = ncoord[e_nodes[:,1]]
+            flip = c1 < c0
+            if bm.any(flip):
+                # 交换需要翻转的边两个端点
+                tmp = e_nodes[flip,0].copy()
+                e_nodes = bm.set_at(e_nodes, (flip,0), e_nodes[flip,1])
+                e_nodes = bm.set_at(e_nodes, (flip,1), tmp)
+
+            # 5. 获取对应边的 (p+1) 个边自由度值 (全局编号)
+            e2dof = self.space.edge_to_dof(slice_edge_ids)   # (E, p+1)
+            # 与几何方向一致: 若翻转则反转对应 dof 行
+            if bm.any(flip):
+                # 需要重新按排序索引回到 flip 布尔掩码对应
+                flip_sorted = flip  # 已与 e_nodes 同步
+                row_flip_indices = bm.where(flip_sorted)[0]
+                for r in row_flip_indices:
+                    e2dof_r = e2dof[r]
+                    e2dof = bm.set_at(e2dof, r, e2dof_r[::-1])
+            # 6. 取得对应数值
+            edge_vals = self.uh[e2dof]          # (E, p+1)
+            # 7. 生成 1D 网格 (端点坐标按每条边端点串联)
+            E = e2dof.shape[0]
+            # 边端点沿方向坐标
+            start_coord = ncoord[e_nodes[:,0]]
+            end_coord   = ncoord[e_nodes[:,1]]
+            # 端点序列: 第 0 条边起点 + 所有边终点
+            nodes_1d = bm.concat([start_coord[:1], end_coord], axis=0)  # (E+1,)
+            # 保证严格单调 (若有重复或倒序, 说明网格质量/截取有问题)
+            if bm.any(nodes_1d[1:] - nodes_1d[:-1] <= 0):
+                self.logger.warning(f"Non-monotone parameter nodes on {label}={fixed_val}")
+            # 构造 1D IntervalMesh (几何只用端点)
+            cells_1d = bm.stack([bm.arange(E), bm.arange(1, E+1)], axis=1)
+            int_mesh = IntervalMesh(nodes_1d, cells_1d)
+            # 8. 构造 1D p 次 Lagrange 空间
+            fe_space = LagrangeFESpace(int_mesh, p=self.p)
+            cell2dof_1d = fe_space.cell_to_dof()      # (E, p+1)
+            # 9. 原 2D 边 DOF 值展平为 (E*p + 1,) 与 1D 全局 DOF 一一对应:
+            flat_list = [edge_vals[0]]
+            if E > 1:
+                flat_list.extend(edge_vals[i,1:] for i in range(1, E))
+            flat_vals = bm.concat(flat_list, axis=0)  # 形状 (E*p + 1,)
+            ndof_1d = fe_space.number_of_global_dofs()
+            # 10. 装载到 1D 解向量
+            uh1d_vec = bm.zeros(ndof_1d, dtype=bm.float64)
+            # 利用编号模式: cell i 对应全局段 i*p .. i*p+p
+            for i in range(E):
+                seg = flat_vals[i*self.p : i*self.p + self.p + 1]
+                uh1d_vec = bm.set_at(uh1d_vec, cell2dof_1d[i], seg)
+            uh1d = fe_space.function(uh1d_vec)
+            return int_mesh, uh1d, nodes_1d
+
+        # 固定时间 t: 沿 x 方向
+        if t is not None:
+            built = _build_slice(t, fixed_axis=1, label='t')
+            if built is not None:
+                int_mesh, uh1d, _ = built
+                exact = lambda x: self.pde.sl_solution(x, t)
+                grad  = lambda x: self.pde.sl_gradient(x, t)
+                L2e = int_mesh.error(exact, uh1d, q=self.q)
+                H1e = int_mesh.error(grad,  uh1d.grad_value, q=self.q)
+                self.logger.info(f"L2 Error: {L2e}, H1 Error: {H1e} at t={t}.")
+                results['t'] = {'value': t, 'L2': float(L2e), 'H1': float(H1e)}
+
+        # 固定空间 x=p: 沿 t 方向
+        if p is not None:
+            built = _build_slice(p, fixed_axis=0, label='x')
+            if built is not None:
+                int_mesh, uh1d, _ = built
+                exact = lambda tau: self.pde.sl_solution(p, tau)
+                grad  = lambda tau: self.pde.sl_gradient(p, tau)
+                L2e = int_mesh.error(exact, uh1d, q=self.q)
+                H1e = int_mesh.error(grad,  uh1d.grad_value, q=self.q)
+                self.logger.info(f"L2 Error: {L2e}, H1 Error: {H1e} at x={p}.")
+                results['x'] = {'value': p, 'L2': float(L2e), 'H1': float(H1e)}
+
+        if return_error:
+            if not results:
+                return None
+            return results
         
-        edge = self.mesh.edge
-        time_edge = bm.all(bm.isin(edge, time_idx), axis=1)
-        space_edge = bm.where(time_edge)[0]
-            
+    def interpolate_error(self):
+        solution = self.pde.solution
+        gradient = self.pde.gradient
+        space = self.space
+        sol_int = space.interpolate(solution)
+
+        mesh = self.mesh
+        L2e = mesh.error(solution, sol_int, q=self.q)
+        H1e = mesh.error(gradient, sol_int.grad_value, q=self.q)
+        self.logger.info(f"L2 Error: {L2e}, H1 Error: {H1e} at interpolation.")
+
+    def to_vtk(self, filename='parabolic_stfem_solution.vtu'):
+        uh = self.uh
+        mesh = self.mesh
+        mesh.nodedata['uh_node'] = uh
+        mesh.celldata['uh'] = uh.value(self.bcs)
+        mesh.to_vtk(filename)
+
         

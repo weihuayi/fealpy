@@ -21,7 +21,7 @@ class SpaceTimeMassIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
-                 theta: float = 1e-5,
+                 theta: float = 5e-2,
                  conv_coef: Optional[CoefLike]=None,
                  method: Optional[str]=None) -> None:
         super().__init__()
@@ -76,7 +76,7 @@ class SpaceTimeMassIntegrator(LinearInt, OpInt, CellInt):
                 coef = bm.concat([coef , bm.array([1.0], dtype=coef.dtype)], axis=0)
                 return bm.broadcast_to(coef, shape)[index]
             elif coef.ndim >= 2:
-                ones = bm.ones((coef.shape[0],1), dtype=coef.dtype)
+                ones = bm.ones((coef.shape[:-1]+(1,)), dtype=coef.dtype)
                 coef_exp = bm.concat([coef, ones], axis=-1)
                 return coef_exp[index]
     
