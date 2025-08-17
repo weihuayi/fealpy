@@ -37,6 +37,6 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # Add elastoplasticity PDE models here (file_name, class_name)
-    "1": ("example1", "exp1"),
-    "2": ("example2", "exp2"),
+    1: ("elastoplasticity_data_2d", "ElastoplasticityData2D"),
+    2: ("elastoplasticity_data_3d", "ElastoplasticityData3D"),
 }
