@@ -5,6 +5,7 @@ from ..decorator import variantmethod
 from ..mesh import TriangleMesh
 
 import gmsh
+import ast
 
 class ChipMesher:
     """
@@ -32,78 +33,64 @@ class ChipMesher:
         if not options:
             self.options = self.get_options()
 
+        self.options['return_mesh'] = self._parse_opt(self.options.get('return_mesh'))
+        self.options['show_figure'] = self._parse_opt(self.options.get('show_figure'))
+
         self.box = self.options['box']
         self.generate()
+    
+    def _parse_opt(self, opt):
+        """If the input is a string, try to convert it to a Python object.
+
+        Parameters
+            opt : Any
+                Input value, possibly a string representing a Python literal.
+
+        Returns
+            Any
+                Parsed Python object or the original value.
+        """
+        if isinstance(opt, str):
+            try:
+                return ast.literal_eval(opt)
+            except Exception:
+                return opt
+        return opt
     
     def get_options(self) -> dict:
         options = {
             'box': [0.0, 0.75, 0.0, 0.41],
             'center': (0.1, 0.05),
             'radius': 0.029,
-            'l1': 0.1,
-            'l2': 0.1,
+            'l1': 0.12,
+            'l2': 0.12,
             'h': 0.04,
-            'lc': 0.01,
-            'return_mesh': False,
-            'show_figure': True,
+            'lc': 0.03,
+            'hole_lc': 0.01,
+            'return_mesh': True,
+            'show_figure': False,
         }
 
         return options
-
-    def generate(self):
-        option = self.options
-        self.box = option['box']
-        self.center = option['center']
-        self.r = option['radius']
-        self.l1 = option['l1']
-        self.l2 = option['l2']
-        self.h = option['h']
-        self.lc = option['lc'] 
-
-        return_mesh = option['return_mesh']
-        show_figure = option['show_figure']
-
-        gmsh.initialize()
-        gmsh.model.add("chip")
-        
-        x0, x1, y0, y1 = self.box
-        rectangle = gmsh.model.occ.addRectangle(x0, y0, 0, x1 - x0, y1 - y0)
-
-        self.centers = self.generate_circle_centers(self.box, self.center, self.l1, self.l2, self.h)
-        circle_tags = []
-        for i, (cx, cy) in enumerate(self.centers):
-            circle = gmsh.model.occ.addDisk(cx, cy, 0, self.r, self.r)
-            circle_tags.append(circle)
-        
-        # Boolean difference
-        gmsh.model.occ.cut([(2, rectangle)], [(2, tag) for tag in circle_tags], removeObject=True, removeTool=True)
-        gmsh.model.occ.synchronize()
-
-        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), self.lc)
-        gmsh.model.mesh.generate(2)
-
-        if return_mesh:
-            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-            node = node_coords.reshape((-1,3))[:,:2]
-            nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
-            cell_type = 2 
-            cell_tags,cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
-
-            evid = bm.array([nodetags_map[j] for j in cell_connectivity])
-            cell = evid.reshape((cell_tags.shape[-1],-1))
-            self.mesh = TriangleMesh(node, cell)
-
-        if show_figure:
-            gmsh.option.setNumber("Mesh.SurfaceFaces", 1)
-            gmsh.option.setNumber("Mesh.VolumeEdges", 0)
-            gmsh.fltk.run()
-
-        gmsh.finalize()
     
-    def generate_circle_centers(self, box, center, l1, l2, h):
+    def generate(self):
+        """生成网格（拆分成三部分）"""
+        method = self.options['hole_method']
+        self._generate_holes[method]()  # 孔洞排序
+        self._generate_gmsh_geometry()  # GMSH建模
+        self._generate_mesh()  # 网格剖分
+
+    @variantmethod("tilted")
+    def _generate_holes(self):
+        option = self.options
+        box = option['box']
+        center = option['center']
+        r = option['radius']
+        l1 = option['l1']
+        l2 = option['l2']
+        h = option['h']
         x0, x1, y0, y1 = box
         cx0, cy0 = center
-        r = self.r
 
         centers = []
 
@@ -128,4 +115,98 @@ class ChipMesher:
                 y_down -= l1
             x += l2
             col_idx += 1
-        return centers
+
+        self.centers = centers
+
+    @_generate_holes.register("aligned")
+    def _generate_holes(self):
+        option = self.options
+        box = option['box']
+        m = option['m']  
+        n = option['n']  
+        x0, x1, y0, y1 = box
+
+        x_vals = bm.linspace(x0, x1, m + 2)[1:-1]
+        y_vals = bm.linspace(y0, y1, n + 2)[1:-1]
+        x_grid, y_grid = bm.meshgrid(x_vals, y_vals)
+
+        centers = bm.stack((x_grid.ravel(), y_grid.ravel())).T
+        self.centers = centers
+
+    def _generate_gmsh_geometry(self):
+        option = self.options
+        self.box = option['box']
+        self.center = option['center']
+        self.r = option['radius']
+        self.l1 = option['l1']
+        self.l2 = option['l2']
+        self.h = option['h']
+        self.lc = option['lc'] 
+        self.hole_lc = option['hole_lc'] 
+
+        gmsh.initialize()
+        gmsh.model.add("chip")
+        
+        # 定义矩形区域
+        x0, x1, y0, y1 = self.box
+        rectangle = gmsh.model.occ.addRectangle(x0, y0, 0, x1 - x0, y1 - y0)
+
+        circle_tags = []
+        for cx, cy in self.centers:
+            circle = gmsh.model.occ.addDisk(cx, cy, 0, self.r, self.r)
+            circle_tags.append(circle)
+
+        gmsh.model.occ.cut([(2, rectangle)], [(2, tag) for tag in circle_tags], removeObject=True, removeTool=True)
+        gmsh.model.occ.synchronize()
+    
+    def _generate_mesh(self):
+        option = self.options
+        return_mesh = option['return_mesh']
+        show_figure = option['show_figure']
+    
+        # 定义距离场，用于孔洞附近网格加密
+        f_dist = gmsh.model.mesh.field.add("Distance")
+        circle_edges = []
+        for cx, cy in self.centers:
+            ctag = gmsh.model.occ.addCircle(cx, cy, 0, self.r)
+            circle_edges.append(ctag)
+
+        gmsh.model.occ.synchronize()
+        gmsh.model.mesh.field.setNumbers(f_dist, "EdgesList", circle_edges)
+
+        # 定义阈值场，专门调整孔洞附近的网格
+        f_th = gmsh.model.mesh.field.add("Threshold")
+        gmsh.model.mesh.field.setNumber(f_th, "InField", f_dist)
+        gmsh.model.mesh.field.setNumber(f_th, "SizeMin", self.hole_lc)  # 孔洞附近的小网格
+        gmsh.model.mesh.field.setNumber(f_th, "SizeMax", self.lc)  # 其他地方的网格
+        gmsh.model.mesh.field.setNumber(f_th, "DistMin", 0)   # 孔洞边界内部
+        gmsh.model.mesh.field.setNumber(f_th, "DistMax", self.r * 1.5)  # 孔洞半径的1.5倍内细网
+
+        gmsh.model.mesh.field.setAsBackgroundMesh(f_th)
+
+        # 生成网格
+        gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+        gmsh.model.mesh.generate(2)
+        gmsh.model.occ.synchronize()
+
+        if return_mesh:
+            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+            node = bm.from_numpy(node_coords.reshape((-1, 3))[:, :2])
+            nodetags_map = dict({j: i for i, j in enumerate(node_tags)})
+            cell_type = 2
+            cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+            evid = bm.array([nodetags_map[j] for j in cell_connectivity])
+            cell = evid.reshape((cell_tags.shape[-1], -1))
+            
+            unique, inverse = bm.unique(cell.ravel(), return_inverse=True)
+            new_cell = inverse.reshape(cell.shape)
+            bm.copy(node)
+            self.mesh = TriangleMesh(node[unique], new_cell)
+
+        if show_figure:
+            gmsh.option.setNumber("Mesh.SurfaceFaces", 1)
+            gmsh.option.setNumber("Mesh.VolumeEdges", 0)
+            gmsh.fltk.run()
+
+        gmsh.finalize()
