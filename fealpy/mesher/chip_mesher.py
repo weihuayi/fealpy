@@ -126,8 +126,8 @@ class ChipMesher:
         n = option['n']  
         x0, x1, y0, y1 = box
 
-        x_vals = bm.linspace(x0, x1, m + 2)[1:-1]
-        y_vals = bm.linspace(y0, y1, n + 2)[1:-1]
+        x_vals = bm.linspace(x0, x1, m + 1)[1:-1]
+        y_vals = bm.linspace(y0, y1, n + 1)[1:-1]
         x_grid, y_grid = bm.meshgrid(x_vals, y_vals)
 
         centers = bm.stack((x_grid.ravel(), y_grid.ravel())).T
