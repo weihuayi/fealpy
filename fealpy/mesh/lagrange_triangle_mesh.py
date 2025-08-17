@@ -10,31 +10,33 @@ from .triangle_mesh import TriangleMesh
 
 
 class LagrangeTriangleMesh(HomogeneousMesh):
-    def __init__(self, node: TensorLike, cell: TensorLike, p=1, curve=None, 
+    def __init__(self, node: TensorLike, cell: TensorLike, p=None, curve=None, 
             surface=None, construct=False):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
-        self.p = p
+
+        if p is None:
+            NV = cell.shape[-1]
+            self.p = int(-3 + bm.sqrt(1 + 8 * NV)) // 2 
+        else:
+            NV = (p + 1) * (p + 2) // 2
+            if cell.shape[-1] != NV:
+                raise ValueError(f"cell.shape[-1] != {NV}, p = {p}.")
+            else:
+                self.p = p
+
         self.node = node
         self.cell = cell
         self.surface = surface
 
-        self.localEdge = self.generate_local_lagrange_edges(p)
+        self.construct_local_edge()
         self.localFace = self.localEdge
-        self.ccw  = bm.array([0, 1, 2], **kwargs)
-
-        self.localCell = bm.array([
-            (0, 1, 2),
-            (1, 2, 0),
-            (2, 0, 1)], **kwargs)
-
+        self.construct_local_cell()
         if construct:
             self.construct()
 
         self.meshtype = 'ltri'
-        self.linearmesh = None
-
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
@@ -43,35 +45,38 @@ class LagrangeTriangleMesh(HomogeneousMesh):
     def reference_cell_measure(self):
         return 0.5
 
-    def generate_local_lagrange_edges(self, p: int) -> TensorLike:
+    def local_edge(self) -> None:
         """
         Generate the local edges for Lagrange elements of order p.
         """
         TD = self.top_dimension()
-        multiIndex = bm.multi_index_matrix(p, TD)
+        multiIndex = bm.multi_index_matrix(self.p, TD)
 
         localEdge = bm.zeros((3, p+1), dtype=bm.int32)
         localEdge[2, :], = bm.where(multiIndex[:, 2] == 0)
-        localEdge[1,:] = bm.flip(bm.where(multiIndex[:, 1] == 0)[0])
-        localEdge[0, :],  = bm.where(multiIndex[:, 0] == 0)
+        localEdge[1, :]  = bm.flip(bm.where(multiIndex[:, 1] == 0)[0])
+        localEdge[0, :], = bm.where(multiIndex[:, 0] == 0)
 
         return localEdge
 
+    def local_cell(self) -> TensorLike:
+        return None
+
     def interpolation_points(self, p: int, index: Index=_S):
         """Fetch all p-order interpolation points on the triangle mesh."""
-        node = self.linearmesh.entity('node')
+        node = self.entity('node')
         if p == 1:
             return node[index]
-        if p <= 0:
-            raise ValueError("p must be a integer larger than 0.")
+        elif p == self.p:
+            return node[index]
+        else:
+            raise ValueError(f"p must be a integer larger than 0, but got {p}.")
 
         ipoint_list = []
-        kwargs = {'dtype': self.ftype}
+        kwargs = bm.context(node) 
 
         GD = self.geo_dimension()
         vidx = [0, ]
-        ipoint_list.append(node) # ipoints[:NN, :]
-
         edge = self.entity('edge')
         w = bm.multi_index_matrix(p, 1, dtype=self.ftype)
         w = w[1:-1]/p
