@@ -7,6 +7,10 @@ from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
 
 from .elastoplastic_integrator import ElastoplasticIntegrator
 
+from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
+
+from .elastoplastic_integrator import ElastoplasticIntegrator
+
 
 ### Model Operator
 from .euler_bernoulli_beam_fem_model import EulerBernoulliBeamFEMModel
