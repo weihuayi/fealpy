@@ -2,14 +2,13 @@ from .base import BaseEquation
 from typing import Union, Callable, Dict
 CoefType = Union[int, float, Callable]
 
-class DLDStationaryNS(BaseEquation):
+class StationaryStokes(BaseEquation):
     def __init__(self, pde):
         super().__init__(pde)
         self._coefs = {
-            'convection': 1,      # 对流项系数
             'pressure': 1,        # 压力项系数
             'viscosity': 1,       # 粘性项系数
-            'reaction': 1      # 外力项系数
+            'body_force': 1      # 外力项系数
         }
         self.pde = pde
         self.initialize_from_pde(pde) 
@@ -28,25 +27,15 @@ class DLDStationaryNS(BaseEquation):
             - 设置 velocity 和 pressure 的初始值。
         """
         # 处理物理参数
-        if hasattr(pde, 'rho') and hasattr(pde, 'mu'):
-            rho = pde.rho
+        if hasattr(pde, 'mu'):
             mu = pde.mu
-        elif hasattr(pde, 'R'):
-            rho = 1050  # 默认 rho=1
-            mu = rho / pde.R  # mu = rho / R
         else:
-            rho = 1050
             mu = 1.0
-        if hasattr(pde, 'H'):
-            H = pde.H
-        else:
-            H = 50e-6
 
         # 设置系数 
-        self._coefs['convection'] = rho
         self._coefs['pressure'] = 1
         self._coefs['viscosity'] = mu
-        self._coefs['reaction'] = -12*mu / H**2  
+        self._coefs['body_force'] = getattr(pde, 'source', 0)
 
 
     # 定义属性访问
@@ -54,11 +43,6 @@ class DLDStationaryNS(BaseEquation):
     def coefs(self):
         """系数字典"""
         return self._coefs
-
-    @property
-    def coef_convection(self) -> CoefType:
-        """对流项系数（惯性项）"""
-        return self._coefs['convection']
 
     @property
     def coef_viscosity(self) -> CoefType:
@@ -71,9 +55,9 @@ class DLDStationaryNS(BaseEquation):
         return self._coefs['pressure']
     
     @property
-    def coef_reaction(self) -> CoefType:
+    def coef_body_force(self) -> CoefType:
         """外力项系数"""
-        return self._coefs['reaction']
+        return self._coefs['body_force']
     
     def set_coefficient(
         self,
@@ -111,7 +95,7 @@ class DLDStationaryNS(BaseEquation):
             for name, value in self._variables.items()
         )
         
-        return f"=== IncompressibleNS ===\n" \
+        return f"=== Stokes ===\n" \
                f"coefficients:\n{terms_str}\n\n" \
                f"Variables:\n{variables_str}"
     
