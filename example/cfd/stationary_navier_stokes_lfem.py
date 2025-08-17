@@ -1,5 +1,7 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
+from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
+from fealpy.cfd.equation import StationaryIncompressibleNS
 from fealpy.cfd.model import CFDPDEModelManager
 from fealpy.mesher.chip_mesher import ChipMesher
 import matplotlib.pyplot as plt
@@ -47,29 +49,29 @@ parser.add_argument('--radius',
     default = 0.7e-4, type=int,
     help="Radius of the circles, default is 0.029.")
 
-parser.add_argument('--nx',
-    default = 7, type=int,
-    help="N")
+# parser.add_argument('--nx',
+#     default = 7, type=int,
+#     help="N")
 
-parser.add_argument('--ny',
-    default = 7, type=int,
-    help="N")
+# parser.add_argument('--ny',
+#     default = 7, type=int,
+#     help="N")
 
-parser.add_argument('--dx',
-    default = 0.20, type=int,
-    help="N")
+# parser.add_argument('--dx',
+#     default = 0.20, type=int,
+#     help="N")
 
-parser.add_argument('--dy',
-    default = 0.08, type=int,
-    help="N")
+# parser.add_argument('--dy',
+#     default = 0.08, type=int,
+#     help="N")
 
-parser.add_argument('--shift_angle',
-    default = 7, type=int,
-    help="N")
+# parser.add_argument('--shift_angle',
+#     default = 7, type=int,
+#     help="N")
 
-parser.add_argument('--n_circle',
-    default = 100, type=int,
-    help="Number of divisions in the circle, default is 60")
+# parser.add_argument('--n_circle',
+#     default = 100, type=int,
+#     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--l1',
     default = 3e-4, type=float,
@@ -84,7 +86,7 @@ parser.add_argument('--h',
     help="Mesh size, default is 0.05")
 
 parser.add_argument('--lc',
-    default = 1e-4, type=float,
+    default = 5e-5, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--hole_lc',
@@ -148,7 +150,7 @@ bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.mesh
-model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
+model = StationaryIncompressibleStokesLFEMModel(pde=pde, mesh = mesh, options = options)
 uh, ph = model.run()
 # model.__str__()
 
