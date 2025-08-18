@@ -11,7 +11,23 @@ from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
 from fealpy.fem import DirichletBC
 
 class StokesLFEMModel(ComputationalModel):
+    """
+    A computational model class for solving the Stokes equations using the
+    lagrange finite element method (FEM).
 
+    Parameters:
+        options(dict, optional): A dictionary containing computational options 
+        for the model.
+
+    Attributes:
+
+    Methods:
+
+    Notes:
+
+    Todos:
+
+    """
     def __init__(self, options: dict = None):
         self.options = options
         super().__init__(
