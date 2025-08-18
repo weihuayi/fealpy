@@ -20,9 +20,9 @@ from ..solver import spsolve, cg
 class SurfacePoissonLFEMModel(ComputationalModel):
     """A class to represent a surface Poisson problem using the Lagrange finite element method (LFEM).
     
-    Attributes
+    Attributes:
         mesh: The mesh of the domain.   
-    Methods
+    Methods:
         set_pde(pde): Initializes the PDE model for the problem.
         set_mesh(mesh): Sets the mesh for the domain.
         set_space_degree(p): Sets the polynomial degree for the isoparametric finite element space.
@@ -30,13 +30,14 @@ class SurfacePoissonLFEMModel(ComputationalModel):
         solve(): Solves the system using the selected solver method.
         run(): Runs the solver, iterating over the solution process.
         postprocess(): Computes the L2 error of the solution.                                        
-    Reference
+    Reference:
         https://wnesm678i4.feishu.cn/wiki/SsOKwQiVqi241WkusA9cn9ylnPf
     """
     
     def __init__(self, options):
        self.options = options
-       super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+       super().__init__(pbar_log=options['pbar_log'], 
+                        log_level=options['log_level'])
        self.set_pde(options['pde'])
        self.pde.init_mesh.set(options['init_mesh'])
        mesh = self.pde.init_mesh(options['mesh_degree'])
@@ -74,7 +75,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     def surface_poisson_system(self):
         """Construct the linear system for the surface problem.
 
-        Returns
+        Returns:
             The diffusion matrix and source matrix.
         """
         self.space = ParametricLagrangeFESpace(self.mesh, self.p)

@@ -1,60 +1,102 @@
-from fealpy.typing import Optional, TensorLike
+from fealpy.typing import Tuple, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
-
 from fealpy.mesh import EdgeMesh
 from fealpy.material import Material
 
 
+
 class TimoshenkoBeamData3D:
     """
-    3D Timoshenko beam problem:
+    3D Timoshenko beam geometry and boundary/load data container.
     """
 
-    def __init__(self):
+    def __init__(self, para: TensorLike=None, 
+                 FSY: float=10/9, FSZ: float=10/9):
         """
-        Initialize beam parameters.
-        """
-        # Axle structure parameters [phi diameter, length, number of segments]
-        self.para = bm.array([
-            [120, 141, 2],
-            [150, 28, 2],
-            [184, 177, 4], 
-            [160, 268, 2],
-            [184.2, 478, 2], 
-            [160, 484, 2], 
-            [184, 177, 4],
-            [150, 28, 2], 
-            [120, 141, 2]
-        ])
-        self.L = bm.sum(self.para[:, 1])  # 总长度
-        self.mesh = self.init_mesh()
+        A data structure class representing beam parameters and properties, including geometry characteristics.
 
-    @property
-    def E(self, p: Optional[TensorLike] = None) -> TensorLike:
-        # Young's modulus in Pascals
-        return 2.07e11 
+        Parameters:
+            para(TensorLike): A list or tensor containing the axle structure parameters: [phi diameter, length, number of segments].
+            D(float): Diameter of the beam and lunzhou.
+            FSY(float): Shear correction factor in the y-direction.
+            FSZ(float): Shear correction factor in the z-direction.
+            beam_E, beam_nu: beam elastic modulus & poisson_ratio.
+            axle_E, axle_mu: axle elastic modulus & shear modulus.
+            dofs_per_node(int): Each node has 6 DOFs,[u, v, w, θx, θy, θz].
+        
+        Notes:
+            FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
+        """
+        
+        # 几何参数
+        self.beam_para = bm.array([
+            [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
+            [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
+            [120, 141, 2]], dtype=bm.float64)
+        self.axle_para =  bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
     
-    @property
-    def nu(self, p: Optional[TensorLike] = None) -> TensorLike:
-        # Poisson's ratio
-        return 0.276 
-    @property
-    def k_lunzhou(self, p: Optional[TensorLike] = None) -> TensorLike:
-        #N/mm equivalent node stiffness for the axle, identical in all three translational directions.
-        return 1.976e6 
-
+        #self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
+        
+        # diameter
+        self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
+        self.axle_D = bm.repeat(self.axle_para[:, 0], self.axle_para[:, 2].astype(int))
+        
+        self.FSY = FSY
+        self.FSZ = FSZ
+        self.dofs_per_node = 6
+        self.mesh = self.init_mesh()
+        
+        # === 独立计算 beam 和 axle 截面 & 惯性矩 ===
+        self.beam_Ax, self.beam_Ay, self.beam_Az = self.calculate_beam_cross_section()
+        self.beam_Ix, self.beam_Iy, self.beam_Iz = self.calculate_beam_inertia()
+        
+        # self.axle_Ax, self.axle_Ay, self.axle_Az = self.calculate_axle_cross_section()
+        # self.axle_Ix, self.axle_Iy, self.axle_Iz = self.calculate_axle_inertia()
+        
+    def __str__(self) -> str:
+        """Returns a formatted multi-line string summarizing the configuration of the 3D Timoshenko beam data.
+        
+        Returns:
+            str: A multi-line string showing key beam parameters, geometry, and mesh info.
+    """
+        s = f"{self.__class__.__name__}(\n"
+        s += "  === Geometry & Mesh ===\n"
+        s += f"  Total Length (L)      : {float(self.L):.3f} mm\n"
+        s += f"  Diameters (D)         : {self._D.tolist()} mm\n"
+        s += f"  Mesh Type             : {self.mesh.__class__.__name__}\n"
+        s += f"  Number of Nodes       : {self.mesh.number_of_nodes()}\n"
+        s += f"  Number of Elements    : {self.mesh.number_of_cells()}\n"
+        s += f"  Geo Dimension         : {self.geo_dimension()}\n"
+        s += f"  Shear Factors     : {self.FSY}, {self.FSZ}\n"
+        s += f"  beam_Ax, beam_Ay, beam_Az : {self.beam_Ax[:5].tolist()} ...\n"
+        s += f"  beam_Ix, beam_Iy, beam_Iz : {self.beam_Ix[:5].tolist()} ...\n"
+        s += f"  axle_Ax,axle_Ay, axle_Az : {self.axle_Ax[:5].tolist()} ...\n"
+        s += f"  axle_Ix, axle_Iy, axle_Iz : {self.axle_Ix[:5].tolist()} ...\n"
+        s += ")"
+        return s
+    
     def geo_dimension(self) -> int:
-        """Return the geometric dimension of the domain."""
+        """the geometric dimension."""
         return 3
     
-    def domain(self):
-        """Return the computational domain [xmin, xmax]."""
-        return [0.0, self.L]
+    def calculate_beam_cross_section(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        """Beam cross-sectional areas."""
+        beam_Ax = bm.pi * self.beam_D**2 / 4
+        beam_Ay = beam_Ax / self.FSY
+        beam_Az = beam_Ax / self.FSZ
 
+        return beam_Ax, beam_Ay, beam_Az
+    
+    def calculate_beam_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+       """Beam moments of inertia."""
+       beam_Iy  = bm.pi * self.beam_D**4 / 64
+       beam_Iz = beam_Iy
+       beam_Ix = beam_Iy + beam_Iz
+       return beam_Ix, beam_Iy, beam_Iz
+    
     def init_mesh(self):
-        """
-        Construct a 3D mesh for the Timoshenko beam domain.
+        """Construct a mesh for the beam.
 
         Returns:
             EdgeMesh: 3D mesh with nodes and cells for the beam domain.
@@ -79,29 +121,59 @@ class TimoshenkoBeamData3D:
         return EdgeMesh(node, cell)
     
     @cartesian
-    def load(self):
+    def external_load(self) -> TensorLike:
+        """The load applied to the node.
+        Notes:
+            Each node has 6 DOFs: [u, v, w, θx, θy, θz].
+            dof_map = {'u': 0,'v': 1,'w': 2,'θx': 3,'θy': 4,'θz': 5}
         """
-        The load applied to the node.
-        load = [node_index, x, y, z, theta_x theta_y theta_z]
-        """
-        x = self.mesh.node[:, 0]
-        dofs = 6 * len(x)
-        load = bm.array([[1, 0, 0, -88200, 0, 0 , 0],
-                         [21, 0, 0, -88200, 0, 0, 0],
-                         [11, 3140, 0, 0, 14000e3, 0, 0]], dtype=bm.float64)
+        NN = self.mesh.number_of_nodes()
+        n_dofs = NN * self.dofs_per_node
+        F = bm.zeros(n_dofs)
 
-        return load
-    
-    
+        external_load = bm.array([-88200, 3140, 1.4e6, -88200], dtype=bm.float64)
+
+        F[1 * self.dofs_per_node + 2] = external_load[0]
+        F[11 * self.dofs_per_node] = external_load[1]
+        F[11 * self.dofs_per_node + 3] = external_load[2]
+        F[21 * self.dofs_per_node + 2] = external_load[3]
+
+
+
+        return F 
+
+    @cartesian
     def dirichlet_dof_index(self) -> TensorLike:
+        """Dirichlet boundary conditions are applied.
+
+        Returns:
+            A 1D tensor containing the global DOF indices corresponding to 
+        the fixed boundary nodes.
+
+        Notes:
+            Each node has 6 DOFs: [u, v, w, θx, θy, θz].
+            Global DOF index for a given node `n` and local DOF `i` is calculated as `n * 6 + i`.
+            The fixed nodes here are nodes 23 through 32 inclusive.
         """
-        Return the indices of degrees of freedom (DOFs) where Dirichlet boundary conditions are applied.
-        """
-        return bm.array([23, 24, 25, 26, 27, 28, 29, 30, 31, 32])
+        fixed_nodes = bm.arange(23, 33) # 节点23到32
+        node_dofs = []
+        for node in fixed_nodes:               # 遍历固定的节点
+            for i in range(self.dofs_per_node): # 遍历该节点的所有自由度
+                dof_index = node * self.dofs_per_node + i
+                node_dofs.append(dof_index)     # 加入全局 DOF 列表
+        
+        return bm.array(node_dofs)
     
     @cartesian
-    def dirichlet(self, x):
+    def dirichlet(self, x: TensorLike):
+        """Dirichlet boundary condition function that accepts boundary integration point coordinates x,
+        and returns the boundary values at the corresponding points with shape (N, dofs_per_node).
+        
+        Parameters:
+            x (TensorLike): Coordinates of boundary integration points, shape (N, dim).
+        
+        Returns:
+            TensorLike: Boundary values at the points, shape (N, dofs_per_node).
         """
-        Compute the Dirichlet boundary condition.
-        """
-        return 0
+        N = x.shape[0]  # 积分点数量
+        return bm.zeros((N, self.dofs_per_node))
