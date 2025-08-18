@@ -1,44 +1,47 @@
-from ....backend import backend_manager as bm
-from ....backend import TensorLike
-from ....fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
-from ....fem import DirichletBC
-from ....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
+from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
+from fealpy.fem import DirichletBC
+from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
                      ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
                      ViscousWorkIntegrator, SourceIntegrator, BoundaryFaceSourceIntegrator)
-from ....decorator import barycentric
-from ....fem import BoundaryPressWorkIntegrator
+from fealpy.decorator import barycentric
 
-from .fem_base import FEM
-from ..simulation_base import SimulationBase, SimulationParameters
+from ..iterative_method import IterativeMethod 
 
-
-class Newton(FEM):
+class Newton(IterativeMethod):
     """Newton Interative Method""" 
-    
-    def __init__(self, equation, boundary_threshold=None):
-        FEM.__init__(self, equation)
-        self.threshold = boundary_threshold
+    def __init__(self, equation, mesh):
+        super().__init__(equation, mesh)
+        
+        if self.equation.pressure_neumann == False:
+            self.threshold = self.equation.pde.is_pressure_boundary
 
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
         q = self.q
-        threshold = self.threshold
+        # threshold = self.threshold 
         
         A00 = BilinearForm(uspace)
         self.u_BM = ScalarMassIntegrator(q=q)
         self.u_BM_netwon = ScalarMassIntegrator(q=q)
         self.u_BC = ScalarConvectionIntegrator(q=q)
-        self.u_BVW = ViscousWorkIntegrator(q=q)
-        # self.u_BVW = ScalarDiffusionIntegrator(q = q)
-        #self.u_BFBF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold)
-        #self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        #self.u_BF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold) 
         
+        if self.equation.constitutive.value == 1:
+            self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        elif self.equation.constitutive.value == 2:
+            self.u_BVW = ViscousWorkIntegrator(q=q)
+        else:
+            raise ValueError(f"未知的粘性模型")
+
         A00.add_integrator(self.u_BM)
         A00.add_integrator(self.u_BM_netwon)
         A00.add_integrator(self.u_BC)
         A00.add_integrator(self.u_BVW)
-        #A00.add_integrator(self.u_BFBF)
+        #A00.add_integrator(self.u_BF)
+        
         
         A01 = BilinearForm((pspace, uspace))
         self.u_BPW = PressWorkIntegrator(q=q)
@@ -58,12 +61,15 @@ class Newton(FEM):
 
         L0 = LinearForm(uspace)
         self.u_LSI = SourceIntegrator(q=q)
+        self.u_LSI_f = SourceIntegrator(q=q)
         L0.add_integrator(self.u_LSI) 
+        L0.add_integrator(self.u_LSI_f)
+
         L1 = LinearForm(pspace)
         L = LinearBlockForm([L0, L1])
         return L
 
-    def update(self, u0, u00): 
+    def update(self, uk, u0): 
         equation = self.equation
         dt = self.dt
         ctd = equation.coef_time_derivative 
@@ -81,13 +87,13 @@ class Newton(FEM):
         @barycentric
         def u_BC_coef(bcs, index):
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            return cccoef * u0(bcs, index)
+            return cccoef * uk(bcs, index)
         self.u_BC.coef = u_BC_coef
 
         @barycentric
         def u_BM_netwon_coef(bcs,index):
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            return cccoef * u0.grad_value(bcs, index)
+            return cccoef * uk.grad_value(bcs, index)
         self.u_BM_netwon.coef = u_BM_netwon_coef
 
         ## LinearForm 
@@ -95,11 +101,9 @@ class Newton(FEM):
         def u_LSI_coef(bcs, index):
             ctdcoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
             cccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
-            result = ctdcoef * u00(bcs, index) / dt
-            result += cccoef*bm.einsum('...j, ...ij -> ...i', u0(bcs, index), u0.grad_value(bcs, index))
-            result += cbfcoef 
+            result = ctdcoef * u0(bcs, index) / dt
+            result += cccoef*bm.einsum('...j, ...ij -> ...i', uk(bcs, index), uk.grad_value(bcs, index))
             return result
         self.u_LSI.source = u_LSI_coef
-       
-
+        self.u_LSI_f.source = cbf 
+    
