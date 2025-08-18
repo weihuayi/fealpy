@@ -144,68 +144,234 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         return mesh
 
-    def uniform_refine(self , n:int = 1 ):
+    def uniform_refine(self, n: int = 1):
         """
+        Uniform refine the Lagrange triangle mesh.
         """
-        GD = self.geo_dimension()
-        node = self.entity('node')
-        edge = self.entity('edge')
-        cell = self.entity('cell')
+        for i in range(n):
+            GD = self.geo_dimension()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
+            edge2cell = self.edge_to_cell()
 
-        isCornerNode = bm.zeros(len(node), dtype=bm.bool)
-        isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
+            ikwargs = bm.context(edge) # integer kwargs
+            fkwargs = bm.context(node) # float kwargs
 
-        nodes = [] 
+            isCornerNode = bm.zeros(len(node), dtype=bm.bool)
+            isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
 
-        # the corner nodes 
-        nodes.append(node[isCornerNode])
+            # the list container for new nodes, edges, cells, and edge2cells
+            nodes = [] 
+            edges = []
+            cells = [] 
+            edge2cells = [] 
+
+            # the corner nodes 
+            nodes.append(node[isCornerNode])
 
 
-        E = bm.array([
-            [1.0, 0.0],
-            [0.5, 0.5],
-            [0.0, 1.0], 
-            ], dtype=bm.float64)
-        # the middle 
-        nodes.append(self.bc_to_point(E[1]).reshape(-1, self.GD))
+            NN = len(nodes[0]) # the number of corner nodes
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
 
-        # the edge interior interpolation points        
-        w = bm.multi_index_matrix(self.p, 1)[1:-1]/self.p
-        w0 = bm.einsum('ij, jk->ik', w, E[[0, 1], :])
-        w1 = bm.einsum('ij, jk->ik', w, E[[1, 2], :])
-        w = bm.concatenate([w0, w1], axis=0)
-        nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
+            # the index of subcells in each cell
+            cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4) 
 
-        # the edge in cell 
-        A = bm.array([
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-            [0.0, 0.5, 0.5],
-            [0.5, 0.0, 0.5],
-            [0.5, 0.5, 0.0]], dtype=bm.float64)
+            E = bm.array([
+                [1.0, 0.0],
+                [0.5, 0.5],
+                [0.0, 1.0], 
+                ], **fkwargs)
 
-        w = bm.multi_index_matrix(self.p, 1)[1:-1]/self.p
-        w0 = bm.einsum('ij, jk->ik', w, A[[4, 5], :])
-        w1 = bm.einsum('ij, jk->ik', w, A[[5, 3], :])
-        w2 = bm.einsum('ij, jk->ik', w, A[[3, 4], :])
-        w = bm.concatenate((w0, w1, w2), axis=0)
-        nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
+            # the middle point of the edges
+            nodes.append(self.bc_to_point(E[1]).reshape(-1, self.GD))
 
-        if self.p >= 3:
-            TD = self.top_dimension()
-            multiIndex = bm.multi_index_matrix(self.p, TD)
-            isInCellNodes = bm.sum(multiIndex > 0, axis=-1) == 3
-            w = multiIndex[isInCellNodes, :] / self.p
-            w0 = bm.einsum('ij, jk->ik', w, A[[0, 5, 4], :])
-            w1 = bm.einsum('ij, jk->ik', w, A[[1, 3, 5], :])
-            w2 = bm.einsum('ij, jk->ik', w, A[[2, 4, 3], :])
-            w3 = bm.einsum('ij, jk->ik', w, A[[3, 4, 5], :])
-            w = bm.concatenate((w0, w1, w2, w3), axis=0)
+            start = NN 
+            end = start + NE 
+            mid = bm.arange(start, end, **ikwargs) # the global index of the middle points
+
+            # the edge interior interpolation points        
+            w = bm.multi_index_matrix(self.p, 1)[1:-1]/self.p
+            w = bm.concatenate((
+                w @ E[[0, 1]], 
+                w @ E[[1, 2]]), axis=0)
             nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
 
-        node = bm.concatenate(nodes, axis=0)
-        return node
+            map0 = bm.array([[1, 2], [2, 2], [0, 2]], **ikwargs)
+            map1 = bm.array([[2, 1], [0, 1], [1, 1]], **ikwargs)
+
+            if self.p == 1:
+                e0 = bm.stack((edge[:, 0], mid), axis=1)
+                e1 = bm.stack((mid, edge[:, -1]), axis=1)
+            else:
+                n = self.p - 1
+                start = end
+                end = start + 2 * n * NE
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 2 * n)
+                e0 = bm.concat((edge[:, [0]], e[:, 0*n:1*n],      mid[:, None]), axis=1)
+                e1 = bm.concat((    mid[:, None], e[:, 1*n:2*n], edge[:, [-1]]), axis=1)
+            edges.extend([e0, e1])
+
+            e2c0 = bm.stack((
+                cell2subcell[edge2cell[:, 0], map0[edge2cell[:, 2], 0]],
+                cell2subcell[edge2cell[:, 1], map1[edge2cell[:, 3], 0]],
+                map0[edge2cell[:, 2], 1],
+                map1[edge2cell[:, 3], 1],
+                ), axis=1)
+
+            e2c1 = bm.stack((
+                cell2subcell[edge2cell[:, 0], map1[edge2cell[:, 2], 0]],
+                cell2subcell[edge2cell[:, 1], map0[edge2cell[:, 3], 0]],
+                map1[edge2cell[:, 2], 1],
+                map0[edge2cell[:, 3], 1],
+                ), axis=1)
+
+            isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+            e2c0 = bm.set_at(e2c0, (isBdEdge, 1), e2c0[isBdEdge, 0])
+            e2c0 = bm.set_at(e2c0, (isBdEdge, 3), e2c0[isBdEdge, 2])
+            e2c1 = bm.set_at(e2c1, (isBdEdge, 1), e2c1[isBdEdge, 0])
+            e2c1 = bm.set_at(e2c1, (isBdEdge, 3), e2c1[isBdEdge, 2])
+            edge2cells.extend([e2c0, e2c1])
+            
+
+            # the edge in cell 
+            A = bm.array([
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [0.0, 0.5, 0.5],
+                [0.5, 0.0, 0.5],
+                [0.5, 0.5, 0.0]], dtype=bm.float64)
+
+            w = bm.multi_index_matrix(self.p, 1)[1:-1]/self.p
+            w = bm.concat((
+                w @ A[[4, 5]], 
+                w @ A[[5, 3]], 
+                w @ A[[3, 4]],
+                ), axis=0)
+            nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
+
+            # construct the new edges in each cell
+            c2e = self.cell_to_edge() + NN
+            if self.p == 1:
+                e0 = c2e[:, [1, 2]]
+                e1 = c2e[:, [2, 0]] 
+                e2 = c2e[:, [0, 1]]
+            else:
+                n = self.p - 1
+                start = end
+                end = start + 3 * n * NC
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 3 * n)
+                e0 = bm.concat((c2e[:, [1]], e[:, 0*n:1*n], c2e[:, [2]]), axis=1)
+                e1 = bm.concat((c2e[:, [2]], e[:, 1*n:2*n], c2e[:, [0]]), axis=1)
+                e2 = bm.concat((c2e[:, [0]], e[:, 2*n:3*n], c2e[:, [1]]), axis=1) 
+            edges.extend([e0, e1, e2])
+
+            e2c0 = bm.stack((
+                cell2subcell[:, 3], 
+                cell2subcell[:, 0],
+                bm.full(NC, 0, **ikwargs),
+                bm.full(NC, 0, **ikwargs),
+                ), axis=1)
+            e2c1 = bm.stack((
+                cell2subcell[:, 3], 
+                cell2subcell[:, 1],
+                bm.full(NC, 1, **ikwargs),
+                bm.full(NC, 0, **ikwargs),
+                ), axis=1)
+            e2c2 = bm.stack((
+                cell2subcell[:, 3], 
+                cell2subcell[:, 2],
+                bm.full(NC, 2, **ikwargs),
+                bm.full(NC, 0, **ikwargs),
+                ), axis=1)
+            edge2cells.extend([e2c0, e2c1, e2c2])
+
+
+            icell = None
+            if self.p >= 3:
+                TD = self.top_dimension()
+                multiIndex = bm.multi_index_matrix(self.p, TD)
+                isInCellNodes = bm.sum(multiIndex > 0, axis=-1) == 3
+                w = multiIndex[isInCellNodes, :] / self.p
+                n = len(w)
+                w = bm.concatenate((
+                    w @ A[[0, 5, 4]], 
+                    w @ A[[1, 3, 5]], 
+                    w @ A[[2, 4, 3]], 
+                    w @ A[[3, 4, 5]],
+                    ), axis=0)
+                nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
+                start = end
+                end = start + 4 * n * NC
+                icell = bm.arange(start, end, **ikwargs).reshape(-1, n)
+
+
+
+            node = bm.concatenate(nodes, axis=0)
+            edge = bm.concatenate(edges, axis=0)
+            edge2cell = bm.concatenate(edge2cells, axis=0)
+
+            cell2edge = bm.zeros((4*NC, 3), **ikwargs)
+            cell2edge = bm.set_at(cell2edge, (edge2cell[:, 0], edge2cell[:, 2]), range(len(edge)))
+            cell2edge = bm.set_at(cell2edge, (edge2cell[:, 1], edge2cell[:, 3]), range(len(edge)))
+
+            self.node = node
+            self.face = edge
+            self.edge = edge 
+            self.edge2cell = edge2cell
+            self.face2cell = edge2cell
+            self.cell2face = cell2edge
+            self.cell2edge = cell2edge
+
+            # construct the sub cells
+            self.construct_global_cell(icell, **ikwargs)
+
+
+    def construct_global_cell(self, icell: TensorLike, **ikwargs):
+        """
+        """
+        p = self.p 
+        NC = self.number_of_cells()
+        ldof = (p + 1) * (p + 2) // 2
+        cell = bm.zeros((4*NC, ldof), **ikwargs)
+
+        TD = self.top_dimension()
+        mi = self.multi_index_matrix(p, TD)
+        idx0, = bm.nonzero(mi[:, 0] == 0)
+        idx1, = bm.nonzero(mi[:, 1] == 0)
+        idx2, = bm.nonzero(mi[:, 2] == 0)
+        edge2cell = self.edge_to_cell()
+
+        edge = self.entity('edge')
+
+        flag = edge2cell[:, 2] == 0
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx0), edge[flag])
+
+        flag = edge2cell[:, 2] == 1
+        idx1_ = bm.flip(idx1, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx1_), edge[flag])
+
+        flag = edge2cell[:, 2] == 2
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx2), edge[flag])
+
+        iflag = edge2cell[:, 0] != edge2cell[:, 1]
+        flag = iflag & (edge2cell[:, 3] == 0)
+        idx0_ = bm.flip(idx0, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 1][:, None], idx0_), edge[flag])
+
+        flag = iflag & (edge2cell[:, 3] == 1)
+        cell = bm.set_at(cell, (edge2cell[flag, 1][:, None], idx1), edge[flag])
+
+        flag = iflag & (edge2cell[:, 3] == 2)
+        idx2_ = bm.flip(idx2, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 1][:, None], idx2_),  edge[flag])
+
+        if self.p >= 3:
+            flag = bm.sum(mi > 0, axis=1) == 3
+            cell = bm.set_at(cell, (..., flag), icell)
+        self.cell = cell
 
 
     # quadrature
