@@ -119,9 +119,13 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             u0[:] = u1
             p0[:] = p1
 
-            uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
+            mesh.nodedata['ph'] = p1
+            mesh.nodedata['uh'] = u1.reshape(2,-1).T
+            mesh.to_vtk(f'ns2d_{i+1}.vtu')
+
+            # uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
             self.timeline.advance()
-        uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
+        # uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
         return u0, p0
     
     @run.register('one_step')

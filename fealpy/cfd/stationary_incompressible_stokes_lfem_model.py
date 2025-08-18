@@ -4,7 +4,7 @@ from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
 from fealpy.mesh import Mesh
 from fealpy.utils import timer
-from fealpy.cfd.equation.stokes import StationaryStokes
+from fealpy.cfd.equation import StationaryIncompressibleNS
 
 class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
     """
@@ -66,7 +66,7 @@ class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
         super().__init__(pbar_log=True, log_level="INFO")
         self.options = options
         self.pde = pde
-        self.equation = StationaryStokes(pde)
+        self.equation = StationaryIncompressibleNS(pde)
         
         if mesh is None:
             if hasattr(pde, 'init_mesh'):
