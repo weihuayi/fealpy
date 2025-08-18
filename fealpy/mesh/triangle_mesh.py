@@ -1286,6 +1286,27 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
         return cls(node, cell)
 
+    @classmethod
+    def from_one_hexagon(cls):
+        t = bm.sqrt(3)/2.0
+        node = bm.array([
+            [ 0.0, 0.0], #0
+            [ 1.0, 0.0], #1
+            [ 0.5,   t], #2
+            [-0.5,   t], #3
+            [-1.0, 0.0], #4
+            [-0.5,  -t], #5
+            [ 0.5,  -t]  #6
+            ], dtype=bm.float64)
+        cell = bm.array([
+            [0, 1, 2],
+            [0, 2, 3],
+            [0, 3, 4], 
+            [0, 4, 5],
+            [0, 5, 6],
+            [0, 6, 1]], dtype=bm.int32)
+        return cls(node, cell)
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_square_domain_with_fracture(cls, device=None):

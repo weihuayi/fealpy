@@ -10,8 +10,8 @@ from .triangle_mesh import TriangleMesh
 
 
 class LagrangeTriangleMesh(HomogeneousMesh):
-    def __init__(self, node: TensorLike, cell: TensorLike, p=None, curve=None, 
-            surface=None, construct=False):
+    def __init__(self, node: TensorLike, cell: TensorLike, p=None, boundary=None, 
+            surface=None):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
@@ -29,12 +29,16 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         self.node = node
         self.cell = cell
         self.surface = surface
+        self.boundary = boundary
 
         self.construct_local_edge()
         self.localFace = self.localEdge
         self.construct_local_cell()
-        if construct:
-            self.construct()
+        self.construct()
+        if self.boundary is not None:
+            isBdNode = self.boundary_node_flag()
+            bdNode, _ = self.boundary.project(node[isBdNode])
+            node = bm.set_at(node, isBdNode, bdNode)
 
         self.meshtype = 'ltri'
         self.nodedata = {}
@@ -129,22 +133,16 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         return lmesh
 
     @classmethod
-    def from_triangle_mesh(cls, mesh, p: int, surface=None):
-        init_node = mesh.entity('node')
-        cls.surface = surface
+    def from_triangle_mesh(cls, mesh, p: int, surface=None, boundary=None):
+        """
+        """
+
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
-        if surface is not None:
-            init_node[:], _ = surface.project(init_node) 
-            node, _ = surface.project(node)
 
-        lmesh = cls(node, cell, p=p, construct=True)
-        lmesh.linearmesh = mesh
+        mesh = cls(node, cell, p=p, boundary=boundary, surface=surface)
 
-        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
-        lmesh.cell2edge = mesh.cell2edge
-        lmesh.edge  = mesh.edge_to_ipoint(p)
-        return lmesh 
+        return mesh
 
     def uniform_refine(self , n:int = 1 ):
         """
@@ -163,8 +161,19 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         nodes.append(node[isCornerNode])
 
 
+        E = bm.array([
+            [1.0, 0.0],
+            [0.5, 0.5],
+            [0.0, 1.0], 
+            ], dtype=bm.float64)
+        # the middle 
+        nodes.append(self.bc_to_point(E[1]).reshape(-1, self.GD))
+
         # the edge interior interpolation points        
-        w = bm.multi_index_matrix(2 * self.p + 1, 1)[1:-1]/2
+        w = bm.multi_index_matrix(self.p, 1)[1:-1]/self.p
+        w0 = bm.einsum('ij, jk->ik', w, E[[0, 1], :])
+        w1 = bm.einsum('ij, jk->ik', w, E[[1, 2], :])
+        w = bm.concatenate([w0, w1], axis=0)
         nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
 
         # the edge in cell 
@@ -176,9 +185,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             [0.5, 0.0, 0.5],
             [0.5, 0.5, 0.0]], dtype=bm.float64)
 
-        w = bm.multi_index_matrix(self.p + 1, 1)[1:-1]/self.p
+        w = bm.multi_index_matrix(self.p, 1)[1:-1]/self.p
         w0 = bm.einsum('ij, jk->ik', w, A[[4, 5], :])
-        w1 = bm.enisum('ij, jk->ik', w, A[[5, 3], :])
+        w1 = bm.einsum('ij, jk->ik', w, A[[5, 3], :])
         w2 = bm.einsum('ij, jk->ik', w, A[[3, 4], :])
         w = bm.concatenate((w0, w1, w2), axis=0)
         nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
@@ -222,7 +231,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index=index) # 
         phi = self.shape_function(bc) # (NC, NQ, NVC)
-        p = bm.einsum('cqn, cni -> cqi', phi, node[entity])
+        p = bm.einsum('c...n, cni -> c...i', phi, node[entity])
         return p
     
     # shape function
@@ -232,7 +241,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         if variables == 'u':
             return phi
         elif variables == 'x':
-            return phi[None, :, :]
+            return phi[None, ...]
 
     def grad_shape_function(self, bc: TensorLike, p: int=None, 
                             index: Index=_S, variables='x'):

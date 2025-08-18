@@ -9,22 +9,22 @@ from fealpy.mmesh.tool import high_order_meshploter
 bm.set_backend('numpy')
 
 curve = CircleCurve(center=(0.0, 0.0), radius=1.0)
-mesh = TriangleMesh.from_unit_circle_gmsh(0.2)
+mesh = TriangleMesh.from_one_hexagon()
+mesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, 2, boundary=curve)
 
-mesh = LagrangeTriangleMesh.from_triangle_mesh(mesh, 3)
+edge = mesh.entity('edge')
 
-node = mesh.entity('node')
-isBdNode = mesh.boundary_node_flag()
+print(edge)
 
-bdNode, _ = curve.project(node[isBdNode, :])
+#ipoints = mesh.interpolation_points(4)
 
-node = bm.set_at(node, isBdNode, bdNode)
-
+node = mesh.uniform_refine()
 
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
 high_order_meshploter(ax, mesh)
-ax.plot(ipoints[:, 0], ipoints[:, 1], 'k.', markersize=10)
+#ax.plot(ipoints[:, 0], ipoints[:, 1], 'k.', markersize=10)
+ax.plot(node[:, 0], node[:, 1], 'k.', markersize=5)
 plt.show()
 
