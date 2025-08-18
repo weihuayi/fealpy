@@ -69,3 +69,4 @@ from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
 from .helmholtz_lfem_model import HelmholtzLFEMModel
 from .curlcurl_lfem_model import CurlCurlLFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+from .stokes_lfem_model import StokesLFEMModel

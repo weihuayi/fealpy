@@ -1,5 +1,4 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
 from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
 from fealpy.cfd.equation import StationaryIncompressibleNS
 from fealpy.cfd.model import CFDPDEModelManager
@@ -150,7 +149,7 @@ bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.mesh
-model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
+model = StationaryIncompressibleStokesLFEMModel(pde=pde, mesh = mesh, options = options)
 uh, ph = model.run()
 # model.__str__()
 

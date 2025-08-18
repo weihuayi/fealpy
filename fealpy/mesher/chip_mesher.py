@@ -33,11 +33,6 @@ class ChipMesher:
         if not options:
             self.options = self.get_options()
 
-<<<<<<< HEAD
-        self.box = self.options['box']
-        self.generate()
-    
-=======
         self.options['return_mesh'] = self._parse_opt(self.options.get('return_mesh'))
         self.options['show_figure'] = self._parse_opt(self.options.get('show_figure'))
 
@@ -62,78 +57,11 @@ class ChipMesher:
                 return opt
         return opt
     
->>>>>>> 6e4e766075f344aaa6956ba8e831583d5b9c669d
     def get_options(self) -> dict:
         options = {
             'box': [0.0, 0.75, 0.0, 0.41],
             'center': (0.1, 0.05),
             'radius': 0.029,
-<<<<<<< HEAD
-            'l1': 0.1,
-            'l2': 0.1,
-            'h': 0.04,
-            'lc': 0.01,
-            'return_mesh': False,
-            'show_figure': True,
-        }
-
-        return options
-
-    def generate(self):
-        option = self.options
-        self.box = option['box']
-        self.center = option['center']
-        self.r = option['radius']
-        self.l1 = option['l1']
-        self.l2 = option['l2']
-        self.h = option['h']
-        self.lc = option['lc'] 
-
-        return_mesh = option['return_mesh']
-        show_figure = option['show_figure']
-
-        gmsh.initialize()
-        gmsh.model.add("chip")
-        
-        x0, x1, y0, y1 = self.box
-        rectangle = gmsh.model.occ.addRectangle(x0, y0, 0, x1 - x0, y1 - y0)
-
-        self.centers = self.generate_circle_centers(self.box, self.center, self.l1, self.l2, self.h)
-        circle_tags = []
-        for i, (cx, cy) in enumerate(self.centers):
-            circle = gmsh.model.occ.addDisk(cx, cy, 0, self.r, self.r)
-            circle_tags.append(circle)
-        
-        # Boolean difference
-        gmsh.model.occ.cut([(2, rectangle)], [(2, tag) for tag in circle_tags], removeObject=True, removeTool=True)
-        gmsh.model.occ.synchronize()
-
-        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), self.lc)
-        gmsh.model.mesh.generate(2)
-
-        if return_mesh:
-            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-            node = node_coords.reshape((-1,3))[:,:2]
-            nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
-            cell_type = 2 
-            cell_tags,cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
-
-            evid = bm.array([nodetags_map[j] for j in cell_connectivity])
-            cell = evid.reshape((cell_tags.shape[-1],-1))
-            self.mesh = TriangleMesh(node, cell)
-
-        if show_figure:
-            gmsh.option.setNumber("Mesh.SurfaceFaces", 1)
-            gmsh.option.setNumber("Mesh.VolumeEdges", 0)
-            gmsh.fltk.run()
-
-        gmsh.finalize()
-    
-    def generate_circle_centers(self, box, center, l1, l2, h):
-        x0, x1, y0, y1 = box
-        cx0, cy0 = center
-        r = self.r
-=======
             'l1': 0.12,
             'l2': 0.12,
             'h': 0.04,
@@ -144,7 +72,7 @@ class ChipMesher:
         }
 
         return options
-    
+
     def generate(self):
         """生成网格（拆分成三部分）"""
         method = self.options['hole_method']
@@ -163,7 +91,6 @@ class ChipMesher:
         h = option['h']
         x0, x1, y0, y1 = box
         cx0, cy0 = center
->>>>>>> 6e4e766075f344aaa6956ba8e831583d5b9c669d
 
         centers = []
 
@@ -188,9 +115,6 @@ class ChipMesher:
                 y_down -= l1
             x += l2
             col_idx += 1
-<<<<<<< HEAD
-        return centers
-=======
 
         self.centers = centers
 
@@ -202,8 +126,8 @@ class ChipMesher:
         n = option['n']  
         x0, x1, y0, y1 = box
 
-        x_vals = bm.linspace(x0, x1, m + 2)[1:-1]
-        y_vals = bm.linspace(y0, y1, n + 2)[1:-1]
+        x_vals = bm.linspace(x0, x1, m + 1)[1:-1]
+        y_vals = bm.linspace(y0, y1, n + 1)[1:-1]
         x_grid, y_grid = bm.meshgrid(x_vals, y_vals)
 
         centers = bm.stack((x_grid.ravel(), y_grid.ravel())).T
@@ -286,4 +210,3 @@ class ChipMesher:
             gmsh.fltk.run()
 
         gmsh.finalize()
->>>>>>> 6e4e766075f344aaa6956ba8e831583d5b9c669d
