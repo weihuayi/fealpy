@@ -72,7 +72,7 @@ class ChipMesher:
         }
 
         return options
-    
+
     def generate(self):
         """生成网格（拆分成三部分）"""
         method = self.options['hole_method']

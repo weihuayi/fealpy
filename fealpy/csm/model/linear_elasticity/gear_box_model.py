@@ -49,6 +49,10 @@ class GearBoxModel:
         for name, data in self.mesh.data['materials'].items():
             self.material = LinearElasticMaterial(name, **data) 
 
+        self.coupling = self.parser.to_coupling()
+        self.material = self.parser.to_material()
+        self.boundary = self.parser.to_boundary()
+
     def __str__(self) -> str:
         """
         Return a human-readable summary of the model configuration.
