@@ -36,8 +36,48 @@ class BdfFileParser:
         self.sections: List[Section] = []
         self.is_free_format = None
 
-    def parse(self, filename: str) -> 'BdfFileParser':
+    def parse(self, filename: str, is_use_nastran:bool=False) -> 'BdfFileParser':
         current_section: Optional[Section] = None
+        if is_use_nastran:
+            try:
+                from pyNastran.bdf.bdf import BDF
+            except ImportError:
+                raise ImportError("pyNastran is not installed. Please install it to use BDF file parsing.")
+
+            nastran_card_map = {'GRID': 'NODE',
+                                'CTRIA3': 'ELEMENT',
+                                'CQUAD4': 'ELEMENT',
+                                'CTETRA': 'ELEMENT',
+                                'CHEXA': 'ELEMENT'}
+            # 初始化 BDF 对象
+            bdf = BDF()
+            try:
+                bdf.read_bdf(filename, punch=False)
+            except Exception as e:
+                try:
+                    # 如果读取失败，尝试不使用 punch
+                    bdf.read_bdf(filename, punch=True)
+                except Exception as e:
+                    raise RuntimeError(f"Failed to read BDF file: {filename}, Error: {e}. "
+                                       f"try to delete the fist line with 'BEGIN BULK' "
+                                       f"and the last line with 'ENDDATA' in the file.")
+            for card in bdf.card_count.keys():
+                is_exist_section = False
+                if card in nastran_card_map:
+                    options: Dict[str, str] = {}
+                    for sec in self.sections:
+                        if sec.match_keyword(nastran_card_map[card]):
+                            is_exist_section = True
+                            break
+                    if not is_exist_section:
+                        for sec_cls in SECTION_REGISTRY:
+                            if sec_cls.match_keyword(nastran_card_map[card]):
+                                current_section = sec_cls(options)
+                                self.sections.append(current_section)
+            for sec in self.sections:
+                sec.finalize_nastran(bdf)
+            return self
+
         with open(filename, 'r') as f:
             for raw in f:
                 line = raw.strip()

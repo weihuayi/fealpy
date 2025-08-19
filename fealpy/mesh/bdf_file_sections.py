@@ -15,6 +15,19 @@ def parse_free_format(line: str):
     fields = [f for f in fields if f]  # 移除空字段
     return fields
 
+
+data_map = {
+    'NODE': ['node_ids', ['nodes', 'xyz']],
+    'ELEMENT': ['element_ids', ['elements', 'type'], ['elements', 'node_ids']]
+}
+
+mesh_type_map = {
+    'CTRIA3': 'triangle',
+    'CQUAD4': 'quadrangle',
+    'CTETRA': 'tetrahedron',
+    'CHEXA': 'hexahedron'
+}
+
 class Section:
     """
     Abstract base class for all parsed Nastran *.bdf file sections.
@@ -113,6 +126,19 @@ class NodeSection(Section):
         self.node_map = bm.zeros((N,), dtype=bm.int32)
         bm.set_at(self.node_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
 
+    def finalize_nastran(self, bdf) -> None:
+        node_ = []
+        node_id_ = []
+        for node_id, node in bdf.nodes.items():
+            node_id_.append(node_id)
+            # node.xyz 包含 [x, y, z] 坐标
+            node_.append([node.xyz[0], node.xyz[1], node.xyz[2]])
+        self.id = bm.array(node_id_)
+        self.node = bm.array(node_)
+        N = bm.max(self.id) + 1
+        self.node_map = bm.zeros((N,), dtype=bm.int32)
+        bm.set_at(self.node_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
+
     def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata['node_map'] = self.node_map
 
@@ -170,6 +196,23 @@ class ElementSection(Section):
             # Convert each connectivity list to a bm.array
             self._cell[etype] = bm.array(conn_list)
         self.cell = self._cell
+
+    def finalize_nastran(self, bdf) -> None:
+        id_ = []
+        cell_ = {}
+        for elem_id, elem in bdf.elements.items():
+            id_.append(elem_id)
+            cell_.setdefault(mesh_type_map[elem.type], []).append(elem)
+        for k, v in cell_.items():
+            cell_[k] = bm.array([node.node_ids for node in v], dtype=bm.int64)
+        self.id = bm.array(id_)
+        N = bm.max(self.id) + 1
+        self.cell_map = bm.zeros((N,), dtype=bm.int32)
+        bm.set_at(self.cell_map, self.id, bm.arange(len(self.id), dtype=bm.int32))
+        for etype, conn_list in cell_.items():
+            # Convert each connectivity list to a bm.array
+            cell_[etype] = bm.array(conn_list)
+        self.cell = cell_
 
     def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata['cell_map'] = self.cell_map  # 存入共享数据字典

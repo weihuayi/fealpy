@@ -32,6 +32,13 @@ class TestMeshBase:
         # bd_mesh.to_vtk(fname=f"bd_mesh_{class_name}.vtu")
         np.testing.assert_allclose(bd_mesh.node, mesh.node[bd_node_idx], atol=1e-7)
 
+    @pytest.mark.parametrize("backend", ["numpy"])
+    def test_mesh_reader(self, backend):
+        from fealpy.tools.bdf_reader import read_bdf_mesh
+        file_neame = "./bdf_test.bdf"
+        node, cell = read_bdf_mesh(file_neame)
+
+
 
 if __name__ == "__main__":
     pytest.main(["./test_mesh_base.py", "-k", "test_get_bd_mesh"])
