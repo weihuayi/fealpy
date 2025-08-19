@@ -1,8 +1,13 @@
+
+import math
 from typing import Optional
+
 from ...backend import backend_manager as bm
 from ...decorator import cartesian
 from ...typing import TensorLike
+
 from ...mesher import BoxMesher2d
+from ...material import LinearElasticMaterial
 
 
 
