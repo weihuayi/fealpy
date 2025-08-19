@@ -191,6 +191,19 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         return bm.concatenate(ipoints, axis=0)
 
+    def entity_barycenter(self, 
+                          etype: Union[int, str]='cell', 
+                          index: Index=_S) -> TensorLike:
+        """
+
+        Parameters:
+            etype(Union[int, str]): the type of the mesh entity. It can be 'cell',
+                'edge', or 'node', or their corresponding integer values 2, 1, 0.
+
+            index(Index): the index of the mesh entities.
+        """
+        pass
+
     def uniform_refine(self, n: int = 1):
         """
         Uniform refine the Lagrange triangle mesh.
@@ -271,7 +284,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                 nn = self.p - 1
                 start = end
                 end = start + 2 * nn * NE
-                e = bm.arange(start, end, **ikwargs).reshape(-1, 2 * n)
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 2 * nn)
                 e0 = bm.concat((edge[:, [0]], e[:, 0*nn:1*nn],  mid[:, None]), axis=1)
                 e1 = bm.concat((mid[:, None], e[:, 1*nn:2*nn], edge[:, [-1]]), axis=1)
             edges.extend([e0, e1])
@@ -326,7 +339,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                 nn = self.p - 1
                 start = end
                 end = start + 3 * nn * NC
-                e = bm.arange(start, end, **ikwargs).reshape(-1, 3 * n)
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 3 * nn)
                 e0 = bm.concat((c2e[:, [1]], e[:, 0*nn:1*nn], c2e[:, [2]]), axis=1)
                 e1 = bm.concat((c2e[:, [2]], e[:, 1*nn:2*nn], c2e[:, [0]]), axis=1)
                 e2 = bm.concat((c2e[:, [0]], e[:, 2*nn:3*nn], c2e[:, [1]]), axis=1) 
@@ -370,8 +383,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                 start = end
                 end = start + 4 * nn * NC
                 icell = bm.arange(start, end, **ikwargs).reshape(-1, nn)
-
-
 
             node = bm.concat(nodes, axis=0)
             edge = bm.concat(edges, axis=0)

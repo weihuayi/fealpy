@@ -45,11 +45,14 @@ A = bm.array([
     [0.5, 0.5, 0.0]], dtype=bm.float64)
 
 w = bm.array([1.0/3.0, 1.0/3.0, 1.0/3.0], dtype=bm.float64)
-w = bm.stack((w @ A[[0, 4, 5]], w @ A[[1, 3, 5]], w @ A[[2, 4, 3]], w @ A[[3, 4, 5]]), axis=0)
-cc = mesh.bc_to_point(w).reshape(-1, 2)
+#w = bm.stack((w @ A[[0, 4, 5]], w @ A[[1, 3, 5]], w @ A[[2, 4, 3]], w @ A[[3, 4, 5]]), axis=0)
+#cc = mesh.bc_to_point(w).reshape(-1, 2)
 #ipoints = mesh.interpolation_points(4)
 
-mesh.uniform_refine()
+mesh.uniform_refine(n=2)
+
+cc = mesh.bc_to_point(w).reshape(-1, 2)
+
 
 node = mesh.entity('node')
 edge = mesh.entity('edge')
