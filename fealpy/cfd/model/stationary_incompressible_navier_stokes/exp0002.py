@@ -2,10 +2,12 @@ from typing import Sequence
 from fealpy.decorator import cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
-from fealpy.mesher.chip_mesher import ChipMesher
+from fealpy.geometry import DLDModeler
+from fealpy.mesher import DLDMesher
+
 import sympy as sp
 
-class Exp0002(ChipMesher):
+class Exp0002(DLDMesher):
     def __init__(self, options: dict = {}):
         self.options = options
         self.eps = 1e-10
@@ -23,65 +25,19 @@ class Exp0002(ChipMesher):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.options['box']
     
-    # def init_mesh(self):
-    #     options = self.options
-    #     box = options['box']
-    #     start_center = options['start_center']
-    #     radius = options['radius']
-    #     nx = options['nx']
-    #     ny = options['ny']
-    #     dx = options['dx']
-    #     dy = options['dy']
-    #     shift_angle = options['shift_angle']
-    #     n_circle = options['n_circle']
-    #     h = options['h']    
+    def init_mesh(self):
+        import gmsh
+        import ipdb
+        gmsh.initialize()
+        
+        modeler = DLDModeler(options=self.options)
+        modeler.build(gmsh)
 
-    #     self.box = box   
-    #     self.radius = radius 
-    #     from meshpy.triangle import MeshInfo, build
-    #     from fealpy.mesh import TriangleMesh    
-    #     # 矩形顶点
-    #     points = [
-    #     (box[0], box[2]),
-    #     (box[1], box[2]),
-    #     (box[1], box[3]),
-    #     (box[0], box[3])]
-    #     facets = [[0, 1], [1, 2], [2, 3], [3, 0]]
-    #     hole_points = []
-
-    #     # 构造圆柱中心阵列
-    #     x0, y0 = start_center
-    #     shift_rad = shift_angle * bm.pi / 180
-    #     centers = []
-
-    #     for i in range(nx):
-    #         for j in range(ny):
-    #             cx = x0 + i * dx
-    #             cy = y0 + j * dy + i * dx * bm.tan(shift_rad)
-    #             if box[0] + radius < cx < box[1] - radius and box[2] + radius < cy < box[3] - radius:
-    #                 centers.append((cx, cy))
-
-    #     # 构建所有圆形边界和空洞点
-    #     for center in centers:
-    #         cx, cy = center
-    #         theta = bm.linspace(0, 2*bm.pi, n_circle, endpoint=False)
-    #         circle_pts = [(cx + radius*bm.cos(t), cy + radius*bm.sin(t)) for t in theta]
-    #         offset = len(points)
-    #         circle_facets = [[i + offset, (i + 1) % n_circle + offset] for i in range(n_circle)]
-
-    #         points.extend(circle_pts)
-    #         facets.extend(circle_facets)
-    #         hole_points.append([cx, cy])
-
-    #     mesh_info = MeshInfo()
-    #     mesh_info.set_points(points)
-    #     mesh_info.set_facets(facets)
-    #     mesh_info.set_holes(hole_points)
-
-    #     mesh = build(mesh_info, max_volume=h**2)
-    #     node = bm.array(mesh.points)
-    #     cell = bm.array(mesh.elements)
-    #     return TriangleMesh(node, cell)
+        self.generate(modeler, gmsh)
+        ipdb.set_trace()
+        gmsh.finalize()
+        
+        return self.mesh
     
     @cartesian
     def velocity_dirichlet(self, p:TensorLike) -> TensorLike:
