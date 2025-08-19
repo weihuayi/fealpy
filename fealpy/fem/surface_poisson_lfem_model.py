@@ -1,5 +1,6 @@
 from typing import Optional, Union
 from scipy.sparse import coo_array, bmat
+
 from ..backend import backend_manager as bm
 from ..model import PDEModelManager, ComputationalModel
 from ..model.surface_poisson import SurfacePDEDataT
@@ -7,57 +8,74 @@ from ..decorator import variantmethod
 
 from ..mesh import Mesh
 from ..functionspace.parametric_lagrange_fe_space import ParametricLagrangeFESpace
-from ..fem import BilinearForm, ScalarDiffusionIntegrator
-from ..fem import LinearForm, ScalarSourceIntegrator
+from ..fem import (BilinearForm, 
+                   ScalarDiffusionIntegrator,
+                   LinearForm, 
+                   ScalarSourceIntegrator)
 from ..sparse import COOTensor
 
 from ..solver import spsolve, cg
 
 
 class SurfacePoissonLFEMModel(ComputationalModel):
-    """
-    A class to represent a surface Poisson problem using the Lagrange finite element method (LFEM).
+    """A class to represent a surface Poisson problem using the Lagrange finite element method (LFEM).
     
-    Attributes
-        mesh: The mesh of the domain.                                           
-    Reference
+    Attributes:
+        mesh: The mesh of the domain.   
+    Methods:
+        set_pde(pde): Initializes the PDE model for the problem.
+        set_mesh(mesh): Sets the mesh for the domain.
+        set_space_degree(p): Sets the polynomial degree for the isoparametric finite element space.
+        surface_poisson_system(): Assembles the linear system for the Poisson problem.
+        solve(): Solves the system using the selected solver method.
+        run(): Runs the solver, iterating over the solution process.
+        postprocess(): Computes the L2 error of the solution.                                        
+    Reference:
         https://wnesm678i4.feishu.cn/wiki/SsOKwQiVqi241WkusA9cn9ylnPf
     """
     
-    
     def __init__(self, options):
        self.options = options
-       super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+       super().__init__(pbar_log=options['pbar_log'], 
+                        log_level=options['log_level'])
        self.set_pde(options['pde'])
-       self.set_init_mesh(options['mesh_degree'], options['init_mesh']) 
+       self.pde.init_mesh.set(options['init_mesh'])
+       mesh = self.pde.init_mesh(options['mesh_degree'])
+       self.set_mesh(mesh)
        self.set_space_degree(options['space_degree']) 
     
+    def __str__(self) -> str:
+        """Returns a formatted multi-line string summarizing the configuration of the current surface Poisson problem finite element model.
+        
+        Returns
+            str: A multi-line string containing the current model configuration, 
+            displaying information such as the mesh, PDE, space degree, solver.
+        """
+        s = f"{self.__class__.__name__}(\n"
+        s += f"  pde            : {self.pde.__class__.__name__}\n"
+        s += f"  mesh           : {self.mesh.__class__.__name__}\n"
+        s += f"  space_degree   : {self.p}\n"
+        s += ")"
+
+        self.logger.info(f"\n{s}")
+        return s
+  
     def set_pde(self, pde: Union[SurfacePDEDataT, int] = 1) -> None:
         if isinstance(pde, int):
             self.pde = PDEModelManager("surface_poisson").get_example(pde)
         else:
             self.pde = pde
 
-    def set_init_mesh(self, p:int, mesh:Union[Mesh, str] = "ltri", **kwargs):
-        if isinstance(mesh, str):
-            self.mesh = self.pde.init_mesh[mesh](p, **kwargs)
-        else:
-            self.mesh = mesh
-
-        NN = self.mesh.number_of_nodes()
-        NE = self.mesh.number_of_edges()
-        NF = self.mesh.number_of_faces()
-        NC = self.mesh.number_of_cells()
-        self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+    def set_mesh(self, mesh: Mesh) -> None:
+        self.mesh = mesh
 
     def set_space_degree(self, p: int) -> None:
         self.p = p
 
     def surface_poisson_system(self):
-        """
-        Construct the linear system for the surface problem.
+        """Construct the linear system for the surface problem.
 
-        Returns
+        Returns:
             The diffusion matrix and source matrix.
         """
         self.space = ParametricLagrangeFESpace(self.mesh, self.p)
@@ -86,9 +104,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     
     @variantmethod("direct")
     def solve(self):
-        """
-        Solve the surface problem using the finite element method.
-        """
+        """Solve the surface problem using the finite element method."""
         A, F = self.surface_poisson_system()
         return spsolve(A, F, solver='scipy')
     

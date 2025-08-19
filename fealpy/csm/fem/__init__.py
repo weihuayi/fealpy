@@ -3,10 +3,13 @@ from .euler_bernoulli_beam_diffusion_integrator import EulerBernoulliBeamDiffusi
 from .euler_bernoulli_beam_uniform_source_integrator   import EulerBernoulliBeamSourceIntegrator
 from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliBeamPLSourceIntegrator
 
+from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
+
+from .elastoplastic_integrator import ElastoplasticIntegrator
+
 
 ### Model Operator
 from .euler_bernoulli_beam_fem_model import EulerBernoulliBeamFEMModel
+from .timoshenko_beam_model import TimoshenkoBeamModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
-from .elastoplastic_integrator import ElastoplasticIntegrator
-
 from .gear_box_modal_lfem_model import GearBoxModalLFEMModel
