@@ -11,9 +11,34 @@ from .triangle_mesh import TriangleMesh
 
 class LagrangeTriangleMesh(HomogeneousMesh):
     """
+    
+    Parameters:
+        node(TensorLike): the coordinates of the nodes.
+
+        cell(TensorLike): the connectivity of the cells.
+
+        p(int, optional): the order of the Lagrange element. If p is None,
+            it will be computed from cell.shape[-1].
+
+        boundary(Boundary, optional): the boundary object of the mesh.
+
+        surface(Surface, optional): the surface object contained the mesh.
+
+    Attributes:
+
+    Methods:
+
+    Notes:
+
+    Todos:
+
     """
-    def __init__(self, node: TensorLike, cell: TensorLike, p=None, boundary=None, 
-            surface=None):
+    def __init__(self, 
+                 node: TensorLike, 
+                 cell: TensorLike, 
+                 p: Optional[int] = None, 
+                 boundary=None, 
+                 surface=None):
 
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
@@ -29,6 +54,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         self.node = node
         self.cell = cell
+
         self.surface = surface
         self.boundary = boundary
 
@@ -36,6 +62,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         self.localFace = self.localEdge
         self.construct_local_cell()
         self.construct() # construct the toplogy of the mesh
+
+        # TODO: project the nodes to surface
+        # 
 
         if self.boundary is not None:
             isBdNode = self.boundary_node_flag()
@@ -51,58 +80,115 @@ class LagrangeTriangleMesh(HomogeneousMesh):
     def reference_cell_measure(self):
         return 0.5
 
-    def construct_local_edge(self) -> None:
+    def construct_local_edge(self, p: Optional[int]=None) -> None:
         """
         Generate the local edges for Lagrange elements of order p.
-        """
-        TD = self.top_dimension()
-        multiIndex = bm.multi_index_matrix(self.p, TD)
 
-        edge0 = bm.where(multiIndex[:, 0] == 0)[0]
-        edge1 = bm.where(multiIndex[:, 1] == 0)[0]
-        edge2 = bm.where(multiIndex[:, 2] == 0)[0]
+        Parameters:
+            p(int, optional): the order of the Lagrange element. If p is None,
+                it will be set to self.p.
+
+        Returns:
+            None: the local edges will be stored in self.localEdge.
+        """
+        p = self.p if p is None else p
+
+        TD = self.top_dimension()
+        mi = bm.multi_index_matrix(p, TD)
+
+        edge0 = bm.where(mi[:, 0] == 0)[0]
+        edge1 = bm.where(mi[:, 1] == 0)[0]
+        edge2 = bm.where(mi[:, 2] == 0)[0]
 
         self.localEdge = bm.stack([
             edge0, bm.flip(edge1), edge2], axis=0)  # (3, p+1)
 
-    def construct_local_cell(self) -> TensorLike:
+    def construct_local_cell(self, p: Optional[int]=None) -> TensorLike:
         """
-        TODO: Generate the local cells for Lagrange elements of order p.
+        Generate the local cells for Lagrange elements of order p.
+
+        Parameters:
+            p(int, optional): the order of the Lagrange element. If p is None,
+                it will be set to self.p.
+
+        Returns:
+            None: the local cells will be stored in self.localCell.
+        Notes:
+
         """
+
         self.localCell = None
 
-    def interpolation_points(self, p: int):
-        """Fetch all p-order interpolation points on the triangle mesh."""
+    def number_of_corner_nodes(self) -> int:
+        """
+        Get the number of corner nodes in the mesh.
 
-        if p < 1:
-            raise ValueError(f"p must be at least 1, but got {p}.")
+        Returns:
+            int: the number of corner nodes.
+        """
+        return self.cell_corner_node_flag().sum()
+
+    def cell_corner_node_flag(self) -> TensorLike:
+        """
+        Get the flag array of the corner nodes in each cell.
+
+        Returns:
+            TensorLike: a boolean array of shape (NN, ), where NN is the number
+            of nodes in the mesh. The value is True if the node is a cell corner
+            node, and False otherwise.
+        """
+
+        NN = self.number_of_nodes()
+        edge = self.entity('edge')
+
+        isCornerNode = bm.zeros(NN, dtype=bm.bool)
+        isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
+        return isCornerNode
+
+    def interpolation_points(self, p: Optional[int]=None) -> TensorLike:
+        """
+        Fetch all p-order interpolation points on the triangle mesh.
+
+        Parameters:
+            p(int, optional): the order of the Lagrange element. If p is None,
+                it will be set to self.p.
+
+        Returns:
+            TensorLike: the coordinates of the interpolation points in the
+            physical space. The shape is (NIP, GD), where NIP is the number of
+            interpolation points, and GD is the geometric dimension of the
+            mesh.
+        """
 
         GD = self.geo_dimension()
         node = self.entity('node')
-        edge = self.entity('edge')
 
-        isCornerNode = bm.zeros(len(node), dtype=bm.bool)
-        isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
-        if p == 1:
-            return node[isCornerNode]
+        if p is None:
+            return self.entity('node')
+        elif p < 1:
+            raise ValueError(f"p must be at least 1, but got {p}.")
         elif p == self.p:
             return node
+
+        isCornerNode = self.cell_corner_node_flag()
+        if p == 1:
+            return node[isCornerNode]
 
         ipoints = []
         ipoints.append(node[isCornerNode])  # the corner nodes 
 
         # edge interior interpolation points 
-        w = bm.multi_index_matrix(p, 1, dtype=self.ftype)[1:-1]/p
-        w = w[1:-1]/p
+        w = bm.multi_index_matrix(p, 1)[1:-1]/p
         ipoints.append(self.bc_to_point(w).reshape(-1, GD))
 
         # cell interior interpolation_points 
-        if p >= 3:
+        if p > 2:
             TD = self.top_dimension()
             mi = self.multi_index_matrix(p, TD)
             isInCellIPoints = bm.sum(mi > 0, axis=-1) == 3
             w = mi[isInCellIPoints, :] / p
             ipoints.append(self.bc_to_point(w).reshape(-1, GD))
+
         return bm.concatenate(ipoints, axis=0)
 
     def uniform_refine(self, n: int = 1):
@@ -111,6 +197,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         Parameters:
             n(int): the number of uniform refinements.
+
+        Returns:
 
         Notes:
             
@@ -180,12 +268,12 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                 e0 = bm.stack((edge[:, 0], mid), axis=1)
                 e1 = bm.stack((mid, edge[:, -1]), axis=1)
             else:
-                n = self.p - 1
+                nn = self.p - 1
                 start = end
-                end = start + 2 * n * NE
+                end = start + 2 * nn * NE
                 e = bm.arange(start, end, **ikwargs).reshape(-1, 2 * n)
-                e0 = bm.concat((edge[:, [0]], e[:, 0*n:1*n],      mid[:, None]), axis=1)
-                e1 = bm.concat((    mid[:, None], e[:, 1*n:2*n], edge[:, [-1]]), axis=1)
+                e0 = bm.concat((edge[:, [0]], e[:, 0*nn:1*nn],  mid[:, None]), axis=1)
+                e1 = bm.concat((mid[:, None], e[:, 1*nn:2*nn], edge[:, [-1]]), axis=1)
             edges.extend([e0, e1])
 
             e2c0 = bm.stack((
@@ -235,13 +323,13 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                 e1 = c2e[:, [2, 0]] 
                 e2 = c2e[:, [0, 1]]
             else:
-                n = self.p - 1
+                nn = self.p - 1
                 start = end
-                end = start + 3 * n * NC
+                end = start + 3 * nn * NC
                 e = bm.arange(start, end, **ikwargs).reshape(-1, 3 * n)
-                e0 = bm.concat((c2e[:, [1]], e[:, 0*n:1*n], c2e[:, [2]]), axis=1)
-                e1 = bm.concat((c2e[:, [2]], e[:, 1*n:2*n], c2e[:, [0]]), axis=1)
-                e2 = bm.concat((c2e[:, [0]], e[:, 2*n:3*n], c2e[:, [1]]), axis=1) 
+                e0 = bm.concat((c2e[:, [1]], e[:, 0*nn:1*nn], c2e[:, [2]]), axis=1)
+                e1 = bm.concat((c2e[:, [2]], e[:, 1*nn:2*nn], c2e[:, [0]]), axis=1)
+                e2 = bm.concat((c2e[:, [0]], e[:, 2*nn:3*nn], c2e[:, [1]]), axis=1) 
             edges.extend([e0, e1, e2])
 
             e2c0 = bm.stack((
@@ -271,8 +359,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                 mi = bm.multi_index_matrix(self.p, TD)
                 isInCellNodes = bm.sum(mi > 0, axis=-1) == 3
                 w = mi[isInCellNodes, :] / self.p
-                n = len(w)
-                w = bm.concatenate((
+                nn = len(w)
+                w = bm.concat((
                     w @ A[[0, 5, 4]], 
                     w @ A[[1, 3, 5]], 
                     w @ A[[2, 4, 3]], 
@@ -280,8 +368,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                     ), axis=0)
                 nodes.append(self.bc_to_point(w).reshape(-1, self.GD))
                 start = end
-                end = start + 4 * n * NC
-                icell = bm.arange(start, end, **ikwargs).reshape(-1, n)
+                end = start + 4 * nn * NC
+                icell = bm.arange(start, end, **ikwargs).reshape(-1, nn)
 
 
 
@@ -312,6 +400,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         Parameters:
             icell(TensorLike):
+
         Notes:
             
         """
@@ -370,14 +459,14 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         Notes:
             
         """
-        from ..quadrature import TriangleQuadrature
-        from ..quadrature import GaussLegendreQuadrature
 
         if isinstance(etype, str):
             etype = estr2dim(self, etype)
         if etype == 2:
+            from ..quadrature import TriangleQuadrature
             quad = TriangleQuadrature(q)
         elif etype == 1:
+            from ..quadrature import GaussLegendreQuadrature
             quad = GaussLegendreQuadrature(q)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
@@ -481,20 +570,30 @@ class LagrangeTriangleMesh(HomogeneousMesh):
     def number_of_global_ipoints(self, p:int):
         """
         """
-        NN = self.linearmesh.number_of_nodes()
-        NE = self.linearmesh.number_of_edges()
-        NC = self.linearmesh.number_of_cells()
+        NN = self.number_of_corner_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
         num = (NN, NE, NC)
         return simplex_gdof(p, num) 
 
-    def cell_to_ipoint(self, p:int, index:Index=_S):
+    def cell_to_ipoint(self, p:int, index:Index=_S) -> TensorLike:
         """
+        Construct the map matrix from cells to interpolation points.
+
+        Parameters:
+            p(int): the order of the Lagrange polynomial.
+            index(Index): the index of the mesh cells.
+
+        Returns:
+            TensorLike: the map matrix from cells to interpolation points.
+            The shape is (NC, ldof), where NC is the number of cells and ldof is
+            the number of local interpolation points.
         """
-        sp = self.p
-        cell = self.cell[:, [0, -sp-1, 1]]  # 取角点
+        cell = self.entity('cell')
+        ikwargs = bm.context(cell)
 
         if p == 1:
-            return cell[index]
+            return cell[:, [0, -self.p-1, -1]][index]
 
         TD = self.top_dimension()
         mi = self.multi_index_matrix(p, TD)
@@ -503,15 +602,14 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         idx2, = bm.nonzero(mi[:, 2] == 0)
 
         face2cell = self.face_to_cell()
-        NN = self.number_of_nodes()
+        NN = self.number_of_corner_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
 
         e2p = self.edge_to_ipoint(p)
         ldof = self.number_of_local_ipoints(p, 'cell')
 
-        kwargs = bm.context(cell)
-        c2p = bm.zeros((NC, ldof), **kwargs)
+        c2p = bm.zeros((NC, ldof), **ikwargs)
 
         flag = face2cell[:, 2] == 0
         c2p = bm.set_at(c2p, (face2cell[flag, 0][:, None], idx0), e2p[flag])
@@ -537,21 +635,20 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         cdof = (p-1)*(p-2)//2
         flag = bm.sum(mi > 0, axis=1) == 3
-        val = NN + NE*(p-1) + bm.arange(NC*cdof, **kwargs).reshape(NC, cdof)
+        val = NN + NE*(p-1) + bm.arange(NC*cdof, **ikwargs).reshape(NC, cdof)
         c2p = bm.set_at(c2p, (..., flag), val)
         return c2p[index]
 
     def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
         """Get the relationship between edges and integration points."""
-        NN = self.linearmesh.number_of_nodes()
+        NN = self.number_of_corner_nodes()
         NE = self.number_of_edges()
-        edges = self.edge[index]
-        # kwargs = {'dtype': edges.dtype}
-        kwargs = bm.context(edges)
-        indices = bm.arange(NE, **kwargs)[index]
+        edge = self.edge[index]
+        ikwargs = bm.context(edges)
+        indices = bm.arange(NE, **ikwargs)[index]
         return bm.concatenate([
-            edges[:, 0].reshape(-1, 1),
-            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
+            edges[:, [0]],
+            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **ikwargs) + NN,
             edges[:, -1].reshape(-1, 1),
         ], axis=-1)
 
@@ -783,6 +880,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
     @classmethod
     def from_curve_triangle_mesh(cls, mesh, p: int, curve=None):
+        """
+        """
         init_node = mesh.entity('node')
 
         node = mesh.interpolation_points(p)
@@ -795,8 +894,6 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             node[e2p], _ = curve.project(node[e2p])
 
         lmesh = cls(node, cell, p=p, construct=True)
-        lmesh.linearmesh = mesh
-
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
         lmesh.cell2edge = mesh.cell2edge
         lmesh.edge  = mesh.edge_to_ipoint(p)
