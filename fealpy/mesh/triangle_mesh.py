@@ -1479,6 +1479,13 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         return cls(node, cell)
 
+    @classmethod
+    def from_box_with_circular_holes(cls, box=[0, 1, 0, 1], holes=[0.5, 0.5, 0.1], h): 
+        """
+        """
+        import gmsh
+        pass
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_polygon_gmsh(cls, vertices, h):
