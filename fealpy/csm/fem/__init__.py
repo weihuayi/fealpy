@@ -4,11 +4,7 @@ from .euler_bernoulli_beam_uniform_source_integrator   import EulerBernoulliBeam
 from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliBeamPLSourceIntegrator
 
 from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
-
-from .elastoplastic_integrator import ElastoplasticIntegrator
-
-from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
-
+from .axle_integrator import AxleIntegrator
 from .elastoplastic_integrator import ElastoplasticIntegrator
 
 

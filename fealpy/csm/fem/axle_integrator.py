@@ -8,9 +8,9 @@ from fealpy.fem.integrator import (
 from fealpy.functionspace.space import FunctionSpace as _FS
 
 
-class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
+class AxleIntegrator(LinearInt, OpInt, CellInt):
     """
-    Integrator for Timoshenko beam problems.
+    Integrator for axle problems.
     """
 
     def __init__(self, 
@@ -83,36 +83,6 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         R = bm.concatenate([row1, row2, row3, row4], axis=1)  #shape: (NC, 12, 12)
         return R
     
-    @enable_cache
-    def fetch(self, space: _FS):
-        """Retrieve material and geometric parameters for the 3D Timoshenko beam.
-        
-        Parameters:
-            beam_E(float) : Young's modulus.
-            beam_mu(float): shear modulus.
-            l(float): Length of the beam element.
-            AX(float): Cross-sectional area in the x-direction.
-            AY(float): Cross-sectional area in the y-direction.
-            AZ(float): Cross-sectional area in the z-direction.
-            Iy(float): Moment of inertia about the y-axis.
-            Iz(float): Moment of inertia about the z-axis.
-            Ix(float): Polar moment of inertia (for torsional effects).
-        """
-        assert space is self.space  
-
-        E, mu = self.material.E, self.material.mu
-        mesh = space.mesh
-        
-        # 几何参数
-        l = mesh.entity_measure('cell')
-        Ax, Ay, Az = self.material.cross_section()
-        Ix, Iy, Iz = self.material.inertia()
-
-        # 坐标变换矩阵
-        R = self._coord_transfrom()
-        
-        return E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R
-
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         """Construct the stiffness matrix for 3D beam elements.This function computes the (12, 12) stiffness matrix for each element.
@@ -121,58 +91,31 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
             Ke(ndarray),The 3D beam element stiffness matrix, shape (NC, 12, 12).
         """
         assert space is self.space  
-        
-        E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R = self.fetch(space)
+
         mesh = space.mesh
         NC = mesh.number_of_cells()
-        cells = bm.arange(0, NC - 10)
+        cells = bm.arange(NC - 10, NC)
+        
+        k_axle = 1.976e6  # Axle stiffness
 
-        l = l[cells]
-        R = R[cells]
+        R = self._coord_transfrom()[cells] # 坐标变换矩阵
+        kx, ky, kz = k_axle, k_axle, k_axle
 
-        phi_y = 12 * E * Iz / mu / Ay / (l**2)
-        phi_z = 12 * E * Iy / mu / Az / (l**2)
-
-        Ke = bm.zeros((len(cells), 12, 12))
-
-        Ke[:, 0, 0] = E * Ax / l
-        Ke[:, 0, 6] = -Ke[:, 0, 0]
-
-        Ke[:, 1, 1] = 12 * E * Iz / (1+phi_y) /(l**3)
-        Ke[:, 1, 5] = 6 * E *Iz / (1+phi_y) / (l**2)
-        Ke[:, 1, 7] = -Ke[:, 1, 1]
-        Ke[:, 1, 11] = -Ke[:, 1, 5]
-
-        Ke[:, 2, 2] = 12 * E * Iy / (1+phi_z) /(l**3)
-        Ke[:, 2, 4] = -6 * E *Iy / (1+phi_z) / (l**2)
-        Ke[:, 2, 8] = -Ke[:, 2, 2]
-        Ke[:, 2, 10] = Ke[:, 2, 4]
-
-        Ke[:, 3, 3] = mu * Ix / l
-        Ke[:, 3, 9] = -Ke[:, 3, 3]
-
-        Ke[:, 4, 4] = (4+phi_z) * E * Iy / (1+phi_z) / l
-        Ke[:, 4, 8] = 6 * E * Iy / (1+phi_z) / (l**2)
-        Ke[:, 4, 10] = (2-phi_z) * E * Iy / (1+phi_z) / l
-
-        Ke[:, 5, 5] = (4+phi_y) * E * Iz / (1+phi_y) / l
-        Ke[:, 5, 7] = -6 * E * Iz / (1+phi_y) / (l**2)
-        Ke[:, 5, 11] = (2-phi_y) * E * Iz / (1+phi_y) / l
-
-        Ke[:, 6, 6] = Ke[:, 0, 0]
-        Ke[:, 7, 7] = -Ke[:, 1, 7]
-        Ke[:, 7, 11] = -Ke[:, 1, 11]
-
-        Ke[:, 8, 8] = -Ke[:, 2, 8]
-        Ke[:, 8, 10] = -Ke[:, 2, 10]
-        Ke[:, 9, 9] = Ke[:, 3, 3]
-        Ke[:, 10, 10] = Ke[:, 4, 4]
-        Ke[:, 11, 11] = Ke[:, 6, 6]
-
-        # Symmetrize
-        for j in range(11):
-            for k in range(j + 1, 12):
-                Ke[:, k, j] = Ke[:, j, k]
-
-        KE = bm.einsum('cij, cjk, clk -> cil', R, Ke, R)
+        K0 = bm.array([[kx, 0, 0],
+                      [0, ky, 0],
+                      [0, 0, kz]], dtype=bm.float64)
+        
+        # 转动刚度矩阵（假设远大于平动）
+        K_zeros = bm.ones((3, 3), dtype=bm.float64)*kx*1e3
+        
+        # 水平拼接每一行
+        row1 = bm.concatenate(( K0,      K_zeros,  -K0,     K_zeros), axis=1)
+        row2 = bm.concatenate(( K_zeros, K_zeros,   K_zeros, K_zeros), axis=1)
+        row3 = bm.concatenate((-K0,      K_zeros,    K0,     K_zeros), axis=1)
+        row4 = bm.concatenate(( K_zeros, K_zeros,   K_zeros, K_zeros), axis=1)
+        Ke = bm.concatenate((row1, row2, row3, row4), axis=0)
+        
+        # 刚度矩阵
+        Ke_batch = bm.repeat(Ke[None, :, :], len(cells), axis=0)  # (NC_axle, 12, 12)
+        KE = bm.einsum('cij, cjk, clk -> cil', R, Ke_batch, R)
         return KE

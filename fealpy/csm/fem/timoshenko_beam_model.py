@@ -19,7 +19,9 @@ from fealpy.solver import spsolve, cg
 
 from ..model.beam import BeamPDEDataT
 from ..model import CSMModelManager
-from ..material import TimoshenkoBeamMaterial
+from ..material import TimoshenkoBeamMaterial,  AxleMaterial
+from ..fem.timoshenko_beam_integrator import TimoshenkoBeamIntegrator
+from ..fem.axle_integrator import AxleIntegrator
 from ..fem import TimoshenkoBeamIntegrator
 
 
@@ -75,7 +77,7 @@ class TimoshenkoBeamModel(ComputationalModel):
         def set_space_degree(self, p: int) -> None:
                 self.p = p
 
-        def timo_beam_system(self):
+        def timo_axle_system(self):
                 """"Construct the linear system for the 3D timoshenko beam problem.
 
                 Parameters:
@@ -85,13 +87,33 @@ class TimoshenkoBeamModel(ComputationalModel):
                 self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
                 self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
 
-                TBM = TimoshenkoBeamMaterial(name="timobeam",
+                Timo = TimoshenkoBeamMaterial(name="timobeam",
                                       model=self.pde, 
                                       elastic_modulus=self.beam_E,
                                       poisson_ratio=self.beam_nu)
+                
+                Axle = AxleMaterial(name="axle",
+                                      model=self.pde, 
+                                      elastic_modulus=self.axle_E,
+                                      poisson_ratio=self.axle_nu)
+                
+                mesh = self.tspace.mesh
+                NC = mesh.number_of_cells()
+                
+                bform = BilinearForm(self.tspace, batch_size=NC-10)
+                beam_K = bform.add_integrator(TimoshenkoBeamIntegrator(self.tspace, Timo))
+                
+                bform = BilinearForm(self.tspace, batch_size=10)
+                axle_K = bform.add_integrator(AxleIntegrator(self.tspace, Axle))
+                print("beam_K:", beam_K)
+                print("axle_K:", axle_K)
+                
+                K = bm.zeros((NC, 12, 12), dtype=bm.float64)
+                # print("K dtype:", K.dtype)
+                # K[beam_cells] += beam_K
+                # K[axle_cells] += axle_K
 
-                bform = BilinearForm(self.tspace)
-                bform.add_integrator(TimoshenkoBeamIntegrator(self.tspace, TBM))
+                bform.add_integrator(K)
                 K = bform.assembly()
                 
                 # lform = LinearForm(self.tspace)
