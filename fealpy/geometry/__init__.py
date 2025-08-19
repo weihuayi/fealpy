@@ -2,6 +2,6 @@
 # from .sizing_function import huniform
 from .geometry_kernel_manager import GeometryKernelManager
 from .implicit_surface import SphereSurface
-
+from .dld_modeler import DLDModeler
 
 geometry_kernel_manager = GeometryKernelManager(default_adapter='occ')
