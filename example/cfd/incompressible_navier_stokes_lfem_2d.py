@@ -1,9 +1,10 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.cfd.model.test.incompressible_navier_stokes.incompressible_navier_stokes_2d import FromSympy, NSLFEMChannelPDE
+from fealpy.cfd.model import CFDPDEModelManager
 from fealpy.cfd.incompressible_navier_stokes_lfem_2d_model import IncompressibleNSLFEM2DModel
 import argparse
 
 
+## 参数解析
 parser = argparse.ArgumentParser(description=
     """
     Solve elliptic equations using the lowest order Raviart-Thomas element and piecewise constant mixed finite element method.
@@ -13,12 +14,8 @@ parser.add_argument('--backend',
     default='numpy', type=str,
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
-parser.add_argument('--GD',
-    default='2d', type=str,
-    help="Geometry dimension, default is 2d. You can also choose 3d.")
-    
 parser.add_argument('--pde',
-    default='poly2d', type=str,
+    default = 2, type=str,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--rho',
@@ -29,33 +26,41 @@ parser.add_argument('--mu',
     default=1.0, type=float,
     help="Viscosity of the fluid, default is 1.0")
 
-parser.add_argument('--init_mesh',
-    default='tri', type=str,
-    help="Type of initial mesh, default is tri")
-
-parser.add_argument('--nx',
-    default=8, type=int,
-    help="Number of divisions in the x direction, default is 8")
-
-parser.add_argument('--ny',
-    default=8, type=int,
-    help="Number of divisions in the y direction, default is 8")
-
-parser.add_argument('--nz',
-    default=8, type=int,
-    help="Number of divisions in the z direction, default is 8 (only for 3D problems)")
-
 parser.add_argument('--T0',
     default=0.0, type=float,
     help="Initial time, default is 0.0")
 
 parser.add_argument('--T1',
-    default=0.5, type=float,
+    default=4, type=float,
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=100, type=int,
+    default=300, type=int,
     help="Number of time steps, default is 1000")
+
+parser.add_argument('--init_mesh',
+    default = 'tri', type=str,
+    help="Type of initial mesh, default is tri")
+
+parser.add_argument('--box',
+    default = [0.0, 2.2, 0.0, 0.41], type=int,
+    help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
+
+parser.add_argument('--center',
+    default = (0.3, 0.205), type=float,
+    help="Center of the first circle, default is (0.1, 0.05).")
+
+parser.add_argument('--radius',
+    default = 0.05, type=int,
+    help="Radius of the circles, default is 0.029.")
+
+parser.add_argument('--n_circle',
+    default = 400, type=int,
+    help="Number of divisions in the circle, default is 60")
+
+parser.add_argument('--lc',
+    default = 0.05, type=float,
+    help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--method',
     default='Newton', type=str,
@@ -65,8 +70,16 @@ parser.add_argument('--solve',
     default='direct', type=str,
     help="Type of solver, default is direct, options are direct, iterative")
 
+parser.add_argument('--apply_bc',
+    default='cylinder', type=str,
+    help="Type of boundary condition application, default is dirichlet, options are dirichlet, neumann, cylinder, None")
+
+parser.add_argument('--postprocess',
+    default='res', type=str,
+    help="Post-processing method, default is error, options are error, plot")
+
 parser.add_argument('--run',
-    default='uniform_refine', type=str,
+    default='main', type=str,
     help="Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
@@ -75,7 +88,7 @@ parser.add_argument('--maxit',
 
 parser.add_argument('--maxstep',
     default=10, type=int,
-    help="Maximum number of steps for the refinement, default is 10")
+    help="Maximum number of steps for the refinement, default is 1000")
 
 parser.add_argument('--tol',
     default=1e-10, type=float,
@@ -85,5 +98,9 @@ parser.add_argument('--tol',
 options = vars(parser.parse_args())
 
 bm.set_backend(options['backend'])
-# pde = FromSympy(rho=options['rho'], mu=options['mu'])
-model = IncompressibleNSLFEM2DModel(options)
+manager = CFDPDEModelManager('incompressible_navier_stokes')
+pde = manager.get_example(options['pde'], **options)
+mesh = pde.init_mesh()
+model = IncompressibleNSLFEM2DModel(pde=pde, mesh = mesh, options = options)
+uh, ph = model.run()
+# model.__str__()

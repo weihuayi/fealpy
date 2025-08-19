@@ -26,7 +26,7 @@ class Exp0001():
         center = options['center']
         radius = options['radius']
         n_circle = options['n_circle'] 
-        h = options['h']
+        h = options['lc']
 
         self.box = box
         self.center = center
