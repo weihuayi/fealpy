@@ -2,12 +2,12 @@ from typing import Sequence
 from fealpy.decorator import cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
-from fealpy.geometry import DLDModeler
-from fealpy.mesher import DLDMesher
+from fealpy.geometry import DLDMicrofluidicChipModeler
+from fealpy.mesher import DLDMicrofluidicChipMesher
 
 import sympy as sp
 
-class Exp0002(DLDMesher):
+class Exp0002(DLDMicrofluidicChipMesher):
     def __init__(self, options: dict = {}):
         self.options = options
         self.eps = 1e-10
@@ -27,16 +27,11 @@ class Exp0002(DLDMesher):
     
     def init_mesh(self):
         import gmsh
-        import ipdb
         gmsh.initialize()
-        
-        modeler = DLDModeler(options=self.options)
+        modeler = DLDMicrofluidicChipModeler(self.options)
         modeler.build(gmsh)
-
         self.generate(modeler, gmsh)
-        ipdb.set_trace()
         gmsh.finalize()
-        
         return self.mesh
     
     @cartesian

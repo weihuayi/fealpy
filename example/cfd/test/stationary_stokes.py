@@ -2,7 +2,6 @@ from fealpy.backend import backend_manager as bm
 from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
 from fealpy.cfd.equation import StationaryIncompressibleNS
 from fealpy.cfd.model import CFDTestModelManager
-from fealpy.mesher.chip_mesher import ChipMesher
 import matplotlib.pyplot as plt
 import argparse
 
