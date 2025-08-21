@@ -53,9 +53,9 @@ options = vars(parser.parse_args())
 from fealpy.backend import backend_manager as bm
 bm.set_backend(options['backend'])
 
-from fealpy.csm.fem import TimoshenkoBeamModel
-model = TimoshenkoBeamModel(options)
+from fealpy.csm.fem import TimobeamAxleModel
+model = TimobeamAxleModel(options)
 model.__str__()
-# model.timo_beam_system()
+model.timo_axle_system()
 model.solve()
 # print("u", model.solve())
