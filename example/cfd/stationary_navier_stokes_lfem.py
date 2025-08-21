@@ -26,7 +26,7 @@ parser.add_argument('--rho',
     help="Density of the fluid, default is 1.0")
 
 parser.add_argument('--mu',
-    default=1.0, type=float,
+    default=1.0e-3, type=float,
     help="Viscosity of the fluid, default is 1.0")
 
 parser.add_argument('--init_mesh',
@@ -46,46 +46,46 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.029.")
 
 parser.add_argument('--n_circle',
-    default = 400, type=int,
+    default = 1000, type=int,
     help="Number of divisions in the circle, default is 60")
 
-# parser.add_argument('--l1',
-#     default = 3e-4, type=float,
-#     help="Vertical spacing between circles in a column. Default: 0.1.")
+parser.add_argument('--l1',
+    default = 3e-4, type=float,
+    help="Vertical spacing between circles in a column. Default: 0.1.")
 
-# parser.add_argument('--l2',
-#     default = 3e-4, type=float,
-#     help="Horizontal spacing between circle columns. Default: 0.1.")
+parser.add_argument('--l2',
+    default = 3e-4, type=float,
+    help="Horizontal spacing between circle columns. Default: 0.1.")
 
-# parser.add_argument('--h',
-#     default = 5e-5, type=float,
-#     help="Mesh size, default is 0.05")
+parser.add_argument('--h',
+    default = 5e-5, type=float,
+    help="Mesh size, default is 0.05")
 
 parser.add_argument('--lc',
-    default = 0.05, type=float,
+    default = 0.01, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
-# parser.add_argument('--hole_lc',
-#     default = 8e-6, type=float,
-#     help="Mesh size, default is 0.006")
+parser.add_argument('--hole_lc',
+    default = 8e-6, type=float,
+    help="Mesh size, default is 0.006")
 
-# parser.add_argument('--m',
-#     default = 7, type=float,
-#     help="Number of divisions in the x direction, default is 10")
-# parser.add_argument('--n',
-#     default = 7, type=float,
-#     help="Number of divisions in the y direction, default is 10")
-# parser.add_argument('--hole_method',
-#     default = 'aligned', type=str,
-#     help="Method for generating holes, default is 'aligned' (holes are generated in a regular, aligned grid layout)")
+parser.add_argument('--m',
+    default = 7, type=float,
+    help="Number of divisions in the x direction, default is 10")
+parser.add_argument('--n',
+    default = 7, type=float,
+    help="Number of divisions in the y direction, default is 10")
+parser.add_argument('--hole_method',
+    default = 'aligned', type=str,
+    help="Method for generating holes, default is 'aligned' (holes are generated in a regular, aligned grid layout)")
 
-# parser.add_argument('--return_mesh',
-#     default='True', type=str,
-#     help='Whether to generate mesh, default is True')
+parser.add_argument('--return_mesh',
+    default='True', type=str,
+    help='Whether to generate mesh, default is True')
 
-# parser.add_argument('--show_figure',
-#     default='False', type=str,
-#     help='Whether to show figure in Gmsh, default is True')
+parser.add_argument('--show_figure',
+    default='False', type=str,
+    help='Whether to show figure in Gmsh, default is True')
 
 parser.add_argument('--method',
     default='Newton', type=str,
@@ -128,7 +128,13 @@ pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
 uh, ph = model.run()
+cd,cl,delta_p = model.error['benchmark'](uh, ph)
+print(f"Drag coefficient: {cd}, \nLift coefficient: {cl}, \nPressure difference: {delta_p}")
 # model.__str__()
+
+print("number of cell:", mesh.number_of_cells())
+print("number of edge:", mesh.number_of_edges())
+print("number of node:", mesh.number_of_nodes())
 
 mesh.nodedata['ph'] = ph
 mesh.nodedata['uh'] = uh.reshape(2,-1).T
