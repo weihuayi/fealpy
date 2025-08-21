@@ -42,6 +42,8 @@ mesh = LagrangeTriangleMesh.from_box_with_circular_holes(box=box, holes=holes, p
 
 model = DLDMicrofluidicChipLFEMModel(options)
 
+model.set_mesh(mesh)
+
 fig = plt.figure()
 ax = fig.add_subplot(111)
 high_order_meshploter(ax, mesh)

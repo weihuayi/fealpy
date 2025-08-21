@@ -40,6 +40,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
     def set_mesh(self, mesh):
         """
         """
+        self.mesh = mesh
 
     def linear_system(self):
         pass
