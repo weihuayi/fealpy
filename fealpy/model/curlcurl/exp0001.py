@@ -31,8 +31,8 @@ class Exp0001(BoxMesher2d):
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
-        x = p[..., 0]
-        y = p[..., 1]
+        x = p[..., 0, None]
+        y = p[..., 1, None]
         Fx = x*y*(1 - x)*(1 - y)
         Fy = bm.sin(bm.pi*x)*bm.sin(bm.pi*y)
         f = bm.concatenate([Fx, Fy], axis=-1) 
@@ -51,8 +51,8 @@ class Exp0001(BoxMesher2d):
     
     @cartesian
     def curl_curl_solution(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
+        x = p[..., 0, None]
+        y = p[..., 1, None]
         pi = bm.pi
         sin = bm.sin
         cos = bm.cos

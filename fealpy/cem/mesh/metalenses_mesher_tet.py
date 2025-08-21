@@ -134,20 +134,20 @@ class MetalensesMesherTet:
             master_tag, origin_node_tag, master_node_tag, _ = gmsh.model.mesh.getPeriodicNodes(2, face)
             if origin_node_tag is not None:
                 for i in range(len(origin_node_tag)):
-                    periodic_node_pairs_x[origin_node_tag[i]-1] = master_node_tag[i]-1
+                    periodic_node_pairs_x[int(origin_node_tag[i]-1)] = int(master_node_tag[i]-1)
         origin_face_tag_y = [67, 62, 57, 72]
         periodic_node_pairs_y = {}
         for face in origin_face_tag_y:
             master_tag, origin_node_tag, master_node_tag, _ = gmsh.model.mesh.getPeriodicNodes(2, face)
             if origin_node_tag is not None:
                 for i in range(len(origin_node_tag)):
-                    periodic_node_pairs_y[origin_node_tag[i]-1] = master_node_tag[i]-1
+                    periodic_node_pairs_y[int(origin_node_tag[i]-1)] = int(master_node_tag[i]-1)
         # 获取所有节点坐标
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        points = bm.array(node_coords).reshape(-1, 3)
+        points = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)
         # 获取所有三维单元（wedge）：
         elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(3)
-        cells = bm.array(elem_node_tags).reshape(-1, 4) - 1  # Gmsh 节点是从 1 开始编号
+        cells = bm.array(elem_node_tags, dtype=bm.int64).reshape(-1, 4) - 1  # Gmsh 节点是从 1 开始编号
         # 获取所有元素和其物理组
         physical_groups = gmsh.model.getPhysicalGroups(3)
         cell_to_physical = {}
