@@ -32,12 +32,11 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         """Construct the coordinate transformation matrix for 3D beam elements."""
         mesh = self.space.mesh
         node= mesh.entity('node')
-        cell = mesh.entity('cell')
+        cell = mesh.entity('cell')[self.index]
         bar_nodes = node[cell]
         
-        NC = mesh.number_of_cells()
         x, y, z = bar_nodes[..., 0], bar_nodes[..., 1], bar_nodes[..., 2]
-        bars_length = mesh.entity_measure('cell')
+        bars_length = mesh.entity_measure('cell')[self.index]
         
         # 第一行（轴向单位向量）
         T11 = (x[..., 1] - x[..., 0]) / bars_length
@@ -74,6 +73,7 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
                 ], axis=1)  # shape: (NC, 3, 3)
 
         # 构造12x12旋转变换矩阵 R
+        NC = T0.shape[0]
         O = bm.zeros((NC, 3, 3))
         row1 = bm.concatenate([T0   , O,  O,  O], axis=2)
         row2 = bm.concatenate([O,  T0, O,  O], axis=2)
@@ -93,12 +93,10 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         assert space is self.space  
 
         mesh = space.mesh
-        NC = mesh.number_of_cells()
-        cells = bm.arange(NC - 10, NC)
+        cells = bm.arange(mesh.number_of_cells()) if self.index is _S else self.index
+        NC = len(cells)
         
-        k_axle = 1.976e6  # Axle stiffness
-
-        R = self._coord_transfrom()[cells] # 坐标变换矩阵
+        k_axle = getattr(self.material, "k_axle", 1.976e6) # Axle stiffness
         kx, ky, kz = k_axle, k_axle, k_axle
 
         K0 = bm.array([[kx, 0, 0],
@@ -113,9 +111,10 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         row2 = bm.concatenate(( K_zeros, K_zeros,   K_zeros, K_zeros), axis=1)
         row3 = bm.concatenate((-K0,      K_zeros,    K0,     K_zeros), axis=1)
         row4 = bm.concatenate(( K_zeros, K_zeros,   K_zeros, K_zeros), axis=1)
-        Ke = bm.concatenate((row1, row2, row3, row4), axis=0)
+        Ke = bm.concatenate((row1, row2, row3, row4), axis=0) # (12,12)
         
         # 刚度矩阵
-        Ke_batch = bm.repeat(Ke[None, :, :], len(cells), axis=0)  # (NC_axle, 12, 12)
+        Ke_batch = bm.repeat(Ke[None, :, :], NC, axis=0)  # (NC, 12, 12)
+        R = self._coord_transfrom()
         KE = bm.einsum('cij, cjk, clk -> cil', R, Ke_batch, R)
         return KE

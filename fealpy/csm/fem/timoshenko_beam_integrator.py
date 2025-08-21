@@ -32,12 +32,11 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         """Construct the coordinate transformation matrix for 3D beam elements."""
         mesh = self.space.mesh
         node= mesh.entity('node')
-        cell = mesh.entity('cell')
+        cell = mesh.entity('cell')[self.index]
         bar_nodes = node[cell]
         
-        NC = mesh.number_of_cells()
         x, y, z = bar_nodes[..., 0], bar_nodes[..., 1], bar_nodes[..., 2]
-        bars_length = mesh.entity_measure('cell')
+        bars_length = mesh.entity_measure('cell')[self.index]
         
         # 第一行（轴向单位向量）
         T11 = (x[..., 1] - x[..., 0]) / bars_length
@@ -74,6 +73,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
                 ], axis=1)  # shape: (NC, 3, 3)
 
         # 构造12x12旋转变换矩阵 R
+        NC = T0.shape[0]
         O = bm.zeros((NC, 3, 3))
         row1 = bm.concatenate([T0   , O,  O,  O], axis=2)
         row2 = bm.concatenate([O,  T0, O,  O], axis=2)
@@ -99,41 +99,36 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
             Ix(float): Polar moment of inertia (for torsional effects).
         """
         assert space is self.space  
-
-        E, mu = self.material.E, self.material.mu
         mesh = space.mesh
+        cells = bm.arange(mesh.number_of_cells()) if self.index is _S else self.index
         
-        # 几何参数
-        l = mesh.entity_measure('cell')
+        # 参数
+        l = mesh.entity_measure('cell')[cells]
+        E, mu = self.material.E, self.material.mu
         Ax, Ay, Az = self.material.cross_section()
         Ix, Iy, Iz = self.material.inertia()
 
         # 坐标变换矩阵
         R = self._coord_transfrom()
         
-        return E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R
+        return E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R, len(cells)
 
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
-        """Construct the stiffness matrix for 3D beam elements.This function computes the (12, 12) stiffness matrix for each element.
+        """Construct the stiffness matrix for 3D beam elements.
+        This function computes the (12, 12) stiffness matrix for each element.
             
         Returns:
             Ke(ndarray),The 3D beam element stiffness matrix, shape (NC, 12, 12).
         """
-        assert space is self.space  
+        assert space is self.space 
         
-        E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R = self.fetch(space)
-        mesh = space.mesh
-        NC = mesh.number_of_cells()
-        cells = bm.arange(0, NC - 10)
-
-        l = l[cells]
-        R = R[cells]
+        E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R, NC = self.fetch(space)
 
         phi_y = 12 * E * Iz / mu / Ay / (l**2)
         phi_z = 12 * E * Iy / mu / Az / (l**2)
 
-        Ke = bm.zeros((len(cells), 12, 12))
+        Ke = bm.zeros((NC, 12, 12))
 
         Ke[:, 0, 0] = E * Ax / l
         Ke[:, 0, 6] = -Ke[:, 0, 0]
