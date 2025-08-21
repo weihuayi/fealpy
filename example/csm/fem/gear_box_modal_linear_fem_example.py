@@ -39,6 +39,6 @@ options = vars(parser.parse_args())
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
-from fealpy.csm.fem import GearBoxModalLFEMModel
-model = GearBoxModalLFEMModel(options)
+from fealpy.csm.fem import GearBoxModalLinearFEMModel
+model = GearBoxModalLinearFEMModel(options)
 model.solve()

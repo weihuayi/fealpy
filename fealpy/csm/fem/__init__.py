@@ -18,4 +18,4 @@ from .elastoplastic_integrator import ElastoplasticIntegrator
 from .euler_bernoulli_beam_fem_model import EulerBernoulliBeamFEMModel
 from .timoshenko_beam_model import TimoshenkoBeamModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
-from .gear_box_modal_lfem_model import GearBoxModalLFEMModel
+from .gear_box_modal_linear_fem_model import GearBoxModalLinearFEMModel
