@@ -2,7 +2,6 @@ from fealpy.typing import Tuple, TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.mesh import EdgeMesh
-from fealpy.material import Material
 
 
 
