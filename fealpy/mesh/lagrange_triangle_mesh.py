@@ -655,12 +655,12 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         NN = self.number_of_corner_nodes()
         NE = self.number_of_edges()
         edge = self.edge[index]
-        ikwargs = bm.context(edges)
+        ikwargs = bm.context(edge)
         indices = bm.arange(NE, **ikwargs)[index]
         return bm.concatenate([
-            edges[:, [0]],
+            edge[:, [0]],
             (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **ikwargs) + NN,
-            edges[:, -1].reshape(-1, 1),
+            edge[:, -1].reshape(-1, 1),
         ], axis=-1)
 
     def face_to_ipoint(self, p: int, index: Index=_S):

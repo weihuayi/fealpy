@@ -121,16 +121,13 @@ class DLDMicrofluidicChipModeler:
         self.options['stage_gap'] = stage_gap
 
     @variantmethod('circle')
-    def build(self, gmsh: Any = None):
+    def build(self, gmsh: Any):
         """
         Build the microfluidic chip model with circular pillars.
 
         Parameters:
             gmsh: Optional; GMSH instance for mesh generation.
         """
-        if gmsh is None:
-            raise TypeError("A valid GMSH instance must be provided for geometry modeling.")
-
         options: Dict[str, Any] = self.options
  
         x0, y0 = options['init_point']
@@ -172,8 +169,10 @@ class DLDMicrofluidicChipModeler:
         stage_centers = (row_centers[None, ...] + bm.arange(n)[:, None, None] * v_shift).reshape(-1, 2)
         centers = (stage_centers[None, ...] + bm.arange(N)[:, None, None] * v_trans).reshape(-1, 2)
         self.circles = bm.concat([centers, bm.full((len(centers), 1), r)], axis=1)
-        
-        # Generate pillar centers
+
+        if not hasattr(gmsh, "model") or not hasattr(gmsh.model, "occ"):
+            raise ValueError("Unsupported geometry engine: only 'gmsh' is supported.")
+
         boundary_points = self.boundary.reshape(-1, 2)
         boundary_line_tags = []
 
@@ -203,17 +202,17 @@ class DLDMicrofluidicChipModeler:
         gmsh.model.occ.synchronize()
   
     @build.register('ellipse')
-    def build(self, gmsh: Any = None):
+    def build(self, gmsh: Any):
         """Build chip model with elliptical pillars (not implemented)."""
         raise NotImplementedError
 
     @build.register('droplet')
-    def build(self, gmsh: Any = None):
+    def build(self, gmsh: Any):
         """Build chip model with droplet-shaped pillars (not implemented)."""
         raise NotImplementedError
 
     @build.register('triangle')
-    def build(self, gmsh: Any = None):
+    def build(self, gmsh: Any):
         """Build chip model with triangular pillars (not implemented)."""
         raise NotImplementedError
 

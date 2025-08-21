@@ -50,11 +50,11 @@ parser.add_argument('--tan_angle',
     help = "Tangent of the deflection angle.")
 
 parser.add_argument('--n_stages',
-    default = 7, type = int,
+    default = 3, type = int,
     help = "Number of stages (or periods) in the chip.")
 
 parser.add_argument('--lc',
-    default = 0.1, type = float,
+    default = 0.2, type = float,
     help = "Grid size for meshing.")
 
 parser.add_argument('--show_figure',
