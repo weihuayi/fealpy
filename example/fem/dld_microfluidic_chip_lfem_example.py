@@ -1,4 +1,5 @@
 import argparse 
+import matplotlib.pyplot as plt
 
 
 ## 参数解析
@@ -30,6 +31,18 @@ from fealpy.backend import bm
 
 bm.set_backend('numpy')
 
+from fealpy.mesh import LagrangeTriangleMesh
 from fealpy.fem import DLDMicrofluidicChipLFEMModel
+from fealpy.mmesh.tool import high_order_meshploter
+
+box = [-1.0, 1.0, -1.0, 1.0]
+holes = [[-0.5, 0.5, 0.2], [0.5, 0.5, 0.2], [-0.5, -0.5, 0.2], [0.5, -0.5, 0.2]]
+
+mesh = LagrangeTriangleMesh.from_box_with_circular_holes(box=box, holes=holes, p=2)
 
 model = DLDMicrofluidicChipLFEMModel(options)
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+high_order_meshploter(ax, mesh)
+plt.show()

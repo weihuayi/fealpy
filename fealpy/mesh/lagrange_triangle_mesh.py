@@ -1,4 +1,4 @@
-from typing import Union, Optional, Sequence, Tuple, Any
+from typing import Union, Optional, List, Sequence, Tuple, Any
 
 from ..backend import backend_manager as bm 
 from ..typing import TensorLike, Index, _S
@@ -886,101 +886,96 @@ class LagrangeTriangleMesh(HomogeneousMesh):
     
     @classmethod
     def from_box_with_circular_holes(cls, 
-                                     box=[0, 1, 0, 1], 
-                                     holes=[0.5, 0.5, 0.1], 
-                                     h=0.1): 
+                                     box: TensorLike = [0, 1, 0, 1], 
+                                     holes: TensorLike =[[0.0, 0.0, 0.5]], 
+                                     p: int = 1, 
+                                     h: float =0.1,
+                                     ftype = bm.float64, 
+                                     itype = bm.int32): 
         """
+        Create a Lagrange triangle mesh from a rectangular box with circular
+        holes.
+
+        Parameters:
+            box (list | TensorLike): The coordinates of the box in the format [xmin, xmax, ymin, ymax].
+            holes (list | TensorLike): A list of tuples representing the circular holes in the format [(cx, cy, r), ...].
+            p (int): The polynomial order of the Lagrange elements.
+            h (float): The target mesh size for the mesh generation.
         """
         import gmsh
 
-        xmin, xmax, ymin, ymax = box
+        assert len(box) == 4, "box must be [xmin, xmax, ymin, ymax]"
+        xmin, xmax, ymin, ymax = map(float, box)
+        assert p in (1, 2), "Only p=1 or p=2 supported in this minimal version."
+        assert h > 0, "h must be positive."
+
+        print("[step] init gmsh")
         gmsh.initialize()
         gmsh.option.setNumber("General.Terminal", 1)
 
-        model = gmsh.model
-        occ = model.occ
-        model.add("box_with_circular_holes")
+        try:
+            print("[step] build geometry")
+            gmsh.model.add("box_with_holes")
+            xmin, xmax, ymin, ymax = map(float, box)
 
-        # 1) Create a rectangle surface
-        rect = occ.addRectangle(xmin, ymin, 0.0, xmax - xmin, ymax - ymin)
+            # 外矩形 (4 条线 + loop)
+            p1 = gmsh.model.occ.addPoint(xmin, ymin, 0)
+            p2 = gmsh.model.occ.addPoint(xmax, ymin, 0)
+            p3 = gmsh.model.occ.addPoint(xmax, ymax, 0)
+            p4 = gmsh.model.occ.addPoint(xmin, ymax, 0)
+            l1 = gmsh.model.occ.addLine(p1, p2)
+            l2 = gmsh.model.occ.addLine(p2, p3)
+            l3 = gmsh.model.occ.addLine(p3, p4)
+            l4 = gmsh.model.occ.addLine(p4, p1)
+            outer_loop = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
 
-        # 2) Create circular holes 
-        disk_entities = []
-        for (cx, cy, r) in holes:
-            dtag = occ.addDisk(cx, cy, 0.0, r, r)
-            disk_entities.append((2, dtag))  # 2 表示面实体
+            # 每个圆洞 (圆弧 loop)
+            hole_loops = []
+            for cx, cy, r in holes or []:
+                circle = gmsh.model.occ.addCircle(cx, cy, 0, r)
+                loop = gmsh.model.occ.addCurveLoop([circle])
+                hole_loops.append(loop)
 
-        # 3) Boolean cut: rectangle surface - all disk surfaces => surface
-        # with holes
-        cut_obj, _ = occ.cut([(2, rect)], disk_entities, removeObject=True, removeTool=True)
+            # 平面 (带孔)
+            surf = gmsh.model.occ.addPlaneSurface([outer_loop] + hole_loops)
 
-        # collect all 2D faces from the cut result
-        faces = [(dim, tag) for (dim, tag) in cut_obj if dim == 2]
+            gmsh.model.occ.synchronize()
 
-        # 4) synchronize the model to ensure all operations are applied 
-        occ.synchronize()
-
-        # 5) Create physical groups for surfaces and boundaries 
-        surf_group = model.addPhysicalGroup(2, [tag for (_, tag) in faces], tag=-1)
-        model.setPhysicalName(2, surf_group, "domain")
-
-        # collect outer and hole loops (1-D entities)
-        outer_loop_curves = []
-        hole_loops_curves = []
-
-        # Iterate through the faces to get their boundaries
-        for (_, ftag) in faces:
-            bnd = model.getBoundary([(2, ftag)], oriented=False, combined=False)
-            loops = model.getCurveLoops([c[1] for c in bnd])
-            for loop in loops:
-                if loop.get("type", "").lower() == "outer":
-                    outer_loop_curves.extend(loop["curves"])
-                else:
-                    hole_loops_curves.append(loop["curves"])
-
-        if outer_loop_curves:
-            outer_pg = model.addPhysicalGroup(1, outer_loop_curves, tag=-1)
-            model.setPhysicalName(1, outer_pg, "outer_boundary")
-        else:
-            outer_pg = None
-
-        hole_pgs = []
-        for i, curves in enumerate(hole_loops_curves, start=1):
-            pg = model.addPhysicalGroup(1, curves, tag=-1)
-            model.setPhysicalName(1, pg, f"hole_{i}")
-            hole_pgs.append(pg)
-
-        # 6) 
-        gmsh.option.setNumber("Mesh.Algorithm", 2)
-        if h > 0:
+            print("[step] mesh options & generate")
+            gmsh.option.setNumber("Mesh.ElementOrder", p)
             gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h)
             gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
-        model.mesh.setOrder(1)
+            gmsh.model.mesh.generate(2)
 
-        # 7) generate the 2d mesh  
-        model.mesh.generate(2)
+            # --- minimal stats ---
+            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+            node = bm.from_numpy(node_coords.reshape(-1, 3)[:, 0:2]) # only 2D
 
+            tri_type = gmsh.model.mesh.getElementType("triangle", p)
+            types, elemTags, elemNodeTags = gmsh.model.mesh.getElements(2)
+            print(f"[step] found {len(elemTags)} elements of type {tri_type} with {len(node_tags)} nodes")
+            cell = None
+            for etype, cell in zip(types, elemNodeTags):
+                if etype == tri_type:
+                    nn = gmsh.model.mesh.getElementProperties(etype)[3]
+                    cell = bm.array(cell, dtype=itype).reshape(-1, nn) - 1
+                    break
 
-        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node_tags = bm.from_numpy(node_tags)
-        node = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)[:, 0:2]
+        finally:
+            print("[step] finalize gmsh")
+            gmsh.finalize()
+            NN = len(node)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode = bm.set_at(isValidNode, cell, True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype)
+            idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=bm.int64))
+            cell = idxMap[cell]
 
-        # 获取三角形单元信息
-        cell_type = 2  # 三角形单元的类型编号为 2
-        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
-        cell = bm.array(cell_connectivity, dtype=bm.int64).reshape(-1, 3) - 1
+            if p == 2:
+                cell = cell[:, [0, 3, 5, 1, 4, 2]] # reorder for p=2
 
-        gmsh.finalize()
-
-        NN = len(node)
-        isValidNode = bm.zeros(NN, dtype=bm.bool)
-        isValidNode = bm.set_at(isValidNode, cell, True)
-        node = node[isValidNode]
-        idxMap = bm.zeros(NN, dtype=cell.dtype)
-        idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=bm.int64))
-        cell = idxMap[cell]
-
-        return cls(node, cell)
+            return cls(node, cell, p=p)
 
 
     @classmethod
