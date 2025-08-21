@@ -2,7 +2,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
 from fealpy.cfd.equation import StationaryIncompressibleNS
 from fealpy.cfd.model import CFDPDEModelManager
-from fealpy.mesher.chip_mesher import ChipMesher
+from fealpy.mesher.dld_microfluidic_chip_mesher import DLDMicrofluidicChipMesher
 import matplotlib.pyplot as plt
 import argparse
 
@@ -32,83 +32,49 @@ parser.add_argument('--init_mesh',
     default = 'tri', type=str,
     help="Type of initial mesh, default is tri")
 
-parser.add_argument('--box',
-    default = [0.0, 7e-3, 0.0, 2e-3], type=int,
-    help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
+parser.add_argument('--init_point',
+    default = (0.0, 0.0), type = tuple,
+    help = "Initial point for chip positioning.")
 
-parser.add_argument('--center',
-    default = (2e-4, 1.5e-4), type=float,
-    help="Center of the first circle, default is (0.1, 0.05).")
+parser.add_argument('--chip_height',
+    default = 5.0, type = float,
+    help = "Height of the microfluidic chip.")
 
-parser.add_argument('--start_center',
-    default = (0.015, 0.015), type=int,
-    help="N")
+parser.add_argument('--inlet_length',
+    default = 1.0, type = float,
+    help = "Length of the inlet section.")
+
+parser.add_argument('--outlet_length',
+    default = 1.0, type = float,
+    help = "Length of the outlet section.")
 
 parser.add_argument('--radius',
-    default = 0.7e-4, type=int,
-    help="Radius of the circles, default is 0.029.")
+    default = 0.2, type = float,
+    help = "Radius of the pillars.")
 
-# parser.add_argument('--nx',
-#     default = 7, type=int,
-#     help="N")
+parser.add_argument('--n_rows',
+    default = 8, type = int,
+    help = "Number of rows of pillars in each stage.")
 
-# parser.add_argument('--ny',
-#     default = 7, type=int,
-#     help="N")
+parser.add_argument('--n_cols',
+    default = 6, type = int,
+    help = "Number of columns of pillars in each stage.")
 
-# parser.add_argument('--dx',
-#     default = 0.20, type=int,
-#     help="N")
+parser.add_argument('--tan_angle',
+    default = 1/10, type = float,
+    help = "Tangent of the deflection angle.")
 
-# parser.add_argument('--dy',
-#     default = 0.08, type=int,
-#     help="N")
-
-# parser.add_argument('--shift_angle',
-#     default = 7, type=int,
-#     help="N")
-
-# parser.add_argument('--n_circle',
-#     default = 100, type=int,
-#     help="Number of divisions in the circle, default is 60")
-
-parser.add_argument('--l1',
-    default = 3e-4, type=float,
-    help="Vertical spacing between circles in a column. Default: 0.1.")
-
-parser.add_argument('--l2',
-    default = 3e-4, type=float,
-    help="Horizontal spacing between circle columns. Default: 0.1.")
-
-parser.add_argument('--h',
-    default = 5e-5, type=float,
-    help="Mesh size, default is 0.05")
+parser.add_argument('--n_stages',
+    default = 1, type = int,
+    help = "Number of stages (or periods) in the chip.")
 
 parser.add_argument('--lc',
-    default = 5e-5, type=float,
-    help="Target mesh element size (characteristic length). Default: 0.01.")
-
-parser.add_argument('--hole_lc',
-    default = 8e-6, type=float,
-    help="Mesh size, default is 0.006")
-
-parser.add_argument('--m',
-    default = 7, type=float,
-    help="Number of divisions in the x direction, default is 10")
-parser.add_argument('--n',
-    default = 7, type=float,
-    help="Number of divisions in the y direction, default is 10")
-parser.add_argument('--hole_method',
-    default = 'aligned', type=str,
-    help="Method for generating holes, default is 'aligned' (holes are generated in a regular, aligned grid layout)")
-
-parser.add_argument('--return_mesh',
-    default='True', type=str,
-    help='Whether to generate mesh, default is True')
+    default = 0.1, type = float,
+    help = "Grid size for meshing.")
 
 parser.add_argument('--show_figure',
-    default='False', type=str,
-    help='Whether to show figure in Gmsh, default is True')
+    default = False, type = bool,
+    help = "Whether to display the generated mesh.")
 
 parser.add_argument('--method',
     default='Newton', type=str,
@@ -148,7 +114,7 @@ options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
-mesh = pde.mesh
+mesh = pde.init_mesh()
 model = StationaryIncompressibleStokesLFEMModel(pde=pde, mesh = mesh, options = options)
 uh, ph = model.run()
 # model.__str__()

@@ -3,13 +3,14 @@ import argparse
 
 from fealpy.backend import bm 
 from fealpy.geometry import DLDMicrofluidicChipModeler
+from fealpy.mesher import DLDMicrofluidicChipMesher
 
 import gmsh
 
 parser = argparse.ArgumentParser(description=
     """
-    Test microfluidic chip mesh generation.
-    This script generates a microfluidic chip mesh using the given parameters.
+    Test microfluidic chip geometry modeling.
+    This script generates the geometry for a microfluidic chip using the specified parameters.
     """)
 
 parser.add_argument('--backend',
@@ -52,10 +53,20 @@ parser.add_argument('--n_stages',
     default = 7, type = int,
     help = "Number of stages (or periods) in the chip.")
 
+parser.add_argument('--lc',
+    default = 0.1, type = float,
+    help = "Grid size for meshing.")
+
+parser.add_argument('--show_figure',
+    default = True, type = bool,
+    help = "Whether to display the generated mesh.")
+
+
 options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 gmsh.initialize()
 modeler = DLDMicrofluidicChipModeler(options)
 modeler.build(gmsh)
-modeler.show()
+mesher = DLDMicrofluidicChipMesher(options)
+mesher.generate(modeler, gmsh)
 gmsh.finalize()
