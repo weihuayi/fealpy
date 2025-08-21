@@ -23,6 +23,7 @@ from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 from .mthlaplace_integrator import MthLaplaceIntegrator
 from .mass_integrator import MassIntegrator
+from .diffusion_integrator import DiffusionIntegrator
 from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator
 from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
