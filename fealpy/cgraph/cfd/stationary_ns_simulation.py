@@ -16,5 +16,8 @@ class StationaryNSSimulation(CNodeType):
     @staticmethod
     def run(equation):
         from fealpy.cfd.simulation.fem.stationary_incompressible_ns import Newton
-        simulation = Newton(equation)
+        
+        mesh = equation.pde.init_mesh()
+        simulation = Newton(equation,mesh)
+        
         return simulation

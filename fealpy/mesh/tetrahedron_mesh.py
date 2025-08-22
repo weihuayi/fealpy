@@ -44,6 +44,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         self.facedata = {} 
         self.celldata = {}
         self.meshdata = {}
+        self.data = {}
 
     def cell_to_face_permutation(self, locFace = None):
         """
@@ -1343,6 +1344,14 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         return mesh
 
     def to_vtk(self, fname=None, etype='cell', index:Index=_S):
+        """
+        Export the mesh to a VTK file in VTU format.
+
+        Parameters:
+            fname (str, optional): The name of the output file. If None, returns the mesh data instead.
+            etype (str): The type of entity to export ('cell', 'face', or 'edge').
+            index (Index, optional): The index of the entity to export. Defaults to _S (all entities).
+        """
         from .vtk_extent import  write_to_vtu
 
         node = self.entity('node')

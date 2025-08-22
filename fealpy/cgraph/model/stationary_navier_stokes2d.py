@@ -16,7 +16,7 @@ class StationaryNS2d(CNodeType):
 
     @staticmethod
     def run(rho: float = 1.0, mu: float = 1.0) -> Union[object]:
-        from fealpy.cfd.model.stationary_incompressible_navier_stokes_2d import FromSympy
+        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
 
         model = FromSympy(rho=rho, mu=mu)
         model.select_pde["poly2d"]()

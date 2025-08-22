@@ -1,104 +1,146 @@
 from typing import Union
-import time
-
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod
-from fealpy.utils import timer
 from fealpy.model import ComputationalModel
-
 from fealpy.mesh import Mesh
-
-from fealpy.fem import DirichletBC
-
-from .simulation.fem.stationary_incompressible_ns import Stokes, Newton, Ossen
-from .equation.stationary_incompressible_ns import StationaryIncompressibleNS
+from fealpy.utils import timer
+from fealpy.cfd.equation import StationaryIncompressibleNS
 
 class StationaryIncompressibleNSLFEMModel(ComputationalModel):
-    def __init__(self, options):
+    """
+    StationaryIncompressibleNSLFEMModel: Stationary Incompressible Navier-Stokes Finite Element Solver
+
+    This class implements a finite element solver for the stationary incompressible Navier-Stokes equations.
+    It supports multiple linearization methods (Stokes, Oseen, Newton), boundary condition handling,
+    linear system assembly, solution, and error evaluation.
+
+    Parameters
+    equation : StationaryIncompressibleNS
+        The equation object encapsulating the PDE data, function spaces, and operators.
+    options : dict
+        Solver options, including:
+            - 'solve': linear solver variant, e.g., 'direct', 'pcg'
+            - 'method': FEM linearization method, e.g., 'Stokes', 'Ossen', 'Newton'
+            - 'run': run method, e.g., 'one_step', 'uniform_refine'
+            - 'maxstep': max nonlinear iteration steps
+            - 'maxit': max mesh refinement iterations (for 'uniform_refine')
+            - 'tol': convergence tolerance
+
+    Attributes
+    pde : object
+        The PDE data including viscosity, velocity, pressure, etc.
+    fem : object
+        Finite element method object corresponding to the selected linearization method.
+    solve : variant method
+        Linear solver variant (e.g., direct, pcg, amg).
+    run : variant method
+        Execution strategy (e.g., one_step solve, adaptive or uniform mesh refinement).
+    method : variant method
+        Linearization method for the Navier-Stokes equations (e.g., Newton, Ossen, Stokes).
+
+    Methods
+    method()
+        Select and initialize the FEM method (Stokes, Oseen, or Newton).
+    run()
+        Solve the Navier-Stokes system using the selected run strategy.
+    apply_bc()
+        Apply velocity and pressure boundary conditions.
+    linear_system()
+        Assemble the FEM system (bilinear and linear forms).
+    solve()
+        Solve the resulting linear system.
+    lagrange_multiplier()
+        Augment the linear system with a global pressure constraint.
+    error()
+        Compute errors in velocity and pressure.
+
+    Notes
+    This class is designed for stationary incompressible fluid flow problems using a mixed finite element method. 
+    It supports velocity-pressure coupling and enforces pressure uniqueness through Lagrange multipliers. 
+
+    Example
+    >>> model = StationaryIncompressibleNSLFEMModel(equation, options)
+    >>> model.__str__()
+    """
+    def __init__(self, pde, mesh=None, options=None):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.set_pde[options['GD']](options['pde'], rho=options['rho'], mu=options['mu'])
+        self.options = options
+        self.pde = pde
+        self.equation = StationaryIncompressibleNS(pde)
         
-        set_init_mesh = self.set_init_mesh[options['GD']]
-        if options['GD'] == '2d':
-            set_init_mesh(options['init_mesh'], options['nx'], options['ny'])
-        else:  # '3d'
-            set_init_mesh(options['init_mesh'], options['nx'], options['ny'], options['nz'])
-        
-        self.solve.set(options['solve'])
-        self.equation = StationaryIncompressibleNS(self.pde)
-        self.fem = self.method[options['method']]()
-
-        run = self.run[options['run']]
-        if options['run'] == 'uniform_refine':
-            run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'])
-        else:  # 'one_step' 或其他
-            run(maxstep=options['maxstep'], tol=options['tol'])
-        
-    @variantmethod("2d")
-    def set_pde(self, pde = "sinsin", rho = 1.0, mu = 1.0):
-        """
-        Set the PDE data for the model.
-        """
-        from fealpy.cfd.model.stationary_incompressible_navier_stokes_2d import FromSympy
-        self.pde = FromSympy(rho=rho, mu=mu)
-        self.pde.select_pde[pde]()
-
-    @set_pde.register("3d")
-    def set_pde(self, pde = "poly3d", rho = 1.0, mu = 1.0):
-        """
-        Set the PDE data for the model in 3D.
-        """
-        from fealpy.cfd.model.stationary_incompressible_navier_stokes_3d import FromSympy
-        self.pde = FromSympy(rho=rho, mu=mu)
-        self.pde.select_pde[pde]()
-    
-    @variantmethod("2d")
-    def set_init_mesh(self, mesh = "tri", nx=8, ny=8):
-        """
-        Set the initial mesh for the model.
-        """
-        if isinstance(mesh, str):
-            mesh = self.pde.init_mesh[mesh](nx=nx, ny=ny)
+        if mesh is None:
+            if hasattr(pde, 'init_mesh'):
+                self.mesh = pde.mesh
+            else:
+                raise ValueError("Not found mesh!")
         else:
-            mesh = mesh
+            self.mesh = mesh
+        
+        self.fem = self.method()
+        if options is not None:
+            self.solve.set(options['solve'])
+            self.fem = self.method[options['method']]()
+            self.run.set(options['run'])
+            self.maxit = options.get('maxit', 5)
+            self.maxstep = options.get('maxstep', 10)
+            self.tol = options.get('tol', 1e-10)
+            # self.apply_bc = self.apply_bc[options['apply_bc']]
 
-        NN = self.pde.mesh.number_of_nodes()
-        NE = self.pde.mesh.number_of_edges()
-        NF = self.pde.mesh.number_of_faces()
-        NC = self.pde.mesh.number_of_cells()
-        # self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
+
+            # if options['run'] == 'uniform_refine':
+            #     self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
+            # else:  # 'one_step' 或其他
+            #     self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
     
-    @set_init_mesh.register("3d")
-    def set_init_mesh(self, mesh = "tet", nx=8, ny=8, nz=8):
-        """
-        Set the initial mesh for the model in 3D.
-        """
-        if isinstance(mesh, str):
-            mesh = self.pde.init_mesh[mesh](nx=nx, ny=ny, nz=nz)
-        else:
-            mesh = mesh
-
-        NN = self.pde.mesh.number_of_nodes()
-        NE = self.pde.mesh.number_of_edges()
-        NF = self.pde.mesh.number_of_faces()
-        NC = self.pde.mesh.number_of_cells()
-        # self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
-
+    def __str__(self) -> str:
+        """Return a nicely formatted, multi-line summary of the computational model configuration."""
+        s = f"{self.__class__.__name__}(\n"
+        s += f"  equation       : {self.equation.__class__.__name__}\n"
+        s += f"  pde            : {self.pde.__class__.__name__}\n"
+        s += f"  method         : {self.method_str}\n"
+        s += f"  run            : {self.run_str}\n"
+        s += f"  solve          : {self.solve_str}\n"
+        s += f"  maxsteps       : {self.maxstep}\n"
+        s += f"  tol            : {self.tol}\n"
+        if self.options.get("run") == "uniform_refine":
+            s += f"  Max Refinement : {self.maxit}\n"
+        s += ")"
+        self.logger.info(f"\n{s}")
+        
     @variantmethod("Newton")
     def method(self): 
-        self.fem = Newton(self.equation)
+        """
+        Use Newton iteration method to solve the Navier-Stokes equations.
+        """
+        from .simulation.fem.stationary_incompressible_ns import Newton
+        self.fem = Newton(self.equation, self.mesh)
         self.method_str = "Newton"
         return self.fem
     
+    def update_mesh(self, mesh):
+        """
+        Update the mesh used in the model.
+        """
+        self.mesh = mesh
+        self.fem.update_mesh(mesh)
+
     @method.register("Ossen")
     def method(self): 
-        self.fem = Ossen(self.equation)
+        """
+        Use Oseen iteration method to solve the Navier-Stokes equations.
+        """
+        from .simulation.fem.stationary_incompressible_ns import Ossen
+        self.fem = Ossen(self.equation, self.mesh)
         self.method_str = "Ossen"
         return self.fem
     
     @method.register("Stokes")
     def method(self): 
-        self.fem = Stokes(self.equation)
+        """
+        Use Stokes iteration method to solve the system.
+        """
+        from .simulation.fem.stationary_incompressible_ns import Stokes
+        self.fem = Stokes(self.equation, self.mesh)
         self.method_str = "Stokes"
         return self.fem
     
@@ -106,100 +148,80 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.fem.update(u0)
     
     def linear_system(self):
+        """
+        Assemble the linear system for the stationary navier-stokes finite element model.
+        """
         BForm = self.fem.BForm()
         LForm = self.fem.LForm()
         return BForm, LForm
     
-    def lagrange_multiplier(self, A, b):
-        from fealpy.fem import LinearForm, SourceIntegrator, BlockForm
-        from fealpy.sparse import COOTensor
-
-        LagLinearForm = LinearForm(self.fem.pspace)
-        LagLinearForm.add_integrator(SourceIntegrator(source=1))
-        LagA = LagLinearForm.assembly()
-        LagA = bm.concatenate([bm.zeros(self.fem.uspace.number_of_global_dofs()), LagA], axis=0)
-
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                                 bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
-
-
-        A = BlockForm([[A, A1.T], [A1, None]])
-        A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([0])
-        b  = bm.concatenate([b, b0], axis=0)
-
-        return A, b
-
-    @variantmethod('one_step')
+    
+    @variantmethod('main')
     def run(self, maxstep=1000, tol=1e-10):
+        self.run_str = 'main'
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
         uh0 = self.fem.uspace.function()
         ph0 = self.fem.pspace.function()
-        uh1 = self.fem.uspace.function()
-        ph1 = self.fem.pspace.function()
-
-        ugdof = self.fem.uspace.number_of_global_dofs()
         
-        BForm, LForm = self.linear_system()
         for i in range(maxstep):
-            # self.logger.info(f"iteration: {i+1}")
-            # tmr = timer()
-            # next(tmr)
-            # start = time.time()
-            self.update(uh0)
-            A = BForm.assembly()
-            # tmr.send('迭代左端项矩阵组装时间')
-            F = LForm.assembly()
-            # tmr.send('右端项组装时间')
-            BC = DirichletBC(
-                (self.fem.uspace, self.fem.pspace), 
-                gd=(self.pde.velocity, self.pde.pressure), 
-                threshold=(self.pde.is_velocity_boundary, self.pde.is_pressure_boundary), 
-                method='interp')
-            
-            A, F = BC.apply(A, F)
-            A, F = self.lagrange_multiplier(A, F)
-            # tmr.send('边界处理时间')
-            x = self.solve(A, F)
-            # tmr.send('矩阵求解时间')
-            # next(tmr)
-            uh1[:] = x[:ugdof]
-            ph1[:] = x[ugdof:-1]
-            res_u = self.pde.mesh.error(uh0, uh1)
-            res_p = self.pde.mesh.error(ph0, ph1)
-            
-            # self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
+            uh1, ph1 = self.run['one_step'](uh0)
+            res_u = self.mesh.error(uh0, uh1)
+            res_p = self.mesh.error(ph0, ph1)
+            self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
             if res_u + res_p < tol:
                 self.logger.info(f"Converged at iteration {i+1}")
-                break
+                break 
             uh0[:] = uh1
             ph0[:] = ph1
-        uerror, perror = self.postprocess(uh1, ph1) 
-        self.logger.info(f"final uerror: {uerror}, final perror: {perror}") 
+        # uerror, perror = self.error(uh1, ph1) 
+        # self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
+        return uh1, ph1
+    
+    @run.register('one_step')
+    def run(self, uh):
+        self.run_str = 'one_step'
+        BForm, LForm = self.linear_system()  
+        self.fem.update(uh)
+        A = BForm.assembly() 
+        b = LForm.assembly()
+        A, b = self.fem.apply_bc(A, b, self.pde)
+        A, b = self.fem.lagrange_multiplier(A, b)
+        x = self.solve(A, b)
+
+        ugdof = self.fem.uspace.number_of_global_dofs()
+        u = self.fem.uspace.function()
+        p = self.fem.pspace.function()
+        u[:] = x[:ugdof]
+        p[:] = x[ugdof:-1] 
+        return u, p
 
     @run.register('uniform_refine')
     def run(self, maxit = 5, maxstep = 1000, tol = 1e-10):
+        self.run_str = 'uniform_refine'
+        maxit = self.maxit if self.options is not None else maxit
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
         for i in range(maxit):
-            self.logger.info(f"mesh: {self.pde.mesh.number_of_cells()}")
-            self.run['one_step'](maxstep, tol)
-            self.pde.mesh.uniform_refine()
-            self.equation = StationaryIncompressibleNS(self.pde)
+            self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
+            uh1, ph1 = self.run['main'](maxstep, tol)
+            self.mesh.uniform_refine()
+        return uh1, ph1
 
     @variantmethod('direct')
     def solve(self, A, F, solver='scipy'):
         from fealpy.solver import spsolve
+        self.solve_str = 'direct'
         return spsolve(A, F, solver = solver)
 
-    @solve.register('amg')
-    def solve(self, A, F):
-        raise NotImplementedError("AMG solver not yet implemented.")
-
-    @solve.register('pcg')
-    def solve(self, A, F):
-        pass
         
-    @variantmethod('error')
-    def postprocess(self, uh, ph):
-        uerror = self.pde.mesh.error(self.pde.velocity, uh)
-        perror = self.pde.mesh.error(self.pde.pressure, ph)
-        #print(f"uerror: {uerror}, perror: {perror}")
+    def error(self, uh, ph):
+        """
+        Post-process the numerical solution to compute the error in L2 norm.
+        """
+        self.error_str = 'error'
+        uerror = self.mesh.error(self.pde.velocity, uh)
+        perror = self.mesh.error(self.pde.pressure, ph)
         return uerror, perror
+
+    

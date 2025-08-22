@@ -1,26 +1,15 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.backend import TensorLike
+from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
+from fealpy.fem import (ScalarMassIntegrator,ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
+                     ViscousWorkIntegrator, SourceIntegrator)
 from fealpy.decorator import barycentric
 
-from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
-from fealpy.fem import DirichletBC
-from fealpy.fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
-                     ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
-                     ViscousWorkIntegrator, SourceIntegrator, BoundaryFaceSourceIntegrator)
+from ..iterative_method import IterativeMethod 
 
-from fealpy.solver import spsolve
-
-from ..fem_base import FEM
-from ...simulation_base import SimulationBase, SimulationParameters
-
-
-class Newton(FEM):
+class Newton(IterativeMethod):
     """Newton Interative Method""" 
     
-    def __init__(self, equation):
-        FEM.__init__(self, equation)
-
-    def BForm(self, diffusion=True):
+    def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
         q = self.q
@@ -29,10 +18,12 @@ class Newton(FEM):
         self.u_BM_netwon = ScalarMassIntegrator(q=q)
         self.u_BC = ScalarConvectionIntegrator(q=q)
 
-        if diffusion:
+        if self.equation.constitutive.value == 1:
             self.u_BVW = ScalarDiffusionIntegrator(q=q)
-        else:
+        elif self.equation.constitutive.value == 2:
             self.u_BVW = ViscousWorkIntegrator(q=q)
+        else:
+            raise ValueError(f"未知的粘性模型")
         
         A00.add_integrator(self.u_BM_netwon)
         A00.add_integrator(self.u_BC)
@@ -42,9 +33,6 @@ class Newton(FEM):
         self.u_BPW = PressWorkIntegrator(q=q)
         A01.add_integrator(self.u_BPW)
        
-        A11 = BilinearForm(pspace)
-        #A11.add_integrator(ScalarMassIntegrator(coef=1e-10))
-        #A = BlockForm([[A00, A01], [A01.T, A11]]) 
         A = BlockForm([[A00, A01], [A01.T, None]]) 
         return A
         

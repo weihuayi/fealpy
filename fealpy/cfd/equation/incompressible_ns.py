@@ -20,8 +20,14 @@ class IncompressibleNS(BaseEquation):
         }
         self.pde = pde
         if init_variables:
-            self.initialize_from_pde(pde) 
-    
+            self.initialize_from_pde(pde)
+        
+        if pde.is_pressure_boundary() == 0 :
+            self.pressure_neumann = True
+        else:
+            self.pressure_neumann = False
+
+
     def initialize_from_pde(self, pde):
         """
         根据 pde 对象初始化系数和变量。
