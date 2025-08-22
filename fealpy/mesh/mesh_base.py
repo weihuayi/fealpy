@@ -181,15 +181,14 @@ class Mesh(MeshDS):
                        "Use `quadrature_formula` instead.")
         return self.quadrature_formula(q, etype, qtype)
 
-    # ipoints
     def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
-        """Map edges to integration points.
+        """
+        construct the map tensor from edge to interpolation  points.
         
         Parameters:
-            p : int
-                The order of the shape function.
-            index : Index, optional
-                Edge indices to include
+            p (int): The order of the interpolation points.
+            index (Index, optional): The index of the edge. Defaults to _S, _S
+            means all.
                 
         Returns:
             TensorLike: Mapping matrix
@@ -603,6 +602,42 @@ class HomogeneousMesh(Mesh):
         else:
             e = bm.pow(bm.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e # float or (NC, )
+
+    def get_boundary_mesh(self, return_idx:bool=True):
+        """
+        Get the boundary mesh from self.
+
+        Parameters:
+            return_idx : bool, default=True
+                If True, return the index of the nodes and cells
+                in the face mesh within original mesh.
+        Returns:
+            node: array, the nodes of face mesh.
+            face: array, the cells of face mesh,
+                also the boundary faces of original mesh.
+            node_idx: array, the index of nodes in the face mesh
+                within nodes of original mesh.
+            face_idx: array, the index of cells in the face mesh
+                within faces of original mesh.
+        """
+        # TODO: 兼容三棱柱网格
+        # TODO: 兼容非单质网格
+        # TODO: 优化结构化网格
+        bd_face_idx = self.boundary_face_index()
+        node = self.node
+        face = self.face
+        if self.meshtype == 'UniformMesh3d':
+            face = face[:, bm.array([0, 2, 3, 1])]
+        bd_node_idx = self.boundary_node_index()
+        bd_node = node[bd_node_idx]
+        idx_map = bm.zeros(node.shape[0], dtype=bd_node_idx.dtype)
+        idx_map[bd_node_idx] = bm.arange(bd_node_idx.shape[0], dtype=bd_node_idx.dtype)
+        bd_cell = idx_map[face[bd_face_idx]]
+
+        if return_idx:
+            return bd_node, bd_cell, bd_node_idx, bd_face_idx
+        else:
+            return bd_node, bd_cell
 
 
 class SimplexMesh(HomogeneousMesh):
