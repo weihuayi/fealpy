@@ -10,11 +10,47 @@ from .quadrangle_mesh import QuadrangleMesh
 
 
 class LagrangeQuadrangleMesh(TensorMesh):
-    def __init__(self, node: TensorLike, cell: TensorLike, p=None, curve=None,
-                 surface=None,construct=False):
+    """A class for constructing and operating on p-order Lagrange quadrilateral meshes, 
+    inheriting from TensorMesh.
+    
+    Parameters:
+        node (TensorLike):  A tensor of nodal coordinates, shape (NN, GD).
+    
+        cell (TensorLike): A tensor defining the connectivity of quadrilateral cells, 
+        with (p+1)^2 nodes per cell.
+    
+        p (int, optional): The interpolation order of the Lagrange element. 
+        If None, it is inferred from the number of cell vertices.
+        
+        boundary (optional): A boundary projection operator applied only to boundary nodes.
+    
+        surface (optional): A surface projection operator applied to all mesh nodes.
+    
+    Attributes:
+        p (int): Lagrange interpolation order.
+        
+        GD (int): Geometric dimension of the mesh (2 or 3).
+        
+        node (TensorLike): Coordinates of all mesh nodes.
+        
+        cell (TensorLike): Connectivity array of quadrilateral cells.
+        
+        localEdge (TensorLike): Local edge connectivity for each quadrilateral 
+        in counter-clockwise order.
+        
+        meshtype (str): Mesh type identifier, fixed to 'lquad'.
+        
+    Methods:
+        
+    """
+    def __init__(self, 
+                 node: TensorLike, 
+                 cell: TensorLike, 
+                 p: Optional[int]=None, 
+                 boundary=None, 
+                 surface=None):
+        
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
-
-        kwargs = bm.context(cell)
         
         if p is None:
             NV = cell.shape[-1]
@@ -26,17 +62,23 @@ class LagrangeQuadrangleMesh(TensorMesh):
             else:
                 self.p = p
         
-        self.GD = node.shape[1]
-        self.node = node
-        self.cell = cell
-        self.surface = surface
-
-        self.construct_local_edge()
-        self.localFace = self.localEdge
-        self.construct_local_cell()
+        self.node = node     
+        self.cell = cell   
         
-        if construct:
-            self.construct()
+        self.surface = surface
+        self.boundary = boundary
+
+        self.construct_local_edge(p)
+        self.localFace = self.localEdge
+        self.construct_local_cell(p)
+        self.construct()
+        
+        if self.surface is not None:
+            self.node, _ = self.surface.project(self.node)
+            
+        if self.boundary is not None:
+            isBdNode = self.boundary_node_flag()
+            self.node[isBdNode] = self.boundary.project(self.node[isBdNode])
 
         self.meshtype = 'lquad'
         self.nodedata = {}
@@ -47,11 +89,21 @@ class LagrangeQuadrangleMesh(TensorMesh):
     def reference_cell_measure(self):
         return 1.0
     
-    def construct_local_edge(self) -> None:
-        """Generate the local edges for Lagrange elements of order p."""
-        k = bm.arange((self.p + 1)**2, dtype=self.itype , device=self.device)
-        k = k.reshape((self.p + 1, self.p + 1))  # (p+1, p+1), row: y direction, col: x direction
-    
+    def construct_local_edge(self,  p: Optional[int]=None) -> None:
+        """Generate the local edges for Lagrange elements of order p.
+        
+        Parameters:
+            p(int, optional): the order of the Lagrange element. If p is None,
+                it will be set to self.p.
+
+        Returns:
+            None: the local edges will be stored in self.localEdge.
+        """
+        p = self.p if p is None else p
+
+        k = bm.arange((p + 1)**2, dtype=self.itype , device=self.device)
+        k = k.reshape((p + 1, p + 1))  # (p+1, p+1), row: y direction, col: x direction
+        
         # Extract the four edges of the quadrilateral in consistent order
         edge0 = k[0, :]                # bottom edge, left to right
         edge1 = k[:, -1]               # right edge, bottom to top
@@ -59,57 +111,183 @@ class LagrangeQuadrangleMesh(TensorMesh):
         edge3 = bm.flip(k[:, 0])       # left edge, top to bottom
     
         self.localEdge = bm.stack([edge0, edge1, edge2, edge3], axis=0)
+
+    def construct_local_cell(self, p: Optional[int]=None) -> None:
+        """Generate the local cell for Lagrange elements of order p.
         
-    def construct_local_cell(self):
-        """Generate the local cell for Lagrange elements of order p."""
-        self.localcell = None
+        Parameters:
+            p(int, optional): the order of the Lagrange element. If p is None,
+                it will be set to self.p.
+
+        Returns:
+            None: the local edges will be stored in self.localCell.
+        """
+        p = self.p if p is None else p
+        self.localCell = None
+        
+    def number_of_corner_nodes(self) -> int:
+        """ Get the number of corner nodes in the mesh.
+
+        Returns:
+            int: the number of corner nodes."""
+        return self.cell_corner_node_flag().sum()
     
-    def interpolation_points(self, p: int):
+    def cell_corner_node_flag(self) -> TensorLike:
+        """
+        Get the flag array of the corner nodes in each cell.
+
+        Returns:
+            TensorLike: a boolean array of shape (NN, ), where NN is the number
+            of nodes in the mesh. The value is True if the node is a cell corner
+            node, and False otherwise.
+        """
+
+        NN = self.number_of_nodes()
+        edge = self.entity('edge')
+
+        isCornerNode = bm.zeros(NN, dtype=bm.bool)
+        isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
+        return isCornerNode
+    
+    def interpolation_points(self,  p: Optional[int]=None):
         """Fetch all p-order interpolation points on the quadrilateral mesh."""
     
-        if p < 1:
-            raise ValueError(f"p must be at least 1, but got {p}.")
-        
         node = self.entity('node')
         GD = self.geo_dimension()
+        
+        if p is None:
+            return self.entity('node')
+        elif p < 1:
+            raise ValueError(f"p must be at least 1, but got {p}.")
+        elif p == self.p:
+            return node
+        
+        isCornerNode = self.cell_corner_node_flag()
+        if p == 1:
+            return node[isCornerNode]
 
-        multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
-        w = multiIndex[1:-1, :] / p
+        w = self.multi_index_matrix(p, 1, dtype=self.ftype)[1:-1, :] / p
         ipoints0 = self.bc_to_point((w,)).reshape(-1, GD)
         ipoints1 = bm.zeros((0, GD), dtype=self.ftype) 
         
-        if p >= 3:
+        if p > 2:
             ipoints1 = self.bc_to_point((w, w)).reshape(-1, GD) 
 
         ipoints = bm.concatenate((node, ipoints0, ipoints1), axis=0)
         return ipoints
-    
-    @classmethod
-    def from_box(cls, box, p: int, nx=2, ny=2):
-        mesh = QuadrangleMesh.from_box(box, nx, ny)
-        return cls.from_quadrangle_mesh(mesh, p)
-    
-    @classmethod
-    def from_quadrangle_mesh(cls, mesh, p: int, surface=None):
-        init_node = mesh.entity('node')
-        
-        node = mesh.interpolation_points(p)
-        cell = mesh.cell_to_ipoint(p)
-        if surface is not None:
-            init_node[:],_ = surface.project(init_node)
-            node,_ = surface.project(node)
 
-        lmesh = cls(node, cell, p=p, construct=True)
-
-        lmesh.edge2cell = mesh.edge2cell # (NF, 4)
-        lmesh.cell2edge = mesh.cell2edge
-        lmesh.edge  = mesh.edge_to_ipoint(p)
-        return lmesh
-    
     def uniform_refine(self, n: int = 1):
-        pass
-    
-    # quadrature
+        """ Uniform refine the lagrange quadrangle mesh n times.
+
+        Parameters:
+            n (int): Times refine the  quadrangle mesh.
+
+        Returns:
+            mesh: The mesh obtained after uniformly refining n times.
+            List(CSRTensor): The prolongation matrix from the finest to the the coarsest。
+            
+        Notes:
+            子单元编号约定：
+            1 | 3
+            --+--
+            0 | 2
+            即 0: 左下, 1: 左上, 2: 右下, 3: 右上。
+        """
+        for i in range(n):
+            GD = self.geo_dimension()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
+            edge2cell = self.edge_to_cell()
+
+            ikwargs = bm.context(edge) # integer kwargs
+            fkwargs = bm.context(node) # float kwargs
+            
+            isCornerNode = bm.zeros(len(node), dtype=bm.bool)
+            isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
+            
+            nodes, edges, cells, edge2cells = [], [], [], []
+            
+            nodes.append(isCornerNode)
+            
+            NN_corner = self.number_of_corner_nodes() # the number of corner nodes
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+            
+            # TOdo: 还未走通
+            E = bm.array([
+                [0.5, 0.0],  # bottom edge midpoint
+                [1.0, 0.5],  # right edge midpoint
+                [0.5, 1.0],  # top edge midpoint
+                [0.0, 0.5],  # left edge midpoint
+                ], **fkwargs)
+
+            # 映射到物理坐标
+            nodes.append(self.bc_to_point(E).reshape(-1, GD))
+            start = NN_corner
+            end = start + NE
+            mid = bm.arange(start, end, **ikwargs)
+            
+          
+            
+
+    def construct_global_cell(self, icell: TensorLike, **ikwargs):
+        """
+        Construct the new cells for the Lagrange quadrangle mesh after uniform
+        refinement.
+
+        Parameters:
+            icell(TensorLike):
+        """
+        p = self.p 
+        NC = self.number_of_cells()
+        ldof = (p + 1) * (p + 1)
+        cell = bm.zeros((4*NC, ldof), **ikwargs)
+
+        TD = self.top_dimension()
+        mi = self.multi_index_matrix(p, TD)
+        idx0, = bm.nonzero(mi[:, 0] == 0) # 左边界（i=0）
+        idx1, = bm.nonzero(mi[:, 1] == 0) # 下边界（j=0）
+        idx2, = bm.nonzero(mi[:, 1] == p) # 上边界（j=p）
+        idx3, = bm.nonzero(mi[:, 0] == p) # 右边界（i=p）
+        
+        edge2cell = self.edge_to_cell()
+        edge = self.entity('edge')
+
+        flag = edge2cell[:, 2] == 0
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx0), edge[flag])
+
+        flag = edge2cell[:, 2] == 1
+        idx1_ = bm.flip(idx1, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx1_), edge[flag])
+
+        flag = edge2cell[:, 2] == 2
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx2), edge[flag])
+
+        flag = edge2cell[:, 2] == 3
+        idx3_ = bm.flip(idx3, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx3_), edge[flag])
+        
+        iflag = edge2cell[:,0] != edge2cell[:,1]
+        flag = iflag & (edge2cell[:,3] == 0)
+        cell = bm.set_at(cell, (edge2cell[flag,1][:,None], bm.flip(idx0,axis=0)), edge[flag])
+
+        flag = iflag & (edge2cell[:,3] == 1)
+        cell = bm.set_at(cell, (edge2cell[flag,1][:,None], idx1), edge[flag])
+
+        flag = iflag & (edge2cell[:,3] == 2)
+        cell = bm.set_at(cell, (edge2cell[flag,1][:,None], bm.flip(idx2,axis=0)), edge[flag])
+
+        flag = iflag & (edge2cell[:,3] == 3)
+        cell = bm.set_at(cell, (edge2cell[flag,1][:,None], idx3), edge[flag])
+
+        if self.p >= 3:
+            flag = (bm.sum((mi > 0) & (mi < p), axis=1) == 2)  # 内部点
+            cell = bm.set_at(cell, (..., flag), icell)
+
+        self.cell = cell
+
+        # quadrature
     def quadrature_formula(self, q, etype: Union[int, str] = 'cell'):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):
@@ -123,7 +301,16 @@ class LagrangeQuadrangleMesh(TensorMesh):
             raise ValueError(f"entity type: {etype} is wrong!")
 
     def bc_to_point(self, bc: TensorLike, index: Index=_S, etype='cell'):
-        """"Map coordinates from the reference element to the physical element."""
+        """"Map coordinates from the reference element to the physical element.
+        
+        Parameters:
+            bc(TensorLike): the barycentric coordinates of the integration points.
+            index(Index): the index of the mesh entities.
+
+        Returns:
+            TensorLike: the coordinates of the integration points in the
+            physical space.
+        """
         node = self.node
         TD = len(bc) 
         entity = self.entity(TD, index=index) # 
@@ -133,28 +320,48 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     # ipoints
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
-        """The number of interpolation points on each lquad element."""
+        """The number of interpolation points on each lquad element.
+        
+        Parameters:
+            p(int): the order of the Lagrange polynomial.
+        """
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
         return tensor_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p:int) -> int:
-        """The total number of interpolation points on the lquad mesh."""
+        """The total number of interpolation points on the lquad mesh.
+        
+        Parameters:
+            p(int): the order of the Lagrange polynomial.
+        """
         num = [self.entity(i).shape[0] for i in range(self.TD+1)]
         return tensor_gdof(p, num)
 
     def cell_to_ipoint(self, p:int, index:Index=_S):
-        """Obtain the bi-p interpolation points on the element."""
-        sp = self.p
-        cell = self.cell[:, [0, -sp-1, 1]]  # 取角点
-        NC = self.number_of_cells()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
+        """
+        Construct the map matrix from cells to interpolation points.
+
+        Parameters:
+            p(int): the order of the Lagrange polynomial.
+            index(Index): the index of the mesh cells.
+
+        Returns:
+            TensorLike: the map matrix from cells to interpolation points.
+            The shape is (NC, ldof), where NC is the number of cells and ldof is
+            the number of local interpolation points.
+        """
+        cell = self.entity('cell')
+        
         edge2cell = self.edge2cell
         if p == 0:
             return bm.arange(len(cell)).reshape((-1, 1))[index]
         if p == 1:
             return cell[index, [0, 3, 1, 2]]
+        
+        NN = self.number_of_corner_nodes()
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
         
         cell2ipoint = bm.zeros((NC, (p + 1) * (p + 1)), dtype=self.itype, device=bm.get_device(cell))
         c2p = cell2ipoint.reshape((NC, p + 1, p + 1))
@@ -191,16 +398,21 @@ class LagrangeQuadrangleMesh(TensorMesh):
         return cell2ipoint[index]
     
     def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
-        """Get the relationship between edges and integration points."""
-        NN = self.number_of_nodes()
+        """Get the relationship between edges and integration points.
+        
+        Parameters:
+            p(int): the order of the Lagrange polynomial.
+             index(Index): the index of the mesh edge.
+        """
+        NN = self.number_of_corner_nodes()
         NE = self.number_of_edges()
         
         edges = self.edge[index]
-        kwargs = bm.context(edges)
-        indices = bm.arange(NE, **kwargs)[index]
+        ikwargs = bm.context(edges)
+        indices = bm.arange(NE, **ikwargs)[index]
         return bm.concatenate([
             edges[:, 0].reshape(-1, 1),
-            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
+            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **ikwargs) + NN,
             edges[:, 1].reshape(-1, 1),
         ], axis=-1)
     
@@ -249,7 +461,12 @@ class LagrangeQuadrangleMesh(TensorMesh):
         return a
 
     def cell_unit_normal(self, bc: TensorLike, index: Index=_S):
-        """When calculating the surface,the direction of the unit normal at the integration point."""
+        """When calculating the surface,the direction of the unit normal at the integration point.
+        
+        Parameters:
+            bc(TensorLike): the barycentric coordinates of the integration
+            points.
+        """
         J = self.jacobi_matrix(bc, index=index)
         n = bm.cross(J[..., 0], J[..., 1], axis=-1)
         if self.GD == 3:
@@ -260,6 +477,11 @@ class LagrangeQuadrangleMesh(TensorMesh):
     def jacobi_matrix(self, bc: tuple, index: Index=_S, return_grad=False):
         """Compute the Jacobian matrix of the mapping from the reference element (xi, eta) to the physical Lagrange quadrilateral (x).
         
+        Parameters:
+            bc(TensorLike): the barycentric coordinates of the integration
+            points.
+            index(Index): the index of the mesh entities.
+
         Notes:
             x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
@@ -408,3 +630,33 @@ class LagrangeQuadrangleMesh(TensorMesh):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+            
+    @classmethod
+    def from_box(cls, box, p: int, nx=2, ny=2):
+        """Construct a higher-order quadrilateral mesh from a rectangular box.
+        
+        Parameters:
+            box (Sequence[float]): A sequence of 4 floats defining the box as [xmin, xmax, ymin, ymax].
+            p (int): The order of the Lagrange polynomial.
+            nx (int): Number of divisions along the x-axis.
+            ny (int): Number of divisions along the y-axis.
+        """
+        mesh = QuadrangleMesh.from_box(box, nx, ny)
+        return cls.from_quadrangle_mesh(mesh, p)
+    
+    @classmethod
+    def from_quadrangle_mesh(cls, mesh, p: int, boundary=None, surface=None):
+        """Construct a higher-order quadrilateral mesh from a linear quadrilateral mesh.
+        
+        Parameters:
+            mesh (QuadrangleMesh): A linear quadrilateral mesh.
+            p (int): The order of the Lagrange polynomial.
+            boundary (optional): A boundary projection operator applied only to boundary nodes.
+            surface (optional): A surface projection operator applied to all mesh nodes.
+        """
+        node = mesh.interpolation_points(p)
+        cell = mesh.cell_to_ipoint(p)
+        
+        mesh = cls(node, cell, p=p, boundary=boundary, surface=surface)
+
+        return mesh
