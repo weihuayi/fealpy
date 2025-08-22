@@ -1,5 +1,6 @@
 
 from .mesh_data_structure import MeshDS
+from .mesh_data import MeshData
 from .mesh_base import Mesh, HomogeneousMesh, SimplexMesh, TensorMesh, StructuredMesh
 
 from .interval_mesh import IntervalMesh
@@ -22,3 +23,4 @@ from .lagrange_quadrangle_mesh import LagrangeQuadrangleMesh
 
 from .edge_mesh import EdgeMesh
 from .inp_file_parser import InpFileParser
+from .bdf_file_parser import BdfFileParser, NodeSection, ElementSection

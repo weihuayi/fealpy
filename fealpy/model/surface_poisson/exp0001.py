@@ -6,27 +6,13 @@ from ...mesher import SphereSurfaceMesher
 
 class Exp0001(SphereSurfaceMesher):
 
-    """
-    Surface Poisson problem on a closed manifold:
+    """Surface Poisson problem on a closed manifold.
 
-        -Δ_S u(x, y, z) = f(x, y, z),   (x, y, z) ∈ S
-
-    where:
-        - S ⊂ ℝ³ is a closed, compact, C³-smooth surface without boundary (∂S = ∅),
-        - Δ_S is the Laplace-Beltrami operator on surface S,
-        - f is a given function defined on S, satisfying the compatibility condition:
-              ∫_S f dσ = 0,
-          where dσ is the surface measure on S,
-        - To ensure uniqueness of the solution u, an additional constraint is imposed:
-              ∫_S u dσ = 0.
-
-    In this example:
-        - The surface S is the unit sphere, represented implicitly as the level set:
-              x² + y² + z² - 1 = 0.
-        - The exact solution is chosen as:
-              u(x, y, z) = x·y.
-        - The corresponding source term f is defined as:
-              f = -Δ_S (x·y).
+    Example
+    >>> equation: -Δ_S u(x, y, z) = f(x, y, z),   (x, y, z) ∈ S
+    >>> S: the unit sphere.
+    >>> x² + y² + z² - 1 = 0: implicitly as the level set.
+    >>> u(x, y, z) = x·y: The exact solution.
     """
 
     def __init__(self):

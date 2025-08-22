@@ -51,31 +51,31 @@ class PaddleBackend(BackendProxy, backend_name='paddle'):
         if not isinstance(shape, (list, tuple)):
             shape = [shape]
         return x.reshape(shape)
+    
     @staticmethod
-    def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
-        """
-        unique(input, sorted=True, return_inverse=False, return_counts=False, dim=None) -> Tuple[Tensor, Tensor, Tensor]
-        """
-        b, index, inverse, counts = paddle.unique(a, return_index=True,
-                return_inverse=True,
-                return_counts=True,
-                axis=axis, **kwargs)
-        any_return = return_index or return_inverse or return_counts
-        if any_return:
-            result = (b, )
-        else:
-            retult = b
+    def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=None, **kwargs):
+        if not (return_index or return_inverse or return_counts):
+            b = paddle.unique(a, axis=axis, **kwargs)
+            return b
+
+        b, index, inverse, counts = paddle.unique(a,
+                                                   return_index=True,
+                                                   return_inverse=True,
+                                                   return_counts=True,
+                                                   axis=axis, **kwargs)
+
+        result = (b,)
 
         if return_index:
-            result += (index, )
+            result += (index,)
 
         if return_inverse:
-            # TODO: 处理 paddle.Tensor.reshape 形状参数不能为整数问题
-            inverse = inverse.reshape((-1,))
-            result += (inverse, )
+            if axis is None:
+                inverse = inverse.reshape(a.shape)
+            result += (inverse,)
 
         if return_counts:
-            result += (counts, )
+            result += (counts,)
 
         return result
 

@@ -14,6 +14,14 @@ class UniformTimeLine():
         self.NL = NT + 1 # the number of time levels
         self.dt = (self.T1 - self.T0)/NT
         self.current = int(0)
+    
+
+    def set_timeline(self, T0, T1, NT):
+        self.T0 = T0
+        self.T1 = T1
+        self.NL = NT + 1
+        self.dt = (self.T1 - self.T0)/NT
+    
 
     def add_time(self, n):
         """
@@ -41,13 +49,13 @@ class UniformTimeLine():
     def current_time_level_index(self):
         return self.current
 
-    def current_time_level(self):
+    def current_time(self):
         return self.T0 + self.current*self.dt
 
-    def next_time_level(self):
+    def next_time(self):
         return self.T0 + (self.current + 1)*self.dt
 
-    def prev_time_level(self):
+    def prev_time(self):
         return self.T0 + (self.current - 1)*self.dt
 
     def current_time_step_length(self):

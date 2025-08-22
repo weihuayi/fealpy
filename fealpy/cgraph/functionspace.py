@@ -3,6 +3,7 @@ from typing import Type
 from .nodetype import CNodeType, PortConf, DataType
 
 __all__ = [
+    "TensorFunctionSpace",
     "FunctionSpace",
     "BoundaryDof",
     "FEFunction"
@@ -39,6 +40,26 @@ class FunctionSpace(CNodeType):
         SpaceClass = get_space_class(space_type)
         return SpaceClass(mesh, p)
 
+class TensorFunctionSpace(CNodeType):
+    TITLE: str = "Tensor Function Space"
+    PATH: str = "space.creation"
+    INPUT_SLOTS = [
+        PortConf("type", DataType.MENU, 0, param="space_type", default="lagrange", items=["lagrange", "bernstein"]),
+        PortConf("mesh", DataType.MESH, 1),
+        PortConf("p", DataType.INT, 1),
+        PortConf("gd", DataType.INT, 1, param="GD", default=2),     
+        PortConf("value_dim", DataType.INT, 1, param="VD", default=-1)  
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("space", DataType.SPACE)
+    ]
+
+    @staticmethod
+    def run(space_type: str, mesh, p: int, GD: int, VD: int):
+        from ..functionspace import functionspace
+        element = (space_type.capitalize(), p)
+        shape = (GD, VD)
+        return functionspace(mesh, element, shape=shape)
 
 class BoundaryDof(CNodeType):
     TITLE: str = "Boundary Dof"

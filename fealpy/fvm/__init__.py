@@ -10,3 +10,4 @@ from .vector_decomposition import VectorDecomposition
 
 from .poisson_fvm_model import PoissonFVMModel
 from .stokes_fvm_model import StokesFVMModel
+from .dld_microfluidic_chip_fvm_model import DLDMicrofluidicChipFVMModel
