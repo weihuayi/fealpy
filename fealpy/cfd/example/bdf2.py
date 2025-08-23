@@ -1,13 +1,15 @@
-from fealpy.cfd.equation import IncompressibleNS
-from fealpy.cfd.simulation.fem import BDF2
-from fealpy.cfd.problem.IncompressibleNS import Channel
-
 from fealpy.backend import backend_manager as bm
+
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import TensorFunctionSpace
-from fealpy.solver import spsolve 
+
 from fealpy.fem import DirichletBC
 
+from fealpy.solver import spsolve 
+
+from ..equation import IncompressibleNS
+from ..simulation.fem import BDF2
+from ..problem.IncompressibleNS import Channel
 
 backend = 'pytorch'
 #backend = 'numpy'

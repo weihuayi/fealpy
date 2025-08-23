@@ -2,11 +2,15 @@ from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
 from .scalar_cross_diffusion_integrator import ScalarCrossDiffusionIntegrator
 from .scalar_source_integrator import ScalarSourceIntegrator
 from .div_integrator import DivIntegrator
+from .convection_integrator_x import ConvectionIntegratorX
+from .convection_integrator_y import ConvectionIntegratorY
 
 from .gradient_reconstruct import GradientReconstruct
+from .staggered_mesh_manager import StaggeredMeshManager
+from .div_reconstruct import DivergenceReconstruct
 from .dirichlet_bc import DirichletBC
+from .neumann_bc import NeumannBC
 from .vector_decomposition import VectorDecomposition
-
 
 from .poisson_fvm_model import PoissonFVMModel
 from .stokes_fvm_model import StokesFVMModel
