@@ -1,12 +1,11 @@
 from fealpy.backend import backend_manager as bm
-from .fem_base import FEM
-from ....fem import (ScalarMassIntegrator, ScalarConvectionIntegrator,PressWorkIntegrator,
-                     ViscousWorkIntegrator, SourceIntegrator, GradSourceIntegrator, 
-                     ScalarDiffusionIntegrator)
-from ....fem import (BilinearForm, LinearForm, BlockForm, LinearBlockForm)
 from fealpy.decorator import barycentric
-from fealpy.fem import ScalarNeumannBCIntegrator
 
+from fealpy.fem import (ScalarMassIntegrator, ScalarConvectionIntegrator,PressWorkIntegrator,
+                     ViscousWorkIntegrator, SourceIntegrator)
+from fealpy.fem import (BilinearForm, LinearForm, BlockForm, LinearBlockForm)
+
+from ..fem_base import FEM
 
 class BDF2(FEM):
     

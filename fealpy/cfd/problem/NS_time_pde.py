@@ -1,7 +1,9 @@
 import numpy as np
-import time
 import sympy as sp
+import time
+
 from fealpy.mesh import TriangleMesh
+
 class NSPDE():
     def __init__(self, u1, u2, p):
         self.box = [0, 1, 0, 1]

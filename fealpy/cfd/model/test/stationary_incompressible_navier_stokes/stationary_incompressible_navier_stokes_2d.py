@@ -1,3 +1,7 @@
+from typing import Union, Callable, Dict
+
+import sympy as sp
+
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian,variantmethod
 from typing import Union, Callable, Dict
@@ -5,6 +9,8 @@ from fealpy.mesh import TriangleMesh, QuadrangleMesh
 import sympy as sp
 from fealpy.mesher.box_mesher import BoxMesher2d 
 
+from fealpy.mesh import TriangleMesh
+from fealpy.mesher.box_mesher import BoxMesher2d 
 
 CoefType = Union[int, float, Callable]
 

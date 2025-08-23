@@ -1,10 +1,14 @@
 from typing import Optional
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S, CoefLike
-from ..mesh import HomogeneousMesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..decorator.variantmethod import variantmethod
-from ..fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, Index, _S, CoefLike
+from fealpy.decorator import variantmethod
+
+from fealpy.mesh import HomogeneousMesh
+from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
+
 from .vector_decomposition import VectorDecomposition
 from .gradient_reconstruct import GradientReconstruct
 
