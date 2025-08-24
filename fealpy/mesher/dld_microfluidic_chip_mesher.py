@@ -136,6 +136,10 @@ class DLDMicrofluidicChipMesher:
 
         centers: TensorLike = modeler.circles[:, :2]  # Extract (x, y) coordinates
         self.centers = centers
+        self.boundary = modeler.boundary
+        self.inlet_boundary = modeler.inlet_boundary
+        self.outlet_boundary = modeler.outlet_boundary
+        self.wall_boundary = modeler.wall_boundary
         try:
             if local_refine:
                 self.local_refine(gmsh, centers, radius, lc)
