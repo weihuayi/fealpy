@@ -103,7 +103,6 @@ class StaggeredMeshManager:
         dist_u = bm.sum((self.u_cell_centers[:, None, :] - VEP[None, :, :])**2, axis=2)
         u_map = bm.argmin(dist_u, axis=1).astype(bm.int32)
         u_edge_idx = self.vertical_edge_indices[u_map]
-
         # v_cell -> horizontal edge
         dist_v = bm.sum((self.v_cell_centers[:, None, :] - HEP[None, :, :])**2, axis=2)
         v_map = bm.argmin(dist_v, axis=1).astype(bm.int32)

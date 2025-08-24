@@ -13,12 +13,13 @@ from .vector_decomposition import VectorDecomposition
 from .gradient_reconstruct import GradientReconstruct
 
 class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
-    def __init__(self, uh, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
+    def __init__(self, uh, grad_f, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
                  batched: bool=False,
                  method: Optional[str]=None) -> None:
         super().__init__()
         self.uh = uh
+        self.grad_f = grad_f
         self.coef = coef
         self.q = q
         self.index = index
@@ -38,16 +39,15 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
                                f"homogeneous meshes, but {type(mesh).__name__} is"
                                "not a subclass of HomoMesh.")
         Tf = VectorDecomposition(mesh).tangential_vector_calculation() # (NE, 2)
-        grad_f = GradientReconstruct(mesh).reconstruct(self.uh)  # (NE, 2)
         edge_to_cell = mesh.edge_to_cell(index=index)[:,:2]
         NC = mesh.number_of_cells()
-        return Tf, grad_f,edge_to_cell,NC
+        return Tf,edge_to_cell,NC
         
 
     @variantmethod 
     def assembly(self, space: _FS) -> TensorLike:
-        Tf, grad_f,edge_to_cell,NC= self.fetch(space)
-        Cross_diffusion = bm.einsum('ij,ij->i', Tf, grad_f)
+        Tf,edge_to_cell,NC= self.fetch(space)
+        Cross_diffusion = bm.einsum('ij,ij->i', Tf, self.grad_f)
         NE = Cross_diffusion.shape[0]
         flux = bm.zeros((NE, 2))
         is_boundary = edge_to_cell[:, 0] == edge_to_cell[:, 1]
