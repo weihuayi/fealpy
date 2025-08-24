@@ -27,7 +27,7 @@ class Exp0001(BoxMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary conditions:
     
-        -Δu - k^2 u = f   in Ω = [-0.5, 0.5]^2
+        -Δu - k^2 u = f   in Ω = (-0.5, 0.5)^2
          iku + ∂u/∂n = g  on ∂Ω
 
     Exact solution:

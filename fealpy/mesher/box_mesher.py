@@ -78,7 +78,7 @@ class BoxMesher3d:
     @init_mesh.register('uniform')
     def init_mesh(self, nx=30, ny=30, nz=30):
         domain = self.box
-        extent = (0, nx, 0, ny, nz)
+        extent = (0, nx, 0, ny, 0, nz)
         mesh = UniformMesh(domain, extent)
         return mesh
 

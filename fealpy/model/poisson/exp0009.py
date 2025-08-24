@@ -9,7 +9,7 @@ class Exp0009(BoxMesher2d):
     """
     2D Poisson problem with circular source and non-homogeneous boundary conditions:
 
-        -Δu(x,y) = f(x,y),   (x,y) ∈ [-4,4]^2
+        -Δu(x,y) = f(x,y),   (x,y) ∈ (-4,4)^2
         u(x,y) = g(x, y), (x,y) ∈ ∂Ω
     
     with the exact solution:
@@ -32,7 +32,7 @@ class Exp0009(BoxMesher2d):
         self.box = [-4.0, 4.0, -4.0, 4.0]  # [xmin, xmax, ymin, ymax]
         super().__init__(box=self.box)
 
-    def get_dimension(self) -> int:
+    def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 

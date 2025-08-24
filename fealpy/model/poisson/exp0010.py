@@ -12,7 +12,7 @@ class Exp0010(BoxMesher2d):
     """
     2D Poisson problem:
     
-        -Δu(x,y) = f(x,y),   (x,y) ∈ [0,1]^2 
+        -Δu(x,y) = f(x,y),   (x,y) ∈ (0,1)^2 
         u(x, y) = g(x, y),    on ∂Ω
     
     with the exact solution:
@@ -21,12 +21,15 @@ class Exp0010(BoxMesher2d):
                  *[1.5cos(πy + 2π/5) + 2cos(2πy - π/5)]
 
     Homogeneous Dirichlet boundary conditions are applied on all edges.
+
+    Reference:
+        https://doi.org/10.48550/arXiv.2207.13380
     """
     def __init__(self):
         self.box = [0.0, 1.0, 0.0, 1.0] 
         super().__init__(box=self.box)
 
-    def get_dimension(self) -> int:
+    def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 

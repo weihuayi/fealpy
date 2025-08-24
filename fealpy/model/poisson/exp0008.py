@@ -9,7 +9,7 @@ class Exp0008(BoxMesher2d):
     """
     2D Poisson problem:
     
-        -Δu(x,y) = f(x, y) , (x,y) ∈ [-5,5]^2
+        -Δu(x,y) = f(x, y) , (x,y) ∈ (-5,5)^2
         u(x,y) = g(x, y), (x,y) ∈ ∂Ω
 
     with the exact solution:
@@ -33,7 +33,7 @@ class Exp0008(BoxMesher2d):
         self.box= [-5.0, 5.0, -5.0, 5.0]  # [xmin, xmax, ymin, ymax]
         super().__init__(box=self.box)
 
-    def get_dimension(self) -> int:
+    def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 

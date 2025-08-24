@@ -137,10 +137,7 @@ class PoissonPENNModel(ComputationalModel):
                 Dictionary containing all configuration parameters with parameter names as keys and default values
         """
         import argparse
-        parser = argparse.ArgumentParser(description=
-        """
-        A simple example of using PENN to solve Poisson equation.
-        """)
+        parser = argparse.ArgumentParser(description="Poisson equation solver using PENN.")
 
         parser.add_argument('--pde',default=8, type=int,
                             help="Built-in PDE example ID (1, 2, 6, 8, 9) for different Poisson problems, default is 8.")
@@ -198,7 +195,7 @@ class PoissonPENNModel(ComputationalModel):
         the input PDE object or built-in example ID.
         
         Parameters
-            pde : Union[PoissonPDEDataT, int]
+            pde: Union[PoissonPDEDataT, int]
                 Either a Poisson's equation problem object or the ID (integer) of a predefined example. 
                 If an integer, the corresponding predefined Poisson's equation problem is retrieved from 
                 the PDE model manager.
@@ -527,7 +524,7 @@ class PoissonPENNModel(ComputationalModel):
             fig.colorbar(surf3, ax=ax4, shrink=0.5, label='value')
 
             fig.suptitle('Comparison between PENN and FEM Solution', fontsize=14)
-            # plt.legend(fontsize=12)
+            plt.legend(fontsize=12)
             plt.grid(True, linestyle=':')
 
         plt.tight_layout()      

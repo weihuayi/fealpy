@@ -183,10 +183,7 @@ class HelmholtzPINNModel(ComputationalModel):
         """
 
         import argparse
-        parser = argparse.ArgumentParser(description=
-                """
-                A simple example of using PINN to solve Poisson equation.
-                """)
+        parser = argparse.ArgumentParser(description="Helmholtz equation solver using PINN.")
 
         parser.add_argument('--pde',default=1, type=int,
                             help="Built-in PDE example ID for different Helmholtz problems, default is 1.")
@@ -263,7 +260,9 @@ class HelmholtzPINNModel(ComputationalModel):
         
         Parameters
             pde : Union[[HelmholtzPDEDataT, int]
-                PDE object or built-in example ID.
+                Either a Helmholtz equation problem object or the ID (integer) of a predefined example. 
+                If an integer, the corresponding predefined Helmholtz equation problem is retrieved from 
+                the PDE model manager.
         """
         if isinstance(pde, int):
             self.pde = PDEModelManager('helmholtz').get_example(pde, k=self.k)
