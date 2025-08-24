@@ -1,5 +1,6 @@
 
 from .mesh_data_structure import MeshDS
+from .mesh_data import MeshData
 from .mesh_base import Mesh, HomogeneousMesh, SimplexMesh, TensorMesh, StructuredMesh
 
 from .interval_mesh import IntervalMesh

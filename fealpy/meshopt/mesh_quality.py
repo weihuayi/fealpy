@@ -36,13 +36,16 @@ class RadiusRatioQuality(MeshCellQuality):
             v = [node[cell[:,j],:] - node[cell[:,i],:] for i,j in localEdge]
             l2 = bm.zeros((NC, 3))
             for i in range(3):
-                #l2[:, i] = bm.sum(v[i]**2, axis=1)
                 l2 = bm.set_at(l2, (slice(None), i), bm.sum(v[i]**2, axis=1))
             l = bm.sqrt(l2)
             p = l.sum(axis=1)
             q = l.prod(axis=1)
-            area = bm.cross(v[2], -v[1])/2
+            
+            area = 0.5*(-v[2][:,0]*v[1][:,1] + v[2][:,1]*v[1][:,0])
             quality = p*q/(16*area**2)
+            penalty = self.penalty(area)
+            quality = quality+penalty
+
         elif self.mesh.top_dimension() == 3:
             vji = node[cell[:,0]] - node[cell[:,1]]
             vki = node[cell[:,0]] - node[cell[:,2]]
@@ -63,7 +66,23 @@ class RadiusRatioQuality(MeshCellQuality):
             cell2face = self.mesh.cell_to_face()
             s_sum = bm.sum(fm[cell2face], axis=-1) 
             quality = s_sum*dl/108/cm/cm
+            penalty = self.penalty(cm)
+            quality = quality+penalty
         return quality
+
+    def penalty(self,cm:TensorLike):
+        '''
+        Computes the penalty for the inversion elements.
+        Parameters:
+            cm(TensorLike): Element volume tensor of shape (NC,)
+        Returns:
+            TensorLike: Penalty values tensor of shape (NC,) where:
+                Values are 0 for cm >0 , and (1 - cm/1e-8)**2 for cm < 0
+        '''
+        penalty = bm.zeros_like(cm, dtype=bm.float64)
+        flag = cm<0
+        penalty = bm.set_at(penalty, flag, (1 - cm[flag]/1e-8)**2)
+        return penalty
 
     def jac(self,x:TensorLike) -> TensorLike:
         '''
@@ -83,34 +102,30 @@ class RadiusRatioQuality(MeshCellQuality):
         NN = self.mesh.number_of_nodes()
 
         if self.mesh.TD == 2:
-            idxi = cell[:, 0]
-            idxj = cell[:, 1] 
-            idxk = cell[:, 2] 
+            idx0 = cell[:, 0]
+            idx1 = cell[:, 1] 
+            idx2 = cell[:, 2] 
 
-            v0 = node[idxk] - node[idxj]
-            v1 = node[idxi] - node[idxk]
-            v2 = node[idxj] - node[idxi]
+            v0 = node[idx2] - node[idx1]
+            v1 = node[idx0] - node[idx2]
+            v2 = node[idx1] - node[idx0]
 
             area = 0.5*(-v2[:, [0]]*v1[:, [1]] + v2[:, [1]]*v1[:, [0]])
             l2 = bm.zeros((NC, 3), dtype=bm.float64)
             l2 = bm.set_at(l2, (slice(None), 0), bm.sum(v0**2, axis=1))
             l2 = bm.set_at(l2, (slice(None), 1), bm.sum(v1**2, axis=1))
             l2 = bm.set_at(l2, (slice(None), 2), bm.sum(v2**2, axis=1))
-            '''
-            l2[:, 0] = bm.sum(v0**2, axis=1)
-            l2[:, 1] = bm.sum(v1**2, axis=1)
-            l2[:, 2] = bm.sum(v2**2, axis=1)
-            '''
+
             l = bm.sqrt(l2)
             p = l.sum(axis=1, keepdims=True)
             q = l.prod(axis=1, keepdims=True)
             mu = p*q/(16*area**2)
-
-            c = mu*(1/(p*l)+1/l2)
-            cn = mu/area
+            c = mu*(1/(p*l)+1/l2)/NC
+            cn = mu/(area*NC)
 
             grad = bm.zeros((NC, 3, 2), dtype=bm.float64)
             cn = cn.reshape(-1)
+            
             grad = bm.set_at(grad, (slice(None), 0, 0), 
                              c[:, 1]*v1[:, 0] - c[:, 2]*v2[:, 0] + cn*v0[:, 1])
             grad = bm.set_at(grad, (slice(None), 0, 1), 
@@ -123,13 +138,14 @@ class RadiusRatioQuality(MeshCellQuality):
                              c[:, 0]*v0[:, 0] - c[:, 1]*v1[:, 0] + cn*v2[:, 1])
             grad = bm.set_at(grad, (slice(None), 2, 1),
                              c[:, 0]*v0[:, 1] - c[:, 1]*v1[:, 1] - cn*v2[:, 0])
+            
             '''
-            grad[:,0,0] = c[:, 1]*v1[:,0] - c[:, 2]*v2[:,0] + cn*v0[:,1]
-            grad[:,0,1] = c[:, 1]*v1[:,1] - c[:, 2]*v2[:,1] - cn*v0[:,0]
-            grad[:,1,0] = -c[:, 0]*v0[:,0] + c[:, 2]*v2[:,0] + cn*v1[:,1]
-            grad[:,1,1] = -c[:, 0]*v0[:,1] + c[:, 2]*v2[:,1] - cn*v1[:,0]
-            grad[:,2,0] = c[:, 0]*v0[:,0] - c[:, 1]*v1[:,0] + cn*v2[:,1]
-            grad[:,2,1] = c[:, 0]*v0[:,1] - c[:, 1]*v1[:,1] - cn*v2[:,0]
+            grad[:,0,0] = c[:, 1]*v1[:,0] - c[:, 2]*v2[:,0] - cn*v0[:,1]
+            grad[:,0,1] = c[:, 1]*v1[:,1] - c[:, 2]*v2[:,1] + cn*v0[:,0]
+            grad[:,1,0] = -c[:, 0]*v0[:,0] + c[:, 2]*v2[:,0] - cn*v1[:,1]
+            grad[:,1,1] = -c[:, 0]*v0[:,1] + c[:, 2]*v2[:,1] + cn*v1[:,0]
+            grad[:,2,0] = c[:, 0]*v0[:,0] - c[:, 1]*v1[:,0] - cn*v2[:,1]
+            grad[:,2,1] = c[:, 0]*v0[:,1] - c[:, 1]*v1[:,1] + cn*v2[:,0]
             '''
             return grad
 
@@ -156,7 +172,7 @@ class RadiusRatioQuality(MeshCellQuality):
             d0 += l10[:, None]*c23
             c31 = bm.cross(v30, v10)
             d0 += l20[:, None]*c31
-            #print('d0:',d0)
+            
             c12 = bm.sum(c12*d0, axis=-1)
             c23 = bm.sum(c23*d0, axis=-1)
             c31 = bm.sum(c31*d0, axis=-1)
@@ -173,17 +189,6 @@ class RadiusRatioQuality(MeshCellQuality):
             A = bm.set_at(A, (slice(None), 3, 3), 2*c12)
             A = bm.set_at(A, (slice(None), slice(1,None), 0), A[:, 0, 1:]) 
             
-            '''
-            A[:, 0, 0]  = 2*c
-            A[:, 0, 1] -= 2*c23
-            A[:, 0, 2] -= 2*c31
-            A[:, 0, 3] -= 2*c12
-
-            A[:, 1, 1] = 2*c23
-            A[:, 2, 2] = 2*c31
-            A[:, 3, 3] = 2*c12
-            A[:, 1:, 0] = A[:, 0, 1:]
-            '''
             K = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
             K = bm.set_at(K, (slice(None), 0, 1), -(l30 - l20))
             K = bm.set_at(K, (slice(None), 0, 2), -(l10 - l30))
@@ -196,30 +201,14 @@ class RadiusRatioQuality(MeshCellQuality):
             
             K = bm.set_at(K, (slice(None), 2, 3), -l10)
             K = bm.set_at(K, (slice(None), 3, 2), l10)
-            '''
-            K[:, 0, 1] -= l30 - l20
-            K[:, 0, 2] -= l10 - l30
-            K[:, 0, 3] -= l20 - l10
-            K[:, 1:, 0] -= K[:, 0, 1:]
 
-            K[:, 1, 2] -= l30
-            K[:, 1, 3] += l20
-            K[:, 2:, 1] -= K[:, 1, 2:]
-
-            K[:, 2, 3] -= l10
-            K[:, 3, 2] += l10
-            '''
             S = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
             face = self.mesh.entity('face')
             fv01 = node[face[:,1],:] - node[face[:,0],:]
             fv02 = node[face[:,2],:] - node[face[:,0],:]
             fm = bm.sqrt(bm.square(bm.cross(fv01,fv02)).sum(axis=1))/2.0
-            #print('fm:',fm)
-            #fm = self.mesh.entity_measure("face")
-            #cm = self.mesh.entity_measure("cell")
 
             cm = bm.sum(-v30*bm.cross(v10,v20),axis=1)/6.0
-            #print('cm:',cm)
             c2f = self.mesh.cell_to_face()
 
             s = fm[c2f]
@@ -236,8 +225,7 @@ class RadiusRatioQuality(MeshCellQuality):
             q21 = -(bm.sum(v32*v31, axis=-1)/s[:,0]+bm.sum(v20*v10, axis=-1)/s[:,3])/4
             q31 = -(bm.sum(v30*v10, axis=-1)/s[:,2]+bm.sum(-v32*v21, axis=-1)/s[:,0])/4
             q32 = -(bm.sum(v31*v21, axis=-1)/s[:,0]+bm.sum(v30*v20, axis=-1)/s[:,1])/4
-            #print('q10:',q10)
-            #print('q30:',q30)
+            
             S = bm.set_at(S, (slice(None), 0, 0), p0)
             S = bm.set_at(S, (slice(None), 0, 1), q10)
             S = bm.set_at(S, (slice(None), 0, 2), q20)
@@ -254,23 +242,6 @@ class RadiusRatioQuality(MeshCellQuality):
             S = bm.set_at(S, (slice(None), 3, 2), q32) 
             S = bm.set_at(S, (slice(None), 3, 3), p3)
            
-            '''
-            S[:, 0, 0] = p0
-            S[:, 0, 1] = q10
-            S[:, 0, 2] = q20
-            S[:, 0, 3] = q30
-            S[:, 1:,0] = S[:, 0, 1:]
-
-            S[:, 1, 1] = p1
-            S[:, 1, 2] = q21
-            S[:, 1, 3] = q31
-            S[:, 2:,1] = S[:, 1, 2:]
-
-            S[:, 2, 2] = p2
-            S[:, 2, 3] = q32
-            S[:, 3, 2] = q32
-            S[:, 3, 3] = p3
-            '''
             C0 = bm.zeros((NC, 4, 4), dtype=bm.float64)
             C1 = bm.zeros((NC, 4, 4), dtype=bm.float64)
             C2 = bm.zeros((NC, 4, 4), dtype=bm.float64)
@@ -289,28 +260,14 @@ class RadiusRatioQuality(MeshCellQuality):
                 CC = bm.set_at(CC, (slice(None), 3, 1), xx[:, 0])
                 CC = bm.set_at(CC, (slice(None), 3, 2), xx[:, 1])
                 return CC
-                '''
-                CC[:, 0, 1] = xx[:, 2]
-                CC[:, 0, 2] = xx[:, 3]
-                CC[:, 0, 3] = xx[:, 1]
-                CC[:, 1, 0] = xx[:, 3]
-                CC[:, 1, 2] = xx[:, 0]
-                CC[:, 1, 3] = xx[:, 2]
-                CC[:, 2, 0] = xx[:, 1]
-                CC[:, 2, 1] = xx[:, 3]
-                CC[:, 2, 3] = xx[:, 0]
-                CC[:, 3, 0] = xx[:, 2]
-                CC[:, 3, 1] = xx[:, 0]
-                CC[:, 3, 2] = xx[:, 1]
-                '''
             C0 = f(C0, node[cell, 0])
             C1 = f(C1, node[cell, 1])
             C2 = f(C2, node[cell, 2])
-            #print('C0:',C0)
+        
             C0 = 0.5*(-C0 + C0.swapaxes(-1, -2))
             C1 = 0.5*(C1  - C1.swapaxes(-1, -2))
             C2 = 0.5*(-C2 + C2.swapaxes(-1, -2))
-            #print('C0:',C0) 
+             
             B0 = -d0[:,0,None,None]*K
             B1 = d0[:,1,None,None]*K
             B2 = -d0[:,2,None,None]*K
@@ -334,7 +291,6 @@ class RadiusRatioQuality(MeshCellQuality):
             B2 -= C2
 
             mu = s_sum*bm.sqrt(ld0)/(108*cm**2)
-            #mu = s_sum*np.sqrt(ld0)/(108)
 
             A  *= mu[:,None,None]/NC
             B0 *= mu[:,None,None]/NC
@@ -377,7 +333,6 @@ class RadiusRatioQuality(MeshCellQuality):
                     B: (NC, 3, 3) rotation-related terms
                 - For 3D: (NC, 4, 4) matrix of ∂²quality/∂v_i∂v_j for vertex pairs
         '''
-        #node = self.mesh.entity('node')
         node = x
         cell = self.mesh.entity('cell')
         NC = self.mesh.number_of_cells()
@@ -394,19 +349,39 @@ class RadiusRatioQuality(MeshCellQuality):
 
             area = 0.5*(-v2[:, [0]]*v1[:, [1]] + v2[:, [1]]*v1[:, [0]])
             l2 = bm.zeros((NC, 3), dtype=bm.float64)
-            l2[:, 0] = bm.sum(v0**2, axis=1)
-            l2[:, 1] = bm.sum(v1**2, axis=1)
-            l2[:, 2] = bm.sum(v2**2, axis=1)
+            #l2[:, 0] = bm.sum(v0**2, axis=1)
+            #l2[:, 1] = bm.sum(v1**2, axis=1)
+            #l2[:, 2] = bm.sum(v2**2, axis=1)
+            l2 = bm.set_at(l2, (slice(None), 0), bm.sum(v0**2, axis=1))
+            l2 = bm.set_at(l2, (slice(None), 1), bm.sum(v1**2, axis=1))
+            l2 = bm.set_at(l2, (slice(None), 2), bm.sum(v2**2, axis=1))
             l = bm.sqrt(l2)
             p = l.sum(axis=1, keepdims=True)
             q = l.prod(axis=1, keepdims=True)
             mu = p*q/(16*area**2)
 
-            c = mu*(1/(p*l)+1/l2)
-            cn = mu/area
+            c = mu*(1/(p*l)+1/l2)/NC
+            cn = mu/(area*NC)
 
             A = bm.zeros((NC, 3, 3), dtype=bm.float64)
             B = bm.zeros((NC, 3, 3), dtype=bm.float64)
+            A = bm.set_at(A, (slice(None), 0, 0), c[:, 1] + c[:, 2])
+            A = bm.set_at(A, (slice(None), 0, 1), -c[:, 2])
+            A = bm.set_at(A, (slice(None), 0, 2), -c[:, 1])
+            A = bm.set_at(A, (slice(None), 1, 0), -c[:, 2])
+            A = bm.set_at(A, (slice(None), 1, 1), c[:, 0] + c[:, 2])
+            A = bm.set_at(A, (slice(None), 1, 2), -c[:, 0])
+            A = bm.set_at(A, (slice(None), 2, 0), -c[:, 1])
+            A = bm.set_at(A, (slice(None), 2, 1), -c[:, 0])
+            A = bm.set_at(A, (slice(None), 2, 2), c[:, 0] + c[:, 1])
+
+            B = bm.set_at(B, (slice(None), 0, 1), -cn.reshape(-1))
+            B = bm.set_at(B, (slice(None), 1, 2), -cn.reshape(-1))
+            B = bm.set_at(B, (slice(None), 2, 0), -cn.reshape(-1))
+            B = bm.set_at(B, (slice(None), 1, 0), cn.reshape(-1))
+            B = bm.set_at(B, (slice(None), 2, 1), cn.reshape(-1))
+            B = bm.set_at(B, (slice(None), 0, 2), cn.reshape(-1))
+            '''
             A[:, 0, 0] = c[:, 1] + c[:, 2]
             A[:, 0, 1] = -c[:, 2]
             A[:, 0, 2] = -c[:, 1]
@@ -419,6 +394,8 @@ class RadiusRatioQuality(MeshCellQuality):
 
             B[:, 0, 1] = B[:, 1, 2] = B[:, 2, 0] = -cn.reshape(-1)
             B[:, 1, 0] = B[:, 2, 1] = B[:, 0, 2] = cn.reshape(-1)
+            '''
+
             return (A,B)
 
         elif self.mesh.TD == 3:
@@ -463,18 +440,7 @@ class RadiusRatioQuality(MeshCellQuality):
             A = bm.set_at(A, (slice(None), 2, 2), 2*c31)
             A = bm.set_at(A, (slice(None), 3, 3), 2*c12)
             A = bm.set_at(A, (slice(None), slice(1,None), 0), A[:, 0, 1:]) 
-            #A[:, 1:, 0] = A[:, 0, 1:]
-            '''
-            A[:, 0, 0]  = 2*c
-            A[:, 0, 1] -= 2*c23
-            A[:, 0, 2] -= 2*c31
-            A[:, 0, 3] -= 2*c12
 
-            A[:, 1, 1] = 2*c23
-            A[:, 2, 2] = 2*c31
-            A[:, 3, 3] = 2*c12
-            A[:, 1:, 0] = A[:, 0, 1:]
-            '''
             S = bm.zeros((NC, 4, 4), dtype=self.mesh.ftype)
             face = self.mesh.entity('face')
             fv01 = node[face[:,1],:] - node[face[:,0],:]
@@ -514,23 +480,6 @@ class RadiusRatioQuality(MeshCellQuality):
             S = bm.set_at(S, (slice(None), 2, 3), q32)
             S = bm.set_at(S, (slice(None), 3, 2), q32) 
             S = bm.set_at(S, (slice(None), 3, 3), p3)
-            '''
-            S[:, 0, 0] = p0
-            S[:, 0, 1] = q10
-            S[:, 0, 2] = q20
-            S[:, 0, 3] = q30
-            S[:, 1:,0] = S[:, 0, 1:]
-
-            S[:, 1, 1] = p1
-            S[:, 1, 2] = q21
-            S[:, 1, 3] = q31
-            S[:, 2:,1] = S[:, 1, 2:]
-
-            S[:, 2, 2] = p2
-            S[:, 2, 3] = q32
-            S[:, 3, 2] = q32
-            S[:, 3, 3] = p3
-            '''
 
             ld0 = bm.sum(d0**2,axis=-1)
      
