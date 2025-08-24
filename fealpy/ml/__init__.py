@@ -6,4 +6,5 @@ from .torch_mapping import optimizers, activations
 from .poisson_penn_model import PoissonPENNModel
 from .poisson_pinn_model import PoissonPINNModel
 from .helmholtz_pinn_model import HelmholtzPINNModel
+from .poisson_rfm_model import PoissonRFMModel
 

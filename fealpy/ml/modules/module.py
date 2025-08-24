@@ -90,7 +90,7 @@ class TensorMapping(Module):
 
     ### module wrapping
 
-    def diff(self, target: TensorFunction):
+    def diff(self, target: TensorFunction, solution2: TensorFunction=None):
         """Create a new mapping representing difference with target function.
         
         Parameters:
@@ -101,7 +101,7 @@ class TensorMapping(Module):
             TensorMapping: 
                 New mapping that computes self(p) - target(p)
         """
-        return DiffSolution(self, target)
+        return DiffSolution(self, target, fn3=solution2)
 
     def real(self, dtype):
         """Create mapping returning real part of complex output.
@@ -297,7 +297,7 @@ class TensorMapping(Module):
         return bm.pow(e.sum(axis=0), 1/power)
 
     def estimate_error_tensor(self, other: TensorFunction, mesh, *, power: int=2,
-                              q: int=3, cell_type: bool=False, dtype=float64):
+                              q: int=3, cell_type: bool=False, dtype=float64,solution2: TensorFunction= None):
         """Tensor-based error estimation between mappings.
         
         Parameters:
@@ -321,21 +321,29 @@ class TensorMapping(Module):
         device = self.get_device()
         qf = mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ws = torch.from_numpy(ws).to(dtype=dtype).to(device=device)
         _cm = mesh.entity_measure('cell')
 
         if isinstance(_cm, float): # to tackle with the returns from cell_area of UniformMesh2d
-            NC = mesh.ds.number_of_cells()
+            NC = mesh.number_of_cells()
             cellmeasure = torch.tensor(_cm, dtype=dtype, device=device).broadcast_to((NC, ))
         else:
-            cellmeasure = torch.from_numpy(_cm).to(dtype=dtype).to(device=device)
+            cellmeasure = _cm
 
-        ps = torch.from_numpy(mesh.bc_to_point(bcs)).to(dtype=dtype).to(device=device)
+        ps = mesh.bc_to_point(bcs)
         original_shape = ps.shape[:-1]
         ps = ps.reshape(-1, ps.shape[-1])
-        diff = torch.pow(torch.abs(self(ps) - other(ps)), power)
+
+        if solution2 is not None:
+            a = self(ps) + solution2(ps)
+        else:
+            a = self(ps)
+        b = other(ps)
+        if b.shape[-1] != 1:
+            b = b[..., None]
+        assert a.shape == b.shape, f"Shape mismatch: a {a.shape}, b {b.shape}"
+        diff = torch.pow((a - b), power)
         diff = diff.reshape(original_shape + (diff.shape[-1], ))
-        e = torch.einsum('q, qc..., c -> c...', ws, diff, cellmeasure)
+        e = torch.einsum('q, cq..., c -> c...', ws, diff, cellmeasure)
 
         if cell_type:
             return torch.pow(e, 1/power, out=e)
@@ -482,7 +490,7 @@ class TensorMapping(Module):
 
 class ZeroMapping(Module):
     def forward(self, p: Tensor):
-        return torch.zeros_like(p)
+        return torch.zeros_like(p[..., 0])
 
 
 class Solution(TensorMapping):
@@ -542,15 +550,27 @@ class Solution(TensorMapping):
 
 
 class DiffSolution(TensorMapping):
-    """Mapping representing difference between two tensor functions."""
-    def __init__(self, fn1: TensorFunction, fn2: TensorFunction) -> None:
+    """Mapping representing difference between two tensor functions.
+
+    Parameters:
+        fn1: TensorFunction
+            First function to subtract from
+        fn2: TensorFunction
+            Second function to subtract
+        fn3: TensorFunction, optional
+            Third function to add (default: ZeroMapping)
+    Return
+        Tensor: Difference between fn1, fn2, and fn3 at input points p (fn1(p) - fn2(p) + fn3(p)).
+    """
+    def __init__(self, fn1: TensorFunction, fn2: TensorFunction, *, fn3:TensorFunction=None) -> None:
         super().__init__()
         self.__fn_1 = fn1
+        self.__fn_3 = fn3 if fn3 is not None else ZeroMapping()
         self.__fn_2 = fn2
 
     def forward(self, p: Tensor):
-        return self.__fn_1(p) - self.__fn_2(p)
-
+        return self.__fn_1(p).flatten() + self.__fn_3(p).flatten() - self.__fn_2(p).flatten()
+ 
 
 class RealSolution(TensorMapping):
     def __init__(self, fn: TensorFunction, dtype) -> None:

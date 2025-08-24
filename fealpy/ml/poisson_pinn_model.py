@@ -164,10 +164,7 @@ class PoissonPINNModel(ComputationalModel):
         import argparse
 
         # Argument parsing
-        parser = argparse.ArgumentParser(description=
-                """
-                A simple example of using PINN to solve Poisson equation.
-                """)
+        parser = argparse.ArgumentParser(description="Poisson equation solver using PINN.")
 
         parser.add_argument('--pde',default=1, type=int,
                             help="Built-in PDE example ID for different Poisson problems, default is 1.")
@@ -236,9 +233,10 @@ class PoissonPINNModel(ComputationalModel):
         """Initialize the PDE problem definition.
         
         Parameters
-            pde : Union[PoissonPDEDataT, int]
-                Either a predefined PDE object or string identifier for built-in examples.
-                Defaults to 'sin' example problem.
+            pde: Union[PoissonPDEDataT, int]
+                Either a Poisson's equation problem object or the ID (integer) of a predefined example. 
+                If an integer, the corresponding predefined Poisson's equation problem is retrieved from 
+                the PDE model manager.
         """
         if isinstance(pde, int):
             self.pde = PDEModelManager('poisson').get_example(pde)
@@ -456,7 +454,7 @@ class PoissonPINNModel(ComputationalModel):
             fig = plt.figure()
             if self.gd == 1:
                 # 绘制真实解和预测解
-                plt.plot(node, u_true, 'b-', linewidth=3, label='Exact Solution')
+                plt.plot(node, u_true, 'b-', linewidth=2, label='Exact Solution')
                 plt.plot(node, u_pred, 'g--', linewidth=2, label='PINN Prediction')
                 plt.plot(node, u_pred-u_true, 'r-', linewidth=2, label='Error: PINN-Exact')
 

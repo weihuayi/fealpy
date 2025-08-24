@@ -12,7 +12,7 @@ class Exp0006(IntervalMesher):
     """
     1D Helmholtz problem:
     
-        -Δu(x) - k^2*u(x) = f(x),   x ∈ [0,8] 
+        -Δu(x) - k^2*u(x) = f(x),   x ∈ (0,8) 
           u(x) = g(x),    on ∂Ω
     
     with the exact solution:
@@ -20,13 +20,16 @@ class Exp0006(IntervalMesher):
         u(x) = sin(3πx + 3π/20)*cos(2πx + π/10) + 2
 
     Homogeneous Dirichlet boundary conditions are applied on all edges.
+
+    Reference:
+        https://doi.org/10.48550/arXiv.2207.13380
     """
     def __init__(self, options: dict = {}):
         self.box = [0.0, 8.0] 
         super().__init__(interval=self.box)
         self.k = bm.tensor(options.get('k', 1.0))
 
-    def get_dimension(self) -> int:
+    def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 
