@@ -1,9 +1,6 @@
-from typing import Union
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
-from fealpy.mesh import Mesh
-from fealpy.utils import timer
 from fealpy.cfd.equation.stationary_stokes import StationaryStokes
 
 class StationaryIncompressibleStokesLFEMModel(ComputationalModel):

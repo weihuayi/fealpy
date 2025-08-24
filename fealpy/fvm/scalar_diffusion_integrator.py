@@ -1,11 +1,15 @@
 from typing import Optional
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S, CoefLike
-from ..mesh import HomogeneousMesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
-from ..decorator.variantmethod import variantmethod
-from ..fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, Index, _S, CoefLike
+from fealpy.decorator import variantmethod
+from fealpy.utils import process_coef_func
+
+from fealpy.mesh import HomogeneousMesh
+from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
+
 from .vector_decomposition import VectorDecomposition
 
 class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
@@ -54,8 +58,11 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         e_norm = bm.einsum('ij,ij->i', e, e)**0.5               
         # Ef_abs = (|Sf|^2 / (e·Sf)) * |e|
         Ef_abs = bm.einsum('i,i->i', Sf_dot_Sf / e_dot_Sf, e_norm)
+        if coef is None:
+            coef = bm.ones_like(Ef_abs, dtype=space.ftype)
+        integrator  = bm.einsum('i,i->i', Ef_abs / d, coef)
         direction_matrix = bm.array([[1.0, -1.0], [-1.0, 1.0]], dtype=space.ftype)
         eye_D = bm.eye(D, dtype=space.ftype, device=bm.get_device(space))
         base_matrix = bm.einsum('ij,pq->ipjq', eye_D, direction_matrix).reshape(2*D, 2*D)
-        local_matrix = bm.einsum('i,ab->iab', Ef_abs / d, base_matrix)
+        local_matrix = bm.einsum('i,ab->iab', integrator, base_matrix)
         return local_matrix
