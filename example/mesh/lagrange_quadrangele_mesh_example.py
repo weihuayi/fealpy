@@ -22,8 +22,8 @@ surface = SphereSurface()
 # fname = f"sphere_qtest.vtu"
 # lmesh.to_vtk(fname=fname)
 
-mesh = LagrangeQuadrangleMesh.from_box([0, 1, 0, 1], p=3, nx=2, ny=2)
-#mesh.uniform_refine(1)
+mesh = LagrangeQuadrangleMesh.from_box([0, 1, 0, 1], p=2, nx=2, ny=2)
+mesh.uniform_refine(1)
 node = mesh.entity('node')
 edge = mesh.entity('edge')
 cell = mesh.entity('cell')

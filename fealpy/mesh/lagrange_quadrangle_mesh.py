@@ -180,7 +180,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
         """ Uniform refine the lagrange quadrangle mesh n times.
 
         Parameters:
-            n (int): Times refine the  quadrangle mesh.
+            n (int): Times refine the  quadrangle mesh. Default is 1.
 
         Returns:
             mesh: The mesh obtained after uniformly refining n times.
@@ -214,23 +214,38 @@ class LagrangeQuadrangleMesh(TensorMesh):
             NE = self.number_of_edges()
             NC = self.number_of_cells()
             
-            # TOdo: 还未走通
+            cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4)
+            # Segment parameters: 0, 0.5, 1
             E = bm.array([
-                [0.5, 0.0],  # bottom edge midpoint
-                [1.0, 0.5],  # right edge midpoint
-                [0.5, 1.0],  # top edge midpoint
-                [0.0, 0.5],  # left edge midpoint
-                ], **fkwargs)
+                [1.0, 0.0],
+                [0.5, 0.5],
+                [0.0, 1.0]], **fkwargs)
 
-            # 映射到物理坐标
-            nodes.append(self.bc_to_point(E).reshape(-1, GD))
+            # Midpoint of the edge
+            nodes.append((node[edge[:, 0]] + node[edge[:, -1]]) / 2.0)
             start = NN_corner
             end = start + NE
             mid = bm.arange(start, end, **ikwargs)
             
-          
+            # Construct new edges
+            if self.p == 1:
+                e0 = bm.stack((edge[:, 0], mid), axis=1)
+                e1 = bm.stack((mid, edge[:, -1]), axis=1)
+            else:
+                nn = self.p - 1
+                # Each edge has 2*nn points
+                start = end
+                end = start + 2 * nn * NE
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 2 * nn)
+                e0 = bm.concat((edge[:, [0]], e[:, 0*nn:1*nn], mid[:, None]), axis=1)
+                e1 = bm.concat((mid[:, None], e[:, 1*nn:2*nn], edge[:, [-1]]), axis=1)
+            edges.extend([e0, e1])
             
+            # TODO：边的插值点和子单元
+            icell = None
 
+            self.construct_global_cell(icell, **ikwargs)
+            
     def construct_global_cell(self, icell: TensorLike, **ikwargs):
         """
         Construct the new cells for the Lagrange quadrangle mesh after uniform
