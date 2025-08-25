@@ -136,8 +136,6 @@ class TimoshenkoBeamData3D:
         F[11 * self.dofs_per_node + 3] = external_load[2]
         F[21 * self.dofs_per_node + 2] = external_load[3]
 
-
-
         return F 
 
     @cartesian
