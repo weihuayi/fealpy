@@ -350,8 +350,8 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
             val = eps.getEigenpair(i, vr, vi)
             eigvals.append(val.real)
             eigvecs.append(vr.getArray().copy())
-        val = bm.array(eigvals)
-        self.logger.info(f"Eigenvalues: {val}")
+        eigvals = bm.array(eigvals)
+        self.logger.info(f"Eigenvalues: {eigvals}")
 
         # transform the eigenvectors to the original node index
         NN = self.mesh.number_of_nodes()
@@ -362,13 +362,24 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         vec = [] 
         for i, val in enumerate(eigvecs):
             phi = bm.zeros((NN * 3,), dtype=self.ftype)
-            phi = bm.set_at(phi, isFreeDof, val[:N0])
+            idx, = bm.where(isFreeDof)
+            phi = bm.set_at(phi, idx, val[N0:N0 + N1])
             # transform the dof values of coupling nodes to surface nodes
             # constrained by the coupling nodes.
-            phi = bm.set_at(phi, isCSDof, self.G @ val[N0 + N1:])
+            idx, = bm.where(isCSDof)
+            phi = bm.set_at(phi, idx, self.G @ val[N0 + N1:])
             phi = phi.reshape((NN, 3))
             # put into the mesh node data 
-            self.mesh.nodedata[f'eigenvalue{val[i]}'] = phi
+            self.mesh.nodedata[f'eigenvalue-{i}-{eigvals[i]:0.5e}'] = phi
+
+        # check the correctness of the eigenvectors
+        for i, v in enumerate(eigvecs):
+            v = bm.array(v, dtype=self.ftype)
+            print(f"Eigenvector {i} norm: {bm.linalg.norm(v)}")
+            print(f"Eigenvector {i} v^T*M*v: {bm.dot(v, M @ v)}")
+            
+
+
 
 
     def post_process(self, fname: str="eigen.vtu") -> None:

@@ -42,3 +42,4 @@ bm.set_backend(options['backend'])
 from fealpy.csm.fem import GearBoxModalLinearFEMModel
 model = GearBoxModalLinearFEMModel(options)
 model.solve()
+model.post_process()
