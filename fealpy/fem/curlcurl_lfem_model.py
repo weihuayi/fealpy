@@ -46,10 +46,10 @@ class CurlCurlLFEMModel(ComputationalModel):
         """
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.k = self.options['wave_number']
         self.set_pde(options['pde'])
         self.set_init_mesh(options['init_mesh'], nx=options['nx'], ny=options['ny'])
         self.set_space_degree(options['space_degree'])
-        self.set_wave_number(options['wave_number'])
         self.set_gamma(options['gamma'])
         self.solver = self.options['solver']
         self.method = self.options['method']
@@ -94,15 +94,6 @@ class CurlCurlLFEMModel(ComputationalModel):
             p: The polynomial degree.
         """
         self.p = p
-        
-    def set_wave_number(self, k: int):
-        """
-        Set the wave number for the Helmholtz equation.
-
-        Args:
-            k: Wave number.
-        """
-        self.k = k
 
     def set_gamma(self, gamma: float):
         """
@@ -117,16 +108,15 @@ class CurlCurlLFEMModel(ComputationalModel):
     def linear_system(self, mesh, p):
         """
         """
-        self.pde.set(k=self.k)
         self.space= FirstNedelecFESpace(mesh, p=p)
 
         LDOF = self.space.number_of_local_dofs()
         GDOF = self.space.number_of_global_dofs()
         self.logger.info(f"local DOFs: {LDOF}, global DOFs: {GDOF}")
 
-        D = CurlCurlIntegrator(coef=1, q=p+3)
+        D = CurlCurlIntegrator(coef=1, q=self.p+2)
         M = ScalarMassIntegrator(coef=-self.k**2, q=self.p+2)
-        R = BoundaryFaceMassIntegrator(coef=-1j, q=p+3)
+        R = BoundaryFaceMassIntegrator(coef=-1j, q=self.p+2)
  
         beform = BilinearForm(self.space)
         beform.add_integrator(D)
@@ -135,7 +125,7 @@ class CurlCurlLFEMModel(ComputationalModel):
         A = beform.assembly() 
 
         f = VectorSourceIntegrator(self.pde.source, q=self.p+2)
-        Vr = BoundaryFaceSourceIntegrator(self.pde.robin, q=p+3)
+        Vr = BoundaryFaceSourceIntegrator(self.pde.robin, q=self.p+2)
 
         leform = LinearForm(self.space)
         leform.add_integrator(f)
@@ -148,7 +138,6 @@ class CurlCurlLFEMModel(ComputationalModel):
     def linear_system(self, mesh, p):
         """
         """
-        self.pde.set(k=self.k)
         self.space= FirstNedelecFESpace(mesh, p=p)
 
         LDOF = self.space.number_of_local_dofs()
@@ -157,7 +146,7 @@ class CurlCurlLFEMModel(ComputationalModel):
         
         D = CurlCurlIntegrator(coef=1, q=p+3)
         M = ScalarMassIntegrator(coef=-self.k**2, q=self.p+2)
-        R = BoundaryFaceMassIntegrator(coef=-1j, q=p+3)
+        R = BoundaryFaceMassIntegrator(coef=-1j, q=self.p+2)
         G = CurlJumpPenaltyIntergrator(coef=self.gamma, q=self.p+2)
  
         beform = BilinearForm(self.space)
@@ -168,7 +157,7 @@ class CurlCurlLFEMModel(ComputationalModel):
         A = beform.assembly() 
 
         f = VectorSourceIntegrator(self.pde.source, q=self.p+2)
-        Vr = BoundaryFaceSourceIntegrator(self.pde.robin, q=p+3)
+        Vr = BoundaryFaceSourceIntegrator(self.pde.robin, q=self.p+2)
 
         leform = LinearForm(self.space)
         leform.add_integrator(f)
@@ -201,7 +190,6 @@ class CurlCurlLFEMModel(ComputationalModel):
     def run(self):
         """
         """
-        self.pde.set(k=self.k)
         A, F = self.linear_system[f"{self.method}"](self.mesh, self.p)
         uh = self.space.function(dtype=bm.complex128)
         uh[:] = self.solve[self.solver](A, F)

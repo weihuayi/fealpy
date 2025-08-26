@@ -37,7 +37,7 @@ class LinearElasticityLFEMModel(ComputationalModel):
         self.space= LagrangeFESpace(mesh, p=p)
         gd = self.pde.geo_dimension()
         if gd == 2:
-            self.tspace = TensorFunctionSpace(self.space, shape=(-1, 2))
+            self.tspace = TensorFunctionSpace(self.space, shape=(2, -1))
         elif gd == 3:
             self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
 

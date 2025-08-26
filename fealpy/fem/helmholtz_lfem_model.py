@@ -46,10 +46,10 @@ class HelmholtzLFEMModel(ComputationalModel):
         """
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
+        self.k = self.options['wave_number']
         self.set_pde(options['pde'])
         self.set_init_mesh(options['init_mesh'], nx=options['nx'], ny=options['ny'])
         self.set_space_degree(options['space_degree'])
-        self.set_wave_number(options['wave_number'])
         self.set_gamma(options['gamma'])
         self.solver = self.options['solver']
         self.method = self.options['method']
@@ -62,7 +62,7 @@ class HelmholtzLFEMModel(ComputationalModel):
             pde: PDE model instance or string key to get example PDE.
         """
         if isinstance(pde, int):
-            self.pde = PDEModelManager('helmholtz').get_example(pde)
+            self.pde = PDEModelManager('helmholtz').get_example(pde, k = self.k)
         else:
             self.pde = pde
 
@@ -94,15 +94,6 @@ class HelmholtzLFEMModel(ComputationalModel):
             p: The polynomial degree.
         """
         self.p = p
-        
-    def set_wave_number(self, k: int):
-        """
-        Set the wave number for the Helmholtz equation.
-
-        Args:
-            k: Wave number.
-        """
-        self.k = k
 
     def set_gamma(self, gamma: float):
         """
@@ -117,7 +108,6 @@ class HelmholtzLFEMModel(ComputationalModel):
     def linear_system(self, mesh, p):
         """
         """
-        self.pde.set(k=self.k)
         self.space= LagrangeFESpace(mesh, p=p)
 
         LDOF = self.space.number_of_local_dofs()
@@ -148,7 +138,6 @@ class HelmholtzLFEMModel(ComputationalModel):
     def linear_system(self, mesh, p):
         """
         """
-        self.pde.set(k=self.k)
         self.space= LagrangeFESpace(mesh, p=p)
 
         LDOF = self.space.number_of_local_dofs()
@@ -201,7 +190,6 @@ class HelmholtzLFEMModel(ComputationalModel):
     def run(self):
         """
         """
-        self.pde.set(k=self.k)
         A, F = self.linear_system[f"{self.method}"](self.mesh, self.p)
         uh = self.space.function(dtype=bm.complex128)
         uh[:] = self.solve[self.solver](A, F)
@@ -242,7 +230,6 @@ class HelmholtzLFEMModel(ComputationalModel):
         2. Pointwise error of Interior Penalty FEM on 3D surface
         3. Bar chart comparing relative L2 errors
         """
-        self.pde.set(k=self.k)
         node = self.mesh.node
         x, y = node[:, 0], node[:, 1]
         u_exact = self.pde.solution(node)
