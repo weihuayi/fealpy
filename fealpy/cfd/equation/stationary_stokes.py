@@ -8,7 +8,7 @@ class StationaryStokes(BaseEquation):
         self._coefs = {
             'pressure': 1,        # 压力项系数
             'viscosity': 1,       # 粘性项系数
-            'reaction': 1      # 外力项系数
+            'body_force': 1      # 外力项系数
         }
         self.pde = pde
         self.initialize_from_pde(pde) 
@@ -31,15 +31,11 @@ class StationaryStokes(BaseEquation):
             mu = pde.mu
         else:
             mu = 1.0
-        if hasattr(pde, 'H'):
-            H = pde.H
-        else:
-            H = 50e-6
 
         # 设置系数 
         self._coefs['pressure'] = 1
         self._coefs['viscosity'] = mu
-        self._coefs['reaction'] = -12*mu / H**2  
+        self._coefs['body_force'] = getattr(pde, 'source', 0)
 
 
     # 定义属性访问
@@ -59,9 +55,9 @@ class StationaryStokes(BaseEquation):
         return self._coefs['pressure']
     
     @property
-    def coef_reaction(self) -> CoefType:
+    def coef_body_force(self) -> CoefType:
         """外力项系数"""
-        return self._coefs['reaction']
+        return self._coefs['body_force']
     
     def set_coefficient(
         self,

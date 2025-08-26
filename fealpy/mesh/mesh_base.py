@@ -181,15 +181,14 @@ class Mesh(MeshDS):
                        "Use `quadrature_formula` instead.")
         return self.quadrature_formula(q, etype, qtype)
 
-    # ipoints
     def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
-        """Map edges to integration points.
+        """
+        construct the map tensor from edge to interpolation  points.
         
         Parameters:
-            p : int
-                The order of the shape function.
-            index : Index, optional
-                Edge indices to include
+            p (int): The order of the interpolation points.
+            index (Index, optional): The index of the edge. Defaults to _S, _S
+            means all.
                 
         Returns:
             TensorLike: Mapping matrix

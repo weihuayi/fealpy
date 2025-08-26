@@ -1,11 +1,8 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
-from fealpy.fem import DirichletBC
-from fealpy.fem import (ScalarMassIntegrator,
-                     PressWorkIntegrator, ScalarDiffusionIntegrator,
+from fealpy.fem import (PressWorkIntegrator, ScalarDiffusionIntegrator,
                      SourceIntegrator, ViscousWorkIntegrator)
 from fealpy.decorator import barycentric
-from fealpy.solver import spsolve
 
 from ..iterative_method import IterativeMethod 
 

@@ -1,4 +1,6 @@
 import argparse
+from petsc4py import PETSc
+from slepc4py import SLEPc
 
 # Argument parsing
 parser = argparse.ArgumentParser(description=
@@ -34,6 +36,7 @@ parser.add_argument('--space_degree',
 parser.add_argument('--neigen',
         default=6, type=int,
         help='Number of eigenvalues to compute, default is 6')
+
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True')
@@ -57,4 +60,7 @@ options['nx'] = n * 10
 options['ny'] = n * 2 
 options['nz'] = n * 2
 model = LinearElasticityEigenLFEMModel(options)
+S, M = model.linear_system()
+S, M = model.apply_bc(S, M)
+
 model.solve['slepc']()

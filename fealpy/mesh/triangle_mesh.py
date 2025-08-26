@@ -1286,6 +1286,27 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
         return cls(node, cell)
 
+    @classmethod
+    def from_one_hexagon(cls):
+        t = bm.sqrt(3)/2.0
+        node = bm.array([
+            [ 0.0, 0.0], #0
+            [ 1.0, 0.0], #1
+            [ 0.5,   t], #2
+            [-0.5,   t], #3
+            [-1.0, 0.0], #4
+            [-0.5,  -t], #5
+            [ 0.5,  -t]  #6
+            ], dtype=bm.float64)
+        cell = bm.array([
+            [0, 1, 2],
+            [0, 2, 3],
+            [0, 3, 4], 
+            [0, 4, 5],
+            [0, 5, 6],
+            [0, 6, 1]], dtype=bm.int32)
+        return cls(node, cell)
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_square_domain_with_fracture(cls, device=None):
@@ -1457,6 +1478,15 @@ class TriangleMesh(SimplexMesh, Plotable):
         print(f"Number of cells: {cell.shape[0]}")
 
         return cls(node, cell)
+
+    @classmethod
+    def from_box_with_circular_holes(cls, 
+                                     box=[0, 1, 0, 1], 
+                                     holes=[[0.5, 0.5, 0.1]], h=0.1): 
+        """
+        """
+        import gmsh
+        pass
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -1674,7 +1704,16 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def to_vtk(self, fname=None, etype='cell', index: Index=_S):
         """
-        @brief 把网格转化为 vtk 的数据格式
+        Export the mesh to VTK format. 
+
+        Parameters:
+            fname (str): File name to save the mesh in VTK format. If None, returns the data instead.
+            etype (str): Type of entity to export ('cell' or 'face').
+            index (Index): Index of the entities to export. Default is all entities.
+
+        Returns:
+            If fname is None, returns the node coordinates, cell connectivity, cell type, and number of cells.
+            Otherwise, writes the mesh to a VTK file.
         """
         from .vtk_extent import  write_to_vtu
 

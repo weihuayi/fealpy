@@ -1,14 +1,18 @@
+from typing import Optional
+
 from fealpy.backend import backend_manager as bm
-from fealpy.typing import TensorLike, Index, _S
+from fealpy.typing import TensorLike
+from fealpy.decorator import variantmethod
+
+from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
+from fealpy.functionspace.space import FunctionSpace as _FS
+
 from fealpy.fem.integrator import (
     LinearInt, OpInt, CellInt,
     enable_cache,
 )
-from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
-from typing import Optional, Literal
-from fealpy.typing import TensorLike, Index, _S
-from fealpy.functionspace.space import FunctionSpace as _FS
-from fealpy.decorator import variantmethod
+
+
 class EulerBernoulliBeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     """
     BeamDiffusionIntegrator assembles and manages the diffusion (stiffness) matrix for beam elements in a finite element space.

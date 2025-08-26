@@ -8,8 +8,6 @@ from fealpy.model.linear_elasticity import LinearElasticityPDEDataT
 
 from fealpy.mesh import Mesh
 from fealpy.functionspace import functionspace 
-from fealpy.material import LinearElasticMaterial
-
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearElasticityIntegrator
 from fealpy.fem import ScalarMassIntegrator as MassIntegrator

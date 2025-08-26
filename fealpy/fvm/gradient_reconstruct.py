@@ -1,4 +1,4 @@
-from ..backend import backend_manager as bm
+from fealpy.backend import backend_manager as bm
 
 class GradientReconstruct:
     def __init__(self, mesh):

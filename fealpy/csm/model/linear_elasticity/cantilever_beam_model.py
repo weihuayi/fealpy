@@ -1,10 +1,11 @@
 from typing import Optional
 
-from ....backend import bm
-from ....typing import TensorLike
-from ....decorator import cartesian
-from ....material import LinearElasticMaterial
-from ....mesher import BoxMesher3d
+from fealpy.backend import bm
+from fealpy.typing import TensorLike
+from fealpy.decorator import cartesian
+
+from fealpy.mesher import BoxMesher3d
+from fealpy.material import LinearElasticMaterial
 
 
 class CantileverBeamModel(BoxMesher3d):

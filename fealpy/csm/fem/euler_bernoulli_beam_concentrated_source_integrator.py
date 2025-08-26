@@ -1,9 +1,15 @@
-from fealpy.backend import backend_manager as bm
-from fealpy.fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
-from fealpy.typing import TensorLike, Index, _S, SourceLike
+
 from typing import Optional, Literal
-from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, SourceLike
 from fealpy.decorator import variantmethod
+
+from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
+
+
 
 class EulerBernoulliBeamPLSourceIntegrator(LinearInt, SrcInt, CellInt):
     """

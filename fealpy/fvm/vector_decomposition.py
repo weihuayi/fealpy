@@ -1,9 +1,8 @@
-from ..backend import backend_manager as bm
-from ..typing import TensorLike
-from ..mesh import TriangleMesh
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike
 
 class VectorDecomposition():
-    def __init__(self, mesh: TriangleMesh):
+    def __init__(self, mesh):
         self.mesh = mesh  
         self.Sf = mesh.edge_normal()  # (NE, 2)
 

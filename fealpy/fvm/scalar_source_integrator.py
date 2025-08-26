@@ -1,10 +1,13 @@
 from typing import Optional, Literal
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, SourceLike
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
-from ..decorator.variantmethod import variantmethod
-from ..fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, SourceLike
+from fealpy.utils import process_coef_func
+from fealpy.decorator import variantmethod
+
+from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
 class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
