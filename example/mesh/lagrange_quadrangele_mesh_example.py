@@ -16,11 +16,12 @@ def plot_nodes(ax, node, fontsize=10, color='k'):
     for i, (x, y) in enumerate(node):
         ax.text(x, y, str(i), fontsize=fontsize, color=color)
 
-surface = SphereSurface()
-# mesh = QuadrangleMesh.from_unit_sphere_surface()
-# lmesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(mesh, p=2, surface=surface)
+# surface = SphereSurface()
+# qmesh = QuadrangleMesh.from_unit_sphere_surface()
+# mesh = LagrangeQuadrangleMesh.from_quadrangle_mesh(qmesh, p=3, surface=surface)
+# node = mesh.entity('node')
 # fname = f"sphere_qtest.vtu"
-# lmesh.to_vtk(fname=fname)
+# mesh.to_vtk(fname=fname)
 
 mesh = LagrangeQuadrangleMesh.from_box([0, 1, 0, 1], p=2, nx=2, ny=2)
 mesh.uniform_refine(1)
@@ -32,7 +33,7 @@ cell = mesh.entity('cell')
 fig = plt.figure()
 ax = fig.add_subplot(111)
 high_order_meshploter(ax, mesh)
-plot_nodes(ax, node, fontsize=10, color='r')
+plot_nodes(ax, node, fontsize=7, color='r')
 plt.show()
 
 
