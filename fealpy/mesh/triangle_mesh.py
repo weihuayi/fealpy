@@ -1786,6 +1786,58 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.array(mesh.entity('cell'), dtype=itype, device=device)
 
         return cls(node, cell)
+    
+    def location(self, points):
+        """
+        Notes
+        -----
+        给定一组点 p , 找到这些点所在的单元
+
+        这里假设：
+
+        1. 所有点在网格内部，
+        2. 网格中没有洞
+        3. 区域还要是凸的
+        """
+        from scipy.spatial import KDTree
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NP = points.shape[0]
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.cell_to_cell()
+
+        start = bm.zeros(NN, dtype=self.itype)
+        start[cell[:, 0]] = range(NC)
+        start[cell[:, 1]] = range(NC)
+        start[cell[:, 2]] = range(NC)
+        tree = KDTree(node)
+        _, loc = tree.query(points)
+        start = start[loc]  # 设置一个初始单元位置
+
+        isNotOK = bm.ones(NP, dtype=bm.bool)
+        while bm.any(isNotOK):
+            idx = start[isNotOK]
+            pp = points[isNotOK]
+
+            v0 = node[cell[idx, 0]] - pp  # 所在单元的三个顶点
+            v1 = node[cell[idx, 1]] - pp
+            v2 = node[cell[idx, 2]] - pp
+
+            a = bm.zeros((len(idx), 3), dtype=self.ftype)
+            a[:, 0] = bm.cross(v1, v2)
+            a[:, 1] = bm.cross(v2, v0)
+            a[:, 2] = bm.cross(v0, v1)
+            lidx = bm.argmin(a, axis=-1)
+
+            # 最小面积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0
+
+            idx0, = bm.nonzero(isNotOK)
+            start[idx0[isOutCell]] = cell2cell[idx[isOutCell], lidx[isOutCell]]
+            isNotOK[idx0[~isOutCell]] = False
+
+        return start
 
 TriangleMesh.set_ploter('2d')
 

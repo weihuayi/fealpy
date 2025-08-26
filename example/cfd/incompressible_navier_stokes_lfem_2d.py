@@ -31,11 +31,11 @@ parser.add_argument('--T0',
     help="Initial time, default is 0.0")
 
 parser.add_argument('--T1',
-    default=4, type=float,
+    default=8.0, type=float,
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=300, type=int,
+    default=8000, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--init_mesh',
@@ -47,7 +47,7 @@ parser.add_argument('--box',
     help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
 
 parser.add_argument('--center',
-    default = (0.3, 0.205), type=float,
+    default = (0.2, 0.2), type=float,
     help="Center of the first circle, default is (0.1, 0.05).")
 
 parser.add_argument('--radius',
@@ -55,7 +55,7 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.029.")
 
 parser.add_argument('--n_circle',
-    default = 400, type=int,
+    default = 200, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--lc',
