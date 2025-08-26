@@ -29,7 +29,7 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         return space.cell_to_dof()[self.index]
 
     def _coord_transfrom(self) -> TensorLike:
-        """Construct the coordinate transformation matrix for 3D beam elements."""
+        """Construct the coordinate transformation matrix for 3D axle elements."""
         mesh = self.space.mesh
         node= mesh.entity('node')
         cell = mesh.entity('cell')[self.index]
