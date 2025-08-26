@@ -132,10 +132,10 @@ class Exp0002(ChipMesher):
         return None
     
     @cartesian
-    def is_pressure_boundary(self, p):
+    def is_pressure_boundary(self, p = None):
         # is_out = self.is_outlet_boundary(p)
         # return is_out
-        return 0
+        return self.is_inlet_boundary(p)
     
     @cartesian
     def is_inlet_boundary(self, p: TensorLike) -> TensorLike:

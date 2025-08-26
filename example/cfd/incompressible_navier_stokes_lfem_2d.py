@@ -55,15 +55,15 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.029.")
 
 parser.add_argument('--n_circle',
-    default = 400, type=int,
+    default = 200, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--lc',
-    default = 0.03, type=float,
+    default = 0.05, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--method',
-    default='IPCS', type=str,
+    default='Newton', type=str,
     help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',

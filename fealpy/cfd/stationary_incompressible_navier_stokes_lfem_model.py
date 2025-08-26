@@ -85,15 +85,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             self.maxit = options.get('maxit', 5)
             self.maxstep = options.get('maxstep', 10)
             self.tol = options.get('tol', 1e-10)
-            # self.mesh = pde.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
-            # self.apply_bc = self.apply_bc[options['apply_bc']]
-
-
-            # if options['run'] == 'uniform_refine':
-            #     self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
-            # else:  # 'one_step' 或其他
-            #     self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
-    
+            
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
         s = f"{self.__class__.__name__}(\n"
@@ -235,25 +227,22 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         mesh = self.mesh
         location = mesh.location
         ipoints = self.fem.uspace.interpolation_points()
+        qf = mesh.quadrature_formula(q=3, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
         def integrate_term(grad_uh_dot_grad_v, u_dot_grad_u_dot_v, div_v):
             NC = mesh.number_of_cells()
             node_points = mesh.entity('node')
             c2n = mesh.cell_to_node()
             
-            p = ph(bcs = bm.array([[1.0, 0.0, 0.0],
-                                   [0.5, 0.0, 0.5],
-                                   [0.5, 0.5, 0.0],
-                                   [0.0, 1.0, 0.0],
-                                   [0.0, 0.5, 0.5],
-                                   [0.0, 0.0, 1.0]]))
+            p = ph(bcs = bcs)
             term = bm.zeros(NC)
             for i in bm.arange(NC):
                 cell = node_points[c2n[i]]
-                S = bm.cross(cell[1]-cell[0], cell[2]-cell[0])
-                term[i] = self.pde.mu * S * 1/6 * bm.sum(grad_uh_dot_grad_v[i])  
-                term[i] += self.pde.rho * S * 1/6 * bm.sum(u_dot_grad_u_dot_v[i]) 
-                term[i] += S * 1/6 * bm.sum(-p[i] @ div_v[i])  
+                S = 0.5 * bm.cross(cell[1]-cell[0], cell[2]-cell[0])
+                term[i] = self.pde.mu * S * bm.sum(ws * grad_uh_dot_grad_v[i])  
+                term[i] += self.pde.rho * S * bm.sum(ws * u_dot_grad_u_dot_v[i]) 
+                term[i] -= S * bm.sum((p[i] * div_v[i]) * ws)  
             integrate = bm.sum(term)
             return integrate
         
@@ -261,67 +250,26 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         vd[self.pde.is_velocity_boundary(ipoints)] = 0.0
         vd[:len(ipoints)][self.pde.is_obstacle_boundary(ipoints)] = 1.0
         grad_vd = self.fem.uspace.grad_value(uh = vd, 
-                                             bc = bm.array([[1.0, 0.0, 0.0],
-                                                            [0.5, 0.0, 0.5],
-                                                            [0.5, 0.5, 0.0],
-                                                            [0.0, 1.0, 0.0],
-                                                            [0.0, 0.5, 0.5],
-                                                            [0.0, 0.0, 1.0]]))
+                                             bc = bcs)
         grad_uh = self.fem.uspace.grad_value(uh = uh, 
-                                             bc = bm.array([[1.0, 0.0, 0.0],
-                                                            [0.5, 0.0, 0.5],
-                                                            [0.5, 0.5, 0.0],
-                                                            [0.0, 1.0, 0.0],
-                                                            [0.0, 0.5, 0.5],
-                                                            [0.0, 0.0, 1.0]]))
+                                             bc = bcs)
         grad_uh_dot_grad_vd = bm.einsum('knij,knij->kn', grad_uh, grad_vd)  # ∇u : ∇vd
-        u_dot_grad_u_dot_vd = bm.einsum('kni, knij, knj -> kn', uh(bcs = bm.array([[1.0, 0.0, 0.0],
-                                                                    [0.5, 0.0, 0.5],
-                                                                    [0.5, 0.5, 0.0],
-                                                                    [0.0, 1.0, 0.0],
-                                                                    [0.0, 0.5, 0.5],
-                                                                    [0.0, 0.0, 1.0]])), 
+        u_dot_grad_u_dot_vd = bm.einsum('kni, knij, knj -> kn', uh(bcs = bcs), 
                                                                     grad_uh, 
-                                                                    vd(bcs = bm.array([[1.0, 0.0, 0.0],
-                                                                    [0.5, 0.0, 0.5],
-                                                                    [0.5, 0.5, 0.0],
-                                                                    [0.0, 1.0, 0.0],
-                                                                    [0.0, 0.5, 0.5],
-                                                                    [0.0, 0.0, 1.0]])))  # (u · ∇)u
+                                                                    vd(bcs = bcs))  # (u · ∇)u
         div_vd = bm.einsum('knij -> kn', grad_vd)  # Divergence of vd
-
 
         vl = self.fem.uspace.function()
         vl[self.pde.is_velocity_boundary(ipoints)] = 0.0
         vl[len(ipoints):][self.pde.is_obstacle_boundary(ipoints)] = 1.0
         grad_vl = self.fem.uspace.grad_value(uh = vl, 
-                                             bc = bm.array([[1.0, 0.0, 0.0],
-                                                            [0.5, 0.0, 0.5],
-                                                            [0.5, 0.5, 0.0],
-                                                            [0.0, 1.0, 0.0],
-                                                            [0.0, 0.5, 0.5],
-                                                            [0.0, 0.0, 1.0]]))
+                                             bc = bcs)
         grad_uh = self.fem.uspace.grad_value(uh = uh, 
-                                             bc = bm.array([[1.0, 0.0, 0.0],
-                                                            [0.5, 0.0, 0.5],
-                                                            [0.5, 0.5, 0.0],
-                                                            [0.0, 1.0, 0.0],
-                                                            [0.0, 0.5, 0.5],
-                                                            [0.0, 0.0, 1.0]]))
+                                             bc = bcs)
         grad_uh_dot_grad_vl = bm.einsum('knij,knij->kn', grad_uh, grad_vl)  # ∇u : ∇vl
-        u_dot_grad_u_dot_vl = bm.einsum('kni, knij, knj -> kn', uh(bcs = bm.array([[1.0, 0.0, 0.0],
-                                                                    [0.5, 0.0, 0.5],
-                                                                    [0.5, 0.5, 0.0],
-                                                                    [0.0, 1.0, 0.0],
-                                                                    [0.0, 0.5, 0.5],
-                                                                    [0.0, 0.0, 1.0]])), 
+        u_dot_grad_u_dot_vl = bm.einsum('kni, knij, knj -> kn', uh(bcs = bcs), 
                                                                     grad_uh, 
-                                                                    vl(bcs = bm.array([[1.0, 0.0, 0.0],
-                                                                    [0.5, 0.0, 0.5],
-                                                                    [0.5, 0.5, 0.0],
-                                                                    [0.0, 1.0, 0.0],
-                                                                    [0.0, 0.5, 0.5],
-                                                                    [0.0, 0.0, 1.0]])))  # (u · ∇)u
+                                                                    vl(bcs = bcs))  # (u · ∇)u
         div_vl = bm.einsum('knij -> kn', grad_vl)  # Divergence of vl
         
         point0 = bm.array([[0.15, 0.2]])
@@ -333,9 +281,9 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             node_points = mesh.entity("node")
             c2n = mesh.cell_to_node()
             cell = node_points[c2n][index][0]
-            S = bm.cross(cell[1]-cell[0], cell[2]-cell[0])
-            lambda1 = bm.cross(cell[1]-point[0], cell[2]-point[0]) / S
-            lambda2 = bm.cross(cell[2]-point[0], cell[0]-point[0]) / S
+            S = 0.5 * bm.cross(cell[1]-cell[0], cell[2]-cell[0])
+            lambda1 = 0.5 * bm.cross(cell[1]-point[0], cell[2]-point[0]) / S
+            lambda2 = 0.5 * bm.cross(cell[2]-point[0], cell[0]-point[0]) / S
             lambda3 = 1.0 - lambda1 - lambda2
             bcs = bm.array([[lambda1, lambda2, lambda3]])
             return bcs

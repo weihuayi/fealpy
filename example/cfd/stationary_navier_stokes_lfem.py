@@ -38,7 +38,7 @@ parser.add_argument('--box',
     help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
 
 parser.add_argument('--center',
-    default = (0.205, 0.205), type=float,
+    default = (0.2, 0.2), type=float,
     help="Center of the first circle, default is (0.1, 0.05).")
 
 parser.add_argument('--radius',
@@ -62,7 +62,7 @@ parser.add_argument('--h',
     help="Mesh size, default is 0.05")
 
 parser.add_argument('--lc',
-    default = 0.01, type=float,
+    default = 0.004, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--hole_lc',

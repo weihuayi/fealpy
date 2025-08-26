@@ -2,7 +2,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod,cartesian
 from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
-from .equation import IncompressibleNS
+from fealpy.cfd.equation import IncompressibleNS
 from .simulation.time import UniformTimeLine
 from fealpy.utils import timer
 
@@ -107,8 +107,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
 
-        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = self.timeline.T0)))
-        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = self.timeline.T0)))
+        # u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = self.timeline.T0)))
+        # p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = self.timeline.T0)))
+        u0 = fem.uspace.function()
+        p0 = fem.pspace.function()
         
         for i in range(self.timeline.NL-1):
             t  = self.timeline.current_time()
@@ -173,7 +175,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             
             uk0 = u0.space.function()
             uk1 = u0.space.function()
-            uk0[:] = u0
+            
             pk = p0.space.function()
 
             for j in range(maxstep): 
@@ -188,14 +190,14 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 # tmr.send('右端项组装时间')
                 A, b = self.fem.apply_bc(A, b, self.pde, t=self.timeline.next_time())
                 # tmr.send('边界条件处理时间')
-                A, b = self.fem.lagrange_multiplier(A, b, 0)
+                # A, b = self.fem.lagrange_multiplier(A, b)
                 # tmr.send('拉格朗日乘子处理时间')
             
                 x = self.solve(A, b, 'mumps')
                 # tmr.send('求解线性方程组时间')
                 # next(tmr)
                 uk1[:] = x[:ugdof]
-                pk[:] = x[ugdof:-1]
+                pk[:] = x[ugdof:]
                 
                 res_u = self.mesh.error(uk0, uk1)
                 # print(res_u)
