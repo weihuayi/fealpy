@@ -187,11 +187,17 @@ class LagrangeQuadrangleMesh(TensorMesh):
             List(CSRTensor): The prolongation matrix from the finest to the the coarsest。
             
         Notes:
-            子单元编号约定：
-            1 | 3
-            --+--
-            0 | 2
-            即 0: 左下, 1: 左上, 2: 右下, 3: 右上。
+            Vertex order: [v0, v1, v2, v3] = [left-bottom, left-top, right-bottom, right-top]
+            Edge order: 
+                edge0: v0 -> v1
+                edge1: v2 -> v0
+                edge2: v1 -> v3
+                edge3: v3 -> v2
+                
+            Subcell order in each parent cell:
+                0 | 1
+                --+--
+                2 | 3
         """
         for _ in range(n):
             GD = self.geo_dimension()
@@ -207,175 +213,245 @@ class LagrangeQuadrangleMesh(TensorMesh):
             isCornerNode = bm.zeros(len(node), dtype=bm.bool)
             isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
 
-            nodes_parts = []
-            edges_parts = []
-            edge2cells_parts = []
+            nodes = []
+            edges = []
+            edge2cells = []
 
             # corner nodes (first block)
-            nodes_parts.append(node[isCornerNode])
-            NN = len(nodes_parts[0])           # number of corner nodes
+            nodes.append(node[isCornerNode])
+            NN = len(nodes[0])           # number of corner nodes
             NE = self.number_of_edges()
             NC = self.number_of_cells()
-
-            # each cell is split into 4 subcells
-            cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4)
-
-            # midpoints of each edge (one per edge)
-            mid_pts = 0.5 * (node[edge[:, 0]] + node[edge[:, -1]])
-            nodes_parts.append(mid_pts)
-
-            start_mid = NN
-            end_mid = start_mid + NE
-            mid_idx = bm.arange(start_mid, end_mid, **ikwargs)  # global indices of midpoints
-
-            # edge internal nodes (if p > 1), each edge has (p-1) internal point
+            
+            mid_pts = 0.5 * (node[edge[:, 0]] + node[edge[:, 1]])
+            nodes.append(mid_pts)
+            start = NN
+            end = start + NE
+            mid_idx = bm.arange(start, end, **ikwargs)
+            
             if self.p > 1:
                 nn = self.p - 1
-                # 参数 [1/p, 2/p, ..., (p-1)/p]
-                t = bm.linspace(1/(self.p), (self.p-1)/self.p, nn, endpoint=True)
-                # 对每条边，按比例插值
-                edge_start = node[edge[:, 0]]
-                edge_end   = node[edge[:, -1]]
-                edge_internal_pts = bm.stack([
-                    (1 - ti) * edge_start + ti * edge_end
-                    for ti in t
-                ], axis=1).reshape(-1, self.GD)
-                nodes_parts.append(edge_internal_pts)
-
-            # cell midpoints and interior points
-            if self.p > 1:
-                # 参数网格 (i/p, j/p), i,j = 1..p-1
-                t = bm.linspace(1/(self.p), (self.p-1)/self.p, self.p-1, endpoint=True)
-                t1, t2 = bm.meshgrid(t, t, indexing='ij')
-                tt = bm.stack([t1.ravel(), t2.ravel()], axis=-1)  # ((p-1)^2, 2)
-
-                # 四边形四个顶点
-                v0 = node[cell[:, 0]]
-                v1 = node[cell[:, 1]]
-                v2 = node[cell[:, 2]]
-                v3 = node[cell[:, 3]]
-
-                # 双线性插值公式
-                def bilinear_interp(xi, eta, v0, v1, v2, v3):
-                    return ((1-xi)*(1-eta))[...,None]*v0 + xi*(1-eta)[...,None]*v1 \
-                        + xi*eta[...,None]*v2 + (1-xi)*eta[...,None]*v3
-
-                interior_pts = []
-                for xi, eta in tt:
-                    pts = bilinear_interp(xi, eta, v0, v1, v2, v3)
-                    interior_pts.append(pts)
-                interior_pts = bm.concatenate(interior_pts, axis=0).reshape(-1, self.GD)
-                nodes_parts.append(interior_pts)
-
-            # collect new nodes
-            node_new = bm.concatenate(nodes_parts, axis=0)
-
-            # edges
+                t = bm.arange(1, self.p) / self.p
+                edge_nodes = []
+                for k in range(nn):
+                    t_k = t[k]
+                    pts = (1 - t_k)[:, None] * node[edge[:, 0]] + t_k[:, None] * node[edge[:, 1]]
+                    edge_nodes.append(pts)
+                edge_nodes = bm.concat(edge_nodes, axis=0)
+                nodes.append(edge_nodes)
+                
+            
+            # each cell is split into 4 subcells
+            cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4)
+            
             if self.p == 1:
                 e0 = bm.stack((edge[:, 0], mid_idx), axis=1)
-                e1 = bm.stack((mid_idx, edge[:, -1]), axis=1)
+                e1 = bm.stack((mid_idx, edge[:, 1]), axis=1)
             else:
-                nn = self.p - 1  # 内部节点数
-                start_idx = edge[:, [0]]               # 每条边起点
-                end_idx   = edge[:, [-1]]              # 每条边终点
-                eint_idx = bm.arange(end_mid, end_mid + nn*NE, **ikwargs).reshape(NE, nn)
-
-                # 构造子边 (逐段拼接)
-                sub_edges = []
-                # 第一段：start -> 第一个内部点
-                sub_edges.append(bm.stack((start_idx[:, 0], eint_idx[:, 0]), axis=1))
-                # 中间段：内部点 -> 内部点
-                for k in range(nn-1):
-                    sub_edges.append(bm.stack((eint_idx[:, k], eint_idx[:, k+1]), axis=1))
-                # 最后一段：最后一个内部点 -> end
-                sub_edges.append(bm.stack((eint_idx[:, -1], end_idx[:, 0]), axis=1))
-
-                # 合并
-                e_all = bm.concatenate(sub_edges, axis=0)
-                edges_parts.append(e_all)
-
-            # edge2cell mapping
+                nn = self.p - 1  # 每条子边上的中间节点数
+                start = end
+                end = start + 2 * nn * NE  
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 2 * nn)
+                e0 = bm.concat((edge[:, [0]], e[:, 0*nn:1*nn], mid_idx[:, None]), axis=1)
+                e1 = bm.concat((mid_idx[:, None], e[:, 1*nn:2*nn], edge[:, [-1]]), axis=1)
+            edges.extend([e0, e1])
+            
+            imap = bm.array([
+                [[1, 2], [2, 1]],  
+                [[2, 2], [3, 1]],  
+                [[3, 2], [0, 1]],  
+                [[0, 2], [1, 1]]  
+            ],** ikwargs)
+            
+            # 构建边到子单元格的映射关系
             e2c0 = bm.stack((
-                cell2subcell[edge2cell[:, 0], 0],
-                cell2subcell[edge2cell[:, 1], 0],
-                bm.full(NE, 0, **ikwargs),
-                bm.full(NE, 0, **ikwargs),
+                cell2subcell[edge2cell[:, 0], imap[edge2cell[:, 2], 0, 0]],
+                cell2subcell[edge2cell[:, 1], imap[edge2cell[:, 3], 1, 0]],
+                imap[edge2cell[:, 2], 0, 1],
+                imap[edge2cell[:, 3], 1, 1],
             ), axis=1)
+            
             e2c1 = bm.stack((
-                cell2subcell[edge2cell[:, 0], 1],
-                cell2subcell[edge2cell[:, 1], 1],
-                bm.full(NE, 1, **ikwargs),
-                bm.full(NE, 1, **ikwargs),
+                cell2subcell[edge2cell[:, 0], imap[edge2cell[:, 2], 1, 0]],
+                cell2subcell[edge2cell[:, 1], imap[edge2cell[:, 3], 0, 0]],
+                imap[edge2cell[:, 2], 1, 1],
+                imap[edge2cell[:, 3], 0, 1],
             ), axis=1)
-            edge2cells_parts.extend([e2c0, e2c1])
+            
+            # 处理边界边
+            isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+            e2c0 = bm.set_at(e2c0, (isBdEdge, 1), e2c0[isBdEdge, 0])
+            e2c0 = bm.set_at(e2c0, (isBdEdge, 3), e2c0[isBdEdge, 2])
+            e2c1 = bm.set_at(e2c1, (isBdEdge, 1), e2c1[isBdEdge, 0]) 
+            e2c1 = bm.set_at(e2c1, (isBdEdge, 3), e2c1[isBdEdge, 2])
+            edge2cells.extend([e2c0, e2c1])
+            
+            edge = bm.concat(edges, axis=0)
+            edge2cell = bm.concat(edge2cells, axis=0)
+            
+            # 构建每个单元格中的新边
+            c2e = self.cell_to_edge() + NN 
+            if self.p == 1:
+                e0 = c2e[:, [1, 2]]  
+                e1 = c2e[:, [2, 3]]  
+                e2 = c2e[:, [3, 0]]  
+                e3 = c2e[:, [0, 1]]  
+            else:
+                # 高阶情况下，插入中间节点（每条边有p-1个中间节点）
+                nn = self.p - 1
+                start = end
+                end = start + 4 * nn * NC
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 4 * nn)
+                
+                e0 = bm.concat((c2e[:, [1]], e[:, 0*nn:1*nn], c2e[:, [2]]), axis=1)
+                e1 = bm.concat((c2e[:, [2]], e[:, 1*nn:2*nn], c2e[:, [3]]), axis=1)
+                e2 = bm.concat((c2e[:, [3]], e[:, 2*nn:3*nn], c2e[:, [0]]), axis=1)
+                e3 = bm.concat((c2e[:, [0]], e[:, 3*nn:4*nn], c2e[:, [1]]), axis=1)
+                
+            edges.extend([e0, e1, e2, e3])  
+            
+            # 边与子单元格的拓扑映射关系
+            e2c0 = bm.stack((
+                cell2subcell[:, 2],  
+                cell2subcell[:, 0],  
+                bm.full(NC, 0,** ikwargs),  
+                bm.full(NC, 3, **ikwargs),  
+            ), axis=1)
 
-            # finalize global arrays
-            edge_new = bm.concatenate(edges_parts, axis=0)
-            edge2cell_new = bm.concatenate(edge2cells_parts, axis=0)
+            e2c1 = bm.stack((
+                cell2subcell[:, 3],  
+                cell2subcell[:, 2],  
+                bm.full(NC, 0,** ikwargs),  
+                bm.full(NC, 1, **ikwargs), 
+            ), axis=1)
 
+            e2c2 = bm.stack((
+                cell2subcell[:, 0], 
+                cell2subcell[:, 1],  
+                bm.full(NC, 1,** ikwargs),  
+                bm.full(NC, 3, **ikwargs), 
+            ), axis=1)
+
+            e2c3 = bm.stack((
+                cell2subcell[:, 1],  
+                cell2subcell[:, 3],  
+                bm.full(NC, 2,** ikwargs),  
+                bm.full(NC, 2, **ikwargs),  
+            ), axis=1)
+            edge2cells.extend([e2c0, e2c1, e2c2, e2c3])
+            edge2cell = bm.concat(edge2cells, axis=0)
+            
+            icell = None
+            if self.p >= 2:
+                TD = self.top_dimension()
+                mi = bm.multi_index_matrix(self.p, TD)
+                isInCellNodes = (mi[:, 0] > 0) & (mi[:, 0] < self.p) & \
+                    (mi[:, 1] > 0) & (mi[:, 1] < self.p)
+                xi_eta = mi[isInCellNodes, :] / self.p # 转换为参数坐标（r, s ∈ (0,1)）
+                
+                v0 = node[cell[:, 0]]  
+                v1 = node[cell[:, 1]]  
+                v2 = node[cell[:, 2]]  
+                v3 = node[cell[:, 3]]  
+                
+                pts_list = []
+                for iCell in range(NC):
+                    xi = xi_eta[:, 0]
+                    eta = xi_eta[:, 1]
+                    pts_cell = ((1 - xi) * (1 - eta)[:, None] * v0[iCell] +
+                                (1 - xi) * eta[:, None] * v1[iCell] +
+                                xi * (1 - eta)[:, None] * v2[iCell] +
+                                xi * eta[:, None] * v3[iCell])
+                    pts_list.append(pts_cell)
+                    
+                pts_all = bm.concat(pts_list, axis=0)
+                nodes.append(pts_all)
+                
+                start = end
+                end = start + 4 * nn * NC
+                icell = bm.arange(start, end, **ikwargs).reshape(-1, nn)
+                
+            node = bm.concat(nodes, axis=0)
+            edge = bm.concat(edges, axis=0)
+            edge2cell = bm.concat(edge2cells, axis=0)
+            
             # assemble cell2edge mapping for refined mesh: 4*NC cells each with 4 edges (indices into edge_new)
             cell2edge = bm.zeros((4 * NC, 4), **ikwargs)
-            cell2edge = bm.set_at(cell2edge, (edge2cell_new[:, 0], edge2cell_new[:, 2]), range(len(edge_new)))
-            cell2edge = bm.set_at(cell2edge, (edge2cell_new[:, 1], edge2cell_new[:, 3]), range(len(edge_new)))
+            cell2edge = bm.set_at(cell2edge, (edge2cell[:, 0], edge2cell[:, 2]), range(len(edge)))
+            cell2edge = bm.set_at(cell2edge, (edge2cell[:, 1], edge2cell[:, 3]), range(len(edge)))
 
             # commit new topology to mesh
-            self.node = node_new
-            self.edge = edge_new
-            self.edge2cell = edge2cell_new
+            self.node = node
+            self.edge = edge
+            self.edge2cell = edge2cell
             self.cell2edge = cell2edge
-            self.face = edge_new
-            self.face2cell = edge2cell_new
+            self.face = edge
+            self.face2cell = edge2cell
             self.cell2face = cell2edge
 
-            # 重新构造 cell
-            self.construct_global_cell(cell2subcell, **ikwargs)
+            # Reconstruct the cell
+            self.construct_global_cell(icell, **ikwargs)
 
     def construct_global_cell(self, icell=None, **ikwargs):
-        """Construct the global cell array after uniform refinement."""
+        """Construct the new cells for the Lagrange quadrangle mesh after uniform
+        refinement.
+
+        Parameters:
+            icell(TensorLike): The interior node values of the original cells.
+        """
         p = self.p
         NC = self.number_of_cells()
-        ldof = (p+1)*(p+1)
-        cell = bm.zeros((4*NC, ldof), **ikwargs)
-
-        TD = self.top_dimension()
+        ldof = (p + 1) * (p + 1)
+        cell = bm.zeros((4 * NC, ldof), **ikwargs)
+        TD = self.top_dimension() 
         mi = self.multi_index_matrix(p, TD)
-
-        idx_left = bm.nonzero(mi[:,0]==0)[0]
-        idx_right = bm.nonzero(mi[:,0]==p)[0]
-        idx_bottom = bm.nonzero(mi[:,1]==0)[0]
-        idx_top = bm.nonzero(mi[:,1]==p)[0]
-
+        
+        idx0, = bm.nonzero(mi[:, 0] == 0)
+        idx1, = bm.nonzero(mi[:, 1] == self.p)
+        idx2, = bm.nonzero(mi[:, 0] == self.p)
+        idx3, = bm.nonzero(mi[:, 1] == 0)
+        
         edge2cell = self.edge_to_cell()
         edge = self.entity('edge')
         
-        # 定义每个边的局部索引
-        sides = [(0, idx_left), (1, bm.flip(idx_bottom)), (2, idx_top), (3, bm.flip(idx_right))]
+        flag = edge2cell[:, 2] == 0
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx0), edge[flag])
+        
+        flag = edge2cell[:, 2] == 1
+        idx1_ = bm.flip(idx2, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx1_), edge[flag])
+        
+        flag = edge2cell[:, 2] == 2
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx2), edge[flag])
+        
+        flag = edge2cell[:, 2] == 3
+        idx3_ = bm.flip(idx3, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 0][:, None], idx3_), edge[flag])
 
-        # 填充边 DOF
-        for side, idx in sides:
-            flag = edge2cell[:, 2] == side
-            if flag.any():
-                for j, c in enumerate(idx):
-                    # 每列逐个填充
-                    bm.set_at(cell, (edge2cell[flag,0], c), edge[flag][:, j])
-
-        # 处理共享边
         iflag = edge2cell[:, 0] != edge2cell[:, 1]
-        for side, idx in sides:
-            flag = iflag & (edge2cell[:, 3] == side)
-            if flag.any():
-                for j, c in enumerate(idx):
-                    bm.set_at(cell, (edge2cell[flag,1], c), edge[flag][:, j])
-
-        # 内部自由度 (p >= 3)
-        if p >= 3 and icell is not None:
-            internal_flag = (bm.sum((mi > 0) & (mi < p), axis=1) == 2)
-            # icell shape should match number of cells x number of internal DOFs
-            bm.set_at(cell, (..., internal_flag), icell)
-            
+        
+        flag = iflag & (edge2cell[:, 3] == 0)
+        idx0_ = bm.flip(idx0, axis=0)
+        cell = bm.set_at(cell, (edge2cell[flag, 1][:, None], idx0_), edge[flag])
+        
+        flag = iflag & (edge2cell[:, 3] == 1)
+        cell = bm.set_at(cell, (edge2cell[flag, 1][:, None], idx1), edge[flag])
+        
+        flag = iflag & (edge2cell[:, 3] == 2)
+        cell = bm.set_at(cell, (edge2cell[flag, 1][:, None], idx2), edge[flag])
+        
+        flag = iflag & (edge2cell[:, 3] == 3)
+        cell = bm.set_at(cell, (edge2cell[flag, 1][:, None], idx3), edge[flag])
+        
+        if self.p >= 3:
+            # 内部节点：不在任何边上（r∈(0,1)且s∈(0,1)，即参数索引均不为0或p）
+            is_inner = (mi[:, 0] > 0) & (mi[:, 0] < self.p) & \
+                       (mi[:, 1] > 0) & (mi[:, 1] < self.p)
+            cell = bm.set_at(cell, (..., is_inner), icell) 
+        
         self.cell = cell
-
-        # quadrature
+        
+    # quadrature
     def quadrature_formula(self, q, etype: Union[int, str] = 'cell'):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
         if isinstance(etype, str):

@@ -23,17 +23,14 @@ def plot_nodes(ax, node, fontsize=10, color='k'):
 # fname = f"sphere_qtest.vtu"
 # mesh.to_vtk(fname=fname)
 
-mesh = LagrangeQuadrangleMesh.from_box([0, 1, 0, 1], p=2, nx=2, ny=2)
+mesh = LagrangeQuadrangleMesh.from_box([0, 1, 0, 1], p=1, nx=1, ny=1)
 mesh.uniform_refine(1)
 node = mesh.entity('node')
 edge = mesh.entity('edge')
 cell = mesh.entity('cell')
-
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
 high_order_meshploter(ax, mesh)
 plot_nodes(ax, node, fontsize=7, color='r')
 plt.show()
-
-
