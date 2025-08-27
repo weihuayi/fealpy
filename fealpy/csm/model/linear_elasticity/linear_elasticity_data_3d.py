@@ -3,8 +3,10 @@ from typing import Optional
 from fealpy.backend import bm
 from fealpy.typing import TensorLike
 from fealpy.decorator import cartesian
-from fealpy.material import LinearElasticMaterial
+
 from fealpy.mesher import BoxMesher3d
+from fealpy.material import LinearElasticMaterial
+
 
 
 class LinearElasticityData3D(BoxMesher3d):

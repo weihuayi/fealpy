@@ -1,5 +1,6 @@
 from typing import Protocol, Sequence, TypeVar, overload,Optional
-from ....backend import TensorLike
+
+from fealpy.backend import TensorLike
 
 class TrussPDEDataProtocol(Protocol):
     """

@@ -2,9 +2,12 @@ from typing import Sequence
 from fealpy.decorator import cartesian
 from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike
-from fealpy.mesher.chip_mesher import ChipMesher
+from fealpy.geometry import DLDMicrofluidicChipModeler
+from fealpy.mesher import DLDMicrofluidicChipMesher
 
-class Exp0002(ChipMesher):
+import sympy as sp
+
+class Exp0002(DLDMicrofluidicChipMesher):
     def __init__(self, options: dict = {}):
         self.options = options
         self.eps = 1e-10
@@ -21,6 +24,15 @@ class Exp0002(ChipMesher):
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.options['box']
+    
+    def init_mesh(self):
+        import gmsh
+        gmsh.initialize()
+        modeler = DLDMicrofluidicChipModeler(self.options)
+        modeler.build(gmsh)
+        self.generate(modeler, gmsh)
+        gmsh.finalize()
+        return self.mesh
     
     @cartesian
     def velocity_dirichlet(self, p:TensorLike) -> TensorLike:

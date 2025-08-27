@@ -45,35 +45,39 @@ class RadiusRatioSumObjective(SumObjective):
         self.NI = NI
         ND = len(data)
         self.ND = ND
-        newdata = bm.zeros(3*ND,dtype=data.dtype)
-        newdata = bm.set_at(newdata,(slice(0,ND)),data) 
-        newdata = bm.set_at(newdata,(slice(ND,2*ND)),data)
-        newdata = bm.set_at(newdata,(slice(2*ND,None)),data)
-        '''
-        newdata[:ND] = data
-        newdata[ND:2*ND] = data
-        newdata[2*ND:] = data
-        '''
-        newrow = bm.zeros(3*ND,dtype=row.dtype)
-        newrow = bm.set_at(newrow, (slice(0,ND)),row)
-        newrow = bm.set_at(newrow, (slice(ND,2*ND)),row + NI)
-        newrow = bm.set_at(newrow, (slice(2*ND,None)),row + 2*NI)
-        '''
-        newrow[:ND] = row
-        newrow[ND:2*ND] = row + NI
-        newrow[2*ND:] = row + 2*NI
-        '''
-        newcol = bm.zeros(3*ND,dtype=col.dtype)
-        newcol = bm.set_at(newcol, (slice(0,ND)),col) 
-        newcol = bm.set_at(newcol, (slice(ND,2*ND)),col + NI)
-        newcol = bm.set_at(newcol, (slice(2*ND,None)),col + 2*NI)
-        '''
-        newcol[:ND] = col
-        newcol[ND:2*ND] = col + NI
-        newcol[2*ND:] = col + 2*NI
-        '''
-        self.indice = bm.stack([newrow,newcol],axis=0)
-        self.P = COOTensor(self.indice,newdata,spshape=(3*NI,3*NI))
+        if mesh_quality.mesh.TD == 2:
+            newdata = bm.zeros(2*ND,dtype=data.dtype)
+            newdata = bm.set_at(newdata,(slice(0,ND)),data) 
+            newdata = bm.set_at(newdata,(slice(ND,None)),data)
+
+            newrow = bm.zeros(2*ND,dtype=row.dtype)
+            newrow = bm.set_at(newrow, (slice(0,ND)),row)
+            newrow = bm.set_at(newrow, (slice(ND,None)),row + NI)
+
+            newcol = bm.zeros(2*ND,dtype=col.dtype)
+            newcol = bm.set_at(newcol, (slice(0,ND)),col) 
+            newcol = bm.set_at(newcol, (slice(ND,None)),col + NI)
+
+            self.indice = bm.stack([newrow,newcol],axis=0)
+            self.P = COOTensor(self.indice,newdata,spshape=(2*NI,2*NI))
+        elif mesh_quality.mesh.TD == 3:
+            newdata = bm.zeros(3*ND,dtype=data.dtype)
+            newdata = bm.set_at(newdata,(slice(0,ND)),data) 
+            newdata = bm.set_at(newdata,(slice(ND,2*ND)),data)
+            newdata = bm.set_at(newdata,(slice(2*ND,None)),data)
+
+            newrow = bm.zeros(3*ND,dtype=row.dtype)
+            newrow = bm.set_at(newrow, (slice(0,ND)),row)
+            newrow = bm.set_at(newrow, (slice(ND,2*ND)),row + NI)
+            newrow = bm.set_at(newrow, (slice(2*ND,None)),row + 2*NI)
+
+            newcol = bm.zeros(3*ND,dtype=col.dtype)
+            newcol = bm.set_at(newcol, (slice(0,ND)),col) 
+            newcol = bm.set_at(newcol, (slice(ND,2*ND)),col + NI)
+            newcol = bm.set_at(newcol, (slice(2*ND,None)),col + 2*NI)
+
+            self.indice = bm.stack([newrow,newcol],axis=0)
+            self.P = COOTensor(self.indice,newdata,spshape=(3*NI,3*NI))
 
     def fun_with_grad(self,x: TensorLike):
         '''
@@ -96,9 +100,7 @@ class RadiusRatioSumObjective(SumObjective):
                 isBdNode = self.mesh_quality.mesh.boundary_node_flag()
                 node0 = self.mesh_quality.mesh.entity('node')
                 x0 = bm.full_like(node0,0.0)
-                #x0[~isBdNode,:] = x
                 x0 = bm.set_at(x0, (~isBdNode), x)
-                #x0[isBdNode,:] = node0[isBdNode,:]
                 x0 = bm.set_at(x0, (isBdNode), node0[isBdNode,:])
                 x = x0
                 return self.fun(x),self.jac(x,return_free=True).T.flatten()
@@ -127,7 +129,6 @@ class RadiusRatioSumObjective(SumObjective):
                 tem_jacobi = bm.zeros(NN,dtype=grad.dtype)
                 tem_jacobi = bm.index_add(tem_jacobi,cell.flatten(),grad[:,:,i].flatten())
                 jacobi = bm.set_at(jacobi, (slice(None),i), tem_jacobi)
-                #bm.index_add(jacobi[:,i],cell.flatten(),grad[:,:,i].flatten())
             return jacobi
         else:
             isFreeNode = ~self.mesh_quality.mesh.boundary_node_flag()
@@ -138,11 +139,8 @@ class RadiusRatioSumObjective(SumObjective):
             jacobi = bm.zeros((NN,TD),dtype=grad.dtype)
             for i in range(TD):
                 tem_jacobi = bm.zeros(NN,dtype=grad.dtype)
-                #bm.set_at(jacobi, (slice(None,i)),bm.index_add(jacobi[:,i],cell.flatten(),grad[:,:,i].flatten()))
-                #bm.index_add(jacobi[:,i],cell.flatten(),grad[:,:,i].flatten())
                 tem_jacobi = bm.index_add(tem_jacobi,cell.flatten(),grad[:,:,i].flatten())
                 jacobi = bm.set_at(jacobi, (slice(None),i), tem_jacobi)
-                #jacobi = bm.set_at(jacobi,(cell.flatten(),i),grad[:,:,i].flatten())
             jacobi = jacobi[isFreeNode,:]
             return jacobi
     
@@ -167,10 +165,11 @@ class RadiusRatioSumObjective(SumObjective):
             I = bm.broadcast_to(cell[:,:,None],(NC,3,3))
             J = bm.broadcast_to(cell[:,None,:],(NC,3,3))
             indice = bm.stack([I.flatten(),J.flatten()],axis=0)
-            data = A.flatten()
-            A = COOTensor(I.flat,J.flat,A.flat,spshape=(NN,NN))
-            B = COOTensor(I.flat,J.flat,B.flat,spshape=(NN,NN))
-            return (A,B)
+            dataA = A.flatten()
+            #dataB = B.flatten()
+            A = COOTensor(indice,dataA,spshape=(NN,NN))
+            #B = COOTensor(indice,dataB,spshape=(NN,NN))
+            return A#return (A,B)
 
         elif self.mesh_quality.mesh.TD == 3:
             A = self.mesh_quality.hess(x)
@@ -205,27 +204,30 @@ class RadiusRatioSumObjective(SumObjective):
         isFreeNode = ~self.mesh_quality.mesh.boundary_node_flag()
         node0 = bm.copy(self.mesh_quality.mesh.entity('node'))
         NI = self.NI
-        node0 = bm.set_at(node0, (isFreeNode, 0), x[:NI])
-        node0 = bm.set_at(node0, (isFreeNode, 1), x[NI:2*NI])
-        node0 = bm.set_at(node0, (isFreeNode, 2), x[2*NI:])
-        '''
-        node0[isFreeNode,0] = x[:NI]
-        node0[isFreeNode,1] = x[NI:2*NI]
-        node0[isFreeNode,2] = x[2*NI:]
-        '''
+        if self.mesh_quality.mesh.TD == 2:
+            node0 = bm.set_at(node0, (isFreeNode, 0), x[:NI])
+            node0 = bm.set_at(node0, (isFreeNode, 1), x[NI:])
+        elif self.mesh_quality.mesh.TD == 3:
+            node0 = bm.set_at(node0, (isFreeNode, 0), x[:NI])
+            node0 = bm.set_at(node0, (isFreeNode, 1), x[NI:2*NI])
+            node0 = bm.set_at(node0, (isFreeNode, 2), x[2*NI:])
+
         A = self.hess(node0)
         data = A.data[self.datatag]
         ND = self.ND
-        newdata = bm.zeros(3*ND,dtype=data.dtype)
-        newdata = bm.set_at(newdata, (slice(0,ND)), data)
-        newdata = bm.set_at(newdata, (slice(ND,2*ND)), data)
-        newdata = bm.set_at(newdata, (slice(2*ND,None)), data)
-        '''
-        newdata[:ND] = data 
-        newdata[ND:2*ND] = data
-        newdata[2*ND:] = data
-        '''
-        self.P = COOTensor(self.indice,newdata,spshape=(3*NI,3*NI))
+        if self.mesh_quality.mesh.TD == 2:
+            newdata = bm.zeros(2*ND,dtype=data.dtype)
+            newdata = bm.set_at(newdata, (slice(0,ND)), data)
+            newdata = bm.set_at(newdata, (slice(ND,None)), data)
+
+            self.P = COOTensor(self.indice,newdata,spshape=(2*NI,2*NI))
+        elif self.mesh_quality.mesh.TD == 3:
+            newdata = bm.zeros(3*ND,dtype=data.dtype)
+            newdata = bm.set_at(newdata, (slice(0,ND)), data)
+            newdata = bm.set_at(newdata, (slice(ND,2*ND)), data)
+            newdata = bm.set_at(newdata, (slice(2*ND,None)), data)
+
+            self.P = COOTensor(self.indice,newdata,spshape=(3*NI,3*NI))
         return self.P
 
 

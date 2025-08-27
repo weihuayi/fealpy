@@ -1,7 +1,7 @@
 from ...backend import bm
 from ...decorator import cartesian
 from ...typing import TensorLike
-from ..mesher import BoxMesher2d
+from ...mesher import BoxMesher2d
 from typing import Sequence
 
 
@@ -98,3 +98,42 @@ class Exp0001(BoxMesher2d):
         eps = 1e-12
         return (bm.abs(x - 0.0) < eps) | (bm.abs(x - 1.0) < eps) | \
                (bm.abs(y - 0.0) < eps) | (bm.abs(y - 1.0) < eps)
+
+
+    @cartesian
+    def source_u(self, p: TensorLike) -> TensorLike:
+        x, y = p[..., 0], p[..., 1]
+        mu = self.mu
+        pi = bm.pi
+
+        fx = bm.cos(pi * x) * bm.sin(pi * y) * (pi - 2 * mu * pi ** 2)
+        return fx
+    
+    @cartesian
+    def source_v(self, p: TensorLike) -> TensorLike:
+        x, y = p[..., 0], p[..., 1]
+        mu = self.mu
+        pi = bm.pi
+
+        fy = bm.sin(pi * x) * bm.cos(pi * y) * (pi + 2 * mu * pi ** 2)
+        return fy
+    
+    @cartesian
+    def velocity_u(self, p: TensorLike) -> TensorLike:
+        x, y = p[..., 0], p[..., 1]
+        u1 = -bm.cos(bm.pi * x) * bm.sin(bm.pi * y)
+        return u1
+    
+    @cartesian
+    def velocity_v(self, p: TensorLike) -> TensorLike:
+        x, y = p[..., 0], p[..., 1]
+        u2 =  bm.sin(bm.pi * x) * bm.cos(bm.pi * y)
+        return u2
+    
+    @cartesian
+    def dirichlet_velocity_u(self, p: TensorLike) -> TensorLike:
+        return self.velocity_u(p)
+    
+    @cartesian
+    def dirichlet_velocity_v(self, p: TensorLike) -> TensorLike:
+        return self.velocity_v(p)

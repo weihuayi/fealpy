@@ -1,10 +1,11 @@
-from fealpy.cfd.equation import IncompressibleNS
-from fealpy.cfd.simulation.fem import IPCS
-from fealpy.cfd.problem.incompressible_navier_stokes_2d import Channel
-
 from fealpy.backend import backend_manager as bm
+
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import TensorFunctionSpace
+
+from ..equation import IncompressibleNS
+from ..simulation.fem import IPCS
+from ..problem.incompressible_navier_stokes_2d import Channel
 
 #backend = 'pytorch'
 backend = 'numpy'
