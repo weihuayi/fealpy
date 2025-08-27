@@ -1,23 +1,47 @@
 
 import fealpy.cgraph as cgraph
+
 WORLD_GRAPH = cgraph.WORLD_GRAPH
+
 pde = cgraph.create("StationaryNS2d")
 mesher = cgraph.create("Box2d")
-equation = cgraph.create("StationaryNSEquation")
+uspacer = cgraph.create("FunctionSpace")
+pspacer = cgraph.create("FunctionSpace")
 simulation = cgraph.create("StationaryNSSimulation")
+dbc = cgraph.create("StationaryNSBC")
 StationaryNSRun = cgraph.create("StationaryNSRun")
-equation(pde = pde())
 
-simulation(equation=equation()) 
+mesher(domain = pde().domain)
+uspacer(mesh = mesher(), p=2)
+pspacer(mesh = mesher(), p=1)
+simulation(
+    mu = pde().mu,
+    rho = pde().rho,
+    source = pde().source,
+    uspace = uspacer(),
+    pspace = pspacer(),
+    p = 2
+) 
+dbc(
+    uspace = uspacer(), 
+    pspace = pspacer(), 
+    velocity_dirichlet = pde().velocity_dirichlet, 
+    pressure_dirichlet = pde().pressure_dirichlet, 
+    is_velocity_boundary = pde().is_velocity_boundary, 
+    is_pressure_boundary = pde().is_pressure_boundary
+)
 StationaryNSRun(
     maxstep=1000,
-    simulation = simulation(),
     tol=1e-6,
-    pde=pde()
+    update = simulation().update,
+    apply_bc = dbc().apply_bc,
+    lagrange_multiplier = simulation().lagrange_multiplier,
+    A = simulation().A,
+    L = simulation().L,
+    uspace = simulation().uspace, 
+    pspace = simulation().pspace, 
+    mesh = mesher()
 )
-WORLD_GRAPH.output_node(
-    uh1 = StationaryNSRun().uh1,  
-    ph1 = StationaryNSRun().ph1
-)
+WORLD_GRAPH.output_node(pde = pde())
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())
