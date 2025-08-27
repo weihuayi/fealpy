@@ -180,14 +180,14 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         A = BForm.assembly() 
         b = LForm.assembly()
         A, b = self.fem.apply_bc(A, b, self.pde)
-        A, b = self.fem.lagrange_multiplier(A, b)
+        # A, b = self.fem.lagrange_multiplier(A, b)
         x = self.solve(A, b)
 
         ugdof = self.fem.uspace.number_of_global_dofs()
         u = self.fem.uspace.function()
         p = self.fem.pspace.function()
         u[:] = x[:ugdof]
-        p[:] = x[ugdof:-1] 
+        p[:] = x[ugdof:] 
         return u, p
 
     @run.register('uniform_refine')
@@ -224,53 +224,79 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         Compute the error in benchmark form.
         """
         self.error_str = 'benchmark'
+        fem = self.fem
         mesh = self.mesh
         location = mesh.location
-        ipoints = self.fem.uspace.interpolation_points()
         qf = mesh.quadrature_formula(q=3, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        def integrate_term(grad_uh_dot_grad_v, u_dot_grad_u_dot_v, div_v):
-            NC = mesh.number_of_cells()
-            node_points = mesh.entity('node')
-            c2n = mesh.cell_to_node()
-            
-            p = ph(bcs = bcs)
-            term = bm.zeros(NC)
-            for i in bm.arange(NC):
-                cell = node_points[c2n[i]]
-                S = 0.5 * bm.cross(cell[1]-cell[0], cell[2]-cell[0])
-                term[i] = self.pde.mu * S * bm.sum(ws * grad_uh_dot_grad_v[i])  
-                term[i] += self.pde.rho * S * bm.sum(ws * u_dot_grad_u_dot_v[i]) 
-                term[i] -= S * bm.sum((p[i] * div_v[i]) * ws)  
-            integrate = bm.sum(term)
-            return integrate
+        vd = fem.uspace.function()
+        vl = fem.uspace.function()
+        from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator, LinearForm, DirichletBC
+        A = BilinearForm(fem.uspace)
+        BD = ScalarDiffusionIntegrator()
+        BD.coef = -1.0
+        A.add_integrator(BD)
+        L = LinearForm(fem.uspace)
+
+        A = A.assembly()
+        L = L.assembly()
+
+        def vd_dirichlet(p):
+            is_obstacle = self.pde.is_obstacle_boundary(p)
+            result = bm.zeros(p.shape)
+            result[..., 0] = 0.0
+            result[..., 0][is_obstacle] = 1.0
+            result[..., 1] = 0.0
+            return result
         
-        vd = self.fem.uspace.function()
-        vd[self.pde.is_velocity_boundary(ipoints)] = 0.0
-        vd[:len(ipoints)][self.pde.is_obstacle_boundary(ipoints)] = 1.0
+        def vl_dirichlet(p):
+            is_obstacle = self.pde.is_obstacle_boundary(p)
+            result = bm.zeros(p.shape)
+            result[..., 0] = 0.0
+            result[..., 1] = 0.0
+            result[..., 1][is_obstacle] = 1.0
+            return result
+        
+        def is_v_boundary(p):
+            return None
+
+        BC_d = DirichletBC(fem.uspace, 
+                         gd = vd_dirichlet,
+                         threshold=is_v_boundary,
+                         method='interp')
+        BC_l = DirichletBC(fem.uspace, 
+                         gd = vl_dirichlet,
+                         threshold=is_v_boundary,
+                         method='interp')
+        A_d, L_d = BC_d.apply(A, L)
+        A_l, L_l = BC_l.apply(A, L)
+        vd[:] = self.solve(A_d, L_d)
+        vl[:] = self.solve(A_l, L_l)
+        
+        cellmeasure = self.mesh.entity_measure("cell")
+        p = ph(bcs = bcs)
         grad_vd = self.fem.uspace.grad_value(uh = vd, 
                                              bc = bcs)
         grad_uh = self.fem.uspace.grad_value(uh = uh, 
                                              bc = bcs)
-        grad_uh_dot_grad_vd = bm.einsum('knij,knij->kn', grad_uh, grad_vd)  # ∇u : ∇vd
-        u_dot_grad_u_dot_vd = bm.einsum('kni, knij, knj -> kn', uh(bcs = bcs), 
-                                                                    grad_uh, 
-                                                                    vd(bcs = bcs))  # (u · ∇)u
-        div_vd = bm.einsum('knij -> kn', grad_vd)  # Divergence of vd
+        cd = self.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vd, cellmeasure) 
+        cd += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
+                                                    grad_uh,
+                                                    vd(bcs = bcs), cellmeasure)  
+        cd -= bm.einsum('n, knii, kn, k -> ', ws, grad_vd, p, cellmeasure) 
 
-        vl = self.fem.uspace.function()
-        vl[self.pde.is_velocity_boundary(ipoints)] = 0.0
-        vl[len(ipoints):][self.pde.is_obstacle_boundary(ipoints)] = 1.0
         grad_vl = self.fem.uspace.grad_value(uh = vl, 
                                              bc = bcs)
         grad_uh = self.fem.uspace.grad_value(uh = uh, 
                                              bc = bcs)
-        grad_uh_dot_grad_vl = bm.einsum('knij,knij->kn', grad_uh, grad_vl)  # ∇u : ∇vl
-        u_dot_grad_u_dot_vl = bm.einsum('kni, knij, knj -> kn', uh(bcs = bcs), 
+        cl = self.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vl, cellmeasure)
+        cl += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ', ws, 
+                                                                    uh(bcs = bcs), 
                                                                     grad_uh, 
-                                                                    vl(bcs = bcs))  # (u · ∇)u
-        div_vl = bm.einsum('knij -> kn', grad_vl)  # Divergence of vl
+                                                                    vl(bcs = bcs),
+                                                                    cellmeasure)
+        cl -= bm.einsum('n, knii, kn, k -> ', ws, grad_vl, p, cellmeasure)
         
         point0 = bm.array([[0.15, 0.2]])
         point1 = bm.array([[0.25, 0.2]])
@@ -291,8 +317,9 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         bcs0 = get_bcs(point=point0, index = index0)
         bcs1 = get_bcs(point=point1, index = index1)
 
-        cd = -500 * integrate_term(grad_uh_dot_grad_vd, u_dot_grad_u_dot_vd, div_vd)
-        cl = -500 * integrate_term(grad_uh_dot_grad_vl, u_dot_grad_u_dot_vl, div_vl)
+        cd = -500 * cd
+        # cl = -500 * integrate_term(grad_uh_dot_grad_vl, u_dot_grad_u_dot_vl, div_vl)
+        cl = -500 * cl
         delta_p = ph(bcs = bcs0, index = index0) - ph(bcs = bcs1, index = index1)
         # delta_p = 0.0
         return cd, cl, delta_p

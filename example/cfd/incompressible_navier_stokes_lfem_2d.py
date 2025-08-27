@@ -35,7 +35,7 @@ parser.add_argument('--T1',
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=8000, type=int,
+    default=800, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--init_mesh',
@@ -55,7 +55,7 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.029.")
 
 parser.add_argument('--n_circle',
-    default = 200, type=int,
+    default = 100, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--lc',

@@ -143,7 +143,7 @@ class Cylinder2D():
         return result
     
     @cartesian
-    def velocity(self, p: TensorLike, t) -> TensorLike:
+    def velocity_0(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity."""
         x = p[..., 0]
         y = p[..., 1]
@@ -151,7 +151,7 @@ class Cylinder2D():
         return result
     
     @cartesian
-    def pressure(self, p: TensorLike, t) -> TensorLike:
+    def pressure_0(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape[0], dtype=p.dtype)

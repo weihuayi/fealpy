@@ -46,7 +46,7 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.029.")
 
 parser.add_argument('--n_circle',
-    default = 1000, type=int,
+    default = 400, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--l1',
@@ -62,7 +62,7 @@ parser.add_argument('--h',
     help="Mesh size, default is 0.05")
 
 parser.add_argument('--lc',
-    default = 0.004, type=float,
+    default = 0.05, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--hole_lc',

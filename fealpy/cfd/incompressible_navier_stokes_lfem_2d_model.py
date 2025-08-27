@@ -107,10 +107,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
 
-        # u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = self.timeline.T0)))
-        # p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = self.timeline.T0)))
-        u0 = fem.uspace.function()
-        p0 = fem.pspace.function()
+        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity_0(p)))
+        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure_0(p)))
         
         for i in range(self.timeline.NL-1):
             t  = self.timeline.current_time()

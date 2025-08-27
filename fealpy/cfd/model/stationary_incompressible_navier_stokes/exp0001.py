@@ -117,13 +117,15 @@ class Exp0001():
     
     @cartesian
     def is_velocity_boundary(self, p):
-        return None
+        inlet = self.is_inlet_boundary(p)
+        wall = self.is_wall_boundary(p)
+        obstacle = self.is_obstacle_boundary(p)
+        return inlet|wall|obstacle
     
     @cartesian
     def is_pressure_boundary(self, p):
         is_out = self.is_outlet_boundary(p)
         return is_out
-
 
     @cartesian
     def obstacle_velocity(self, p: TensorLike) -> TensorLike:
@@ -142,13 +144,10 @@ class Exp0001():
     @cartesian
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
         inlet = self.inlet_velocity(p)
-        outlet = self.outlet_velocity(p)
         is_inlet = self.is_inlet_boundary(p)
-        is_outlet = self.is_outlet_boundary(p)
         
         result = bm.zeros_like(p, dtype=p.dtype)
         result[is_inlet] = inlet[is_inlet]
-        result[is_outlet] = outlet[is_outlet]
         return result
 
     @cartesian
