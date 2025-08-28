@@ -109,10 +109,21 @@ class TimobeamAxleData3D:
     
     @cartesian
     def external_load(self) -> TensorLike:
-        """The load applied to the node.
+        """Node-based concentrated external loads for the Timoshenko beam and Axle.
+        
         Notes:
-            Each node has 6 DOFs: [u, v, w, θx, θy, θz].
-            dof_map = {'u': 0,'v': 1,'w': 2,'θx': 3,'θy': 4,'θz': 5}
+            Each node has 6 degrees of freedom (DOFs): [u, v, w, θx, θy, θz].
+            dof_map = {'u': 0,'v': 1,'w': 2,'θx': 3,'θy': 4,'θz': 5}.
+            
+            Concentrated load definition:
+                - Node 1: Fz = -88200
+                - Node 11: Fx = 3140, Mx = 1.4e6
+                - Node 21: Fz = -88200
+
+        Returns:
+            F(TensorLike):
+                Global nodal force vector, with concentrated loads applied
+                at the specified nodes.
         """
         NN = self.mesh.number_of_nodes()
         n_dofs = NN * self.dofs_per_node
@@ -126,7 +137,7 @@ class TimobeamAxleData3D:
         F[21 * self.dofs_per_node + 2] = external_load[3]
 
         return F 
-
+    
     @cartesian
     def dirichlet_dof_index(self) -> TensorLike:
         """Dirichlet boundary conditions are applied.

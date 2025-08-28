@@ -1,7 +1,6 @@
 from typing import Union
 
 from fealpy.backend import bm
-from fealpy.typing import TensorLike
 from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
 
@@ -11,8 +10,7 @@ from fealpy.functionspace import (
         TensorFunctionSpace
         )
 from fealpy.fem import (
-        BilinearForm,LinearForm,
-        VectorSourceIntegrator,
+        BilinearForm,
         DirichletBC
         )
 from fealpy.solver import spsolve, cg
@@ -110,7 +108,7 @@ class TimobeamAxleModel(ComputationalModel):
 
                 # 直接相加
                 K = beam_K + axle_K
-                F = self.pde.external_load()        
+                F = self.pde.external_load()
 
                 return K, F
         

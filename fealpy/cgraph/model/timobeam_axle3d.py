@@ -8,12 +8,11 @@ class TimobeamAxle3d(CNodeType):
     
     OUTPUT_SLOTS = [
         PortConf("domain", DataType.NONE),
-        PortConf("E", DataType.FLOAT),
-        PortConf("nu", DataType.FLOAT),
-        PortConf("displacement", DataType.FUNCTION),
-        PortConf("body_force", DataType.TENSOR),
-        PortConf("displacement_bc", DataType.FUNCTION),
-        PortConf("hypo", DataType.STRING)
+        PortConf("shear Factors", DataType.FLOAT),
+        PortConf("beam_cross_section", DataType.FLOAT),
+        PortConf("beam_inertia", DataType.FLOAT),
+        PortConf("external_load", DataType.TENSOR),
+        PortConf("dirichlet", DataType.FUNCTION)
     ]
     
     @staticmethod
@@ -22,5 +21,5 @@ class TimobeamAxle3d(CNodeType):
         model = TimobeamAxleData3D()
         return (model.domain(), model.lam(), model.mu()) + tuple(
             getattr(model, name)
-            for name in ["displacement", "body_force", "displacement_bc", "hypo"]
+            for name in ["shear Factors", "beam_cross_section", "beam_inertia", "external_load", "dirichlet"]
         )
