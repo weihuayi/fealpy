@@ -229,24 +229,14 @@ class LagrangeQuadrangleMesh(TensorMesh):
             end = start + NE
             mid_idx = bm.arange(start, end, **ikwargs)
             
-            if self.p > 1:
-                nn = self.p - 1
-                t = bm.arange(1, self.p) / self.p
-                edge_nodes = []
-                for k in range(nn):
-                    t_k = t[k]
-                    pts = (1 - t_k)[:, None] * node[edge[:, 0]] + t_k[:, None] * node[edge[:, 1]]
-                    edge_nodes.append(pts)
-                edge_nodes = bm.concat(edge_nodes, axis=0)
-                nodes.append(edge_nodes)
-                
-            
-            # each cell is split into 4 subcells
-            cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4)
-            
             if self.p == 1:
-                e0 = bm.stack((edge[:, 0], mid_idx), axis=1)
-                e1 = bm.stack((mid_idx, edge[:, 1]), axis=1)
+                e0 = bm.stack((mid_idx, edge[:, 0]), axis=1) 
+                e1 = bm.flip(bm.stack((edge[:, 1], mid_idx), axis=1)) 
+                edges = [
+                    e0[0], e1[1],
+                    e0[1], e1[2],
+                    e0[2], e1[3],
+                    e0[3], e1[0]]
             else:
                 nn = self.p - 1  # 每条子边上的中间节点数
                 start = end
@@ -254,7 +244,22 @@ class LagrangeQuadrangleMesh(TensorMesh):
                 e = bm.arange(start, end, **ikwargs).reshape(-1, 2 * nn)
                 e0 = bm.concat((edge[:, [0]], e[:, 0*nn:1*nn], mid_idx[:, None]), axis=1)
                 e1 = bm.concat((mid_idx[:, None], e[:, 1*nn:2*nn], edge[:, [-1]]), axis=1)
-            edges.extend([e0, e1])
+        
+                t = bm.arange(1, self.p) / self.p
+                edge_nodes = []
+                for k in range(nn):
+                    t_k = t[k]
+                    pts = (1 - t_k)[:, None] * node[edge[:, 0]] + t_k[:, None] * node[edge[:, 1]]
+                    edge_nodes.append(pts)
+                
+                edge_nodes = bm.concat(edge_nodes, axis=0)
+                nodes.append(edge_nodes)
+            
+            # edge = bm.concat(edges, axis=0)
+            edge = bm.stack(edges, axis=0)
+            
+            # each cell is split into 4 subcells
+            cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4)
             
             imap = bm.array([
                 [[1, 2], [2, 1]],  
@@ -286,7 +291,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             e2c1 = bm.set_at(e2c1, (isBdEdge, 3), e2c1[isBdEdge, 2])
             edge2cells.extend([e2c0, e2c1])
             
-            edge = bm.concat(edges, axis=0)
+           
             edge2cell = bm.concat(edge2cells, axis=0)
             
             # 构建每个单元格中的新边
