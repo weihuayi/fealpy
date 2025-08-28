@@ -6,7 +6,6 @@ from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
 
 
-
 class AxleMaterial(LinearElasticMaterial):
     """Material properties for 3D axles.
 

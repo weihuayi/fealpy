@@ -66,7 +66,7 @@ class TimobeamAxleModel(ComputationalModel):
                
         def set_pde(self, pde: Union[BeamPDEDataT, int] = 2) -> None:
              if isinstance(pde, int):
-                self.pde = CSMModelManager("timoshenko_beam").get_example(pde)
+                self.pde = CSMModelManager("timobeam_axle").get_example(pde)
              else:
                 self.pde = pde
                 

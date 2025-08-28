@@ -39,7 +39,6 @@ parser.add_argument('--axle_nu',
                     default=-0.5, type=float,
                     help='Type of mesh, default is the axle Poisson ratio')
 
-
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True')
