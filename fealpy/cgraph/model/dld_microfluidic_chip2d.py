@@ -15,8 +15,9 @@ class DLDMicroflidicChip2D(CNodeType):
 
     @staticmethod
     def run():
-        from fealpy.cfd.model.stationary_incompressible_navier_stokes.exp0001 import Exp0001
-        model = Exp0001()
+        from fealpy.cfd.model.stationary_incompressible_navier_stokes.exp0003 import Exp0003
+        model = Exp0003()
+        print(1)
         return tuple(
             getattr(model, name)
             for name in ["velocity_dirichlet", "pressure_dirichlet", "is_velocity_boundary", "is_pressure_boundary"]

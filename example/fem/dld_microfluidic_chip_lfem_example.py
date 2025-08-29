@@ -54,7 +54,7 @@ parser.add_argument('--stage_length',
     help = "Number of stages (or periods) in the chip.")
 
 parser.add_argument('--lc',
-    default = 0.07, type = float,
+    default = 0.08, type = float,
     help = "Grid size for meshing.")
 
 parser.add_argument('--show_figure',
@@ -88,7 +88,7 @@ from fealpy.mmesh.tool import high_order_meshploter
 import gmsh
 box = [0.0, 1.0, 0.0, 1.0]
 holes = [[0.3, 0.3, 0.1], [0.3, 0.7, 0.1], [0.7, 0.3, 0.1], [0.7, 0.7, 0.1]]
-holes = [[0.5, 0.5, 0.2]]
+# holes = [[0.5, 0.5, 0.2]]
 mesh = TriangleMesh.from_box_with_circular_holes(box=box, holes=holes, h=0.02)
 
 
@@ -104,6 +104,7 @@ gmsh.finalize()
 
 model = DLDMicrofluidicChipLFEMModel(options)
 model.set_init_mesher(mesher)
+# model.mesh = mesh
 model.set_space_degree(options['space_degree'])
 model.set_inlet_condition()
 uh, ph = model.run()
