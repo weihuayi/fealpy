@@ -25,11 +25,13 @@ def plot_nodes(ax, node, fontsize=10, color='k'):
 # mesh.to_vtk(fname=fname)
 
 qmesh = QuadrangleMesh.from_box(nx=1, ny=1)
-qmesh.uniform_refine(1)
-# node = qmesh.entity('node')
+# qmesh.uniform_refine(1)
+node = qmesh.entity('node')
 edge = qmesh.entity('edge')
-# cell = qmesh.entity('cell')
-print(edge)
+cell = qmesh.entity('cell')
+print('node', node)
+print('edge', edge)
+print('cell', cell)
 
 # fig = plt.figure()
 # axes = fig.gca()
@@ -38,8 +40,6 @@ print(edge)
 # qmesh.find_edge(axes, showindex=True)
 # qmesh.find_cell(axes, showindex=True)
 # plt.show()
-
-
 
 mesh = LagrangeQuadrangleMesh.from_box([0, 1, 0, 1], p=1, nx=1, ny=1)
 mesh.uniform_refine(1)
