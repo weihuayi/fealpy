@@ -14,6 +14,7 @@ from ..fvm import (
     ScalarSourceIntegrator,
     ScalarCrossDiffusionIntegrator,
     DirichletBC,
+    GradientReconstruct,
 )
 
 
@@ -64,7 +65,7 @@ class PoissonFVMModel(ComputationalModel):
         self.logger.info(self.pde)
 
     def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
-        self.mesh = self.pde.init_mesh['uniform_quad'](nx=nx, ny=ny)    
+        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)    
 
     def set_space(self, degree: int = 0) -> None:
         self.p = degree
@@ -101,7 +102,9 @@ class PoissonFVMModel(ComputationalModel):
             ndarray: Right-hand side vector from cross-diffusion.
         """
         lform = LinearForm(self.space)
-        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, q=self.p + 2))
+        grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(uh,self.pde.dirichlet)  # (NC, 2)
+        grad_f = GradientReconstruct(self.mesh).reconstruct(grad_u)  # (NE, 2)
+        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f, q=self.p + 2))
         return lform.assembly()
 
     def solve(self, max_iter=6, tol=1e-6) -> TensorLike:
@@ -173,5 +176,4 @@ class PoissonFVMModel(ComputationalModel):
 
         plt.tight_layout()
         plt.show()
-
 

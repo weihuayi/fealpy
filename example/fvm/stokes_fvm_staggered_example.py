@@ -9,20 +9,31 @@ def main():
 
     parser.add_argument('--pde', default=1, type=int,
                         help='Stokes PDE example ID')
-    parser.add_argument('--nx', default=20, type=int,
+    
+    parser.add_argument('--nx', default=40, type=int,
                         help='Grid divisions in x-direction')
-    parser.add_argument('--ny', default=20, type=int,
+    
+    parser.add_argument('--ny', default=40, type=int,
                         help='Grid divisions in y-direction')
-    parser.add_argument('--backend', default='numpy', choices=['numpy', 'cupy'],
-                        help='Backend engine')
-    parser.add_argument('--pbar_log', action='store_true')
-    parser.add_argument('--log_level', default='INFO')
-    parser.add_argument('--max_iter', default=100, type=int)
-    parser.add_argument('--tol', default=1e-6, type=float)
+    
+    parser.add_argument('--backend',default='numpy', type=str,
+                        help="the backend of fealpy, can be 'numpy', 'torch', 'tensorflow' or 'jax'.")
+    
+    parser.add_argument('--pbar_log', default=True, type=bool,
+                        help='Whether to show progress bar, default is True')
+    
+    parser.add_argument('--log_level',
+                        default='INFO', type=str,
+                        help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
+
+    parser.add_argument('--max_iter', default=1000, type=int)
+
+    parser.add_argument('--tol', default=1e-5, type=float)
+
     parser.add_argument('--plot', action='store_true')
 
-    args = parser.parse_args()
-    options = vars(args)
+    options = vars(parser.parse_args())
+    
     bm.set_backend(options["backend"])
 
     model = StokesFVMStaggeredModel(options)
@@ -31,7 +42,6 @@ def main():
     model.solve(max_iter=options["max_iter"], tol=options["tol"])
     ue, ve, pe = model.compute_error()
     print(f"Velocity L2 error (u): {ue:.4e}, (v): {ve:.4e}, Pressure L2 error: {pe:.4e}")
-
     if options["plot"]:
         model.plot()
         model.plot_residual()
