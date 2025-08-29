@@ -4,15 +4,9 @@ from fealpy.decorator import cartesian
 from fealpy.mesh import EdgeMesh
 
 
-class TimoshenkoBeamData3D:
+class TimobeamAxleData3D:
     """
-    3D Timoshenko beam geometry and boundary/load data container.
-    """
-
-    def __init__(self, para: TensorLike=None, 
-                 FSY: float=10/9, FSZ: float=10/9):
-        """
-        A data structure class representing beam parameters and properties, including geometry characteristics.
+        A data structure class representing beam and axle parameters and properties, including geometry characteristics.
 
         Parameters:
             para(TensorLike): A list or tensor containing the axle structure parameters: [phi diameter, length, number of segments].
@@ -25,16 +19,16 @@ class TimoshenkoBeamData3D:
         
         Notes:
             FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
-        """
-        
-        # 几何参数
+    """
+    def __init__(self, para: TensorLike=None, 
+                 FSY: float=10/9, FSZ: float=10/9):
         self.beam_para = bm.array([
             [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
             [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
             [120, 141, 2]], dtype=bm.float64)
         self.axle_para =  bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
     
-        #self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
+        # self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
         
         # diameter
         self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
@@ -45,12 +39,9 @@ class TimoshenkoBeamData3D:
         self.dofs_per_node = 6
         self.mesh = self.init_mesh()
         
-        # === 独立计算 beam 和 axle 截面 & 惯性矩 ===
+        # === 计算 beam 截面 & 惯性矩 ===
         self.beam_Ax, self.beam_Ay, self.beam_Az = self.calculate_beam_cross_section()
         self.beam_Ix, self.beam_Iy, self.beam_Iz = self.calculate_beam_inertia()
-        
-        # self.axle_Ax, self.axle_Ay, self.axle_Az = self.calculate_axle_cross_section()
-        # self.axle_Ix, self.axle_Iy, self.axle_Iz = self.calculate_axle_inertia()
         
     def __str__(self) -> str:
         """Returns a formatted multi-line string summarizing the configuration of the 3D Timoshenko beam data.
@@ -69,8 +60,6 @@ class TimoshenkoBeamData3D:
         s += f"  Shear Factors     : {self.FSY}, {self.FSZ}\n"
         s += f"  beam_Ax, beam_Ay, beam_Az : {self.beam_Ax[:5].tolist()} ...\n"
         s += f"  beam_Ix, beam_Iy, beam_Iz : {self.beam_Ix[:5].tolist()} ...\n"
-        s += f"  axle_Ax,axle_Ay, axle_Az : {self.axle_Ax[:5].tolist()} ...\n"
-        s += f"  axle_Ix, axle_Iy, axle_Iz : {self.axle_Ix[:5].tolist()} ...\n"
         s += ")"
         return s
     
@@ -94,7 +83,7 @@ class TimoshenkoBeamData3D:
        return beam_Ix, beam_Iy, beam_Iz
     
     def init_mesh(self):
-        """Construct a mesh for the beam.
+        """Construct a mesh for the beam ane axle.
 
         Returns:
             EdgeMesh: 3D mesh with nodes and cells for the beam domain.
@@ -120,10 +109,21 @@ class TimoshenkoBeamData3D:
     
     @cartesian
     def external_load(self) -> TensorLike:
-        """The load applied to the node.
+        """Node-based concentrated external loads for the Timoshenko beam and Axle.
+        
         Notes:
-            Each node has 6 DOFs: [u, v, w, θx, θy, θz].
-            dof_map = {'u': 0,'v': 1,'w': 2,'θx': 3,'θy': 4,'θz': 5}
+            Each node has 6 degrees of freedom (DOFs): [u, v, w, θx, θy, θz].
+            dof_map = {'u': 0,'v': 1,'w': 2,'θx': 3,'θy': 4,'θz': 5}.
+            
+            Concentrated load definition:
+                - Node 1: Fz = -88200
+                - Node 11: Fx = 3140, Mx = 1.4e6
+                - Node 21: Fz = -88200
+
+        Returns:
+            F(TensorLike):
+                Global nodal force vector, with concentrated loads applied
+                at the specified nodes.
         """
         NN = self.mesh.number_of_nodes()
         n_dofs = NN * self.dofs_per_node
@@ -136,10 +136,8 @@ class TimoshenkoBeamData3D:
         F[11 * self.dofs_per_node + 3] = external_load[2]
         F[21 * self.dofs_per_node + 2] = external_load[3]
 
-
-
         return F 
-
+    
     @cartesian
     def dirichlet_dof_index(self) -> TensorLike:
         """Dirichlet boundary conditions are applied.
