@@ -1,6 +1,5 @@
 import os
 import imageio.v3 as iio
-from ..backend import backend_manager as bm
 
 class TerrainLoader:
     """

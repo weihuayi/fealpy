@@ -13,7 +13,9 @@ __nodes__ = [
     "functionspace",
     "solver",
     "fem",
-    "cfd"
+    "cfd",
+    "opt",
+    "pathplanning"
 ]
 
 register_all_nodes()

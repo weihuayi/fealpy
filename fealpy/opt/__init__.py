@@ -24,4 +24,3 @@ from .PLBFGSAlg import PLBFGS
 from .PNLCGAlg import PNLCG
 from .GradientDescentAlg import GradientDescent
 from .multi_opt import MO_QuantumParticleSwarmOpt, NondominatedSortingGeneticAlgIII
-from .benchmark.cec import CEC2017, CEC2022, CEC2020

@@ -239,9 +239,10 @@ class Optimizer():
         if pop_new_f < pop_f:
             pop = pop_new
             pop_f = pop_new_f
-        else:
-            self.person = pop
-            self.person_f = pop_f
+        
+        self.person = pop
+        self.person_f = pop_f
+        
         return pop, pop_f
 
 def opt_alg_options(
