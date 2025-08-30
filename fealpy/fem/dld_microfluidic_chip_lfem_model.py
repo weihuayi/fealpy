@@ -80,7 +80,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             x = p[..., 0]
             y = p[..., 1]
             result = bm.zeros(p.shape, dtype=bm.float64)
-            result[..., 0] = y * (1 -y)
+            result[..., 0] = y * (0.5-y)
             result[..., 1] = bm.array(0.0)
             return result
         
@@ -181,17 +181,11 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
         """Optional: prescribed velocity on boundary, if needed explicitly."""
         inlet = self.inlet_velocity(p)
-        wall = self.wall_velocity(p)
-        obstacle = self.obstacle_velocity(p)
         is_inlet = self.is_inlet_boundary(p)
-        is_wall = self.is_wall_boundary(p)
-        is_obstacle = self.is_obstacle_boundary(p)
         
         result = bm.zeros_like(p, dtype=p.dtype)
         result[is_inlet] = inlet[is_inlet]
-        result[is_wall] = wall[is_wall]
-        result[is_obstacle] = obstacle[is_obstacle]
-        
+
         return result
     
     @cartesian
@@ -253,7 +247,9 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             method='interp'
         )
         A, L = BC.apply(A, L)
-        x = self.solve(A, L)
+        from fealpy.solver import cg
+        x = cg(A, L)
+        print(x, x.shape)
         ugdof = self.uspace.number_of_global_dofs()
         uh = x[:ugdof]
         ph = x[ugdof:]

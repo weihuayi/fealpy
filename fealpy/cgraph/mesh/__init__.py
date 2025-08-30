@@ -1,3 +1,2 @@
-from .creation import Box2d
+from .creation import Box2d, ChipMesh2D
 from .ops import Error
-from .chip_mesh import ChipMesh2D
