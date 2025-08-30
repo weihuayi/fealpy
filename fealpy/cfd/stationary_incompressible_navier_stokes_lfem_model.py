@@ -180,14 +180,14 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         A = BForm.assembly() 
         b = LForm.assembly()
         A, b = self.fem.apply_bc(A, b, self.pde)
-        # A, b = self.fem.lagrange_multiplier(A, b)
+        A, b = self.fem.lagrange_multiplier(A, b)
         x = self.solve(A, b)
 
         ugdof = self.fem.uspace.number_of_global_dofs()
         u = self.fem.uspace.function()
         p = self.fem.pspace.function()
         u[:] = x[:ugdof]
-        p[:] = x[ugdof:] 
+        p[:] = x[ugdof:-1] 
         return u, p
 
     @run.register('uniform_refine')
