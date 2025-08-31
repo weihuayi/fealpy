@@ -1,29 +1,28 @@
-<<<<<<< HEAD
 from typing import Union
 from ..backend import bm
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 from ..decorator import variantmethod
 
 # FEM imports
 from ..functionspace import LagrangeFESpace, TensorFunctionSpace
 from ..fem import BilinearForm, LinearForm
-from ..fem import LinearElasticIntegrator, VectorSourceIntegrator
+from ..fem import LinearElasticityIntegrator, VectorSourceIntegrator
 from ..material import LinearElasticMaterial
 
 class LinearElasticityLFEMModel(ComputationalModel):
     def __init__(self):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("linear_elasticity")
+        self.pdm = PDEModelManager("linear_elasticity")
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly"):
-        if isinstance(pde, str):
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, int]=1):
+        if isinstance(pde, int):
             self.pde = self.pdm.get_example(pde)
         else:
             self.pde = pde
 
-    def set_init_mesh(self, meshtype: str = "hex", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+    def set_init_mesh(self, meshtype: str, **kwargs):
+        self.mesh = self.pde.init_mesh(**kwargs)
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -31,13 +30,16 @@ class LinearElasticityLFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
 
-
     def set_space_degree(self, p: int = 1) -> None:    
         self.p = p
 
     def linear_system(self, mesh, p):
         self.space= LagrangeFESpace(mesh, p=p)
-        self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
+        gd = self.pde.geo_dimension()
+        if gd == 2:
+            self.tspace = TensorFunctionSpace(self.space, shape=(2, -1))
+        elif gd == 3:
+            self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
 
         LDOF = self.tspace.number_of_local_dofs()
         GDOF = self.tspace.number_of_global_dofs()
@@ -46,12 +48,12 @@ class LinearElasticityLFEMModel(ComputationalModel):
 
         LEM = LinearElasticMaterial(
                                 name='E1nu025',
-                                lame_lambda=self.pde.lam(), shear_modulus=self.pde.mu(), 
-                                hypo='3D', device=bm.get_device(self.uh[:])
+                                lame_lambda=self.pde.lam, shear_modulus=self.pde.mu,
+                                hypo=self.pde.hypo, device=bm.get_device(self.uh[:])
                             )
         
         bform = BilinearForm(self.tspace)
-        LEI = LinearElasticIntegrator(
+        LEI = LinearElasticityIntegrator(
                                 material=LEM, q=self.p+3, method=None
                             )
         bform.add_integrator(LEI)
@@ -127,7 +129,6 @@ class LinearElasticityLFEMModel(ComputationalModel):
     @run.register("bisect")
     def run(self):
         pass
-
 
     @variantmethod("error")
     def postprocess(self):

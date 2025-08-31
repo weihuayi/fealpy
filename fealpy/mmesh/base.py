@@ -1,5 +1,6 @@
 from .config import *
 from .tool import _solve_quad_parametric_coords
+from ..decorator import variantmethod
 
 class MM_PREProcessor:
     def __init__(self,mesh:_U,space:_V,config:Config) -> None:
@@ -691,6 +692,7 @@ class MM_PREProcessor:
         Returns
             method: corresponding method object
         """
+        print(f"Getting method: {method_name}")
         if hasattr(self, method_name):
             return getattr(self, method_name)
         else:
@@ -705,47 +707,8 @@ class MM_monitor(MM_PREProcessor):
         self.alpha = config.alpha
         self.mol_times = config.mol_times
 
-        self.monitor = config.monitor
-        self.mol_meth = config.mol_meth
-
-    @property
-    def monitor(self):
-        return self._monitor_name
-
-    @monitor.setter
-    def monitor(self, name: str):
-        """
-        setting monitor and dynamically update _mot_meth
-        """
-        self._mot_meth = self._get_method(name)
-        self._monitor_name = name
-
-    @property
-    def mol_meth(self):
-        return self._mol_meth_name
-
-    @mol_meth.setter
-    def mol_meth(self, name: str):
-        """
-        setting mol_meth and dynamically update _mol_meth
-        """
-        self._mol_meth = self._get_method(name)
-        self._mol_meth_name = name
-
-    def mot(self):
-        """
-        manager of the monitor and mollification method
-        """
-        self._mot_meth() # monitor method
-        self._mol_meth() # mollification method
-
-    def mp_mot(self):
-        """
-        manager of the monitor and mollification method for multiphysics
-        """
-
-        self._mot_meth()
-        self._mol_meth()
+        # self.monitor = config.monitor
+        # self.mol_meth = config.mol_meth
     
     def _grad_uh(self):
         """
@@ -775,14 +738,16 @@ class MM_monitor(MM_PREProcessor):
         guh_incell = bm.einsum('cqid , cil -> cqld ',gphi,uh[pcell2dof])
         return guh_incell
 
-    def arc_length(self):
+    @variantmethod('arc_length')
+    def monitor(self):
         """
         arc length monitor
         """
         guh_incell = self._grad_uh()
         self.M = bm.sqrt(1 +  self.beta * bm.sum(guh_incell**2,axis=-1))
-
-    def arc_length_norm(self):
+        
+    @monitor.register('norm_arc_length')
+    def monitor(self):
         """
         normalized arc length monitor
         """
@@ -792,7 +757,8 @@ class MM_monitor(MM_PREProcessor):
             R = 1
         self.M = bm.sqrt(1 + self.beta * bm.sum(guh_incell**2,axis=-1)/R**2)
     
-    def mp_arc_length(self):
+    @monitor.register('mp_arc_length')
+    def monitor(self):
         """
         arc length monitor for multiphysics
         """
@@ -800,7 +766,8 @@ class MM_monitor(MM_PREProcessor):
         self.M = bm.sqrt(1 + 1/self.dim*bm.sum(self.beta[None,None,:]*
                                    bm.sum(guh_incell**2,axis=-1),axis=-1))
 
-    def matrix_normal(self):
+    @monitor.register('matrix_normal')
+    def monitor(self):
         """
         matrix normal monitor method
         """
@@ -825,7 +792,36 @@ class MM_monitor(MM_PREProcessor):
         self.M = lambda_1[...,None,None]*v[...,None,:]*v[...,None] + \
                  lambda_1[...,None,None]*v_orth[...,None,:]*v_orth[...,None] # NC,NQ,TD,TD
 
-    def heatequ(self):
+    @variantmethod('projector')
+    def mol_method(self):
+        """
+        projection operator mollification method
+        """
+        M = self.M
+        exp_nd = M.ndim - 2
+        cell2dof = self.cell2dof  # NC,NQ
+        sm = self.sm
+        d = self.d # NC,NQ
+        rm = self.rm
+        exp_sm = sm[(...,) + (None,) * exp_nd]
+        shape = (self.NN,) + (self.TD,) * exp_nd
+        phi = self.mspace.basis(self.bcs)
+        dphi = phi*rm*d[(...,) + (None,) *(3-d.ndim)]  # NC,NQ,...
+        M = M*rm*d[(...,) + (None,) * (2-d.ndim+exp_nd)]  # NC,NQ,...
+        M_node = bm.zeros(shape, **self.kwargs0)
+        for i in range(self.mol_times):
+            if i != 0:
+                M = bm.einsum('cqi,ci...->cq...', dphi, M_node[cell2dof])
+            M_incell = bm.einsum('cq...,q-> c...',M,self.ws)
+            M_node.fill(0)
+            M_node = bm.index_add(M_node, cell2dof, M_incell[:,None,...])
+            M_node /= exp_sm
+            
+        self.M = bm.einsum('cqi,ci...->cq...', phi, M_node[cell2dof])
+        self.M_node = M_node
+    
+    @mol_method.register('heat_equ')
+    def mol_method(self):
         """
         heat equation mollification method
         """
@@ -855,33 +851,6 @@ class MM_monitor(MM_PREProcessor):
             M = M_bar(self.bcs)
         self.M = M
 
-    def projector(self):
-        """
-        projection operator mollification method
-        """
-        M = self.M
-        exp_nd = M.ndim - 2
-        cell2dof = self.cell2dof  # NC,NQ
-        sm = self.sm
-        d = self.d # NC,NQ
-        rm = self.rm
-        exp_sm = sm[(...,) + (None,) * exp_nd]
-        shape = (self.NN,) + (self.TD,) * exp_nd
-        phi = self.mspace.basis(self.bcs)
-        dphi = phi*rm*d[(...,) + (None,) *(3-d.ndim)]  # NC,NQ,...
-        M = M*rm*d[(...,) + (None,) * (2-d.ndim+exp_nd)]  # NC,NQ,...
-        M_node = bm.zeros(shape, **self.kwargs0)
-        for i in range(self.mol_times):
-            if i != 0:
-                M = bm.einsum('cqi,ci...->cq...', dphi, M_node[cell2dof])
-            M_incell = bm.einsum('cq...,q-> c...',M,self.ws)
-            M_node.fill(0)
-            M_node = bm.index_add(M_node, cell2dof, M_incell[:,None,...])
-            M_node /= exp_sm
-            
-        self.M = bm.einsum('cqi,ci...->cq...', phi, M_node[cell2dof])
-        self.M_node = M_node
-
 
 class MM_Interpolater(MM_PREProcessor):
     def __init__(self, mesh,space, config: Config):
@@ -895,31 +864,9 @@ class MM_Interpolater(MM_PREProcessor):
         elif self.mesh_type == "QuadrangleMesh":
             self.interpolate_batch = self._quad_interpolate_batch
             self.high_order_batch = self._quad_high_order_interpolate
-    @property
-    def int_meth(self):
-        """
-        only for get the int_meth name
-        """
-        return self._int_meth_name
 
-    @int_meth.setter
-    def int_meth(self, name: str):
-        """
-        when int_meth is set, update _int_meth dynamically
-        """
-        self._int_meth = self._get_method(name)
-        self._int_meth_name = name
-
+    @variantmethod('comass')
     def interpolate(self,moved_node:TensorLike):
-        """
-        interpolate the solution,the method is determined by the int_meth
-        
-        Parameters
-            moved_node: TensorLike, new node positions
-        """
-        self.uh = self._int_meth(moved_node)
-
-    def comass(self,moved_node:TensorLike):
         """
         conservation of mass interpolation method
         
@@ -960,7 +907,8 @@ class MM_Interpolater(MM_PREProcessor):
         sol = bm.asarray(sol,**self.kwargs0)
         return sol
 
-    def linear_interpolate(self, moved_node: TensorLike):
+    @interpolate.register('linear')
+    def interpolate(self, moved_node: TensorLike):
         """
         linear interpolation method
         
@@ -1001,8 +949,8 @@ class MM_Interpolater(MM_PREProcessor):
             print(f"Warning: Maximum iterations reached ({max_iterations}) without full interpolation.")
         
         new_uh = self.high_order_batch(new_uh, p)  # 高阶插值处理
-        self.uh = new_uh
-
+        return new_uh
+        
     def _tri_interpolate_batch(self,nodes, cells,new_uh, interpolated,moved_node):
         """
         triangle mesh interpolation batch processing
@@ -1027,7 +975,8 @@ class MM_Interpolater(MM_PREProcessor):
         )
         v_b = moved_node[nodes] - self.node[self.cell[cells, 0]]
         
-        lam = bm.linalg.solve(v_matrix, v_b)
+        inv_matrix = bm.linalg.inv(v_matrix)
+        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
         lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
         valid = bm.all(lam > -1e-14, axis=-1) & ~interpolated[nodes]
         
@@ -1137,7 +1086,8 @@ class MM_Interpolater(MM_PREProcessor):
         
         return value
 
-    def mp_comass(self,moved_node:TensorLike):
+    @interpolate.register('mp_comass')
+    def interpolate(self,moved_node:TensorLike):
         """
         conservation of mass interpolation method for multiphysics
         
@@ -1177,7 +1127,8 @@ class MM_Interpolater(MM_PREProcessor):
             sol = bm.set_at(sol,(...,i),s)
         return sol
     
-    def solution(self,moved_node:TensorLike):
+    @interpolate.register('solution')
+    def interpolate(self,moved_node:TensorLike):
         """
         get the solution
         
@@ -1189,7 +1140,8 @@ class MM_Interpolater(MM_PREProcessor):
         pde = self.pde
         return pde.init_solution(moved_node)
     
-    def poisson(self,moved_node:TensorLike):
+    @interpolate.register('poisson')
+    def interpolate(self,moved_node:TensorLike):
         """
         poisson interpolation method
         
@@ -1217,7 +1169,8 @@ class MM_Interpolater(MM_PREProcessor):
         A, b = bc.apply(A, b)
         return spsolve(A, b, solver=self.solver)
     
-    def convect_diff(self,moved_node:TensorLike):
+    @interpolate.register('convect_diff')
+    def interpolate(self,moved_node:TensorLike):
         """
         convection diffusion interpolation method
         

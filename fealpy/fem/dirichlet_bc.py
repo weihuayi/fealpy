@@ -131,15 +131,19 @@ class DirichletBC():
         Returns:
             SparseTensor: New adjusted left-hand-size matrix.
         """
+       
         A = self.check_matrix(matrix) if check else matrix
         isDDof = self.is_boundary_dof
         kwargs = A.values_context()
         bdIdx = bm.zeros(A.shape[0], **kwargs)
-        # bdIdx[isDDof.reshape(-1)] = 1
         bdIdx = bm.set_at(bdIdx, isDDof.reshape(-1), 1)
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        A = D0@A@D0 + D1
+        if isinstance(A, COOTensor):
+            D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0], format='coo')
+        elif isinstance(A, CSRTensor):
+            D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0], format='csr')
+        #A = D0@A@D0 + D1
+        A = self._mul(A, D0) + D1 
         return A
 
     def apply_vector(self, vector: TensorLike, matrix: SparseTensor,
@@ -193,57 +197,114 @@ class DirichletBC():
         f = bm.set_at(f, bd_idx, uh[bd_idx])
         return f
 
+    def _mul(self, A, D0):
+        isDDof = self.is_boundary_dof
 
-    # def apply_for_vspace_with_scalar_basis(self, A, f, uh, dflag=None):
-    #     """
-    #     @brief 处理基由标量函数组合而成的向量函数空间的 Dirichlet 边界条件
+        if isinstance(A, COOTensor):
+            indices = A.indices
+            remove_flag = bm.logical_or(
+                isDDof[indices[0, :]], isDDof[indices[1, :]]
+            )
+            retain_flag = bm.logical_not(remove_flag)
+            new_indices = indices[:, retain_flag]
+            new_values = A.values[..., retain_flag]
+            return COOTensor(new_indices, new_values, A.sparse_shape)
 
-    #     @param[in]
+        elif isinstance(A, CSRTensor):
+            isIDof = bm.logical_not(isDDof)
+            crow, col, values = A.crow, A.col, A.values
+            indices_context = bm.context(col)
+            ZERO = bm.array([0], **indices_context)
 
-    #     """
-    #     space = self.space
-    #     assert isinstance(space, tuple) and not isinstance(space[0], tuple)
+            nnz_per_row = crow[1:] - crow[:-1]
+            remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col]
 
-    #     gD = self.gD
-    #     if dflag is None:
-    #         dflag = space[0].boundary_interpolate(gD, uh, threshold=self.threshold)
-    #     f = f - A@uh.flat # 注意这里不修改外界 f 的值
+            rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
+            nnz_per_row_new = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]]
+            nnz_per_row_new = nnz_per_row_new * isIDof
 
-    #     bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-    #     bdIdx[dflag.flat] = 1
-    #     D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-    #     D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-    #     A = D0@A@D0 + D1
-    #     f[dflag.flat] = uh.ravel()[dflag.flat]
-    #     return A, f
+            new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row_new], axis=0), axis=0)
+            new_col = col[remain_flag]
+            new_values = values[remain_flag]
+            return CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
+
+        else:
+            print(f"Warning: Matrix type {type(A)} is not optimized. "
+                  "Falling back to memory-intensive sparse multiplication.")
+            return D0 @ A @ D0
+
 
 
 # backup
-def apply_csr_matrix(A: CSRTensor, isDDof: TensorLike):
-    isIDof = bm.logical_not(isDDof)
-    crow = A.crow
-    col = A.col
-    indices_context = bm.context(col)
-    ZERO = bm.array([0], **indices_context)
+def apply_matrix(self, matrix: _ST, *, check=True) -> _ST:
+    """Apply Dirichlet boundary condition to left-hand-size matrix only.
 
-    nnz_per_row = crow[1:] - crow[:-1]
-    remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
-    rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
-    nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
+    Parameters:
+        matrix (SparseTensor): The original left-hand-size sparse matrix\
+            of the linear system.
+        check (bool, optional): Whether to check the matrix. Defaults to True.
 
-    new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
+    Returns:
+        SparseTensor: New adjusted left-hand-size matrix.
+    """
+    '''
+    A = self.check_matrix(matrix) if check else matrix
+    isDDof = self.is_boundary_dof
+    kwargs = A.values_context()
+    bdIdx = bm.zeros(A.shape[0], **kwargs)
+    # bdIdx[isDDof.reshape(-1)] = 1
+    bdIdx = bm.set_at(bdIdx, isDDof.reshape(-1), 1)
+    D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+    D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+    A = D0@A@D0 + D1
+    '''
+    A = self.check_matrix(matrix) if check else matrix
+    isDDof = self.is_boundary_dof
+    kwargs = A.values_context()
+    if isinstance(A, COOTensor):
+        indices = A.indices()
+        remove_flag = bm.logical_or(
+            isDDof[indices[0, :]], isDDof[indices[1, :]]
+        )
+        retain_flag = bm.logical_not(remove_flag)
+        new_indices = indices[:, retain_flag]
+        new_values = A.values()[..., retain_flag]
+        A = COOTensor(new_indices, new_values, A.sparse_shape)
 
-    NNZ = new_crow[-1]
-    non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
-    loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
-    non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
+        index = bm.nonzero(isDDof)[0]
+        shape = new_values.shape[:-1] + (len(index), )
+        one_values = bm.ones(shape, **kwargs)
+        one_indices = bm.stack([index, index], axis=0)
+        A1 = COOTensor(one_indices, one_values, A.sparse_shape)
+        A = A.add(A1).coalesce()
 
-    new_col = bm.empty((NNZ,), **indices_context)
-    new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], isDDof)
-    new_col = bm.set_at(new_col, non_diag, col[remain_flag])
+    elif isinstance(A, CSRTensor):
+        isIDof = bm.logical_not(isDDof)
+        crow = A.crow
+        col = A.col
+        indices_context = bm.context(col)
+        ZERO = bm.array([0], **indices_context)
 
-    new_values = bm.empty((NNZ,), **A.values_context())
-    new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
-    new_values = bm.set_at(new_values, non_diag, A.values[remain_flag])
+        nnz_per_row = crow[1:] - crow[:-1]
+        remain_flag = bm.repeat(isIDof, nnz_per_row) & isIDof[col] # 保留行列均为内部自由度的非零元素
+        rm_cumsum = bm.concat([ZERO, bm.cumsum(remain_flag, axis=0)], axis=0) # 被保留的非零元素数量累积
+        nnz_per_row = rm_cumsum[crow[1:]] - rm_cumsum[crow[:-1]] + isDDof # 计算每行的非零元素数量
 
-    return CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
+        new_crow = bm.cumsum(bm.concat([ZERO, nnz_per_row], axis=0), axis=0)
+
+        NNZ = new_crow[-1]
+        non_diag = bm.ones((NNZ,), dtype=bm.bool, device=bm.get_device(isDDof)) # Field: non-zero elements
+        loc_flag = bm.logical_and(new_crow[:-1] < NNZ, isDDof)
+        non_diag = bm.set_at(non_diag, new_crow[:-1][loc_flag], False)
+
+        new_col = bm.empty((NNZ,), **indices_context)
+        new_col = bm.set_at(new_col, new_crow[:-1][loc_flag], self.boundary_dof_index)
+        new_col = bm.set_at(new_col, non_diag, col[remain_flag])
+
+        new_values = bm.empty((NNZ,), **kwargs)
+        new_values = bm.set_at(new_values, new_crow[:-1][loc_flag], 1.)
+        new_values = bm.set_at(new_values, non_diag, A.values[remain_flag])
+
+        A = CSRTensor(new_crow, new_col, new_values, A.sparse_shape)
+    return A
+

@@ -46,7 +46,7 @@ To register a new model, add its file and class name here.
 The solver will dynamically load it using this registry.
 """
 DATA_TABLE = {
-    "spherical_shell": ("spherical_shell_case", "SphericalShellIonFlowData"),
-    # "parallel_plate": ("parallel_plate_case", "ParallelPlateIonFlowData"),
+    1: ("exp0001", "Exp0001")
+    
 }
 

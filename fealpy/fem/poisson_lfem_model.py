@@ -1,7 +1,7 @@
 from typing import Optional, Union
 from ..backend import bm
 from ..typing import TensorLike
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.poisson import PoissonPDEDataT
 from ..decorator import variantmethod
 
@@ -9,13 +9,14 @@ from ..decorator import variantmethod
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
 from ..fem import ScalarDiffusionIntegrator, ScalarSourceIntegrator
+from  . import RecoveryAlg
 
 class PoissonLFEMModel(ComputationalModel):
     """
     """
     def __init__(self):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("poisson")
+        self.pdm = PDEModelManager("poisson")
 
     def set_pde(self, pde: Union[PoissonPDEDataT, str]="coscos"):
         """
@@ -124,11 +125,75 @@ class PoissonLFEMModel(ComputationalModel):
                 self.logger.info(f"Refining mesh {i+1}/{maxit}.")
                 self.mesh.uniform_refine()
 
+    @run.register("h1_afem")
+    def run(self, theta=0.95, maxit=6):
+        for i in range(maxit):
+            A, F = self.linear_system(self.mesh, self.p)
+            A, F = self.apply_bc(A, F)
+            self.uh[:] = self.solve(A, F)
+            l2, h1 = self.postprocess()
+            self.logger.info(f"{i}-th step with  L2 Error: {l2},  H1 Error: {h1}.")
+            if i < maxit - 1:
+                self.logger.info(f"Refining mesh {i+1}/{maxit}.")
+                error = self.mesh.error(self.pde.gradient, 
+                                        self.uh.grad_value,
+                                        celltype=True) ** 2
+                indice = bm.argsort(-error)  
+                cum_ratio = bm.cumsum(error[indice], axis=0) / bm.sum(error)
+                mask = cum_ratio >= theta**2
+                idx = bm.nonzero(mask)[0][0] + 1
+                isMark = bm.zeros_like(indice, dtype=bm.bool)
+                isMark = bm.set_at(isMark, indice[:idx], True)
+                self.mesh.bisect(isMark)
 
-    @run.register("bisect")
-    def run(self):
-        pass
+    @run.register("res_afem")
+    def run(self, theta=0.95, maxit=6):
+        for i in range(maxit):
+            A, F = self.linear_system(self.mesh, self.p)
+            A, F = self.apply_bc(A, F)
+            self.uh[:] = self.solve(A, F)
+            l2, h1 = self.postprocess()
+            self.logger.info(f"{i}-th step with  L2 Error: {l2},  H1 Error: {h1}.")
+            if i < maxit - 1:
+                self.logger.info(f"Refining mesh {i+1}/{maxit}.")
+                bcs = bm.array([[1/3,1/3,1/3]], dtype=bm.float64)
+                nu = self.mesh.edge_unit_normal()                
+                grad = self.uh.grad_value(bcs)
+                edge2cell = self.mesh.edge_to_cell()
+                res_grad = grad[edge2cell[:, 0]] - grad[edge2cell[:, 1]]
+                dot = bm.einsum('cqn, cn -> cq', res_grad, nu).reshape(-1)
+                len = self.mesh.entity_measure('edge')
+                bd_edge = self.mesh.boundary_edge_flag()
+                edge_error = (dot * len)**2 * ~bd_edge         
+                cell2edge = self.mesh.cell_to_edge()
+                error = bm.sum(edge_error[cell2edge], axis=-1) 
+                indice = bm.argsort(-error)  
+                cum_ratio = bm.cumsum(error[indice], axis=0) / bm.sum(error)
+                mask = cum_ratio >= theta**2
+                idx = bm.nonzero(mask)[0][0] + 1
+                isMark = bm.zeros_like(indice, dtype=bm.bool)
+                isMark = bm.set_at(isMark, indice[:idx], True)
+                self.mesh.bisect(isMark)
 
+    @run.register("recovery_afem")
+    def run(self, theta=0.95, maxit=6, method='simple'):
+        for i in range(maxit):
+            A, F = self.linear_system(self.mesh, self.p)
+            A, F = self.apply_bc(A, F)
+            self.uh[:] = self.solve(A, F)
+            l2, h1 = self.postprocess()
+            self.logger.info(f"{i}-th step with  L2 Error: {l2},  H1 Error: {h1}.")
+            if i < maxit - 1:
+                self.logger.info(f"Refining mesh {i+1}/{maxit}.")
+                alg = RecoveryAlg()
+                error = alg.recovery_estimate(self.uh, method=method)
+                indice = bm.argsort(-error)  
+                cum_ratio = bm.cumsum(error[indice], axis=0) / bm.sum(error)
+                mask = cum_ratio >= theta**2
+                idx = bm.nonzero(mask)[0][0]
+                isMark = bm.zeros_like(indice, dtype=bm.bool)
+                isMark = bm.set_at(isMark, indice[:idx], True)
+                self.mesh.bisect(isMark)
 
     @variantmethod("error")
     def postprocess(self):

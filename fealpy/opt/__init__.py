@@ -8,7 +8,7 @@ from .swarm_based import (AntColonyOptAlg, ArtificialRabbitsOpt, BlackwingedKite
                           GreyWolfOpt, HarrisHawksOpt, HippopotamusOptAlg, HoneybadgerAlg, 
                           JellyfishSearchOpt, MarinePredatorsAlg, ParticleSwarmOpt, 
                           StarFishOptAlg, SandCatSwarmOpt, SeagullOptAlg, SparrowSearchAlg, SquirrelSearchAlg, 
-                          WhaleOptAlg, ZebraOptAlg)
+                          TIS_MarinePredatorsAlg, WhaleOptAlg, ZebraOptAlg)
 from .opt_function import levy, initialize
 from .physics_based import RimeOptAlg, SnowAblationOpt, QuantumParticleSwarmOpt
 from .improved import (CuckooQuantumParticleSwarmOpt, DifferentialSquirrelSearchAlg, 
@@ -17,10 +17,10 @@ from .improved import (CuckooQuantumParticleSwarmOpt, DifferentialSquirrelSearch
 from .music_based import HarmonySearchAlg
 from .math_based import ExponentialTrigonometricOptAlg, SineCosineAlg
 from .human_based import DifferentialtedCreativeSearch, TeachingLearningBasedAlg
-from .bio_based import PlantRhizomeGrowthBasedOpt, InvasiveWeedOpt
+from .bio_based import AnimatedOatOpt, PlantRhizomeGrowthBasedOpt, InvasiveWeedOpt
 from .chaos import *
 from .evolutionary_based import (GeneticAlg, DifferentialEvolution)
 from .PLBFGSAlg import PLBFGS
 from .PNLCGAlg import PNLCG
 from .GradientDescentAlg import GradientDescent
-from .multi_quantum_particle_swarm_opt import MO_QuantumParticleSwarmOpt
+from .multi_opt import MO_QuantumParticleSwarmOpt, NondominatedSortingGeneticAlgIII

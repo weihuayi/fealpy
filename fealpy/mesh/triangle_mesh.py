@@ -66,10 +66,7 @@ class TriangleMesh(SimplexMesh, Plotable):
                 return bm.sqrt(bm.sum(nv ** 2, axis=1)) / 2.0
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
-    
-    def reference_cell_measure(self):
-        return 0.5
-    
+  
     # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
                            qtype: str='legendre'): # TODO: other qtype
@@ -1139,7 +1136,20 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @brief 找到定点 point 所在的单元，并计算其重心坐标 
         """
-        pass
+        index = self.location(point)
+        node = self.node
+        cell = self.entity('cell')
+        cm = self.cell_area()[index]
+        point = point[:, bm.newaxis, :]
+        v = node[cell[index]] - point
+        a0 = 0.5 * bm.abs(bm.cross(v[:, 1, :], v[:, 2, :]))
+        a1 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 2, :]))
+        a2 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 1, :]))
+        result = bm.zeros((index.shape[0], 3))
+        result[:, 0] = a0 / cm
+        result[:, 1] = a1 / cm
+        result[:, 2] = a2 / cm
+        return index, result
 
     def mark_interface_cell(self, phi):
         """
@@ -1168,18 +1178,91 @@ class TriangleMesh(SimplexMesh, Plotable):
         pass
 
     @classmethod
-    def show_lattice(cls, p=1, shownltiindex=False):
+    def show_lattice(cls, p=1, showmultiindex=False):
         """
         @berif 展示三角形上的单纯形格点
         """
-        pass
+        import matplotlib.pyplot as plt
+        import matplotlib.tri as mtri
+        if showmultiindex:
+            n = 3
+        else:
+            n = 2
+
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
+        node = mesh.entity('node')
+        ips = mesh.interpolation_points(p)
+        c2p = mesh.cell_to_ipoint(p)
+        ips = ips[c2p].reshape(-1, 2)
+
+        fig = plt.figure()
+        axes = fig.add_subplot(1, n, 1)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True, fontcolor='k')
+
+        axes = fig.add_subplot(1, n, 2)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, node=ips, showindex=True)
+        triangulation = mtri.Triangulation(ips[:, 0], ips[:, 1])
+        axes.triplot(triangulation, color='black', linestyle='dashed')
+        plt.show()
+
 
     @classmethod
     def show_shape_function(cls, p=1, funtype='L'):
         """
         @brief 可视化展示三角形单元上的 p 次基函数
         """
-        pass
+        import matplotlib.pyplot as plt
+
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
+        TD = mesh.top_dimension()
+        ldof = mesh.number_of_local_ipoints(p)
+
+        if p % 2 == 0:
+            m = (p + 2) // 2
+            n = p + 1
+        else:
+            m = (p + 1) // 2
+            n = p + 2
+
+        node = mesh.entity('node')
+        ips = mesh.interpolation_points(p)
+        c2p = mesh.cell_to_ipoint(p)
+        ips = ips[c2p].reshape(-1, 2)
+        bcs = mesh.multi_index_matrix(10 * p, TD) / 10 / p
+        ps = mesh.bc_to_point(bcs).reshape(len(bcs), -1)
+        if funtype == 'L':
+            phi = mesh.shape_function(bcs, p)
+        elif funtype == 'B':
+            phi = mesh._bernstein_shape_function(bcs, p)
+        fig = plt.figure()
+        for i in range(ldof):
+            axes = fig.add_subplot(m, n, i + 1, projection='3d')
+            axes.plot_trisurf(node[:, 0], node[:, 1], bm.zeros(3),
+                              color='#99BBF6', alpha=0.5)
+
+            for j in range(3):
+                axes.scatter(node[j, 0], node[j, 1], 0.0, color='k')
+                axes.text(node[j, 0], node[j, 1], 0.0, f'$x_{j}$', color='k')
+
+            axes.scatter(ips[i, 0], ips[i, 1], 1.0, color='r')
+            axes.text(ips[i, 0], ips[i, 1], 1 + 0.02, f'$p_{i}$', color='r')
+
+            axes.plot([ips[i, 0], ips[i, 0]], [ips[i, 1], ips[i, 1]], [0.0,
+                                                                       1.0], 'r--')
+
+            axes.plot_trisurf(ps[:, 0], ps[:, 1], phi[:, i], cmap='viridis',
+                              linewidths=0)
+            if p == 1:
+                axes.set_title(f'$\\phi_{{{i}}}=\\lambda_{{{i}}}$')
+            else:
+                axes.set_title(f'$\\phi_{{{i}}}$')
+            axes.set_xlabel('X')
+            axes.set_ylabel('Y')
+            axes.set_zlabel('Z')
+        plt.show()
+
 
     @classmethod
     def show_global_basis_function(cls, p=3):
@@ -1201,6 +1284,27 @@ class TriangleMesh(SimplexMesh, Plotable):
                 [1.0, 0.0],
                 [0.0, 1.0]], dtype=bm.float64)
         cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
+        return cls(node, cell)
+
+    @classmethod
+    def from_one_hexagon(cls):
+        t = bm.sqrt(3)/2.0
+        node = bm.array([
+            [ 0.0, 0.0], #0
+            [ 1.0, 0.0], #1
+            [ 0.5,   t], #2
+            [-0.5,   t], #3
+            [-1.0, 0.0], #4
+            [-0.5,  -t], #5
+            [ 0.5,  -t]  #6
+            ], dtype=bm.float64)
+        cell = bm.array([
+            [0, 1, 2],
+            [0, 2, 3],
+            [0, 3, 4], 
+            [0, 4, 5],
+            [0, 5, 6],
+            [0, 6, 1]], dtype=bm.int32)
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
@@ -1374,6 +1478,15 @@ class TriangleMesh(SimplexMesh, Plotable):
         print(f"Number of cells: {cell.shape[0]}")
 
         return cls(node, cell)
+
+    @classmethod
+    def from_box_with_circular_holes(cls, 
+                                     box=[0, 1, 0, 1], 
+                                     holes=[[0.5, 0.5, 0.1]], h=0.1): 
+        """
+        """
+        import gmsh
+        pass
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -1591,7 +1704,16 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def to_vtk(self, fname=None, etype='cell', index: Index=_S):
         """
-        @brief 把网格转化为 vtk 的数据格式
+        Export the mesh to VTK format. 
+
+        Parameters:
+            fname (str): File name to save the mesh in VTK format. If None, returns the data instead.
+            etype (str): Type of entity to export ('cell' or 'face').
+            index (Index): Index of the entities to export. Default is all entities.
+
+        Returns:
+            If fname is None, returns the node coordinates, cell connectivity, cell type, and number of cells.
+            Otherwise, writes the mesh to a VTK file.
         """
         from .vtk_extent import  write_to_vtu
 

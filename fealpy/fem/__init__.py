@@ -23,6 +23,11 @@ from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 from .mthlaplace_integrator import MthLaplaceIntegrator
 from .mass_integrator import MassIntegrator
+from .diffusion_integrator import DiffusionIntegrator
+from .optimal_control_integrator import OPCIntegrator
+from .optimal_control_source_integrator import OPCSIntegrator
+from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
+from .jump_penalty_intergrator import JumpPenaltyIntergrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -54,9 +59,17 @@ from .recovery_alg import RecoveryAlg
 ### Other
 from .nonlinear_wrapper import NonlinearWrapperInt
 
-### solver
+### computational model 
 from .poisson_lfem_model import PoissonLFEMModel
 from .level_set_lfem_model import LevelSetLFEMModel, LevelSetReinitModel
 from .interface_poisson_lfem_model import InterfacePoissonLFEMModel
-from .polyharmonic_cr_fem_model import PolyharmonicCrFEMModel
+from .elliptic_mixed_fem_model import EllipticMixedFEMModel
+from .allencahn_lfem_model import AllenCahnLFEMModel
+from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
+from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
+from .helmholtz_lfem_model import HelmholtzLFEMModel
+from .curlcurl_lfem_model import CurlCurlLFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+from .stokes_lfem_model import StokesLFEMModel
+from .dld_microfluidic_chip_lfem_model import DLDMicrofluidicChipLFEMModel
+

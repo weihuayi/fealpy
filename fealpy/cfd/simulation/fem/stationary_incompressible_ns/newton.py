@@ -1,26 +1,14 @@
-from .....backend import backend_manager as bm
-from .....backend import TensorLike
-from .....fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
-from .....fem import DirichletBC
-from .....fem import (ScalarMassIntegrator, FluidBoundaryFrictionIntegrator,
-                     ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
-                     ViscousWorkIntegrator, SourceIntegrator, BoundaryFaceSourceIntegrator)
-from .....decorator import barycentric
+from fealpy.backend import backend_manager as bm
+from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
+from fealpy.fem import (ScalarMassIntegrator,ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
+                     ViscousWorkIntegrator, SourceIntegrator)
+from fealpy.decorator import barycentric
 
-from ..fem_base import FEM
-from ...simulation_base import SimulationBase, SimulationParameters
-from .....solver import spsolve
+from ..iterative_method import IterativeMethod 
 
-
-class Newton(FEM):
+class Newton(IterativeMethod):
     """Newton Interative Method""" 
     
-    def __init__(self, equation):
-        FEM.__init__(self, equation)
-
-    def simulation(self):
-        return newton_simulation(self)
-
     def BForm(self):
         pspace = self.pspace
         uspace = self.uspace
@@ -29,8 +17,14 @@ class Newton(FEM):
         A00 = BilinearForm(uspace)
         self.u_BM_netwon = ScalarMassIntegrator(q=q)
         self.u_BC = ScalarConvectionIntegrator(q=q)
-        self.u_BVW = ScalarDiffusionIntegrator(q=q)
-        #self.u_BVW = ViscousWorkIntegrator(q=q)
+
+        if self.equation.constitutive.value == 1:
+            self.u_BVW = ScalarDiffusionIntegrator(q=q)
+        elif self.equation.constitutive.value == 2:
+            self.u_BVW = ViscousWorkIntegrator(q=q)
+        else:
+            raise ValueError(f"未知的粘性模型")
+        
         A00.add_integrator(self.u_BM_netwon)
         A00.add_integrator(self.u_BC)
         A00.add_integrator(self.u_BVW)
@@ -39,9 +33,7 @@ class Newton(FEM):
         self.u_BPW = PressWorkIntegrator(q=q)
         A01.add_integrator(self.u_BPW)
        
-        A11 = BilinearForm(pspace)
-        A11.add_integrator(ScalarMassIntegrator(coef=1e-10))
-        A = BlockForm([[A00, A01], [A01.T, A11]]) 
+        A = BlockForm([[A00, A01], [A01.T, None]]) 
         return A
         
     def LForm(self):
@@ -67,7 +59,7 @@ class Newton(FEM):
         
         ## BilinearForm
         self.u_BVW.coef = cv
-        self.u_BPW.coef = -1
+        self.u_BPW.coef = -pc
 
         @barycentric
         def u_BC_coef(bcs, index):
