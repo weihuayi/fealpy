@@ -12,7 +12,7 @@ uav(
     opt_alg = "AnimatedOatOpt"
 )
 
-WORLD_GRAPH.output_node(
+WORLD_GRAPH.output(
     PATH=uav().PATH,
     Distance=uav().Distance
 )

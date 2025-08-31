@@ -35,7 +35,7 @@ solver(
     x0=dbc().uh
 )
 # 最终连接到图输出节点上
-WORLD_GRAPH.output_node(mesh=mesher(), uh=solver())
+WORLD_GRAPH.output(mesh=mesher(), uh=solver())
 
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

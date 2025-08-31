@@ -12,7 +12,7 @@ mesher(input_mesh=mesher_origin())
 
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output_node(boundary_mesh=mesher().boundary_mesh,
+WORLD_GRAPH.output(boundary_mesh=mesher().boundary_mesh,
                         node_idx=mesher().face_idx, face_idx=mesher().face_idx)
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
