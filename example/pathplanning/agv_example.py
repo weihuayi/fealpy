@@ -1,5 +1,5 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.opt.pathplanning import PathPlanning
+from fealpy.pathplanning.model import PathPlanningModelManager
 from fealpy.opt import ParticleSwarmOpt
 
 # bm.set_backend('pytorch')
@@ -11,8 +11,7 @@ from fealpy.opt import ParticleSwarmOpt
 #[ …………   …………       ………… ]
 #[[0,19] [1,19]…………[19,19]]
 
-
-
+# 1. 建立地图
 MAP = bm.array([[0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0],
                 [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0],
                 [1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0],
@@ -34,11 +33,23 @@ MAP = bm.array([[0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0],
                 [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1],
                 [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
 
-#起点终点坐标
+# 2. 起点终点坐标
 dataS = (0, 0)
 dataE = (19, 19)
 
-pathplanner = PathPlanning(MAP, dataS, dataE, ParticleSwarmOpt)
-pathplanner.solve()
+# 3. 实例化模型
+options = {
+    'MAP': MAP,
+    'start_point': dataS,
+    'end_point': dataE,
+    'opt_alg': ParticleSwarmOpt
+}
+manager = PathPlanningModelManager('route_planning')
+pathplanner = manager.get_example(2, **options)
+
+# 4. 优化
+pathplanner.solver()
+
+# 5. 输出
 pathplanner.print_results()
-pathplanner.visualize()
+pathplanner.visualization()

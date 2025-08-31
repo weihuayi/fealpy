@@ -1,11 +1,11 @@
-from ...backend import backend_manager as bm
-from ...opt import *
-from ...opt.optimizer_base import opt_alg_options
+from ....backend import backend_manager as bm
+from ....opt import *
+from ....opt.optimizer_base import opt_alg_options
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from scipy.interpolate import UnivariateSpline
 
-class UAVPathPlanning():
+class UAV3D():
     """
     UAVPathPlanning encapsulates the entire UAV path planning process in a 3D environment with terrain data and threat avoidance.
 
@@ -25,17 +25,18 @@ class UAVPathPlanning():
         X, Y (Tensor): Meshgrid coordinates for terrain surface.
         ax (matplotlib.axes._subplots.Axes3DSubplot): 3D plot axis, initialized during plotting.
     """
-    def __init__(self, threats, terrain_data, start_pos, end_pos, opt_method):
-        self.threats = threats
-        self.terrain_data = terrain_data
-        self.start_pos = start_pos
-        self.end_pos = end_pos
-        self.opt_method = opt_method
-        self.MAPSIZE_X = terrain_data.shape[1]
-        self.MAPSIZE_Y = terrain_data.shape[0]
+    def __init__(self, options):
+        self.options = options
+        self.threats = options['threats']
+        self.terrain_data = options['terrain_data']
+        self.start_pos = options['start_pos']
+        self.end_pos = options['end_pos']
+        self.opt_method = options['opt_method']
+        self.MAPSIZE_X = self.terrain_data.shape[1]
+        self.MAPSIZE_Y = self.terrain_data.shape[0]
         self.X, self.Y = bm.meshgrid(bm.arange(self.MAPSIZE_X), bm.arange(self.MAPSIZE_Y))
     
-    def plot_mode(self):
+    def plot_model(self):
         """
         Plots the terrain surface along with all defined threats (as vertical cylinders).
 
@@ -81,7 +82,7 @@ class UAVPathPlanning():
         self.ax.set_facecolor('white')
         plt.tight_layout()
 
-    def plot_solution(self, sol, smooth=1):
+    def visualization(self, sol, smooth=1):
         """
         Visualizes the optimized UAV path over the 3D environment.
 
@@ -89,7 +90,7 @@ class UAVPathPlanning():
             sol (Tensor): Optimized solution from the optimizer, of shape (1, 3*n).
             smooth (float): Spline smoothing parameter in [0, 1]. Default is 1 (interpolation).
         """
-        self.plot_mode()
+        self.plot_model()
         x, y, z, _ = self.spherical_to_cart(sol)
         x_all = bm.concatenate(
             [
@@ -112,6 +113,15 @@ class UAVPathPlanning():
                 bm.array([[self.end_pos[2]]])
             ], axis=1
         )
+
+        route = bm.stack([x_all, y_all, z_all], axis=-1).squeeze()
+        diff = route[:-1] - route[1:]
+        total_distance = bm.sum(bm.linalg.norm(diff, axis=1))
+
+        print('UAV Route: ')
+        print(route)
+        print('Total Route Distance: ', total_distance)
+
         H = self.terrain_data
         y_index = bm.round(y_all).astype(int)
         x_index = bm.round(x_all).astype(int)
@@ -133,15 +143,13 @@ class UAVPathPlanning():
             linewidth=1,     
             marker=None,      
         )
-        h1 = self.ax.plot([x_all[0]], [y_all[0]], [z_all[0]],
-                    'go', markersize=7, markerfacecolor='g', label='Start')[0]
-        h2 = self.ax.plot([x_all[-1]], [y_all[-1]], [z_all[-1]],
-                    'p', color='r', markersize=7, markerfacecolor='r', label='End')[0]
+        self.ax.scatter([x_all[0][0]], [y_all[0][0]], [z_all[0][0]], color='blue', label='Start')
+        self.ax.scatter([x_all[-1][-1]], [y_all[-1][-1]], [z_all[-1][-1]], color='red', label='End')
         self.ax.legend(loc='upper right') 
         plt.show()
 
 
-    def opt(self, n):
+    def solver(self, n):
         """
         Performs the UAV trajectory optimization process.
 
@@ -361,7 +369,7 @@ class UAVPathPlanning():
         Parameters:
             angle_range (float): Maximum allowed deviation from initial direction, default is pi/4.
         """
-        r_max = 2 * bm.linalg.norm(self.start_pos - self.end_pos) / self.n
+        r_max = bm.linalg.norm(self.start_pos - self.end_pos) 
         r_min = 0
         psi_max = angle_range
         psi_min = -angle_range
