@@ -112,8 +112,6 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         sidx = bm.where(isCSNode)[0]
         rmap = bm.zeros(NN, dtype=self.itype)
         smap = bm.zeros(NN, dtype=self.itype)
-        rmap = bm.set_at(rmap, ridx, bm.arange(ridx.shape[0], dtype=self.itype))
-        smap = bm.set_at(smap, sidx, bm.arange(sidx.shape[0], dtype=self.itype))
 
         I = smap[redges[isRBE2, 1]]
         J = rmap[redges[isRBE2, 0]]
@@ -206,14 +204,14 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         from scipy.sparse import csr_matrix
 
         shaft_system = loadmat(self.options['shaft_system_file'])
-        S = shaft_system['stiffness_total_system_spectrum']
+        S = shaft_system['stiffness_total_system']
         M = shaft_system['mass_total_system']
         layout = shaft_system['component_bearing_layout'][:, 1:]
         section = shaft_system['order_section_shaft']
 
         self.logger.info(
-                f"Sucsess load shaft system from {self.options['shaft_system_file']}"
-                f"shaft system stiffness matrix: {S.shape}"
+                f"Sucsess load shaft system from {self.options['shaft_system_file']}\n"
+                f"shaft system stiffness matrix: {S.shape}\n"
                 f"shaft system mass matrix: {M.shape}")
         # the total number of nodes in the shaft system
         NN = int(section[1].sum())  
@@ -221,7 +219,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         # offset for the nodes in each shaft section 
         offset = [0] + [int(a) for a in bm.cumsum(section[1])]  
         self.logger.info(
-                f"Number of nodes in the shaft system: {NN}"
+                f"Number of nodes in the shaft system: {NN}\n"
                 f"Offset for the nodes: {offset}")
 
         nidmap = self.mesh.data['nidmap']
@@ -232,7 +230,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         # gearbox shell model
         isCNode = bm.zeros(NN, dtype=bm.bool)
         for i, j in layout[:, :2]:
-            idx = imap[f"{i:.1f}"] + int(j) - 1
+            idx = offset[imap[f"{i:.1f}"]] + int(j) - 1
             isCNode[idx] = True
         self.logger.info(f"Number of coupling nodes: {bm.sum(isCNode)}")
 
@@ -253,7 +251,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         M01 = M0[:, isCDof]
         M11 = M1[:, isCDof]
         self.logger.info(
-                f"shaft system stiffness matrix: {S00.shape}, {S01.shape}, {S11.shape}"
+                f"shaft system stiffness matrix: {S00.shape}, {S01.shape}, {S11.shape}\n"
                 f"shaft system mass matrix: {M00.shape}, {M01.shape}, {M11.shape}")
 
         # the flag of the coupling nodes in the gearbox shell model
@@ -304,17 +302,17 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         self.logger.info(f"Global system: {S.shape}, {M.shape}")
 
-        S = PETSc.Mat().createAIJ(
+        PS = PETSc.Mat().createAIJ(
                 size=S.shape, 
                 csr=(S.indptr, S.indices, S.data))
-        S.assemble()
-        M = PETSc.Mat().createAIJ(
+        PS.assemble()
+        PM = PETSc.Mat().createAIJ(
                 size=M.shape, 
                 csr=(M.indptr, M.indices, M.data))
-        M.assemble()
+        PM.assemble()
 
         eps = SLEPc.EPS().create()
-        eps.setOperators(S, M)
+        eps.setOperators(PS, PM)
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
 
         eps.setTolerances(tol=1e-6, max_it=10000)
@@ -322,7 +320,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         st = eps.getST()
         st.setType(SLEPc.ST.Type.SINVERT)
-        st.setShift(0.0)  # 目标 shift，通常为目标最小特征值附近
+        st.setShift(1e+7)  # 目标 shift，通常为目标最小特征值附近
 
         ksp = st.getKSP()
         ksp.setTolerances(rtol=1e-8, atol=1e-08, max_it=1000)
@@ -350,8 +348,8 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
             val = eps.getEigenpair(i, vr, vi)
             eigvals.append(val.real)
             eigvecs.append(vr.getArray().copy())
-        val = bm.array(eigvals)
-        self.logger.info(f"Eigenvalues: {val}")
+        eigvals = bm.array(eigvals)
+        self.logger.info(f"Eigenvalues: {eigvals}")
 
         # transform the eigenvectors to the original node index
         NN = self.mesh.number_of_nodes()
@@ -362,13 +360,23 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         vec = [] 
         for i, val in enumerate(eigvecs):
             phi = bm.zeros((NN * 3,), dtype=self.ftype)
-            phi = bm.set_at(phi, isFreeDof, val[:N0])
+            idx, = bm.where(isFreeDof)
+            phi = bm.set_at(phi, idx, val[N0:N0 + N1])
             # transform the dof values of coupling nodes to surface nodes
             # constrained by the coupling nodes.
-            phi = bm.set_at(phi, isCSDof, self.G @ val[N0 + N1:])
+            idx, = bm.where(isCSDof)
+            phi = bm.set_at(phi, idx, self.G @ val[N0 + N1:])
             phi = phi.reshape((NN, 3))
             # put into the mesh node data 
-            self.mesh.nodedata[f'eigenvalue{val[i]}'] = phi
+            self.mesh.nodedata[f'eigenvalue-{i}-{eigvals[i]:0.5e}'] = phi
+
+        # check the correctness of the eigenvectors
+        ne = len(eigvals)
+        for i in range(len(eigvecs)):
+            for j in range(i+1):
+                v1 = bm.array(eigvecs[i], dtype=self.ftype)
+                v2 = bm.array(eigvecs[j], dtype=self.ftype)
+                print(f"Eigenvector {i} and {j} dot product: {bm.dot(v1, M @ v2)}")
 
 
     def post_process(self, fname: str="eigen.vtu") -> None:

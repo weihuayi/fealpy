@@ -60,7 +60,7 @@ class Exp0001(BoxMesher2d):
         self.box = [0.0, 1.0, 0.0, 1.0]
         self.eps = 1e-10
         self.mu = 1.0
-        self.rho = 1.0
+        self.rho = 2.0
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
         super().__init__(box=self.box)
 
@@ -69,14 +69,17 @@ class Exp0001(BoxMesher2d):
         s = f"{self.__class__.__name__}(\n"
         s += f"  problem            : 2D stationary incompressible Navier-Stokes\n"
         s += f"  domain             : {self.box}\n"
-        # s += f"  mesh size          : nx = {self.nx}, ny = {self.ny}\n"
         s += f"  density (ρ)        : {self.rho}\n"
         s += f"  viscosity (μ)      : {self.mu}\n"
-        s += f"  velocity_x   : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
-        s += f"  velocity_y   : u_2(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²\n"
-        s += f"  pressure     : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
+        s += f"  velocity_x         : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
+        s += f"  velocity_y         : u_2(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²\n"
+        s += f"  pressure           : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
         s += f")"
         return s
+    
+    def domain(self) -> Sequence[float]:
+        """Return the computational domain [xmin, xmax, ymin, ymax]."""
+        return self.box
  
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
