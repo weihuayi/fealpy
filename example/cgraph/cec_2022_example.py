@@ -12,7 +12,7 @@ cec_2022(
     MaxIT=1000
 ) 
 
-WORLD_GRAPH.output_node(
+WORLD_GRAPH.output(
     Optimal_sol=cec_2022().Optimal_sol, 
     Optimal_val=cec_2022().Optimal_val
 )
