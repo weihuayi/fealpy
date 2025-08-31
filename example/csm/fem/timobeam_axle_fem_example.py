@@ -39,7 +39,6 @@ parser.add_argument('--axle_nu',
                     default=-0.5, type=float,
                     help='Type of mesh, default is the axle Poisson ratio')
 
-
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True')
@@ -53,9 +52,9 @@ options = vars(parser.parse_args())
 from fealpy.backend import backend_manager as bm
 bm.set_backend(options['backend'])
 
-from fealpy.csm.fem import TimoshenkoBeamModel
-model = TimoshenkoBeamModel(options)
+from fealpy.csm.fem import TimobeamAxleModel
+model = TimobeamAxleModel(options)
 model.__str__()
-# model.timo_beam_system()
+model.timo_axle_system()
 model.solve()
 # print("u", model.solve())
