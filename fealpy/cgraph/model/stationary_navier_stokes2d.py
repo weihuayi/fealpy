@@ -5,20 +5,27 @@ __all__ = ["StationaryNS2d"]
 
 class StationaryNS2d(CNodeType):
     TITLE: str = "Stationary NS 2D"
-    PATH: str = "model.navier_stokes"
-    INPUT_SLOTS = [
-        PortConf("rho", DataType.FLOAT, default=1.0, min_val=0.0, desc="密度参数"),
-        PortConf("mu", DataType.FLOAT, default=1.0, min_val=0.0, desc="粘性系数")
-    ]
+    PATH: str = "cfd.model.test.stationary_navier_stokes"
+    INPUT_SLOTS = []
     OUTPUT_SLOTS = [
-        PortConf("pde", DataType.NONE)
+        PortConf("mu", DataType.FLOAT),
+        PortConf("rho", DataType.FLOAT),
+        PortConf("domain", DataType.DOMAIN),
+        PortConf("velocity", DataType.FUNCTION),
+        PortConf("pressure", DataType.FUNCTION),
+        PortConf("source", DataType.FUNCTION),
+        PortConf("velocity_dirichlet", DataType.FUNCTION),
+        PortConf("pressure_dirichlet", DataType.FUNCTION),
+        PortConf("is_velocity_boundary", DataType.FUNCTION),
+        PortConf("is_pressure_boundary", DataType.FUNCTION)
     ]
 
     @staticmethod
-    def run(rho: float = 1.0, mu: float = 1.0) -> Union[object]:
-        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.stationary_incompressible_navier_stokes_2d import FromSympy
+    def run() -> Union[object]:
+        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.exp0001 import Exp0001
 
-        model = FromSympy(rho=rho, mu=mu)
-        model.select_pde["poly2d"]()
-
-        return model
+        model = Exp0001()
+        return (model.mu, model.rho, model.domain()) + tuple(
+            getattr(model, name)
+            for name in ["velocity", "pressure", "source", "velocity_dirichlet", "pressure_dirichlet", "is_velocity_boundary", "is_pressure_boundary"]
+        )

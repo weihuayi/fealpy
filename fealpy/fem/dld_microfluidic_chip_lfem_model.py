@@ -80,7 +80,27 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             x = p[..., 0]
             y = p[..., 1]
             result = bm.zeros(p.shape, dtype=bm.float64)
-            result[..., 0] = y*(1-y)
+            result[..., 0] = y * (0.5-y)
+            result[..., 1] = bm.array(0.0)
+            return result
+        
+        @cartesian
+        def wall_velocity(p: TensorLike) -> TensorLike:
+            """Compute exact solution of velocity."""
+            x = p[..., 0]
+            y = p[..., 1]
+            result = bm.zeros(p.shape, dtype=bm.float64)
+            result[..., 0] = bm.array(0.0)
+            result[..., 1] = bm.array(0.0)
+            return result
+        
+        @cartesian
+        def obstacle_velocity(p: TensorLike) -> TensorLike:
+            """Compute exact solution of velocity."""
+            x = p[..., 0]
+            y = p[..., 1]
+            result = bm.zeros(p.shape, dtype=bm.float64)
+            result[..., 0] = bm.array(0.0)
             result[..., 1] = bm.array(0.0)
             return result
         
@@ -117,7 +137,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             x = p[..., 0]
             y = p[..., 1]
             radius = self.options['radius']
-            atol = 1e-12
+            atol = 5e-3
             on_boundary = bm.zeros_like(x, dtype=bool)
             for center in self.centers:
                 cx, cy = center
@@ -125,6 +145,8 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             return on_boundary
         
         self.inlet_velocity = inlet_velocity
+        self.wall_velocity = wall_velocity
+        self.obstacle_velocity = obstacle_velocity
         self.outlet_pressure = outlet_pressure
         self.is_inlet_boundary = is_inlet_boundary
         self.is_outlet_boundary = is_outlet_boundary
@@ -141,13 +163,6 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         dot = bm.einsum('ijk,ijk->ij', v0, v1) # (NN, NI)
         cond = (bm.abs(cross) < atol) & (dot < atol)
         return bm.any(cond, axis=1)
-    
-    @cartesian
-    def pressure(self, p: TensorLike) -> TensorLike:
-        """Compute exact solution of pressure."""
-        x = p[..., 0]
-        y = p[..., 1]
-        return 8*(1-x)
     
     @cartesian
     def is_velocity_boundary(self, p: TensorLike) -> TensorLike:
@@ -170,7 +185,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         
         result = bm.zeros_like(p, dtype=p.dtype)
         result[is_inlet] = inlet[is_inlet]
-        
+
         return result
     
     @cartesian
@@ -178,7 +193,6 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         """Optional: prescribed pressure on boundary (usually for stability)."""
         outlet = self.outlet_pressure(p)
         is_outlet = self.is_outlet_boundary(p)
-
         result = bm.zeros_like(p[..., 0], dtype=p.dtype)
         result[is_outlet] = outlet[is_outlet]
         return result
@@ -194,11 +208,11 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
 
         A00 = BilinearForm(self.uspace)
         self.BD = DiffusionIntegrator()
-        # self.BD.coef = 1.0
+        self.BD.coef = 1.0
         A00.add_integrator(self.BD)
         A01 = BilinearForm((self.pspace, self.uspace))
         self.BP = PressWorkIntegrator()
-        # self.BP.coef = -1.0
+        self.BP.coef = -1.0
         A01.add_integrator(self.BP)
         A = BlockForm([[A00, A01], [A01.T, None]])
 
@@ -233,10 +247,12 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             method='interp'
         )
         A, L = BC.apply(A, L)
-        x = self.solve(A, L)
+        from fealpy.solver import cg
+        x = cg(A, L)
+        print(x, x.shape)
         ugdof = self.uspace.number_of_global_dofs()
         uh = x[:ugdof]
-        ph = x[ugdof:-1]
+        ph = x[ugdof:]
 
         self.post_process(uh ,ph)
         return uh, ph
