@@ -1,6 +1,7 @@
 import re
 from typing import List, Tuple, Dict, Type, Optional, Any
 from ..backend import bm
+from ..typing import TensorLike
 from .inp_file_sections import *
 
 
@@ -100,25 +101,18 @@ class InpFileParser:
     def get_sections(self, section_type: Type[Section]) -> List[Section]:
         return [sec for sec in self.sections if isinstance(sec, section_type)]
   
-    def to_mesh(self, mesh_type):
+    def to_mesh(self, mesh_type, meshdata_type):
+        """
+        """
+        meshdata  = meshdata_type() 
+        for section in self.sections:
+            section.attach(meshdata)
+
         ns = self.get_section(NodeSection)
         es = self.get_section(ElementSection)
         node = ns.node
-        cell = ns.node_map[es.cell]
+        cell = meshdata.update_node_id(es.cell)
         mesh = mesh_type(node, cell)
+        mesh.data = meshdata 
 
-        for section in self.sections:
-            section.attach(mesh.meshdata)
         return mesh
-
-    def to_material(self, Material, name: str):
-        materials = self.get_section(MaterialSection)
-        elastic_modulus, poisson_ratio = materials.elastic
-        density = materials.density
-
-        return Material(
-            name=name,
-            elastic_modulus=elastic_modulus,
-            poisson_ratio=poisson_ratio,
-            density=density
-        )

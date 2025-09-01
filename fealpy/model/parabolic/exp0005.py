@@ -124,7 +124,7 @@ class Exp0005(BoxMesher2d):
         """Check if point is on boundary."""
         x = p[..., 0]
         t = p[..., 1]
-        return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 1.0) < 1e-12) | (bm.abs(t - 0.0) > 1e-12)
+        return (bm.abs(x - 0.0) < 1e-12) | (bm.abs(x - 1.0) < 1e-12) & (bm.abs(t - 0.0) > 1e-12)
 
     @cartesian
     def is_init_boundary(self, p: TensorLike) -> TensorLike:

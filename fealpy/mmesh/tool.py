@@ -275,36 +275,51 @@ def quad_equ_solver(coef:list):
         if bm.any(is_linear):
             x = bm.concat([x, x_linear])
     return x
-    
-def cubic_equ_solver(coef:list):
-    """
-    @brief solve the cubic equation
-    @param a: the coefficient of x^3
-    @param b: the coefficient of x^2
-    @param c: the coefficient of x
-    @param d: the constant term
-    """
-    a,b,c,d = coef
-    kwarg = bm.context(a)
-    p = (3 * a * c - b**2) / (3 * a**2)
-    q = (2 * b**3 - 9 * a * b * c + 27 * a**2 * d) / (27 * a**3)
-    discriminant = (q / 2)**2 + (p / 3)**3
-    u1 = (-q / 2 + bm.sqrt(discriminant))**(1 / 3)
-    u2 = (-q / 2 - bm.sqrt(discriminant))**(1 / 3)
-    v1 = (-q / 2 - bm.sqrt(discriminant))**(1 / 3)
-    v2 = (-q / 2 + bm.sqrt(discriminant))**(1 / 3)
-    u = bm.where(discriminant >= 0, u1,u2)
-    v = bm.where(discriminant >= 0, v1,v2)
-    upv = u + v
-    umv = u - v
-    move_dis = b / (3 * a)
-    x1 = upv - move_dis
-    sq3 = bm.sqrt(bm.array([3]),**kwarg)
-    x2 = -upv / 2 + umv * sq3 * 1j / 2 - move_dis
-    x3 = -upv / 2 - umv * sq3 * 1j / 2 - move_dis
-    x = bm.concat([x1, x2, x3])
-    return x
 
+def cubic_equ_solver(coef: list):
+    """
+    更稳定的三次方程求解器，只返回实根
+    """
+    a, b, c, d = coef
+    kwarg = bm.context(a)
+    eps = 1e-12
+    
+    # 处理退化情况
+    is_quadratic = bm.abs(a) < eps
+    
+    if bm.all(is_quadratic):
+        # 全部是二次方程
+        return quad_equ_solver([b, c, d])
+    
+    # 标准化为首项系数为1的形式
+    a_norm = a[~is_quadratic]
+    b_norm = b[~is_quadratic] / a_norm
+    c_norm = c[~is_quadratic] / a_norm  
+    d_norm = d[~is_quadratic] / a_norm
+    
+    # Cardano 公式
+    p = c_norm - b_norm**2 / 3
+    q = (2 * b_norm**3 - 9 * b_norm * c_norm + 27 * d_norm) / 27
+    
+    discriminant = (q / 2)**2 + (p / 3)**3
+    
+    # 只处理有实根的情况，返回最可能的实根
+    # 对于正判别式，返回唯一实根
+    real_mask = discriminant >= 0
+    
+    if bm.any(real_mask):
+        sqrt_disc = bm.sqrt(discriminant[real_mask])
+        u = bm.sign(-q[real_mask]/2 + sqrt_disc) * bm.abs(-q[real_mask]/2 + sqrt_disc)**(1/3)
+        v = bm.sign(-q[real_mask]/2 - sqrt_disc) * bm.abs(-q[real_mask]/2 - sqrt_disc)**(1/3)
+        x = u + v - b_norm[real_mask] / 3
+        return x
+    else:
+        # 对于负判别式，使用三角方法求解（三个实根）
+        m = 2 * bm.sqrt(-p / 3)
+        theta = bm.arccos(3 * q / (p * m)) / 3
+        x1 = m * bm.cos(theta) - b_norm / 3
+        return x1  # 返回第一个根，通常是最接近期望的
+    
 def _compute_coef_general_2d(A,C):
     """
     @brief compute the coefficient of the quadratic equation
@@ -486,44 +501,122 @@ def _solve_quadratic_with_validation(a, b, c, p_coord, A_coord, B_coord, C_coord
 
 def _solve_quad_parametric_coords(target_points, quad_vertices):
     """
-    直接代数求解四边形参数坐标 (ξ,η) ∈ [0,1]x[0,1]
+    Solve parametric coordinates (xi, eta) for points in quadrilateral elements
+    split into two triangles.
 
     Parameter:
         target_points: 目标点坐标，形状为 (N, 2)
         quad_vertices: 四边形顶点坐标，形状为 (N, 4, 2)，四个顶点按逆时针顺序排列
     """
+    N = target_points.shape[0]
     # 四边形顶点按逆时针顺序：v0(0,0), v1(1,0), v2(1,1), v3(0,1)
     v0, v1, v2, v3 = quad_vertices[:, 0], quad_vertices[:, 1], quad_vertices[:, 2], quad_vertices[:, 3]
     p = target_points
+    kwarg = bm.context(target_points)
+    xi_eta = bm.zeros((N, 2), **kwarg)
     
-    # 双线性映射：x(ξ,η) = A + Bξ + Cη + Dξη
-    A = v0                          # 常数项
-    B = v1 - v0                     # ξ 项系数
-    C = v3 - v0                     # η 项系数  
-    D = v2 - v1 - v3 + v0          # ξη 项系数
+    ref_coords = bm.array([[0,0], [1,0], [1,1], [0,1]], **kwarg)
+    # 三角形1: v0(0,0), v1(1,0), v2(1,1)
+    tri1_physical = bm.stack([v0, v1, v2], axis=1)  # (N, 3, 2)
+    tri1_param = ref_coords[[0,1,2]]  # (3, 2)
+
+    # 三角形2: v0(0,0), v2(1,1), v3(0,1)
+    tri2_physical = bm.stack([v0, v2, v3], axis=1)  # (N, 3, 2)
+    tri2_param = ref_coords[[0,2,3]]  # (3, 2)
+
+    v_matrix = bm.permute_dims(tri1_physical[:,1:,:] - 
+                               tri1_physical[:,0:1,:], axes=(0, 2, 1))
+    v_b = p - tri1_physical[:,0,:]
+    inv_matrix = bm.linalg.inv(v_matrix)
+    lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
+    lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
+    valid = bm.all(lam > -1e-12, axis=1)
     
-    # 求解方程组：p = A + Bξ + Cη + Dξη
-    D_norm = bm.linalg.norm(D, axis=-1)
-    is_linear = D_norm < 1e-10
-    
-    xi_eta = bm.zeros((target_points.shape[0], 2), **bm.context(target_points))
-    
-    # 处理线性情况（平行四边形）
-    if bm.any(is_linear):
-        linear_mask = is_linear
-        rhs = p[linear_mask] - A[linear_mask]
-        matrix = bm.stack([B[linear_mask], C[linear_mask]], axis=-1)
-        try:
-            solution = bm.linalg.solve(matrix, rhs[..., None])[..., 0]
-            xi_eta = bm.set_at(xi_eta, linear_mask, solution)
-        except:
-            pass
-    # 处理非线性情况
-    if bm.any(~is_linear):
-        xi_eta_nl = _solve_bilinear_system(
-            p[~is_linear], A[~is_linear], B[~is_linear], 
-            C[~is_linear], D[~is_linear]
-        )
-        xi_eta = bm.set_at(xi_eta, ~is_linear, xi_eta_nl)
+    if bm.any(valid):
+        # 重心坐标转换为参数坐标
+        param1 = bm.einsum('ni,ij->nj', lam[valid], tri1_param)
+        xi_eta = bm.set_at(xi_eta, valid, param1)
+
+    remaining = ~valid
+    if bm.any(remaining):
+        v_matrix = bm.permute_dims(tri2_physical[remaining,1:,:] - 
+                                   tri2_physical[remaining,0:1,:], axes=(0, 2, 1))
+        v_b = p[remaining] - tri2_physical[remaining,0,:]
+        inv_matrix = bm.linalg.inv(v_matrix)
+        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
+        lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
+        param2 = bm.einsum('ni,ij->nj', lam, tri2_param)
+        xi_eta = bm.set_at(xi_eta, remaining, param2)
 
     return xi_eta
+
+def _solve_hex_parametric_coords(target_points, hex_vertices):
+    """
+    Solve parametric coordinates (xi, eta, zeta) for points in hexahedral elements.
+    split into 6 tetrahedras.
+
+    Parameters
+        target_points: TensorLike, shape (N, 3) - points to find coordinates for
+        hex_vertices: TensorLike, shape (N, 8, 3) - vertices of hexahedral elements
+    
+    Returns
+        TensorLike, shape (N, 3) - parametric coordinates (xi, eta, zeta)
+    """
+    N = target_points.shape[0]
+    # 八边形顶点按逆时针顺序：v0(0,0,0), v1(1,0,0), v2(1,1,0), v3(0,1,0),
+    # v4(0,0,1), v5(1,0,1), v6(1,1,1), v7(0,1,1)
+    v0, v1, v2, v3 = hex_vertices[:, 0], hex_vertices[:, 1], hex_vertices[:, 2], hex_vertices[:, 3]
+    v4, v5, v6, v7 = hex_vertices[:, 4], hex_vertices[:, 5], hex_vertices[:, 6], hex_vertices[:, 7]
+    p = target_points
+    kwarg = bm.context(target_points)
+    xi_eta_zeta = bm.zeros((N, 3), **kwarg)
+    found = bm.zeros(N, dtype=bm.bool)
+
+    ref_coords = bm.array([[0,0,0], [1,0,0], [1,1,0], [0,1,0],
+                           [0,0,1], [1,0,1], [1,1,1], [0,1,1]], **kwarg)
+    
+    # 六个四面体的物理坐标和参考坐标
+    tetrahedra_physical = [
+        bm.stack([v0, v1, v3, v4], axis=1),  # 四面体1
+        bm.stack([v5, v1, v4, v3], axis=1),  # 四面体2
+        bm.stack([v5, v4, v7, v3], axis=1),  # 四面体3
+        bm.stack([v1, v6, v2, v3], axis=1),  # 四面体4
+        bm.stack([v1, v5, v6, v3], axis=1),  # 四面体5
+        bm.stack([v5, v7, v6, v3], axis=1)   # 四面体6
+    ]
+    
+    tetrahedra_param = [
+        ref_coords[[0, 1, 3, 4]],
+        ref_coords[[5, 1, 4, 3]],
+        ref_coords[[5, 4, 7, 3]],
+        ref_coords[[1, 6, 2, 3]],
+        ref_coords[[1, 5, 6, 3]],
+        ref_coords[[5, 7, 6, 3]]
+    ]
+
+    for i in range(6):
+        if bm.all(found):
+            break
+        remaining = ~found
+        tet_physical = tetrahedra_physical[i][remaining]
+        tet_param = tetrahedra_param[i]
+
+        v_matrix = bm.permute_dims(tet_physical[:,1:,:] - 
+                                   tet_physical[:,0:1,:], axes=(0, 2, 1))
+        v_b = p[remaining] - tet_physical[:,0,:]
+        inv_matrix = bm.linalg.inv(v_matrix)
+        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
+        lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
+        # 检查点是否在四面体内
+        if i < 5:
+            in_tetra = bm.all(lam >= -2e-6, axis=1)
+            if bm.any(in_tetra):
+                param = bm.einsum('ni,ij->nj', lam[in_tetra], tet_param)
+                valid_indices = bm.where(remaining)[0][in_tetra]
+                xi_eta_zeta = bm.set_at(xi_eta_zeta, valid_indices, param)
+                found = bm.set_at(found, valid_indices, True)
+        else:
+            param = bm.einsum('ni,ij->nj', lam, tet_param)
+            xi_eta_zeta = bm.set_at(xi_eta_zeta, remaining, param)
+            
+    return xi_eta_zeta

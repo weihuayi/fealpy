@@ -23,14 +23,13 @@ from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 from .mthlaplace_integrator import MthLaplaceIntegrator
 from .mass_integrator import MassIntegrator
+from .diffusion_integrator import DiffusionIntegrator
 from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator
 from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
 from .jump_penalty_intergrator import JumpPenaltyIntergrator
-from .spacetime_diffusion_integrator import SpaceTimeDiffusionIntegrator
-from .spacetime_mass_integrator import SpaceTimeMassIntegrator
-from .spacetime_convection_integrator import SpaceTimeConvectionIntegrator
-from .spacetime_source_integrator import SpaceTimeSourceIntegrator
+from .spacetime_residual_integrator import SpaceTimeResidualIntegrator
+from .spacetime_source_residual_integrator import SpaceTimeSourceResidualIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -74,3 +73,6 @@ from .helmholtz_lfem_model import HelmholtzLFEMModel
 from .curlcurl_lfem_model import CurlCurlLFEMModel
 from .parabolic_stfem_model import ParabolicSTFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+from .stokes_lfem_model import StokesLFEMModel
+from .dld_microfluidic_chip_lfem_model import DLDMicrofluidicChipLFEMModel
+

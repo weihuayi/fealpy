@@ -1,24 +1,32 @@
-from fealpy.opt import GreyWolfOpt, initialize
-from fealpy.opt.optimizer_base import opt_alg_options
+from fealpy.opt import QuantumParticleSwarmOpt, initialize, opt_alg_options
+from fealpy.opt.model import OPTModelManager
+from fealpy.opt.benchmark.constrained_benchmark import constrained_benchmark_data as data
 
-def penalty(value):
-    return 0 + ((0 < value) * (value < 1)) * value + (value >= 1) * (value ** 2)
+# 1. 初始化 Manager 并获取 benchmark
+manager = OPTModelManager('constrained')
+text = manager.get_example(1)
 
-def fobj(x):
-    def f(x):
-        return (1 - x[:, 0]) ** 2 + 100 * (x[:, 1] - x[:, 0] ** 2) ** 2
-    def g1(x):
-        return (x[:, 0] - 1) ** 3 - x[:, 1] + 1
-    def g2(x):
-        return x[:, 0] + x[:, 1] - 2
-    return f(x) + penalty(g1(x)) + penalty(g2(x))
+# 2. 获取上下界、维度
+lb, ub = text.get_bounds() 
+dim = text.get_dim()
 
-lb = [-1.5, -0.5]
-ub = [1.5, 2.5]
-x0 = initialize(50, 2, ub, lb)
-option = opt_alg_options(x0, fobj, (lb, ub), 50, MaxIters=100)
-optimizer = GreyWolfOpt(option)
+# 3. 初始化种群
+NP = 100 # 种群规模
+x0 = initialize(NP, dim, ub, lb, method=None)
+
+# 4. 包装目标函数
+fobj = lambda x: text.evaluate(x)
+
+# 5. 构建优化器选项
+option = opt_alg_options(x0, fobj, (lb, ub), NP)
+
+# 6. 初始化优化算法
+optimizer = QuantumParticleSwarmOpt(option)
+
+# 7. 运行优化
 optimizer.run()
-optimizer.print_optimal_result()
-optimizer.plot_curve("Grey Wolf Optimizer")
-optimizer.plot_plpt_percen()
+
+# 8. 输出结果
+optimizer.print_optimal_result() 
+optimizer.plot_curve() 
+optimizer.plot_plpt_percen() 

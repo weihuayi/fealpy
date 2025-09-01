@@ -7,6 +7,13 @@ __all__ = ["SlotStatus", "InputSlot", "OutputSlot",
            "CNode", "NodeExceptionData", "NodeIOError", "NodeTopologyError"]
 
 
+class ParamPassingKind(IntEnum):
+    POSITIONAL     = 0
+    KEYWORD        = 1
+    VAR_POSITIONAL = 2
+    VAR_KEYWORD    = 3
+
+
 class SlotStatus(IntEnum):
     ACTIVE = auto()
     BLOCKED = auto()
@@ -34,12 +41,25 @@ class Slot():
 
 
 @dataclass(slots=True)
-class InputSlot(Slot):
-    has_default: bool = False
-    default: Any = None
-    param_name: str | None = None
-    variable: bool = False
-    source_list: list[SourceAddr] = field(default_factory=list, init=False, compare=False)
+class TransSlot(Slot):
+    has_default : bool             = False
+    default     : Any              = None
+    source_list : list[SourceAddr] = field(default_factory=list, init=False, compare=False)
+
+    def is_connected(self) -> bool:
+        return len(self.source_list) > 0
+
+    def connect(self, source: "CNode", slot: str):
+        if not self.is_connected():
+            self.source_list.append(SourceAddr(source, slot))
+        else:
+            raise NodeTopologyError("multiple connections to non-variable input")
+
+
+@dataclass(slots=True)
+class InputSlot(TransSlot):
+    variable   : bool       = False
+    param_name : str | None = None
 
     def is_connected(self) -> bool:
         return len(self.source_list) > 0
@@ -62,7 +82,6 @@ class CNode(Protocol):
     @property
     def output_slots(self) -> Mapping[str, OutputSlot]: ...
     def run(self, *args, **kwargs) -> Any: ...
-    def dump_key(self, slot: str) -> Any: ...
 
 
 @dataclass(frozen=True, slots=True)

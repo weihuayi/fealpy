@@ -8,7 +8,7 @@ from .crested_porcupine_opt import CrestedPorcupineOpt
 from .black_winged_kite_alg import BlackwingedKiteAlg
 from .cuckoo_search_opt import CuckooSearchOpt
 from .butterfly_opt_alg import ButterflyOptAlg
-from .marine_predators_alg import MarinePredatorsAlg
+from .marine_predators_alg import MarinePredatorsAlg, TIS_MarinePredatorsAlg
 from .crow_drinking_water_alg import CrowDrinkingWaterAlg
 from .whale_opt_alg import WhaleOptAlg
 from .squirrel_search_alg import SquirrelSearchAlg
