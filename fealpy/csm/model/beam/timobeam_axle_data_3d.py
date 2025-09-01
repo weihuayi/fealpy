@@ -129,7 +129,7 @@ class TimobeamAxleData3D:
         n_dofs = NN * self.dofs_per_node
         F = bm.zeros(n_dofs)
 
-        external_load = bm.array([-88200, 3140, 1.4e6, -88200], dtype=bm.float64)
+        external_load = bm.array([-88200, 3140, 1.4e7, -88200], dtype=bm.float64)
 
         F[1 * self.dofs_per_node + 2] = external_load[0]
         F[11 * self.dofs_per_node] = external_load[1]
