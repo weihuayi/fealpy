@@ -1,6 +1,6 @@
 from typing import Union
 from fealpy.backend import backend_manager as bm
-from fealpy.decorator import variantmethod
+from fealpy.decorator import variantmethod, cartesian
 from fealpy.model import ComputationalModel
 from fealpy.mesh import Mesh
 from fealpy.utils import timer
@@ -168,8 +168,8 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        # uerror, perror = self.error(uh1, ph1) 
-        # self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
+        uerror, perror = self.error(uh1, ph1) 
+        self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
         return uh1, ph1
     
     @run.register('one_step')
@@ -180,14 +180,18 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         A = BForm.assembly() 
         b = LForm.assembly()
         A, b = self.fem.apply_bc(A, b, self.pde)
-        # A, b = self.fem.lagrange_multiplier(A, b)
+        if self.equation.pressure_neumann == True:
+            A, b = self.fem.lagrange_multiplier(A, b)
         x = self.solve(A, b)
 
         ugdof = self.fem.uspace.number_of_global_dofs()
         u = self.fem.uspace.function()
         p = self.fem.pspace.function()
         u[:] = x[:ugdof]
-        p[:] = x[ugdof:] 
+        if self.equation.pressure_neumann == True:
+            p[:] = x[ugdof:-1]
+        else:
+            p[:] = x[ugdof:]
         return u, p
 
     @run.register('uniform_refine')
@@ -227,7 +231,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         fem = self.fem
         mesh = self.mesh
         location = mesh.location
-        qf = mesh.quadrature_formula(q=3, etype='cell')
+        qf = mesh.quadrature_formula(q=4, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         vd = fem.uspace.function()
