@@ -199,7 +199,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
                 --+--
                 2 | 3
         """
-        for _ in range(n):
+        for i in range(n):
             GD = self.geo_dimension()
             node = self.entity('node')        
             edge = self.entity('edge')       
@@ -230,8 +230,8 @@ class LagrangeQuadrangleMesh(TensorMesh):
             mid_idx = bm.arange(start, end, **ikwargs)
             
             if self.p == 1:
-                e0 = bm.flip(bm.stack((edge[:, 0], mid_idx), axis=1))
-                e1 =  bm.flip(bm.stack((mid_idx, edge[:, 1]), axis=1))
+                e0 = bm.stack((edge[:, 0], mid_idx), axis=1)
+                e1 =  bm.stack((mid_idx, edge[:, 1]), axis=1)
             else:
                 nn = self.p - 1  # 每条子边上的中间节点数
                 start = end
@@ -249,145 +249,145 @@ class LagrangeQuadrangleMesh(TensorMesh):
                 
                 edge_nodes = bm.concat(edge_nodes, axis=0)
                 nodes.append(edge_nodes)
+            edges.extend([e0, e1])
             
             # each cell is split into 4 subcells
-            # cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4)
+            cell2subcell = bm.arange(4 * NC, **ikwargs).reshape(NC, 4)
             
-            # imap = bm.array([
-            #     [[1, 2], [2, 1]],  
-            #     [[2, 2], [3, 1]],  
-            #     [[3, 2], [0, 1]],  
-            #     [[0, 2], [1, 1]]  
-            # ],** ikwargs)
+            imap = bm.array([
+                [[1, 2], [2, 1]],  
+                [[2, 2], [3, 1]],  
+                [[3, 2], [0, 1]],  
+                [[0, 2], [1, 1]]  
+            ],** ikwargs)
             
-            # # 构建边到子单元格的映射关系
-            # e2c0 = bm.stack((
-            #     cell2subcell[edge2cell[:, 0], imap[edge2cell[:, 2], 0, 0]],
-            #     cell2subcell[edge2cell[:, 1], imap[edge2cell[:, 3], 1, 0]],
-            #     imap[edge2cell[:, 2], 0, 1],
-            #     imap[edge2cell[:, 3], 1, 1],
-            # ), axis=1)
+            # 构建边到子单元格的映射关系
+            e2c0 = bm.stack((
+                cell2subcell[edge2cell[:, 0], imap[edge2cell[:, 2], 0, 0]],
+                cell2subcell[edge2cell[:, 1], imap[edge2cell[:, 3], 1, 0]],
+                imap[edge2cell[:, 2], 0, 1],
+                imap[edge2cell[:, 3], 1, 1],
+            ), axis=1)
             
-            # e2c1 = bm.stack((
-            #     cell2subcell[edge2cell[:, 0], imap[edge2cell[:, 2], 1, 0]],
-            #     cell2subcell[edge2cell[:, 1], imap[edge2cell[:, 3], 0, 0]],
-            #     imap[edge2cell[:, 2], 1, 1],
-            #     imap[edge2cell[:, 3], 0, 1],
-            # ), axis=1)
+            e2c1 = bm.stack((
+                cell2subcell[edge2cell[:, 0], imap[edge2cell[:, 2], 1, 0]],
+                cell2subcell[edge2cell[:, 1], imap[edge2cell[:, 3], 0, 0]],
+                imap[edge2cell[:, 2], 1, 1],
+                imap[edge2cell[:, 3], 0, 1],
+            ), axis=1)
             
-            # # 处理边界边
-            # isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
-            # e2c0 = bm.set_at(e2c0, (isBdEdge, 1), e2c0[isBdEdge, 0])
-            # e2c0 = bm.set_at(e2c0, (isBdEdge, 3), e2c0[isBdEdge, 2])
-            # e2c1 = bm.set_at(e2c1, (isBdEdge, 1), e2c1[isBdEdge, 0]) 
-            # e2c1 = bm.set_at(e2c1, (isBdEdge, 3), e2c1[isBdEdge, 2])
-            # edge2cells.extend([e2c0, e2c1])
+            # 处理边界边
+            isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+            e2c0 = bm.set_at(e2c0, (isBdEdge, 1), e2c0[isBdEdge, 0])
+            e2c0 = bm.set_at(e2c0, (isBdEdge, 3), e2c0[isBdEdge, 2])
+            e2c1 = bm.set_at(e2c1, (isBdEdge, 1), e2c1[isBdEdge, 0]) 
+            e2c1 = bm.set_at(e2c1, (isBdEdge, 3), e2c1[isBdEdge, 2])
+            edge2cells.extend([e2c0, e2c1])
             
            
-            # edge2cell = bm.concat(edge2cells, axis=0)
+            edge2cell = bm.concat(edge2cells, axis=0)
             
-            # # 构建每个单元格中的新边
-            # c2e = self.cell_to_edge() + NN 
-            # if self.p == 1:
-            #     e0 = c2e[:, [1, 2]]  
-            #     e1 = c2e[:, [2, 3]]  
-            #     e2 = c2e[:, [3, 0]]  
-            #     e3 = c2e[:, [0, 1]]  
-            # else:
-            #     # 高阶情况下，插入中间节点（每条边有p-1个中间节点）
-            #     nn = self.p - 1
-            #     start = end
-            #     end = start + 4 * nn * NC
-            #     e = bm.arange(start, end, **ikwargs).reshape(-1, 4 * nn)
+            # 构建每个单元格中的新边
+            c2e = self.cell_to_edge() + NN 
+            if self.p == 1:
+                e0 = c2e[:, [1, 2]]  
+                e1 = c2e[:, [2, 3]]  
+                e2 = c2e[:, [3, 0]]  
+                e3 = c2e[:, [0, 1]]  
+            else:
+                # 高阶情况下，插入中间节点（每条边有p-1个中间节点）
+                nn = self.p - 1
+                start = end
+                end = start + 4 * nn * NC
+                e = bm.arange(start, end, **ikwargs).reshape(-1, 4 * nn)
                 
-            #     e0 = bm.concat((c2e[:, [1]], e[:, 0*nn:1*nn], c2e[:, [2]]), axis=1)
-            #     e1 = bm.concat((c2e[:, [2]], e[:, 1*nn:2*nn], c2e[:, [3]]), axis=1)
-            #     e2 = bm.concat((c2e[:, [3]], e[:, 2*nn:3*nn], c2e[:, [0]]), axis=1)
-            #     e3 = bm.concat((c2e[:, [0]], e[:, 3*nn:4*nn], c2e[:, [1]]), axis=1)
+                e0 = bm.concat((c2e[:, [1]], e[:, 0*nn:1*nn], c2e[:, [2]]), axis=1)
+                e1 = bm.concat((c2e[:, [2]], e[:, 1*nn:2*nn], c2e[:, [3]]), axis=1)
+                e2 = bm.concat((c2e[:, [3]], e[:, 2*nn:3*nn], c2e[:, [0]]), axis=1)
+                e3 = bm.concat((c2e[:, [0]], e[:, 3*nn:4*nn], c2e[:, [1]]), axis=1)
                 
-            # edges.extend([e0, e1, e2, e3]) 
+            edges.extend([e0, e1, e2, e3]) 
             
-            # # 边与子单元格的拓扑映射关系
-            # e2c0 = bm.stack((
-            #     cell2subcell[:, 2],  
-            #     cell2subcell[:, 0],  
-            #     bm.full(NC, 0,** ikwargs),  
-            #     bm.full(NC, 3, **ikwargs),  
-            # ), axis=1)
+            # 边与子单元格的拓扑映射关系
+            e2c0 = bm.stack((
+                cell2subcell[:, 2],  
+                cell2subcell[:, 0],  
+                bm.full(NC, 0,** ikwargs),  
+                bm.full(NC, 3, **ikwargs),  
+            ), axis=1)
 
-            # e2c1 = bm.stack((
-            #     cell2subcell[:, 3],  
-            #     cell2subcell[:, 2],  
-            #     bm.full(NC, 0,** ikwargs),  
-            #     bm.full(NC, 1, **ikwargs), 
-            # ), axis=1)
+            e2c1 = bm.stack((
+                cell2subcell[:, 3],  
+                cell2subcell[:, 2],  
+                bm.full(NC, 0,** ikwargs),  
+                bm.full(NC, 1, **ikwargs), 
+            ), axis=1)
 
-            # e2c2 = bm.stack((
-            #     cell2subcell[:, 0], 
-            #     cell2subcell[:, 1],  
-            #     bm.full(NC, 1,** ikwargs),  
-            #     bm.full(NC, 3, **ikwargs), 
-            # ), axis=1)
+            e2c2 = bm.stack((
+                cell2subcell[:, 0], 
+                cell2subcell[:, 1],  
+                bm.full(NC, 1,** ikwargs),  
+                bm.full(NC, 3, **ikwargs), 
+            ), axis=1)
 
-            # e2c3 = bm.stack((
-            #     cell2subcell[:, 1],  
-            #     cell2subcell[:, 3],  
-            #     bm.full(NC, 2,** ikwargs),  
-            #     bm.full(NC, 2, **ikwargs),  
-            # ), axis=1)
-            # edge2cells.extend([e2c0, e2c1, e2c2, e2c3])
-            # edge2cell = bm.concat(edge2cells, axis=0)
+            e2c3 = bm.stack((
+                cell2subcell[:, 1],  
+                cell2subcell[:, 3],  
+                bm.full(NC, 2,** ikwargs),  
+                bm.full(NC, 2, **ikwargs),  
+            ), axis=1)
+            edge2cells.extend([e2c0, e2c1, e2c2, e2c3])
+            edge2cell = bm.concat(edge2cells, axis=0)
             
-            # icell = None
-            # if self.p >= 2:
-            #     TD = self.top_dimension()
-            #     mi = bm.multi_index_matrix(self.p, TD)
-            #     isInCellNodes = (mi[:, 0] > 0) & (mi[:, 0] < self.p) & \
-            #         (mi[:, 1] > 0) & (mi[:, 1] < self.p)
-            #     xi_eta = mi[isInCellNodes, :] / self.p # 转换为参数坐标（r, s ∈ (0,1)）
+            icell = None
+            if self.p >= 2:
+                TD = self.top_dimension()
+                mi = bm.multi_index_matrix(self.p, TD)
+                isInCellNodes = (mi[:, 0] > 0) & (mi[:, 0] < self.p) & \
+                    (mi[:, 1] > 0) & (mi[:, 1] < self.p)
+                xi_eta = mi[isInCellNodes, :] / self.p # 转换为参数坐标（r, s ∈ (0,1)）
                 
-            #     v0 = node[cell[:, 0]]  
-            #     v1 = node[cell[:, 1]]  
-            #     v2 = node[cell[:, 2]]  
-            #     v3 = node[cell[:, 3]]  
+                v0 = node[cell[:, 0]]  
+                v1 = node[cell[:, 1]]  
+                v2 = node[cell[:, 2]]  
+                v3 = node[cell[:, 3]]  
                 
-            #     pts_list = []
-            #     for iCell in range(NC):
-            #         xi = xi_eta[:, 0]
-            #         eta = xi_eta[:, 1]
-            #         pts_cell = ((1 - xi) * (1 - eta)[:, None] * v0[iCell] +
-            #                     (1 - xi) * eta[:, None] * v1[iCell] +
-            #                     xi * (1 - eta)[:, None] * v2[iCell] +
-            #                     xi * eta[:, None] * v3[iCell])
-            #         pts_list.append(pts_cell)
+                pts_list = []
+                for iCell in range(NC):
+                    xi = xi_eta[:, 0]
+                    eta = xi_eta[:, 1]
+                    pts_cell = ((1 - xi) * (1 - eta)[:, None] * v0[iCell] +
+                                (1 - xi) * eta[:, None] * v1[iCell] +
+                                xi * (1 - eta)[:, None] * v2[iCell] +
+                                xi * eta[:, None] * v3[iCell])
+                    pts_list.append(pts_cell)
                     
-            #     pts_all = bm.concat(pts_list, axis=0)
-            #     nodes.append(pts_all)
+                pts_all = bm.concat(pts_list, axis=0)
+                nodes.append(pts_all)
                 
-            #     start = end
-            #     end = start + 4 * nn * NC
-            #     icell = bm.arange(start, end, **ikwargs).reshape(-1, nn)
+                start = end
+                end = start + 4 * nn * NC
+                icell = bm.arange(start, end, **ikwargs).reshape(-1, nn)
                 
-            # node = bm.concat(nodes, axis=0)
-            # edge = bm.concat(edges, axis=0)
-            # edge2cell = bm.concat(edge2cells, axis=0)
+            node = bm.concat(nodes, axis=0)
+            edge = bm.concat(edges, axis=0)
+            edge2cell = bm.concat(edge2cells, axis=0)
             
-            # # assemble cell2edge mapping for refined mesh: 4*NC cells each with 4 edges (indices into edge_new)
-            # cell2edge = bm.zeros((4 * NC, 4), **ikwargs)
-            # cell2edge = bm.set_at(cell2edge, (edge2cell[:, 0], edge2cell[:, 2]), range(len(edge)))
-            # cell2edge = bm.set_at(cell2edge, (edge2cell[:, 1], edge2cell[:, 3]), range(len(edge)))
+            # assemble cell2edge mapping for refined mesh: 4*NC cells each with 4 edges (indices into edge_new)
+            cell2edge = bm.zeros((4 * NC, 4), **ikwargs)
+            cell2edge = bm.set_at(cell2edge, (edge2cell[:, 0], edge2cell[:, 2]), range(len(edge)))
+            cell2edge = bm.set_at(cell2edge, (edge2cell[:, 1], edge2cell[:, 3]), range(len(edge)))
 
-            # # commit new topology to mesh
-            # self.node = node
-            # self.edge = edge
-            # self.edge2cell = edge2cell
-            # self.cell2edge = cell2edge
-            # self.face = edge
-            # self.face2cell = edge2cell
-            # self.cell2face = cell2edge
+            # commit new topology to mesh
+            self.node = node
+            self.edge = edge
+            self.edge2cell = edge2cell
+            self.cell2edge = cell2edge
+            self.face = edge
+            self.face2cell = edge2cell
+            self.cell2face = cell2edge
 
             # Reconstruct the cell
-            icell =None
             self.construct_global_cell(icell, **ikwargs)
 
     def construct_global_cell(self, icell=None, **ikwargs):
