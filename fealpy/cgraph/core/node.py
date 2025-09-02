@@ -97,6 +97,12 @@ class CNode():
         _E.connect_from_address(self.input_slots, kwargs)
         return _E.AddrHandler(self, None)
 
+    def __repr__(self):
+        if hasattr(self, "__node_type__"):
+            return "$" + f"{self.__node_type__} at {hex(id(self))}" + "$"
+        else:
+            return "$anonymous node at " + hex(id(self)) + "$"
+
 
 class Container(CNode):
     nodes : tuple[CNode, ...]

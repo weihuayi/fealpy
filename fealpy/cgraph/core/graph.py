@@ -71,9 +71,12 @@ class GraphCtxOps:
     def send_data(
         context: dict[int, Any],
         send_slots: Mapping[str, Slot],
-        results: tuple[Any, ...],
+        results: Any,
         node_msg: str = ""
     ):
+        if results is None:
+            return
+
         if not isinstance(results, tuple):
             results = (results,)
 
@@ -100,7 +103,8 @@ class Graph:
     error_listeners : list[Callable[[NodeExceptionData], Any]]
     status_listeners : list[Callable[[GraphStatus], Any]]
 
-    def __init__(self):
+    def __init__(self, name: str | None = None):
+        self.name = name
         self.status = GraphStatus.READY
         self._input_slots = OrderedDict()
         self._output_slots = OrderedDict()
@@ -109,6 +113,12 @@ class Graph:
         self.error_listeners = []
         self.status_listeners = []
         self._input_node = GraphInputNode(self)
+        self._output_node = GraphOutputNode(self)
+
+    def __repr__(self):
+        if self.name is None:
+            return "$$anonymous graph at " + hex(id(self)) + "$$"
+        return "$$" + self.name + "$$"
 
     def __bool__(self) -> bool:
         return True
@@ -198,15 +208,15 @@ class Graph:
                 self.register_output(name)
         _E.connect_from_address(self.output_slots, kwargs)
 
-    def requests(self):
-        request_set: set[CNode] = set()
+    # def requests(self):
+    #     request_set: set[CNode] = set()
 
-        for outslot in self.output_slots.values():
-            request_set = request_set.union(
-                set(addr.node for addr in outslot.source_list)
-            )
+    #     for outslot in self.output_slots.values():
+    #         request_set = request_set.union(
+    #             set(addr.node for addr in outslot.source_list)
+    #         )
 
-        return request_set
+    #     return request_set
 
     def _send_exception(self, info: NodeExceptionData) -> None:
         for callback in self.error_listeners:
@@ -233,7 +243,7 @@ class Graph:
         if self.status != GraphStatus.READY:
             raise GraphStatusError("Can not execute a graph with status %s".format(self.status))
 
-        for node in self._topological_sort(self.requests()):
+        for node in self._topological_sort([self._output_node]):
             with self.controller:
                 if self.status in (GraphStatus.STOP, GraphStatus.DEBUG):
                     break
@@ -279,7 +289,7 @@ class Graph:
                 self._set_status(GraphStatus.READY)
 
     def get(self) -> dict[str, Any]:
-        return GraphCtxOps.receive_data(self.context, self.output_slots, {}, repr(self)+"(output)")
+        return self._output_node.data.copy()
 
     @staticmethod
     def _collect_relevant_nodes(nodes: Iterable[CNode]):
@@ -341,9 +351,15 @@ class Graph:
 
 
 class GraphInputNode:
-    def __init__(self, graph: Graph):
+    def __init__(self, graph: Graph, /):
         self.graph = graph
         self.data = OrderedDict()
+
+    def __repr__(self):
+        if self.graph.name is None:
+            return "$graph input node at " + hex(id(self)) + "$"
+        else:
+            return "$input node (" + self.graph.name + ")$"
 
     @property
     def input_slots(self):
@@ -358,5 +374,36 @@ class GraphInputNode:
         self.data.clear()
         return result
 
+    def __call__(self, **kwargs: _E.AddrHandler | Any):
+        return _E.AddrHandler(self, None)
 
-WORLD_GRAPH = Graph()
+
+class GraphOutputNode:
+    def __init__(self, graph: Graph, /):
+        self.graph = graph
+        self.data = OrderedDict()
+
+    def __repr__(self):
+        if self.graph.name is None:
+            return "$graph output node at " + hex(id(self)) + "$"
+        else:
+            return "$output node (" + self.graph.name + ")$"
+
+    @property
+    def input_slots(self):
+        return self.graph.output_slots
+
+    @property
+    def output_slots(self):
+        return {}
+
+    def run(self, **kwargs):
+        self.data.clear()
+        self.data.update(kwargs)
+
+    def __call__(self, **kwargs: _E.AddrHandler | Any):
+        _E.connect_from_address(self.input_slots, kwargs)
+        return _E.AddrHandler(self, None)
+
+
+WORLD_GRAPH = Graph("WORLD_GRAPH")
