@@ -1,19 +1,15 @@
 from typing import Optional, Union
 from ..backend import bm
-from ..typing import TensorLike
+from ..typing import TensorLike,Index,_S
 from ..model import PDEModelManager, ComputationalModel
 from ..model.parabolic import ParabolicPDEDataProtocol
-from ..decorator import variantmethod,barycentric
+from ..decorator import variantmethod,barycentric,cartesian
 from ..mesh import Mesh
+from ..utils import is_tensor
 # FEM imports
 from ..functionspace import LagrangeFESpace
 from ..fem import BilinearForm, LinearForm
 from ..fem import DirichletBC
-from ..fem import SpaceTimeConvectionIntegrator
-from ..fem import SpaceTimeSourceIntegrator
-from ..fem import SpaceTimeDiffusionIntegrator
-from ..fem import SpaceTimeMassIntegrator
-
 
 class ParabolicSTFEMModel(ComputationalModel):
     """
@@ -40,6 +36,7 @@ class ParabolicSTFEMModel(ComputationalModel):
         self.set_space_degree(options['space_degree'])
         self.set_quadrature(options['quadrature'])
         self.set_assemble_method(options['assemble_method'])
+        self.linear_system.set(options['method'])
         self.solve.set(options['solver'])
         self.set_function_space()
         
@@ -105,6 +102,16 @@ class ParabolicSTFEMModel(ComputationalModel):
         self.assemble_method = method
         self.logger.info(f"Assembly method set to {self.assemble_method}.")
         
+    def set_method(self, method: Union[str,None] = None):
+        """
+        Set the method for solving the PDE.
+
+        Parameters:
+            method (str): The method to use for solving the PDE.
+        """
+        self.method = method
+        self.logger.info(f"Method set to {self.method}.")
+
     def set_function_space(self):
         """
         Set the function space for the finite element method.
@@ -113,28 +120,85 @@ class ParabolicSTFEMModel(ComputationalModel):
         self.space = LagrangeFESpace(self.mesh, p=self.p)
         self.logger.info(f"Function space initialized with polynomial order {self.p}.")
         self.uh = self.space.function()
+    
+    @cartesian
+    def diff_coef_expand(self, diff_coef, p: TensorLike, epsilon: float = 1e-12, index: Index = _S) -> TensorLike:
+        """
+        Expand the diffusion coefficient to match the shape of the basis function gradients.
+
+        Parameters:
+            coef (TensorLike): The diffusion coefficients at quadrature points.
+        """
+        if not callable(diff_coef):
+            coef = diff_coef
+        else:
+            coef = diff_coef(p)
+        shape = p.shape + (p.shape[-1],)
+        dim = p.shape[-1]
+        idx = bm.arange(dim-1)
+        coef_exp = bm.zeros(shape, dtype=bm.float64)
+        coef_exp = bm.set_at(coef_exp, (...,idx,idx), coef)
+        coef_exp = bm.set_at(coef_exp, (...,-1,-1), epsilon)
+        return coef_exp[index]
+    
+    @cartesian
+    def conv_coef_expand(self, conv_coef, p: TensorLike, index: Index = _S) -> TensorLike:
+        """
+        Expand the convection coefficient to match the shape of the basis function gradients.
         
+        Parameters:
+            coef (TensorLike): The convection coefficients at quadrature points.
+        """
+        if not callable(conv_coef):
+            coef = conv_coef
+        else:
+            coef = conv_coef(p)
+        shape = p.shape
+        if isinstance(coef, (int, float)):
+            coef_exp = bm.broadcast_to(coef, shape).copy()
+            coef_exp = bm.set_at(coef_exp, (...,-1),1.0)
+            return coef_exp[index]
+        elif is_tensor(coef):
+            if coef.ndim == 1:
+                coef = bm.concat([coef , bm.array([1.0], dtype=coef.dtype)], axis=0)
+                return bm.broadcast_to(coef, shape)[index]
+            elif coef.ndim >= 2:
+                ones = bm.ones((coef.shape[:-1]+(1,)), dtype=coef.dtype)
+                coef_exp = bm.concat([coef, ones], axis=-1)
+                return coef_exp[index]
+    
+    @variantmethod
     def linear_system(self):
         """
         Set up the linear system for the parabolic PDE.
         This method initializes the bilinear and linear forms, and sets up the Dirichlet boundary conditions.
         """
+        from ..fem import ScalarMassIntegrator
+        from ..fem import ScalarDiffusionIntegrator
+        from ..fem import ScalarConvectionIntegrator
+        from ..fem import ScalarSourceIntegrator
+
         space = self.space
         pde = self.pde
-        method = self.assemble_method
+        amethod = self.assemble_method
         q = self.q
         self.bform = BilinearForm(space)
         self.lform = LinearForm(space)
         self.logger.info("Linear system set with bilinear and linear forms.")
-        STMI = SpaceTimeMassIntegrator(coef=pde.reaction_coef, q=q, method=method,conv_coef=pde.convection_coef)
-        STDI = SpaceTimeDiffusionIntegrator(coef=pde.diffusion_coef, q=q, method=method, conv_coef=pde.convection_coef)
-        STCI = SpaceTimeConvectionIntegrator(coef=pde.convection_coef, q=q, method=method)
-        STSI = SpaceTimeSourceIntegrator(source=pde.source, q=q, method=method, conv_coef=pde.convection_coef)
+        ps = self.mesh.bc_to_point(self.bcs)
+        diff_coef = self.diff_coef_expand(pde.diffusion_coef, p = ps)
+        conv_coef = self.conv_coef_expand(pde.convection_coef, p = ps)
+
+        SMI = ScalarMassIntegrator(coef=pde.reaction_coef, q=q, method=amethod)
+        SDI = ScalarDiffusionIntegrator(coef=diff_coef, q=q, method=amethod)
+        SCI = ScalarConvectionIntegrator(coef=conv_coef, q=q, method=amethod)
+        SSI = ScalarSourceIntegrator(source=pde.source, q=q, method=amethod)
 
         self.logger.info("Integrators for mass, diffusion, convection, and source terms created.")
-        self.bform.add_integrator(STMI, STDI, STCI)
+        self.bform.add_integrator(SMI, SDI, SCI)
+        # self.bform.add_integrator(STMI, STDI, STCI)
         self.logger.info("Bilinear form set with diffusion, convection and mass terms.")
-        self.lform.add_integrator(STSI)
+        self.lform.add_integrator(SSI)
         self.logger.info("Linear form set with source term.")
         
         A = self.bform.assembly()
@@ -144,7 +208,48 @@ class ParabolicSTFEMModel(ComputationalModel):
         self.logger.info("Bilinear and linear forms assembled.")
         
         return A, b
-    
+
+    @linear_system.register('SUPG')
+    def linear_system(self):
+        from ..fem import ScalarMassIntegrator
+        from ..fem import ScalarDiffusionIntegrator
+        from ..fem import ScalarConvectionIntegrator
+        from ..fem import ScalarSourceIntegrator
+        from ..fem import SpaceTimeResidualIntegrator
+        from ..fem import SpaceTimeSourceResidualIntegrator
+
+        space = self.space
+        pde = self.pde
+        method = self.assemble_method
+        q = self.q
+        self.bform = BilinearForm(space)
+        self.lform = LinearForm(space)
+        self.logger.info("Linear system set with bilinear and linear forms.")
+        ps = self.mesh.bc_to_point(self.bcs)
+        diff_coef = self.diff_coef_expand(pde.diffusion_coef, ps)
+        conv_coef = self.conv_coef_expand(pde.convection_coef, ps)
+
+        SMI = ScalarMassIntegrator(coef=pde.reaction_coef, q=q, method=method)
+        SDI = ScalarDiffusionIntegrator(coef=diff_coef, q=q, method=method)
+        SCI = ScalarConvectionIntegrator(coef=conv_coef, q=q, method=method)
+        SSI = ScalarSourceIntegrator(source=pde.source, q=q, method=method)
+        SRI = SpaceTimeResidualIntegrator(pde=pde, q=q)
+        SSRI = SpaceTimeSourceResidualIntegrator(pde=pde, q=q)
+        
+        self.logger.info("Integrators for mass, diffusion, convection, and source terms created.")
+        self.bform.add_integrator(SMI, SDI, SCI, SRI)
+        self.logger.info("Bilinear form set with diffusion, convection , mass and residual terms.")
+        self.lform.add_integrator(SSI, SSRI)
+        self.logger.info("Linear form set with source and source residual terms.")
+        
+        A = self.bform.assembly()
+        self.logger.info(f"Linear system initialized with {A.shape} matrix.")
+        b = self.lform.assembly()
+        self.logger.info(f"Linear system initialized with {b.shape} right-hand side vector.")
+        self.logger.info("Bilinear and linear forms assembled.")
+        
+        return A, b
+
     def apply_bc(self,A,b):
         """
         Apply Dirichlet boundary conditions to the linear system.
@@ -248,6 +353,30 @@ class ParabolicSTFEMModel(ComputationalModel):
                     ms['nx'] *= 2
                     ms['ny'] = int(ms['nx']**2*1.2)
                 self.mesh = self.pde.init_mesh[self.options['init_mesh']](**ms)
+                self.space = LagrangeFESpace(self.mesh, p=self.p)
+                self.uh = self.space.function()
+        if plot_error:
+            self.show_order(error_matrix,maxit)
+    
+    @run.register("uniform_refine")
+    def run(self,maxit=4,plot_error=False):
+        """
+        Run the model with uniform mesh refinement.
+        Parameters:
+            maxit (int): The maximum number of refinement iterations.
+        """
+        error_matrix = bm.zeros((maxit+1,2), dtype=bm.float64)
+        for i in range(maxit):
+            A, b = self.linear_system()
+            A, b = self.apply_bc(A, b)
+            self.uh[:] = self.solve(A, b)
+            l2,h1 = self.error()
+            self.logger.info(f"{i}-th step with  L2 Error: {l2}, H1 Error: {h1}.")
+            error_matrix[i,0] = l2
+            error_matrix[i,1] = h1
+            if i < maxit - 1:
+                self.logger.info(f"Refining mesh {i+1}/{maxit}.")
+                self.mesh.uniform_refine()
                 self.space = LagrangeFESpace(self.mesh, p=self.p)
                 self.uh = self.space.function()
         if plot_error:
@@ -449,8 +578,8 @@ class ParabolicSTFEMModel(ComputationalModel):
     def to_vtk(self, filename='parabolic_stfem_solution.vtu'):
         uh = self.uh
         mesh = self.mesh
-        mesh.nodedata['uh_node'] = uh
-        mesh.celldata['uh'] = uh.value(self.bcs)
+        mesh.nodedata['uh'] = uh
+        # mesh.celldata['uh'] = uh.value(self.bcs)
         mesh.to_vtk(filename)
 
         

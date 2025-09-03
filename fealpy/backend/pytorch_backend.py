@@ -347,28 +347,44 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
         return b, indices0, indices1, inverse, counts
 
     @staticmethod
-    def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=0, **kwargs):
-        b, inverse, counts = torch.unique(a, return_inverse=True,
-                return_counts=True,
-                dim=axis, **kwargs)
+    def unique(a, return_index=False, return_inverse=False, return_counts=False, axis=None, **kwargs):
+        if axis is None:
+            b, inverse, counts = torch.unique(a.flatten(), return_inverse=True,
+                                              return_counts=True,
+                                              dim=0, **kwargs)
+        else:
+            b, inverse, counts = torch.unique(a, return_inverse=True,
+                                              return_counts=True,
+                                              dim=axis, **kwargs)
+
         any_return = return_index or return_inverse or return_counts
         if any_return:
-            result = (b, )
+            result = (b,)
         else:
-            result = b
+            return b 
 
         if return_index:
-            kwargs = {'dtype': inverse.dtype, 'device': inverse.device}
-            indices = torch.zeros(counts.shape, **kwargs)
-            idx = torch.arange(a.shape[axis]-1, -1, -1, **kwargs)
-            indices.scatter_(0, inverse.flip(dims=[0]), idx)
-            result += (indices, )
+            if axis is None:
+                original_tensor = a.flatten()
+                size = original_tensor.shape[0]
+            else:
+                original_tensor = a
+                size = original_tensor.shape[axis]
+            
+            kwargs_device_dtype = {'dtype': inverse.dtype, 'device': inverse.device}
+            indices = torch.zeros(counts.shape, **kwargs_device_dtype)
+            idx_range = torch.arange(size - 1, -1, -1, **kwargs_device_dtype)
+            flipped_inverse = inverse.flip(dims=[0])
+            indices.scatter_(0, flipped_inverse, idx_range)
+            result += (indices,)
 
         if return_inverse:
-            result += (inverse, )
+            if axis is None:
+                inverse = inverse.reshape(a.shape)
+            result += (inverse,)
 
         if return_counts:
-            result += (counts, )
+            result += (counts,)
 
         return result
 
@@ -880,3 +896,5 @@ class PyTorchRandom(ModuleProxy):
 
 
 PyTorchRandom.attach_methods({'seed': 'manual_seed'}, torch)
+
+

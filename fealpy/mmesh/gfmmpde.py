@@ -29,7 +29,8 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
         elif self.TD == 3:
             self.equ_solver = cubic_equ_solver
             self.compute_coef = lambda p : _compute_coef_3d(p,self.AC_gererator)
-
+            self.A,self.b = self._get_linear_constraint()
+            
         if self.mesh_type in ["TriangleMesh","TetrahedronMesh"]:
             self.scell = self.cell
         elif self.mesh_type == "QuadrangleMesh":
@@ -45,9 +46,10 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
         if self.mesh_type in ["TriangleMesh","TetrahedronMesh"]:
             self.matrix_assemblor = self.fast_matrix_assembly
         else:
-            self.matrix_assemblor = self.matrix_assembly
+            self.matrix_assemblor = self.matrix_assembly    
 
         self.SCI = ScalarConvectionIntegrator(q = self.q,method=self.assambly_method)
+        self.SSI = ScalarSourceIntegrator(q = self.q,method=self.assambly_method)
         self.lphi = self.lmspace.basis(self.bcs)
         self.lgphi = self.lmspace.grad_basis(self.bcs)
         self.cell2cell = self.mesh.cell_to_cell()
@@ -62,7 +64,37 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
         self.itSMI = ScalarMassIntegrator(q =self.q,method= None)
         self.itSSI = ScalarSourceIntegrator(q =self.q,method= None)
         self.bc = DirichletBC(self.lmspace)
- 
+        if self.TD == 3:
+            self.vertice_and_arris = self._vertice_and_arris(self.mesh)
+            self.is_vertice_and_arris = bm.zeros(self.NN, dtype=bm.bool, device=self.device)
+            self.is_vertice_and_arris = bm.set_at(self.is_vertice_and_arris,(self.vertice_and_arris,), True)
+            self.bc = DirichletBC(self.lmspace,threshold=self.is_vertice_and_arris)
+
+    def _get_linear_constraint(self):
+        """
+        @brief construct the linear constraint
+        """
+        Vertices_idx = self.Vertices_idx
+        Bdinnernode_idx = self.Bdinnernode_idx
+        Binnorm = self.Bi_Pnode_normal
+
+        NN = self.NN
+        BDINN = len(Bdinnernode_idx)
+        VNN = len(Vertices_idx)
+
+        A_diag = bm.zeros((self.TD , NN)  , **self.kwargs0)
+        A_diag = bm.set_at(A_diag , (...,Bdinnernode_idx) , Binnorm.T)
+        A_m0 = CSRTensor(crow= bm.arange(BDINN+1,**self.kwargs1),col=Bdinnernode_idx,
+                         values=A_diag[0,Bdinnernode_idx],spshape=(BDINN,NN))
+        A_m1 = CSRTensor(crow= bm.arange(BDINN+1,**self.kwargs1),col=Bdinnernode_idx,
+                         values=A_diag[1,Bdinnernode_idx],spshape=(BDINN,NN))
+        A_m2 = CSRTensor(crow= bm.arange(BDINN+1,**self.kwargs1),col=Bdinnernode_idx,
+                         values=A_diag[2,Bdinnernode_idx],spshape=(BDINN,NN))
+        A = hstack([A_m0, A_m1, A_m2])
+        b = self.b_val0
+        
+        return A,b
+
     def matrix_assembly(self):
         """
         Assemble the matrix for the GFMMPDE method.
@@ -169,22 +201,19 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
         sm = self.sm
 
         a_recover = bm.zeros((self.NN,self.TD,self.TD),**self.kwargs0)
-        cm_weight = d[:, None]
+        cm_weight = self.rm*d[:, None]
         a_recover = bm.index_add(a_recover,cell2dof,(a*cm_weight)[:,None,...])
         a_recover /= sm[:,None,None]
         A_xi = bm.einsum('cqid,cidk-> cqk',lgphi,a_recover[cell2dof])
         AmB = A_xi - b[:,None,:]
         A_value = bm.einsum('cqi,cidk-> cqdk',lphi,a_recover[cell2dof])
- 
+        
         SCI = self.SCI
         SDI = self.SDI
         SMI = self.SMI
         SCI.coef = self.dt * AmB
         SDI.coef = self.dt * A_value 
         SMI.coef = self.tau 
-        SCI.clear()
-        SDI.clear()
-        SMI.clear()
         A = self.bform.assembly()
         return A
 
@@ -198,7 +227,7 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
         cell2dof = self.cell2dof
         b_c = self.tau*bm.einsum('cqi,cqj,cjd,q-> cid',lphi , 
                         lphi , node[cell2dof],ws)* self.logic_cm[:,None,None]
-        
+
         F = bm.zeros((self.NN,self.TD),**self.kwargs0)
         F = bm.index_add(F, cell2dof , b_c)
         return F
@@ -244,7 +273,105 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
                 node, M, sbd_node_idx, vertices_idx
             )
         return node
-    
+
+    def boundary_move_3d(self):
+        """
+        Move the boundary node in 3D
+        """
+        M = self.M_node
+        arris2node = self.arris2node
+        node = bm.copy(self.node)
+        vertices_idx = self.Vertices_idx
+        node = self._process_boundary_3d(node, M, arris2node)
+        return node
+
+    def _process_boundary_3d(self, node, M, arris2node:CSRTensor):
+        """
+        处理 3D 边界棱上的点移动
+        """
+        i, j = arris2node.row , arris2node.col
+        ui,counts = bm.unique(i, return_counts=True)
+        SDI = self.itSDI
+        SMI = self.itSMI
+        SCI = self.itSCI
+        SSI = self.itSSI
+        for k in range(counts.shape[0]):
+            # 获取当前棱的节点索引和点坐标
+            K = k*counts[k] + bm.arange(counts[k])
+            arris_node = self.node[j[K]]
+            arris_M = M[j[K]]
+            # 按照某个维度进行排序
+            for m in range(self.GD):
+                if bm.abs(arris_node[0,m] - arris_node[1,m]) > 1e-10:
+                    sorted_idx = bm.argsort(arris_node[:,m])
+                    # 处理排序后的节点
+                    arris_node = arris_node[sorted_idx]
+                    arris_M = arris_M[sorted_idx]
+                    G = j[K][sorted_idx]
+                    break
+            # 计算单位切向量，并将控制函数投影到边界
+            vector = arris_node[-1] - arris_node[0]
+            v_length = bm.linalg.norm(vector, axis=-1)
+            norm_vector = vector / v_length
+            if arris_M.ndim > 1:
+                arris_M = norm_vector @ arris_M @ norm_vector
+
+            # 构造一个低维局部逻辑网格
+            part_NN = arris_node.shape[0]
+            part_logic_node = bm.linspace(0, 1, num=part_NN)
+            part_logic_cell = bm.stack([bm.arange(part_NN-1),
+                                    bm.arange(1, part_NN)], axis=1)
+            x_n = bm.linalg.norm(arris_node - arris_node[0], axis=-1) / v_length
+            pc_mea = x_n[1:] - x_n[:-1]
+            sm = bm.zeros(part_NN, **self.kwargs0)
+            sm = bm.index_add(sm, part_logic_cell, pc_mea[:, None])
+            
+            part_mesh = IntervalMesh(part_logic_node, part_logic_cell)
+            space = LagrangeFESpace(part_mesh, p=1)
+            qf = part_mesh.quadrature_formula(self.q)
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            gphi = part_mesh.grad_shape_function(bcs, variables='x')
+            phi = part_mesh.shape_function(bcs)
+            
+            grad_M = bm.einsum('cqid,ci-> cq', gphi, arris_M[part_logic_cell])
+            grad_M_node = bm.zeros(part_NN, **self.kwargs0)
+            grad_M_node = bm.index_add(grad_M_node,
+                                    part_logic_cell, grad_M[:, 0, None] * pc_mea[:, None])
+            grad_M_node = grad_M_node / sm
+            
+            p_node = 1 / bm.sqrt(arris_M**2 + grad_M_node**2)
+            p = bm.einsum('cqi, ci -> cq', phi[None, ...], (p_node)[part_logic_cell])
+            grad_p = bm.einsum('cqid,ci-> cqd', gphi, (p_node)[part_logic_cell])
+            M_cell = bm.mean(arris_M[part_logic_cell], axis=-1)
+
+            bform = BilinearForm(space)
+            bform.add_integrator(SDI, SMI, SCI)
+            SDI.coef = self.dt * p * M_cell[:, None]
+            SMI.coef = self.tau
+            SCI.coef = self.dt * grad_p * M_cell[:, None, None]
+            SDI.clear()
+            SMI.clear()
+            SCI.clear()
+            A = bform.assembly()
+
+            lform = LinearForm(space)
+            lform.add_integrator(SSI)
+            SSI.source = self.tau * space.function(x_n)
+            SSI.clear()
+            b = lform.assembly()
+            
+            bdIdx = bm.zeros(part_NN, **self.kwargs0)
+            bdIdx[[0, -1]] = 1
+            D0 = spdiags(1-bdIdx, 0, part_NN, part_NN)
+            D1 = spdiags(bdIdx, 0, part_NN, part_NN)
+            A = D0 @ A + D1
+            b[0] = 0
+            b[-1] = 1
+            x = spsolve(A, b, 'scipy')
+            node = bm.set_at(node,G, node[G[0]] + vector * x[:, None])
+        
+        return node
+
     def _process_boundary_group(self, node, M, group_sbd_node_idx, vertices_group):
         """
         处理单个边界组的移动
@@ -360,21 +487,47 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
     def func_solver(self):
         H = self.matrix_assemblor()
         F = self.vector_assembly()
-        
+        TD = self.TD
         bd_condition = self.boundary_move()
         F_new = bm.zeros((self.NN,self.GD),**self.kwargs0)
         H0 = H.copy()
         for i in range(self.GD):
             self.bc.gd = bd_condition[:,i]
             H, F0 = self.bc.apply(H0, F[:,i])
-            F_new[:,i] = F0
+            F_new = bm.set_at(F_new,(...,i), F0)
 
-        H_bar = bmat([[H, None],
-                 [None, H]],format='csr')
+        blocks = [[None] * TD for _ in range(TD)] 
+        for i in range(TD):
+            blocks[i][i] = H
+        H_bar = bmat(blocks, format='csr')
         F_flat = F_new.T.flatten()
         x = spsolve(H_bar,F_flat,solver='scipy')
+        NN = self.NN
+        x = x.reshape(TD,NN).T
+        return x
+
+    def func_solver_3d(self):
+        H = self.matrix_assemblor()
+        F = self.vector_assembly()
+        A, b = self.A, self.b
         TD = self.TD
         NN = self.NN
+        bd_condition = self.boundary_move_3d()
+        F_new = bm.zeros((self.NN,self.GD),**self.kwargs0)
+        H0 = H.copy()
+        for i in range(self.GD):
+            self.bc.gd = bd_condition[:,i]
+            H, F0 = self.bc.apply(H0, F[:,i])
+            F_new = bm.set_at(F_new,(...,i), F0)
+        blocks = [[None] * TD for _ in range(TD)] 
+        for i in range(TD):
+            blocks[i][i] = H
+        H_bar = bmat(blocks, format='csr')
+        H_bar = bmat([[H_bar,A.T],[A,None]],format='csr')
+        F_flat = F_new.T.flatten()
+        F_flat = bm.concat([F_flat, b], axis=0)
+        x = cg(H_bar,F_flat,atol=1e-10,rtol = 1e-10)
+        x = x[:TD*NN]
         x = x.reshape(TD,NN).T
         return x
 
@@ -442,18 +595,21 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
             self.monitor()
             self.mol_method()
             self.monitor_time_smooth(old_M)
+            if self.TD == 2:
+                node = self.func_solver()
+            else:
+                node = self.func_solver_3d()
 
-            node = self.func_solver()
             v = node - self.node
             node = self._get_physical_node(v)
-            
             error = bm.max(bm.linalg.norm(node - self.node,axis=1))
             print(f"iteration {i} , error: {error}")
             self.uh = self.interpolate(node)
             old_M = self.M.copy()
             self.construct(node)
             if error < self.tol:
-                break       
+                break
+              
             
     def preprocessor(self,fun_solver =None):
         """

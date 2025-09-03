@@ -1,9 +1,12 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.cfd.simulation.fem import Newton, Ossen
-from fealpy.cfd.equation import IncompressibleNS
-from fealpy.cfd.problem.incompressible_navier_stokes_2d import Channel
+
 from fealpy.fem import DirichletBC
+
 from fealpy.solver import spsolve 
+
+from ..simulation.fem import Newton, Ossen
+from ..equation import IncompressibleNS
+from ..problem.incompressible_navier_stokes_2d import Channel
 
 backend = 'numpy'
 bm.set_backend(backend)

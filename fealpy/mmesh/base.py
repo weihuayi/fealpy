@@ -1,5 +1,5 @@
 from .config import *
-from .tool import _solve_quad_parametric_coords
+from .tool import _solve_quad_parametric_coords,_solve_hex_parametric_coords
 from ..decorator import variantmethod
 
 class MM_PREProcessor:
@@ -60,10 +60,19 @@ class MM_PREProcessor:
             else:
                 p_mesh = self.mesh
                 self.lmspace = LagrangeFESpace(self.logic_mesh, p=self.p)
-            (self.Vertices_idx,
-             self.Bdinnernode_idx,
-             self.sort_BdNode_idx) = self._get_various_bdidx(p_mesh,True)
-            self._align_boundary_with_vertices()
+            if self.mesh.TD == 2:
+                (self.Vertices_idx,
+                self.Bdinnernode_idx,
+                self.sort_BdNode_idx) = self._get_various_bdidx(p_mesh,True)
+                self._align_boundary_with_vertices()
+            else:
+                self.isconvex = self._is_convex()
+                (self.Vertices_idx,
+                self.Bdinnernode_idx,
+                self.Arrisnode_idx) = self._get_various_bdidx(p_mesh,False)
+                self.arris2node = self._arris_to_node(self.mesh)
+                self.Bi_Pnode_normal,self.Ar_Pnode_normal,bcollection = self._get_normal_information(self.mesh)
+                self.b_val0 = bcollection[0]
             self._space_preparation()
 
     def _meshtop_preparation(self):
@@ -334,8 +343,9 @@ class MM_PREProcessor:
         """
         NN = self.NN
         d = self.d
+        rm = self.rm
         star_measure = bm.zeros(NN,**self.kwargs0)
-        cell_areas = bm.sum(d * self.ws[None,:], axis=1)
+        cell_areas = bm.sum(rm*d* self.ws[None,:], axis=1)
         bm.index_add(star_measure , self.cell , cell_areas[:,None])
         return star_measure
     
@@ -462,7 +472,9 @@ class MM_PREProcessor:
         if not is_bdsort:
             Vertices_idx = BdNodeidx[node2face_normal[:,-1] >= 0]
             if mesh.TD == 3:
-                Arrisnode_idx = BdNodeidx[(node2face_normal[:,1] >= 0) & (node2face_normal[:,-1] < 0)]
+                second_vol_idx = node2face_normal[:,1] >= 0
+                # 找出棱内点
+                Arrisnode_idx = BdNodeidx[(second_vol_idx) & (node2face_normal[:,-1] < 0)]
             return Vertices_idx,Bdinnernode_idx,Arrisnode_idx
         else:
             if self.vertices is None:
@@ -482,7 +494,53 @@ class MM_PREProcessor:
                 Vertices_idx = bm.matmul(judge_Vertices, K)
             sort_Bdnode_idx,sort_Bdface_idx = self._sort_bdnode_and_bdface(mesh)
             return Vertices_idx,Bdinnernode_idx,sort_Bdnode_idx
+
+    def _arris_to_node(self,mesh:_U):
+        from ..sparse import coo_matrix
+        node2face_normal,normal = self._get_node2face_norm(mesh)
+        bd_arris_idx = (node2face_normal[:,1] >= 0) & (node2face_normal[:,-1] < 0)
+        # 给棱上点进行逐棱分类
+        Arris_sort_vol = bm.sort(node2face_normal[bd_arris_idx,:-1],axis=-1)
+        t,inverse = bm.unique(Arris_sort_vol,return_inverse=True,axis=0)
+        # row 表示内点对应的棱编号
+        row = inverse 
+        col = self.Arrisnode_idx
+        # 使用棱点对角点的关系，找到每个棱内点的邻接角点
+        node2node = self.mesh.node_to_node(format='csr')
+        shift = node2node[self.Arrisnode_idx, self.Vertices_idx]
+        i,j = shift.row, shift.col
+        # 按照棱内点的顺序将所有的邻接角点添加到对应的角点索引中
+        row_exp = bm.concat([row, row[i]],axis=0)
+        col_exp = bm.concat([col, self.Vertices_idx[j]],axis=0)
+        # 将其存储为稀疏布尔格式
+        value = bm.ones_like(row_exp,dtype=bm.bool, device=self.device)
+        arris_to_node = coo_matrix((value, (row_exp, col_exp)), shape=(len(t), self.NN))
+        return arris_to_node.tocsr()
+    
+    def _vertice_and_arris(self,mesh:_U):
+        BdNodeidx = self.BdNodeidx
+        node2face_normal,normal = self._get_node2face_norm(mesh)
+        vertice_arris_idx = (node2face_normal[:,1] >= 0)
+        return BdNodeidx[vertice_arris_idx]
         
+    def _arris_to_vertice(self,mesh:_U):
+        pass
+
+    def _vertice_to_arris(self,mesh:_U):
+        pass
+
+    def _surface_to_vertice(self,mesh:_U):
+        pass
+    
+    def _vertice_to_surface(self,mesh:_U):
+        pass
+
+    def _arris_to_surface(self,mesh:_U):
+        pass
+
+    def _surface_to_arris(self,mesh:_U):
+        pass
+
     def _get_normal_information(self,mesh:_U) -> TensorLike:
         """
         get the normal information
@@ -864,6 +922,12 @@ class MM_Interpolater(MM_PREProcessor):
         elif self.mesh_type == "QuadrangleMesh":
             self.interpolate_batch = self._quad_interpolate_batch
             self.high_order_batch = self._quad_high_order_interpolate
+        elif self.mesh_type == "TetrahedronMesh":
+            self.interpolate_batch = self._tet_interpolate_batch
+            self.high_order_batch = self._tet_high_order_interpolate
+        elif self.mesh_type == "HexahedronMesh":
+            self.interpolate_batch = self._hex_interpolate_batch
+            self.high_order_batch = self._hex_high_order_interpolate
 
     @variantmethod('comass')
     def interpolate(self,moved_node:TensorLike):
@@ -921,7 +985,6 @@ class MM_Interpolater(MM_PREProcessor):
         new_uh = bm.zeros(self.NN, **self.kwargs0) # 初始化新的解向量,对节点优先进行赋值
         interpolated = bm.zeros(self.NN, dtype=bool, device=self.device)
         
-        
         current_i, current_j = self.interpolate_batch(i, j, new_uh, 
                                                       interpolated,moved_node) 
         # 迭代扩展 - 添加循环上限
@@ -978,7 +1041,7 @@ class MM_Interpolater(MM_PREProcessor):
         inv_matrix = bm.linalg.inv(v_matrix)
         lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
         lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
-        valid = bm.all(lam > -1e-14, axis=-1) & ~interpolated[nodes]
+        valid = bm.all(lam > -1e-10, axis=-1) & ~interpolated[nodes]
         
         if bm.any(valid):
             valid_nodes = nodes[valid]
@@ -1006,7 +1069,7 @@ class MM_Interpolater(MM_PREProcessor):
         """
         if len(nodes) == 0:
             return bm.array([], **self.kwargs1), bm.array([], **self.kwargs1)
-            
+        
         # 使用 [0,1]×[0,1] 参数坐标求解
         xi_eta = _solve_quad_parametric_coords(
             moved_node[nodes], self.node[self.cell[cells]]
@@ -1027,6 +1090,98 @@ class MM_Interpolater(MM_PREProcessor):
             valid_nodes = nodes[valid]
             valid_cells = cells[valid]
             valid_shape = (phi0[:, :, None] * phi1[:, None, :]).reshape(phi0.shape[0], -1)
+            valid_value = bm.sum(valid_shape * self.uh[self.pcell2dof[valid_cells]], axis=1)
+            new_uh = bm.set_at(new_uh, valid_nodes, valid_value)
+            interpolated = bm.set_at(interpolated, valid_nodes, True)
+
+        return nodes[~interpolated[nodes]], cells[~interpolated[nodes]]
+    
+    def _tet_interpolate_batch(self, nodes, cells, new_uh, interpolated, moved_node):
+        """
+        Tetrahedral mesh interpolation batch processing
+        
+        Parameters
+            nodes: TensorLike, nodes to be interpolated
+            cells: TensorLike, cells corresponding to the nodes
+            new_uh: TensorLike, new solution vector
+            interpolated: TensorLike, boolean mask indicating if nodes are already interpolated
+            moved_node: TensorLike, moved node positions
+        Returns
+            nodes: TensorLike, nodes that still need interpolation
+            cells: TensorLike, cells corresponding to the nodes that still need interpolation
+        """
+        if len(nodes) == 0:
+            return bm.array([], **self.kwargs1), bm.array([], **self.kwargs1)
+        # 计算重心坐标 (类似三角形但在3D)
+        # 对四面体 [v0, v1, v2, v3]，重心坐标通过求解 3x3 线性系统
+        v_matrix = bm.permute_dims(
+            self.node[self.cell[cells, 1:]] - self.node[self.cell[cells, 0:1]], 
+            axes=(0, 2, 1)
+        )  # (NC, 3, 3)
+        v_b = moved_node[nodes] - self.node[self.cell[cells, 0]]  # (NC, 3)
+        
+        inv_matrix = bm.linalg.inv(v_matrix)
+        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)  # (NC, 3)
+        lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)  # (NC, 4)
+        
+        # 检查重心坐标有效性
+        valid = bm.all(lam > -2e-5, axis=-1) & ~interpolated[nodes]
+        if bm.any(valid):
+            valid_nodes = nodes[valid]
+            # 使用四面体形函数
+            phi = self.mesh.shape_function(lam[valid], self.pspace.p)
+            valid_value = bm.sum(phi * self.uh[self.pcell2dof[cells[valid]]], axis=1)
+            
+            new_uh = bm.set_at(new_uh, valid_nodes, valid_value)
+            interpolated = bm.set_at(interpolated, valid_nodes, True)
+        
+        return nodes[~interpolated[nodes]], cells[~interpolated[nodes]]
+    
+    def _hex_interpolate_batch(self, nodes, cells, new_uh, interpolated, moved_node):
+        """
+        Hexahedral mesh interpolation batch processing
+        
+        Parameters
+            nodes: TensorLike, nodes to be interpolated
+            cells: TensorLike, cells corresponding to the nodes
+            new_uh: TensorLike, new solution vector
+            interpolated: TensorLike, boolean mask indicating if nodes are already interpolated
+            moved_node: TensorLike, moved node positions
+        Returns
+            nodes: TensorLike, nodes that still need interpolation
+            cells: TensorLike, cells corresponding to the nodes that still need interpolation
+        """
+        if len(nodes) == 0:
+            return bm.array([], **self.kwargs1), bm.array([], **self.kwargs1)
+            
+        # 使用 [0,1]³ 参数坐标求解六面体内的位置
+        xi_eta_zeta = _solve_hex_parametric_coords(
+            moved_node[nodes], self.node[self.cell[cells]]
+        )
+        # 检查有效性：参数在 [0,1]³ 范围内
+        tolerance = 5e-6
+        param_in_range = bm.all((xi_eta_zeta >= -tolerance) & (xi_eta_zeta <= 1.0 + tolerance), axis=-1)
+        not_interpolated = ~interpolated[nodes]
+
+        valid = (param_in_range & not_interpolated)
+
+        if bm.any(valid):
+            # 构造三线性形函数
+            xi, eta, zeta = xi_eta_zeta[valid, 0], xi_eta_zeta[valid, 1], xi_eta_zeta[valid, 2]
+            # 对于高阶六面体，需要使用张量积形函数
+            mi = bm.multi_index_matrix(self.pspace.p, 1, dtype=self.itype)
+            bc = (bm.stack([1-xi, xi], axis=1),
+                  bm.stack([1-eta, eta], axis=1),
+                  bm.stack([1-zeta, zeta], axis=1))
+            phi0 = bm.simplex_shape_function(bc[0], p=self.pspace.p, mi=mi)
+            phi1 = bm.simplex_shape_function(bc[1], p=self.pspace.p, mi=mi)
+            phi2 = bm.simplex_shape_function(bc[2], p=self.pspace.p, mi=mi)
+            # 张量积形函数
+            valid_shape = (phi0[:, :, None, None] * 
+                           phi1[:, None, :, None] * 
+                           phi2[:, None, None, :]).reshape(phi0.shape[0], -1)
+            valid_nodes = nodes[valid]
+            valid_cells = cells[valid]
             valid_value = bm.sum(valid_shape * self.uh[self.pcell2dof[valid_cells]], axis=1)
             new_uh = bm.set_at(new_uh, valid_nodes, valid_value)
             interpolated = bm.set_at(interpolated, valid_nodes, True)
@@ -1086,6 +1241,84 @@ class MM_Interpolater(MM_PREProcessor):
         
         return value
 
+    def _tet_high_order_interpolate(self, value, p):
+        """
+        High order interpolation for tetrahedral mesh (p >= 2)
+
+        Parameters
+            value: Tensor, the solution vector
+            p: int, polynomial degree of the space
+        Returns
+            TensorLike: value with high order interpolation values added
+        """
+        if p >= 2:
+            # 边上的插值点
+            edge = self.mesh.edge
+            w = self.mesh.multi_index_matrix(p, 1, dtype=self.ftype, device=self.device)
+            w = w[1:-1]/p
+            edge_value = bm.einsum('ij,cj...->ci...', w, value[edge]).reshape(-1, *value.shape[1:])
+            value = bm.concat((value, edge_value), axis=0)
+
+        if p >= 3:
+            # 面上的插值点
+            face = self.mesh.face
+            multiIndex_face = self.mesh.multi_index_matrix(p, 2, dtype=self.ftype, device=self.device)
+            isEdgeIPoints_face = (multiIndex_face == 0)
+            isInFaceIPoints = ~(isEdgeIPoints_face[:, 0] | isEdgeIPoints_face[:, 1] | 
+                               isEdgeIPoints_face[:, 2])
+            multiIndex_face = multiIndex_face[isInFaceIPoints, :]
+            w_face = multiIndex_face / p
+            face_value = bm.einsum('ij, kj...->ki...', w_face, value[face]).reshape(-1, *value.shape[1:])
+            value = bm.concat((value, face_value), axis=0)
+
+        if p >= 4:
+            # 体内的插值点
+            TD = self.TD  # 应该是3
+            cell = self.cell
+            multiIndex = self.mesh.multi_index_matrix(p, TD, dtype=self.ftype, device=self.device)
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] |
+                                isEdgeIPoints[:, 2] | isEdgeIPoints[:, 3])
+            multiIndex = multiIndex[isInCellIPoints, :]
+            w = multiIndex / p
+            cell_value = bm.einsum('ij, kj...->ki...', w, value[cell]).reshape(-1, *value.shape[1:])
+            value = bm.concat((value, cell_value), axis=0)
+        
+        return value
+    
+    def _hex_high_order_interpolate(self, value, p):
+        """
+        High order interpolation for hexahedral mesh (p >= 2)
+
+        Parameters
+            value: Tensor, the solution vector
+            p: int, polynomial degree of the space
+        Returns
+            TensorLike: value with high order interpolation values added
+        """
+        if p >= 2:
+            cell = self.cell
+            edge = self.mesh.edge
+            multiIndex = self.mesh.multi_index_matrix(p, 1, dtype=self.ftype, device=self.device)
+            w = multiIndex[1:-1, :] / p
+            edge_value = bm.einsum('ij,cj...->ci...', w, value[edge]).reshape(-1, *value.shape[1:])
+            
+            # 面上的高阶点 (每个面是四边形)
+            face = self.mesh.face
+            w_face = bm.einsum('im, jn->ijmn', w, w).reshape(-1, 4)
+            # 重新排列面节点顺序以匹配参数坐标
+            face_value = bm.einsum('ij, kj...->ki...', w_face, 
+                                  value[face[:, [0, 1, 2, 3]]]).reshape(-1, *value.shape[1:])
+            # 体内的高阶点 (三重张量积)
+            w_cell = bm.einsum('im, jn, ko->ijkimno', w, w, w).reshape(-1, 8)
+            # 重新排列单元节点顺序
+            cell_value = bm.einsum('ij, kj...->ki...', w_cell, 
+                                  value[cell[:, [0, 1, 2, 3, 4, 5, 6, 7]]]).reshape(-1, *value.shape[1:])
+            
+            value = bm.concat((value, edge_value, face_value, cell_value), axis=0)
+        
+        return value
+    
     @interpolate.register('mp_comass')
     def interpolate(self,moved_node:TensorLike):
         """

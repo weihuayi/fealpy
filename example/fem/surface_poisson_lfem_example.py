@@ -41,4 +41,5 @@ bm.set_backend(options['backend'])
 
 from fealpy.fem import SurfacePoissonLFEMModel
 model = SurfacePoissonLFEMModel(options)
+model.__str__()
 model.solve['cg']()
