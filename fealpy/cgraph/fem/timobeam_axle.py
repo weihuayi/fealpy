@@ -13,7 +13,7 @@ class TimobeamAxle(CNodeType):
         PortConf("beam_E", DataType.FLOAT),
         PortConf("beam_nu", DataType.FLOAT),
         PortConf("beam_mu", DataType.FLOAT),
-         PortConf("axle_E", DataType.FLOAT),
+        PortConf("axle_E", DataType.FLOAT),
         PortConf("axle_nu", DataType.FLOAT),
         PortConf("axle_mu", DataType.FLOAT)
     ]
