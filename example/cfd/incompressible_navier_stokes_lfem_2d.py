@@ -44,18 +44,18 @@ parser.add_argument('--init_mesh',
 
 parser.add_argument('--box',
     default = [0.0, 2.2, 0.0, 0.41], type=int,
-    help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
+    help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 2.2, 0.0, 0.41].")
 
 parser.add_argument('--center',
     default = (0.2, 0.2), type=float,
-    help="Center of the first circle, default is (0.1, 0.05).")
+    help="Center of the first circle, default is (0.2, 0.2).")
 
 parser.add_argument('--radius',
     default = 0.05, type=int,
-    help="Radius of the circles, default is 0.029.")
+    help="Radius of the circles, default is 0.05.")
 
 parser.add_argument('--n_circle',
-    default = 100, type=int,
+    default = 60, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--lc',
@@ -63,7 +63,7 @@ parser.add_argument('--lc',
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--method',
-    default='Newton', type=str,
+    default='IPCS', type=str,
     help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',

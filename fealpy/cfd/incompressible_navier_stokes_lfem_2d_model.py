@@ -190,14 +190,18 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 # tmr.send('右端项组装时间')
                 A, b = self.fem.apply_bc(A, b, self.pde, t=self.timeline.next_time())
                 # tmr.send('边界条件处理时间')
-                # A, b = self.fem.lagrange_multiplier(A, b)
+                if self.equation.pressure_neumann == True:
+                    A, b = self.fem.lagrange_multiplier(A, b)
                 # tmr.send('拉格朗日乘子处理时间')
             
                 x = self.solve(A, b, 'mumps')
                 # tmr.send('求解线性方程组时间')
                 # next(tmr)
                 uk1[:] = x[:ugdof]
-                pk[:] = x[ugdof:]
+                if self.equation.pressure_neumann == True:
+                    pk[:] = x[ugdof:-1]
+                else:
+                    pk[:] = x[ugdof:]
                 
                 res_u = self.mesh.error(uk0, uk1)
                 # print(res_u)
@@ -239,3 +243,39 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         perror = self.mesh.error(cartesian(lambda p : self.pde.pressure(p, t = t)), ph)
         self.logger.info(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror
+    
+    @error.register('benchmark')
+    def error(self, uh, ph, uh0):
+        self.error_str = 'benchmark'
+        fem = self.fem
+        mesh = self.mesh
+        location = mesh.location
+        qf = mesh.quadrature_formula(q=4, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        vd = fem.uspace.function()
+        ipoints = fem.uspace.interpolation_points()
+        vd[:len(ipoints)][self.pde.is_obstacle_boundary(ipoints)] = 1.0
+        vl = fem.uspace.function()
+        vd[len(ipoints):][self.pde.is_obstacle_boundary(ipoints)] = 1.0
+
+        cellmeasure = self.mesh.entity_measure("cell")
+        p = ph(bcs = bcs)
+        u = uh(bcs = bcs)
+        u0 = uh0(bcs = bcs)
+        grad_vd = self.fem.uspace.grad_value(uh = vd, 
+                                             bc = bcs)
+        grad_vl = self.fem.uspace.grad_value(uh = vl, 
+                                             bc = bcs)
+        grad_uh = self.fem.uspace.grad_value(uh = uh, 
+                                             bc = bcs)
+        
+        cd = (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u, vd(bcs = bcs), cellmeasure)
+        cd -= (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u0, vd(bcs = bcs), cellmeasure)
+        cd += self.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vd, cellmeasure) 
+        cd += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
+                                                    grad_uh,
+                                                    vd(bcs = bcs), cellmeasure)  
+        cd -= bm.einsum('n, knii, kn, k -> ', ws, grad_vd, p, cellmeasure) 
+        cd = -20 * cd
+        return cd

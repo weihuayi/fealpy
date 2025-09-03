@@ -7,11 +7,10 @@ from fealpy.mesher import BoxMesher2d
 class Cylinder2D():
     def __init__(self, options: dict = {}):
         self.options = options
-        self.eps = 1e-10
         self.mu = 1.0e-3
         self.rho = 1.0
         self.box = options.get('box', [0.0, 2.2, 0.0, 0.41])
-        self.radius = options.get('radius', 0.1)
+        self.radius = options.get('radius', 0.05)
         # super().__init__(options)
 
     def get_dimension(self) -> int: 
@@ -99,7 +98,8 @@ class Cylinder2D():
         pi = bm.pi
         sin = bm.sin
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = sin(pi*t/8) * 1/(0.41)**2 * (0.41 - y) * 6 * y
+        # result[..., 0] = sin(pi*t/8) * 1/(0.41)**2 * (0.41 - y) * 6 * y
+        result[..., 0] =  6 * 1/(0.41)**2 * (0.41 - y) * y
         result[..., 1] = bm.array(0.0)
         return result
     
@@ -119,7 +119,7 @@ class Cylinder2D():
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = 0.0
+        result[..., 0] = bm.array(0.0)
         result[..., 1] = bm.array(0.0)
         return result
     
@@ -129,7 +129,7 @@ class Cylinder2D():
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape[0], dtype=p.dtype)
-        result[:] = 0.0
+        result[:] = bm.array(0.0)
         return result
     
     @cartesian
@@ -143,7 +143,7 @@ class Cylinder2D():
         return result
     
     @cartesian
-    def velocity_0(self, p: TensorLike) -> TensorLike:
+    def init_velocity(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity."""
         x = p[..., 0]
         y = p[..., 1]
@@ -151,11 +151,10 @@ class Cylinder2D():
         return result
     
     @cartesian
-    def pressure_0(self, p: TensorLike) -> TensorLike:
+    def init_pressure(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape[0], dtype=p.dtype)
-        result[:] = 0.0
         return result
     
     @cartesian
@@ -164,8 +163,8 @@ class Cylinder2D():
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        result[..., 0] = 0.0
-        result[..., 1] = 0.0
+        result[..., 0] = bm.array(0.0)
+        result[..., 1] = bm.array(0.0)
         return result
     
     @cartesian
@@ -176,17 +175,18 @@ class Cylinder2D():
         return inlet|wall|obstacle
     
     @cartesian
-    def is_pressure_boundary(self, p : TensorLike) -> TensorLike:
+    def is_pressure_boundary(self, p : TensorLike = None) -> TensorLike:
+        if p is None:
+            return 1
         is_out = self.is_outlet_boundary(p)
         return is_out
-        # return 0
     
     @cartesian
     def is_inlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point where velocity is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-2
+        atol = 1e-4
         on_boundary = (
             (bm.abs(x - self.box[0]) < atol) &
             (y > self.box[2]) & (y < self.box[3]))
@@ -197,7 +197,7 @@ class Cylinder2D():
         """Check if point where pressure is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-2
+        atol = 1e-4
         on_boundary = (bm.abs(x - self.box[1]) < atol)
         return on_boundary
     
@@ -206,7 +206,7 @@ class Cylinder2D():
         """Check if point where velocity is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-2
+        atol = 1e-4
         on_boundary = (
             (bm.abs(y - self.box[2]) < atol) | (bm.abs(y - self.box[3]) < atol))
         return on_boundary
@@ -218,7 +218,7 @@ class Cylinder2D():
         y = p[..., 1]
         cx, cy = self.center
         radius = self.radius
-        atol = 1e-2
+        atol = 1e-4
         # 检查是否接近圆的边界
         on_boundary = bm.abs((x - cx)**2 + (y - cy)**2 - radius**2) < atol
         return on_boundary

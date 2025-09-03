@@ -15,7 +15,7 @@ parser.add_argument('--backend',
     help = "Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
     
 parser.add_argument('--pde',
-    default = 4, type = str,
+    default = 3, type = str,
     help = "Name of the PDE model, default is exp0001")
 
 parser.add_argument('--init_mesh',
@@ -35,7 +35,7 @@ parser.add_argument('--nz',
     help = "Number of divisions in the z direction, default is 8 (only for 3D problems)")
 
 parser.add_argument('--method',
-    default = 'Ossen', type = str,
+    default = 'Newton', type = str,
     help = "Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',
@@ -51,7 +51,7 @@ parser.add_argument('--run',
     help = "Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
-    default = 1, type = int,
+    default = 3, type = int,
     help = "Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',
@@ -64,11 +64,11 @@ parser.add_argument('--tol',
 
 # 解析参数
 options = vars(parser.parse_args())
-
 bm.set_backend(options['backend'])
 manager = CFDTestModelManager('stationary_incompressible_navier_stokes')
-pde = manager.get_example(options['pde'], **options)
-model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
+pde = manager.get_example(options['pde'])
+mesh = pde.init_mesh['uniform_tri'](8, 8)
+model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
 model.equation.set_constitutive(1)  # 设置粘性模型
 model.run()
 model.__str__()

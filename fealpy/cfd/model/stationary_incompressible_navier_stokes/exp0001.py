@@ -123,7 +123,9 @@ class Exp0001():
         return inlet|wall|obstacle
     
     @cartesian
-    def is_pressure_boundary(self, p):
+    def is_pressure_boundary(self, p = None):
+        if p is None:
+            return 1
         is_out = self.is_outlet_boundary(p)
         return is_out
 
@@ -165,7 +167,7 @@ class Exp0001():
         """Check if point where velocity is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-12
+        atol = 1e-4
         # 检查是否接近 x=±1 或 y=±1
         on_boundary = (
             (bm.abs(x - self.box[0]) < atol) &
@@ -177,7 +179,7 @@ class Exp0001():
         """Check if point where pressure is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-12
+        atol = 1e-4
         on_boundary = (bm.abs(x - self.box[1]) < atol)
         return on_boundary
     
@@ -186,7 +188,7 @@ class Exp0001():
         """Check if point where velocity is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-12
+        atol = 1e-4
         on_boundary = (
             (bm.abs(y - self.box[2]) < atol) | (bm.abs(y - self.box[3]) < atol))
         return on_boundary
@@ -198,7 +200,7 @@ class Exp0001():
         y = p[..., 1]
         cx, cy = self.center
         radius = self.radius
-        atol = 1e-12
+        atol = 1e-4
         # 检查是否接近圆的边界
         on_boundary = bm.abs((x - cx)**2 + (y - cy)**2 - radius**2) < atol
         return on_boundary

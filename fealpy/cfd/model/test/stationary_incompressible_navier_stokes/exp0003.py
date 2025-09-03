@@ -12,7 +12,6 @@ class Exp0003(BoxMesher2d):
         self.eps = 1e-10
         self.mu = 1.0
         self.rho = 1.0
-        self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
         super().__init__(box=self.box)
 
     def __str__(self) -> str:
@@ -75,8 +74,10 @@ class Exp0003(BoxMesher2d):
         return None
 
     @cartesian
-    def is_pressure_boundary(self, p: TensorLike) -> TensorLike:
+    def is_pressure_boundary(self, p: TensorLike = None) -> TensorLike:
         """Check if point where pressure is defined is on boundary."""
+        if p is None:
+            return 0
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
         return result
 

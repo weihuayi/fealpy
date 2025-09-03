@@ -5,7 +5,6 @@ from fealpy.cfd.equation import StationaryIncompressibleNS
 from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
 from fealpy.cfd.equation import StationaryIncompressibleNS
 from fealpy.cfd.model import CFDPDEModelManager
-from fealpy.mesher.dld_mesher import DLDMesher
 import matplotlib.pyplot as plt
 import argparse
 
@@ -133,10 +132,6 @@ uh, ph = model.run()
 cd,cl,delta_p = model.error['benchmark'](uh, ph)
 print(f"Drag coefficient: {cd}, \nLift coefficient: {cl}, \nPressure difference: {delta_p}")
 # model.__str__()
-
-print("number of cell:", mesh.number_of_cells())
-print("number of edge:", mesh.number_of_edges())
-print("number of node:", mesh.number_of_nodes())
 
 mesh.nodedata['ph'] = ph
 mesh.nodedata['uh'] = uh.reshape(2,-1).T
