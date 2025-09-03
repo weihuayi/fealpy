@@ -13,8 +13,8 @@ parser.add_argument('--backend',
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
 
 parser.add_argument('--pde',
-    default='poly2d', type=str,
-    help="Name of the PDE model, default is poly2d")
+    default=2, type=int,
+    help="Name of the PDE model, default is 1")
 
 parser.add_argument('--init_mesh',
     default='uniform_tri', type=str,

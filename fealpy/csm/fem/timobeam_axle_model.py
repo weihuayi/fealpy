@@ -109,27 +109,14 @@ class TimobeamAxleModel(ComputationalModel):
                 # 直接相加
                 K = beam_K + axle_K
                 F = self.pde.external_load()
-
-                return K, F
-        
-        def apply_bc(self, K, F):
-                """Apply boundary conditions to the linear system."""
-                num_dofs = self.tspace.number_of_global_dofs()
-                threshold = bm.zeros(num_dofs, dtype=bool)
                 
-                fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
-                threshold[fixed_dofs] = True
-                
-                K, F = DirichletBC(space=self.tspace,
-                                gd=self.pde.dirichlet,
-                                threshold=threshold).apply(K, F)
                 return K, F
         
         def apply_bc_penalty(self, K, F):
                 """Apply Dirichlet boundary conditions using Penalty Method."""
                 penalty = 1e20
                 fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
-        
+                
                 F[fixed_dofs] *= penalty
 
                 crow, col, values = K._crow, K._col, K._values
@@ -145,6 +132,5 @@ class TimobeamAxleModel(ComputationalModel):
         @variantmethod("direct")
         def solve(self):
                 K, F = self.timo_axle_system()
-                # K, F = self.apply_bc(K, F)
                 K, F = self.apply_bc_penalty(K, F)
                 return  spsolve(K, F, solver='scipy')  

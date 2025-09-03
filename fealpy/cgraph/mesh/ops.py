@@ -1,7 +1,30 @@
 from ..nodetype import CNodeType, PortConf, DataType
 
 
-class Error(CNodeType):
+class MeshDimensionUpgrading(CNodeType):
+    """Geometric 2d to 3d"""
+    TITLE = "Mesh Dimension Upgrading"
+    PATH = "mesh.ops"
+    INPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH),
+        PortConf("z", DataType.TENSOR, 1, "Coordinate in z direction.")
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH, 1, "3D Mesh")
+    ]
+
+    @staticmethod
+    def run(mesh, z):
+        from fealpy.backend import bm
+        assert mesh.geo_dimension() == 2
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        new_node = bm.concat([node, z[:, None]], axis=1)
+        # TODO: avoid unnecessary construction
+        return mesh.__class__(new_node, cell)
+
+
+class ErrorEstimation(CNodeType):
     r"""Error estimator on mesh.
 
     Args:

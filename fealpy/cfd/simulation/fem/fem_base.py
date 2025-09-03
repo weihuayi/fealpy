@@ -1,5 +1,4 @@
-from typing import Union, Dict
-from fealpy.backend import backend_manager as bm
+from typing import Union
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace, FunctionSpace
 
 class FEMParameters:
@@ -89,7 +88,7 @@ class FEM:
         if config['type'] == 'Lagrange':
             return LagrangeFESpace(self.mesh, p=config['p'])
         # 其他空间类型...
-        raise ValueError(f"不支持的空间类型: {space_type}")  
+        raise ValueError(f"不支持的空间类型: {config['type']}")  
     
 
     class Set:

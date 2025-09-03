@@ -162,7 +162,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ke[:, 8, 10] = -Ke[:, 2, 10]
         Ke[:, 9, 9] = Ke[:, 3, 3]
         Ke[:, 10, 10] = Ke[:, 4, 4]
-        Ke[:, 11, 11] = Ke[:, 6, 6]
+        Ke[:, 11, 11] = Ke[:, 5, 5]
 
         # Symmetrize
         for j in range(11):
