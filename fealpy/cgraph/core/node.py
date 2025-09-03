@@ -3,12 +3,11 @@ from collections import OrderedDict
 from collections.abc import Callable
 
 from . import edge as _E
-from ._types import NodeTopologyError, InputSlot, OutputSlot
+from ._types import InputSlot, OutputSlot
 
 __all__ = [
     "CNode",
     "Sequential",
-    "VariableOutput"
 ]
 
 
@@ -78,21 +77,6 @@ class CNode():
         else:
             self._output_slots[name] = OutputSlot()
 
-    def get_input(self, name: str):
-        """Return the input slot given by `name`. Raises NodeTopologyError if not exists."""
-        if name not in self._input_slots:
-            raise NodeTopologyError(f"no input named {name}")
-        return self._input_slots[name]
-
-    def get_output(self, name: str):
-        """Return the output slot given by `name`. Raises NodeTopologyError if not exists."""
-        if name not in self._output_slots:
-            raise NodeTopologyError(f"no output named {name}")
-        return self._output_slots[name]
-
-    def dump_key(self, slot: str):
-        return (self, slot)
-
     @property
     def input_slots(self):
         return self._input_slots
@@ -148,12 +132,3 @@ class Sequential(Container):
                 args = (args,)
             kwargs = {}
         return args
-
-
-class VariableOutput(CNode):
-    def __init__(self, out: dict[str, Any]):
-        super().__init__(variable=True)
-        self.out = out
-
-    def run(self, **kwargs):
-        self.out.update(kwargs)

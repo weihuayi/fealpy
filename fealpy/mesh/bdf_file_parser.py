@@ -18,7 +18,7 @@ class BdfFileParser:
 
     Methods:
         parse(filename: str) -> BdfFileParser:
-            Parses the given .inp file and returns the parser instance itself.
+            Parses the given .bdf file and returns the parser instance itself.
 
         get_section(section_type: Type[Section]) -> Optional[Section]:
             Returns the first instance of a given section type (e.g., NodeSection).

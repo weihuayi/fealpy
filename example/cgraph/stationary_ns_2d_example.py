@@ -15,7 +15,7 @@ StationaryNSRun(
     tol=1e-6,
     pde=pde()
 )
-WORLD_GRAPH.output_node(
+WORLD_GRAPH.output(
     uh1 = StationaryNSRun().uh1,  
     ph1 = StationaryNSRun().ph1
 )
