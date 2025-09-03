@@ -43,18 +43,7 @@ class Exp0003(BoxMesher2d):
         result[..., 0] = 2* bm.pi *bm.sin(t) * bm.sin(bm.pi*x)**2 * bm.sin(bm.pi*y) * bm.cos(bm.pi*y)
         result[..., 1] = -2* bm.pi *bm.sin(t) * bm.sin(bm.pi*x) * bm.cos(bm.pi*x) * bm.sin(bm.pi*y)**2
         return result
-    
-    @cartesian
-    def velocity_0(self, p):
-        return self.velocity(p, self.t0)
-
-    @cartesian
-    def pressure_0(self, p: TensorLike) -> TensorLike:
-        """Compute exact solution of pressure."""
-        x = p[..., 0]
-        y = p[..., 1]
-        return self.pressure(p, self.t0)
-    
+     
     @cartesian
     def pressure(self, p, t):
         x = p[..., 0]

@@ -11,8 +11,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         super().__init__(pbar_log = True, log_level = "INFO")
         self.pde = pde
         self.equation = IncompressibleNS(self.pde)
-        self.T0, self.T1, self.nt = 0, 1, 100
-        self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
+        self.timeline = UniformTimeLine(0, 1, 100)
         self.options = options
         
         if mesh is None:
@@ -51,6 +50,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             s += f"  maxit          : {self.maxit}\n"
         s += ")"
         self.logger.info(f"\n{s}")
+   
+
+    def set_timeline(self, timeline: UniformTimeLine):
+        self.timeline = timeline
 
     @variantmethod("Newton")
     def method(self):
@@ -106,8 +109,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
 
-        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity_0(p)))
-        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure_0(p)))
+        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, self.timeline.T0)))
+        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, self.timeline.T0)))
         
         for i in range(self.timeline.NL-1):
             t  = self.timeline.current_time()
@@ -124,7 +127,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
             # uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
             self.timeline.advance()
-        # uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
+        uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
         return u0, p0
     
     @run.register('one_step')
@@ -214,7 +217,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         for i in range(maxit):
             self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
-            self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
             uh,ph = self.run['main']( maxstep, tol)
             self.nt = self.nt*4
             self.equation = IncompressibleNS(self.pde)
