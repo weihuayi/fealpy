@@ -1,7 +1,6 @@
 import argparse 
 import matplotlib.pyplot as plt
 
-
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
@@ -18,19 +17,19 @@ parser.add_argument('--init_point',
     help = "Initial point for chip positioning.")
 
 parser.add_argument('--chip_height',
-    default = 4.0, type = float,
+    default = 1.0, type = float,
     help = "Height of the microfluidic chip.")
 
 parser.add_argument('--inlet_length',
-    default = 1.0, type = float,
+    default = 0.1, type = float,
     help = "Length of the inlet section.")
 
 parser.add_argument('--outlet_length',
-    default = 1.0, type = float,
+    default = 0.1, type = float,
     help = "Length of the outlet section.")
 
 parser.add_argument('--radius',
-    default = 1 / (2.5 * 3), type = float,
+    default = 1 / (3 * 4 * 3), type = float,
     help = "Radius of the pillars.")
 
 parser.add_argument('--n_rows',
@@ -42,7 +41,7 @@ parser.add_argument('--n_cols',
     help = "Number of columns of pillars in each stage.")
 
 parser.add_argument('--tan_angle',
-    default = 1/8, type = float,
+    default = 1/7, type = float,
     help = "Tangent of the deflection angle.")
 
 parser.add_argument('--n_stages',
@@ -50,11 +49,11 @@ parser.add_argument('--n_stages',
     help = "Number of stages (or periods) in the chip.")
 
 parser.add_argument('--stage_length',
-    default = 1, type = float,
+    default = 1.4, type = float,
     help = "Number of stages (or periods) in the chip.")
 
 parser.add_argument('--lc',
-    default = 0.08, type = float,
+    default = 0.02, type = float,
     help = "Grid size for meshing.")
 
 parser.add_argument('--show_figure',
@@ -90,7 +89,6 @@ box = [0.0, 1.0, 0.0, 1.0]
 holes = [[0.3, 0.3, 0.1], [0.3, 0.7, 0.1], [0.7, 0.3, 0.1], [0.7, 0.7, 0.1]]
 # holes = [[0.5, 0.5, 0.2]]
 mesh = TriangleMesh.from_box_with_circular_holes(box=box, holes=holes, h=0.02)
-
 
 options = vars(parser.parse_args())
 bm.set_backend(options['backend'])

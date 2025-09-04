@@ -10,7 +10,6 @@ from fealpy.decorator import barycentric
 
 
 _MT = TypeVar('_MT', bound=Mesh)
-Index = Union[int, slice, TensorLike]
 Number = Union[int, float]
 _S = slice(None)
 _F = Union[Callable[..., TensorLike], TensorLike, Number]
@@ -54,7 +53,8 @@ class ParametricLagrangeFESpace(FunctionSpace, Generic[_MT]):
         return self.dof.number_of_global_dofs()
 
     def interpolation_points(self) -> TensorLike:
-        return self.dof.interpolation_points(self.p)
+        # return self.dof.interpolation_points(self.p)
+        return self.mesh.node
 
     def cell_to_dof(self, index: Index=_S) -> TensorLike:
         return self.dof.cell_to_dof()[index]
