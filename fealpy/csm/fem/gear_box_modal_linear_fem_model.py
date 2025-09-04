@@ -71,9 +71,9 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         # the flag of nodes coupling with the shaft system 
         isCNode = self.mesh.data.get_node_data('isCNode')
+        self.mesh.nodedata['isCNode'] = isCNode
 
-        # the flag of reference nodes, which decide the displacement of the
-        # coupling nodes
+        # the flag of reference nodes
         isRNode = bm.zeros(NN, dtype=bm.bool)
         isRNode = bm.set_at(isRNode, rnodes, True)
 
@@ -107,6 +107,13 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         self.mesh.data.add_node_data('isCSNode', isCSNode)
         self.mesh.data.add_node_data('isFNode', isFNode)
 
+        # put the flags into mesh.nodedata for visualization
+        self.mesh.nodedata['isRNode'] = isRNode
+        self.mesh.nodedata['isGBNode'] = isGBNode
+        self.mesh.nodedata['isSNode'] = isSNode
+        self.mesh.nodedata['isCSNode'] = isCSNode
+        self.mesh.nodedata['isFNode'] = isFNode
+
         # construct the RBE2 matrix 
         ridx = bm.where(isCNode)[0]
         sidx = bm.where(isCSNode)[0]
@@ -121,11 +128,11 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         v = node[redges[isRBE2, 0]] - node[redges[isRBE2, 1]]
 
         NS = isCSNode.sum() # number of surface nodes
-        NR = isCNode.sum() # number of reference nodes
+        NC = isCNode.sum() # number of coupling nodes
 
-        self.logger.info(f"RBE2 matrix: {NS} surface nodes, {NR} reference nodes")
+        self.logger.info(f"RBE2 matrix: {NS} surface nodes, {NC} reference nodes")
 
-        kwargs = {'shape':(3*NS, 6*NR), 'itype': self.itype, 'dtype': self.ftype}
+        kwargs = {'shape':(3*NS, 6*NC), 'itype': self.itype, 'dtype': self.ftype}
         ones = bm.ones(NS, dtype=self.ftype)
 
         G  = coo_matrix((    ones, (3*I+0, 6*J+0)), **kwargs)
@@ -265,6 +272,8 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         idx = bm.arange(6 * cnode.shape[0], dtype=self.itype).reshape(-1, 6)
         idx = idx[re, :].flatten()
 
+        self.logger.info(f"{idx}")
+
         S01 = csr_matrix(S01[:, idx])
         S11 = csr_matrix(S11[idx, :][:, idx])
         M01 = csr_matrix(M01[:, idx])
@@ -275,7 +284,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
 
     @variantmethod('slepc')
-    def solve(self, which: str ='SM'):
+    def solve(self, which: str ='SM', fname: str="eigen.vtu") -> None:
         """
         Solve the eigenvalue problem using SLEPc.
         """
@@ -283,10 +292,13 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         from slepc4py import SLEPc
         from scipy.sparse import bmat
 
-        # 获取
         S0, M0 = self.shaft_linear_system()
         self.rbe2_matrix()
         S1, M1 = self.box_linear_system()
+
+        self.mesh.to_vtk(fname=fname)
+
+
 
         N0 = S0[0][0].shape[0]  # number of free dofs in the shaft system
         N1 = S1[0][0].shape[0]  # number of free dofs in the gearbox shell model

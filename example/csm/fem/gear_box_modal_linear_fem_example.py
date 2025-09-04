@@ -45,7 +45,9 @@ print(options)
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
+fname = options['mesh_file'].stem + '.vtu' 
+
 from fealpy.csm.fem import GearBoxModalLinearFEMModel
 model = GearBoxModalLinearFEMModel(options)
-model.solve()
-model.post_process()
+model.solve(fname=fname)
+#model.post_process(fname=fname)

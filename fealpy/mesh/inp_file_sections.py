@@ -514,14 +514,22 @@ class BoundarySection(Section):
         self.data = []
 
     def parse_line(self, line: str) -> None:
-        # 跳过空行和注释
+        """
+        Parses a line defining boundary conditions.
+        """
+        # Skip empty lines or comments
         if not line.strip() or line.strip().startswith('**'):
             return
         parts = [p.strip() for p in line.strip().split(',') if p.strip() != ""]
         nset = parts[0]
         dof_start = int(parts[1]) - 1
-        dof_end = int(parts[2]) 
-        magnitude = float(parts[3]) if len(parts) > 3 else 0.0
+        dof_end = float(parts[2]) 
+        if dof_end == 0.0:
+            dof_end = dof_start + 1
+            magnitude = 0.0
+        else:
+            dof_end = int(dof_end)
+            magnitude = float(parts[3]) if len(parts) > 3 else 0.0
         self.data.append((nset, dof_start, dof_end, magnitude))
 
     def attach(self, meshdata: Dict[str, Any]):
