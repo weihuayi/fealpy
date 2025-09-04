@@ -111,11 +111,11 @@ class DLDMicrofluidicChipModeler:
         n: int = options['n_stages']
 
         if tan > 0:
-            pitch_y: float = chip_height / (n_rows + 1)
+            pitch_y: float = chip_height / n_rows
             pitch_x: float = pitch_y / (n_cols * tan)
             cx0: float = pitch_x / 3
-            cy0: float = chip_height / (n_rows + 1)
-            stage_length: float = n * pitch_x - 0.5 * (pitch_x - cx0 - radius)
+            cy0: float = chip_height / (2 * n_rows)
+            stage_length: float = n_cols * pitch_x - 0.2 * (pitch_x - cx0 - radius)
         else:
             cx0: float = 1 / (2 * n_cols)
             cy0: float = chip_height / (2 * n_rows)
