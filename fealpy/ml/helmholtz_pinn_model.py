@@ -1,12 +1,13 @@
 import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
-from typing import Union, Optional
+from typing import Union
 
 from fealpy.backend import bm
 from fealpy.utils import timer
 from fealpy.typing import TensorLike
 from fealpy.model import ComputationalModel, PDEModelManager
 from fealpy.model.helmholtz import HelmholtzPDEDataT
+from fealpy.mesh import MeshDS
 
 from fealpy.ml import gradient, optimizers, activations
 
@@ -22,97 +23,76 @@ class HelmholtzPINNModel(ComputationalModel):
     Supports both uniform and random sampling strategies for collocation points.
     Specialized for complex-valued solutions (real + imaginary components).
     
-    Parameters
-        options : dict
-            If None, default parameters from get_options() will be used.
+    Parameters:
+        options(dict): If None, default parameters from get_options() will be used.
             Configuration dictionary containing:
-            - pde: PDE definition (int or HelmholtzPDEDataT);
-            - lr: Learning rate (float);
-            - epochs: Number of training epochs (int);
-            - weights: Weight for the equation loss and boundary loss (tuple);
-            - hidden_size: Tuple of hidden layer sizes (tuple);
-            - npde: Number of PDE collocation points (int);
-            - nbc: Number of boundary collocation points (int);
-            - activation: Activation function (str, options: 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax');
-            - optimizer: Optimization algorithm (str, options: 'Adam', 'SGD');
-            - sampling_mode: Sampling strategy (str, options: 'linspace' or 'random');
-            - complex: Boolean flag for complex-valued solutions (bool);
-            - wave: Wave number k for Helmholtz equation (float).
-            - step_size: Period of learning rate decay (int);
-            - gamma: Multiplicative factor of learning rate decay (float).
-            - pbar_log: Whether to use progress bar for logging (bool);
-            - log_level: Logging level (str, options: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
+            - pde(int or HelmholtzPDEDataT): PDE definition;
+            - lr(float): Learning rate;
+            - epochs(int): Number of training epochs;
+            - weights(tuple): Weight for the equation loss and boundary loss;
+            - hidden_size(tuple): Tuple of hidden layer sizes;
+            - npde(int): Number of PDE collocation points;
+            - nbc(int): Number of boundary collocation points;
+            - activation(str): Activation function, can choose from 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax';
+            - optimizer(str): Optimization algorithm, can choose from 'Adam', 'SGD';
+            - sampling_mode(str): Sampling strategy, can choose from 'linspace' or 'random';
+            - complex(bool): Boolean flag for complex-valued solutions, if True, the solutions is complex-valued;
+            - wave(float): Wave number k for Helmholtz equation.
+            - step_size(int): Period of learning rate decay;
+            - gamma(float): Multiplicative factor of learning rate decay.
+            - pbar_log(bool): Whether to use progress bar for logging;
+            - log_level(str): Logging level, can choose from 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
         
-    Attributes
-        pde : PoissonPDEDataT
-            Helmholtz PDE problem definition
-        gd : int
-            Geometric dimension
-        domain : list
-            Computational domain boundaries
-        mesh : TriangleMesh or UniformMesh
-            Discretization mesh for error estimation
-        sampler_pde : ISampler
-            Sampler for PDE collocation points
-        sampler_bc : BoxBoundarySampler
-            Sampler for boundary points
-        net : torch.nn.Module
-            Neural network model
-        optimizer : torch.optim.Optimizer
-            Training optimizer
-        mse : nn.MSELoss
-            Mean-squared error loss function.
-        Loss : list
-            Training loss history
-        error_real : list
-            Real part error history (vs FEM solution)
-        error_imag : list
-            Imaginary part error history (vs FEM solution, only when complex=True)
-        options : dict
-            Initial configuration dictionary
-        complex : bool
-            Flag indicating complex-valued solutions
-        k : float
-            Wave number for Helmholtz equation
-    
-    Methods
-        set_pde(pde)
-            Initialize PDE problem
-        set_network(net)
-            Configure neural network architecture
-        set_mesh(type)
-            Initialize computational mesh
-        set_n(p)
-            Compute normal vectors at boundary points
-        pde_residual(p)
-            Compute PDE residual (Δu + k²u + f)
-        bc_residual(p)
-            Compute boundary condition residual
-        run()
-            Execute training process
-        predict(p)
-            Make predictions at given points
-        show()
-            Visualize results
-    
-    Notes
-        Key features:
-        1. Supports complex-valued solutions: When complex=True, network outputs two channels (real + imaginary)
-        2. Helmholtz residual: Δu + k²u + f = 0
-        3. Supports multiple boundary conditions: Dirichlet and Robin
-        4. Uses automatic differentiation for higher-order derivatives
-        5. Loss function handles real/imaginary components separately
+    Attributes:
+        pde(PoissonPDEDataT): Helmholtz PDE problem definition.
+
+        gd(int): Geometric dimension.
+
+        domain(list): Computational domain boundaries.
+
+        mesh(TriangleMesh or UniformMesh): Discretization mesh for error estimation.
+
+        net(torch.nn.Module): Neural network model.
         
-        Complex-valued solution handling:
-        - Network output layer: 2 channels when complex=True (real + imaginary), else 1 channel
-        - Residual calculation: Separate computation for real and imaginary components
-        - Loss function: Weighted sum of real and imaginary PDE/boundary losses
-        - Error evaluation: Separate error calculation for real and imaginary components
-    
-    Reference
-        https://wnesm678i4.feishu.cn/wiki/U219wwT18iH4v7kNTOacxl8cnXb?from=from_copylink
+        optimizer(torch.optim.Optimizer): Training optimizer.
         
-    Examples
+        Loss(list): Training loss history.
+        
+        error_real(list): Real part error history (vs FEM solution).
+        
+        error_imag(list): Imaginary part error history (vs FEM solution, only when complex=True).
+        
+        options(dict): Initial configuration dictionary.
+        
+        complex(bool): Flag indicating complex-valued solutions.
+        
+        k(float): Wave number for Helmholtz equation.
+
+        tmr(timer): Timer for measuring training time.
+    
+    Methods:
+        set_pde(): Initialize PDE problem.
+
+        set_network(): Configure neural network architecture.
+
+        set_mesh(): Initialize computational mesh.
+
+        set_n(): Compute normal vectors at boundary points.
+
+        pde_residual(): Compute PDE residual (Δu + k²u + f).
+
+        bc_residual(): Compute boundary condition residual.
+
+        run(): Execute training process.
+
+        predict(): Make predictions at given points.
+
+        show(): Visualize results.  
+    
+    Reference:
+        https://wnesm678i4.feishu.cn/wiki/U219wwT18iH4v7kNTOacxl8cnXb?from=from_copylink.
+        
+    Examples:
         >>> from fealpy.backend import bm  
         >>> bm.set_backend('pytorch')  # Set the backend to PyTorch  
         >>> from fealpy.ml import HelmholtzPINNModel  
@@ -121,55 +101,29 @@ class HelmholtzPINNModel(ComputationalModel):
         >>> model.run()   # Train the network  
         >>> model.show()   # Show the results of the network training  
     """
-    def __init__(self, options: Optional[dict] = None):
-        if options is None:
-            self.options = self.get_options()
-        else:
-            self.options = options
+    def __init__(self, options: dict = {}):
+        self.options = self.get_options()
+        self.options.update(options)
         
-        self.pbar_log = self.options.get('pbar_log', True)
-        self.log_level = self.options.get('log_level', 'INFO')
+        self.pbar_log = self.options['pbar_log']
+        self.log_level = self.options['log_level']
         super().__init__(pbar_log=self.pbar_log, log_level=self.log_level)
-        
-        self.complex = self.options.get('complex', True)
-        self.k = self.options.get('wave', 1.0)
 
-        self.set_pde(self.options.get('pde', 1))
-        self.gd = self.pde.geo_dimension()
-        self.domain = self.pde.domain()
-        self.set_mesh(self.options.get('mesh_size', 30))
-        
-
-        # 采样器
-        self.sampler_pde = ISampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
-        self.sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options.get('sampling_mode', 'random'))
-
-        # 网络超参数、激活函数、采样点数、权重
-        self.lr = self.options.get('lr', 0.001)
-        self.epochs = self.options.get('epochs', 3000)
-        self.hidden_size = self.options.get('hidden_size', (50, 50, 50, 50))
-        self.activation = activations[self.options.get('activation', "Tanh")]
-        self.npde = self.options.get('npde', 400)
-        self.nbc = self.options.get('nbc', 100)
-        self.weights = self.options.get('weights', (1, 30))
-
-        # 损失函数
-        self.mse = nn.MSELoss(reduction='mean')
-
-        # 网络
+        self.k = self.options['wave']  
+        self.lr = self.options['lr']   
+        self.epochs = self.options['epochs'] 
+        self.hidden_size = self.options['hidden_size']    
+        self.activation = activations[self.options['activation']]   
+        self.npde = self.options['npde']   
+        self.nbc = self.options['nbc']   
+        self.weights = self.options['weights']  
+        self.complex = self.options['complex'] 
+        self.tmr = timer() 
+ 
+        self.set_pde(self.options['pde'])  # PDE 
+        self.set_mesh(self.options['mesh_size']) 
         self.set_network()
 
-        # 优化器与学习率调度器
-        opt = optimizers[self.options.get('optimizer', 'Adam')]
-        self.optimizer = opt(params=self.net.parameters(), lr=self.lr)
-        
-        # 学习率调度器
-        step_size = self.options.get('step_size', 0)
-        gamma = self.options.get('gamma', 0.99)
-        self.set_steplr(step_size, gamma)
-
-        self.tmr = timer()  # 计时器
-    
     @classmethod
     def get_options(cls):
         """Get default configuration parameters for the model.
@@ -177,9 +131,8 @@ class HelmholtzPINNModel(ComputationalModel):
         Defines and returns default configurations for the model through a command-line argument parser,
         including PDE problem number, grid size, network structure, and optimizer parameters.
         
-        Returns
-            options : dict
-                Dictionary containing all configuration parameters with parameter names as keys and default values
+        Returns:
+            options(dict): Dictionary containing all configuration parameters with parameter names as keys and default values
         """
 
         import argparse
@@ -256,31 +209,25 @@ class HelmholtzPINNModel(ComputationalModel):
         return options
         
     def set_pde(self, pde: Union[HelmholtzPDEDataT, int]=1):
-        """Initialize the PDE problem definition.
+        """Initialize the PDE problem definition and boundary condition sampler, internal sampler.
         
-        Parameters
-            pde : Union[[HelmholtzPDEDataT, int]
-                Either a Helmholtz equation problem object or the ID (integer) of a predefined example. 
-                If an integer, the corresponding predefined Helmholtz equation problem is retrieved from 
-                the PDE model manager.
+        Parameters:
+            pde(Union[HelmholtzPDEDataT, int]): Either a Helmholtz equation problem object or the ID (integer) of a predefined example. 
+                If an integer, the corresponding predefined Helmholtz equation problem is retrieved from the PDE model manager.
         """
         if isinstance(pde, int):
             self.pde = PDEModelManager('helmholtz').get_example(pde, k=self.k)
         else:
             self.pde = pde 
-
+        
+        self.gd = self.pde.geo_dimension() 
+        self.domain = self.pde.domain()
 
     def set_network(self, net=None):
-        """Configure the neural network architecture.
+        """Configure the neural network architecture and optimizer, learning rate scheduler.
         
-        Parameters
-            net : torch.nn.Module, optional
-                Custom network architecture. If None, creates default MLP.
-                
-        Notes
-            When complex=True:
-            - Output layer dimension is 2 (real + imaginary)
-            - Solution wrapper handles complex-valued output
+        Parameters:
+            net(torch.nn.Module): Custom network architecture. If None, creates default MLP.
         """
         if net == None:
             layers = []
@@ -298,29 +245,42 @@ class HelmholtzPINNModel(ComputationalModel):
             
         self.net = Solution(net, self.complex)
 
-    def set_mesh(self, mesh_size: int):
+        # optimizer
+        opt = optimizers[self.options['optimizer']]
+        self.optimizer = opt(params=self.net.parameters(), lr=self.lr)
+
+        # scheduler
+        step_size = self.options['step_size']
+        gamma = self.options['gamma']
+        self.set_steplr(step_size, gamma)
+
+    def set_mesh(self, mesh_size: int=30, mesh=None):
         """Create computational mesh.
         
         Creates a computational mesh over the domain defined by the PDE based on the specified mesh size.
         
-        Parameters
-            mesh_size : tuple of int
-                Number of nodes in each dimension.
+        Parameters:
+            mesh_size(int): Number of nodes in each dimension.
+
+            mesh: Mesh object. If None, creates a default mesh based on the PDE domain and mesh size.
         """
-        self.mesh_size = (mesh_size, ) * self.gd
-        cell_size = tuple(x - 1 for x in self.mesh_size)
-        self.mesh = self.pde.init_mesh(*cell_size)
+        if mesh == None:
+            gd = self.gd
+            self.mesh_size = (mesh_size, ) * gd
+            cell_size = tuple(x - 1 for x in self.mesh_size)
+            self.mesh = self.pde.init_mesh(*cell_size)
+        else:
+            self.mesh = mesh
 
     def set_steplr(self, step_size: int=0, gamma: float=0.9):
         """Create learning rate scheduler
         
         Initializes a learning rate scheduler for decaying the learning rate periodically during training.
         
-        Parameters
-            step_size : int, optional, default=0
-                Period for learning rate decay, i.e., decay every step_size epochs. No scheduler is used if step_size = 0.
-            gamma : float, optional, default=0.9
-                Multiplicative factor for learning rate decay, new_lr = current_lr * gamma
+        Parameters:
+            step_size(int): Default is 0. Period for learning rate decay, i.e., decay every step_size epochs. No scheduler is used if step_size = 0.
+            
+            gamma(float): default is 0.9. Multiplicative factor for learning rate decay, new_lr = current_lr * gamma.
         """
         if step_size == 0:
             self.steplr = None
@@ -330,62 +290,51 @@ class HelmholtzPINNModel(ComputationalModel):
     def set_n(self, p: TensorLike) -> TensorLike:
         """Compute normal vectors at boundary points (for rectangular domains)
         
-        Parameters
-            p : TensorLike
-                Boundary point coordinates
+        Parameters:
+            p(TensorLike): Boundary point coordinates.
                 
-        Returns
-            TensorLike
-                Unit normal vectors
+        Returns:
+            TensorLike: Unit normal vectors.
         """
         n = bm.zeros_like(p)
         tol = 1e-4
         dim = self.gd
-        coords = [p[..., i] for i in range(dim)]  # 分解各维度坐标
+        coords = [p[..., i] for i in range(dim)] 
         
-        # 边界处理优先级顺序（按维度从低到高）
         for axis in range(dim):
             min_val, max_val = self.domain[2*axis], self.domain[2*axis+1]
-            
-            # 当前维度边界掩码
             min_mask = bm.abs(coords[axis] - min_val) <= tol
             max_mask = bm.abs(coords[axis] - max_val) <= tol
-            
-            # 生成active_mask：如果是第一个维度（axis=0），则全部点为active；否则，只选择未被标记的点
             if axis == 0:
-                active_mask = bm.ones_like(min_mask, dtype=bool)  # 全部为True
+                active_mask = bm.ones_like(min_mask, dtype=bool) 
             else:
-                active_mask = ~bm.any(n != 0, axis=-1)  # 未被更高优先级标记的点
+                active_mask = ~bm.any(n != 0, axis=-1) 
             
-            # 设置法向量分量
-            n[min_mask & active_mask, axis] = -1.0  # 负向边界
-            n[max_mask & active_mask, axis] = 1.0   # 正向边界
+            n[min_mask & active_mask, axis] = -1.0 
+            n[max_mask & active_mask, axis] = 1.0 
         
         return n
 
     def pde_residual(self, p: TensorLike) -> TensorLike:
         """Compute PDE residual (Δu + k²u + f)
         
-        Parameters
-            p : TensorLike
-                Collocation point coordinates
+        Parameters:
+            p(TensorLike): Collocation point coordinates.
                 
-        Returns
-            TensorLike
-                PDE residual values
-                
-        Notes
-            Helmholtz equation form: Δu + k²u + f = 0
-            Uses automatic differentiation to compute Laplacian
+        Returns:
+            TensorLike: PDE residual values.
+
+        Notes:
+            Helmholtz equation form: Δu + k²u + f = 0.
+            Uses automatic differentiation to compute Laplacian.
         """
         u = self.net(p)
         f = self.pde.source(p).flatten()
-        # 一阶导数计算
         grad_u = gradient(u.real, p, create_graph=True)  ## (npde, dim)
-        laplacian = bm.zeros(u.shape[0])    # 拉普拉斯项初始化
+        laplacian = bm.zeros(u.shape[0])    
         
         for i in range(p.shape[-1]):
-            u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # 计算 ∂²u/∂x_i²
+            u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   
             laplacian += u_ii.flatten()
         
         if self.complex:
@@ -402,15 +351,13 @@ class HelmholtzPINNModel(ComputationalModel):
     def bc_residual(self, p: TensorLike) -> TensorLike:
         """Compute boundary condition residual
         
-        Parameters
-            p : TensorLike
-                Boundary point coordinates
-                
-        Returns
-            TensorLike
-                Boundary condition residual values
-                
-        Notes
+        Parameters:
+            p(TensorLike): Boundary point coordinates.
+
+        Returns:
+            TensorLike: Boundary condition residual values.
+
+        Notes:
             Supported boundary conditions:
             1. Dirichlet: u - g = 0
             2. Robin: i*k*u + ∂u/∂n - g = 0, i serves as the imaginary unit.
@@ -437,7 +384,7 @@ class HelmholtzPINNModel(ComputationalModel):
     def run(self):
         """Execute training process.
         
-        Notes
+        Notes:
             Training workflow:
             1. Sample collocation points (domain + boundary)
             2. Compute PDE and boundary residuals
@@ -451,11 +398,15 @@ class HelmholtzPINNModel(ComputationalModel):
         """
         tmr = timer()
         next(tmr)
+        # sampler
+        sampler_pde = ISampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
+        sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
+        mse = nn.MSELoss(reduction='mean')
+
         self.Loss = []
         self.error_real= []
         self.error_imag = []
         w = self.weights
-
         mesh = self.mesh
 
         for epoch in range(self.epochs+1):
@@ -465,32 +416,31 @@ class HelmholtzPINNModel(ComputationalModel):
             if (self.options['sampling_mode'] == 'linspace') :
                 if epoch == 0:
                     ''' 均匀采样只采一次 '''
-                    spde = self.sampler_pde.run(self.npde)
-                    sbc = self.sampler_bc.run(self.nbc)
+                    spde = sampler_pde.run(self.npde)
+                    sbc = sampler_bc.run(self.nbc)
             else:
-                spde = self.sampler_pde.run(self.npde)
-                sbc = self.sampler_bc.run(self.nbc)
-
+                spde = sampler_pde.run(self.npde)
+                sbc = sampler_bc.run(self.nbc)
 
             # 计算残差与损失
             pde_res = self.pde_residual(spde)
             bc_res = self.bc_residual(sbc)
             pde_r = bm.real(pde_res)
             bc_r = bm.real(bc_res)
-            mse_pde_r = self.mse(pde_r, bm.zeros_like(pde_r))
-            mse_bc_r = self.mse(bc_r, bm.zeros_like(bc_r))
+            mse_pde_r = mse(pde_r, bm.zeros_like(pde_r))
+            mse_bc_r = mse(bc_r, bm.zeros_like(bc_r))
 
             if self.complex:
                 pde_i =  bm.imag(pde_res)
                 bc_i = bm.imag(bc_res)
-                mse_pde_i = self.mse(pde_i, bm.zeros_like(pde_i))
-                mse_bc_i = self.mse(bc_i, bm.zeros_like(bc_i))
+                mse_pde_i = mse(pde_i, bm.zeros_like(pde_i))
+                mse_bc_i = mse(bc_i, bm.zeros_like(bc_i))
                 loss = w[0]* (mse_pde_r + mse_pde_i) + w[1] * (mse_bc_r + mse_bc_i)
             else:
                 loss = w[0] * mse_pde_r + w[1]* mse_bc_r
 
             loss.backward()            
-            self.optimizer.step()    # 更新参数
+            self.optimizer.step()  
             if self.steplr is not None:
                 self.steplr.step()
 
@@ -503,32 +453,25 @@ class HelmholtzPINNModel(ComputationalModel):
                 if self.complex:
                     error_i = self.net.estimate_error(self.pde.solution, mesh, coordtype='c', compare='imag')
                     self.error_imag.append(error_i.detach().numpy()) 
-                #     self.logger.info(f"epoch: {epoch}, mse_pde_r: {mse_pde_r:.6f}, mse_bc_r: {mse_bc_r:.6f}, "
-                #                     f"mse_pde_i: {mse_pde_i:.6f}, mse_bc_i: {mse_bc_i:.6f}, "
-                #                     f"loss: {loss.item():.6f}, error_real: {error.item():.4f}, error_imag: {error_i.item():.4f}")
-               
-                # self.logger.info(f"epoch: {epoch}, mse_pde: {mse_pde_r:.6f}, mse_bc: {mse_bc_r:.6f}, "                                    
-                #                 f"loss: {loss.item():.6f}, error_real: {error.item():.4f}")      
+
         tmr.send(f'PINN training time')
         next(tmr)
 
     def predict(self, p: TensorLike) -> TensorLike:
         """Make predictions using trained network.
         
-        Parameters
-            p : TensorLike
-                Input point coordinates
-                
-        Returns
-            TensorLike
-                Network predictions (complex tensor when complex=True)
+        Parameters:
+            p(TensorLike): Input point coordinates.
+
+        Returns:
+            TensorLike: Network predictions (complex tensor when complex=True).
         """
         return self.net(p)
 
     def show(self):
         """Visualize training results and solution comparisons.
         
-        Notes
+        Notes:
             Visualizations include:
             1. Training loss history
             2. Real/imaginary error history
@@ -543,14 +486,14 @@ class HelmholtzPINNModel(ComputationalModel):
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 6))
         Loss = bm.log10(bm.tensor(self.Loss)).numpy()
 
-        # 绘制损失曲线
+        # plot loss curve
         axes[0].plot(Loss, 'r-', linewidth=2)
         axes[0].set_title('Training Loss', fontsize=12)
         axes[0].set_xlabel('training epochs*100', fontsize=10)
         axes[0].set_ylabel('log10(Loss)', fontsize=10)
         axes[0].grid(True)
 
-        # 绘制实部和虚部误差曲线
+        # plot real and imaginary error curves
         error_real = bm.log10(bm.tensor(self.error_real)).numpy()
         error_imag = bm.log10(bm.tensor(self.error_imag)).numpy()
         axes[1].plot(error_real, 'b-', linewidth=2, label='Real Part Error')
@@ -566,9 +509,8 @@ class HelmholtzPINNModel(ComputationalModel):
             mesh = self.mesh
             node = mesh.entity('node')
 
-            # 获取预测解和真解
-            u_pred = self.net(node)  # PINN预测解
-            u_true = self.pde.solution(node)   # 解析解
+            u_pred = self.net(node)  # PINN solution
+            u_true = self.pde.solution(node)   # exact solution
             node = node.detach().numpy()
 
             u_pred_r = bm.real(u_pred).detach().numpy().flatten()
@@ -577,10 +519,8 @@ class HelmholtzPINNModel(ComputationalModel):
                 u_pred_i = bm.imag(u_pred).detach().numpy().flatten()
                 u_true_i = bm.imag(u_true).detach().numpy().flatten()
 
-            # fig = plt.figure()
             if self.gd == 1:
                 fig = plt.figure()
-                # 绘制真实解和预测解
                 plt.plot(node, u_true_r, 'b-', linewidth=2, label='Real Part of Exact  Solution')
                 plt.plot(node, u_pred_r, 'g--', linewidth=2, label='Real Part of PINN Prediction')
                 plt.plot(node, u_pred_r-u_true_r, 'r--', linewidth=2, label='Real Error: PINN - Exact')
@@ -588,15 +528,14 @@ class HelmholtzPINNModel(ComputationalModel):
                     plt.plot(node, u_true_i, 'g-', linewidth=2, label='Imag Part of Exact  Solution')
                     plt.plot(node, u_pred_i, 'y--', linewidth=2, label='Imag Part of PINN Prediction')
                     plt.plot(node, u_pred_i-u_true_i, 'r--', linewidth=2, label='Imag Error: PINN - Exact')
-                # 图形修饰
                 plt.xlabel('x', fontsize=12)
                 plt.ylabel('u(x)', fontsize=12)
                 plt.title('Comparison between PINN and Exact Solution', fontsize=14)
                 plt.legend(fontsize=12)
                 plt.grid(True, linestyle=':')
             else:
-                #  PINN预测解的实部
                 fig = plt.figure()
+                # real part of PINN solution
                 ax1_3d = fig.add_subplot(131, projection='3d')
                 surf1 = ax1_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_pred_r,
@@ -607,7 +546,7 @@ class HelmholtzPINNModel(ComputationalModel):
                 ax1_3d.set_zlabel('u(x,y)')
                 fig.colorbar(surf1, ax=ax1_3d, shrink=0.5, label='Value')
 
-                # 真解的实部
+                # real part of exact solution
                 ax2_3d = fig.add_subplot(132, projection='3d')
                 surf2 = ax2_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_true_r,
@@ -618,7 +557,7 @@ class HelmholtzPINNModel(ComputationalModel):
                 ax2_3d.set_zlabel('u(x,y)')
                 fig.colorbar(surf2, ax=ax2_3d, shrink=0.5, label='Value')
 
-                # 实部的误差
+                # real error
                 ax3_3d = fig.add_subplot(133, projection='3d')
                 surf3 = ax3_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_pred_r-u_true_r,
@@ -643,7 +582,7 @@ class HelmholtzPINNModel(ComputationalModel):
                     ax1_3d.set_zlabel('u(x,y)')
                     fig.colorbar(surf1, ax=ax1_3d, shrink=0.5, label='Value')
 
-                    # 真解的虚部
+                    # imag part of exact solution
                     ax2_3d = fig.add_subplot(132, projection='3d')
                     surf2 = ax2_3d.plot_trisurf(
                         node[:, 0], node[:, 1], u_true_i,
@@ -654,7 +593,7 @@ class HelmholtzPINNModel(ComputationalModel):
                     ax2_3d.set_zlabel('u(x,y)')
                     fig.colorbar(surf2, ax=ax2_3d, shrink=0.5, label='Value')
 
-                    # 虚部的误差
+                    # imag error
                     ax3_3d = fig.add_subplot(133, projection='3d')
                     surf3 = ax3_3d.plot_trisurf(
                         node[:, 0], node[:, 1], u_pred_i-u_true_i,
@@ -668,5 +607,5 @@ class HelmholtzPINNModel(ComputationalModel):
                     plt.suptitle('Comparison between PINN and Exact Solution of Imag')
 
         plt.tight_layout()      
-        plt.show()  # 显示第二个Figure
+        plt.show()  
 

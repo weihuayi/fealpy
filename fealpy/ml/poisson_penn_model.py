@@ -23,65 +23,90 @@ class PoissonPENNModel(ComputationalModel):
     as the base network structure, computes partial derivatives through automatic differentiation to satisfy
     PDE constraints, and supports comparison with Finite Element Method (FEM) results.
 
-    Parameters
-        options : dict, optional
-            If None, default parameters from get_options() will be used.
+    Parameters:
+        options(dict): If None, default parameters from get_options() will be used.
             Configuration dictionary containing:
-            - pde: PDE definition (int or HelmholtzPDEDataT);
-            - scaling_function: The scaling_function is a function that satisfies the boundary conditions, default is None;
-            - mesh_size: Number of grid points along each dimension (int);
-            - lr: Learning rate (float);
-            - epochs: Number of training epochs (int);
-            - weights: Weight for the equation loss and boundary loss (tuple);
-            - hidden_size: Tuple of hidden layer sizes (tuple);
-            - activation: Activation function (str, options: 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax');
-            - optimizer: Optimization algorithm (str, options: 'Adam', 'SGD');
-            - step_size: Period of learning rate decay (int);
-            - gamma: Multiplicative factor of learning rate decay (float);
-            - pbar_log: Whether to use progress bar for logging (bool);
-            - log_level: Logging level (str, options: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
-    
-    Attributes
-        options : dict
-            Collection of model configuration parameters
-        pde : PoissonPDEDataT
-            Poisson's equation problem definition object containing equation parameters, boundary conditions, 
-            and source terms.
-        gd : int
-            Geometric dimension (1D, 2D, or 3D) of the problem domain.
-        domain : tuple, list
-            Computational domain boundaries in the format (xmin, xmax, ymin, ymax, ...)
-        mesh_size : tuple
-            Grid size specifying the number of nodes in each dimension
-        mesh : Mesh
-            Computational grid object
-        lr : float
-            Optimizer learning rate
-        epochs : int
-            Number of training iterations
-        hidden_size : tuple
-            Size of neural network hidden layers, e.g., (50, 50) indicates two hidden layers with 50 neurons each
-        activation : torch.nn.Module
-            Activation function class used for non-linear mapping between network layers
-        net : Solution
-            Encapsulated neural network model for predicting solution coefficients
-        optimizer : torch.optim.Optimizer
-            Optimizer object for updating network parameters
-        steplr : torch.optim.lr_scheduler.StepLR or None
-            Learning rate scheduler, None if step_size is 0
-        tmr : timer
-            Timer object for recording training and solution process times
-        Loss : list
-            Record of loss values during training
-        error : list
-            Record of error values during training
-        pred : TensorLike
-            Final prediction results
+            - pde(int or HelmholtzPDEDataT): PDE definition;
+            - scaling_function(callable): The scaling_function is a function that satisfies the boundary conditions, default is None;
+            - mesh_size(int): Number of grid points along each dimension;
+            - lr(float): Learning rate;
+            - epochs(int): Number of training epochs;
+            - weights(tuple): Weight for the equation loss and boundary loss;
+            - hidden_size(tuple): Tuple of hidden layer sizes;
+            - activation(str): Activation function, can choose from 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax';
+            - optimizer(str): Optimization algorithm, can choose from 'Adam', 'SGD';
+            - step_size(int): Period of learning rate decay;
+            - gamma(float): Multiplicative factor of learning rate decay;
+            - pbar_log(bool): Whether to use progress bar for logging;
+            - log_level(str): Logging level, can choose from 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
 
-    Reference
+    Attributes:
+        options(dict): Collection of model configuration parameters.
+
+        pde(PoissonPDEDataT): Poisson's equation problem definition object containing equation parameters, boundary conditions, 
+            and source terms.
+
+        gd(int): Geometric dimension (1D, 2D, or 3D) of the problem domain.
+
+        domain(tuple, list): Computational domain boundaries in the format (xmin, xmax, ymin, ymax, ...).
+        
+        mesh_size(tuple): Grid size specifying the number of nodes in each dimension.
+        
+        mesh(Mesh): Computational grid object.
+        
+        lr(float): Optimizer learning rate.
+        
+        epochs(int): Number of training iterations.
+        
+        hidden_size(tuple): Tuple of hidden layer sizes.
+        
+        activation(torch.nn.Module): Activation function class used for non-linear mapping between network layers.
+        
+        net(Solution): Encapsulated neural network model for predicting solution coefficients.
+
+        optimizer(torch.optim.Optimizer): Optimizer object for updating network parameters.
+
+        mesh(Mesh): Computational grid object.
+
+        steplr(torch.optim.lr_scheduler.StepLR or None): Learning rate scheduler, None if step_size is 0.
+        
+        tmr(timer): Timer object for recording training and solution process times.
+        
+        Loss(list): Record of loss values during training.
+        
+        error(list): Record of error values during training.
+        
+        pred(TensorLike): Final prediction results.
+
+    Methods:
+        get_options(): Get default configuration parameters for the model.
+        
+        set_pde(): Initialize the PDE problem definition.
+        
+        set_network(): Configure the neural network architecture.
+        
+        set_mesh(): Create computational mesh.
+        
+        set_steplr(): Set the learning rate scheduler.
+=
+        shape_function(): Compute shape function values at given points.
+
+        scaling_function(): Compute scaling function values at given points.
+
+        pde_residual(): Compute PDE residual (Laplacian(u)).
+
+        predict(): Make predictions using the trained network.
+
+        fem(): Solve Poisson's equation using Finite Element Method (FEM) for comparison.
+
+        run(): Start training the model.
+
+        show(): Visualize the solution results.
+
+    Reference:
         https://wnesm678i4.feishu.cn/wiki/Xc2iw6mDUiOBZCkQtFcczVcZnW9?from=from_copylink
 
-    Examples
+    Examples:
         >>> from fealpy.backend import bm
         >>> bm.set_backend('pytorch')  # Set computation backend
         >>> from fealpy.ml.poisson_penn_model import PoissonPENNModel
@@ -90,41 +115,24 @@ class PoissonPENNModel(ComputationalModel):
         >>> model.run()  # Start training
         >>> model.show()  # Visualize results
     """
-    def __init__(self, options: Optional[dict] = None):
-        if options is None:
-            self.options = self.get_options()
-        else:
-            self.options = options
+    def __init__(self, options: dict = {}):
+        self.options = self.get_options()
+        self.options.update(options)
         
-        self.pbar_log = self.options.get('pbar_log', True)
-        self.log_level = self.options.get('log_level', 'INFO')
+        self.pbar_log = self.options['pbar_log']
+        self.log_level = self.options['log_level']
         super().__init__(pbar_log=self.pbar_log, log_level=self.log_level)
 
-        self.set_pde(self.options.get('pde', 8))
-        self.gd = self.pde.geo_dimension()
-        self.domain = self.pde.domain()
-        self.set_mesh(self.options.get('mesh_size', 30))
+        self.lr = self.options['lr']  
+        self.epochs = self.options['epochs']     
+        self.hidden_size = self.options['hidden_size']  # hidden layer sizes and 
+        self.activation = activations[self.options['activation']]  
+        self.tmr = timer()  
 
-        # 网络超参数、激活函数
-        self.lr = self.options.get('lr', 0.005)
-        self.epochs = self.options.get('epochs', 1000)
-        self.hidden_size = self.options.get('hidden_size', (50, 50))
-        self.activation = activations[self.options.get('activation', "LogSigmoid")]
-
-        self.set_network()  # 网络
-       
-        # 优化器与学习率调度器
-        opt = optimizers[self.options.get('optimizer', 'Adam')]
-        self.optimizer = opt(params=self.net.parameters(), lr=self.lr)
+        self.set_pde(self.options['pde'])  # PDE 
+        self.set_mesh(self.options['mesh_size'])  # mesh
+        self.set_network()  # network
         
-        # 学习率调度器
-        step_size = self.options.get('step_size', 0)
-        gamma = self.options.get('gamma', 0.99)
-        self.set_steplr(step_size, gamma)
-
-        self.tmr = timer()  # 计时器
-        
-
     @classmethod
     def get_options(cls):
         """Get default configuration parameters for the model.
@@ -132,58 +140,47 @@ class PoissonPENNModel(ComputationalModel):
         Defines and returns default configurations for the model through a command-line argument parser,
         including PDE problem number, grid size, network structure, and optimizer parameters.
         
-        Returns
-            options : dict
-                Dictionary containing all configuration parameters with parameter names as keys and default values
+        Returns:
+            options(dict): Dictionary containing all configuration parameters with parameter names as keys and default values
         """
         import argparse
         parser = argparse.ArgumentParser(description="Poisson equation solver using PENN.")
 
-        parser.add_argument('--pde',default=8, type=int,
+        parser.add_argument('--pde', default=8, type=int,
                             help="Built-in PDE example ID (1, 2, 6, 8, 9) for different Poisson problems, default is 8.")
 
-        parser.add_argument('--scaling_function',default=None, 
+        parser.add_argument('--scaling_function', default=None, 
                             help="The caling_function is a function that satisfies the boundary conditions, default is None.")
         
-        parser.add_argument('--mesh_size',
-                            default=30, type=int,
+        parser.add_argument('--mesh_size', default=30, type=int,
                             help='Number of grid points along each dimension, default is 30.')
 
-        parser.add_argument('--hidden_size',
-                            default=(50, 50), type=tuple,
+        parser.add_argument('--hidden_size', default=(50, 50), type=tuple,
                             help='Default hidden sizes, default is (50, 50).')
 
-        parser.add_argument('--optimizer', 
-                            default="Adam",  type=str,
+        parser.add_argument('--optimizer', default="Adam",  type=str,
                             help="Optimizer to use for training, default is Adam,  options are 'Adam' , 'SGD'.")
 
-        parser.add_argument('--activation',
-                            default="LogSigmoid", type=str,
+        parser.add_argument('--activation', default="LogSigmoid", type=str,
                             help="Activation function, default is 'LogSigmoid', " \
                             "options are 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax'.")
 
-        parser.add_argument('--lr',
-                            default=0.005, type=float,
+        parser.add_argument('--lr', default=0.005, type=float,
                             help='Learning rate for the optimizer, default is 0.005.')
 
-        parser.add_argument('--step_size',
-                            default=0, type=int,
+        parser.add_argument('--step_size', default=0, type=int,
                             help='Period of learning rate decay, default is 0.')
 
-        parser.add_argument('--gamma',
-                            default=0.99, type=float,
+        parser.add_argument('--gamma', default=0.99, type=float,
                             help='Multiplicative factor of learning rate decay. Default: 0.99.')
 
-        parser.add_argument('--epochs',
-                            default=1000, type=int,
+        parser.add_argument('--epochs', default=1000, type=int,
                             help='Number of training epochs, default is 1000.')
 
-        parser.add_argument('--pbar_log',
-                            default=True, type=bool,
+        parser.add_argument('--pbar_log', default=True, type=bool,
                             help='Whether to show progress bar, default is True')
 
-        parser.add_argument('--log_level',
-                            default='INFO', type=str,
+        parser.add_argument('--log_level', default='INFO', type=str,
                             help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
         options = vars(parser.parse_args())
         return options
@@ -194,28 +191,26 @@ class PoissonPENNModel(ComputationalModel):
         Sets up the Poisson's equation problem to be solved by the model based on 
         the input PDE object or built-in example ID.
         
-        Parameters
-            pde: Union[PoissonPDEDataT, int]
-                Either a Poisson's equation problem object or the ID (integer) of a predefined example. 
-                If an integer, the corresponding predefined Poisson's equation problem is retrieved from 
-                the PDE model manager.
+        Parameters:
+            pde(Union[PoissonPDEDataT, int]): Either a Poisson's equation problem object or the ID (integer) of a predefined example. 
+                If an integer, the corresponding predefined Poisson's equation problem is retrieved from the PDE model manager.
         """  
         if isinstance(pde, int):
             self.pde = PDEModelManager('poisson').get_example(pde)
         else:
             self.pde = pde 
-
+        self.gd = self.pde.geo_dimension()
+        self.domain = self.pde.domain()
 
     def set_network(self, net=None):
-        """Configure the neural network architecture
+        """Configure the neural network architecture and optimizer, learning rate scheduler.
         
         Creates or sets the neural network model used for solving the PDE. If no custom network is provided,
         a default Multi-Layer Perceptron (MLP) is created with input dimension equal to the geometric dimension,
         output dimension 1, and hidden layer sizes specified by hidden_size.
         
-        Parameters
-            net : torch.nn.Module, optional
-                Custom neural network architecture. If None, a default MLP network is automatically created
+        Parameters:
+            net(torch.nn.Module): Custom neural network architecture. If None, a default MLP network is automatically created
         """
         if net == None:
             layers = []
@@ -227,36 +222,47 @@ class PoissonPENNModel(ComputationalModel):
             net = nn.Sequential(*layers)
         self.net = Solution(net)
 
-    def set_mesh(self, mesh_size: int):
+        # optimizer
+        opt = optimizers[self.options['optimizer']]
+        self.optimizer = opt(params=self.net.parameters(), lr=self.lr)
+        
+        # learning rate scheduler
+        step_size = self.options['step_size']
+        gamma = self.options['gamma']
+        self.set_steplr(step_size, gamma)
+
+    def set_mesh(self, mesh_size: int=30, mesh=None):
         """Create computational mesh
         
         Creates a computational mesh over the domain defined by the PDE based on the specified mesh size.
         
-        Parameters
-            mesh_size : tuple of int
-                Number of nodes in each dimension.
+        Parameters:
+            mesh_size(tuple of int): Number of nodes in each dimension.
+
+            mesh: Mesh object. If None, creates a default mesh based on the PDE domain and mesh size.
         """
-        self.mesh_size = (mesh_size, ) * self.gd
-        cell_size = tuple(x - 1 for x in self.mesh_size)
-        self.mesh = self.pde.init_mesh(*cell_size)
+        if mesh == None:
+            self.mesh_size = (mesh_size, ) * self.gd
+            cell_size = tuple(x - 1 for x in self.mesh_size)
+            self.mesh = self.pde.init_mesh(*cell_size)
+        else:
+            self.mesh = mesh
 
     def set_steplr(self, step_size: int=0, gamma: float=0.9):
         """Create learning rate scheduler
         
         Initializes a learning rate scheduler for decaying the learning rate periodically during training.
         
-        Parameters
-            step_size : int, optional, default=0
-                Period for learning rate decay, i.e., decay every step_size epochs. No scheduler is used if step_size = 0.
-            gamma : float, optional, default=0.9
-                Multiplicative factor for learning rate decay, new_lr = current_lr * gamma
+        Parameters:
+            step_size(int): default is 0. Period for learning rate decay, i.e., decay every step_size epochs. No scheduler is used if step_size = 0.
+            
+            gamma(float): default is 0.9. Multiplicative factor for learning rate decay, new_lr = current_lr * gamma
         """
         if step_size == 0:
             self.steplr = None
         else:
             self.steplr = StepLR(self.optimizer, step_size, gamma)
         
-
     def shape_function(self, p: TensorLike) -> TensorLike:
         """Compute shape function values at given points。
 
@@ -264,17 +270,15 @@ class PoissonPENNModel(ComputationalModel):
         at the equation's boundaries. For a two-dimensional rectangular domain where all edges serve 
         as the equation's boundaries, the shape function can be formulated as:
 
-            ψ(x,y) = [e^{-((x-x₀)² + (y-y₀)²)/32} / √(32π)] * (x-x_min)(x-x_max)(y-y_min)(y-y_max)
+            ψ(x,y) = [e^{-((x-x₀)² + (y-y₀)²)/32} / (32π)] * (x-x_min)(x-x_max)(y-y_min)(y-y_max)
         
         where (x₀, y₀) represents the center point of the domain.
         
-        Parameters
-            p : TensorLike
-                Tensor of shape (n_points, geo_dimension) representing coordinates of input points
-        
-        Returns
-            val : TensorLike
-                Tensor of shape (n_points, ) representing shape function values at each point
+        Parameters:
+            p(TensorLike): Tensor of shape (n_points, geo_dimension) representing coordinates of input points.
+
+        Returns:
+            val(TensorLike): Tensor of shape (n_points, ) representing shape function values at each point.
         """
         a = 32
         c = math.sqrt(math.pi * a) ** self.gd
@@ -316,20 +320,19 @@ class PoissonPENNModel(ComputationalModel):
         2. A user-provided function (if passed via func parameter)
         3. Raises ValueError if neither is available
         
-        Args:
-            p: TensorLike of shape (n_points, geo_dimension), 
+        Parameters:
+            p(TensorLike): Tensor of shape (n_points, geo_dimension), 
                 input points where the scaling function should be evaluated.
-            func: Optional callable that takes points as input and returns 
+
+            func(callable): Optional callable that takes points as input and returns 
                 scaling function values. Used as fallback if no built-in 
                 function exists in the PDE.
         
         Returns:
-            TensorLike of shape (n_points, n_shape_functions), 
-            the computed scaling function values at each point.
+            TensorLike: Tensor of shape (n_points, n_shape_functions), the computed scaling function values at each point.
         
         Raises:
-            ValueError: If neither the PDE has a scaling function 
-                    nor a function is provided through func argument.
+            ValueError: If neither the PDE has a scaling function nor a function is provided through func argument.
         """
         if func is not None: 
             return func(p)
@@ -342,26 +345,23 @@ class PoissonPENNModel(ComputationalModel):
     def pde_residual(self, p: TensorLike, pred: TensorLike) -> TensorLike:
         """Compute PDE residual (Laplacian(u)).
         
-        Parameters
-            p : TensorLike
-                Collocation points where residual is evaluated.
-            pred : TensorLike
-                Predicted solution values at collocation points by net.
-            
-        Returns
-            val : TensorLike
-                PDE residual values at input points.
+        Parameters:
+            p(TensorLike): Collocation points where residual is evaluated.
+
+            pred(TensorLike): Predicted solution values at collocation points by net.
+
+        Returns:
+            val(TensorLike): PDE residual values at input points.
                 
-        Notes
+        Notes:
             Uses automatic differentiation to compute second derivatives.
             The residual is calculated as Δu where Δ is the Laplacian operator.
         """     
-        # 一阶导数计算
         grad_u = gradient(pred, p, create_graph=True)  ## (npde, dim)
-        laplacian = bm.zeros(pred.shape[0], 1)    # 拉普拉斯项初始化
+        laplacian = bm.zeros(pred.shape[0], 1)   
         
         for i in range(p.shape[-1]):
-            u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # 计算 ∂²u/∂x_i²
+            u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # computes ∂²u/∂x_i²
             laplacian += u_ii
         val = laplacian 
         return val 
@@ -388,7 +388,7 @@ class PoissonPENNModel(ComputationalModel):
             loss = mse(pde_res, bm.zeros_like(pde_res)) / f_std
 
             loss.backward(retain_graph=True)            
-            self.optimizer.step()    # 更新参数
+            self.optimizer.step()    # update parameters
             if self.steplr is not None:
                 self.steplr.step()
 
@@ -402,13 +402,11 @@ class PoissonPENNModel(ComputationalModel):
     def predict(self, p: TensorLike) -> TensorLike:
         """Make predictions using the trained network.
         
-        Parameters
-            p : TensorLike
-                Input points where prediction is needed.
-                
-        Returns
-            pred : TensorLike
-                Network predictions at input points.
+        Parameters:
+            p(TensorLike): Input points where prediction is needed.
+
+        Returns:
+            pred(TensorLike): Network predictions at input points.
         """
         coff = self.net(p)
         U = self.shape_function(p).reshape(-1, 1)
@@ -420,11 +418,10 @@ class PoissonPENNModel(ComputationalModel):
     def fem(self):
         """Solve Poisson's equation using Finite Element Method (FEM) for comparison
         
-        Returns
-            uh : TensorLike
-                FEM solution results
-        
-        Notes
+        Returns:
+            uh(TensorLike): FEM solution results
+
+        Notes:
             q=1, p=q+2, where p is the polynomial degree of the finite element space.
         """
         from fealpy.functionspace import LagrangeFESpace
@@ -434,8 +431,9 @@ class PoissonPENNModel(ComputationalModel):
         from fealpy.solver import spsolve
 
         pde = self.pde
-        mesh_size = tuple(x - 1 for x in self.mesh_size)
-        mesh = pde.init_mesh(*mesh_size)
+        # mesh_size = tuple(x - 1 for x in self.mesh_size)
+        # mesh = pde.init_mesh(*mesh_size)
+        mesh = self.mesh
         p = 1
         q = p + 2
         space = LagrangeFESpace(mesh, p)
@@ -473,7 +471,7 @@ class PoissonPENNModel(ComputationalModel):
         fem_pred = self.fem().detach().numpy()
         er = net_pred - fem_pred
 
-        # 绘制损失曲线 
+        # plot loss curve
         fig = plt.figure()
         ax1 = fig.add_subplot()
 

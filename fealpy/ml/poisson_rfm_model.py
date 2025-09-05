@@ -21,107 +21,103 @@ class PoissonRFMModel(ComputationalModel):
     with dirichlet boundary conditions. It supports multiple activation functions and
     provides comprehensive visualization capabilities.
 
-    Parameters
-    options : dict, optional
-        Configuration dictionary containing model parameters. If None, default parameters
-        from get_options() will be used. Key parameters include:
-        - pde: PDE definition (int or PoissonPDEDataT)
-        - rfm_type: Type of RFM approach ('global', 'pou', or 'both')
-        - mesh_cen_size: Mesh size for center points generation
-        - mesh_col_size: Mesh size for collocation points generation
-        - nbasis: Number of basis functions
-        - uniform: Uniform distribution parameters for random feature weights
-        - activation: Activation function type
-        - pbar_log: Progress bar logging flag
-        - log_level: Logging level
+    Parameters:
+        options(dict): Configuration dictionary containing model parameters. If None, default parameters
+            from get_options('Tanh', 'Sin', 'Cos') will be used. Key parameters include:
+            - pde(int or PoissonPDEDataT): PDE definition;
+            - rfm_type(str): Type of RFM approach, can choose from 'global', 'pou', or 'both';
+            - mesh_cen_size(Union[int, tuple]): Mesh size for center points generation;
+            - mesh_col_size(Union[int, tuple]): Mesh size for collocation points generation;
+            - mesh_error_size(Union[int, tuple]): Mesh size for error computation;
+            - nbasis(int): Number of basis functions;
+            - uniform(tuple): Uniform distribution parameters for random feature weights;
+            - activation(str): Activation function type, can choose from 'Tanh', 'Sin', or 'Cos';
+            - pbar_log(bool): Progress bar logging flag;
+            - log_level(str): Logging level, can choose from 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
 
-    Attributes
-        pde : PoissonPDEDataT
-            The Poisson PDE problem definition.
-        options : dict
-            Configuration parameters for the model.
-        pbar_log : bool
-            Flag indicating whether to use progress bar for logging.
-        log_level : str
-            Logging level ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
-        mesh_cen_size : Union[int, tuple]
-            Mesh size for center points generation.
-        mesh_col_size : Union[int, tuple]
-            Mesh size for collocation points generation.
-        nbasis : int
-            Number of basis functions in each partition or globally.
-        uniform : tuple
-            Uniform distribution parameters for random feature weights.
-        activation : nn.Module
-            Activation function module.
-        rfm_type : str
-            Type of RFM approach ('global', 'pou', or 'both').
-        tmr : timer
-            Timer instance for performance measurement.
-        space : Union[RandomFeatureSpace, PoUSpace, tuple]
-            Feature space used for approximation.
-        solution : Union[Function, tuple]
-            Computed solution function.
+    Attributes:
+        pde(PoissonPDEDataT): The Poisson PDE problem definition.
 
-    Methods
-        get_options()
-            Get default configuration parameters.
-        set_pde(pde)
-            Initialize the PDE problem definition.
-        set_mesh(mesh_size)
-            Create computational mesh.
-        globalspace(i=0)
-            Create global random feature space.
-        pouspace()
-            Create partition of unity space.
-        bothspace()
-            Create combined global and PoU spaces.
-        get_collocation_points()
-            Generate collocation points for training.
-        linear_system()
-            Assemble the linear system for solving.
-        predict(p)
-            Make predictions at given points.
-        run()
-            Execute the complete solution process.
-        show(s=80)
-            Visualize results and compute errors.
+        options(dict): Configuration parameters for the model.
 
-    Examples
+        pbar_log(bool): Flag indicating whether to use progress bar for logging.
+
+        log_level(str): Logging level. Logging level, can choose from 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
+
+        mesh_cen_size(Union[int, tuple]): Mesh size for center points generation.
+
+        mesh_col_size(Union[int, tuple]): Mesh size for collocation points generation.
+
+        nbasis(int): Number of basis functions in each partition or globally.
+
+        uniform(tuple): Uniform distribution parameters for random feature weights.
+
+        activation(nn.Module): Activation function module.
+
+        rfm_type(str): Type of RFM approach. Type of RFM approach ('global', 'pou', or 'both').
+
+        tmr(timer): Timer instance for performance measurement.
+
+        space(Union[RandomFeatureSpace, PoUSpace, tuple]): Feature space used for approximation.
+
+        solution(Union[Function, tuple]): Computed solution function.
+
+    Methods:
+        get_options(): Get default configuration parameters.
+
+        set_pde(): Initialize the PDE problem definition.
+
+        set_mesh(): Create computational mesh.
+
+        globalspace(): Create global random feature space.
+
+        pouspace():  Create partition of unity space.
+
+        bothspace():  Create combined global and PoU spaces.
+
+        get_collocation_points():  Generate collocation points for training.
+
+        linear_system(): Assemble the linear system for solving.
+
+        predict():  Make predictions at given points.
+
+        run(): Execute the complete solution process.
+
+        show(s=80):  Visualize results and compute errors.
+
+    Examples:
         >>> from fealpy.backend import bm
         >>> bm.set_backend('pytorch')
-        >>> model = PoissonRFMModel()
-        >>> model.run()
+        >>> from fealpy.ml import PoissonRFMModel  
+        >>> options = PoissonRFMModel.get_options()    # Get the default options of the network  
+        >>> model = PoissonRFMModel(options=options)  # Initialize the model with the default options  
+        >>> model.run()                                # Run the model  
         >>> model.show()
     """
-    def __init__(self, options: Optional[dict] = None):
-        if options is None:
-            self.options = self.get_options()
-        else:
-            self.options = options
+    def __init__(self, options:dict={}):
+        self.options = self.get_options()
+        self.options.update(options)
         
-        self.pbar_log = self.options.get('pbar_log', True)
-        self.log_level = self.options.get('log_level', 'INFO')
+        self.pbar_log = self.options['pbar_log']
+        self.log_level = self.options['log_level']
         super().__init__(pbar_log=self.pbar_log, log_level=self.log_level)
-        
-        self.set_pde(self.options.get('pde', 10))
 
-        self.mesh_cen_size = self.options.get('mesh_cen_size', 3)
-        self.mesh_col_size = self.options.get('mesh_col_size', 100)
-        self.nbasis = self.options.get('nbasis', 160)
-        self.uniform = self.options.get('uniform', (1, bm.pi))
-        self.activation = activations[self.options.get('activation', 'Tanh')]
-        self.rfm_type = self.options.get('rfm_type', 'pou')
+        self.mesh_cen_size = self.options['mesh_cen_size']
+        self.mesh_col_size = self.options['mesh_col_size']
+        self.nbasis = self.options['nbasis']
+        self.uniform = self.options['uniform']
+        self.activation = activations[self.options['activation']]
+        self.rfm_type = self.options['rfm_type']
+        self.tmr = timer() 
 
-        self.tmr = timer()  # 计时器
+        self.set_pde(self.options['pde'])
 
     @classmethod
     def get_options(cls):
         """Get default configuration parameters for the model.
 
-        Returns
-            options: dict
-                Dictionary containing all configuration parameters with parameter names as keys and default values.
+        Returns:
+            options(dict): Dictionary containing all configuration parameters with parameter names as keys and default values.
         """
 
         import argparse
@@ -141,12 +137,16 @@ class PoissonRFMModel(ComputationalModel):
         parser.add_argument('--mesh_col_size', default=100, type=Union[int, tuple],
                             help='Number of grid points along each dimension, used to generate the \
                                 collocation points, default is 100.')
+        
+        parser.add_argument('--mesh_error_size', default=80, type=Union[int, tuple],
+                            help='Number of grid points along each dimension, used to compute the \
+                                error, it is best not to set a very large value, default is 80.')
 
         parser.add_argument('--nbasis', default=160, type=int,
                             help='Number of basis functions in each partition or globally, default is 160.')
         
         parser.add_argument('--uniform', default=(1, bm.pi), type=tuple,
-                            help='Parameters k(weight), b(bias) in random feature function are \
+                            help='Parameters: k(weight), b(bias) in random feature function are \
                                 generated from uniform distribution, default is (1, pi).')
 
         parser.add_argument('--activation', default="Cos", type=str,
@@ -165,11 +165,9 @@ class PoissonRFMModel(ComputationalModel):
     def set_pde(self, pde: Union[PoissonPDEDataT, int]=1):
         """Initialize the PDE problem definition.
         
-        Parameters
-            pde: Union[PoissonPDEDataT, int]
-                Either a Poisson's equation problem object or the ID (integer) of a predefined example. 
-                If an integer, the corresponding predefined Poisson's equation problem is retrieved from 
-                the PDE model manager.
+        Parameters:
+            pde(Union[PoissonPDEDataT, int]): Either a Poisson's equation problem object or the ID (integer) of a predefined example. 
+                If an integer, the corresponding predefined Poisson's equation problem is retrieved from the PDE model manager.
         """
         if isinstance(pde, int):
             self.pde = PDEModelManager('poisson').get_example(pde)
@@ -179,11 +177,10 @@ class PoissonRFMModel(ComputationalModel):
     def set_mesh(self, mesh_size: Union[int, tuple]):
         """Create computational mesh.
 
-        Parameters
-            mesh_size : tuple of int
-                Number of nodes in each dimension.
+        Parameters:
+            mesh_size(tuple of int Number of nodes in each dimension.
 
-        Return
+        Returns:
             mesh: The created mesh object.
         """
         pde = self.pde
@@ -195,7 +192,7 @@ class PoissonRFMModel(ComputationalModel):
             if n == 1:
                 self.mesh_size = mesh_size * gd
             else:
-                assert n == self.gd, f"Dimension of mesh size {n} does not match dimension of problem {self.gd}."
+                assert n == gd, f"Dimension of mesh size {n} does not match dimension of problem {gd}."
         cell_size = tuple(x - 1 for x in self.mesh_size)
         mesh = self.pde.init_mesh['uniform'](*cell_size)
         return mesh
@@ -204,7 +201,7 @@ class PoissonRFMModel(ComputationalModel):
         """
         Create a global random feature space.
 
-        Returns
+        Returns:
             RandomFeatureSpace: Global random feature space instance.
         """
         gd = self.pde.geo_dimension()
@@ -217,7 +214,7 @@ class PoissonRFMModel(ComputationalModel):
     def pouspace(self):
         """Create a partition of unity (PoU) space.
 
-        Returns
+        Returns:
             PoUSpace: Partition of unity space instance.
         """
         factory = self.globalspace()
@@ -232,7 +229,7 @@ class PoissonRFMModel(ComputationalModel):
         """
         Create both global and PoU spaces.
 
-        Returns
+        Returns:
             tuple: Tuple containing (globalspace, pouspace).
         """
         space = (self.globalspace(), self.pouspace())
@@ -242,7 +239,7 @@ class PoissonRFMModel(ComputationalModel):
         """
         Generate collocation points for training.
 
-        Returns
+        Returns:
             tuple: Tuple containing (interior_points, boundary_points) tensors.
         """
         mesh = self.set_mesh(self.mesh_col_size)
@@ -258,7 +255,7 @@ class PoissonRFMModel(ComputationalModel):
         """
         Assemble the linear system for solving the Poisson equation.
 
-        Returns
+        Returns:
             tuple: Tuple containing (A, b) where A is the system matrix and b is the right-hand side vector.
         """
         from fealpy.sparse import csr_matrix
@@ -314,11 +311,10 @@ class PoissonRFMModel(ComputationalModel):
         """
         Make predictions at given points.
 
-        Parameters
-            p: TensorLike
-                Points at which to evaluate the solution.
+        Parameters:
+            p(TensorLike):  Points at which to evaluate the solution.
 
-        Returns
+        Returns:
             TensorLike: Predicted values at the given points.
         """
         if self.rfm_type == 'both':
@@ -346,19 +342,24 @@ class PoissonRFMModel(ComputationalModel):
         self.tmr.send(f"Solution assembly time")
         next(self.tmr)
 
-    def show(self, s:int = 80):
+    def show(self):
         """
         Visualize results and compute errors.
-
-        Parameters
-            s : int, optional
-                Mesh resolution for error computation, by default 80.
         """
         pde = self.pde
         gd = pde.geo_dimension()
         domain = pde.domain()
-        s = (s,) * gd
-        mesh_err = pde.init_mesh(*s)
+        s = self.options['mesh_error_size']
+        if isinstance(s, int):
+            s = (s, ) * gd
+        elif isinstance(s, tuple):
+            n = len(s)
+            if n == 1:
+                s = s * gd
+            else:
+                assert n == gd, f"Dimension of mesh size {n} does not match dimension of problem {gd}."
+        mesh_err = pde.init_mesh(*s)  # TriangleMesh
+
         if self.rfm_type == 'both':
             error = self.solution[0].estimate_error_tensor(pde.solution, mesh=mesh_err, solution2=self.solution[1])
         else:
