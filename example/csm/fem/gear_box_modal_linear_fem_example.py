@@ -4,7 +4,7 @@ from fealpy.data import get_data_path
 # Argument parsing
 parser = argparse.ArgumentParser(description=
         """
-        Arbitrary-order finite element method for solving linear elasticity eigenvalue problems
+        Linear finite element method for solving linear elasticity eigenvalue problems
         """)
 
 parser.add_argument('--backend',
