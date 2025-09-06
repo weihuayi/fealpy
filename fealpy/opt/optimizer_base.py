@@ -46,6 +46,7 @@ class Optimizer():
         self.N = options["NP"]
         self.MaxIT = options["MaxIters"]
         self.dim = options["ndim"]
+        self.MaxFes = self.dim * 10000
         if options["domain"] is not None:
             self.lb, self.ub = options["domain"]
         self.curve = bm.zeros((self.MaxIT,))
@@ -78,7 +79,7 @@ class Optimizer():
         Returns:
             The function value (and gradient if applicable for gradient-based methods).
         """
-        self.__NF += self.options['NP'] 
+        self.__NF += x.shape[0]
         return self.options['objective'](x)
 
     def update_gbest(self, x, f):
@@ -189,6 +190,76 @@ class Optimizer():
             total = total + min_dis
         return total / N
     
+    def find_memory(self, pop):
+        """
+        Locates a population individual in the memory archive.
+
+        Parameters:
+            pop (Tensor): The candidate individual of shape (1, dim).
+
+        Returns:
+            int | None: The index of the matching memory entry if found, otherwise None.
+        """
+        which1 = bm.where(self.Memory[:, 0] == pop[0, 0])[0]
+        i = 1
+        while len(which1) > 1:
+            which1 = which1[bm.where(self.Memory[which1, i] == pop[0, i])[0]]
+            i += 1
+        if len(which1) == 1:
+            return which1[0]  
+        else:
+            return None
+    
+    def save_memory(self, pop, fit):
+        """
+        Saves a solution and its fitness into the memory archive.
+
+        If the memory is full, the archive is sorted in descending order 
+        of fitness to retain higher-quality solutions.
+
+        Parameters:
+            pop (Tensor): The solution vector to save.
+            fit (float): The corresponding fitness value.
+        """
+        self.Mw += 1
+        if self.Mw > self.Max - 1:
+            self.Mw = 0
+            sy = bm.argsort(-self.Memory_f)
+            self.Memory_f = self.Memory_f[sy]
+            self.Memory = self.Memory[sy]
+        self.Memory[self.Mw] = bm.copy(pop)
+        self.Memory_f[self.Mw] = bm.copy(fit)
+    
+    def guided_learning_strategy(self, V0, x, fit, Fes):
+        """
+        Apply guided learning strategy to update solutions.
+
+        This strategy uses a combination of global best information and random
+        exploration to guide the search process.
+
+        Parameters:
+            V0 (TensorLike): Velocity vector for guidance.
+            x (TensorLike): Current population positions.
+            fit (TensorLike): Current fitness values.
+            Fes (int): Current function evaluation count.
+
+        Returns:
+            tuple: Updated positions, fitness values, and evaluation count.
+            Returns None if maximum evaluations reached.
+        """
+        which_dim = V0 > self.A
+        x_new = (which_dim * (self.gbest + bm.tan(bm.pi * (bm.random.rand(self.N, self.dim) - 0.5)) * (self.ub - self.lb) / V0) + 
+                 ~which_dim * (bm.random.rand(self.N, self.dim) * (self.ub - self.lb)))
+        x_new = bm.clip(x_new, self.lb, self.ub)
+        fit_new = self.fun(x_new)
+        mask = fit_new < fit
+        x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
+        self.update_gbest(x, fit)
+        Fes = Fes + self.N
+        if Fes >= self.MaxFes:
+            return
+        return x, fit, Fes
+    
     def thinking_innovation_strategy(self, pop):
         """
         Applies the Thinking Innovation Strategy (TIS) to update a population in a metaheuristic algorithm
@@ -207,7 +278,7 @@ class Optimizer():
 
         Process:
             1. Recall out-of-bound solutions for `pop` to ensure all variables are within `[lu[0], lu[1]]`.
-            2. Compute the Depth of Knowledge (DOK) according to Eq. (1)–(3) from the TIS paper.
+            2. Compute the Depth of Knowledge (DOK) according to Eq. (1)-(3) from the TIS paper.
             3. Retrieve the Information Event (IE) from `self.person`.
             4. Compute imagination (IM) based on Eq. (4).
             5. Generate a new candidate `pop_new` using Eq. (5).
