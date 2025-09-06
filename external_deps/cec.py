@@ -8,7 +8,7 @@ import shutil
 import platform
 
 EXTERNAL_DIR = Path(__file__).parent
-CEC_DIR = EXTERNAL_DIR.parent / "fealpy" / "opt" / "model" / "singel"
+CEC_DIR = EXTERNAL_DIR.parent / "fealpy" / "opt" / "model" / "single"
 os.makedirs(CEC_DIR, exist_ok=True)
 
 def download_cec_data_zip(url: str) -> None:

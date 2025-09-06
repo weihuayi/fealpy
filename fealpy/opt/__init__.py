@@ -6,9 +6,9 @@ from .optimizer_base import opt_alg_options, Optimizer
 from .swarm_based import (AntColonyOptAlg, ArtificialRabbitsOpt, BlackwingedKiteAlg, ButterflyOptAlg, 
                           CrayfishOptAlg, CrowDrinkingWaterAlg, CrestedPorcupineOpt, CuckooSearchOpt,
                           GreyWolfOpt, HarrisHawksOpt, HippopotamusOptAlg, HoneybadgerAlg, 
-                          JellyfishSearchOpt, MarinePredatorsAlg, ParticleSwarmOpt, 
-                          StarFishOptAlg, SandCatSwarmOpt, SeagullOptAlg, SparrowSearchAlg, SquirrelSearchAlg, 
-                          TIS_MarinePredatorsAlg, WhaleOptAlg, ZebraOptAlg)
+                          JellyfishSearchOpt, MarinePredatorsAlg, ParticleSwarmOpt, StarFishOptAlg,
+                          SandCatSwarmOpt, SeagullOptAlg, SparrowSearchAlg, SquirrelSearchAlg, WhaleOptAlg, ZebraOptAlg,
+                          GLS_MarinePredatorsAlg, MBS_MarinePredatorsAlg, TIS_MarinePredatorsAlg)
 from .opt_function import levy, initialize
 from .physics_based import RimeOptAlg, SnowAblationOpt, QuantumParticleSwarmOpt
 from .improved import (CuckooQuantumParticleSwarmOpt, DifferentialSquirrelSearchAlg, 
