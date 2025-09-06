@@ -62,18 +62,6 @@ def search_node(name: str):
     raise ValueError(f"Node {name} not found")
 
 
-def _check_src_dst(data) -> tuple[int, str]:
-    if not isinstance(data, tuple) or len(data) != 2:
-        raise TypeError("src and dst must be both 2-tuples")
-
-    if not isinstance(data[0], int): # node index
-        raise TypeError("node index must be an integer")
-    if not isinstance(data[1], str): # slot name
-        raise TypeError("slot name must be a string")
-
-    return data
-
-
 def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
     from .nodetype import create
     from .core.edge import connect_from_address, AddrHandler
@@ -89,7 +77,7 @@ def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
     # Create cnodes and graphs
     for cnode_item in cnode_table:
         # Skip graph IO nodes
-        if cnode_item["gi"] > -1 or cnode_item["go"] > -1:
+        if cnode_item["gin"] > -1 or cnode_item["gout"] > -1:
             # use a placeholder to keep index, as the graph may not be created yet
             cnode_list.append(None)
             continue
@@ -104,12 +92,12 @@ def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
 
     # Loop again to replace placeholders with actual graph IO nodes
     for idx, cnode_item in enumerate(cnode_table):
-        if cnode_item["gi"] > -1:
-            graph = graph_list[cnode_item["gi"]]
+        if cnode_item["gin"] > -1:
+            graph = graph_list[cnode_item["gin"]]
             assert cnode_list[idx] is None
             cnode_list[idx] = graph._input_node
-        elif cnode_item["go"] > -1:
-            graph = graph_list[cnode_item["go"]]
+        elif cnode_item["gout"] > -1:
+            graph = graph_list[cnode_item["gout"]]
             assert cnode_list[idx] is None
             cnode_list[idx] = graph._output_node
 
@@ -122,8 +110,8 @@ def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
             # Register IO slots got subgraphs:
             # Operations are done through the graph, but not their IO nodes which
             # are only wrappers.
-            if cnode_item["go"] > -1: # input slot of the output node of a graph
-                graph = graph_list[cnode_item["go"]]
+            if cnode_item["gout"] > -1: # input slot of the output node of a graph
+                graph = graph_list[cnode_item["gout"]]
                 graph.register_output(slot_item["name"], default=slot_item["val"])
                 graph.output_slots[slot_item["name"]].default = slot_item["val"]
             else:
@@ -194,7 +182,7 @@ def relation_table(graph: Graph, /):
     return conn_list, output_map, input_map, cnode_map, graph_map
 
 
-def dump(global_graph: Graph, /):
+def dump(global_graph: Graph, /) -> dict[str, list[dict[str, Any]]]:
     cl, om, im, nm, gm = relation_table(global_graph)
     # make index
     output_idx = {key: idx for idx, key in enumerate(om.keys())}
@@ -236,7 +224,7 @@ def dump(global_graph: Graph, /):
 
         ref = graph_idx[node] if isinstance(node, Graph) else -1
         cnode_table.append(
-            {"name": name, "ref": ref, "gi": gi, "go": go}
+            {"name": name, "ref": ref, "gin": gi, "gout": go}
         )
 
     for (name, cnode), default in im.items():
