@@ -41,3 +41,29 @@ class Box2d(CNodeType):
         if domain is not None:
             kwds["box"] = domain
         return MeshClass.from_box(**kwds)
+    
+
+class Edgemesh(CNodeType):
+    r"""Create a mesh in a edge mesh area.
+
+    Inputs:
+        mesh_type (str): Type of mesh to granerate.
+        domain (tuple[float, float], optional): Domain.
+
+    Outputs:
+        mesh (MeshType): The mesh object created.
+    """
+    TITLE: str = "EdgeMesh"
+    PATH: str = "mesh.creation"
+    INPUT_SLOTS = [
+        PortConf("node", DataType.FLOAT),
+        PortConf("cell", DataType.INT)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH)
+    ]
+
+    @staticmethod
+    def run(node, cell):
+        from fealpy.mesh import EdgeMesh
+        return EdgeMesh(node, cell)
