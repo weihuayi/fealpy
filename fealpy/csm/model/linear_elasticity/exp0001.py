@@ -25,11 +25,10 @@ class Exp0001(BoxMesher3d):
             Gravity direction vector.
     """
 
-    def __init__(self, options = {'L':1.0, 'W':0.2}):
-        self.L = options['L']
-        self.W = options['W']
-        super().__init__(box=[0, L, 0, W , 0, W])
+    def __init__(self, L=1.0, W=0.2):
+        super().__init__(box=[0, L, 0, W, 0, W])
 
+        self.L, self.W = L, W 
         delta = self.W / self.L  # aspect ratio
         self.g = 0.4 * delta**2  # gravity acceleration
         self.d = bm.array(

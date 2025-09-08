@@ -1,36 +1,30 @@
-from typing import Sequence
-
-from ...backend import backend_manager as bm
+from typing import Optional, Sequence
 from ...decorator import cartesian
-from ...backend import TensorLike
+from ...backend import backend_manager as bm
+from ...typing import TensorLike
 from ...mesher import BoxMesher2d
+
 
 class Exp0008(BoxMesher2d):
     """
-    2D Poisson problem:
-    
-        -Δu(x,y) = f(x, y) , (x,y) ∈ (-5,5)^2
-        u(x,y) = g(x, y), (x,y) ∈ ∂Ω
+    2D Vector Poisson problem:
 
-    with the exact solution:
+        -Δu = f,  in Ω = [0,1]^2
+         u = g,   on ∂Ω
 
-        Unknown.
+    With manufactured solution:
+        u₁(x, y) = sin(πx) sin(πy)
+        u₂(x, y) = cos(πx) cos(πy)
 
     The corresponding source term is:
+        f₁(x, y) = 2π² sin(πx) sin(πy)
+        f₂(x, y) = 2π² cos(πx) cos(πy)
 
-        f(x,y) = -e^{-((x+2)²/2 + y²/2)} + 1/2 e^{-((x-2)²/2 + y²/2)}
-   
-    The boundary conditions are:
-
-        g(x, y) = 0
-
-    The domain is a square with Dirichlet boundary conditions applied on all boundaries.
-
-    Reference:
-        https://doi.org/10.1016/j.neucom.2024.128936
+    Non-homogeneous Dirichlet boundary conditions are applied on all edges.
     """
+
     def __init__(self):
-        self.box= [-5.0, 5.0, -5.0, 5.0]  # [xmin, xmax, ymin, ymax]
+        self.box = [0.0, 1.0, 0.0, 1.0]
         super().__init__(box=self.box)
 
     def geo_dimension(self) -> int:
@@ -40,39 +34,48 @@ class Exp0008(BoxMesher2d):
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
-    
-    @cartesian
-    def solution(self, p: TensorLike):
-        """Exact solution is unknown, return NotImplementedError."""
-        raise NotImplementedError("The exact solution is unknown.")
 
     @cartesian
-    def gradient(self, p: TensorLike):
-        """Gradient is unknown, return NotImplementedError."""
-        raise NotImplementedError("The exact gradient is unknown.")
+    def solution(self, p: TensorLike) -> TensorLike:
+        """Compute exact solution u = (u₁, u₂)."""
+        x, y = p[..., 0], p[..., 1]
+        pi = bm.pi
+        u1 = bm.sin(pi * x) * bm.sin(pi * y)
+        u2 = bm.cos(pi * x) * bm.cos(pi * y)
+        return bm.stack([u1, u2], axis=-1)
+
+    @cartesian
+    def gradient(self, p: TensorLike) -> TensorLike:
+        """Compute gradient of solution ∇u: shape (..., 2, 2)."""
+        x, y = p[..., 0], p[..., 1]
+        pi = bm.pi
+        du1_dx = pi * bm.cos(pi * x) * bm.sin(pi * y)
+        du1_dy = pi * bm.sin(pi * x) * bm.cos(pi * y)
+        du2_dx = -pi * bm.sin(pi * x) * bm.cos(pi * y)
+        du2_dy = -pi * bm.cos(pi * x) * bm.sin(pi * y)
+        return bm.stack([
+            bm.stack([du1_dx, du1_dy], axis=-1),
+            bm.stack([du2_dx, du2_dy], axis=-1),
+        ], axis=-2)
 
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
-        """Compute source term"""
+        """Compute source term f = (f₁, f₂)."""
         x, y = p[..., 0], p[..., 1]
-        term1 = bm.exp(-((x + 2)**2 + y**2) / 2)
-        term2 = 0.5 * bm.exp(-((x - 2)**2 + y**2) / 2)
-        return term2 - term1
+        pi = bm.pi
+        f1 = 2 * pi**2 * bm.sin(pi * x) * bm.sin(pi * y)
+        f2 = 2 * pi**2 * bm.cos(pi * x) * bm.cos(pi * y)
+        return bm.stack([f1, f2], axis=-1)
 
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
-        """Dirichlet boundary condition (zero on all boundaries)"""
-        return bm.zeros_like(p[..., 0])
+        """Dirichlet boundary condition u = g."""
+        return self.solution(p)
 
     @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""
         x, y = p[..., 0], p[..., 1]
-        atol = 1e-12  
-        on_boundary = ((bm.abs(x + 5) < atol) | (bm.abs(x - 5) < atol) |
-                       (bm.abs(y + 5) < atol) | (bm.abs(y - 5) < atol))
-        return on_boundary
-    
-    def scaling_function(self, p: TensorLike) -> TensorLike:
-        """Compute scaling function that satisfies the boundary conditions."""
-        return bm.zeros_like(p[..., 0])
+        atol = 1e-12  # Absolute tolerance
+        return (bm.abs(x - 0.0) < atol) | (bm.abs(x - 1.0) < atol) | \
+               (bm.abs(y - 0.0) < atol) | (bm.abs(y - 1.0) < atol)

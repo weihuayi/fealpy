@@ -1,11 +1,15 @@
 from typing import Optional
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S, CoefLike
-from ..mesh import HomogeneousMesh
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
-from ..decorator.variantmethod import variantmethod
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, Index, _S, CoefLike
+from fealpy.decorator import variantmethod
+from fealpy.utils import process_coef_func
+
+from fealpy.mesh import HomogeneousMesh
+from fealpy.functionspace.space import FunctionSpace as _FS
+
 from fealpy.fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
+
 from .vector_decomposition import VectorDecomposition
 
 class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
@@ -22,8 +26,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
-        mesh = getattr(space, 'mesh', None)
-        return mesh.face_to_cell()[self.index][:,:2]
+        return space.edge_to_dof()[self.index]
 
     @enable_cache
     def fetch(self, space: _FS):
@@ -40,19 +43,26 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         q = self.q
         qf = mesh.quadrature_formula(q, 'face') 
         bcs, ws = qf.get_quadrature_points_and_weights()
-        return Sf, e, d, index, bcs
+        phi = space.basis(bcs, index=index)
+        return Sf, e, d, index, bcs,  phi
     
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         coef = self.coef
         mesh = getattr(space, 'mesh', None)
-        Sf, e, d, index, bcs = self.fetch(space)
+        Sf, e, d, index, bcs,phi = self.fetch(space)
+        D = phi.shape[-1]
         val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        Sf_dot_Sf = bm.einsum('ij,ij->i', Sf, Sf).reshape(-1, 1)  
-        e_dot_Sf = bm.einsum('ij,ij->i', e, Sf).reshape(-1, 1)    
-        e_norm = bm.linalg.norm(e, axis=-1, keepdims=True)  
-        Ef_abs = (Sf_dot_Sf / e_dot_Sf) * e_norm  
-        integrator = Ef_abs/ d  
-        x = bm.stack([[1, -1], [-1, 1]])
-        integrator = integrator.reshape(-1,1,1)*x
-        return integrator
+        Sf_dot_Sf = bm.einsum('ij,ij->i', Sf, Sf)              
+        e_dot_Sf = bm.einsum('ij,ij->i', e, Sf)                
+        e_norm = bm.einsum('ij,ij->i', e, e)**0.5               
+        # Ef_abs = (|Sf|^2 / (e·Sf)) * |e|
+        Ef_abs = bm.einsum('i,i->i', Sf_dot_Sf / e_dot_Sf, e_norm)
+        if coef is None:
+            coef = bm.ones_like(Ef_abs, dtype=space.ftype)
+        integrator  = bm.einsum('i,i->i', Ef_abs / d, coef)
+        direction_matrix = bm.array([[1.0, -1.0], [-1.0, 1.0]], dtype=space.ftype)
+        eye_D = bm.eye(D, dtype=space.ftype, device=bm.get_device(space))
+        base_matrix = bm.einsum('ij,pq->ipjq', eye_D, direction_matrix).reshape(2*D, 2*D)
+        local_matrix = bm.einsum('i,ab->iab', integrator, base_matrix)
+        return local_matrix

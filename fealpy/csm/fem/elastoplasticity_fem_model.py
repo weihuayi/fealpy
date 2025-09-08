@@ -1,18 +1,21 @@
-from ...backend import backend_manager as bm
-from ..model import ComputationalModel
+
+from fealpy.backend import backend_manager as bm
+from fealpy.model import ComputationalModel
+
+from fealpy.mesh import Mesh
+from fealpy.functionspace import functionspace
+from fealpy.material import LinearElasticMaterial
+
+from fealpy.fem import BilinearForm
+from fealpy.fem import LinearForm
+from fealpy.fem import ScalarNeumannBCIntegrator, ScalarSourceIntegrator
+
 from ..model import CSMModelManager
-from ...fem import BilinearForm
-from ...fem import LinearForm
-from ...functionspace import LagrangeFESpace, TensorFunctionSpace
-from ...fem import DirichletBC
-from ...solver import spsolve
-from typing import Union
-from ..model.elastoplasticity import ElastoplasticityPDEDataT
-from ...fem import VectorSourceIntegrator, ConstIntegrator
-from .elastoplastic_integrator import ElastoplasticIntegrator
-from ...material import LinearElasticMaterial
-from ..material.elastoplastic_material import PlasticMaterial
-from ...functionspace import functionspace
+from ..material import ElastoplasticMaterial
+
+from . import ElastoplasticitySourceIntIntegrator
+from . import ElastoplasticDiffusionIntegrator
+
 
 class ElastoplasticityFEMModel(ComputationalModel):
     """
@@ -25,10 +28,11 @@ class ElastoplasticityFEMModel(ComputationalModel):
     It relies on PDEModelManager for physical parameters and boundary conditions, making it suitable for teaching, 
     research, and preliminary engineering analysis.
     
-    Parameters
+    Parameters:
         example : str, optional, default='elastoplasticity2d'
             Selects a preset elastoplasticity problem example for initializing PDE parameters and mesh.
-    Attributes
+            
+    Attributes:
         pde : object
             Object returned by PDEModelManager containing physical parameters and boundary conditions.
         mesh : object
@@ -43,311 +47,268 @@ class ElastoplasticityFEMModel(ComputationalModel):
             Distributed load applied to the domain.
         l : float
             Characteristic length of the domain.
-    Methods
+            
+    Methods:
         run()
             Executes the FEM solution process and returns the displacement vector.
         linear_system()
             Assembles and returns the stiffness matrix and load vector for the elastoplasticity problem.
         solve()
             Applies boundary conditions and solves the linear system, returning the displacement solution.
-    Notes
-        This class assumes the provided PDEModelManager example defines all necessary parameters and boundary conditions.
-        Supports custom loads and boundary conditions for various elastoplasticity problems.
-        Depends on external finite element spaces, integrators, and linear solvers.
-    Examples
-        >>> model = ElastoplasticityFEMModel(example='elastoplasticity2d')
-        >>> displacement = model.run()
-        >>> print(displacement)
-        [0.0, 0.0012, 0.0023, ...]
     """
     def __init__(self, options):
         '''
         Initializes the ElastoplasticityFEMModel with the specified example.
+        
         Parameters:
             example (str): The name of the elastoplasticity problem example to use. Default is 'elastoplasticity2d'.
             Initializes the PDE parameters, mesh, and material properties based on the example.
+            
         Raises:
             ValueError: If the example is not recognized or cannot be initialized.
-        Notes:
-            The example should be a valid key in the PDEModelManager for elastoplasticity problems.
-            It must define all necessary parameters and boundary conditions.
-        Examples:
-            >>> model = ElastoplasticityFEMModel(example='elastoplasticity3d')
-            >>> print(model.pde)
-            <PDEModelManager object with elastoplasticity parameters>
         '''
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        self.set_init_mesh()
+        mesh = self.pde.init_mesh()
+        self.set_mesh(mesh)
+        self.set_space_degree(options['space_degree'])
+        self.set_space()
+        self.set_material_parameters(E=2.069e5, nu=0.29)  # Set material parameters
         self.E = self.pde.E
         self.nu = self.pde.nu
-        self.yield_strength = self.pde.sigma_y0
         self.f = self.pde.Ft_max
-        self.a = self.pde.a
-        self.N = 10
+        self.N = 20  # Number of load steps
 
 
-    def set_pde(self, pde:Union[ElastoplasticityPDEDataT, str]='1'):
+    def set_pde(self, pde=1) -> None:
         '''
         Set the PDE parameters for the elastoplasticity problem.
-        Parameters:
-            pde (PDEModelManager): The PDE data manager containing elastoplasticity parameters and boundary conditions.
-        Raises:
-            ValueError: If the provided pde is not valid or does not contain necessary parameters.
-        Notes:
-            This method updates the model's physical parameters and mesh based on the provided PDE data.
-        Examples:
-            >>> model.set_pde(new_pde)
         '''
-        if isinstance(pde, str):
-            self.pde = PDEModelManager('elastoplasticity').get_example(pde)
+        if isinstance(pde, int):
+            self.pde = CSMModelManager('elastoplasticity').get_example(pde)
         else:
             self.pde = pde
-
-    def set_init_mesh(self):
+        self.logger.info(self.pde)
+            
+    def set_space_degree(self, p: int = 1):
         '''
-        Initialize the finite element mesh based on the PDE parameters.
+        Set the polynomial degree for the finite element space.
+        '''
+        self.p = p
+
+    def set_mesh(self, mesh: Mesh) -> Mesh:
+        '''
         This method generates the mesh according to the domain and boundary conditions defined in the PDE data.
-        Raises:
-            ValueError: If the mesh cannot be initialized due to invalid parameters.
-        Notes:
-            The mesh is generated using the parameters defined in the PDE data manager.
-        Examples:
-            >>> model.set_init_mesh()
-        '''
-        self.mesh = self.pde.init_mesh()
+        
+        Parameters:
+            mesh (Mesh): The mesh object to be initialized.
 
+        Returns:
+            Mesh: The initialized mesh object.
+        '''
+        self.mesh = mesh
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
-
-    def set_material_parameters(self, lam: float, mu: float):
-        self.material = LinearElasticMaterial("elastoplastic", lame_lambda=lam, shear_modulus=mu, 
-                                              hypo='plane_stress', device=bm.get_device(self.mesh))
-        qf = self.mesh.quadrature_formula(q=self.mesh.scalar_space.p+3)
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        self.B = self.material.strain_matrix(True, gphi=self.mesh.scalar_space.grad_basis(bcs))
-        self.D = self.material.elastic_matrix()
         
     def set_space(self):
-        '''
-        Set the finite element space for the model.
-        This method initializes the function space used for the finite element discretization.
-        Raises:
-            ValueError: If the function space cannot be initialized due to invalid parameters.
-        Notes:
-            The function space is based on the mesh and polynomial degree defined in the PDE data.
-        Examples:
-            >>> model.set_space()
-        '''
+        """
+        Set the finite element space for the model based on the mesh and polynomial degree.
+        """
         GD = self.mesh.geo_dimension()
         self.space = functionspace(self.mesh, ('Lagrange', self.p), shape=(GD, -1))
+        Ldof = self.space.number_of_local_dofs()
+        GDof = self.space.number_of_global_dofs()
+        self.logger.info(f"Lagrange space: {self.space}, LDOF: {Ldof}, GDOF: {GDof}")
 
-    # 根据当前位移场计算应力
-    def compute_stress(self, displacement, plastic_strain):
+    def set_material_parameters(self, E: float, nu: float):
         """
-        Compute the stress field based on the current displacement field.
+        Set the material parameters for the elastoplasticity model.
+        
+        Parameters:
+            E (float): Young's modulus in MPa.
+            nu (float): Poisson's ratio.
+        """
+        self.cm = LinearElasticMaterial("elastic", elastic_modulus=E, poisson_ratio=nu, 
+                                              hypo='plane_stress', device=bm.get_device(self.mesh))
+        qf = self.mesh.quadrature_formula(q=self.space.scalar_space.p+3)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        self.NQ = bcs.shape[0]
+        self.NC = self.mesh.number_of_cells()
+        self.B = self.cm.strain_matrix(True, gphi=self.space.scalar_space.grad_basis(bcs))
+        self.D = self.cm.elastic_matrix()
+        self.pfcm = ElastoplasticMaterial(name='elastoplastic',
+                                elastic_modulus=E, poisson_ratio=nu,
+                                yield_stress=self.pde.yield_stress, 
+                                hardening_modulus=self.pde.hardening_modulus, 
+                                hypo='plane_stress', device=bm.get_device(self.mesh))
+
+    def cell2dof(self, stress):
+        """
+        Get the mapping from cell indices to global degree of freedom (dof) numbers.
+
+        Parameters:
+            stress: Stress tensor for the cells.    
+            
+        Returns:
+            TensorLike: A tensor containing the global dof numbers for each cell.
+        """
+        stress = stress[self.space.cell_to_dof()]
+        return stress
+    
+    def compute_strain(self, displacement):
+        """
+        Compute the strain field based on the current displacement field.
         """
         node = self.mesh.entity('node')
         kwargs = bm.context(node)
         cell2dof = self.space.cell_to_dof()
-        uh = bm.array(displacement,**kwargs)
+        uh = bm.array(displacement, **kwargs)
         uh_cell = uh[cell2dof]
-        strain_total = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
-        strain_elastic = strain_total - plastic_strain
+        strain = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
+        return strain
 
-        # 计算应力
-        stress = bm.einsum('cqij,cqj->cqi', self.D, strain_elastic)
-        return stress
-    
-    # 根据当前应力组装内部力项
-    def compute_internal_force(self, stress):
-        qf = self.mesh.quadrature_formula(q=self.mesh.scalar_space.p+3)
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        cm = self.mesh.entity_measure('cell')
-        F_int_cell = bm.einsum('q, c, cqij,cqi->cj', 
-                             ws, cm, self.B, stress) # (NC, tdof)
+    def linear_system(self, loading_source, loading_neumann, D_ep, stress):
+        '''
+        Construct the linear system for the elastoplasticity problem.
         
-        return F_int_cell
+        Parameters:
+            loading_source (callable): Function defining the external load vector.
+            D_ep (TensorLike): Elastoplastic material stiffness matrix.
+            stress (TensorLike): Stress tensor for the cells.
 
-    # TODO:需要修改!
-    def linear_system(self):
-        '''
-        Assemble the linear system for the elastoplasticity problem.
-        This method constructs the stiffness matrix and load vector based on the finite element space and PDE parameters.
         Returns:
-            tuple: (A, b) where A is the stiffness matrix and b is the load vector.
-        Raises:
-            ValueError: If the assembly fails due to invalid parameters or mesh.
-        Notes:
-            The method uses bilinear forms and linear forms defined in the FEM library.
-        Examples:
-            >>> A, b = model.linear_system()
+            Tuple[TensorLike, TensorLike, TensorLike]:
+                - K (TensorLike): Assembled stiffness matrix.
+                - F_int (TensorLike): Internal force vector.
+                - F_ext (TensorLike): External force vector.    
         '''
-        node = self.mesh.entity('node')
-        kwargs = bm.context(node)
-        NC = self.mesh.number_of_cells()
-        NQ = self.mesh.number_of_nodes()
-        equivalent_plastic_strain = bm.zeros((NC, NQ),**kwargs)
-        self.pfcm = PlasticMaterial(name='E1nu0.3',
-                                elastic_modulus=1e5, poisson_ratio=0.3,
-                                yield_stress=50, hardening_modulus=0.0, hypo='plane_stress', device=bm.get_device(self.mesh))
-        elasticintegrator= ElastoplasticIntegrator(self.pfcm.D_ep, material=self.pfcm,space=tensor_space, 
-                                    q=tensor_space.p+3)
-        bform = BilinearForm(tensor_space)
-        bform.add_integrator(elasticintegrator)
+        elastoplasticintegrator= ElastoplasticDiffusionIntegrator(D_ep, material=self.pfcm,
+                                    q=self.space.p+3)
+        bform = BilinearForm(self.space)
+        bform.add_integrator(elastoplasticintegrator)
         K = bform.assembly(format='csr')
 
-
-        load = self.f
-        space = LagrangeFESpace(self.mesh, p=1, ctype='C')
-        tensor_space = TensorFunctionSpace(space, shape=(-1, 2))
-
-        lform = LinearForm(tensor_space) 
-        lform.add_integrator(VectorSourceIntegrator(source = load))
+        lform = LinearForm(self.space) 
+        lform.add_integrator(ScalarSourceIntegrator(source=loading_source))
+        lform.add_integrator(ScalarNeumannBCIntegrator(
+            source=loading_neumann,
+            threshold=self.pde.neumann_boundary,
+            q=self.space.scalar_space.p + 3
+        ))
         F_ext = lform.assembly()
-
-        elasticintegrator = ElastoplasticIntegrator(
-            material=self.pde.material,
-            space=tensor_space,
-            q=tensor_space.p + 3,
-            equivalent_plastic_strain=self.pde.equivalent_plastic_strain
+        
+        lform2 = LinearForm(self.space)
+        elastoplasticintintegrator = ElastoplasticitySourceIntIntegrator(strain_matrix=self.B, stress=stress,
+            q=self.space.p + 3,
         )
-
-        F_int = elasticintegrator.assembly()
-
-
+        lform2.add_integrator(elastoplasticintintegrator)
+        F_int = lform2.assembly()
 
         return K , F_int, F_ext
-    
-
-    def plasticity_update_2d(
-        delta_eps, sigma_n, alpha_n, ep_n,
-        E, nu, H, beta, kappa_func
-    ):
-        """
-        2D von Mises 弹塑性更新函数（平面应变，Voigt 表示）
-        
-        输入参数：
-        delta_eps : ndarray(3,)      # 应变增量 Δε = [ε11, ε22, γ12]
-        sigma_n : ndarray(3,)        # 上步应力 σ_n
-        alpha_n : ndarray(3,)        # 上步背应力 α_n
-        ep_n : float                 # 上步有效塑性应变 ep_n
-        E, nu : float                # 弹性模量 E 与泊松比 ν
-        H : float                    # 总硬化模量 H
-        beta : float                 # 混合硬化参数 β (0≤β≤1)
-        kappa_func : function        # κ(ep)，屈服应力函数
-
-        输出结果：
-        sigma_np1 : ndarray(3,)      # 更新应力 σ_{n+1}
-        alpha_np1 : ndarray(3,)      # 更新背应力 α_{n+1}
-        ep_np1 : float               # 更新有效塑性应变 ep_{n+1}
-        D_alg : ndarray(3,3)         # 一致切线刚度 D_alg (Voigt)
-        """
-
-        # -------- 弹性参数 --------
-        lam = E * nu / ((1 + nu) * (1 - 2 * nu))  # λ
-        mu = E / (2 * (1 + nu))                   # μ
-        K = lam + 2 * mu / 3                      # 体积模量
-
-        # -------- 常量与辅助函数 --------
-        I = bm.array([1.0, 1.0, 0.0])             # Voigt 中的单位张量
-        dev = lambda v: v - bm.dot(v, I)/3 * I    # Voigt 中 dev 操作
-
-        # -------- 1. 弹性预测 --------
-        delta_eps_m = bm.dot(delta_eps, I) / 3                # Δε_m
-        delta_e = dev(delta_eps)                              # Δe
-        sigma_m_n = bm.dot(sigma_n, I) / 3                    # σ_m^n
-        s_n = dev(sigma_n)                                    # s^n
-
-        sigma_m = sigma_m_n + (3 * lam + 2 * mu) * delta_eps_m  # σ_m^{n+1}
-        s_tr = s_n + 2 * mu * delta_e                           # s^tr
-        alpha_tr = alpha_n
-        ep_tr = ep_n
-        eta_tr = s_tr - alpha_tr
-        eta_norm = bm.linalg.norm(eta_tr)
-
-        # -------- 2. 检查屈服 --------
-        f_tr = eta_norm - bm.sqrt(2/3) * kappa_func(ep_tr)
-
-        if f_tr <= 0:
-            # 弹性步
-            sigma_np1 = sigma_m * I + s_tr
-            alpha_np1 = alpha_tr
-            ep_np1 = ep_tr
-            D_alg = bm.array([
-                [lam + 2*mu, lam, 0],
-                [lam, lam + 2*mu, 0],
-                [0, 0, mu]
-            ])
-            return sigma_np1, alpha_np1, ep_np1, D_alg
-
-        # -------- 3. 塑性修正 --------
-        N = eta_tr / eta_norm
-        H_alpha = beta * H
-        H_kappa = (1 - beta) * H
-        gamma_hat = f_tr / (2*mu + H_alpha + (2/3)*H_kappa)
-
-        ep_np1 = ep_n + bm.sqrt(2/3) * gamma_hat
-        s_np1 = s_tr - 2 * mu * gamma_hat * N
-        alpha_np1 = alpha_n + H_alpha * gamma_hat * N
-        sigma_np1 = sigma_m * I + s_np1
-
-        # -------- 4. 一致切线刚度 --------
-        theta1 = 1 - 2 * mu * gamma_hat / eta_norm
-        theta2 = (2 * mu) / (2 * mu + H_alpha + (2/3)*H_kappa) - 2 * mu * gamma_hat / eta_norm
-
-        I_dev = bm.eye(3) - bm.outer(I, I) / 3
-        N_outer = bm.outer(N, N)
-        D_alg = K * bm.outer(I, I) + 2 * mu * (
-            theta1 * (I_dev - N_outer) + theta2 * N_outer
-        )
-
-        return sigma_np1, alpha_np1, ep_np1, D_alg
-
-    
-    
-    
+       
     def solve(self):
-        # 初始化
-        u = 0  # 初始位移
-        sigma = 0  # 初始应力
-        alpha = 0  # 初始塑性应变
-        ep = 0  # 初始等效塑性应变
+        
+        u = self.space.function()  # 总位移
+        strain_pl = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
+        stress = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
+        strain_e = bm.zeros((self.NC, self.NQ), dtype=bm.float64)
+        strain_total = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
+
         tol = 1e-8
         N = self.N
 
-        # 循环荷载步
         for n in range(N):
-            delta_u = 0
+            delta_u = bm.zeros_like(u)
             converged = False
+            print(f"Load step {n+1}/{N}, solving...")
+
+            # 固定的加载项
+            from fealpy.decorator import cartesian
+            @cartesian
+            def loading_source(p):
+                coef = (n + 1) / N
+                return coef * self.pde.source(p)
+
+            @cartesian
+            def loading_neumann(p):
+                coef = (n + 1) / N
+                return coef * self.pde.neumann(p)
+
+            # 记录状态
+            strain_pl_old = strain_pl.copy()
+            strain_e_old = strain_e.copy()
+
+            iter_count = 0
             while not converged:
-                # i. 组装全局残余力向量 R = F_int - F_ext, 组装全局切线刚度矩阵 K
-                K, F_int, F_ext = self.linear_system()
+                # 计算当前试应变
+                delta_strain = self.compute_strain(delta_u)
+                strain_total_trial = strain_total + delta_strain
+
+
+                stress_trial, strain_pl_trial, strain_e_trial, Ctang_trial, is_plastic = \
+                    self.pfcm.material_point_update(strain_total_trial, strain_pl_old, strain_e_old)
+                    
+                num_plastic = is_plastic.astype(bm.uint8).sum()
+                num_total = is_plastic.size
+
+                if num_plastic == 0:
+                    print("====== 当前为纯弹性阶段 ======")
+                else:
+                    print(f"====== 当前为塑性阶段：{num_plastic}/{num_total} 个点屈服 ======")
+
+                K, F_int, F_ext = self.linear_system(loading_source=loading_source,
+                                                    loading_neumann=loading_neumann,
+                                                    D_ep=Ctang_trial,
+                                                    stress=stress_trial)
+
+                from fealpy.fem import DirichletBC
                 R = F_int - F_ext
+                K, R = DirichletBC(self.space, gd=self.pde.dirichlet,
+                                threshold=self.pde.dirichlet_boundary).apply(K, R)
+
+                if bm.linalg.norm(R) > 1e6:
+                    print("Residual too large. Exiting.")
+                    exit()
+
                 from fealpy.solver import spsolve
-                delta_u = spsolve(K, -R)
+                delta_du = spsolve(K, -R, 'scipy')
+                delta_u += delta_du  # 累加位移增量
 
-                # iv. 更新位移增量 Δu ← Δu + δΔu
-                delta_u += delta_u
+                norm_R = bm.linalg.norm(R)
+                norm_du = bm.linalg.norm(delta_du)
+                print(f"  Iter {iter_count:02d}: ||R|| = {norm_R:.3e}, ||du|| = {norm_du:.3e}")
 
-                # v. 更新所有积分点状态
-                sigma, alpha, ep = self.plasticity_update_2d(u, sigma, alpha, ep, delta_u)
-
-                # vi. 检查收敛
-                if bm.norm(R) < tol and bm.norm(delta_u) < tol:
+                if norm_R < tol and norm_du < tol:
                     converged = True
+                    
+                    stress = stress_trial
+                    strain_pl = strain_pl_trial
+                    strain_e = strain_e_trial
+                    strain_total = strain_total_trial
+                iter_count += 1
 
-            # d. 更新总位移
+            # 更新总位移
             u += delta_u
+            print(f"  u.max = {u.max():.4e}, u.min = {u.min():.4e}")
+            self.show(displacement=u, n=n)
 
-            # e. 保存状态变量 (σ, α, ep) 用于下一步
-            self.save_state(sigma, alpha, ep)
+        return u, stress, strain_pl, strain_e
+    
+    def show(self, displacement, n):
+        """
+        Visualize the mesh and the displacement field.
+        """
+        save_path = "../elastoplastic_result"
+        self.mesh.nodedata['displacement'] = displacement
+        self.mesh.to_vtk(f"{save_path}/incremental_iter_{n:03d}.vtu")
 
-        # 返回最终结果或状态
-        return u, sigma, alpha, ep
+    def save_data(self, filename):
+        pass
+
+    
 
        
