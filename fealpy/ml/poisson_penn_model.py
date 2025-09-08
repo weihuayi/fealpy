@@ -146,7 +146,7 @@ class PoissonPENNModel(ComputationalModel):
         import argparse
         parser = argparse.ArgumentParser(description="Poisson equation solver using PENN.")
 
-        parser.add_argument('--pde', default=8, type=int,
+        parser.add_argument('--pde', default=12, type=int,
                             help="Built-in PDE example ID (1, 2, 6, 8, 9) for different Poisson problems, default is 8.")
 
         parser.add_argument('--scaling_function', default=None, 

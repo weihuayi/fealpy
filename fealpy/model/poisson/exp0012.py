@@ -5,7 +5,7 @@ from ...decorator import cartesian
 from ...backend import TensorLike
 from ...mesher import BoxMesher2d
 
-class Exp0008(BoxMesher2d):
+class Exp0012(BoxMesher2d):
     """
     2D Poisson problem:
     

@@ -4,7 +4,7 @@ from ...backend import backend_manager as bm
 from ...backend import TensorLike
 from ...mesher import BoxMesher2d
 
-class Exp0002(BoxMesher2d):
+class Exp0003(BoxMesher2d):
     """
     2D Poisson problem with reaction term and piecewise linear boundary conditions:
     
