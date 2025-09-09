@@ -25,7 +25,7 @@ class Exp0007(BoxMesher3d):
         self.box = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0] 
         super().__init__(box=self.box)
 
-    def get_dimension(self) -> int:
+    def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain (3D)."""
         return 3
 
