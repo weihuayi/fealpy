@@ -8,7 +8,7 @@ class Exp0001(BoxMesher2d):
     """
     Exp0001 provides data and methods for a 2D elliptic PDE problem with a exponential exact solution.
     The model problem is:
-        -div(A ∇u) + c u = f,   in Ω = [0, 1] x [0, 1]
+        -div(A ∇u) + c u = f,   in Ω = (0, 1)^2
                 ∇u · n = 0,        on ∂Ω (Neumann)
     with the exact solution:
         u(x, y) = cos(2πx)·cos(2πy)
@@ -30,26 +30,20 @@ class Exp0001(BoxMesher2d):
     def domain(self):
         return self.box
 
-    @cartesian
-    def diffusion_coef(self, p: TensorLike) -> TensorLike:
+    def diffusion_coef(self) -> TensorLike:
         """Diffusion coefficient"""
-        val = bm.array([[10.0, 0.0], [0.0, 10.0]])
-        shape = p.shape[:-1] + val.shape
-        return bm.broadcast_to(val, shape)
+        val = bm.array([[10.0, 0.0], [0.0, 10.0]], dtype=bm.float64)
+        return val
     
-    @cartesian
-    def diffusion_coef_inv(self, p: TensorLike) -> TensorLike:
+    def diffusion_coef_inv(self) -> TensorLike:
         """Inverse diffusion coefficient"""
-        val = bm.array([[0.1, 0], [0, 0.1]])
-        shape = p.shape[:-1] + val.shape
-        return bm.broadcast_to(val, shape)
+        val = bm.array([[0.1, 0], [0, 0.1]], dtype=bm.float64)
+        return val
 
-    @cartesian
-    def reaction_coef(self, p: TensorLike) -> TensorLike:
+    def reaction_coef(self) -> TensorLike:
         """Reaction coefficient"""
-        val = bm.array([2.0])
-        shape = p.shape[:-1] + val.shape
-        return bm.broadcast_to(val, shape)
+        val = bm.array([2.0], dtype=bm.float64)
+        return val
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

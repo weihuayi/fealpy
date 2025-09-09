@@ -321,6 +321,3 @@ class LinearElasticityEigenLFEMModel(ComputationalModel):
             self.mesh.add_plot(axes)
             node[:] = node0
         plt.show()
-           
-
-

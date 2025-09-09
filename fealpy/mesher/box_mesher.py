@@ -1,7 +1,7 @@
 from typing import Sequence
 from ..backend import backend_manager as bm
 from ..decorator import variantmethod
-from ..mesh import HexahedronMesh, TetrahedronMesh, QuadrangleMesh, TriangleMesh, PolygonMesh
+from ..mesh import HexahedronMesh, TetrahedronMesh, QuadrangleMesh, TriangleMesh, PolygonMesh, UniformMesh
 
 class BoxMesher2d:
     """Box domain mesh generator"""
@@ -20,6 +20,13 @@ class BoxMesher2d:
     @variantmethod('uniform_quad')
     def init_mesh(self, nx=10, ny=10):
         mesh = QuadrangleMesh.from_box(box=self.box, nx=nx, ny=ny)
+        return mesh
+    
+    @init_mesh.register('uniform')
+    def init_mesh(self, nx=30, ny=30):
+        domain = self.box
+        extent = (0, nx, 0, ny)
+        mesh = UniformMesh(domain, extent)
         return mesh
     
     @init_mesh.register('uniform_tri')
@@ -73,6 +80,14 @@ class BoxMesher3d:
     def init_mesh(self, nx=10, ny=10, nz=10): 
         mesh = TetrahedronMesh.from_box(box=self.box, nx=nx, ny=ny, nz=nz)
         return mesh
+    
+    @init_mesh.register('uniform')
+    def init_mesh(self, nx=30, ny=30, nz=30):
+        domain = self.box
+        extent = (0, nx, 0, ny, 0, nz)
+        mesh = UniformMesh(domain, extent)
+        return mesh
+
     
     @init_mesh.register('uniform_hex')
     def init_mesh(self, nx=10, ny=10, nz=10):
