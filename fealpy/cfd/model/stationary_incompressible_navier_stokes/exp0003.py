@@ -20,7 +20,7 @@ class Exp0003(BoxMesher2d):
         return self.box
  
     @cartesian
-    def inlet_velocity(p: TensorLike) -> TensorLike:
+    def inlet_velocity(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity."""
         x = p[..., 0]
         y = p[..., 1]
@@ -30,7 +30,7 @@ class Exp0003(BoxMesher2d):
         return result
     
     @cartesian
-    def outlet_pressure(p: TensorLike) -> TensorLike:
+    def outlet_pressure(self, p: TensorLike) -> TensorLike:
         """Compute exact solution of velocity."""
         x = p[..., 0]
         y = p[..., 1]
