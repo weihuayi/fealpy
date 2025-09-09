@@ -75,6 +75,8 @@
         "apt_package": "libp4est-dev"
     },
     {
+        "name": "cec",
+        "env": "WITH_CEC",
         "cec_suites": [
           {
             "name": "CEC2017",
