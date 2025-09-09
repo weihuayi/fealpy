@@ -16,7 +16,7 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         mu (float): The shear modulus of the material.
     """
     
-    def __init__(self, name: str, model,
+    def __init__(self, name: str, 
                  elastic_modulus: Optional[float] = None,
                  poisson_ratio: Optional[float] = None,
                  shear_modulus: Optional[float] = None) -> None:
@@ -24,8 +24,6 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                         elastic_modulus= elastic_modulus, 
                         poisson_ratio=poisson_ratio,
                         shear_modulus=shear_modulus)
-
-        self.model = model
         
         self.E = self.get_property('elastic_modulus')
         self.nu = self.get_property('poisson_ratio')
@@ -40,15 +38,6 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         s += f"  [Beam]  mu          : {self.mu}\n"
         s += ")"
         return s
-
-    def cross_section(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        return self.model.beam_Ax, self.model.beam_Ay, self.model.beam_Az
-
-    def inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        return self.model.beam_Ix, self.model.beam_Iy, self.model.beam_Iz
-
-    def shear_factor(self) -> Tuple[TensorLike, TensorLike]:
-        return self.model.FSY, self.model.FSZ
     
     def stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for Timoshenko beam material."""

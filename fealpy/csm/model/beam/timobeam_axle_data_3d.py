@@ -72,7 +72,6 @@ class TimobeamAxleData3D:
         beam_Ax = bm.pi * self.beam_D**2 / 4
         beam_Ay = beam_Ax / self.FSY
         beam_Az = beam_Ax / self.FSZ
-
         return beam_Ax, beam_Ay, beam_Az
     
     def calculate_beam_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
@@ -83,7 +82,7 @@ class TimobeamAxleData3D:
        return beam_Ix, beam_Iy, beam_Iz
     
     def init_mesh(self):
-        """Construct a mesh for the beam ane axle.
+        """Construct a mesh for the beam and axle.
 
         Returns:
             EdgeMesh: 3D mesh with nodes and cells for the beam domain.
@@ -105,7 +104,12 @@ class TimobeamAxleData3D:
              [21, 22], [4, 23], [5, 24], [6, 25], [7, 26], [8, 27], 
              [14, 28], [15, 29],[16, 30], [17, 31], [18,32]], dtype=bm.int32)
         
-        return EdgeMesh(node, cell)
+        mesh = EdgeMesh(node, cell)
+        mesh.celldata["Ax"] = self.beam_Ax
+        mesh.celldata["Ay"] = self.beam_Ay
+        mesh.celldata["AZ"] = self.beam_Az
+        
+        return mesh
     
     @cartesian
     def external_load(self) -> TensorLike:

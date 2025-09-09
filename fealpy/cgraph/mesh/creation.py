@@ -43,8 +43,8 @@ class Box2d(CNodeType):
         return MeshClass.from_box(**kwds)
     
 
-class Edgemesh(CNodeType):
-    r"""Create a mesh in a edge mesh area.
+class Createmesh(CNodeType):
+    r"""Create a mesh.
 
     Inputs:
         mesh_type (str): Type of mesh to granerate.
@@ -53,12 +53,14 @@ class Edgemesh(CNodeType):
     Outputs:
         mesh (MeshType): The mesh object created.
     """
-    TITLE: str = "EdgeMesh"
+    TITLE: str = "CreateMesh"
     PATH: str = "mesh.creation"
     INPUT_SLOTS = [
-        PortConf("mesh_type", DataType.MENU, 0, default="edgemesh"),
-        PortConf("node", DataType.FLOAT),
-        PortConf("cell", DataType.INT)
+        PortConf("mesh_type", DataType.MENU, 0, default="edgemesh", 
+                 items=["triangle", "quadrangle", "tetrahedron", "hexahedron"]),
+        PortConf("domain", DataType.NONE),
+        PortConf("node", DataType.TENSOR),
+        PortConf("cell", DataType.TENSOR)
     ]
     OUTPUT_SLOTS = [
         PortConf("mesh", DataType.MESH)

@@ -88,8 +88,8 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         """Retrieve material and geometric parameters for the 3D Timoshenko beam.
         
         Parameters:
-            beam_E(float) : Young's modulus.
-            beam_mu(float): shear modulus.
+            E(float) : Young's modulus.
+            mu(float): shear modulus.
             l(float): Length of the beam element.
             AX(float): Cross-sectional area in the x-direction.
             AY(float): Cross-sectional area in the y-direction.
