@@ -56,6 +56,7 @@ class Edgemesh(CNodeType):
     TITLE: str = "EdgeMesh"
     PATH: str = "mesh.creation"
     INPUT_SLOTS = [
+        PortConf("mesh_type", DataType.MENU, 0, default="edgemesh"),
         PortConf("node", DataType.FLOAT),
         PortConf("cell", DataType.INT)
     ]
@@ -64,6 +65,8 @@ class Edgemesh(CNodeType):
     ]
 
     @staticmethod
-    def run(node, cell):
-        from fealpy.mesh import EdgeMesh
-        return EdgeMesh(node, cell)
+    def run(mesh_type, node, cell):
+        MeshClass = get_mesh_class(mesh_type)
+        kwds = {"node": node, "cell": cell}
+        return MeshClass(**kwds)
+    
