@@ -6,8 +6,10 @@ from fealpy.decorator import variantmethod, cartesian
 from fealpy.model import ComputationalModel
 from fealpy.model.stokes import StokesPDEDataT
 
+from fealpy.mesh import TriangleMesh, LagrangeTriangleMesh
 from fealpy.mesher import DLDMicrofluidicChipMesher
-from fealpy.functionspace import functionspace 
+from fealpy.geometry.implicit_curve import CircleCurve
+from fealpy.functionspace import functionspace, ParametricLagrangeFESpace, TensorFunctionSpace, LagrangeFESpace
 from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
 from fealpy.fem import ScalarDiffusionIntegrator as DiffusionIntegrator
 from fealpy.fem import DirichletBC
@@ -57,6 +59,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             mesh: The computational mesh object
         """
         self.mesh = mesher.mesh
+        self.radius = mesher.radius
         self.centers = mesher.centers
         self.boundary = mesher.boundary
         self.inlet_boundary = mesher.inlet_boundary
@@ -80,7 +83,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             x = p[..., 0]
             y = p[..., 1]
             result = bm.zeros(p.shape, dtype=bm.float64)
-            result[..., 0] = y * (0.5-y)
+            result[..., 0] = y * (1-y)
             result[..., 1] = bm.array(0.0)
             return result
         
@@ -137,11 +140,11 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             x = p[..., 0]
             y = p[..., 1]
             radius = self.options['radius']
-            atol = 5e-3
+            atol = 1e-12
             on_boundary = bm.zeros_like(x, dtype=bool)
             for center in self.centers:
                 cx, cy = center
-                on_boundary |= bm.abs((x - cx)**2 + (y - cy)**2 - radius**2) < atol
+                on_boundary |= (x - cx)**2 + (y - cy)**2 < radius**2 + atol
             return on_boundary
         
         self.inlet_velocity = inlet_velocity
@@ -197,6 +200,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         result[is_outlet] = outlet[is_outlet]
         return result
 
+    @variantmethod
     def linear_system(self):
         """
         Assemble the linear system for the Stokes equations.
@@ -222,6 +226,39 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
 
         return A, L
 
+    @linear_system.register('isopara')
+    def linear_system(self):
+        """
+        Assemble the linear system for the Stokes equations.
+        """
+        edge = self.mesh.entity('edge')
+        node = self.mesh.interpolation_points(self.p)
+        cell = self.mesh.cell_to_ipoint(self.p)
+        NN = self.mesh.number_of_nodes()
+        for i in range(len(self.centers)):
+            edge_flag = self.find_edge_indices(edge, self.project_edges[i])
+            curve = CircleCurve(center=self.centers[i], radius=self.radius)
+            isCircleNode = edge_flag + NN
+            bdNode, _ = curve.project(node[isCircleNode])
+            node = bm.set_at(node, isCircleNode, bdNode)
+
+        mesh = LagrangeTriangleMesh(node, cell, p=self.p)
+        space = ParametricLagrangeFESpace(mesh, p=self.p)
+        GD = self.mesh.geo_dimension()
+
+        self.uspace = TensorFunctionSpace(space, shape=(GD, -1))
+        self.pspace = LagrangeFESpace(self.mesh, self.p-1)
+        A00 = BilinearForm(self.uspace)
+        A00.add_integrator(DiffusionIntegrator(coef=1.0, method='isopara'))
+        A01 = BilinearForm((self.pspace, self.uspace))
+        A01.add_integrator(PressWorkIntegrator(coef=-1.0, method='isopara'))
+        A = BlockForm([[A00, A01], [A01.T, None]])
+        L0 = LinearForm(self.uspace)
+        L1 = LinearForm(self.pspace)
+        L = LinearBlockForm([L0, L1])
+
+        return A, L
+
     @variantmethod('direct')
     def solve(self, A, F, solver='scipy'):
         """
@@ -236,10 +273,9 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         """
         Run a single step of the simulation.
         """
-        BForm, LForm = self.linear_system()
+        BForm, LForm = self.linear_system['iso']()
         A = BForm.assembly()
         L = LForm.assembly()    
-
         BC = DirichletBC(
             (self.uspace, self.pspace),
             gd=(self.velocity_dirichlet, self.pressure_dirichlet),
@@ -249,7 +285,6 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         A, L = BC.apply(A, L)
         from fealpy.solver import cg
         x = cg(A, L)
-        print(x, x.shape)
         ugdof = self.uspace.number_of_global_dofs()
         uh = x[:ugdof]
         ph = x[ugdof:]
@@ -269,5 +304,12 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         # plt.show()
         self.mesh.nodedata['ph'] = ph
         self.mesh.nodedata['uh'] = uh.reshape(2,-1).T
-        self.mesh.to_vtk('dld_chip1.vtu')
+        self.mesh.to_vtk('dld_chip.vtu')
+    
+    def find_edge_indices(self, edge, inedge):
+        inedge_sorted = bm.sort(inedge, axis=1)   # (N,2)
+        edge_sorted = bm.sort(edge, axis=1)     # (NE,2)
+        edge_dict = {tuple(e): i for i, e in enumerate(edge_sorted)}
+        indices = bm.array([edge_dict.get(tuple(e), -1) for e in inedge_sorted])
+        return indices
     

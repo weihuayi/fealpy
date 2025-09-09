@@ -145,7 +145,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         isCornerNode = bm.set_at(isCornerNode, edge[:, [0, -1]], True)
         return isCornerNode
 
-    def interpolation_points(self, p: Optional[int]=None) -> TensorLike:
+    def interpolation_points(self, p: Optional[int]=None, index: Index=_S) -> TensorLike:
         """
         Fetch all p-order interpolation points on the triangle mesh.
 
@@ -164,15 +164,15 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         node = self.entity('node')
 
         if p is None:
-            return self.entity('node')
+            return self.entity('node')[index]
         elif p < 1:
             raise ValueError(f"p must be at least 1, but got {p}.")
         elif p == self.p:
-            return node
+            return node[index]
 
         isCornerNode = self.cell_corner_node_flag()
         if p == 1:
-            return node[isCornerNode]
+            return node[isCornerNode][index]
 
         ipoints = []
         ipoints.append(node[isCornerNode])  # the corner nodes 
@@ -189,7 +189,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             w = mi[isInCellIPoints, :] / p
             ipoints.append(self.bc_to_point(w).reshape(-1, GD))
 
-        return bm.concatenate(ipoints, axis=0)
+        return bm.concatenate(ipoints, axis=0)[index]
 
     def entity_barycenter(self, 
                           etype: Union[int, str]='cell', 
@@ -502,7 +502,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         p = bm.einsum('c...n, cni -> c...i', phi, node[entity])
         return p
     
-    def shape_function(self, bc: TensorLike, p: int=None, variables='x',index: Index=_S):
+    def shape_function(self, bc: TensorLike, p: int=None, variables='x', index: Index=_S):
         """
         Parameters:
             bc(TensorLike): the barycentric coordinates of the integration points.

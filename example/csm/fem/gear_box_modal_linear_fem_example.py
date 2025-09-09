@@ -4,7 +4,7 @@ from fealpy.data import get_data_path
 # Argument parsing
 parser = argparse.ArgumentParser(description=
         """
-        Arbitrary-order finite element method for solving linear elasticity eigenvalue problems
+        Linear finite element method for solving linear elasticity eigenvalue problems
         """)
 
 parser.add_argument('--backend',
@@ -45,7 +45,9 @@ print(options)
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
+fname = options['mesh_file'].stem + '.vtu' 
+
 from fealpy.csm.fem import GearBoxModalLinearFEMModel
 model = GearBoxModalLinearFEMModel(options)
-model.solve()
-model.post_process()
+model.solve(fname=fname)
+#model.post_process(fname=fname)

@@ -71,9 +71,9 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         # the flag of nodes coupling with the shaft system 
         isCNode = self.mesh.data.get_node_data('isCNode')
+        self.mesh.nodedata['isCNode'] = isCNode
 
-        # the flag of reference nodes, which decide the displacement of the
-        # coupling nodes
+        # the flag of reference nodes
         isRNode = bm.zeros(NN, dtype=bm.bool)
         isRNode = bm.set_at(isRNode, rnodes, True)
 
@@ -107,25 +107,38 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         self.mesh.data.add_node_data('isCSNode', isCSNode)
         self.mesh.data.add_node_data('isFNode', isFNode)
 
+        # put the flags into mesh.nodedata for visualization
+        self.mesh.nodedata['isRNode'] = isRNode
+        self.mesh.nodedata['isGBNode'] = isGBNode
+        self.mesh.nodedata['isSNode'] = isSNode
+        self.mesh.nodedata['isCSNode'] = isCSNode
+        self.mesh.nodedata['isFNode'] = isFNode
+
         # construct the RBE2 matrix 
         ridx = bm.where(isCNode)[0]
+        NC = ridx.shape[0] # number of coupling nodes
+
         sidx = bm.where(isCSNode)[0]
-        rmap = bm.zeros(NN, dtype=self.itype)
-        smap = bm.zeros(NN, dtype=self.itype)
+        NS = sidx.shape[0] # number of surface nodes
+
+        rmap = bm.full(NN, -1, dtype=self.itype)
+        rmap = bm.set_at(rmap, ridx, bm.arange(NC, dtype=self.itype))
+
+        smap = bm.full(NN, -1, dtype=self.itype)
+        smap = bm.set_at(smap, sidx, bm.arange(NS, dtype=self.itype))
+
 
         I = smap[redges[isRBE2, 1]]
         J = rmap[redges[isRBE2, 0]]
-        
+
+        assert bm.all(I >= 0) and bm.all(J >= 0), "RBE2: I/J 含有 -1，映射未覆盖所有耦合边"
 
         node = self.mesh.entity('node')
         v = node[redges[isRBE2, 0]] - node[redges[isRBE2, 1]]
 
-        NS = isCSNode.sum() # number of surface nodes
-        NR = isCNode.sum() # number of reference nodes
+        self.logger.info(f"RBE2 matrix: {NS} surface nodes, {NC} reference nodes")
 
-        self.logger.info(f"RBE2 matrix: {NS} surface nodes, {NR} reference nodes")
-
-        kwargs = {'shape':(3*NS, 6*NR), 'itype': self.itype, 'dtype': self.ftype}
+        kwargs = {'shape':(3*NS, 6*NC), 'itype': self.itype, 'dtype': self.ftype}
         ones = bm.ones(NS, dtype=self.ftype)
 
         G  = coo_matrix((    ones, (3*I+0, 6*J+0)), **kwargs)
@@ -275,7 +288,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
 
     @variantmethod('slepc')
-    def solve(self, which: str ='SM'):
+    def solve(self, which: str ='SM', fname: str="eigen.vtu") -> None:
         """
         Solve the eigenvalue problem using SLEPc.
         """
@@ -283,10 +296,19 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         from slepc4py import SLEPc
         from scipy.sparse import bmat
 
-        # 获取
         S0, M0 = self.shaft_linear_system()
+        #self._check_symmetry_spd(bmat(S0).tocsr(), bmat(M0).tocsr())
+
         self.rbe2_matrix()
         S1, M1 = self.box_linear_system()
+        #self._check_symmetry_spd(bmat(S1).tocsr(), bmat(M1).tocsr())
+
+        self._check_G(S0, M0, S1, M1)
+        self._check_flags()
+
+
+        self.mesh.to_vtk(fname=fname)
+
 
         N0 = S0[0][0].shape[0]  # number of free dofs in the shaft system
         N1 = S1[0][0].shape[0]  # number of free dofs in the gearbox shell model
@@ -299,6 +321,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         M = bmat([[M0[0][0], None, M0[0][1]],
                   [None, M1[0][0], M1[0][1]],
                   [M0[1][0], M1[1][0], M0[1][1] + M1[1][1]]]).tocsr()
+
 
         self.logger.info(f"Global system: {S.shape}, {M.shape}")
 
@@ -378,6 +401,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
                 v2 = bm.array(eigvecs[j], dtype=self.ftype)
                 print(f"Eigenvector {i} and {j} dot product: {bm.dot(v1, M @ v2)}")
 
+        self.mesh.to_vtk(fname=fname)
 
     def post_process(self, fname: str="eigen.vtu") -> None:
         """
@@ -388,5 +412,57 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
 
 
+    def _check_flags(self):
+        """
+        """
+        NN = self.mesh.number_of_nodes()
+        isRNode = self.mesh.data.get_node_data('isRNode') # reference node
+        isCSNode = self.mesh.data.get_node_data('isCSNode') # surface coupling node
+        isFNode = self.mesh.data.get_node_data('isFNode') # fixed node
+
+        assert isRNode.shape[0] == NN and isCSNode.shape[0] == NN and isFNode.shape[0] == NN
+
+        # 互斥（参考节点不能同时是表面耦合/固定）
+        assert not bm.any(isRNode & isCSNode)
+        assert not bm.any(isRNode & isFNode)
+
+        isFreeNode = ~(isRNode | isFNode | isCSNode)
+        self.logger.info(
+            f"counts - Reference:{bm.sum(isRNode)}, CSurface:{bm.sum(isCSNode)}, Fiexed:{bm.sum(isFNode)}, "
+            f"Free:{bm.sum(isFreeNode)}, Total:{NN}")
         
+    def _check_G(self, S0, M0, S1, M1):
+        """
+        """
+        # S0 来自 shaft_linear_system，S1 来自 box_linear_system
+        # 块意义：[[.., ..],[.., S11]] 中右下角维度就是耦合自由度数
+        n2_shaft = S0[1][1].shape[0]  # 应当等于 6 * NC
+        n2_box   = S1[1][1].shape[0]  # 也应是 6 * NC
+        assert n2_shaft == n2_box, f"耦合块维度不一致: shaft {n2_shaft} vs box {n2_box}"
+
+        # 检查 G 形状与 6*NC
+        assert self.G.shape[1] == n2_box, f"G 列数 {self.G.shape[1]} != 耦合自由度 {n2_box}"
+
+        # G 是否明显降秩（抽样）
+        import numpy as np
+        from scipy.sparse import csc_matrix
+        col_norm = np.sqrt(self.G.power(2).sum(axis=0)).A.ravel()
+        assert np.all(col_norm > 0), "G 存在全零列（降秩）"
+
+
+    def _check_symmetry_spd(self, S, M):
+        """
+        """
+        import numpy as np
+        ST = S - S.T
+        MT = M - M.T
+        assert ST.nnz == 0 or np.max(np.abs(ST.data)) < 1e-10, "S 非对称"
+        assert MT.nnz == 0 or np.max(np.abs(MT.data)) < 1e-10, "M 非对称"
+
+        # M 不应有零行/零对角
+        import numpy as np
+        zrow = np.where(M.getnnz(axis=1) == 0)[0]
+        assert zrow.size == 0, f"M 存在零行: {zrow[:10]}"
+        d = M.diagonal()
+        assert np.all(d > 0), "M 对角存在非正项（可能含零质量自由度）"
 
