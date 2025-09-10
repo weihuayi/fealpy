@@ -73,36 +73,5 @@
         "env": "WITH_P4EST",
         "compile_from_source": false,
         "apt_package": "libp4est-dev"
-    },
-    {
-        "name": "cec",
-        "env": "WITH_CEC",
-        "cec_suites": [
-          {
-            "name": "CEC2017",
-            "env": "WITH_CEC2017",
-            "compile_from_source": true,
-            "cpp_files": ["cec17_interface.cpp","cec17_func.cpp"],
-            "output_base": "cec17_func",
-            "input_folders": ["input_data17"]
-          },
-          {
-            "name": "CEC2020",
-            "env": "WITH_CEC2020",
-            "compile_from_source": true,
-            "cpp_files": ["cec20_interface.cpp","cec20_func.cpp"],
-            "output_base": "cec20_func",
-            "input_folders": ["input_data20"]
-          },
-          {
-            "name": "CEC2022",
-            "env": "WITH_CEC2022",
-            "compile_from_source": true,
-            "cpp_files": ["cec22_interface.cpp","cec22_func.cpp"],
-            "output_base": "cec22_func",
-            "input_folders": ["input_data22"]
-          }
-        ],
-        "data_url": "https://github.com/BenHBLiu/fealpy-cec-input_data/archive/refs/heads/main.zip"
-    }     
+    }    
 ]
