@@ -154,6 +154,8 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         G += coo_matrix(( v[:, 0], (3*I+2, 6*J+4)), **kwargs)
 
         self.logger.info(f"RBE2 matrix shape: {G.shape}, nnz: {G.nnz}")
+        G = G.coalesce() 
+        self.logger.info(f"RBE2 matrix after coalesce: {G.shape}, nnz: {G.nnz}")
 
         self.G = G.tocsr().to_scipy()
 
@@ -180,6 +182,10 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         S = S.to_scipy()
         M = M.to_scipy()
 
+        S = (S + S.T)/2.0
+        M = (M + M.T)/2.0
+
+
         # the flag of free nodes 
         isRNode = self.mesh.data.get_node_data('isRNode')
         isFNode = self.mesh.data.get_node_data('isFNode')
@@ -196,14 +202,22 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         S00 = S0[:, isFreeDof]
         S01 = S0[:, isCSDof] @ self.G
-        S11 = self.G.T @ S1[:, isCSDof] @ self.G 
+        S11 = S1[:, isCSDof] @ self.G 
+        S11 = self.G.T @ S11  
+
 
         M0 = M[isFreeDof, :]
         M1 = M[isCSDof, :]
 
         M00 = M0[:, isFreeDof]
         M01 = M0[:, isCSDof] @ self.G
-        M11 = self.G.T @ M1[:, isCSDof] @ self.G
+        M11 = M1[:, isCSDof] @ self.G
+        M11 = self.G.T @ M11 
+
+        #self._check_symmetry_spd(S11, M11)
+
+        S11 = (S11 + S11.T)/2.0  # ensure symmetry
+        M11 = (M11 + M11.T)/2.0  # ensure symmetry
 
         return [[S00, S01], [S01.T, S11]], [[M00, M01], [M01.T, M11]] 
 
@@ -286,6 +300,33 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         return [[S00, S01], [S01.T, S11]], [[M00, M01], [M01.T, M11]]
 
 
+    @variantmethod('direct')
+    def set_ksp(self, ksp):
+        """
+        Set the KSP solver for the eigenvalue problem using direct method.
+        """
+        ksp.setType('preonly')
+        pc = ksp.getPC()
+        pc.setType('lu')
+        try:
+            pc.setFactorSolverType('mumps')
+        except Exception:
+            pc.setFactorSolverType('superlu')
+
+    @set_ksp.register('iterative')
+    def set_ksp(self, ksp):
+        """
+        Set the KSP solver for the eigenvalue problem using iterative method.
+        """
+        ksp.setTolerances(rtol=1e-8, atol=1e-08, max_it=1000)
+        ksp.setType('gmres')  # 或 'gmres'
+        def my_ksp_monitor(ksp, its, rnorm):
+            print(f"KSP iter {its}, residual norm = {rnorm}")
+        ksp.setMonitor(my_ksp_monitor)
+        pc = ksp.getPC()
+        pc.setType('gamg')  # 或 'gamg' 若使用 AMG
+
+
 
     @variantmethod('slepc')
     def solve(self, which: str ='SM', fname: str="eigen.vtu") -> None:
@@ -301,7 +342,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         self.rbe2_matrix()
         S1, M1 = self.box_linear_system()
-        #self._check_symmetry_spd(bmat(S1).tocsr(), bmat(M1).tocsr())
+        self._check_symmetry_spd(bmat(S1).tocsr(), bmat(M1).tocsr())
 
         self._check_G(S0, M0, S1, M1)
         self._check_flags()
@@ -323,6 +364,9 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
                   [M0[1][0], M1[1][0], M0[1][1] + M1[1][1]]]).tocsr()
 
 
+        self._check_system_singular(S, M, 0.0)
+
+
         self.logger.info(f"Global system: {S.shape}, {M.shape}")
 
         PS = PETSc.Mat().createAIJ(
@@ -337,29 +381,26 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         eps = SLEPc.EPS().create()
         eps.setOperators(PS, PM)
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-
-        eps.setTolerances(tol=1e-6, max_it=10000)
         eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+
+        sigma = 0.0  # 更贴近你的目标最小特征值（基于经验）
+        eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
+        eps.setTarget(sigma)  # ← 显式设置目标
 
         st = eps.getST()
         st.setType(SLEPc.ST.Type.SINVERT)
-        st.setShift(1e+7)  # 目标 shift，通常为目标最小特征值附近
+        st.setShift(sigma)
 
         ksp = st.getKSP()
-        ksp.setTolerances(rtol=1e-8, atol=1e-08, max_it=1000)
-        ksp.setType('gmres')  # 或 'gmres'
-        def my_ksp_monitor(ksp, its, rnorm):
-            print(f"KSP iter {its}, residual norm = {rnorm}")
-        ksp.setMonitor(my_ksp_monitor)
-        pc = ksp.getPC()
-        pc.setType('gamg')  # 或 'gamg' 若使用 AMG
+        self.set_ksp['direct'](ksp)
+
+        vec = PS.getVecRight()
+        vec.setRandom()
+        eps.setInitialSpace([vec])
 
         k = self.options.get('neigen', 2)
-        eps.setDimensions(nev=k, ncv=4*k)
-
-        eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
-
-        eps.setFromOptions()
+        eps.setDimensions(nev=k, ncv=min(8*k, 200))
+        eps.setTolerances(tol=1e-6, max_it=10000)
         eps.solve()
 
         eigvals = []
@@ -456,8 +497,8 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         import numpy as np
         ST = S - S.T
         MT = M - M.T
-        assert ST.nnz == 0 or np.max(np.abs(ST.data)) < 1e-10, "S 非对称"
-        assert MT.nnz == 0 or np.max(np.abs(MT.data)) < 1e-10, "M 非对称"
+        assert ST.nnz == 0 or np.max(np.abs(ST.data)) < 1e-10, f"S 非对称, {ST.nnz}, {np.max(np.abs(ST.data))}"
+        assert MT.nnz == 0 or np.max(np.abs(MT.data)) < 1e-10, f"M 非对称, {MT.nnz}, {np.max(np.abs(MT.data))}"
 
         # M 不应有零行/零对角
         import numpy as np
@@ -465,4 +506,18 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         assert zrow.size == 0, f"M 存在零行: {zrow[:10]}"
         d = M.diagonal()
         assert np.all(d > 0), "M 对角存在非正项（可能含零质量自由度）"
+
+
+    def _check_system_singular(self, S, M, sigma=0.0):
+        """
+        """
+        from scipy.sparse.linalg import spsolve, LinearOperator
+        import numpy as np
+
+        A = S - sigma * M
+
+        rhs = np.random.rand(A.shape[0])
+        x = spsolve(A, rhs)  # 若崩/警告或残差巨大 => (A-σM) 奇异或预处理不当
+        res = np.linalg.norm(A @ x - rhs) / np.linalg.norm(rhs)
+        self.logger.info(f"Test (S - σM) solve residual ~ {res: .2e}")
 
