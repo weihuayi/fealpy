@@ -9,12 +9,12 @@ import sympy as sp
 
 class Exp0001(BoxMesher2d):
     def __init__(self, options: dict = {}):
-        super().__init__(box=self.box)
         self.options = options
         self.box = [0.0, 1.0, 0.0, 1.0]
         self.eps = 1e-10
         self.mu = 1.0
         self.rho = 1.0
+        super().__init__(box=self.box)
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
 
     def __str__(self) -> str:

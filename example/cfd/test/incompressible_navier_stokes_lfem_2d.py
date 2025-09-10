@@ -33,13 +33,11 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--nx',
-    default = 64, type=int,
-    default = 64, type=int,
+    default = 4, type=int,
     help="Number of divisions in the x direction, default is 8")
 
 parser.add_argument('--ny',
-    default =64, type=int,
-    default =64, type=int,
+    default = 4, type=int,
     help="Number of divisions in the y direction, default is 8")
 
 parser.add_argument('--nz',
@@ -55,8 +53,7 @@ parser.add_argument('--T1',
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=6400, type=int,
-    default=6400, type=int,
+    default=25, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--method',
@@ -76,7 +73,7 @@ parser.add_argument('--run',
     help="Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
-    default=1, type=int,
+    default=3, type=int,
     help="Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',

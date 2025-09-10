@@ -3,8 +3,8 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 from scipy.spatial import KDTree
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
-from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
-from ..decorator import timer
+from ...quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
+from ...decorator import timer
 
 
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):

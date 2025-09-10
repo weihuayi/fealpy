@@ -231,52 +231,14 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         fem = self.fem
         mesh = self.mesh
         location = mesh.location
+        ipoints = fem.uspace.interpolation_points()
         qf = mesh.quadrature_formula(q=4, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         vd = fem.uspace.function()
         vl = fem.uspace.function()
-        from fealpy.fem import BilinearForm, ScalarDiffusionIntegrator, LinearForm, DirichletBC
-        A = BilinearForm(fem.uspace)
-        BD = ScalarDiffusionIntegrator()
-        BD.coef = -1.0
-        A.add_integrator(BD)
-        L = LinearForm(fem.uspace)
-
-        A = A.assembly()
-        L = L.assembly()
-
-        def vd_dirichlet(p):
-            is_obstacle = self.pde.is_obstacle_boundary(p)
-            result = bm.zeros(p.shape)
-            result[..., 0] = 0.0
-            result[..., 0][is_obstacle] = 1.0
-            result[..., 1] = 0.0
-            return result
-        
-        def vl_dirichlet(p):
-            is_obstacle = self.pde.is_obstacle_boundary(p)
-            result = bm.zeros(p.shape)
-            result[..., 0] = 0.0
-            result[..., 1] = 0.0
-            result[..., 1][is_obstacle] = 1.0
-            return result
-        
-        def is_v_boundary(p):
-            return None
-
-        BC_d = DirichletBC(fem.uspace, 
-                         gd = vd_dirichlet,
-                         threshold=is_v_boundary,
-                         method='interp')
-        BC_l = DirichletBC(fem.uspace, 
-                         gd = vl_dirichlet,
-                         threshold=is_v_boundary,
-                         method='interp')
-        A_d, L_d = BC_d.apply(A, L)
-        A_l, L_l = BC_l.apply(A, L)
-        vd[:] = self.solve(A_d, L_d)
-        vl[:] = self.solve(A_l, L_l)
+        vd[:len(ipoints)][self.pde.is_obstacle_boundary(ipoints)] = 1.0
+        vl[len(ipoints):][self.pde.is_obstacle_boundary(ipoints)] = 1.0
         
         cellmeasure = self.mesh.entity_measure("cell")
         p = ph(bcs = bcs)
@@ -288,7 +250,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         cd += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
                                                     grad_uh,
                                                     vd(bcs = bcs), cellmeasure)  
-        cd -= bm.einsum('n, knii, kn, k -> ', ws, grad_vd, p, cellmeasure) 
+        cd -= bm.einsum('n, kn, knii, k -> ', ws, p, grad_vd, cellmeasure) 
 
         grad_vl = self.fem.uspace.grad_value(uh = vl, 
                                              bc = bcs)
@@ -322,9 +284,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         bcs1 = get_bcs(point=point1, index = index1)
 
         cd = -500 * cd
-        # cl = -500 * integrate_term(grad_uh_dot_grad_vl, u_dot_grad_u_dot_vl, div_vl)
         cl = -500 * cl
         delta_p = ph(bcs = bcs0, index = index0) - ph(bcs = bcs1, index = index1)
-        # delta_p = 0.0
         return cd, cl, delta_p
     

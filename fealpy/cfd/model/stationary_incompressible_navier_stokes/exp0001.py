@@ -117,17 +117,17 @@ class Exp0001():
     
     @cartesian
     def is_velocity_boundary(self, p):
-        inlet = self.is_inlet_boundary(p)
-        wall = self.is_wall_boundary(p)
-        obstacle = self.is_obstacle_boundary(p)
-        return inlet|wall|obstacle
+        # out = self.is_outlet_boundary(p)
+        # return ~out
+        return None
     
     @cartesian
     def is_pressure_boundary(self, p = None):
-        if p is None:
-            return 1
-        is_out = self.is_outlet_boundary(p)
-        return is_out
+        # if p is None:
+        #     return 1
+        # is_out = self.is_outlet_boundary(p)
+        # return is_out
+        return 0
 
     @cartesian
     def obstacle_velocity(self, p: TensorLike) -> TensorLike:
@@ -146,10 +146,13 @@ class Exp0001():
     @cartesian
     def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
         inlet = self.inlet_velocity(p)
+        outlet = self.inlet_velocity(p)
         is_inlet = self.is_inlet_boundary(p)
+        is_outlet = self.is_outlet_boundary(p)
         
         result = bm.zeros_like(p, dtype=p.dtype)
         result[is_inlet] = inlet[is_inlet]
+        result[is_outlet] = outlet[is_outlet]
         return result
 
     @cartesian
@@ -167,7 +170,7 @@ class Exp0001():
         """Check if point where velocity is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-4
+        atol = 1e-12
         # 检查是否接近 x=±1 或 y=±1
         on_boundary = (
             (bm.abs(x - self.box[0]) < atol) &
@@ -179,7 +182,7 @@ class Exp0001():
         """Check if point where pressure is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-4
+        atol = 1e-12
         on_boundary = (bm.abs(x - self.box[1]) < atol)
         return on_boundary
     
@@ -188,7 +191,7 @@ class Exp0001():
         """Check if point where velocity is defined is on boundary."""
         x = p[..., 0]
         y = p[..., 1]
-        atol = 1e-4
+        atol = 1e-12
         on_boundary = (
             (bm.abs(y - self.box[2]) < atol) | (bm.abs(y - self.box[3]) < atol))
         return on_boundary
@@ -200,9 +203,9 @@ class Exp0001():
         y = p[..., 1]
         cx, cy = self.center
         radius = self.radius
-        atol = 1e-4
+        atol = 1e-12
         # 检查是否接近圆的边界
-        on_boundary = bm.abs((x - cx)**2 + (y - cy)**2 - radius**2) < atol
+        on_boundary = ((x - cx)**2 + (y - cy)**2 - radius**2) < atol
         return on_boundary
         
 

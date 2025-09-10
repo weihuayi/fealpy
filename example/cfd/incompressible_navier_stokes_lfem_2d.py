@@ -31,11 +31,11 @@ parser.add_argument('--T0',
     help="Initial time, default is 0.0")
 
 parser.add_argument('--T1',
-    default=8.0, type=float,
+    default=5.0, type=float,
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=800, type=int,
+    default=5000, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--init_mesh',
@@ -55,11 +55,11 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.05.")
 
 parser.add_argument('--n_circle',
-    default = 60, type=int,
+    default = 200, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--lc',
-    default = 0.05, type=float,
+    default = 0.02, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--method',
@@ -97,10 +97,28 @@ parser.add_argument('--tol',
 # 解析参数
 options = vars(parser.parse_args())
 
+from fealpy.old.pde.navier_stokes_equation_2d import FlowPastCylinder
 bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
 model = IncompressibleNSLFEM2DModel(pde=pde, mesh = mesh, options = options)
+model.equation.set_constitutive(1)
+model.equation.set_coefficient('viscosity', pde.mu)
 uh, ph = model.run()
+cd = model.cd
+cl = model.cl
+delta_p = model.delta_p
+x = bm.linspace(0.0, 5.0, model.timeline.NL)
 # model.__str__()
+
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10, 6))
+#plt.plot(x, errorMatrix, marker='o', linestyle='-', color='black')
+plt.plot(x[3000:], cd[2999:], marker='o', linestyle='-', color='black')
+plt.xscale('log')
+plt.yscale('log')
+plt.xlabel('X (Number of cells)', fontsize=14)
+plt.ylabel('Y (max order)', fontsize=14)
+plt.show()

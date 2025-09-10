@@ -511,7 +511,7 @@ class TriangleMesh(Mesh2d):
         """
         @brief 把网格转化为 vtk 的数据格式
         """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
+        from ..vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
         GD = self.geo_dimension()

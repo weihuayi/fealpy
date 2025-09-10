@@ -15,11 +15,11 @@ import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse.csgraph import minimum_spanning_tree
 
-from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendreQuadrature 
+from ...quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendreQuadrature 
 from .Mesh2d import Mesh2d
-from .adaptive_tools import mark
-from .mesh_tools import show_halfedge_mesh
-from ..common import DynamicArray
+from ..adaptive_tools import mark
+from ..mesh_tools import show_halfedge_mesh
+from ...common import DynamicArray
 from .TriangleMesh import TriangleMesh
 
 
