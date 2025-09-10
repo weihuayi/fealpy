@@ -114,6 +114,9 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         cl = bm.zeros(self.timeline.NL-1)
         delta_p = bm.zeros(self.timeline.NL-1)
         
+        mesh.nodedata['ph'] = p0
+        mesh.nodedata['uh'] = u0.reshape(2,-1).T
+        mesh.to_vtk(f'ns2d_{str(0).zfill(10)}.vtu')
         for i in range(self.timeline.NL-1):
             t  = self.timeline.current_time()
             self.logger.info(f"time={t}")
@@ -127,7 +130,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
             mesh.nodedata['ph'] = p1
             mesh.nodedata['uh'] = u1.reshape(2,-1).T
-            mesh.to_vtk(f'ns2d_{i+1}.vtu')
+            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
             # uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
             self.timeline.advance()
@@ -146,6 +149,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         tol = self.tol if self.options is not None else tol
 
         if self.method_str == "IPCS":
+            self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
+            
             BCu = DirichletBC(space=fem.uspace, 
                 gd = cartesian(lambda p : pde.velocity_dirichlet(p, self.timeline.next_time())), 
                 threshold=pde.is_velocity_boundary, 
@@ -159,12 +164,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uh1 = u0.space.function()
             uhs = u0.space.function()
             ph1 = p0.space.function()
-            
-            
-            self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
-            
+             
             A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
             uhs[:] = self.solve(A0, b0)
+            isbd = BCu.boundary_dof_index
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
             if self.equation.pressure_neumann == True:
@@ -172,7 +175,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             else:
                 ph1[:] = self.solve(A1, b1)
 
-            A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, return_form=False)
+            A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, BC=BCu, return_form=False)
             uh1[:] = self.solve(A2, b2)
             return uh1, ph1
         else:
@@ -183,7 +186,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uk0 = u0.space.function()
             uk1 = u0.space.function()
             
-            pk = p0.space.function()
+            pk0 = p0.space.function()
+            pk1 = p0.space.function()
 
             for j in range(maxstep): 
                 self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
@@ -198,15 +202,18 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
                 x = self.solve(A, b, 'mumps')
                 uk1[:] = x[:ugdof]
                 if self.equation.pressure_neumann == True:
-                    pk[:] = x[ugdof:-1]
+                    pk1[:] = x[ugdof:-1]
                 else:
-                    pk[:] = x[ugdof:]
+                    pk1[:] = x[ugdof:]
                 
                 res_u = self.mesh.error(uk0, uk1)
-                if res_u < tol:
-                    break
+                res_p = self.mesh.error(pk0, pk1)
+                if res_u + res_p < tol:
+                    print(f"迭代收敛!迭代步数为{j+1}, 残差为{res_u + res_p}")
+                    return uk1, pk1
                 uk0[:] = uk1
-            return uk1, pk
+                pk0[:] = pk1
+            return uk1, pk1
     
 
     @run.register('uniform_refine')

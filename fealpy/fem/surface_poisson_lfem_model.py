@@ -75,7 +75,7 @@ class SurfacePoissonLFEMModel(ComputationalModel):
     def surface_poisson_system(self):
         """Construct the linear system for the surface problem.
 
-        Returns:
+        Returns
             The diffusion matrix and source matrix.
         """
         self.space = ParametricLagrangeFESpace(self.mesh, self.p)

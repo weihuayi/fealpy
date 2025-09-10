@@ -30,12 +30,6 @@ class ModelManager:
             Print all available examples for the current type.
         get_example(key)
             Instantiate and return a model based on its example key.
-
-    Examples:
-        >>> ModelManager.show_types()
-        >>> manager = ModelManager('poisson')
-        >>> manager.show_examples()
-        >>> model = manager.get_example('coscos')
     """
 
     _registry = {}
@@ -46,7 +40,7 @@ class ModelManager:
 
         Parameters:
             model_type(str): The model category to load (e.g., 'poisson', 'wave',
-                'parabolic', 'elliptic', 'hyperbolic', 'helmholtz', 'curlcurl').
+                'parabolic', 'hyperbolic', 'helmholtz', 'curlcurl').
         """
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.abspath(os.path.join(current_dir, "..", ".."))
@@ -89,10 +83,6 @@ class ModelManager:
 
         Returns:
             None
-
-        Examples:
-            >>> manager = ModelManager("poisson")
-            >>> manager.show_examples()
         """
         print(f"Available examples for type '{self.model_type}':")
         print("\n examples name: (file_name, class_name)")
@@ -108,9 +98,6 @@ class ModelManager:
 
         Returns:
             instance(object): An instance of the selected model class.
-
-        Examples:
-            >>> model = ModelManager("poisson").get_example(1)
         """
         if key not in self.data_table:
             raise ValueError(f"[Error] Unknown key: '{key}'. Use .show_examples() to view valid keys.")
@@ -125,6 +112,14 @@ class ModelManager:
 
 
 class PDEModelManager(ModelManager):
+    """PDEModelManager manages PDE model types and examples.
+
+    Examples:
+        >>> PDEModelManager.show_types()
+        >>> manager = PDEModelManager('poisson')
+        >>> manager.show_examples()
+        >>> model = manager.get_example(1)
+    """
     _registry = {
         "poisson": "fealpy.model.poisson",
         "diffusion": "fealpy.model.diffusion",

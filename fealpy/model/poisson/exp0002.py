@@ -25,7 +25,7 @@ class Exp0002(BoxMesher2d):
         self.box = [0.0, 1.0, 0.0, 1.0] 
         super().__init__(box=self.box)
 
-    def get_dimension(self) -> int:
+    def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 
@@ -76,4 +76,7 @@ class Exp0002(BoxMesher2d):
             (bm.abs(y - 1.) < atol) | (bm.abs(y + 1.) < atol)
         )
         return on_boundary 
-
+    
+    def scaling_function(self, p: TensorLike) -> TensorLike:
+        """Compute scaling function that satisfies the boundary conditions."""
+        return bm.zeros_like(p[..., 0])
