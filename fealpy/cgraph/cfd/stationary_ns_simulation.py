@@ -14,7 +14,7 @@ class StationaryNSSimulation(CNodeType):
         PortConf("source", DataType.FUNCTION),
         PortConf("uspace", DataType.SPACE),
         PortConf("pspace", DataType.SPACE),
-        PortConf("p", DataType.INT, default = 2)
+        PortConf("p", DataType.INT, default = 3)
     ]
     OUTPUT_SLOTS = [
         PortConf("A", DataType.LINOPS),
@@ -25,31 +25,31 @@ class StationaryNSSimulation(CNodeType):
         PortConf("lagrange_multiplier", DataType.FUNCTION)
     ]
     @staticmethod
-    def run(mu, rho, source, uspace, pspace):
+    def run(mu, rho, source, uspace, pspace, p):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import barycentric
         from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
         from fealpy.fem import (ScalarMassIntegrator,ScalarConvectionIntegrator, PressWorkIntegrator, ScalarDiffusionIntegrator,
                                 SourceIntegrator)
-        print(2)
+ 
         A00 = BilinearForm(uspace)
-        u_BM_netwon = ScalarMassIntegrator()
-        u_BC = ScalarConvectionIntegrator()
-        u_BVW = ScalarDiffusionIntegrator()
+        u_BM_netwon = ScalarMassIntegrator(q = p)
+        u_BC = ScalarConvectionIntegrator(q = p)
+        u_BVW = ScalarDiffusionIntegrator(q = p)
         
         A00.add_integrator(u_BM_netwon)
         A00.add_integrator(u_BC)
         A00.add_integrator(u_BVW)
         
         A01 = BilinearForm((pspace, uspace))
-        u_BPW = PressWorkIntegrator()
+        u_BPW = PressWorkIntegrator(q = p)
         A01.add_integrator(u_BPW)
        
         A = BlockForm([[A00, A01], [A01.T, None]]) 
 
         L0 = LinearForm(uspace)
-        u_LSI = SourceIntegrator()
-        u_source_LSI = SourceIntegrator()
+        u_LSI = SourceIntegrator(q = p)
+        u_source_LSI = SourceIntegrator(q = p)
         L0.add_integrator(u_LSI) 
         L0.add_integrator(u_source_LSI)
         L1 = LinearForm(pspace)
