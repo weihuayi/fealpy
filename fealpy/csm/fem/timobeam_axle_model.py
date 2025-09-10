@@ -89,8 +89,8 @@ class TimobeamAxleModel(ComputationalModel):
                                       poisson_ratio=self.beam_nu)
                 
                 Axle = AxleMaterial(name="axle",
-                                      elastic_modulus=self.axle_E,
-                                      poisson_ratio=self.axle_nu)
+                                elastic_modulus=self.axle_E,
+                                poisson_ratio=self.axle_nu)
                  
                  
                 mesh = self.tspace.mesh

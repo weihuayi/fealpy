@@ -36,12 +36,13 @@ class TimobeamAxleData3D:
         
         self.FSY = FSY
         self.FSZ = FSZ
-        self.dofs_per_node = 6
-        self.mesh = self.init_mesh()
         
         # === 计算 beam 截面 & 惯性矩 ===
         self.beam_Ax, self.beam_Ay, self.beam_Az = self.calculate_beam_cross_section()
         self.beam_Ix, self.beam_Iy, self.beam_Iz = self.calculate_beam_inertia()
+        
+        self.dofs_per_node = 6
+        self.mesh = self.init_mesh() 
         
     def __str__(self) -> str:
         """Returns a formatted multi-line string summarizing the configuration of the 3D Timoshenko beam data.
@@ -105,10 +106,19 @@ class TimobeamAxleData3D:
              [14, 28], [15, 29],[16, 30], [17, 31], [18,32]], dtype=bm.int32)
         
         mesh = EdgeMesh(node, cell)
-        mesh.celldata["Ax"] = self.beam_Ax
-        mesh.celldata["Ay"] = self.beam_Ay
-        mesh.celldata["AZ"] = self.beam_Az
+        beam_props = {
+            "Ax": self.beam_Ax,
+            "Ay": self.beam_Ay,
+            "Az": self.beam_Az,
+            "Ix": self.beam_Ix,
+            "Iy": self.beam_Iy,
+            "Iz": self.beam_Iz,
+        }
         
+        for key, value in beam_props.items():
+            arr = bm.zeros(22)
+            arr[:22] = value
+            mesh.celldata[key] = arr
         return mesh
     
     @cartesian
