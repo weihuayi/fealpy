@@ -11,7 +11,7 @@ class TimobeamAxle3d(CNodeType):
         PortConf("shear Factors", DataType.FLOAT),
         PortConf("beam_cross_section", DataType.FLOAT),
         PortConf("beam_inertia", DataType.FLOAT),
-        PortConf("external_load", DataType.FUNCTION),
+        PortConf("external_load", DataType.TENSOR),
         PortConf("dirichlet", DataType.FUNCTION)
     ]
     

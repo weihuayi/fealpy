@@ -38,12 +38,10 @@ class TimobeamAxle(CNodeType):
         )
         
         Timo = TimoshenkoBeamMaterial(name="timobeam",
-                                    model=pde, 
                                     elastic_modulus=beam_E,
                                     poisson_ratio=beam_nu)
                 
         Axle = AxleMaterial(name="axle",
-                                model=pde, 
                                 elastic_modulus=axle_E,
                                 poisson_ratio=axle_nu)
         
@@ -61,4 +59,3 @@ class TimobeamAxle(CNodeType):
         F = external_load
 
         return K, F
-    

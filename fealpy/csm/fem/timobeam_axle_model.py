@@ -83,6 +83,8 @@ class TimobeamAxleModel(ComputationalModel):
                 """
                 self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
                 self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
+                Dofs = self.tspace.number_of_global_dofs()
+                K = bm.zeros((Dofs, Dofs))
 
                 Timo = TimoshenkoBeamMaterial(name="timobeam",
                                       elastic_modulus=self.beam_E,
@@ -92,25 +94,16 @@ class TimobeamAxleModel(ComputationalModel):
                                 elastic_modulus=self.axle_E,
                                 poisson_ratio=self.axle_nu)
                  
-                 
                 mesh = self.tspace.mesh
                 bform_beam = BilinearForm(self.tspace)
                 bform_beam.add_integrator(TimoshenkoBeamIntegrator(self.tspace, Timo, 
                                                 index=bm.arange(0, mesh.number_of_cells()-10)))
                 beam_K = bform_beam.assembly(format='csr')
-                # beam_Kd = beam_K.toarray()
-                # beam_Kdd = beam_Kd[1:138, :]
-                # print('beam_K', beam_Kdd)
-                # print('beam_K', beam_Kdd.shape)
 
                 bform_axle = BilinearForm(self.tspace)
                 bform_axle.add_integrator(AxleIntegrator(self.tspace, Axle, 
                                                 index=bm.arange(mesh.number_of_cells()-10, mesh.number_of_cells())))
                 axle_K = bform_axle.assembly(format='csr')
-                # axle_Kd = axle_K.toarray()
-                # axle_Kdd = axle_Kd[138:198, :]
-                # print('axle_K', beam_Kdd)
-                # print('axle_K', axle_Kdd.shape)
 
                 # 直接相加
                 K = beam_K + axle_K

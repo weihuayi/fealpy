@@ -54,11 +54,11 @@ bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import TimobeamAxleModel
 model = TimobeamAxleModel(options)
-# model.__str__()
-K, F = model.timo_axle_system()
-K, F = model.apply_bc_penalty(K, F)
-K_dense = K.toarray()
-print('K', K_dense.shape)
+model.__str__()
+model.timo_axle_system()
+# K, F = model.apply_bc_penalty(K, F)
+# K_dense = K.toarray()
+# print('K', K_dense.shape)
 # u_data = model.solve()
 # print("u", u_data.reshape(-1, 6))
 
