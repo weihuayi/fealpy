@@ -19,7 +19,7 @@ class TimobeamAxle3d(CNodeType):
     def run():
         from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         model = TimobeamAxleData3D()
-        return (model.domain(), model.lam(), model.mu()) + tuple(
+        return (model.domain()) + tuple(
             getattr(model, name)
             for name in ["shear Factors", "beam_cross_section", "beam_inertia", "external_load", "dirichlet"]
         )
