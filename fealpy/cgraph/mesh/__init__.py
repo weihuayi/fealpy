@@ -1,2 +1,2 @@
-from .creation import Box2d, ChipMesh2D
+from .creation import Box2d, DLDMicrofluidicChipMesh2d
 from .ops import Error
