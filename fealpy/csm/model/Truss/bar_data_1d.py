@@ -1,8 +1,17 @@
+<<<<<<< HEAD
 from fealpy.mesh import EdgeMesh
+=======
+
+>>>>>>> origin/develop
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.backend import TensorLike
 
+<<<<<<< HEAD
+=======
+from fealpy.mesh import EdgeMesh
+
+>>>>>>> origin/develop
 class BarData1D:
     """
     1D Axial Bar Problem:
@@ -10,7 +19,11 @@ class BarData1D:
         E A du/dx = f(x),    x ∈ (0, L)
         f(x) = constant axial force
 
+<<<<<<< HEAD
     Parameters:
+=======
+    Parameters
+>>>>>>> origin/develop
         E: Young's modulus
         A: Cross-sectional area (used if axial terms are present)
         f: load 
@@ -36,7 +49,11 @@ class BarData1D:
         """
         Construct a 1D EdgeMesh for the bar domain.
 
+<<<<<<< HEAD
         Returns:
+=======
+        Returns
+>>>>>>> origin/develop
             EdgeMesh: 1D mesh from x=0 to x=L.
         """
         node = bm.array([[0], [0.1],[0.2], [0.3]], dtype=bm.float64)
@@ -48,10 +65,17 @@ class BarData1D:
         """
         Compute the load vector f(x) based on the external forces applied at specific nodes.
 
+<<<<<<< HEAD
         Args:
             x: Spatial coordinate(s).
 
         Returns:
+=======
+        Parameters
+            x: Spatial coordinate(s).
+
+        Returns
+>>>>>>> origin/develop
             Tensor: Load vector f at x.
         """
         
@@ -61,11 +85,19 @@ class BarData1D:
         """
        The indices of degrees of freedom (DOFs) where Dirichlet boundary conditions are applied.
         
+<<<<<<< HEAD
         Parameters:
             total_dof : int
             Total number of global degrees of freedom.
 
         Returns:
+=======
+        Parameters
+            total_dof : int
+            Total number of global degrees of freedom.
+
+        Returns
+>>>>>>> origin/develop
             Tensor[int]: Indices of boundary DOFs.
         """
         return bm.array([0, 1, 2, 3])  
@@ -75,10 +107,17 @@ class BarData1D:
         """
         Compute the Dirichlet boundary condition.
 
+<<<<<<< HEAD
         Args:
             x: Spatial coordinate(s).
 
         Returns:
+=======
+        Parameters
+            x: Spatial coordinate(s).
+
+        Returns
+>>>>>>> origin/develop
             Tensor: Dirichlet boundary condition at x.
         """
         return bm.zeros((x.shape[0], 3))

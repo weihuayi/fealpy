@@ -1,4 +1,4 @@
-
+import math
 from typing import Sequence
 from ...decorator import cartesian
 from ...backend import TensorLike
@@ -41,10 +41,10 @@ class Exp0001(SphereShellMesher):
             self.m = 0.4
             self.delta = 1.0
 
-            self.Eon = 33.7 * self.m * self.delta * (1 + 0.24 * bm.sqrt(100 * self.r1 * self.delta)) * 100
-            self.k2 = bm.sqrt(self.r1 * self.Eon * self.eps0 / self.rho0)
-            self.k3 = bm.sqrt(self.k2**2 - self.r1**2)
-            self.c1 = bm.sqrt(self.r1 * self.Eon * self.eps0 * self.rho0)
+            self.Eon = 33.7 * self.m * self.delta * (1 + 0.24 * math.sqrt(100 * self.r1 * self.delta)) * 100
+            self.k2 = math.sqrt(self.r1 * self.Eon * self.eps0 / self.rho0)
+            self.k3 = math.sqrt(self.k2**2 - self.r1**2)
+            self.c1 = math.sqrt(self.r1 * self.Eon * self.eps0 * self.rho0)
 
     def geo_dimension(self) -> int:
         return 3

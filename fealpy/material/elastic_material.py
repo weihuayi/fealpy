@@ -8,10 +8,43 @@ from ..typing import TensorLike
 from typing import Optional, List
 
 class ElasticMaterial(MaterialBase):
+    """
+    A class representing elastic materials with methods to compute various elastic constants from fundamental material properties.
+    
+    This class inherits from MaterialBase and provides functionality to calculate elastic properties such as Young's modulus, 
+    Poisson's ratio, shear modulus, Lamé's first parameter, and bulk modulus. The calculations rely on material properties 
+    stored in the base class, accessed through the `get_property` method. Each calculation method validates the presence of 
+    required input properties and raises a ValueError if they are undefined.
+
+    Parameters:
+        name(str): The name identifier for the elastic material instance.
+
+    Attributes:
+        Inherits all attributes from MaterialBase.
+
+    Methods:
+        calculate_elastic_modulus(): Computes Young's modulus (E) from Lamé's lambda (λ) and shear modulus (μ).
+        calculate_poisson_ratio(): Computes Poisson's ratio (ν) from Lamé's lambda (λ) and shear modulus (μ).
+        calculate_shear_modulus(): Computes shear modulus (μ) from Young's modulus (E) and Poisson's ratio (ν).
+        calculate_lame_lambda(): Computes Lamé's first parameter (λ) from Young's modulus (E) and Poisson's ratio (ν).
+        calculate_bulk_modulus(): Computes bulk modulus (K) from Young's modulus (E) and Poisson's ratio (ν).
+    """
     def __init__(self, name):
         super().__init__(name)
 
     def calculate_elastic_modulus(self):
+        """
+        Computes Young's modulus (E) using Lamé's lambda (λ) and shear modulus (μ).
+
+        Parameters:
+            self(ElasticMaterial): The elastic material instance containing the properties.
+
+        Returns:
+            float: The calculated Young's modulus (E) value.
+
+        Raises:
+            ValueError: If Lamé's lambda or shear modulus properties are not defined in the material.
+        """
         lam = self.get_property('lame_lambda')
         mu = self.get_property('shear_modulus')
         if lam is not None and mu is not None:
@@ -21,6 +54,18 @@ class ElasticMaterial(MaterialBase):
             raise ValueError("Lame's lambda and shear modulus must be defined.")
         
     def calculate_poisson_ratio(self):
+        """
+        Computes Poisson's ratio (ν) using Lamé's lambda (λ) and shear modulus (μ).
+
+        Parameters:
+            self(ElasticMaterial): The elastic material instance containing the properties.
+
+        Returns:
+            float: The calculated Poisson's ratio (ν) value.
+
+        Raises:
+            ValueError: If Lamé's lambda or shear modulus properties are not defined in the material.
+        """
         lam = self.get_property('lame_lambda')
         mu = self.get_property('shear_modulus')
         if lam is not None and mu is not None:
@@ -30,6 +75,18 @@ class ElasticMaterial(MaterialBase):
             raise ValueError("Lame's lambda and shear modulus must be defined.")
 
     def calculate_shear_modulus(self):
+        """
+        Computes shear modulus (μ) using Young's modulus (E) and Poisson's ratio (ν).
+
+        Parameters:
+            self(ElasticMaterial): The elastic material instance containing the properties.
+
+        Returns:
+            float: The calculated shear modulus (μ) value.
+
+        Raises:
+            ValueError: If Young's modulus or Poisson's ratio properties are not defined in the material.
+        """
         E = self.get_property('elastic_modulus')
         nu = self.get_property('poisson_ratio')
         if E is not None and nu is not None:
@@ -39,6 +96,18 @@ class ElasticMaterial(MaterialBase):
             raise ValueError("Elastic modulus and Poisson's ratio must be defined.")
         
     def calculate_lame_lambda(self):
+        """
+        Computes Lamé's first parameter (λ) using Young's modulus (E) and Poisson's ratio (ν).
+
+        Parameters:
+            self(ElasticMaterial): The elastic material instance containing the properties.
+
+        Returns:
+            float: The calculated Lamé's first parameter (λ) value.
+
+        Raises:
+            ValueError: If Young's modulus or Poisson's ratio properties are not defined in the material.
+        """
         E = self.get_property('elastic_modulus')
         nu = self.get_property('poisson_ratio')
         if E is not None and nu is not None:
@@ -48,6 +117,18 @@ class ElasticMaterial(MaterialBase):
             raise ValueError("Elastic modulus and Poisson's ratio must be defined.")
 
     def calculate_bulk_modulus(self):
+        """
+        Computes bulk modulus (K) using Young's modulus (E) and Poisson's ratio (ν).
+
+        Parameters:
+            self(ElasticMaterial): The elastic material instance containing the properties.
+
+        Returns:
+            float: The calculated bulk modulus (K) value.
+
+        Raises:
+            ValueError: If Young's modulus or Poisson's ratio properties are not defined in the material.
+        """
         E = self.get_property('elastic_modulus')
         nu = self.get_property('poisson_ratio')
         if E is not None and nu is not None:
@@ -56,6 +137,50 @@ class ElasticMaterial(MaterialBase):
             raise ValueError("Elastic modulus and Poisson's ratio must be defined.")
 
 class LinearElasticMaterial(ElasticMaterial):
+    """
+    A class representing linear elastic materials with methods to compute elastic constants and construct strain-displacement matrices.
+    
+    This class inherits from ElasticMaterial and extends its functionality to handle linear elastic material behavior
+    under different hypotheses (3D, plane stress, plane strain). It initializes material properties from either 
+    (elastic_modulus, poisson_ratio) or (lame_lambda, shear_modulus) pairs, validates consistency between parameters,
+    and constructs the elastic matrix D based on the specified hypothesis. The class also provides methods to compute
+    strain-displacement matrices with optional B-bar correction for volumetric locking mitigation.
+
+    Parameters:
+        name (str): The name identifier for the linear elastic material instance.
+        elastic_modulus (Optional[float]): Young's modulus (E). Default is None.
+        poisson_ratio (Optional[float]): Poisson's ratio (ν). Default is None.
+        lame_lambda (Optional[float]): Lamé's first parameter (λ). Default is None.
+        shear_modulus (Optional[float]): Shear modulus (μ). Default is None.
+        density (Optional[float]): Material density (ρ). Default is None.
+        hypo (str): Hypothesis type for material behavior. Options: "3D", "plane_stress", "plane_strain". Default is "3D".
+        device (str): Device specification for tensor operations (e.g., "cpu", "cuda"). Default is None.
+
+    Attributes:
+        E (float): Young's modulus (elastic_modulus).
+        nu (float): Poisson's ratio.
+        lam (float): Lamé's first parameter (λ).
+        mu (float): Shear modulus (μ).
+        rho (float): Material density.
+        D (TensorLike): Elastic matrix based on the specified hypothesis.
+        hypo (str): Hypothesis type for material behavior.
+        device (str): Device specification for tensor operations.
+
+    Methods:
+        __str__(): Returns a formatted summary of material properties.
+        elastic_modulus: Property getter for Young's modulus.
+        poisson_ratio: Property getter for Poisson's ratio.
+        lame_lambda: Property getter for Lamé's first parameter.
+        shear_modulus: Property getter for shear modulus.
+        bulk_modulus: Property getter for bulk modulus.
+        density: Property getter for material density.
+        hypothesis: Property getter for hypothesis type.
+        elastic_matrix(): Returns the elastic matrix D.
+        strain_matrix(): Constructs the strain-displacement matrix B.
+        _normal_strain(): Assembles normal strain tensor.
+        _normal_strain_bbar(): Assembles normal strain tensor with B-bar correction.
+        _shear_strain(): Assembles shear strain tensor.
+    """
     def __init__(self, name: str, 
             elastic_modulus: Optional[float] = None, 
             poisson_ratio: Optional[float] = None, 
@@ -131,7 +256,7 @@ class LinearElasticMaterial(ElasticMaterial):
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the material."""
         return (
-            f"Material '{self.name}':\n"
+            f"\n  Material '{self.name}':\n"
             f"  E (Young's modulus):      {self.E:.3g}\n"
             f"  ν (Poisson's ratio):      {self.nu:.3g}\n"
             f"  λ (Lame's first param):   {self.lam:.3g}\n"

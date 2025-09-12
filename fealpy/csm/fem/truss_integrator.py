@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from fealpy.backend import backend_manager as bm
 from fealpy.typing import Optional, Literal, TensorLike, Index, _S
 from fealpy.fem.integrator import (
@@ -7,6 +8,18 @@ from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
 from fealpy.functionspace.space import FunctionSpace as _FS
 from fealpy.decorator import variantmethod
 
+=======
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import Optional, Literal, TensorLike, Index, _S
+from fealpy.decorator import variantmethod
+
+from fealpy.functionspace.tensor_space import TensorFunctionSpace as _TS
+from fealpy.functionspace.space import FunctionSpace as _FS
+
+from fealpy.fem.integrator import (
+    LinearInt, OpInt, CellInt, enable_cache)
+>>>>>>> origin/develop
 
 class TrussIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, 

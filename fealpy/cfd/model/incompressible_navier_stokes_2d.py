@@ -3,7 +3,7 @@ from fealpy.old.timeintegratoralg import UniformTimeLine
 from fealpy.decorator import cartesian,variantmethod
 from typing import Union, Callable, Dict
 from fealpy.mesh import TriangleMesh
-from fealpy.model.mesher.box_mesher import BoxMesher2d
+from fealpy.mesher import BoxMesher2d
 import sympy as sp
 CoefType = Union[int, float, Callable]
 

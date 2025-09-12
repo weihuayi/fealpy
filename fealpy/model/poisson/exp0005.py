@@ -31,20 +31,6 @@ class Exp0005(BoxMesher2d):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
     
-    @variantmethod('tri')
-    def init_mesh(self, nx=16, ny=16):
-        from ...mesh import TriangleMesh
-        d = self.domain()
-        mesh = TriangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-
-    @init_mesh.register('quad')
-    def init_mesh(self, nx=10, ny=10):
-        from ...mesh import QuadrangleMesh
-        d = self.domain()
-        mesh = QuadrangleMesh.from_box(d, nx=nx, ny=ny)
-        return mesh
-    
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
         """Compute exact solution"""

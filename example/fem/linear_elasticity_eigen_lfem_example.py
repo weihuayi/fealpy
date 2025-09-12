@@ -1,4 +1,6 @@
 import argparse
+from petsc4py import PETSc
+from slepc4py import SLEPc
 
 # Argument parsing
 parser = argparse.ArgumentParser(description=
@@ -52,9 +54,12 @@ from fealpy.csm.model import CSMModelManager
 from fealpy.fem import LinearElasticityEigenLFEMModel
 pde = CSMModelManager("linear_elasticity").get_example(1)
 options['pde'] = pde
-n = 1
+n = 4 
 options['nx'] = n * 10 
 options['ny'] = n * 2 
 options['nz'] = n * 2
 model = LinearElasticityEigenLFEMModel(options)
-model.solve()
+S, M = model.linear_system()
+S, M = model.apply_bc(S, M)
+
+model.solve['slepc']()

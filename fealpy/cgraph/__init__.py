@@ -3,5 +3,19 @@ FEALPy Computing Graph
 ============
 """
 
-from .base import Node, DataSource, Const, Identity, Sequential
-from .graph import WORLD_GRAPH, Graph
+from .core import WORLD_GRAPH, Graph
+from .nodetype import CNodeType, search, create, from_dict, to_dict
+from .registry import *
+
+__nodes__ = [
+    "model",
+    "mesh",
+    "functionspace",
+    "solver",
+    "fem",
+    "cfd",
+    "opt",
+    "pathplanning"
+]
+
+register_all_nodes()

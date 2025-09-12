@@ -62,6 +62,94 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
         self.logger.info(f"Material parameters set: λ (Lamé first parameter) = {lam}, μ (shear modulus) = {mu}")
 
 
+
+    def set_space_degree(self, p: int):
+        self.p = p
+
+    def linear_system(self, mesh, p):
+        GD = self.mesh.geo_dimension()
+        lambda0, lambda1 = self.pde.stress_matrix_coefficient() 
+
+        self.space_sigma = HuZhangFESpace(mesh, p=p)
+        self.space = LagrangeFESpace(mesh, p=p-1, ctype='D')
+        self.space_u = TensorFunctionSpace(scalar_space=self.space, shape=(GD, -1))
+
+        bform1 = BilinearForm(self.space_sigma)
+        bform1.add_integrator(HuZhangStressIntegrator(lambda0=lambda0, lambda1=lambda1))
+
+        bform2 = BilinearForm((self.space_u, self.space_sigma))
+        bform2.add_integrator(HuZhangMixIntegrator())
+
+        A = BlockForm([[bform1,   bform2],
+                       [bform2.T, None]])
+        A = A.assembly()
+
+        lform1 = LinearForm(self.space_u)
+        lform1.add_integrator(VectorSourceIntegrator(source=self.pde.body_force))
+
+        b = lform1.assembly()
+
+        gdof_sigma = self.space_sigma.number_of_global_dofs()
+        F = bm.zeros(A.shape[0], dtype=A.dtype)
+        F[gdof_sigma:] = -b
+
+        return A, F, self.space_sigma, self.space_u
+    
+    def apply_bc(self, A, F):
+        pass
+
+    @variantmethod("direct")
+    def solve(self):
+        A, F, space_sigma, space_u = self.linear_system(self.mesh, self.p)
+        X = spsolve(A, F, solver='mumps')
+        
+        gdof_sigma = space_sigma.number_of_global_dofs()
+        sigma_h = space_sigma.function()
+        u_h = space_u.function()
+
+        sigma_h[:] = X[:gdof_sigma]
+        u_h[:] = X[gdof_sigma:]
+
+        return sigma_h, u_h
+    
+    @solve.register('fast')
+    def solve(self):
+        pass
+    
+    @variantmethod('onestep')
+    def run(self):
+        sigma_h, u_h = self.solve()
+        l2_u = self.mesh.error(u_h, self.pde.displacement)
+        l2_sigma = self.mesh.error(sigma_h, self.pde.stress)
+
+        self.logger.info(f"u L2 error (u): {l2_u}, L2 error (σ): {l2_sigma}")
+
+    @run.register('uniform_refine')
+    def run(self, maxit=4):
+        errorType = [
+                 '$|| \\boldsymbol{\\sigma} - \\boldsymbol{\\sigma}_h||_{L_2}$',
+                 '$|| \\boldsymbol{u} - \\boldsymbol{u}_h||_{L_2}$',
+                 ]
+        errorMatrix = bm.zeros((2, maxit), dtype=bm.float64)
+        h = bm.zeros(maxit, dtype=bm.float64)
+
+        for i in range(maxit):
+            N =  2**(i+1)
+            sigma_h, u_h = self.solve()
+            l2_u = self.mesh.error(u_h, self.pde.displacement)
+            l2_sigma = self.mesh.error(sigma_h, self.pde.stress)
+
+            h[i] = 1 / N
+            errorMatrix[0, i] = l2_sigma
+            errorMatrix[1, i] = l2_u 
+
+            if i < maxit - 1:
+                self.mesh.uniform_refine()
+    
+        show_error_table(h, errorType, errorMatrix)
+        showmultirate(plt, 2, h, errorMatrix,  errorType, propsize=20)
+        plt.show()
+
     def set_space_degree(self, p: int):
         self.p = p
 

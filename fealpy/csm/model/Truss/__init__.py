@@ -1,5 +1,10 @@
 from typing import Protocol, Sequence, TypeVar, overload,Optional
+<<<<<<< HEAD
 from ....backend import TensorLike
+=======
+
+from fealpy.backend import TensorLike
+>>>>>>> origin/develop
 
 class TrussPDEDataProtocol(Protocol):
     """
@@ -47,6 +52,11 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # Add beam PDE models here (file_name, class_name)
+<<<<<<< HEAD
     "bar1d": ("bar_data_1d", "BarData1D"),
     "truss2d": ("truss_data_2d", "TrussData2D"),
+=======
+    1: ("bar_data_1d", "BarData1D"),
+    2: ("truss_data_2d", "TrussData2D"),
+>>>>>>> origin/develop
 }

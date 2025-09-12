@@ -2,7 +2,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian,variantmethod
 from typing import Union, Callable, Dict
 import sympy as sp
-from fealpy.model.mesher.box_mesher import BoxMesher3d 
+from fealpy.mesher import BoxMesher3d 
 
 
 CoefType = Union[int, float, Callable]

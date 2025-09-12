@@ -40,7 +40,11 @@ from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import GearBoxModalLFEMModel
+<<<<<<< HEAD
 moddel = GearBoxModalLFEMModel(options)
+=======
+model = GearBoxModalLFEMModel(options)
+>>>>>>> origin/develop
 
 model.mesh.to_vtk('gear_box.vtk')
 

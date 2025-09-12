@@ -7,4 +7,8 @@ from .interval_mesher import IntervalMesher
 from .sphere_shell_mesher import SphereShellMesher
 from .hollowblock_mesher import HollowBlockMesher
 from .interface_mesher import InterfaceFittedMesher2d
+<<<<<<< HEAD
 
+=======
+from .dld_microfluidic_chip_mesher import DLDMicrofluidicChipMesher
+>>>>>>> origin/develop
