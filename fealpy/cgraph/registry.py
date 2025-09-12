@@ -5,7 +5,7 @@ from typing import Any
 from collections.abc import Iterator
 
 from .core import Graph, CNode
-from .nodetype import CNodeType, to_dict, from_dict
+from .nodetype import CNodeType
 
 __all__ = ["register_all_nodes", "search_all_nodes", "search_node", "load", "dump"]
 
@@ -34,12 +34,13 @@ def search_all_nodes(filter: str = ""):
     register_all_nodes()
 
     for nodetype in CNodeType.REGISTRY.values():
-        TITLE = nodetype.TITLE
+        TITLE = getattr(nodetype, "TITLE", None)
         if TITLE and TITLE.lower().startswith(filter.lower()):
             yield {
                 "name": nodetype.__name__,
                 "title": TITLE,
-                "path": nodetype.PATH,
+                "path": getattr(nodetype, "PATH", ""),
+                "desc": getattr(nodetype, "DESC", ""),
             }
 
 

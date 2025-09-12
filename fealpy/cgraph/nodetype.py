@@ -52,6 +52,7 @@ class PortConf:
 class CNodeType:
     TITLE: str
     PATH: str = ""
+    DESC: str = ""
     INPUT_SLOTS: list[PortConf] = []
     OUTPUT_SLOTS: list[PortConf] = []
     VARIABLE: bool = False
