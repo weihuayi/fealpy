@@ -1,10 +1,10 @@
 from fealpy.backend import bm
 from ..nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["TimobeamAxleEquation"]
+__all__ = ["TimobeamAxle"]
 
 class TimobeamAxle(CNodeType):
-    TITLE: str = "TimobeamAxleEquation"
+    TITLE: str = "TimobeamAxle"
     PATH: str = "fem.presets"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE),
@@ -23,7 +23,7 @@ class TimobeamAxle(CNodeType):
     ]
     
     @staticmethod
-    def run(pde, mesh, space, beam_E, beam_nu, axle_E, axle_nu, external_load):
+    def run(mesh, space, beam_E, beam_nu, axle_E, axle_nu, external_load):
         from fealpy.csm.material import (
             TimoshenkoBeamMaterial,
             AxleMaterial

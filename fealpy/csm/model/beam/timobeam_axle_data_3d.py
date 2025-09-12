@@ -68,6 +68,10 @@ class TimobeamAxleData3D:
         """the geometric dimension."""
         return 3
     
+    def shear_factors(self) -> Tuple[float, float]:
+        """Shear correction factor in the y-direction and z-direction."""
+        return self.FSY, self.FSZ
+    
     def calculate_beam_cross_section(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
         """Beam cross-sectional areas."""
         beam_Ax = bm.pi * self.beam_D**2 / 4

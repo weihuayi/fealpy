@@ -44,11 +44,16 @@ class Box2d(CNodeType):
     
 
 class Createmesh(CNodeType):
-    r"""Create a mesh.
+    r"""Create a mesh object.This node generates a mesh of the specified type 
+    using given node and cell data.
 
     Inputs:
         mesh_type (str): Type of mesh to granerate.
+        Supported values: "triangle", "quadrangle", "tetrahedron", "hexahedron".Default is "edgemesh".
+        
         domain (tuple[float, float], optional): Domain.
+        node(tensor):Coordinates of mesh nodes.
+        cell(tensor):Connectivity of mesh cells.
 
     Outputs:
         mesh (MeshType): The mesh object created.
