@@ -1,6 +1,6 @@
 import argparse
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import StokesFVMStaggeredModel
+from fealpy.fvm import StokesFVMRCModel
 
 
 def main():
@@ -26,10 +26,10 @@ def main():
     options = vars(parser.parse_args())
     bm.set_backend(options["backend"])
 
-    model = StokesFVMStaggeredModel(options)
+    model = StokesFVMRCModel(options)
     print(model)
 
-    model.solve()
+    model.solve_rhie_chow()
     uerr, verr, perr = model.compute_error()
     print(f"L2 error (u) = {uerr:.4e}")
     print(f"L2 error (v) = {verr:.4e}")

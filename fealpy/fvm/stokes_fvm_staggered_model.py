@@ -13,241 +13,216 @@ from fealpy.solver import spsolve
 from fealpy.fvm import (
     ScalarDiffusionIntegrator,
     ScalarSourceIntegrator,
-    StaggeredMeshManager,
-    GradientReconstruct,
-    DivergenceReconstruct,
     DirichletBC,
-    NeumannBC,
+    StaggeredMeshManager
 )
+
 
 class StokesFVMStaggeredModel(ComputationalModel):
     """
-    A 2D Stokes solver using finite volume method on staggered mesh.
-    """
+    2D Stokes equation solver on staggered mesh using Finite Volume Method (FVM).
+    This computational model first constructs a staggered mesh based on the initial mesh, where the initial mesh stores pressure, and the staggered mesh stores velocity.
+    The momentum equations in different directions are discretized on their respective staggered meshes, the continuity equation is discretized on the initial mesh, and the resulting coupled linear system is solved directly to obtain all numerical solutions for the Stokes equation.
 
+    Parameters:
+        options (dict): Configuration dictionary for model setup.
+            - 'pde': PDE data or index
+            - 'nx', 'ny': mesh divisions
+            - 'pbar_log', 'log_level': logging controls
+    Attributes:
+        mesh : The initialized computational mesh.
+        pde : The PDE model object.
+        uh,vh,ph : Numerical solution vector (computed after calling `solve`).
+    
+    """
     def __init__(self, options):
         self.options = options
         super().__init__(pbar_log=options.get("pbar_log", False),
                          log_level=options.get("log_level", "INFO"))
         self.set_pde(options["pde"])
         self.set_mesh(options["nx"], options["ny"])
+        self.set_spaces()
 
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}:\n"
-            f"  Mesh shape: {self.pmesh.number_of_cells()} pressure cells\n"
-            f"  PDE type: {type(self.pde).__name__}\n"
+            f"  Mesh: {self.umesh.number_of_cells()} u-cells, "
+            f"{self.vmesh.number_of_cells()} v-cells, "
+            f"{self.pmesh.number_of_cells()} p-cells\n"
+            f"  PDE: {type(self.pde).__name__}\n"
         )
 
-    def set_pde(self, pde: Union[str, object]) -> None:
-        """Set the PDE model."""
-        self.pde = PDEModelManager("stokes").get_example(pde) if isinstance(pde, int) else pde
+    def set_pde(self, pde: Union[int, object]) -> None:
+        if isinstance(pde, int):
+            self.pde = PDEModelManager("stokes").get_example(pde)
+        else:
+            self.pde = pde
 
-    def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
-        """Set the computational staggered mesh."""
-        self.staggered_mesh = StaggeredMeshManager(self.pde, nx, ny)
+    def set_mesh(self, nx: int, ny: int) -> None:
+        self.staggered_mesh = StaggeredMeshManager(self.pde, nx=nx, ny=ny)
         self.umesh = self.staggered_mesh.umesh
         self.vmesh = self.staggered_mesh.vmesh
         self.pmesh = self.staggered_mesh.pmesh
-        self.div = DivergenceReconstruct(self.pmesh)
-        self.pcm = self.pmesh.entity_measure("cell")
-        self.ucm = self.umesh.entity_measure("cell")
-        self.vcm = self.vmesh.entity_measure("cell")
-        self.ppoints = self.pmesh.entity_barycenter("cell")
-        self.upoints = self.umesh.entity_barycenter("cell")
-        self.vpoints = self.vmesh.entity_barycenter("cell")
+        self.UNC, self.VNC, self.PNC = (self.umesh.number_of_cells(),
+                         self.vmesh.number_of_cells(),
+                         self.pmesh.number_of_cells())
+        self.h = 1.0 / nx
 
-    def compute_velocity_u(self, p_u) -> Tuple[TensorLike, TensorLike]:
-        """Solve for temporary velocity u* using the momentum equation."""
-        uspace = ScaledMonomialSpace2d(self.umesh, 0)
-        A = BilinearForm(uspace).add_integrator(ScalarDiffusionIntegrator(q=2)).assembly()
-        f = LinearForm(uspace).add_integrator(ScalarSourceIntegrator(self.pde.source_u, q=2)).assembly()
-        grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
-        f -= bm.einsum('i,i->i', grad_p[:, 0], self.ucm)
-        dbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
-                          threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
-        # A, f = dbc.ThresholdApply(A, f)
-        A, f = dbc.DiffusionApply(A, f)
-        A = sum_duplicates_csr_manual(A)
-        # uap = A.diags().values
-        A, f = dbc.ThresholdApply(A, f)
-        uap = A.diags().values
-        return spsolve(A, f,"mumps"), uap
+    def set_spaces(self) -> None:
+        self.uspace = ScaledMonomialSpace2d(self.umesh, 0)
+        self.vspace = ScaledMonomialSpace2d(self.vmesh, 0)
 
-    def compute_velocity_v(self, p_v) -> Tuple[TensorLike, TensorLike]:
-        """Solve for temporary velocity v* using the momentum equation."""
-        vspace = ScaledMonomialSpace2d(self.vmesh, 0)
-        A = BilinearForm(vspace).add_integrator(ScalarDiffusionIntegrator(q=2)).assembly()
-        f = LinearForm(vspace).add_integrator(ScalarSourceIntegrator(self.pde.source_v, q=2)).assembly()
-        grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
-        f -= bm.einsum('i,i->i', grad_p[:, 1], self.vcm)
-        dbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
-                          threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
-        # A, f = dbc.ThresholdApply(A, f)
-        A, f = dbc.DiffusionApply(A, f)
-        # print(A.shape, f.shape)
-        A = sum_duplicates_csr_manual(A)
-        # vap = A.diags().values
-        A, f = dbc.ThresholdApply(A, f)
-        # print(A.shape, f.shape)
-        # print(A.to_dense())
-        vap = A.diags().values
-        # print("vap",vap)
-        return spsolve(A, f,"mumps"), vap
 
-    def initial_pressure_compute(self, f: TensorLike,) -> TensorLike:
-        """
-        Solve for pressure correction p' to enforce continuity.
-        """
-        pspace = ScaledMonomialSpace2d(self.pmesh, 0)
-        A = BilinearForm(pspace).add_integrator(ScalarDiffusionIntegrator(q=2)).assembly()
-        f = self.neumann_bc(f,self.pde.neumann_pressure)
-        LagA = self.pmesh.entity_measure('cell')
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                             bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
-        A = BlockForm([[A, A1.T], [A1, None]])
-        A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([self.pde.pressure_integral_target()])
-        # b0 = bm.array([0])
-        b = bm.concatenate([f, b0], axis=0)
-        sol = spsolve(A, b,"mumps")
-        p_initial = sol[:-1] 
-        # p_initial -=bm.sum(p_initial*self.pmesh.entity_measure('cell'))
-        # p_initial += self.pde.pressure_integral_target()
-        # self.pI = self.pde.pressure(self.ppoints)
-        # err = bm.sqrt(bm.sum(self.cm *(self.pI-p_initial) ** 2)) 
-        # print(f"Initial pressure L2 error: {err:.2e}") 
-        import matplotlib.pyplot as plt
-        x, y = self.ppoints[:, 0], self.ppoints[:, 1]
-        self.pI = self.pde.pressure(self.ppoints)
-        fig = plt.figure(figsize=(12, 8))
-        for i, (data, title) in enumerate([ 
-            (p_initial, "Numerical p"),
-            (self.pI, "Exact p"),
-            (self.pI - p_initial, "Pressure Correction p'"),
-        ]):
-            ax = fig.add_subplot(2, 3, i+1, projection='3d')
-            ax.plot_trisurf(x, y, data, cmap='viridis')
-            ax.set_title(title)
-        plt.tight_layout()
-        plt.show()  
-        return p_initial
+    def assemble_diffusion_u(self) -> Tuple[TensorLike, TensorLike]:
+        """Assemble the diffusion matrix A on the u-mesh"""
+        Au = BilinearForm(self.uspace).add_integrator(
+            ScalarDiffusionIntegrator(q=2)).assembly()
+        fu = LinearForm(self.uspace).add_integrator(
+            ScalarSourceIntegrator(self.pde.source_u, q=2)).assembly()
+        udbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
+                           threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
+        Au, fu = udbc.DiffusionApply(Au, fu)
+        Au, fu = udbc.ThresholdApply(Au, fu)
+        return Au, fu
 
-    def correct_pressure_compute(self, f: TensorLike, a_p_edge: TensorLike) -> TensorLike:
-        """
-        Solve for pressure correction p' to enforce continuity.
-        """
-        pspace = ScaledMonomialSpace2d(self.pmesh, 0)
-        A = BilinearForm(pspace).add_integrator(
-            ScalarDiffusionIntegrator(q=2, coef=1 / a_p_edge)
-        ).assembly()  
-        # from fealpy.sparse import spdiags
-        # bd_edge = self.pmesh.boundary_face_index()
-        # e2c = self.pmesh.edge_to_cell()
-        # bd_integrator = bm.ones(bd_edge.shape[0])
-        # bde2c = e2c[bd_edge, 0]
-        # bdIdx = bdIdx = bm.zeros(A.shape[0])
-        # bm.add_at(bdIdx, bde2c, bd_integrator)
-        # B = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
-        # A = A - B
-        nbc = NeumannBC(self.pmesh, self.pde.neumann_pressure)
-        f = nbc.DiffusionApply(f)
-        LagA = self.pmesh.entity_measure('cell')
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                             bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
-        A = BlockForm([[A, A1.T], [A1, None]])
-        A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([0])
-        b = bm.concatenate([f, b0], axis=0)
-        sol = spsolve(A, b)
-        p_correct = sol[:-1]   
-        return p_correct
+    def assemble_diffusion_v(self) -> Tuple[TensorLike, TensorLike]:
+        """Assemble the diffusion matrix B on the v-mesh"""
+        Av = BilinearForm(self.vspace).add_integrator(
+            ScalarDiffusionIntegrator(q=2)).assembly()
+        fv = LinearForm(self.vspace).add_integrator(
+            ScalarSourceIntegrator(self.pde.source_v, q=2)).assembly()
+        vdbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
+                           threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
+        Av, fv = vdbc.DiffusionApply(Av, fv)
+        Av, fv = vdbc.ThresholdApply(Av, fv)
+        return Av, fv
 
-    def solve(self, max_iter: int = 200, tol: float = 1e-6) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        """
-        Solve the Stokes equation using the SIMPLE algorithm.
-        """
-        p = bm.zeros(self.ppoints.shape[0])
-        self.residuals = []
-        for i in range(max_iter):
-            p_u, p_v = self.staggered_mesh.interpolate_pressure_to_edges(p)
-            uh, a_p_u = self.compute_velocity_u(p_u)
-            vh, a_p_v = self.compute_velocity_v(p_v)
-            edge_vel, a_p_edge = self.staggered_mesh.map_velocity_cell_to_edge(uh, vh, a_p_u, a_p_v)
-            self.div_rhs = self.div.StagReconstruct(edge_vel)
-            p_corr = self.correct_pressure_compute(-self.div_rhs, a_p_edge)
-            err = bm.sqrt(bm.sum(self.pcm * p_corr ** 2))
-            self.residuals.append(float(err))
-            self.logger.info(f"[Iter {i+1}] Pressure correction residual: {err:.2e}")
-            if err < tol:
-                self.logger.info("Converged.")
-                break
-            p += p_corr  
-        
-        self.pI = self.pde.pressure(self.ppoints)
-        self.pgrad_ph = GradientReconstruct(self.pmesh).AverageGradientreNeumann(p,self.pde.neumann_pressure)
-        self.pgrad_pI1 = GradientReconstruct(self.pmesh).AverageGradientreNeumann(self.pI,self.pde.neumann_pressure)
-        self.pgrad_pI2 = self.pde.grad_pressure(self.ppoints)
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_ph[:,0] - self.pgrad_pI1[:,0])**2)))
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_ph[:,0] - self.pgrad_pI2[:,0])**2)))
-        self.uh, self.vh, self.ph = uh, vh, p
-        self.p_correct = p_corr
-        return uh, vh, p
+    def assemble_pressure_gradient_u(self) -> TensorLike:
+        """Assemble the pressure gradient matrix M1 on the u-mesh"""
+        pedge_centers = self.pmesh.entity_barycenter('edge')
+        ucell_centers = self.umesh.entity_barycenter('cell')
+        dist1 = bm.sum((pedge_centers[:, None, :] - ucell_centers[None, :, :])**2, axis=2)
+        ucell2pedge = bm.argmin(dist1, axis=0)
+        pedge2cell = self.pmesh.edge_to_cell()
+        upressurecell = pedge2cell[ucell2pedge, :2]
+        M1 = COOTensor(
+            indices=bm.stack([bm.repeat(bm.arange(self.UNC), 2), upressurecell.flatten()]),
+            values=bm.tile([-self.h, self.h], self.UNC),
+            spshape=(self.UNC, self.PNC)
+        )
+        return M1
+    
+    def assemble_pressure_gradient_v(self) -> TensorLike:
+        """Assemble the pressure gradient matrix M2 on the v-mesh"""
+        vcell_centers = self.vmesh.entity_barycenter('cell')
+        pedge_centers = self.pmesh.entity_barycenter('edge')
+        dist2 = bm.sum((pedge_centers[:, None, :] - vcell_centers[None, :, :])**2, axis=2)
+        vcell2pedge = bm.argmin(dist2, axis=0)
+        pedge2cell = self.pmesh.edge_to_cell()
+        vpressurecell = pedge2cell[vcell2pedge, :2]
+        M2 = COOTensor(
+            indices=bm.stack([bm.repeat(bm.arange(self.VNC), 2), vpressurecell.flatten()]),
+            values=bm.tile([-self.h, self.h], self.VNC),
+            spshape=(self.VNC, self.PNC)
+        )
+        return M2
 
-    def compute_error(self) -> Tuple[float, float, float]:
-        """
-        Compute L2 errors for velocity and pressure.
-        """
-        self.uI = self.pde.velocity_u(self.upoints)
-        self.vI = self.pde.velocity_v(self.vpoints)
-        self.pI = self.pde.pressure(self.ppoints)
-        ue = bm.sqrt(bm.sum(self.ucm * (self.uh - self.uI)**2))
-        ve = bm.sqrt(bm.sum(self.vcm * (self.vh - self.vI)**2))
-        pe0 = bm.sqrt(bm.sum(self.pcm * (self.ph - self.pI)**2))
-        # pe = self.ph - self.pI
-        return ue, ve, pe0
+    def assemble_divergence_u(self) -> TensorLike:
+        """Assemble the continuity equation matrix M3 (corresponding to u velocity) on the p-mesh"""
+        uedge_centers = self.umesh.entity_barycenter('edge')
+        pcell_centers = self.pmesh.entity_barycenter('cell')
+        dist3 = bm.sum((uedge_centers[:, None, :] - pcell_centers[None, :, :])**2, axis=2)
+        pcell2uedge = bm.argmin(dist3, axis=0)
+        uedge2cell = self.umesh.edge_to_cell()
+        uvelocitycell = uedge2cell[pcell2uedge, :2]
+        M3 = COOTensor(
+            indices=bm.stack([bm.repeat(bm.arange(self.PNC), 2), uvelocitycell.flatten()]),
+            values=bm.tile([-self.h, self.h], self.PNC),
+            spshape=(self.PNC, self.UNC)
+        )
+        return M3
+
+    def assemble_divergence_v(self) -> TensorLike:
+        """Assemble the continuity equation matrix M4 (corresponding to v velocity) on the p-mesh"""
+        vedge_centers = self.vmesh.entity_barycenter('edge')
+        pcell_centers = self.pmesh.entity_barycenter('cell')
+        dist4 = bm.sum((vedge_centers[:, None, :] - pcell_centers[None, :, :])**2, axis=2)
+        pcell2vedge = bm.argmin(dist4, axis=0)
+        vedge2cell = self.vmesh.edge_to_cell()
+        vvelocitycell = vedge2cell[pcell2vedge, :2]
+        M4 = COOTensor(
+            indices=bm.stack([bm.repeat(bm.arange(self.PNC), 2), vvelocitycell.flatten()]),
+            values=bm.tile([-self.h, self.h], self.PNC),
+            spshape=(self.PNC, self.VNC)
+        )
+        return M4
+
+    def assemble_system(self) -> Tuple[TensorLike, TensorLike]:
+        """Main assembly function to combine all matrix blocks into the complete linear system"""
+        # Construct the block matrix
+        # | A   0   M1^T |
+        # | 0   B   M2^T |
+        # | M3  M4   0   |
+        # Here, M1^T and M2^T represent the discretized pressure gradients, and M3 and M4 represent the discretized divergence
+        A,fu = self.assemble_diffusion_u()
+        B,fv = self.assemble_diffusion_v()
+        M1 = self.assemble_pressure_gradient_u()
+        M2 = self.assemble_pressure_gradient_v()
+        M3 = self.assemble_divergence_u()
+        M4 = self.assemble_divergence_v()
+        AB = BlockForm([[A, None], [None, B]]).assembly_sparse_matrix(format="csr")
+        M5 = BlockForm([[M1], [M2]]).assembly_sparse_matrix(format="csr")
+        M6 = BlockForm([[M3, M4]]).assembly_sparse_matrix(format="csr")
+        ABC = BlockForm([[AB, M5], [M6, None]]).assembly_sparse_matrix(format="csr")
+
+        LagA = self.pmesh.entity_measure("cell")
+        A1 = COOTensor(
+            bm.stack([bm.zeros(self.PNC, dtype=bm.int32),
+                      bm.arange(self.UNC+self.VNC, self.UNC+self.VNC+self.PNC, dtype=bm.int32)], axis=0),
+            LagA,
+            spshape=(1, self.UNC+self.VNC+self.PNC)
+        )
+        b = bm.concatenate([fu, fv, bm.zeros(self.PNC), bm.array([self.pde.pressure_integral_target()])])
+        S = BlockForm([[ABC, A1.T], [A1, None]]).assembly_sparse_matrix(format="csr")
+        return S,b
+
+    def solve(self) -> Tuple:
+        S, b = self.assemble_system()
+        sol = spsolve(S, b, "scipy")
+        self.uh = sol[:self.UNC]
+        self.vh = sol[self.UNC:self.UNC+self.VNC]
+        self.ph = sol[self.UNC+self.VNC:-1]
+        return self.uh, self.vh, self.ph
+
+    def compute_error(self) -> Tuple:
+        self.uI = self.pde.velocity_u(self.umesh.entity_barycenter("cell"))
+        self.vI = self.pde.velocity_v(self.vmesh.entity_barycenter("cell"))
+        self.pI = self.pde.pressure(self.pmesh.entity_barycenter("cell"))
+
+        uerr = bm.sqrt(bm.sum(self.umesh.entity_measure("cell") * (self.uh - self.uI)**2))
+        verr = bm.sqrt(bm.sum(self.vmesh.entity_measure("cell") * (self.vh - self.vI)**2))
+        perr = bm.sqrt(bm.sum(self.pmesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        return uerr, verr, perr
 
     def plot(self) -> None:
-        """Plot numerical and exact solutions for u1, u2, and p."""
         import matplotlib.pyplot as plt
-        x, y = self.ppoints[:, 0], self.ppoints[:, 1]
+        fig = plt.figure(figsize=(15, 5))
 
-        fig = plt.figure(figsize=(12, 8))
-        for i, (data, title) in enumerate([
-            (self.pI-self.ph, "Numerical p"),
-            (self.pgrad_ph[:,0] - self.pgrad_pI1[:,0], "Pressure Gradient px'"),
-            (self.pgrad_ph[:,1] - self.pgrad_pI1[:,1], "Pressure Gradient py'"),
-            
-        ]):
-            ax = fig.add_subplot(2, 3, i+1, projection='3d')
-            ax.plot_trisurf(x, y, data, cmap='viridis')
-            ax.set_title(title)
+        px, py = self.pmesh.entity_barycenter("cell").T
+        ux, uy = self.umesh.entity_barycenter("cell").T
+        vx, vy = self.vmesh.entity_barycenter("cell").T
+
+        ax1 = fig.add_subplot(1, 3, 1, projection="3d")
+        ax1.plot_trisurf(px, py, self.ph-self.pI, cmap="viridis")
+        ax1.set_title("Pressure")
+
+        ax2 = fig.add_subplot(1, 3, 2, projection="3d")
+        ax2.plot_trisurf(ux, uy, self.uh-self.uI, cmap="viridis")
+        ax2.set_title("U velocity")
+
+        ax3 = fig.add_subplot(1, 3, 3, projection="3d")
+        ax3.plot_trisurf(vx, vy, self.vh-self.vI, cmap="viridis")
+        ax3.set_title("V velocity")
+
         plt.tight_layout()
         plt.show()
-
-    def plot_residual(self) -> None:
-        '''Plot the residual descent curve of pressure p correction.'''
-        import matplotlib.pyplot as plt
-        plt.figure(figsize=(8, 5))
-        plt.semilogy(self.residuals, marker='o', linestyle='-', color='b')
-        plt.title("Pressure Correction Residual vs Iteration")
-        plt.xlabel("Iteration")
-        plt.ylabel("Residual (log scale)")
-        plt.grid(True, which="both", ls="--")
-        plt.tight_layout()
-        plt.show()
-
-from fealpy.sparse import csr_matrix
-def sum_duplicates_csr_manual(csr):
-    indptr = csr.indptr       # shape (nrow+1,)
-    indices = csr.indices     # shape (nnz,)
-    data = csr.data           # shape (nnz,)
-    nrow, ncol = csr.shape
-    counts = indptr[1:] - indptr[:-1]
-    row = bm.repeat(bm.arange(nrow), counts)
-    flat_idx = row * ncol + indices
-    summed = bm.bincount(flat_idx, weights=data, minlength=nrow*ncol)
-    nnz_idx = bm.nonzero(summed)[0]
-    new_data = summed[nnz_idx]
-    new_row, new_col = divmod(nnz_idx, ncol)
-    return csr_matrix((new_data, (new_row, new_col)), shape=csr.shape)
