@@ -13,6 +13,8 @@ from .vector_decomposition import VectorDecomposition
 
 from .poisson_fvm_model import PoissonFVMModel
 from .stokes_fvm_model import StokesFVMModel
+from .stokes_fvm_simple_model import StokesFVMSimpleModel
 from .stokes_fvm_staggered_model import StokesFVMStaggeredModel
+from .stokes_fvm_rc_model import StokesFVMRCModel
 from .dld_microfluidic_chip_fvm_model import DLDMicrofluidicChipFVMModel
 from .navier_stokes_fvm_model import NavierStokesFVMModel

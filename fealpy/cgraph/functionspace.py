@@ -29,7 +29,7 @@ class FunctionSpace(CNodeType):
     INPUT_SLOTS = [
         PortConf("type", DataType.MENU, 0, param="space_type", default="lagrange", items=["lagrange", "bernstein"]),
         PortConf("mesh", DataType.MESH, 1),
-        PortConf("p", DataType.INT, 1)
+        PortConf("p", DataType.INT, 1, default=1, min_val=1, max_val=10)
     ]
     OUTPUT_SLOTS = [
         PortConf("space", DataType.SPACE)
