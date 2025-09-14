@@ -419,6 +419,45 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         return PS, PM, N0, N1, N2, dof_nodes, dof_comps
 
+    @construct_system.register('shaft')
+    def construct_system(self):
+        """
+        Construct the global linear system for the gearbox modal analysis.
+        """
+
+        S0, M0 = self.shaft_linear_system()
+        self.rbe2_matrix()
+        S1, M1 = self.box_linear_system()
+
+        N0 = S0[0][0].shape[0]  # number of free dofs in the shaft system
+        N1 = 0 # without gearbox shell model
+        N2 = S0[1][1].shape[0]  # number of coupling dofs
+
+        S = bmat(S0, format='csr')
+        M = bmat(M0, format='csr')
+
+        self.S = S
+        self.M = M
+
+
+        self.logger.info(f"Global system: {S.shape}, {M.shape}")
+
+        PS = PETSc.Mat().createAIJ(
+                size=S.shape, 
+                csr=(S.indptr, S.indices, S.data))
+        PS.assemble()
+        PM = PETSc.Mat().createAIJ(
+                size=M.shape, 
+                csr=(M.indptr, M.indices, M.data))
+        PM.assemble()
+
+        NN0 = N0//6
+        NN1 = N1//3
+        NN2 = N2//6
+        dof_nodes = bm.concat((bm.arange(N0)//6, bm.arange(N1)//3 + NN0, bm.arange(N2)//6 + NN0 + NN1))
+        dof_comps = bm.concat((bm.arange(N0)%6, bm.arange(N1)%3, bm.arange(N2)%6))
+
+        return PS, PM, N0, N1, N2, dof_nodes, dof_comps
 
 
     @variantmethod('slepc')
