@@ -31,11 +31,11 @@ parser.add_argument('--T0',
     help="Initial time, default is 0.0")
 
 parser.add_argument('--T1',
-    default=5.0, type=float,
+    default=6.0, type=float,
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=5000, type=int,
+    default=24000, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--init_mesh',
@@ -55,11 +55,11 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.05.")
 
 parser.add_argument('--n_circle',
-    default = 200, type=int,
+    default = 400, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--lc',
-    default = 0.02, type=float,
+    default = 0.01, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--method',
@@ -79,7 +79,7 @@ parser.add_argument('--postprocess',
     help="Post-processing method, default is error, options are error, plot")
 
 parser.add_argument('--run',
-    default='main', type=str,
+    default='main_cylinder', type=str,
     help="Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
@@ -116,7 +116,7 @@ x = bm.linspace(0.0, 5.0, model.timeline.NL)
 import matplotlib.pyplot as plt
 
 plt.figure(figsize=(10, 6))
-plt.plot(x[3000:], cd[2999:], marker=None, linestyle='-', color='black')
+plt.plot(x[16000:20000], cd[15999:19999], marker=None, linestyle='-', color='black')
 plt.xscale('linear')
 plt.yscale('linear')
 plt.xlabel('Time', fontsize=14)
@@ -124,7 +124,7 @@ plt.ylabel('Drag coefficient', fontsize=14)
 plt.show()
 
 plt.figure(figsize=(10, 6))
-plt.plot(x[3000:], cl[2999:], marker=None, linestyle='-', color='black')
+plt.plot(x[16000:20000], cl[15999:19999], marker=None, linestyle='-', color='black')
 plt.xscale('linear')
 plt.yscale('linear')
 plt.xlabel('Time', fontsize=14)
@@ -132,7 +132,7 @@ plt.ylabel('Lift coefficient', fontsize=14)
 plt.show()
 
 plt.figure(figsize=(10, 6))
-plt.plot(x[3000:], delta_p[2999:], marker=None, linestyle='-', color='black')
+plt.plot(x[16000:20000], delta_p[15999:19999], marker=None, linestyle='-', color='black')
 plt.xscale('linear')
 plt.yscale('linear')
 plt.xlabel('Time', fontsize=14)
@@ -141,7 +141,7 @@ plt.show()
 
 
 plt.figure(figsize=(10, 6))
-plt.plot(x[2000:], cd[1999:], marker=None, linestyle='-', color='black')
+plt.plot(x[16000:], cd[15999:], marker=None, linestyle='-', color='black')
 plt.xscale('linear')
 plt.yscale('linear')
 plt.xlabel('Time', fontsize=14)
@@ -150,7 +150,7 @@ plt.show()
 
 
 plt.figure(figsize=(10, 6))
-plt.plot(x[2000:], cl[1999:], marker=None, linestyle='-', color='black')
+plt.plot(x[16000:], cl[15999:], marker=None, linestyle='-', color='black')
 plt.xscale('linear')
 plt.yscale('linear')
 plt.xlabel('Time', fontsize=14)
@@ -158,7 +158,7 @@ plt.ylabel('Lift coefficient', fontsize=14)
 plt.show()
 
 plt.figure(figsize=(10, 6))
-plt.plot(x[2000:], delta_p[1999:], marker=None, linestyle='-', color='black')
+plt.plot(x[16000:], delta_p[15999:], marker=None, linestyle='-', color='black')
 plt.xscale('linear')
 plt.yscale('linear')
 plt.xlabel('Time', fontsize=14)

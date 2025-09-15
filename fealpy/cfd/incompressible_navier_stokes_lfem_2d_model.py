@@ -110,6 +110,40 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
 
         u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, self.timeline.T0)))
         p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, self.timeline.T0)))
+        
+        mesh.nodedata['ph'] = p0
+        mesh.nodedata['uh'] = u0.reshape(self.mesh.GD,-1).T
+        mesh.to_vtk(f'ns2d_{str(0).zfill(10)}.vtu')
+        for i in range(self.timeline.NL-1):
+            t  = self.timeline.current_time()
+            self.logger.info(f"time={t}")
+            
+            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)
+            
+            u0[:] = u1
+            p0[:] = p1
+
+            mesh.nodedata['ph'] = p1
+            mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
+            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+
+            uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
+            self.timeline.advance()
+        uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
+        return u0, p0
+    
+    @run.register('main_cylinder')
+    def run(self, maxstep = 10, tol = 1e-10):
+        self.run_str = "main_cylinder"
+        mesh = self.mesh         
+        pde = self.pde
+        fem = self.fem
+        fem.dt = self.timeline.dt
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
+
+        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, self.timeline.T0)))
+        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, self.timeline.T0)))
         cd = bm.zeros(self.timeline.NL-1)
         cl = bm.zeros(self.timeline.NL-1)
         delta_p = bm.zeros(self.timeline.NL-1)
@@ -121,7 +155,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             t  = self.timeline.current_time()
             self.logger.info(f"time={t}")
             
-            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)\
+            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)
             
             #cd[i], cl[i], delta_p[i] = self.error['benchmark'](u1, p1, u0)
             print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
@@ -132,12 +166,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
             mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
-            # uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
             self.timeline.advance()
         self.cd = cd
         self.cl = cl
         self.delta_p = delta_p
-        # uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
         return u0, p0
     
     @run.register('one_step')
