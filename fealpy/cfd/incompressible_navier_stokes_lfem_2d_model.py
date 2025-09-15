@@ -115,7 +115,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         delta_p = bm.zeros(self.timeline.NL-1)
         
         mesh.nodedata['ph'] = p0
-        mesh.nodedata['uh'] = u0.reshape(2,-1).T
+        mesh.nodedata['uh'] = u0.reshape(self.mesh.GD,-1).T
         mesh.to_vtk(f'ns2d_{str(0).zfill(10)}.vtu')
         for i in range(self.timeline.NL-1):
             t  = self.timeline.current_time()
@@ -129,7 +129,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             p0[:] = p1
 
             mesh.nodedata['ph'] = p1
-            mesh.nodedata['uh'] = u1.reshape(2,-1).T
+            mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
             mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
             # uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
@@ -225,7 +225,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         u_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         for i in range(maxit):
-            self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
+            self.logger.info(f'mesh: {self.mesh.number_of_cells()}')
             uh,ph = self.run['main']( maxstep, tol)
             self.nt = self.nt*4
             self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)

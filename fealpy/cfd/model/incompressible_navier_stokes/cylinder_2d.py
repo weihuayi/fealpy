@@ -50,7 +50,7 @@ class Cylinder2D():
 
         # 圆的离散点
         cx, cy = center
-        theta = bm.linspace(0, 2*bm.pi, n_circle, endpoint=False)
+        theta = bm.linspace(0, 2*bm.pi, n_circle, endpoint=True)
         circle_points = [(cx + radius*bm.cos(t), cy + radius*bm.sin(t)) for t in theta]
 
         # 圆的边界：顺时针编号（meshpy 要求空洞边界为顺时针）

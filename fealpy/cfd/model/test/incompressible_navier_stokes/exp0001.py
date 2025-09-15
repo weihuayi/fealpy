@@ -15,7 +15,7 @@ class Exp0001(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         super().__init__(box=self.box)
-        self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
+        self.mesh = self.init_mesh['uniform_tri'](nx=options.get('nx', 8), ny=options.get('ny', 8))
 
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the PDE configuration."""
