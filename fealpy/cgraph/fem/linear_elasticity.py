@@ -5,19 +5,19 @@ __all__ = ["LinearElasticityEquation"]
 
 
 class LinearElasticityEquation(CNodeType):
-    TITLE: str = "LinearElasticity Equation"
+    TITLE: str = "线弹性方程"
     PATH: str = "fem.presets"
     INPUT_SLOTS = [
-        PortConf("space", DataType.SPACE),
-        PortConf("q", DataType.INT, default=3, min_val=1, max_val=17),
-        PortConf("body_force", DataType.FUNCTION),
-        PortConf("lam", DataType.FLOAT),
-        PortConf("mu", DataType.FLOAT),
-        PortConf("hypo", DataType.STRING, default='plane_strain', items=['plane_strain', 'plane_stress', '3D'])
+        PortConf("space", DataType.SPACE, "函数空间"),
+        PortConf("q", DataType.INT, title="积分公式", default=3, min_val=1, max_val=17),
+        PortConf("body_force", DataType.FUNCTION, title="载荷函数"),
+        PortConf("lam", DataType.FLOAT, title="拉梅常数"),
+        PortConf("mu", DataType.FLOAT, title="剪切模量"),
+        PortConf("hypo", DataType.MENU, 0, title="力学假设", default='plane_strain', items=['plane_strain', 'plane_stress', '3D'])
     ]
     OUTPUT_SLOTS = [
-        PortConf("operator", DataType.LINOPS),
-        PortConf("body_force", DataType.TENSOR)
+        PortConf("operator", DataType.LINOPS, title="算子"),
+        PortConf("body_force", DataType.TENSOR, title="载荷")
     ]
 
     @staticmethod
@@ -29,7 +29,7 @@ class LinearElasticityEquation(CNodeType):
             ScalarSourceIntegrator,
         )
         from ...material import LinearElasticMaterial
-        
+
         LEM = LinearElasticMaterial(
             name='E1nu025',
             lame_lambda=lam, shear_modulus=mu,

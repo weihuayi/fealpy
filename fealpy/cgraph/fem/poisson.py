@@ -3,19 +3,19 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 
 class PoissonEquationDBC(CNodeType):
-    TITLE: str = "Poisson Equation Dirichlet BC"
+    TITLE: str = "Poisson 方程 (第一类边界条件)"
     PATH: str = "fem.presets"
     INPUT_SLOTS = [
-        PortConf("space", DataType.SPACE),
-        PortConf("q", DataType.INT, default=3, min_val=1, max_val=17),
-        PortConf("diffusion", DataType.FUNCTION),
-        PortConf("source", DataType.FUNCTION),
-        PortConf("gd", DataType.FUNCTION)
+        PortConf("space", DataType.SPACE, title="函数空间"),
+        PortConf("q", DataType.INT, title="积分公式", default=3, min_val=1, max_val=17),
+        PortConf("diffusion", DataType.FUNCTION, title="扩散系数", default=None),
+        PortConf("source", DataType.FUNCTION, title="源", default=None),
+        PortConf("gd", DataType.FUNCTION, title="边界条件")
     ]
     OUTPUT_SLOTS = [
-        PortConf("operator", DataType.LINOPS),
-        PortConf("source", DataType.TENSOR),
-        PortConf("uh", DataType.TENSOR)
+        PortConf("operator", DataType.LINOPS, title="算子"),
+        PortConf("source", DataType.TENSOR, title="源"),
+        PortConf("uh", DataType.TENSOR, title="初始解")
     ]
 
     @staticmethod

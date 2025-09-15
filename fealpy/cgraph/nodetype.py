@@ -47,6 +47,8 @@ class PortConf:
             self.param = self.name
         if self.title is None:
             self.title = self.name
+        if self.desc == "":
+            self.desc = self.title
 
 
 class CNodeType:
