@@ -123,7 +123,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             
             u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)\
             
-            cd[i], cl[i], delta_p[i] = self.error['benchmark'](u1, p1, u0)
+            #cd[i], cl[i], delta_p[i] = self.error['benchmark'](u1, p1, u0)
             print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
             u0[:] = u1
             p0[:] = p1
