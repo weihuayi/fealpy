@@ -609,7 +609,7 @@ def _solve_hex_parametric_coords(target_points, hex_vertices):
         lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
         # 检查点是否在四面体内
         if i < 5:
-            in_tetra = bm.all(lam >= -2e-6, axis=1)
+            in_tetra = bm.all(lam >= -2e-5, axis=1)
             if bm.any(in_tetra):
                 param = bm.einsum('ni,ij->nj', lam[in_tetra], tet_param)
                 valid_indices = bm.where(remaining)[0][in_tetra]
@@ -620,3 +620,125 @@ def _solve_hex_parametric_coords(target_points, hex_vertices):
             xi_eta_zeta = bm.set_at(xi_eta_zeta, remaining, param)
             
     return xi_eta_zeta
+
+def newton_barycentric_triangle(target, cell_nodes,
+                                p: int,
+                                local_vnode_idx,
+                                shape_function,
+                                grad_shape_function,
+                                tol=1e-6, maxit=20, damping=True,):
+    """
+    牛顿迭代求二维曲边(高阶)三角形单元内点的重心坐标 lam (N,3).
+    Parameters:
+        target: (N,2) 目标物理点
+        cell_nodes: (N, Ndof, 2) 该单元所有几何节点(包含高阶)的物理坐标
+        p: 形函数次数
+        shape_function(lam, p): 输入 lam (N,3) -> (N, Ndof)
+        grad_shape_function(lam, p): 可选, 返回对重心坐标 λ0,λ1,λ2 的偏导 (N, Ndof, 3);
+                                     若为 None, 用差分近似
+        tol: 残差容差
+        maxit: 最大迭代次数
+        damping: 是否使用阻尼
+    Returns:
+        lam: (N,3) 重心坐标
+        success: (N,) bool 是否收敛
+        iters: (N,) int 实际迭代次数
+    """
+    kw = bm.context(target)
+    N = target.shape[0]
+    TD = 2
+    # 初始线性猜测(用前三个顶点仿射解)
+    v0 = cell_nodes[:, local_vnode_idx[0]]
+    v1 = cell_nodes[:, local_vnode_idx[1]]
+    v2 = cell_nodes[:, local_vnode_idx[2]]
+
+    A = bm.stack([ (v1 - v0), (v2 - v0) ], axis=1)  # (N,2,2)
+    rhs = (target - v0)[..., None]                       # (N,2,1)
+    # 线性解 xi_eta
+    invA = bm.linalg.inv(A)
+    xi_eta = bm.einsum('nij,njk->nik', invA, rhs)[...,0]  # (N,2)
+
+    def build_lam(xe):
+        return bm.concat([1 - xe.sum(axis=1, keepdims=True),
+                           xe[:,0:1], xe[:,1:2]], axis=1)
+    lam = build_lam(xi_eta)
+
+    success = bm.zeros(N, dtype=bm.bool)
+    i = 0
+    while bm.any(~success):
+        active = ~success
+        i += 1
+        if i > maxit:
+            print(f"Warning: Exceeding {maxit} iterations in Newton solver.")
+            break
+        if not bm.any(active):
+            break
+        act_idx = bm.where(active)[0]
+        lam_a   = lam[active]          # (Na,3)
+        cn_a    = cell_nodes[active]   # (Na,Ndof,2)
+        tgt_a   = target[active]       # (Na,2)
+        # print(f"Newton iteration {i}")
+        i += 1
+        Nval = shape_function(lam_a, p, variables='u')            # (Na,Ndof)
+        F    = bm.einsum('ni,nid->nd', Nval, cn_a) - tgt_a        # (Na,2)
+        res  = bm.linalg.norm(F, axis=1)
+
+        conv = res < tol
+        if bm.any(conv):
+            done_glb = act_idx[conv]
+            success  = bm.set_at(success, done_glb, True)
+            
+        if not bm.any(~success):
+            break
+        # 活跃里继续的
+        still_mask = ~conv
+        if not bm.any(still_mask):
+            continue
+        
+        act_sub_idx = act_idx[still_mask]
+        lam_a   = lam_a[still_mask]
+        F_a = F[still_mask]
+        xe_a = lam_a[:,1:3]  # (Na,2)
+        gN = grad_shape_function(lam_a, p,variables = 'u')  # (Na,Ndof,2)
+        
+        # Jacobian: J = Σ_i X_i ⊗ [dN_i/dξ, dN_i/dη] → (Na,2,2)
+        X_a = cn_a[still_mask]  # (Na,Ndof,2)
+        T = bm.einsum('...nij,nid->njd', gN, X_a)  # (Na,2,2)
+        # 重新排列成 J[n, phys_dim, param_dim]
+        J = bm.permute_dims(T, axes=(0, 2, 1))  # (Na,2,2)
+
+        # 解 J δ = -F
+        detJ = J[:,0,0]*J[:,1,1]-J[:,0,1]*J[:,1,0]
+        good = bm.abs(detJ) > 1e-14
+        delta = bm.zeros_like(F_a)
+        if bm.any(good):
+            invJ = bm.linalg.inv(J[good])
+            delta_good = bm.einsum('nij,nj->ni', invJ[good], -F_a[good])
+            delta = bm.set_at(delta, good, delta_good)
+        # 阻尼/线搜索
+        if damping:
+            base_mean = bm.mean(bm.linalg.norm(F_a, axis=1))
+            step = 1.0
+            for _ in range(10):
+                trial = xe_a + step*delta
+                lam_trial = build_lam(trial)
+                lam_trial = lam_trial / bm.sum(lam_trial, axis=1, keepdims=True)
+                N_trial = shape_function(lam_trial, p, variables='u')
+                F_trial = bm.einsum('ni,nid->nd', N_trial, X_a) - target[act_sub_idx]
+                if bm.mean(bm.linalg.norm(F_trial, axis=1)) <= base_mean * 0.98 or step < 1/64:
+                    xe_a = trial
+                    break
+                step *= 0.5
+        else:
+            xe_a = xe_a + 0.5*delta
+
+        lam_upd = build_lam(xe_a)
+        # 归一
+        lam_upd = lam_upd / bm.sum(lam_upd, axis=1, keepdims=True)
+
+        # 写回
+        xi_eta = bm.set_at(xi_eta, act_sub_idx, lam_upd[:,1:3])
+        
+        lam    = bm.set_at(lam,    act_sub_idx, lam_upd)
+
+    return lam, success
