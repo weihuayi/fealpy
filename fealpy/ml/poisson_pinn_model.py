@@ -232,11 +232,9 @@ class PoissonPINNModel(ComputationalModel):
             net = nn.Sequential(*layers)
         self.net = Solution(net)
 
-        # 优化器
         opt = optimizers[self.options.get('optimizer', 'Adam')]
         self.optimizer = opt(params=self.net.parameters(), lr=self.lr)
-        
-        # 学习率调度器
+
         step_size = self.options.get('step_size', 0)
         gamma = self.options.get('gamma', 0.99)
         self.set_steplr(step_size, gamma)

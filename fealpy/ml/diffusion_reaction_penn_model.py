@@ -8,17 +8,16 @@ from fealpy.backend import  bm
 from fealpy.utils import timer
 from fealpy.typing import TensorLike
 from fealpy.model import ComputationalModel, PDEModelManager
-from fealpy.model.poisson import PoissonPDEDataT
+from fealpy.model.diffusion_reaction import DiffusionReactionPDEDataT
 
 from fealpy.ml import gradient, optimizers, activations
 from fealpy.ml.modules import Solution
 
-
-class PoissonPENNModel(ComputationalModel):
-    """Physics embedded neural network (PENN) model for solving Poisson's equation with Dirichlet boundary conditions.
+class DiffusionReactionPENNModel(ComputationalModel):
+    """Physics embedded neural network (PENN) model for solving diffusion-reaction equation with Dirichlet boundary conditions.
     
-    This class implements a PENN approach to solve Poisson's equation.
-    It combines neural networks with the governing equations and boundary conditions of Poisson's equation
+    This class implements a PENN approach to solve diffusion-reaction equation.
+    It combines neural networks with the governing equations and boundary conditions of diffusion-reaction equation
     for numerical solution of partial differential equations. The model uses a Multi-Layer Perceptron (MLP)
     as the base network structure, computes partial derivatives through automatic differentiation to satisfy
     PDE constraints, and supports comparison with Finite Element Method (FEM) results.
@@ -26,7 +25,7 @@ class PoissonPENNModel(ComputationalModel):
     Parameters:
         options(dict): If None, default parameters from get_options() will be used.
             Configuration dictionary containing:
-            - pde(int or PoissonPDEDataT): PDE definition;
+            - pde(int or DiffusionReactionPDEDataT): PDE definition;
             - scaling_function(callable): The scaling_function is a function that satisfies the boundary conditions, default is None;
             - mesh_size(int): Number of grid points along each dimension;
             - lr(float): Learning rate;
@@ -43,7 +42,7 @@ class PoissonPENNModel(ComputationalModel):
     Attributes:
         options(dict): Collection of model configuration parameters.
 
-        pde(PoissonPDEDataT): Poisson's equation problem definition object containing equation parameters, boundary conditions, 
+        pde(DiffusionReactionPDEDataT): diffusion-reaction equation problem definition object containing equation parameters, boundary conditions, 
             and source terms.
 
         gd(int): Geometric dimension (1D, 2D, or 3D) of the problem domain.
@@ -97,7 +96,7 @@ class PoissonPENNModel(ComputationalModel):
 
         predict(): Make predictions using the trained network.
 
-        fem(): Solve Poisson's equation using Finite Element Method (FEM) for comparison.
+        fem(): Solve diffusion-reaction equation using Finite Element Method (FEM) for comparison.
 
         run(): Start training the model.
 
@@ -144,10 +143,10 @@ class PoissonPENNModel(ComputationalModel):
             options(dict): Dictionary containing all configuration parameters with parameter names as keys and default values
         """
         import argparse
-        parser = argparse.ArgumentParser(description="Poisson equation solver using PENN.")
+        parser = argparse.ArgumentParser(description="diffusion-reaction equation solver using PENN.")
 
-        parser.add_argument('--pde', default=12, type=int,
-                            help="Built-in PDE example ID (1, 2, 6, 8, 9) for different Poisson problems, default is 8.")
+        parser.add_argument('--pde', default=3, type=int,
+                            help="Built-in PDE example ID (1, 3) for different diffusion-reaction problems, default is 3.")
 
         parser.add_argument('--scaling_function', default=None, 
                             help="The caling_function is a function that satisfies the boundary conditions, default is None.")
@@ -155,8 +154,8 @@ class PoissonPENNModel(ComputationalModel):
         parser.add_argument('--mesh_size', default=30, type=int,
                             help='Number of grid points along each dimension, default is 30.')
 
-        parser.add_argument('--hidden_size', default=(50, 50), type=tuple,
-                            help='Default hidden sizes, default is (50, 50).')
+        parser.add_argument('--hidden_size', default=(50, 50, 50, 50), type=tuple,
+                            help='Default hidden sizes, default is (50, 50, 50, 50).')
 
         parser.add_argument('--optimizer', default="Adam",  type=str,
                             help="Optimizer to use for training, default is Adam,  options are 'Adam' , 'SGD'.")
@@ -165,7 +164,7 @@ class PoissonPENNModel(ComputationalModel):
                             help="Activation function, default is 'LogSigmoid', " \
                             "options are 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax'.")
 
-        parser.add_argument('--lr', default=0.005, type=float,
+        parser.add_argument('--lr', default=0.001, type=float,
                             help='Learning rate for the optimizer, default is 0.005.')
 
         parser.add_argument('--step_size', default=0, type=int,
@@ -174,8 +173,8 @@ class PoissonPENNModel(ComputationalModel):
         parser.add_argument('--gamma', default=0.99, type=float,
                             help='Multiplicative factor of learning rate decay. Default: 0.99.')
 
-        parser.add_argument('--epochs', default=1000, type=int,
-                            help='Number of training epochs, default is 1000.')
+        parser.add_argument('--epochs', default=5000, type=int,
+                            help='Number of training epochs, default is 5000.')
 
         parser.add_argument('--pbar_log', default=True, type=bool,
                             help='Whether to show progress bar, default is True')
@@ -185,18 +184,18 @@ class PoissonPENNModel(ComputationalModel):
         options = vars(parser.parse_args())
         return options
     
-    def set_pde(self, pde: Union[PoissonPDEDataT, int]=1):
+    def set_pde(self, pde: Union[DiffusionReactionPDEDataT, int]=3):
         """Initialize the PDE problem definition
         
-        Sets up the Poisson's equation problem to be solved by the model based on 
+        Sets up the diffusion-reaction equation problem to be solved by the model based on 
         the input PDE object or built-in example ID.
         
         Parameters:
-            pde(Union[PoissonPDEDataT, int]): Either a Poisson's equation problem object or the ID (integer) of a predefined example. 
-                If an integer, the corresponding predefined Poisson's equation problem is retrieved from the PDE model manager.
+            pde(Union[DiffusionReactionPDEDataT, int]): Either a diffusion-reaction equation problem object or the ID (integer) of a predefined example. 
+                If an integer, the corresponding predefined diffusion-reaction equation problem is retrieved from the PDE model manager.
         """  
         if isinstance(pde, int):
-            self.pde = PDEModelManager('poisson').get_example(pde)
+            self.pde = PDEModelManager('diffusion_reaction').get_example(pde)
         else:
             self.pde = pde 
         self.gd = self.pde.geo_dimension()
@@ -280,7 +279,8 @@ class PoissonPENNModel(ComputationalModel):
         Returns:
             val(TensorLike): Tensor of shape (n_points, ) representing shape function values at each point.
         """
-        a = 32
+        # a = 32
+        a=64
         c = math.sqrt(math.pi * a) ** self.gd
         domain = self.domain
        
@@ -358,12 +358,13 @@ class PoissonPENNModel(ComputationalModel):
             The residual is calculated as Δu where Δ is the Laplacian operator.
         """     
         grad_u = gradient(pred, p, create_graph=True)  ## (npde, dim)
+        reaction = (self.pde.reaction_coef() * pred).reshape(-1, 1)
         laplacian = bm.zeros(pred.shape[0], 1)   
         
         for i in range(p.shape[-1]):
             u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # computes ∂²u/∂x_i²
             laplacian += u_ii
-        val = laplacian 
+        val = laplacian + reaction
         return val 
     
     def run(self):
@@ -416,7 +417,7 @@ class PoissonPENNModel(ComputationalModel):
         return pred.detach().numpy()
     
     def fem(self):
-        """Solve Poisson's equation using Finite Element Method (FEM) for comparison
+        """Solve diffusion-reaction equation using Finite Element Method (FEM) for comparison
         
         Returns:
             uh(TensorLike): FEM solution results
@@ -426,19 +427,19 @@ class PoissonPENNModel(ComputationalModel):
         """
         from fealpy.functionspace import LagrangeFESpace
         from fealpy.fem import BilinearForm, LinearForm
-        from fealpy.fem  import ScalarDiffusionIntegrator, ScalarSourceIntegrator
+        from fealpy.fem  import ScalarDiffusionIntegrator, ScalarSourceIntegrator, ScalarMassIntegrator
         from fealpy.fem import DirichletBC
         from fealpy.solver import spsolve
 
         pde = self.pde
-        # mesh_size = tuple(x - 1 for x in self.mesh_size)
-        # mesh = pde.init_mesh(*mesh_size)
         mesh = self.mesh
         p = 1
         q = p + 2
         space = LagrangeFESpace(mesh, p)
+        r = pde.reaction_coef()
         S = BilinearForm(space)
         S.add_integrator(ScalarDiffusionIntegrator(q=q))
+        S.add_integrator(ScalarMassIntegrator(coef=-r, q=q))
         A = S.assembly()
 
         b = LinearForm(space)
