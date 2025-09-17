@@ -3,8 +3,8 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 
 class Helmholtz2d(CNodeType):
-    TITLE: str = "Helmholtz 2D"
-    PATH: str = "model.helmholtz"
+    TITLE: str = "二维 Helmholtz 问题模型"
+    PATH: str = "模型.Helmholtz"
     INPUT_SLOTS = []
     OUTPUT_SLOTS = [
         PortConf("domain", DataType.NONE),

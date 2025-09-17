@@ -22,16 +22,16 @@ class Box2d(CNodeType):
     Outputs:
         mesh (MeshType): The mesh object created.
     """
-    TITLE: str = "Box 2D"
-    PATH: str = "mesh.creation"
+    TITLE: str = "二维 Box 网格"
+    PATH: str = "网格.构造"
     INPUT_SLOTS = [
-        PortConf("mesh_type", DataType.MENU, 0, default="triangle", items=["triangle", "quadrangle"]),
-        PortConf("domain", DataType.NONE),
-        PortConf("nx", DataType.INT, default=10, min_val=1),
-        PortConf("ny", DataType.INT, default=10, min_val=1)
+        PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="triangle", items=["triangle", "quadrangle"]),
+        PortConf("domain", DataType.NONE, title="区域"),
+        PortConf("nx", DataType.INT, title="X 分段数", default=10, min_val=1),
+        PortConf("ny", DataType.INT, title="Y 分段数", default=10, min_val=1)
     ]
     OUTPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH)
+        PortConf("mesh", DataType.MESH, title="网格")
     ]
 
     @staticmethod

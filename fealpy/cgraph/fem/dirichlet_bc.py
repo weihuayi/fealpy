@@ -5,8 +5,8 @@ __all__ = ["DirichletBC"]
 
 
 class DirichletBC(CNodeType):
-    TITLE: str = "Dirichlet BC"
-    PATH: str = "fem.bc"
+    TITLE: str = "Dirichlet 边界条件处理"
+    PATH: str = "有限元.边界条件"
     INPUT_SLOTS = [
         PortConf("gd", DataType.FUNCTION),
         PortConf("isDDof", DataType.TENSOR),

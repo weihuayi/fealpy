@@ -3,8 +3,8 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 
 class LinearElasticity2d(CNodeType):
-    TITLE: str = "LinearElasticity 2D"
-    PATH: str = "model.linear_elasticity"
+    TITLE: str = "二维线弹性问题模型"
+    PATH: str = "模型.线弹性"
     INPUT_SLOTS = []
     OUTPUT_SLOTS = [
         PortConf("domain", DataType.NONE),
