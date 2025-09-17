@@ -3,4 +3,4 @@ from .poisson import *
 from .dirichlet_bc import *
 from .linear_elasticity import *
 from .helmholtz import *
-from .dld_microfluidic_chip import *
+from .stokes import *

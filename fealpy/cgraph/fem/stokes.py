@@ -1,11 +1,11 @@
 
 from ..nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["DLDMicroflidicChipEquation"]
+__all__ = ["StokesEquation"]
 
 
-class DLDMicroflidicChipEquation(CNodeType):
-    TITLE: str = "DLD Microflidic Chip Equation"
+class StokesEquation(CNodeType):
+    TITLE: str = "Stokes Equation"
     PATH: str = "fem.presets"
     INPUT_SLOTS = [
         PortConf("uspace", DataType.SPACE),
@@ -48,8 +48,7 @@ class DLDMicroflidicChipEquation(CNodeType):
             gd=(velocity_dirichlet, pressure_dirichlet), 
             threshold=(is_velocity_boundary, is_pressure_boundary),
             method='interp')
-        apply_bc = BC.apply
-        A, F = apply_bc(A, F)
+        A, F = BC.apply(A, F)
 
 
         return A, F

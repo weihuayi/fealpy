@@ -11,7 +11,7 @@ simulation = cgraph.create("StationaryNSSimulation")
 dbc = cgraph.create("StationaryNSBC")
 StationaryNSRun = cgraph.create("StationaryNSRun")
 
-mesher(domain = pde().domain)
+mesher(domain = pde().domain, nx = 10, ny = 10)
 uspacer(mesh = mesher(), p=2, gd = 2, value_dim = -1)
 pspacer(mesh = mesher(), p=1)
 simulation(
@@ -20,7 +20,7 @@ simulation(
     source = pde().source,
     uspace = uspacer(),
     pspace = pspacer(),
-    p = 3
+    q = 2
 ) 
 dbc(
     uspace = uspacer(), 
@@ -36,13 +36,14 @@ StationaryNSRun(
     update = simulation().update,
     apply_bc = dbc().apply_bc,
     lagrange_multiplier = simulation().lagrange_multiplier,
-    A = simulation().A,
-    L = simulation().L,
-    uspace = simulation().uspace, 
-    pspace = simulation().pspace, 
+    BForm = simulation().BForm,
+    LForm = simulation().LForm,
+    uspace = uspacer(), 
+    pspace = pspacer(), 
     mesh = mesher()
 )
-WORLD_GRAPH.output_node(uh1 = StationaryNSRun())
+
+WORLD_GRAPH.output_node(uh = StationaryNSRun().uh, ph = StationaryNSRun().ph)
 WORLD_GRAPH.error_listeners.append(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

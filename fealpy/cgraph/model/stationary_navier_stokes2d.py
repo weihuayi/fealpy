@@ -5,26 +5,29 @@ __all__ = ["StationaryNS2d"]
 
 class StationaryNS2d(CNodeType):
     TITLE: str = "Stationary NS 2D"
-    PATH: str = "cfd.model.test.stationary_navier_stokes"
-    INPUT_SLOTS = []
+    PATH: str = "model.stationary_navier_stokes"
+    INPUT_SLOTS = [
+        PortConf("example", DataType.MENU, 0, title="例子编号", default=1, items=[i for i in range(1, 3)])
+    ]
     OUTPUT_SLOTS = [
-        PortConf("mu", DataType.FLOAT),
-        PortConf("rho", DataType.FLOAT),
-        PortConf("domain", DataType.DOMAIN),
-        PortConf("velocity", DataType.FUNCTION),
-        PortConf("pressure", DataType.FUNCTION),
-        PortConf("source", DataType.FUNCTION),
-        PortConf("velocity_dirichlet", DataType.FUNCTION),
-        PortConf("pressure_dirichlet", DataType.FUNCTION),
-        PortConf("is_velocity_boundary", DataType.FUNCTION),
-        PortConf("is_pressure_boundary", DataType.FUNCTION)
+        PortConf("mu", DataType.FLOAT, title="粘度系数"),
+        PortConf("rho", DataType.FLOAT, title = "密度"),
+        PortConf("domain", DataType.DOMAIN, title="求解域"),
+        PortConf("velocity", DataType.FUNCTION, title="速度真解"),
+        PortConf("pressure", DataType.FUNCTION, title="压力真解"),
+        PortConf("source", DataType.FUNCTION, title="源"),
+        PortConf("velocity_dirichlet", DataType.FUNCTION, title="速度边界条件"),
+        PortConf("pressure_dirichlet", DataType.FUNCTION, title="压力边界条件"),
+        PortConf("is_velocity_boundary", DataType.FUNCTION, title="速度边界"),
+        PortConf("is_pressure_boundary", DataType.FUNCTION, title="压力边界")
     ]
 
     @staticmethod
-    def run() -> Union[object]:
-        from fealpy.cfd.model.test.stationary_incompressible_navier_stokes.exp0001 import Exp0001
+    def run(example) -> Union[object]:
+        from fealpy.cfd.model import CFDTestModelManager
 
-        model = Exp0001()
+        manager = CFDTestModelManager('stationary_incompressible_navier_stokes')
+        model = manager.get_example(example)
         return (model.mu, model.rho, model.domain()) + tuple(
             getattr(model, name)
             for name in ["velocity", "pressure", "source", "velocity_dirichlet", "pressure_dirichlet", "is_velocity_boundary", "is_pressure_boundary"]

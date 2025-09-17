@@ -12,6 +12,7 @@ __nodes__ = [
     "mesh",
     "functionspace",
     "solver",
+    "postprocess",
     "fem",
     "cfd"
 ]

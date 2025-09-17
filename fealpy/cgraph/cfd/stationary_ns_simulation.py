@@ -14,18 +14,16 @@ class StationaryNSSimulation(CNodeType):
         PortConf("source", DataType.FUNCTION),
         PortConf("uspace", DataType.SPACE),
         PortConf("pspace", DataType.SPACE),
-        PortConf("p", DataType.INT, default = 3)
+        PortConf("q", DataType.INT, 0, default = 3)
     ]
     OUTPUT_SLOTS = [
-        PortConf("A", DataType.LINOPS),
-        PortConf("L", DataType.LINOPS),
-        PortConf("uspace", DataType.SPACE),
-        PortConf("pspace", DataType.SPACE),
+        PortConf("BForm", DataType.LINOPS),
+        PortConf("LForm", DataType.LINOPS),
         PortConf("update", DataType.FUNCTION),
         PortConf("lagrange_multiplier", DataType.FUNCTION)
     ]
     @staticmethod
-    def run(mu, rho, source, uspace, pspace, p):
+    def run(mu, rho, source, uspace, pspace, q):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import barycentric
         from fealpy.fem import LinearForm, BilinearForm, BlockForm, LinearBlockForm
@@ -33,23 +31,23 @@ class StationaryNSSimulation(CNodeType):
                                 SourceIntegrator)
  
         A00 = BilinearForm(uspace)
-        u_BM_netwon = ScalarMassIntegrator(q = p)
-        u_BC = ScalarConvectionIntegrator(q = p)
-        u_BVW = ScalarDiffusionIntegrator(q = p)
+        u_BM_netwon = ScalarMassIntegrator(q = q)
+        u_BC = ScalarConvectionIntegrator(q = q)
+        u_BVW = ScalarDiffusionIntegrator(q = q)
         
         A00.add_integrator(u_BM_netwon)
         A00.add_integrator(u_BC)
         A00.add_integrator(u_BVW)
         
         A01 = BilinearForm((pspace, uspace))
-        u_BPW = PressWorkIntegrator(q = p)
+        u_BPW = PressWorkIntegrator(q = q)
         A01.add_integrator(u_BPW)
        
         A = BlockForm([[A00, A01], [A01.T, None]]) 
 
         L0 = LinearForm(uspace)
-        u_LSI = SourceIntegrator(q = p)
-        u_source_LSI = SourceIntegrator(q = p)
+        u_LSI = SourceIntegrator(q = q)
+        u_source_LSI = SourceIntegrator(q = q)
         L0.add_integrator(u_LSI) 
         L0.add_integrator(u_source_LSI)
         L1 = LinearForm(pspace)
@@ -105,6 +103,6 @@ class StationaryNSSimulation(CNodeType):
             b0 = bm.array([c])
             b  = bm.concatenate([b, b0], axis=0)
             return A, b
-        return (A, L, uspace, pspace, update, lagrange_multiplier)
+        return (A, L, update, lagrange_multiplier)
 
     
