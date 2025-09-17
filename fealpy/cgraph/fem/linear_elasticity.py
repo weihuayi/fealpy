@@ -6,7 +6,7 @@ __all__ = ["LinearElasticityEquation"]
 
 class LinearElasticityEquation(CNodeType):
     TITLE: str = "线弹性方程"
-    PATH: str = "fem.presets"
+    PATH: str = "有限元.方程离散"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, "函数空间"),
         PortConf("q", DataType.INT, title="积分公式", default=3, min_val=1, max_val=17),

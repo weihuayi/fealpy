@@ -4,7 +4,7 @@ from ..nodetype import CNodeType, PortConf, DataType
 class MeshDimensionUpgrading(CNodeType):
     """Geometric 2d to 3d"""
     TITLE = "网格升维"
-    PATH = "mesh.ops"
+    PATH = "网格.操作"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, title="2D 网格"),
         PortConf("z", DataType.TENSOR, 1, desc="网格顶点在 Z 方向的坐标", title="Z 位置")
@@ -41,7 +41,7 @@ class ErrorEstimation(CNodeType):
         out (Tensor): Error between u and v.
     """
     TITLE = "误差估计"
-    PATH = "mesh"
+    PATH = "网格.运算"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, title="网格"),
         PortConf("u", DataType.FUNCTION),

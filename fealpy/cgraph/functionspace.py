@@ -25,7 +25,7 @@ def get_space_class(space_type: str) -> Type:
 
 class FunctionSpace(CNodeType):
     TITLE: str = "标量函数空间"
-    PATH: str = "space.creation"
+    PATH: str = "函数空间.构造"
     INPUT_SLOTS = [
         PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein"]),
         PortConf("mesh", DataType.MESH, 1, title="网格"),
@@ -43,7 +43,7 @@ class FunctionSpace(CNodeType):
 
 class TensorFunctionSpace(CNodeType):
     TITLE: str = "张量函数空间"
-    PATH: str = "space.creation"
+    PATH: str = "函数空间.构造"
     INPUT_SLOTS = [
         PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein"]),
         PortConf("mesh", DataType.MESH, 1, title="网格"),
@@ -65,7 +65,7 @@ class TensorFunctionSpace(CNodeType):
 
 class BoundaryDof(CNodeType):
     TITLE: str = "边界自由度"
-    PATH: str = "space.ops"
+    PATH: str = "函数空间.操作"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, title="函数空间"),
     ]
@@ -80,7 +80,7 @@ class BoundaryDof(CNodeType):
 
 class FEFunction(CNodeType):
     TITLE: str = "有限元函数"
-    PATH: str = "space"
+    PATH: str = "函数空间.函数"
     INPUT_SLOTS = [
         PortConf("tensor", DataType.TENSOR, title="自由度"),
         PortConf("space", DataType.SPACE, title="函数空间"),

@@ -6,7 +6,7 @@ __all__ = ["CGSolver"]
 
 class CGSolver(CNodeType):
     TITLE: str = "CG 解法器"
-    PATH: str = "solver.iterative"
+    PATH: str = "解法器.迭代"
     INPUT_SLOTS = [
         PortConf("A", DataType.LINOPS, title="算子"),
         PortConf("b", DataType.TENSOR, title="向量"),

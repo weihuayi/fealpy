@@ -4,7 +4,7 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 class PoissonEquationDBC(CNodeType):
     TITLE: str = "Poisson 方程 (第一类边界条件)"
-    PATH: str = "fem.presets"
+    PATH: str = "有限元.方程离散"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, title="函数空间"),
         PortConf("q", DataType.INT, title="积分公式", default=3, min_val=1, max_val=17),

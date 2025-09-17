@@ -4,7 +4,7 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 class Poisson2d(CNodeType):
     TITLE: str = "二维 Poisson 问题模型"
-    PATH: str = "model.poisson"
+    PATH: str = "模型.Poisson"
     INPUT_SLOTS = [
         PortConf("example", DataType.MENU, 0, title="例子编号", default=1, items=[i for i in range(1, 9)])
     ]
