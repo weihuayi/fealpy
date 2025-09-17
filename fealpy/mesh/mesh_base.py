@@ -870,7 +870,7 @@ class TensorMesh(HomogeneousMesh):
     def grad_shape_function(self, bcs: Tuple[TensorLike], p: int=1, *, index: Index=_S,
                             variables: str='u', mi: Optional[TensorLike]=None) -> TensorLike:
         """Evaluate gradient of simplex shape functions.
-        
+
         Parameters:
             bcs : TensorLike
                 Barycentric coordinates
@@ -882,32 +882,38 @@ class TensorMesh(HomogeneousMesh):
                 Variable space ('u' or 'x')
             mi : TensorLike, optional
                 Multi-index matrix
-                
+
         Returns:
             TensorLike: Gradient values
-            
+
         Raises:
             ValueError: For invalid variables type
         """
         assert isinstance(bcs, tuple)
         TD = len(bcs)
         Dlambda = bm.array([-1, 1], dtype=self.ftype, device=bm.get_device(bcs[0]))
-        phi = bm.simplex_shape_function(bcs[0], p=p)
-        R = bm.simplex_grad_shape_function(bcs[0], p=p)
-        dphi = bm.einsum('...ij, j->...i', R, Dlambda)
+        phi0 = bm.simplex_shape_function(bcs[0], p=p)
+        R0 = bm.simplex_grad_shape_function(bcs[0], p=p)
+        dphi0 = bm.einsum('...ij, j->...i', R0, Dlambda)
 
-        n = phi.shape[0]**TD
-        ldof = phi.shape[-1]**TD
+        phi1 = bm.simplex_shape_function(bcs[1], p=p)
+        R1 = bm.simplex_grad_shape_function(bcs[1], p=p)
+        dphi1 = bm.einsum('...ij, j->...i', R1, Dlambda)
+
+        if TD == 3:
+            phi2 = bm.simplex_shape_function(bcs[2], p=p)
+            R2 = bm.simplex_grad_shape_function(bcs[2], p=p)
+            dphi2 = bm.einsum('...ij, j->...i', R2, Dlambda)
+
+        n = phi0.shape[0]**TD
+        ldof = phi0.shape[-1]**TD
         shape = (n, ldof, TD)
         gphi = bm.zeros(shape, dtype=self.ftype, device=bm.get_device(bcs[0]))
 
         if TD == 3:
-            gphi0 = bm.einsum('im, jn, ko->ijkmno', dphi, 
-                              phi, phi).reshape(-1, ldof, 1)
-            gphi1 = bm.einsum('im, jn, ko->ijkmno', phi, dphi,
-                              phi).reshape(-1, ldof, 1)
-            gphi2 = bm.einsum('im, jn, ko->ijkmno', phi, phi,
-                                     dphi).reshape(-1, ldof, 1)
+            gphi0 = bm.einsum('im, jn, ko->ijkmno', dphi0, phi1, phi2).reshape(-1, ldof, 1)
+            gphi1 = bm.einsum('im, jn, ko->ijkmno', phi0, dphi1, phi2).reshape(-1, ldof, 1)
+            gphi2 = bm.einsum('im, jn, ko->ijkmno', phi0, phi1, dphi2).reshape(-1, ldof, 1)
             gphi = bm.concatenate((gphi0, gphi1, gphi2), axis=-1)
             if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)
@@ -916,8 +922,8 @@ class TensorMesh(HomogeneousMesh):
 
                 return gphi
         elif TD == 2:
-            gphi0 = bm.einsum('im, jn -> ijmn', dphi, phi).reshape(-1, ldof, 1)
-            gphi1 = bm.einsum('im, jn -> ijmn', phi, dphi).reshape(-1, ldof, 1)
+            gphi0 = bm.einsum('im, jn -> ijmn', dphi0, phi1).reshape(-1, ldof, 1)
+            gphi1 = bm.einsum('im, jn -> ijmn', phi0, dphi1).reshape(-1, ldof, 1)
             gphi = bm.concatenate((gphi0, gphi1), axis=-1)              # (NQ, ldof, GD)
             if variables == 'x':
                 J = self.jacobi_matrix(bcs, index=index)                # (NC, NQ, GD, GD)
@@ -926,7 +932,7 @@ class TensorMesh(HomogeneousMesh):
                 gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, G, gphi) # (NC, NQ, ldof, GD)
 
                 return gphi
-            
+
         return gphi
 
     def quad_to_ipoint(self, p, index=None):
