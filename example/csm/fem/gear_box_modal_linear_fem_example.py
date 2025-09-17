@@ -40,8 +40,6 @@ options = vars(parser.parse_args())
 options['mesh_file'] = get_data_path('gear', options['mesh_file'])
 options['shaft_system_file'] = get_data_path('gear', options['shaft_system_file'])
 
-print(options)
-
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
@@ -49,5 +47,11 @@ fname = options['mesh_file'].stem + '.vtu'
 
 from fealpy.csm.fem import GearBoxModalLinearFEMModel
 model = GearBoxModalLinearFEMModel(options)
-model.solve(fname=fname)
-#model.post_process(fname=fname)
+PS, PM, N0, N1, N2, dof_nodes, dof_comps = model.construct_system['shaft']()
+eps = model.solve(PS, PM)
+model.post_process(eps, N0, N1, N2)
+model.mesh.to_vtk(fname=fname)
+#model.to_mtx(fname=options['mesh_file'].stem+'.mtx', S=PS, M=PM)
+model.to_abaqus(S=PS, M=PM, dof_nodes=dof_nodes, dof_comps=dof_comps)
+model.write_abaqus_frequency_input()
+
