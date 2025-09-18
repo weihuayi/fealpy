@@ -83,8 +83,9 @@ class CrayfishOptAlg(Optimizer):
                                     (rand > 0.5) * 
                                     (self.x - self.x[bm.random.randint(0, self.N, (self.N,))] + xf)) + 
                     (temp <= 30) * ((P[:, None] > 2) * 
-                                    (self.x + bm.cos(2 * bm.random.rand(self.N, self.dim) * bm.pi) * self.gbest * 
-                                     p - bm.sin(2 * bm.pi * bm.random.rand(self.N, self.dim) * self.gbest * p)) + 
+                                    (self.x + (bm.cos(2 * bm.random.rand(self.N, self.dim) * bm.pi) - 
+                                               bm.sin(2 * bm.pi * bm.random.rand(self.N, self.dim))) * 
+                                               bm.exp(bm.array(-1 / P[:, None])) * self.gbest * p) + 
                                     (P[:, None] <= 2) * 
                                     ((self.x - self.gbest) * p + p * bm.random.rand(self.N, self.dim) * self.x)))
 
@@ -103,8 +104,8 @@ class CrayfishOptAlg(Optimizer):
 
             # Update global best if a better solution is found
             if fit_new[newbest_id] < global_fitness:
-                global_position = x_new[newbest_id]
-                global_fitness = fit_new[newbest_id]
+                global_position = bm.copy(x_new[newbest_id])
+                global_fitness = bm.copy(fit_new[newbest_id])
 
             # Track the global best solution
             self.update_gbest(self.x, fit)
@@ -163,6 +164,12 @@ class ModifiedCrayfishOptAlg(Optimizer):
         discretize_v_roulette(f_vals, violation=None, minimize=True, alpha=6.0):
             Discretizes the water quality factor V ∈ {0,...,5} using a roulette-wheel 
             selection scheme based on softmax probabilities derived from fitness and violation.
+    
+    Reference:
+    Jia, H., Zhou, X., Zhang, J. et al. 
+    Modified crayfish optimization algorithm for solving multiple engineering application problems. 
+    Artif Intell Rev 57, 127 (2024). https://doi.org/10.1007/s10462-024-10738-x
+    
     """
     def __init__(self, options):
         super().__init__(options)
@@ -194,8 +201,8 @@ class ModifiedCrayfishOptAlg(Optimizer):
 
         theta = 2 * bm.pi * r2
 
-        x_new = x2 + (x1 - self.x) * bm.cos(theta) * B * v * r3 \
-                    + x1 * bm.sin(theta) * B * r3
+        x_new = (x2 + (x1 - self.x) * bm.cos(theta) * B * v * r3 
+                    + x1 * bm.sin(theta) * B * r3)
 
         return x_new
     
@@ -273,16 +280,15 @@ class ModifiedCrayfishOptAlg(Optimizer):
                                                     (rand > 0.5) * 
                                                     (self.x - self.x[bm.random.randint(0, self.N, (self.N,))] + xf)) + 
                                     (temp <= 30) * ((P[:, None] > 2) * 
-                                                    (self.x + bm.cos(2 * bm.random.rand(self.N, self.dim) * bm.pi) * self.gbest * 
-                                                    p - bm.sin(2 * bm.pi * bm.random.rand(self.N, self.dim) * self.gbest * p)) + 
+                                                    (self.x + (bm.cos(2 * bm.random.rand(self.N, self.dim) * bm.pi) - 
+                                                    bm.sin(2 * bm.pi * bm.random.rand(self.N, self.dim))) * 
+                                                    bm.exp(bm.array(-1 / P[:, None])) * self.gbest * p) + 
                                                     (P[:, None] <= 2) * 
                                                     ((self.x - self.gbest) * p + p * bm.random.rand(self.N, self.dim) * self.x)))
             )
             x_new = bm.clip(x_new, self.lb, self.ub)
             fit_new = self.fun(x_new)
             self.Fes += self.N
-            # Evaluate fitness for the new population
-            fit_new = self.fun(x_new)
             mask = fit_new < fit
 
             # Update the population with better solutions
@@ -293,16 +299,14 @@ class ModifiedCrayfishOptAlg(Optimizer):
 
             # Update global best if a better solution is found
             if fit_new[newbest_id] < global_fitness:
-                global_position = x_new[newbest_id]
-                global_fitness = fit_new[newbest_id]
+                global_position = bm.copy(x_new[newbest_id])
+                global_fitness = bm.copy(fit_new[newbest_id])
 
             # Track the global best solution
             self.update_gbest(self.x, fit)
 
             x_new = self.ghost_opposition_point(self.x)
             x_new = bm.clip(x_new, self.lb, self.ub)
-            fit_new = self.fun(x_new)
-            self.Fes += self.N
             # Evaluate fitness for the new population
             fit_new = self.fun(x_new)
             mask = fit_new < fit
@@ -315,56 +319,13 @@ class ModifiedCrayfishOptAlg(Optimizer):
 
             # Update global best if a better solution is found
             if fit_new[newbest_id] < global_fitness:
-                global_position = x_new[newbest_id]
-                global_fitness = fit_new[newbest_id]
+                global_position = bm.copy(x_new[newbest_id])
+                global_fitness = bm.copy(fit_new[newbest_id])
 
             # Track the global best solution
-            self.update_gbest(self.x, fit)
-            pass
-    
-    def compute_s_from_fitness(self, f_vals, minimize=True, eps=1e-12):
-        """
-        Computes normalized fitness scores (s) in [0,1].
+            self.update_gbest(self.x, fit) 
 
-        Parameters:
-            f_vals(array-like): Raw fitness values.
-            minimize(bool, optional): Whether the problem is minimization. Defaults to True.
-            eps(float, optional): Numerical safeguard against division by zero.
-
-        Returns:
-            Tensor: Normalized scores, higher values indicate worse solutions.
-        """
-        f = bm.array(f_vals, dtype=bm.float64)
-        if not minimize:
-            f = -f  # 最大化问题变为最小化处理
-        worst = f.max()
-        best = f.min()
-        if worst - best < eps:
-            return bm.zeros_like(f)  # 全部相同：没有劣度
-        s = (f - best) / (worst - best)  # 归一化到 [0,1]
-        return s
-
-    def combine_with_violation(self, s_fitness, violation=None):
-        """
-        Combines normalized fitness scores with constraint violation degrees.
-
-        Parameters:
-            s_fitness(Tensor): Normalized fitness scores in [0,1].
-            violation(array-like | None, optional): Constraint violation measures.
-
-        Returns:
-            Tensor: Combined normalized scores, prioritizing feasibility.
-        """
-        if violation is None:
-            return s_fitness
-        v = bm.array(violation, dtype=bm.float64)
-        if v.max() - v.min() < 1e-12:
-            s_v = bm.zeros_like(v)
-        else:
-            s_v = (v - v.min()) / (v.max() - v.min())
-        return bm.maximum(s_fitness, s_v)  # 若违背大，则以违背为主
-
-    def discretize_v_roulette(self, f_vals, violation=None, minimize=True, alpha=6.0):
+    def discretize_v_roulette(self, f_vals):
         """
         Discretizes the water quality factor V using roulette-wheel selection.
 
@@ -373,32 +334,19 @@ class ModifiedCrayfishOptAlg(Optimizer):
 
         Parameters:
             f_vals(array-like): Fitness values of the population.
-            violation(array-like | None, optional): Constraint violation measures.
-            minimize(bool, optional): Whether the problem is minimization. Defaults to True.
-            alpha(float, optional): Scaling factor controlling selection pressure. Defaults to 6.0.
 
         Returns:
             Tensor: Discretized water quality factors V for all individuals (N,).
         """
-        n = len(f_vals)
-        s = self.compute_s_from_fitness(f_vals, minimize=minimize)  # in [0,1]
-        s = self.combine_with_violation(s, violation)               # 合并违背度
-        # 防止数值问题
-        s = bm.clip(s, 0.0, 1.0)
-
-        # 构造每个个体的 6 个档位 logits: logit_k = alpha * k * s_i
-        ks = bm.arange(6)  # [0,1,2,3,4,5]
-        # logits shape: (n,6)
-        logits = (s * alpha)[:, None] * ks[None, :]   # 每行 i: alpha * s_i * [0..5]
-
-        # softmax -> 概率分布 (n,6)
-        # 为数值稳定性，减去每行最大值
-        logits_max = logits.max(axis=1, keepdims=True)
-        exps = bm.exp(logits - logits_max)
-        probs = exps / (exps.sum(axis=1, keepdims=True) + 1e-16)
-
-        # 对每行做一次按 probs 的抽样（轮盘赌）
-        cumprobs = bm.cumsum(probs, axis=1)  # (n,6)
-        us = bm.random.rand(n, 1)
-        Vs = (us <= cumprobs).argmax(axis=1)  # 每行第一个满足的位置索引就是抽到的档位
+        gap = abs((f_vals - f_vals.min()) / (f_vals.max() - f_vals.min() + 1e-10))
+        mark1 = gap < 0.2
+        r = bm.random.rand(self.N,)
+        mark2 = r < 0.5
+        a = mark1 & mark2
+        b = ~mark1 & mark2
+        c = ~mark1 & ~mark2
+        Vs = bm.zeros((self.N,))
+        Vs[a] = bm.random.randint(0, 4, (bm.sum(a),))
+        Vs[b] = bm.random.randint(4, 6, (bm.sum(b),))
+        Vs[c] = bm.random.randint(2, 5, (bm.sum(c),))
         return Vs
