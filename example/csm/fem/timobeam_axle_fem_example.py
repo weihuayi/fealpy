@@ -39,7 +39,6 @@ parser.add_argument('--axle_nu',
                     default=-0.5, type=float,
                     help='Type of mesh, default is the axle Poisson ratio')
 
-
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True')
@@ -53,9 +52,27 @@ options = vars(parser.parse_args())
 from fealpy.backend import backend_manager as bm
 bm.set_backend(options['backend'])
 
-from fealpy.csm.fem import TimoshenkoBeamModel
-model = TimoshenkoBeamModel(options)
+from fealpy.csm.fem import TimobeamAxleModel
+model = TimobeamAxleModel(options)
 model.__str__()
-# model.timo_beam_system()
-model.solve()
-# print("u", model.solve())
+model.timo_axle_system()
+# K, F = model.apply_bc_penalty(K, F)
+# K_dense = K.toarray()
+# print('K', K_dense.shape)
+# u_data = model.solve()
+# print("u", u_data.reshape(-1, 6))
+
+
+import pandas as pd
+import numpy as np
+file_path = r"C:\Users\Administrator\Desktop\K.xlsx"
+df = pd.read_excel(file_path, header=None)
+k_data = df.to_numpy()
+# print("数组形状:", k_data.shape)
+# print(np.array_equal(K_dense, k_data))   # 判断是否完全一样
+# print(np.allclose(K_dense, k_data, rtol=1e-8, atol=1e-12))  # 判断数值上是否近似相等
+
+# mask = ~np.isclose(K_dense, k_data, rtol=1e-8, atol=1e-12)
+# rows, cols = np.where(mask)
+# for r, c in zip(rows, cols):
+#     print(f"不同元素在[{r}, {c}]: K_dense={K_dense[r,c]} k_data={k_data[r,c]}")
