@@ -99,3 +99,39 @@ class DLDMicrofluidicChipMesh2d(CNodeType):
 
         return (mesher.mesh, mesher.radius, mesher.centers, mesher.inlet_boundary, 
                 mesher.outlet_boundary, mesher.wall_boundary)
+
+
+class CreateMesh(CNodeType):
+    r"""Create a mesh object.This node generates a mesh of the specified type 
+    using given node and cell data.
+
+    Inputs:
+        mesh_type (str): Type of mesh to granerate.
+        Supported values: "triangle", "quadrangle", "tetrahedron", "hexahedron".Default is "edgemesh".
+        
+        domain (tuple[float, float], optional): Domain.
+        node(tensor):Coordinates of mesh nodes.
+        cell(tensor):Connectivity of mesh cells.
+
+    Outputs:
+        mesh (MeshType): The mesh object created.
+    """
+    TITLE: str = "CreateMesh"
+    PATH: str = "mesh.creation"
+    INPUT_SLOTS = [
+        PortConf("mesh_type", DataType.MENU, 0, default="edgemesh", 
+                 items=["triangle", "quadrangle", "tetrahedron", "hexahedron"]),
+        PortConf("domain", DataType.NONE),
+        PortConf("node", DataType.TENSOR),
+        PortConf("cell", DataType.TENSOR)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH)
+    ]
+
+    @staticmethod
+    def run(mesh_type, node, cell):
+        MeshClass = get_mesh_class(mesh_type)
+        kwds = {"node": node, "cell": cell}
+        return MeshClass(**kwds)
+    
