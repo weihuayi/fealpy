@@ -108,17 +108,25 @@ class DLDMicrofluidicChipModeler:
         n_cols: int = options['n_cols']
         radius: float = options['radius']
         tan: float = options['tan_angle']
+        n: int = options['n_stages']
 
-        pitch_y: float = chip_height / (n_rows + 1)
-        pitch_x: float = pitch_y / (n_cols * tan)
-        cx0: float = pitch_x / 3
-        cy0: float = chip_height / (n_rows + 1)
-        stage_gap: float = 0.5 * (pitch_x - cx0 - radius)
-
+        if tan > 0:
+            pitch_y: float = chip_height / n_rows
+            pitch_x: float = pitch_y / (n_cols * tan)
+            cx0: float = pitch_x / 3
+            cy0: float = chip_height / (2 * n_rows)
+            stage_length: float = n_cols * pitch_x - 0.2 * (pitch_x - cx0 - radius)
+        else:
+            cx0: float = 1 / (2 * n_cols)
+            cy0: float = chip_height / (2 * n_rows)
+            pitch_x: float = 1 / n_cols
+            pitch_y: float = chip_height / n_rows
+            stage_length: float = 1
+            
         self.options['start_center'] = (cx0, cy0)
         self.options['pitch_x'] = pitch_x
         self.options['pitch_y'] = pitch_y
-        self.options['stage_gap'] = stage_gap
+        self.options['stage_length'] = stage_length
 
     @variantmethod('circle')
     def build(self, gmsh: Any):
@@ -145,22 +153,35 @@ class DLDMicrofluidicChipModeler:
         
         # stage assembly parameters
         N: int = options['n_stages']
-        gap: float = options['stage_gap']
+        L: float = options['stage_length']
 
         # Create transformation vectors
-        l1 = tan * n * l2
+        if tan > 0:
+            l1 = tan * n * l2
         v_trans = bm.array([[n * l2, 0]], dtype=bm.float64)
         h_trans = bm.array([[0, h]], dtype=bm.float64)
 
         # Define boundary points
         p0 = bm.array([[x0, y0]], dtype=bm.float64)
-        v0 = bm.array([[x0 + h1, y0], [x0 + h1 + n * l2 - gap, y0 + tan * (n * l2 - gap)]], dtype=bm.float64)
-
+        v0 = bm.array([[x0 + h1, y0], [x0 + h1 + L, y0 + tan * L]], dtype=bm.float64)
         all_v = v0[None, ...] + bm.arange(N)[:, None, None] * v_trans
         all_v = all_v.reshape(-1, 2)
         p_last = all_v[-1] + bm.array([[h2, 0]], dtype=bm.float64)
-        self.boundary = bm.concat([p0, all_v, p_last, p_last + h_trans, all_v[::-1] + h_trans, p0 + h_trans], axis=0)
-        
+
+        if (h1 ==0) and (h2 ==0):
+            self.boundary = bm.concat([all_v, all_v[::-1] + h_trans], axis=0)
+            self.inlet_boundary = self.boundary[[0, 3], :]
+            self.outlet_boundary = self.boundary[[1, 2], :]
+            self.wall_boundary = self.boundary[[0, 1, 2, 3], :]
+        else:
+            right = bm.concat([p_last, p_last + h_trans], axis=0)
+            self.boundary = bm.concat([p0, all_v, right, all_v[::-1] + h_trans, p0 + h_trans], axis=0)
+            self.inlet_boundary = self.boundary[[0, -1], :]
+            self.outlet_boundary = bm.concat([p_last, p_last + h_trans], axis=0)
+            bottom = bm.concat([p0, bm.repeat(all_v, 2, axis=0)], axis=0)
+            top = bm.concat([bm.repeat(all_v[::-1] + h_trans, 2, axis=0), p0 + h_trans], axis=0)
+            self.wall_boundary = bm.concat([bottom, right, top], axis=0)
+
         # Generate pillar centers
         v_shift = bm.array([[l2, l2 * tan]], dtype=bm.float64)
         c0 = bm.array([[x0 + h1 + cx0, y0 + cy0]], dtype=bm.float64)
@@ -214,8 +235,8 @@ class DLDMicrofluidicChipModeler:
     @build.register('triangle')
     def build(self, gmsh: Any):
         """Build chip model with triangular pillars (not implemented)."""
-        raise NotImplementedError
-
+        raise NotImplementedError  
+        
     def add_plot(self, ax= None, **kwargs):
         """
         Plot the DLD geometry (boundary polygon and pillar circles) using Matplotlib.

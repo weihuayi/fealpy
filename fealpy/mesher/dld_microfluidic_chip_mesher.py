@@ -135,7 +135,12 @@ class DLDMicrofluidicChipMesher:
         return_project_edges: bool = option.get('return_project_edges', True)
 
         centers: TensorLike = modeler.circles[:, :2]  # Extract (x, y) coordinates
+        self.radius = radius
         self.centers = centers
+        self.boundary = modeler.boundary
+        self.inlet_boundary = modeler.inlet_boundary
+        self.outlet_boundary = modeler.outlet_boundary
+        self.wall_boundary = modeler.wall_boundary
         try:
             if local_refine:
                 self.local_refine(gmsh, centers, radius, lc)
@@ -182,7 +187,7 @@ class DLDMicrofluidicChipMesher:
         gmsh.model.mesh.field.setNumber(f_th, "DistMax", radius * 1.5)
         gmsh.model.mesh.field.setAsBackgroundMesh(f_th)
 
-    def get_project_edges(self, gmsh: Any, centers: TensorLike, radius: float, lc: float) -> List[TensorLike]:
+    def get_project_edges(self, gmsh: Any, centers: TensorLike, radius: float, lc: float) -> TensorLike:
         """Extract boundary edges for all pillars."""
 
         project_edges = []
@@ -207,7 +212,7 @@ class DLDMicrofluidicChipMesher:
             edges = bm.array([nodetags_map[j] for j in ntags[0]]).reshape(-1, 2)
             project_edges.append(edges)
         
-        return project_edges
+        return bm.stack(project_edges, axis=0)
 
     def build_mesh(self, gmsh: Any) -> TriangleMesh:
         """Create TriangleMesh from Gmsh mesh data."""

@@ -41,3 +41,61 @@ class Box2d(CNodeType):
         if domain is not None:
             kwds["box"] = domain
         return MeshClass.from_box(**kwds)
+    
+
+class DLDMicrofluidicChipMesh2d(CNodeType):
+    
+    TITLE: str = "DLD Microfluidic Chip Mesh 2D"
+    PATH: str = "mesh.creation"
+    INPUT_SLOTS = [
+        PortConf("init_point", DataType.FLOAT, 0, default=(0.0,0.0)),
+        PortConf("chip_height", DataType.FLOAT, 0, default=1.0),
+        PortConf("inlet_length", DataType.FLOAT, 0, default=0.1),
+        PortConf("outlet_length", DataType.FLOAT, 0, default=0.1),
+        PortConf("radius", DataType.FLOAT, 0, default=1 / (3 * 4 * 3)),
+        PortConf("n_rows", DataType.INT, 0, default=8),
+        PortConf("n_cols", DataType.INT, 0, default=4),
+        PortConf("tan_angle", DataType.FLOAT, 0, default=1/7),
+        PortConf("n_stages", DataType.INT, 0, default=3),
+        PortConf("stage_length", DataType.FLOAT, 0, default=1.4),
+        PortConf("lc", DataType.FLOAT, 0, default=0.02)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH),
+        PortConf("radius", DataType.FLOAT),
+        PortConf("centers", DataType.FLOAT),
+        PortConf("inlet_boundary", DataType.TENSOR),
+        PortConf("outlet_boundary", DataType.TENSOR),
+        PortConf("wall_boundary", DataType.TENSOR)
+    ]
+
+    @staticmethod
+    def run(**options):
+        from fealpy.geometry import DLDMicrofluidicChipModeler
+        from fealpy.mesher import DLDMicrofluidicChipMesher
+        import gmsh
+
+        options = {
+            "init_point" : options.get("init_point"),
+            "chip_height" : options.get("chip_height"),
+            "inlet_length" : options.get("inlet_length"),
+            "outlet_length" : options.get("outlet_length"),
+            "radius" : options.get("radius"),
+            "n_rows" : options.get("n_rows"),
+            "n_cols" : options.get("n_cols"),
+            "tan_angle" : options.get("tan_angle"),
+            "n_stages" : options.get("n_stages"),
+            "stage_length" : options.get("stage_length"),
+            "lc" : options.get("lc")
+        }
+
+        gmsh.initialize()
+        modeler = DLDMicrofluidicChipModeler(options)
+        modeler.build(gmsh)
+        mesher = DLDMicrofluidicChipMesher(options)
+        mesher.generate(modeler, gmsh)
+        # gmsh.fltk.run()
+        gmsh.finalize()
+
+        return (mesher.mesh, mesher.radius, mesher.centers, mesher.inlet_boundary, 
+                mesher.outlet_boundary, mesher.wall_boundary)
