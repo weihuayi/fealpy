@@ -110,7 +110,10 @@ class SnowAblationOpt(Optimizer):
 
             # Randomly assign solutions to two groups (Na and Nb)
             # index1 = np.random.choice(self.N, Na, replace=False)
-            index1 = bm.unique(bm.random.randint(0, self.N, (Na,)))
+            if bm.backend_name == 'numpy':
+                index1 = bm.random.permutation(self.N)[:Na]
+            elif bm.backend_name == 'pytorch':
+                index1 = bm.random.randperm(self.N)[:Na]
             index2 = bm.array(list(set(index.tolist()).difference(index1.tolist())))
 
             # Update the positions of solutions in group Na
