@@ -3,140 +3,155 @@ from ..backend import backend_manager as bm
 from ..mesh import TriangleMesh
 from fealpy.decorator import cartesian
 
-class LaplacePDE():
-    """
-    -\Delta u = f
-    """
-    def __init__(self, u):
-        x = sp.symbols("x")
-        y = sp.symbols("y")
-        self.su = u
-
-        ux = sp.diff(u, x)
-        print('ux',ux)
-        uy = sp.diff(u, y)
-        print('uy',uy)
-        uxx = sp.diff(ux, x)
-        uyy = sp.diff(uy, y)
-
-        Lu = uxx+uyy
-        print("Lu:", Lu)
-        self.u = sp.lambdify(('x', 'y'), u, 'numpy') 
-
-        self.ux = sp.lambdify(('x', 'y'), ux, 'numpy') 
-
-        self.uy = sp.lambdify(('x', 'y'), uy, 'numpy') 
-        self.Lu = sp.lambdify(('x', 'y'), Lu, 'numpy')
-
-    def init_mesh(self, n=1, meshtype='poly'):
-        mesh = TriangleMesh.from_box([0, 1, 0, 1], 4, 4)
-        return mesh
-
-    @cartesian
-    def source(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        sin = bm.sin
-        pi = bm.pi
-        cos = bm.cos
-        return -self.Lu(x, y)
-
-    def solution(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        return self.u(x, y) 
-
-    def gradient(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        sin = bm.sin
-        pi = bm.pi
-        cos = bm.cos
-        val = bm.zeros(p.shape, dtype=bm.float64)
-        val[..., 0] = self.ux(x, y)
-        val[..., 1] = self.uy(x, y) 
-        return val
-
-    def dirichlet(self, p):
-        return self.solution(p)
-
-class DoubleLaplacePDE():
+class StokesStreamPDE():
     """
     \Delta^2 u = f
     """
-    def __init__(self, u, device=None):
+    def __init__(self, phi, p, viscosity, device=None):
         self.device = device
         x = sp.symbols("x")
         y = sp.symbols("y")
-        self.su = u
-        print("u:", u)
+        self.viscosity = viscosity
+        print("viscosity:", viscosity)
+        self.sphi = phi
+        self.p = p
+        print('p',p)
+        px = sp.diff(p, x)
+        py = sp.diff(p, y)
+        self.px = sp.lambdify(('x', 'y'), px, 'numpy')
+        self.py = sp.lambdify(('x', 'y'), py, 'numpy')
 
-        ux = sp.diff(u, x)
-        print('ux',ux)
-        print(sp.simplify(ux))
-        print(sp.trigsimp(ux))
-        uy = sp.diff(u, y)
-        print('uy',uy)
-        print(sp.simplify(uy))
-        print(sp.trigsimp(uy))
-        uxx = sp.diff(ux, x)
-        print('uxx',uxx)
-        print(sp.simplify(uxx))
-        print(sp.trigsimp(uxx))
-        uyy = sp.diff(uy, y)
-        print('uyy',uyy)
-        print(sp.simplify(uyy))
-        print(sp.trigsimp(uyy))
-        uxy = sp.diff(ux, y)
-        print('uxy',uxy)
-        print(sp.simplify(uxy))
-        print(sp.trigsimp(uxy))
+        phix = sp.diff(phi, x)
+        #print('phix',phix)
+        #print(sp.simplify(phix))
+        phiy = sp.diff(phi, y)
+        #print('phiy',phiy)
+        #print(sp.simplify(phiy))
+        #print(sp.trigsimp(phiy))
+        phixx = sp.diff(phix, x)
+        #print('phixx',phixx)
+        #print(sp.simplify(phixx))
+        #print(sp.trigsimp(phixx))
+        phiyy = sp.diff(phiy, y)
+        #print('phiyy',phiyy)
+        #print(sp.simplify(phiyy))
+        #print(sp.trigsimp(phiyy))
+        phixy = sp.diff(phix, y)
+        #print('phixy',phixy)
+        #print(sp.simplify(phixy))
+        #print(sp.trigsimp(phixy))
 
-        Lu = uxx+uyy
-        print("Lu:", Lu)
-        print(sp.simplify(Lu))
-        print(sp.trigsimp(Lu))
-        L2u = sp.diff(Lu, x, 2) + sp.diff(Lu, y, 2)
-        print("L2u:", L2u)
-        print(sp.simplify(L2u))
-        print(sp.trigsimp(L2u))
+        Lphi = phixx+phiyy
+        #print("Lphi:", Lphi)
+        #print(sp.simplify(Lphi))
+        #print(sp.trigsimp(Lphi))
+        L2phi = sp.diff(Lphi, x, 2) + sp.diff(Lphi, y, 2)
+        #print("L2phi:", L2phi)
+        #print(sp.simplify(L2phi))
+        #print(sp.trigsimp(L2phi))
 
-        self.u = sp.lambdify(('x', 'y'), u, 'numpy') 
+        u1 = phiy
+        u2 = -phix
+        print('u1:', u1)
+        print('u2:', u2)
+        print("phi:", phi)
 
-        self.ux = sp.lambdify(('x', 'y'), ux, 'numpy') 
-        self.uy = sp.lambdify(('x', 'y'), uy, 'numpy') 
+        u1x = phixy
+        u1y = phiyy
+        u2x = -phixx
+        u2y = -phixy
+        assert (u1x+u2y == 0)
 
-        self.uxx = sp.lambdify(('x', 'y'), uxx, 'numpy') 
-        self.uyy = sp.lambdify(('x', 'y'), uyy, 'numpy') 
-        self.uxy = sp.lambdify(('x', 'y'), uxy, 'numpy') 
+        Lu1 = sp.diff(u1x,x)+sp.diff(u1y,y)
+        Lu2 = sp.diff(u2x,x)+sp.diff(u2y,y)
 
-        self.L2u = sp.lambdify(('x', 'y'), L2u, 'numpy')
+        f1 = -viscosity*Lu1 + px 
+        f2 = -viscosity*Lu2 + py
+        f1x = sp.diff(f1, x)
+        f1y = sp.diff(f1, y)
+        f2x = sp.diff(f2, x)
+        f2y = sp.diff(f2, y)
+        fphi = sp.diff(f2, x) - sp.diff(f1, y)
+        fp = -f1x - f2y
+        
 
-    def init_mesh(self, n=1, meshtype='poly'):
-        mesh = TriangleMesh.from_box([0, 1, 0, 1], 4, 4)
-        return mesh
+        assert (sp.simplify(fphi) == sp.simplify(viscosity*L2phi))
+
+        self.phi = sp.lambdify(('x', 'y'), phi, 'numpy') 
+        self.p = sp.lambdify(('x', 'y'), p, 'numpy') 
+
+        self.phix = sp.lambdify(('x', 'y'), phix, 'numpy') 
+        self.phiy = sp.lambdify(('x', 'y'), phiy, 'numpy') 
+        self.u1 = sp.lambdify(('x', 'y'), u1, 'numpy')
+        self.u2 = sp.lambdify(('x', 'y'), u2, 'numpy')
+        self.u1x = sp.lambdify(('x', 'y'), u1x, 'numpy')
+        self.u1y = sp.lambdify(('x', 'y'), u1y, 'numpy')
+        self.u2x = sp.lambdify(('x', 'y'), u2x, 'numpy')
+        self.u2y = sp.lambdify(('x', 'y'), u2y, 'numpy')
+        self.Lu1 = sp.lambdify(('x', 'y'), Lu1, 'numpy')
+        self.Lu2 = sp.lambdify(('x', 'y'), Lu2, 'numpy')
+        self.f1 = sp.lambdify(('x', 'y'), f1, 'numpy')
+        self.f2 = sp.lambdify(('x', 'y'), f2, 'numpy')
+        self.fp = sp.lambdify(('x', 'y'), fp, 'numpy')
+        self.fphi = sp.lambdify(('x', 'y'), fphi, 'numpy')
+
+        self.phixx = sp.lambdify(('x', 'y'), phixx, 'numpy') 
+        self.phiyy = sp.lambdify(('x', 'y'), phiyy, 'numpy') 
+        self.phixy = sp.lambdify(('x', 'y'), phixy, 'numpy') 
+
+        self.L2phi = sp.lambdify(('x', 'y'), L2phi, 'numpy')
 
     @cartesian
-    def source(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
+    def velocity(self, p):
+        x, y = p[..., 0], p[..., 1]
         x_cpu = bm.to_numpy(x)
         y_cpu = bm.to_numpy(y)
-        #sin = bm.sin
-        #pi = bm.pi
-        #cos = bm.cos
-        return bm.array(self.L2u(x_cpu, y_cpu),device=self.device)
+        return bm.stack((self.u1(x_cpu, y_cpu), self.u2(x_cpu, y_cpu)), axis=-1) 
 
     @cartesian
-    def solution(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        x = bm.to_numpy(x)
-        y = bm.to_numpy(y)
-        return bm.array(self.u(x, y), device=self.device)
+    def pressure(self, p):
+        x, y = p[..., 0], p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        return bm.array(self.p(x_cpu, y_cpu), device=self.device)
 
     @cartesian
-    def gradient(self, p):
+    def grad_pressure(self, p):
+        x, y = p[..., 0], p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        val = bm.zeros(p.shape, dtype=bm.float64, device=self.device)
+        val[..., 0] = bm.array(self.px(x_cpu, y_cpu), device=self.device)
+        val[..., 1] = bm.array(self.py(x_cpu, y_cpu), device=self.device) 
+        return val
+
+    @cartesian
+    def grad_velocity(self, p):
+        x, y = p[..., 0], p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        return bm.stack([
+            bm.stack((self.u1x(x_cpu, y_cpu), self.u1y(x_cpu, y_cpu)), axis=-1),
+            bm.stack((self.u2x(x_cpu, y_cpu), self.u2y(x_cpu, y_cpu)), axis=-1)
+        ], axis=-2)  # shape (..., 2, 2)
+
+    @cartesian
+    def laplace_velocity(self, p):
+        x, y = p[..., 0], p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        return bm.stack((self.Lu1(x_cpu, y_cpu), self.Lu2(x_cpu, y_cpu)), axis=-1)
+
+
+    @cartesian
+    def stream_function(self, p):
+        x, y = p[..., 0], p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        return bm.array(self.phi(x, y), device=self.device)
+
+    @cartesian
+    def grad_stream_function(self, p):
         x = p[..., 0]
         y = p[..., 1]
         #sin = bm.sin
@@ -145,12 +160,12 @@ class DoubleLaplacePDE():
         x = bm.to_numpy(x)
         y = bm.to_numpy(y)
         val = bm.zeros(p.shape, dtype=bm.float64, device=self.device)
-        val[..., 0] = bm.array(self.ux(x, y), device=self.device)
-        val[..., 1] = bm.array(self.uy(x, y), device=self.device) 
+        val[..., 0] = bm.array(self.phix(x, y), device=self.device)
+        val[..., 1] = bm.array(self.phiy(x, y), device=self.device) 
         return val
 
     @cartesian
-    def hessian(self, p):
+    def hessian_stream_function(self, p):
         x = p[..., 0]
         y = p[..., 1]
         #sin = bm.sin
@@ -159,13 +174,56 @@ class DoubleLaplacePDE():
         x = bm.to_numpy(x)
         y = bm.to_numpy(y)
         val = bm.zeros(p.shape[:-1]+(3, ), dtype=bm.float64, device=self.device)
-        val[..., 0] = bm.array(self.uxx(x, y), device=self.device)
-        val[..., 1] = bm.array(self.uxy(x, y), device=self.device)
-        val[..., 2] = bm.array(self.uyy(x, y), device=self.device)
+        val[..., 0] = bm.array(self.phixx(x, y), device=self.device)
+        val[..., 1] = bm.array(self.phixy(x, y), device=self.device)
+        val[..., 2] = bm.array(self.phiyy(x, y), device=self.device)
         return val
 
-    def dirichlet(self, p):
-        return self.solution(p)
+
+
+    @cartesian
+    def stream_function_source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        #sin = bm.sin
+        #pi = bm.pi
+        #cos = bm.cos
+        return bm.array(self.fphi(x_cpu, y_cpu),device=self.device)
+
+
+    @cartesian                                                                  
+    def source(self, p):                              
+        # f = -nu Δu + ∇p; here Δu = 0 since u is harmonic sin(x+y)             
+        x, y = p[..., 0], p[..., 1]                                             
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        return bm.stack((self.f1(x_cpu, y_cpu), self.f2(x_cpu, y_cpu)), axis=-1)
+
+    @cartesian
+    def pressure_source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        x_cpu = bm.to_numpy(x)
+        y_cpu = bm.to_numpy(y)
+        return bm.array(self.fp(x_cpu, y_cpu), device=self.device)
+
+    @cartesian
+    def pressure_neumann_boundary(self, p, n):
+        #x = p[..., 0]
+        #y = p[..., 1]
+        #x_cpu = bm.to_numpy(x)
+        #y_cpu = bm.to_numpy(y)
+        #bp1  = float(self.viscosity)* bm.einsum('...d,...d->...',self.laplace_velocity(p), n)
+        #bp2 = bm.einsum('...d,...d->...', self.source(p), n)
+        lap_u = self.laplace_velocity(p)  # (..., d)
+        f = self.source(p)                # (..., d)
+        return float(self.viscosity) * bm.sum(lap_u * n[:, None, :], axis=-1) + bm.sum(f * n[:, None, :], axis=-1)
+        #return bp1+bp2 
+
+
+
 
 class TripleLaplacePDE():
     """

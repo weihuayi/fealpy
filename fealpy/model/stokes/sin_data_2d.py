@@ -95,6 +95,7 @@ class SinData2D:
         fy = 2*y + 2*bm.sin(x + y)
         return bm.stack((fx, fy), axis=-1)
 
+
     @cartesian
     def dirichlet(self, p: TensorLike) -> TensorLike:
         # velocity Dirichlet boundary condition equals exact solution
