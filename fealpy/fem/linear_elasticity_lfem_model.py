@@ -1,6 +1,6 @@
 from typing import Union
 from ..backend import bm
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 from ..decorator import variantmethod
 
@@ -13,16 +13,16 @@ from ..material import LinearElasticMaterial
 class LinearElasticityLFEMModel(ComputationalModel):
     def __init__(self):
         super().__init__(pbar_log=True, log_level="INFO")
-        self.pdm = PDEDataManager("linear_elasticity")
+        self.pdm = PDEModelManager("linear_elasticity")
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxpoly"):
-        if isinstance(pde, str):
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, int]=1):
+        if isinstance(pde, int):
             self.pde = self.pdm.get_example(pde)
         else:
             self.pde = pde
 
-    def set_init_mesh(self, meshtype: str = "hex", **kwargs):
-        self.mesh = self.pde.init_mesh[meshtype](**kwargs)
+    def set_init_mesh(self, meshtype: str, **kwargs):
+        self.mesh = self.pde.init_mesh(**kwargs)
 
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -37,7 +37,7 @@ class LinearElasticityLFEMModel(ComputationalModel):
         self.space= LagrangeFESpace(mesh, p=p)
         gd = self.pde.geo_dimension()
         if gd == 2:
-            self.tspace = TensorFunctionSpace(self.space, shape=(-1, 2))
+            self.tspace = TensorFunctionSpace(self.space, shape=(2, -1))
         elif gd == 3:
             self.tspace = TensorFunctionSpace(self.space, shape=(-1, 3))
 
@@ -48,7 +48,7 @@ class LinearElasticityLFEMModel(ComputationalModel):
 
         LEM = LinearElasticMaterial(
                                 name='E1nu025',
-                                lame_lambda=self.pde.lam(), shear_modulus=self.pde.mu(), 
+                                lame_lambda=self.pde.lam, shear_modulus=self.pde.mu,
                                 hypo=self.pde.hypo, device=bm.get_device(self.uh[:])
                             )
         

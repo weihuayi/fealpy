@@ -44,7 +44,7 @@ StokesPDEDataT = TypeVar('StokesPDEDataT', bound=StokesPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "sin": ("sin_data_2d", "SinData2D"),
-    "lshape": ("lshape_data_2d", "LshapeData2D"),
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
 }
 

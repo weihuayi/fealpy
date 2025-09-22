@@ -439,7 +439,8 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
         """
         old_M = None
         for i in range(maxit):
-            self.mot()
+            self.monitor()
+            self.mol_method()
             self.monitor_time_smooth(old_M)
 
             node = self.func_solver()
@@ -448,14 +449,11 @@ class GFMMPDE(MM_monitor,MM_Interpolater):
             
             error = bm.max(bm.linalg.norm(node - self.node,axis=1))
             print(f"iteration {i} , error: {error}")
-            self.linear_interpolate(node)
+            self.uh = self.interpolate(node)
             old_M = self.M.copy()
             self.construct(node)
-            
             if error < self.tol:
-                break
-
-            
+                break       
             
     def preprocessor(self,fun_solver =None):
         """

@@ -1,89 +1,137 @@
+
+from typing import Tuple
+
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.backend import TensorLike
 
-import numpy as np
-from fealpy.decorator import cartesian
-from fealpy.backend import backend_manager as bm
-from typing import Tuple
+from fealpy.mesh import TriangleMesh
 
 class ElastoplasticityData2D:
     """
-    2D Elasto-Plastic Cantilever Beam with von Mises Yield and Ziegler Hardening
+    2D Elasto-Plastic Beam with von Mises Yield and Ziegler Hardening
 
-    Domain: (0, 1) x (0, 0.25) dm
-    Boundary: Clamped at x=0 (Dirichlet), Neumann traction on top surface (y=0.25)
+    Attributes:
+        E : float
+            Young's modulus (MPa).
+            Hardening modulus (MPa).
+            Initial yield stress (MPa).
+        H : float
+            Ziegler hardening parameter.
+        dim : int
+            Spatial dimension (2 for 2D).
+        Ft_max : float
+            Maximum traction force (N).
+        n : int
+            Mesh refinement level.
+
+    Domain: (0, 1) x (0, 0.25) dm.
+    The left and bottom boundaries are clamped (zero displacement).
+    A time-dependent Neumann traction is applied on the top boundary (y=0.25).
     """
 
     def __init__(self):
-        self.E = 1e5                # Young's modulus in MPa
-        self.Ep = 1e5               # Hardening modulus
-        self.nu = 0.3               # Poisson's ratio
-        self.sigma_y0 = 50.0        # Initial yield stress in MPa
-        self.p = 1.7                # Distributed load in N/dm
-        self.H = self.Ep           # Effective hardening modulus
+        self.E = 206900             # Young's modulus in MPa
+        self.nu = 0.29              # Poisson's ratio
+        self.hardening_modulus = 10000              # Hardening modulus a in MPa
+        self.yield_stress = 450 * (2/3)**0.5  # Initial yield stress in MPa
 
-        self.dim = 2                # 2D problem
+        self.dim = 2
+        self.Ft_max = 200         # N: max traction force
+        self.n = 2                  # Mesh refine level
+
         self.lam = self.compute_lambda()
         self.mu = self.compute_mu()
+        
+    def __str__(self) -> str:
+        """Return a multi-line summary including PDE type and key params."""
+        return (
+            f"\n  elastoplasticity (2D Elasto-Plastic)\n"
+            f"  Box dimensions: L = 5.0, W = 5.0 dm\n"
+            f"  Young's modulus: E = {self.E} MPa\n"
+            f"  Poisson's ratio: nu = {self.nu}\n"
+            f"  Hardening modulus: a = {self.a} MPa\n"
+            f"  Initial yield stress: sigma_y0 = {self.sigma_y0} MPa\n"
+            f"  Ziegler hardening parameter: H = {self.H}\n"
+        )
 
     def geo_dimension(self):
         return self.dim
 
-    def domain(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
-        return (0.0, 1.0), (0.0, 0.25)  # [0, 1] x [0, 0.25] dm
-
     def compute_lambda(self):
-        E, nu = self.E, self.nu
-        return E * nu / ((1 + nu) * (1 - 2 * nu))
+        return self.E * self.nu / ((1 + self.nu) * (1 - 2 * self.nu))
 
     def compute_mu(self):
         return self.E / (2 * (1 + self.nu))
 
-    def stress_strain_tensor(self):
-        """Return 4th-order elasticity tensor C_{ijkl} for isotropic elasticity."""
-        lam, mu = self.lam, self.mu
-        def C(eps):
-            return lam * bm.trace(eps, axis1=-2, axis2=-1)[..., None, None] * bm.eye(2) + 2 * mu * eps
-        return C
+    def domain(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        return (0.0, 1.0), (0.0, 0.25)  # [0,1] x [0,0.25] dm
+
+    def init_mesh(self):
+        node = bm.array([
+            [-5, -5], [0, -5], [-5, 0],
+            [0, 0], [5, 0], [-5, 5],
+            [0, 5], [5, 5]
+        ], dtype=bm.float64)
+
+        cell = bm.array([
+            [1, 3, 0], [2, 0, 3],
+            [3, 6, 2], [5, 2, 6],
+            [4, 7, 3], [6, 3, 7]
+        ], dtype=bm.int32)
+
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(self.n)
+        return mesh
 
     @cartesian
     def body_force(self, x):
-        """Return the body force vector f(x)."""
-        return bm.zeros((x.shape[0], self.dim))
+        return bm.zeros((x.shape[0], self.dim))  # No body force
+    
+    @cartesian
+    def source(self, p: TensorLike) -> TensorLike:
+        shape = p.shape[:-1]
+        f1 = bm.zeros(shape)       
+        f2 = self.Ft_max * bm.ones(shape) 
+        return bm.stack([f1, f2], axis=-1)
+        
+    @cartesian
+    def neumann_boundary(self, p):
+        y = p[:, 1]
+        return bm.abs(y - 5.0) < 1e-12
 
     @cartesian
-    def neumann(self, x):
+    def neumann(self, p):
         """
-        Neumann traction on boundary (e.g., top surface y=0.25)
-        Uniform vertical load: [0, -p]
+        Apply traction force on the top boundary y = 5, unit: MPa.
         """
-        value = bm.zeros((x.shape[0], self.dim))
-        value[:, 1] = -self.p  # Apply downward force
-        return value
+        shape = p.shape[:-1]
+        f1 = bm.zeros(shape)  # x 方向无牵引
+        f2 = self.Ft_max * bm.ones(shape)/10.0  # y 方向
+        return bm.stack([f1, f2], axis=-1)
 
-    def dirichlet_boundary(self, x):
-        """Clamped boundary at x = 0."""
-        return bm.isclose(x[:, 0], 0.0)
+    def dirichlet_boundary(self, p):
+        """
+        Check if points are on the Dirichlet boundary (left and bottom edges).
+        
+        Parameters:
+            p (TensorLike): Points in the domain.
+
+        Returns:
+            TensorLike: Boolean array indicating if points are on the Dirichlet boundary.
+        """
+        return (bm.abs(p[:, 0] - 5) < 1e-12) | (bm.abs(p[:, 1] + 5) < 1e-12)
 
     @cartesian
-    def dirichlet(self, x):
-        """Zero displacement on clamped edge."""
-        return bm.zeros((x.shape[0], self.dim))
-
-    def von_mises_yield(self, stress):
+    def dirichlet(self, p):
         """
-        Return von Mises equivalent stress.
-        stress: (NE, 2, 2)
+        Dirichlet boundary condition: fixed boundary condition (zero displacement).
+        This function returns zero displacement for all points on the Dirichlet boundary.
+        
+        Parameters:
+            p (TensorLike): Points in the domain.
+            
+        Returns:
+            TensorLike: Zero displacement for the Dirichlet boundary.
         """
-        s = stress - bm.trace(stress, axis1=-2, axis2=-1)[..., None, None] / 3 * bm.eye(2)
-        s_sq = (s * s).sum(axis=(-2, -1))
-        return bm.sqrt(1.5 * s_sq)
-
-    def yield_function(self, stress, alpha):
-        """
-        Return yield function Φ(σ, α)
-        alpha: hardening variable
-        """
-        return self.von_mises_yield(stress) - (self.sigma_y0 + self.H * alpha)
-
+        return bm.zeros_like(p)  # 固定边界条件为零位移

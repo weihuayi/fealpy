@@ -19,7 +19,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 from fealpy import logger
 from fealpy.solver import spsolve
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 logger.setLevel('INFO')
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -76,7 +76,7 @@ y = sp.symbols('y')
 #u = (sp.sin(6*y)*sp.sin(6*x))**4
 #u = (sp.sin(5*sp.pi*y)*sp.sin(5*sp.pi*x))**2
 #pde = DoubleLaplacePDE(u, device=device) 
-pde = PDEDataManager("polyharmonic").get_example('sinsinbi')
+pde = PDEModelManager("polyharmonic").get_example('sinsinbi')
 
 #ulist = get_flist(u, device=device)[:3]
 ulist = pde.get_flist()

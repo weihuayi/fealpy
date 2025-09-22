@@ -1,7 +1,7 @@
 from typing import Optional, Union
 from ..backend import bm
-from ..model import PDEDataManager, ComputationalModel
-from ..model.polyharmonic import PolyharmonicPDEDataT
+from ..model import PDEModelManager
+from ..model.elliptic import EllipticPDEDataT
 from ..decorator import variantmethod
 
 from ..mesh import Mesh
@@ -33,7 +33,19 @@ class PolyharmonicCrFEMModel(ComputationalModel):
         self.set_space_degree(options['space_degree'])
         self.set_smoothness(options['smoothness'])
 
+<<<<<<< HEAD
     def set_pde(self, pde: Union[PolyharmonicPDEDataT, str]="sinsinbi"):
+=======
+        self.logger = logger
+        self.logger.setLevel('WARNING')
+
+        if timer is None:
+            from ..utils import timer
+        self.timer = timer
+        self.pdm = PDEModelManager("elliptic")
+
+    def set_pde(self, pde: Union[EllipticPDEDataT, str]="biharm2d"):
+>>>>>>> upstream/develop
         """
         """
         if isinstance(pde, str):

@@ -1,6 +1,7 @@
 from typing import Sequence
-from ...backend import backend_manager as bm
-from ...backend import TensorLike
+
+from fealpy.backend import backend_manager as bm
+from fealpy.backend import TensorLike
 
 class SinData1D:
     """

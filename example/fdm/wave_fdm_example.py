@@ -19,8 +19,8 @@ parser.add_argument('--example',
         default='sinmix', type=str,
         help="求解的 wave 方程的算例, 默认是'sinmix',其他可选算例还有: 'sincos', " \
         "还可以用下面的代码可查看可用的算例： \
-        from fealpy.model import PDEDataManager \
-        PDEDataManager('wave').show_examples().")
+        from fealpy.model import PDEModelManager \
+        PDEModelManager('wave').show_examples().")
 
 parser.add_argument('--maxit',
         default=4, type=int,

@@ -188,7 +188,62 @@ class Optimizer():
             min_dis = bm.min(dis)
             total = total + min_dis
         return total / N
+    
+    def thinking_innovation_strategy(self, pop):
+        """
+        Applies the Thinking Innovation Strategy (TIS) to update a population in a metaheuristic algorithm
+        based on Depth of Knowledge (DOK) and Information Events (IE), improving exploration and exploitation.
 
+        Parameters:
+            pop (Tensor): The current individual's position vector in the search space.
+            pop_f (float or Tensor): The fitness value of the current individual.
+
+        Attributes used:
+            self.fes (int): Current number of function evaluations.
+            self.max_fes (int): Maximum allowed function evaluations.
+            self.person (Tensor): The stored successful individual used as the Information Event (IE).
+            self.person_f (float or Tensor): The fitness value of `self.person`.
+            self.fun (Callable): The objective function to evaluate fitness.
+
+        Process:
+            1. Recall out-of-bound solutions for `pop` to ensure all variables are within `[lu[0], lu[1]]`.
+            2. Compute the Depth of Knowledge (DOK) according to Eq. (1)–(3) from the TIS paper.
+            3. Retrieve the Information Event (IE) from `self.person`.
+            4. Compute imagination (IM) based on Eq. (4).
+            5. Generate a new candidate `pop_new` using Eq. (5).
+            6. Recall out-of-bound solutions for `pop_new`.
+            7. Evaluate the new candidate and update `pop` or `self.person` based on survival-of-the-fittest.
+
+        Returns:
+            Tuple[Tensor, float or Tensor]:
+                - Updated individual position (`pop`)
+                - Updated fitness value (`pop_f`)
+        
+        Reference:
+        Heming Jia, Xuelian Zhou, Jinrui Zhang.
+        Thinking Innovation Strategy (TIS): A novel mechanism for metaheuristic algorithm design and evolutionary update.
+        Applied Soft Computing, 2025, 178: 113071.
+        """
+        pop_f = self.fun(pop)
+        C = 0.5
+        DOK1 = C + (self.fes/ self.max_fes) ** C
+        DOK2 = self.fes ** 10
+        DOK = DOK1 + DOK2
+
+        IM = bm.pi * self.person * bm.random.rand(1)
+
+        pop_new = bm.tan(IM - 0.5) * bm.pi + (pop / DOK + self.person)
+        pop_new = bm.clip(pop_new, self.lb, self.ub)
+        pop_new_f = self.fun(pop_new)
+        self.fes = self.fes + 1
+        if pop_new_f < pop_f:
+            pop = pop_new
+            pop_f = pop_new_f
+        
+        self.person = pop
+        self.person_f = pop_f
+        
+        return pop, pop_f
 
 def opt_alg_options(
     x0: TensorLike,

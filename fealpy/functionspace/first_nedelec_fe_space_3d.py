@@ -711,6 +711,30 @@ class FirstNedelecFESpace3d(FunctionSpace, Generic[_MT]):
         
         return -vec
     
+    def interpolate(self, u: Union[Callable[..., TensorLike], TensorLike],) -> TensorLike:
+
+        p = self.p
+        if p > 0:
+            raise NotImplementedError("Interpolation not implemented for p > 0")
+        mesh = self.mesh
+        qf = mesh.quadrature_formula(p+3, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        points = mesh.bc_to_point(bcs)
+
+        dof = self.number_of_global_dofs()
+        uI = bm.zeros(dof, dtype=self.ftype)
+
+        val = u(points)
+        val = val[:, :, None]
+        t = mesh.edge_tangent()
+        em = mesh.entity_measure('edge')
+        t = mesh.edge_tangent()/em[:, None]
+
+        vals = bm.einsum('q,eqlg, eg, e->el',ws, val, t , em)
+        edge2dof = self.dof.edge_to_dof()
+        uI = bm.index_add(uI, edge2dof, vals)
+        return uI
+    
 
 
 

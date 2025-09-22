@@ -64,7 +64,6 @@ class PLBFGS(Optimizer):
 
         return r
 
-
     def run(self):
         options = self.options
         x = options["x0"]

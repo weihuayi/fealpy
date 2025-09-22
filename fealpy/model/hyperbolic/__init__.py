@@ -43,6 +43,6 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "piecewise": ("piecewise_data_1d", "PiecewiseData1D"),
-    "sinsincos": ("sin_sin_cos_data_2d", "SinSinCosData2D"),
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002")
 }

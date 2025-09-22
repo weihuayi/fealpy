@@ -82,7 +82,7 @@ class DifferentialEvolutionParticleSwarmOpt(Optimizer):
         self.gbest = pbest[gbest_index]
         self.gbest_f = pbest_f[gbest_index]
 
-        v = bm.zeros((self.N, self.dim))
+        v = bm.zeros((self.N, self.dim), dtype=bm.float64)
         index = bm.argsort(fit)
         P = bm.copy(self.x[index[:SEP]])
         Q = bm.copy(self.x[index[SEP:]])
@@ -92,7 +92,7 @@ class DifferentialEvolutionParticleSwarmOpt(Optimizer):
 
             # Calculate switch probability (SP)
             tau = 1.5 + bm.random.rand(1) * (2.2 - 1.5)
-            SP = 1 / (1 + bm.exp(bm.array(1 - (self.MaxIT / (1 + it)))) ** tau)
+            SP = 1 / (1 + bm.exp(bm.array(1 - (self.MaxIT / (1 + it)), dtype=bm.float64)) ** tau)
 
             # Inertia weight
             w = w_max - (it / self.MaxIT) * (w_max - w_min)
@@ -116,7 +116,7 @@ class DifferentialEvolutionParticleSwarmOpt(Optimizer):
             v = bm.clip(v, self.lb, self.ub)
 
             # Apply crossover
-            r_zeros = bm.zeros((self.N, self.dim))
+            r_zeros = bm.zeros((self.N, self.dim), dtype=bm.float64)
             r_zeros[bm.arange(self.N), bm.random.randint(0, self.dim, (self.N,))] = 1
             mask = (bm.random.rand(self.N, self.dim) < cr) + r_zeros
             mask = bm.clip(mask, 0, 1)

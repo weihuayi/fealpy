@@ -1,7 +1,7 @@
 from typing import Optional, Union
 from ..backend import bm
 from ..typing import TensorLike
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.allen_cahn import AllenCahnPDEDataProtocol
 from ..decorator import variantmethod,barycentric
 from ..mesh import Mesh
@@ -27,8 +27,7 @@ class AllenCahnLFEMModel(ComputationalModel):
                          log_level=options['log_level'])
         self.options = options
         self.assemble_method = None
-        self.is_Lag_muliplier = False
-        self.pdm = PDEDataManager("allen_cahn")
+        self.pdm = PDEModelManager("allen_cahn")
         
         self.set_pde(options['pde'])
         self.set_init_mesh(options['init_mesh'])
@@ -42,8 +41,9 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.set_linear_system[options['time_strategy']]()
         self.solve.set(options['solve'])
         
-        if options['is_volume_conservation']:
-            self.set_lagrange_multiplier()
+        self.set_lagrange_multiplier.set(options['lagrange_multiplier'])
+        self.lagrange_multiplier.set(options['lagrange_multiplier'])
+        self.set_lagrange_multiplier()
 
     def set_pde(self,pde: Union[AllenCahnPDEDataProtocol,str] = 'circle_interface'):
         """
@@ -143,11 +143,13 @@ class AllenCahnLFEMModel(ComputationalModel):
         pde = self.pde
         space = self.space
         self.t = t
-        self.phi0[:] = space.interpolate(lambda p:pde.init_solution(p, t=t))
+        self.phi0[:] = space.interpolate(lambda p:pde.init_condition(p, t=t))
     
+    @variantmethod('implicit')
     def set_lagrange_multiplier(self):
         """
         Set the Lagrange multiplier for the weak formulation of the Allen-Cahn equation.
+        This method directly introduces the Lagrange multiplier into the left-hand matrix for implicit solving.
         """
         from ..sparse import COOTensor
         LagLinearForm = LinearForm(self.space)
@@ -161,10 +163,31 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                                  bm.arange(len(LagA), dtype=bm.int32)]), LagA,
                                 spshape=(1, len(LagA)))
-        self.b0 = bm.array([self.mesh.integral(self.pde.init_solution)])
-        self.is_Lag_muliplier = True
+        self.b0 = bm.array([self.mesh.integral(self.pde.init_condition)])
+    
+    @set_lagrange_multiplier.register('explicit')
+    def set_lagrange_multiplier(self):
+        """
+        Set the Lagrange multiplier for the weak formulation of the Allen-Cahn equation.
+        This method differs from the implicit scheme as it requires explicitly 
+        solving the Lagrange multiplier before assembling the right-hand side
+        """
+        self.LagLinearForm = LinearForm(self.space)
+        self.Lag_SSI = ScalarSourceIntegrator(q=self.q)
+        self.LagLinearForm.add_integrator(self.Lag_SSI)
+          
+    @variantmethod('implicit')
+    def lagrange_multiplier(self,A,b, uh0=None, phi_force=None):
+        """
+        Extend the matrix and the right-hand side vector
         
-    def lagrange_multiplier(self,A,b):
+        Parameters:
+            A (CSRTensor): The original matrix from the bilinear form.
+            b (TensorLike): The original right-hand side vector from the linear form.
+        Returns:
+            A (CSRTensor): The extended matrix with Lagrange multiplier terms.
+            b (TensorLike): The extended right-hand side vector with Lagrange multiplier terms.
+        """
         A0 = self.A0
         A1 = self.A1
         b0 = self.b0
@@ -172,6 +195,50 @@ class AllenCahnLFEMModel(ComputationalModel):
         A = A.assembly_sparse_matrix(format='csr')
         b  = bm.concatenate([b, b0], axis=0)
         return A, b
+    
+    @lagrange_multiplier.register('explicit')
+    def lagrange_multiplier(self,A,b, uh0=None, phi_force=None):
+        """
+        Explicitly add the Lagrange multiplier terms to right-hand side vector.
+        This method computes the Lagrange multiplier terms based on the current phase field variable and mesh movement.
+        
+        Parameters:
+            A (CSRTensor): The original matrix from the bilinear form.
+            b (TensorLike): The original right-hand side vector from the linear form.
+            uh0 (Function): The previous velocity field variable.
+            phi_force (Function): The force term for the phase field variable.
+        Returns:
+            A (CSRTensor): Without changing the matrix, only the right-hand side vector is extended.
+            b (TensorLike): The extended right-hand side vector with Lagrange multiplier terms.
+        """
+        space = self.space
+        bcs = self.bcs
+        pde = self.pde
+        gamma = pde.gamma()
+        dt = self.dt
+        eta = pde.eta
+        phi0 = self.phi0
+        rm = space.mesh.reference_cell_measure()
+        @barycentric
+        def G(bcs):
+            phi_val = phi0(bcs)
+            fphi = self.pde.nonlinear_source(phi_val)
+    
+            result = gamma * fphi
+            result += phi_force(bcs)
+            result += gamma* self.laplace_phi(bcs)
+            
+            mesh_result = self.move_vector(bcs) - uh0(bcs)
+            result += bm.einsum('cqi, cqi->cq', mesh_result, phi0.grad_value(bcs))
+            return result
+        node0 = self.mspace.function(self.node0.T.flatten())
+        J = node0.grad_value(bcs)
+        value = (1/dt + gamma/eta**2)*(bm.abs(bm.linalg.det(J))-1)*phi0(bcs) - G(bcs)
+        theta = 1/(gamma*pde.area)*bm.einsum('cq ,q ,cq ->',value,self.ws*rm,self.d)
+        self.Lag_SSI.source = dt*gamma*theta
+        b0 = self.LagLinearForm.assembly()
+        b += b0
+        return A,b
         
     def set_time_step(self, dt: float = 0.01):
         """
@@ -217,7 +284,8 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.mm.config.mol_times = moltimes
         self.mm.config.monitor = monitor
         self.mm.config.mol_meth = mol_meth
-        self.mm.config.is_pre = True
+        self.mm.config.pde = self.pde
+        self.mm.config.is_pre = False
         if config is not None:
             for key, value in config.items():
                 try:
@@ -235,6 +303,10 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.mspace = TensorFunctionSpace(smspace, (self.mesh.GD,-1))
         self.move_vector = self.mspace.function()
         self.time_step.set('moving_mesh')
+        if hasattr(self.space.mesh, 'jacobi_matrix'):
+            self._Jacobi = self.space.mesh.jacobi_matrix
+        else:
+            self._Jacobi = self.space.mesh.jacobian_matrix
     
     @variantmethod('forward')
     def set_linear_system(self):
@@ -252,8 +324,7 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.bform = BilinearForm(space)
         self.SMI = ScalarMassIntegrator(coef=1.0+dt*(gamma/eta**2), q=q, method=method)
         self.SDI = ScalarDiffusionIntegrator(coef=dt*gamma, q=q, method=method)
-        self.bform.add_integrator(self.SMI)
-        self.bform.add_integrator(self.SDI)
+        self.bform.add_integrator(self.SMI,self.SDI)
         self.set_linear_form()
         
         self.logger.info("Linear system set with bilinear and linear forms.")
@@ -279,9 +350,7 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.SMI = ScalarMassIntegrator(coef=1.0+dt*(gamma/eta**2), q=q,method=method)
         self.SDI = ScalarDiffusionIntegrator(coef=dt*gamma, q=q, method=method)
         self.SCI = ScalarConvectionIntegrator(q=q, method=method)
-        self.bform.add_integrator(self.SMI)
-        self.bform.add_integrator(self.SDI)
-        self.bform.add_integrator(self.SCI)
+        self.bform.add_integrator(self.SMI,self.SDI, self.SCI)
         self.set_linear_form()
         
         self.logger.info("Linear system set with bilinear and linear forms.")
@@ -302,12 +371,12 @@ class AllenCahnLFEMModel(ComputationalModel):
         q = self.q
         method = self.assemble_method
         self.bform = BilinearForm(space)
+        self.bform_exp = BilinearForm(space)
         self.SMI = ScalarMassIntegrator(coef=1.0+dt*(gamma/eta**2), q=q, method=method)
+        self.SMI_exp = ScalarMassIntegrator(coef=1.0, q=q, method=method)
         self.SDI = ScalarDiffusionIntegrator(coef=dt*gamma, q=q, method=method)
-        # self.SCI = ScalarConvectionIntegrator(q=q, method=method)
-        self.bform.add_integrator(self.SMI)
-        self.bform.add_integrator(self.SDI)
-        # self.bform.add_integrator(self.SCI)
+        self.bform.add_integrator(self.SMI,self.SDI)
+        self.bform_exp.add_integrator(self.SMI_exp)
         self.set_linear_form()
         
         self.logger.info("Linear system set with bilinear and linear forms.")
@@ -322,6 +391,61 @@ class AllenCahnLFEMModel(ComputationalModel):
             self.set_move_mesher(**filtered_params)
         self.logger.info("Assembly method set to moving_mesh.")
         
+    @set_linear_system.register('moving_mesh_SDIRK')
+    def set_linear_system(self):
+        """
+        Set the linear system for the weak formulation of the Allen-Cahn equation with moving mesh.
+        """
+        space = self.space
+        q = self.q
+        method = self.assemble_method
+        self.bform0 = BilinearForm(space)
+        self.bform1 = BilinearForm(space)
+        self.SMI = ScalarMassIntegrator(q=q, method=method)
+        self.SDI = ScalarDiffusionIntegrator(q=q, method=method)
+        self.SCI = ScalarConvectionIntegrator(q=q, method=method)
+        self.bform0.add_integrator(self.SDI, self.SCI)
+        self.bform1.add_integrator(self.SMI)
+        self.set_linear_form()
+        
+        self.logger.info("Linear system set with bilinear and linear forms.")
+        self.logger.info("Bilinear form moving_mesh set with diffusion and mass terms.")
+        
+        if self.options['mm_param'] is None: 
+            self.set_move_mesher()
+        else:
+            valid_keys = {'mmesher', 'beta', 'tau', 'tmax', 'alpha', 'moltimes', 'monitor', 'mol_meth'}
+            filtered_params = {k: v for k, v in self.options['mm_param'].items() if k in valid_keys}
+            self.set_move_mesher(**filtered_params)
+        self.logger.info("Assembly method set to moving_mesh.")
+    
+    def laplace_recovery(self,phi0):
+        """
+        Compute the Laplacian recovery for the phase field variable.
+        
+        This method uses the L2 projector compute the Laplacian.
+        
+        Parameters:
+            phi0 (Function): The phase field variable function.
+        
+        Returns:
+            Function: The recovered Laplacian of the phase field variable.
+        """
+        space = self.space
+        bcs = self.bcs
+        grad_phi0 = phi0.grad_value(bcs)
+        grad_basis = space.grad_basis(bcs)
+        rm = space.mesh.reference_cell_measure()
+        J = self._Jacobi(bcs)
+        G = bm.permute_dims(J, (0, 1, 3,2))@ J
+        self.d = bm.sqrt(bm.linalg.det(G))
+        b_local = bm.einsum('q,cq,cqid, cqd->ci',self.ws*rm,self.d ,grad_basis,-grad_phi0)
+        F = bm.zeros(space.number_of_global_dofs(), dtype=bm.float64)
+        F = bm.index_add(F, space.cell_to_dof(), b_local)
+        M = self.bform_exp.assembly()
+        laplace_phi = space.function(self.solve(M, F))
+        return laplace_phi
+       
     def set_linear_form(self):
         """
         Set the linear form for the weak formulation of the Allen-Cahn equation.
@@ -351,22 +475,21 @@ class AllenCahnLFEMModel(ComputationalModel):
         eta = pde.eta
         gamma = pde.gamma()
         dt = self.dt
-        theta = self.theta # The Lagrange multiplier (default is 0).
 
         if hasattr(pde , 'phi_force'):
             phi_force = lambda p: pde.phi_force(p, t1)
+            phi_force = space.interpolate(phi_force)
         else:
             phi_force = space.function()
         
         @barycentric
         def source(bcs, index):
             phi_val = phi0(bcs, index)
-            f_force = space.interpolate(phi_force)
             fphi = pde.nonlinear_source(phi_val)
  
             result = (1+ dt*gamma/eta**2) * phi_val
             result -= gamma * dt * fphi
-            result += dt * f_force(bcs, index)
+            result += dt * phi_force(bcs, index)
 
             mesh_result = -uh0(bcs, index)
             result += dt*bm.einsum('cqi, cqi->cq', mesh_result, phi0.grad_value(bcs, index))
@@ -395,10 +518,10 @@ class AllenCahnLFEMModel(ComputationalModel):
         gamma = pde.gamma()
         bcs = self.bcs
         dt = self.dt
-        theta = self.theta # The Lagrange multiplier (default is 0).
 
         if hasattr(pde , 'phi_force'):
             phi_force = lambda p: pde.phi_force(p, t1)
+            phi_force = space.interpolate(phi_force)
         else:
             phi_force = space.function()
 
@@ -407,11 +530,10 @@ class AllenCahnLFEMModel(ComputationalModel):
         @barycentric
         def source(bcs, index):
             phi_val = phi0(bcs, index)
-            f_force = space.interpolate(phi_force)
             fphi = pde.nonlinear_source(phi_val)
             result = (1+ dt*gamma/eta**2) * phi_val
             result -= gamma * dt * fphi
-            result += dt * f_force(bcs, index)
+            result += dt * phi_force(bcs, index)
             return result
         self.SSI.source = source
 
@@ -439,25 +561,22 @@ class AllenCahnLFEMModel(ComputationalModel):
         space = self.space
         eta = pde.eta
         gamma = pde.gamma()
-        bcs = self.bcs
         dt = self.dt
-        theta = self.theta # The Lagrange multiplier (default is 0).
 
         if hasattr(pde , 'phi_force'):
             phi_force = lambda p: pde.phi_force(p, t1)
+            self.phi_force = space.interpolate(phi_force)
         else:
-            phi_force = space.function()
+            self.phi_force = space.function()
 
         @barycentric
         def source(bcs, index):
             phi_val = phi0(bcs, index)
-            # f_force = space.interpolate(phi_force)
             fphi = pde.nonlinear_source(phi_val)
- 
-            result = (1+ dt*gamma/eta**2) * phi_val
-            result -= gamma * dt * fphi
-            # result += dt * f_force(bcs, index)
-
+            result = -gamma * dt * fphi
+            result += gamma * dt * self.laplace_phi(bcs, index)
+            result += dt * self.phi_force(bcs, index)
+            
             mesh_result = move_vector(bcs,index) - uh0(bcs, index)
             result += dt*bm.einsum('cqi, cqi->cq', mesh_result, phi0.grad_value(bcs, index))
             return result
@@ -467,61 +586,6 @@ class AllenCahnLFEMModel(ComputationalModel):
         A = self.bform.assembly()
         b = self.lform.assembly()
         return A, b
-    
-    @variantmethod('explicit')
-    def lagrange_multi_solver(self,t1 = 0.0, phi0 = None, uh0 = None, mesh_vector = None):
-        """
-        Explicitly solve the Lagrange multiplier for the Allen-Cahn equation.
-        """
-        pde = self.pde
-        space = self.space
-        area = pde.area
-        gamma = pde.gamma()
-        eta = pde.eta
-        alpha = 1/self.dt + gamma/eta**2
-        NN = self.mesh.number_of_nodes()
-        GD = self.mesh.GD
-        if uh0 is None:
-            uh0 = self.uspace.interpolate(lambda p: pde.velocity_field(p, t=t1))
-        if phi0 is None:
-            phi0 = self.phi0
-        if mesh_vector is None:
-            mesh_vector = self.mspace.function()
-        if hasattr(pde , 'phi_force'):
-            phi_force = lambda p: pde.phi_force(p, t1)
-        else:
-            phi_force = space.function()
-
-        @barycentric
-        def G(bcs):
-            phi_val = phi0(bcs)
-            f_force = space.interpolate(phi_force)
-            fphi = pde.nonlinear_source(phi_val)
-            grad_phi0 = phi0.grad_value(bcs)
-            cell_grad = bm.mean(grad_phi0, axis=1)
-            vertex_grad = bm.zeros((NN, GD))
-            vertex_count = bm.zeros(NN)
-            cell2dof = space.cell_to_dof()
-            vertex_grad = bm.index_add(vertex_grad, cell2dof, cell_grad[:, None])
-            vertex_count = bm.index_add(vertex_count, cell2dof, 1)
-            vertex_grad /= vertex_count[:, None] 
-
-            grad_basis = space.grad_basis(bcs)
-            laplace_phi0 = bm.einsum('cqid, cid->cq', grad_basis, vertex_grad[cell2dof])
-            result = gamma * fphi
-            result += f_force(bcs)
-            result += gamma* laplace_phi0
-
-            mesh_result = mesh_vector(bcs) - uh0(bcs)
-            result += bm.einsum('cqi, cqi->cq', mesh_result, grad_phi0)
-            return result
-        
-        node0 = self.mspace.function(self.node0.T.flatten())
-        bcs,ws = self.bcs, self.ws
-        cm = self.mesh.entity_measure('cell')
-        J = bm.abs(node0.grad_value(bcs))
-        value = alpha*(bm.linalg.det(J)-1)*phi0(bcs) - G(bcs)
-        self.theta = 1/(gamma*area)*bm.einsum('cq ,q ,c ->',value , ws,cm)
 
     @variantmethod("direct")
     def solve(self,A,b):
@@ -570,11 +634,9 @@ class AllenCahnLFEMModel(ComputationalModel):
         """
         self.uh0[:] = self.uspace.interpolate(lambda p: self.pde.velocity_field(p, t=self.t))
         A,b = self.assembly(t1 = self.t,uh0=self.uh0,phi0=self.phi0)
-        if self.is_Lag_muliplier:
-            A,b = self.lagrange_multiplier(A, b)
-            phi_new = self.solve(A,b)[:-1]
-        else:
-            phi_new = self.solve(A,b)
+
+        A,b = self.lagrange_multiplier(A, b)
+        phi_new = self.solve(A,b)[:-1]
         
         self.phi[:] = phi_new
         self.phi0[:] = self.phi[:]
@@ -590,25 +652,104 @@ class AllenCahnLFEMModel(ComputationalModel):
         mm = self.mm
         mm.run()
         if self.t-self.dt == 0.0:
+            mm.set_interpolation_method('solution')
             self.node0 = self.mesh.node.copy()
-            self.phi0[:] = self.space.interpolate(lambda p:self.pde.init_solution(p, t=self.t-self.dt))
-
+            self.phi0[:] = self.space.interpolate(lambda p:self.pde.init_condition(p, t=self.t-self.dt))
+            mm.set_interpolation_method('linear')
         self.move_vector[:] = ((self.mesh.node - self.node0)/self.dt).T.flatten()
         self.uh0[:] = self.uspace.interpolate(lambda p: self.pde.velocity_field(p, t=self.dt))
+        
+        self.laplace_phi = self.laplace_recovery(self.phi0)
+        A,b = self.assembly(t1 = self.t,uh0 = self.uh0,phi0=self.phi0,move_vector = self.move_vector)
+        A,b = self.lagrange_multiplier(A, b, uh0=self.uh0, phi_force=self.phi_force)
 
-        A,b = self.assembly(t1 = self.t,uh0=self.uh0,phi0=self.phi0,move_vector = self.move_vector)
-        if self.is_Lag_muliplier:
-            self.set_lagrange_multiplier()
-            A,b = self.lagrange_multiplier(A, b)
-            phi_new = self.solve(A,b)[:-1]
-        else:
-            phi_new = self.solve(A,b)
+        phi_e = self.solve(A,b)
+        phi_new = self.phi0 + phi_e
 
         self.phi[:] = phi_new
         self.phi0[:] = self.phi[:]
         self.node0 = self.mesh.node.copy()
-        self.mm.instance.uh = phi_new
+        self.mm.instance.uh = phi_new.copy()
     
+    @time_step.register('moving_mesh_SDIRK')
+    def time_step(self):
+        """
+        Perform a time step for the Allen-Cahn phase field model using the SDIRK method.
+        
+        This method updates the phase field variable using the SDIRK method, which is suitable for stiff problems.
+        """
+        sub_steps = 30
+        r = 1- bm.sqrt(2)/2
+        tau1 = r
+        tau2 = 1
+        a11 = r
+        a21 = 1-r
+        a22 = r
+        b1 = 1-r
+        b2 = r
+        mm = self.mm
+        mm.run()
+        dt = self.dt
+        if self.t-dt == 0.0:
+            sub_steps = 30
+            self.node0 = self.mesh.node.copy()
+            self.phi0[:] = self.space.interpolate(lambda p:self.pde.init_condition(p, t=self.t-self.dt))
+        else:
+            sub_steps = 3
+        
+        delta = dt/(sub_steps)    
+        v = (self.mesh.node - self.node0)/self.dt
+        self.move_vector[:] = (v).T.flatten()
+        for i in range(sub_steps):
+            t_hat = self.t + (i)*delta
+            self.mesh.node = self.node0 + tau1*delta * v
+            M = self.bform1.assembly()
+            self.SDI.coef = delta * self.pde.gamma() *a11
+            self.SCI.coef = -delta * self.move_vector *a11
+            def source(bcs,index):
+                phi_val = self.phi0(bcs, index)
+                f_val = self.pde.nonlinear_source(phi_val)
+                result =  phi_val
+                result -= a11* delta * self.pde.gamma() * f_val
+                return result
+            
+            self.SSI.source = source
+            A = self.bform0.assembly() 
+            A += M
+            b = self.lform.assembly()
+            
+            self.set_lagrange_multiplier()
+            A,b = self.lagrange_multiplier(A, b)
+            phi1 = self.solve(A, b)[:-1]
+            
+            self.mesh.node = self.node0 + delta * v
+            phi1 = self.space.function(phi1)
+            k1 = (phi1 - self.phi0)/(tau1*delta)
+            self.SDI.coef = self.pde.gamma()*delta*a22
+            self.SCI.coef = -delta * self.move_vector*a22
+            def source(bcs,index):
+                result = delta*a21*k1.value(bcs, index)
+                result += self.phi0(bcs, index)
+                
+                phi_val = self.phi0(bcs, index)
+                f_val = self.pde.nonlinear_source(phi_val)
+                result -= a22* delta * self.pde.gamma() * f_val
+                return result
+            self.SSI.source = source
+            A = self.bform0.assembly()
+            M = self.bform1.assembly()
+            A += M
+            b = self.lform.assembly()
+            self.set_lagrange_multiplier()
+            A,b = self.lagrange_multiplier(A, b)
+            phi2 = self.solve(A, b)[:-1]
+            
+            k2 = (phi2 - self.phi0 - delta*a21*k1)/(a22*delta)
+            self.phi[:] = self.phi0 + delta*b1*k1 + delta*b2*k2
+            self.phi0[:] = self.phi[:]
+            self.node0 = self.mesh.node.copy()
+        self.mm.instance.uh = self.phi.copy()
+                   
     def run(self,save_vtu_enabled: bool = False,error_estimate_enabled: bool = False):
         """
         Run the time-stepping loop for the Allen-Cahn phase field model.
@@ -617,7 +758,7 @@ class AllenCahnLFEMModel(ComputationalModel):
         and moving the mesh if necessary.
         """
         self.logger.info("Starting time-stepping loop.")
-        
+        self.error_estimate_enabled = error_estimate_enabled
         step = 0
         while self.t < self.pde.duration()[1]:
             self.t += self.dt
@@ -627,7 +768,7 @@ class AllenCahnLFEMModel(ComputationalModel):
             if save_vtu_enabled:
                 self.save_vtu(step)
 
-            if error_estimate_enabled:
+            if self.error_estimate_enabled:
                 error = self.error_estimate()
                 
             step += 1
@@ -657,7 +798,7 @@ class AllenCahnLFEMModel(ComputationalModel):
         """
         if not hasattr(self.pde, 'solution'):
             self.logger.warning("pde.solution is not defined. Disabling error estimation.")
-            error_estimate_enabled = False
+            self.error_estimate_enabled = False
             return 0.0
         
         pde = self.pde

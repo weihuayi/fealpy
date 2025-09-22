@@ -3,7 +3,7 @@ from fealpy.typing import TensorLike
 from fealpy.decorator import cartesian
 from fealpy.mesh import QuadrangleMesh,TriangleMesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
-from fealpy.fem import LinearElasticIntegrator
+from fealpy.csm.fem import ElastoplasticIntegrator
 from fealpy.fem import VectorSourceIntegrator, ConstIntegrator
 from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
@@ -11,8 +11,8 @@ from fealpy.fem import DirichletBC
 from fealpy.decorator import cartesian
 from fealpy.solver import cg, spsolve
 from fealpy.material.elastic_material import LinearElasticMaterial
-from fealpy.material.elastico_plastic_material import PlasticMaterial
-from fealpy.fem.elasticoplastic_integrator import ElasticoplasticIntegrator
+from fealpy.csm.material.elastoplastic_material import PlasticMaterial
+from fealpy.fem.linear_elasticity_integrator import LinearElasticityIntegrator
 from fealpy.sparse import COOTensor
 import argparse
 # 平面应变问题
@@ -37,7 +37,7 @@ class CantileverBeamData2D():
         y = points[..., 1]
         
         val = bm.zeros(points.shape, dtype=points.dtype, device=bm.get_device(points))
-        val[..., 1] = -1.7
+        val[..., 1] = -10
         return val
     
     @cartesian
@@ -125,6 +125,95 @@ def assemble_global_internal_force(space, F_int_cell):
     return global_force
 
 
+def update_elastoplastic_matrix(material, n,  yield_mask):
+    """正确的弹塑性矩阵构造"""
+    # 获取弹性矩阵
+    D_e = material.elastic_matrix()  # (..., 3, 3)
+    # 计算分母项 H = n:D_e:n (标量)
+    H = bm.einsum('...i,...ij,...j->...', n, D_e, n)
+    H = H[..., None, None]
+    H_inv = 1 / (H + 1e-16)
+    # 计算塑性修正项
+    num1 = bm.einsum('...ij,...j->...i', D_e, n)
+    num2 = bm.einsum('...i,...ij->...j', n, D_e)
+    numerator = bm.einsum('...i,...j->...ij', num1, num2)
+    '''
+    numerator = bm.einsum('...i,...j->...ij', 
+                        bm.einsum('...ik,...k', D_e, n),
+                        bm.einsum('...jk,...k', D_e, n))
+    '''
+    
+    # 理想塑性时 H'=0
+    D_ep = D_e - numerator * H_inv
+    
+    return bm.where(yield_mask[..., None, None], D_ep, D_e)
+
+def constitutive_update(space, uh, plastic_strain_old, material,yield_stress,strain_total_e) -> TensorLike:
+    """执行本构积分返回更新后的状态"""
+    # 计算试应变
+    mesh = space.mesh
+    node = mesh.entity('node')
+    kwargs = bm.context(node)
+    qf = mesh.quadrature_formula(q=space.p+3)
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    B = material.strain_matrix(True,gphi=space.scalar_space.grad_basis(bcs))
+    uh = bm.array(uh,**kwargs)  
+    tldof = space.number_of_local_dofs()
+    NC = mesh.number_of_cells() 
+    uh_cell = bm.zeros((NC, tldof),**kwargs) # (NC, tldof)
+    cell2dof = space.cell_to_dof()
+    uh_cell = uh[cell2dof]
+    strain_total = bm.einsum('cqij,cj->cqi', B, uh_cell)
+    d_strain = strain_total - strain_total_e
+    strain_trial = strain_total - plastic_strain_old
+    # 弹性预测
+    stress_trial = bm.einsum('cqij,cqi->cqj', material.elastic_matrix(), strain_trial)
+    
+    # 屈服判断
+    s_trial = stress_trial - bm.mean(stress_trial[..., :2], axis=-1, keepdims=True)
+    sigma_eff = bm.sqrt(3/2 * bm.einsum('...i,...i', s_trial, s_trial))
+    print(f"Max sigma_eff: {sigma_eff.max()}, Yield stress: {yield_stress}")
+    yield_mask = sigma_eff > yield_stress
+    
+
+    
+    # 塑性修正
+    if bm.any(yield_mask):
+        # 计算流动方向
+        n = material.df_dsigma(stress_trial)
+        """
+        fenzi = bm.einsum('...i,...ij,...j->...', n, material.elastic_matrix(), d_strain)
+        fenmu = bm.einsum('...i,...ij,...j->...', n, material.elastic_matrix(), n)
+        fenmu_inv = 1 / (fenmu+1e-16)
+        delta_lambda = fenzi * fenmu_inv
+        # 更新塑性应变
+        plastic_strain_new = plastic_strain_old.copy()
+        plastic_strain_new[yield_mask] += delta_lambda[yield_mask,None] * n[yield_mask]
+        """
+        # 计算塑性乘子
+        delta_lambda = (sigma_eff[yield_mask] - yield_stress) / (3*material.mu)
+        # 更新塑性应变
+        plastic_strain_new = plastic_strain_old.copy()
+        plastic_strain_new[yield_mask] += delta_lambda[..., None] * n[yield_mask]
+
+        # 更新弹塑性矩阵
+        D_ep = update_elastoplastic_matrix(material, n,  yield_mask)
+            # 在更新D_ep后添加
+        eigenvalues = bm.linalg.eigvalsh(D_ep)
+        print("Max eigenvalue:", eigenvalues.max())
+        # 存储上一次 strain_total_e
+        strain_total_old = strain_total_e.copy()
+
+        # 使用 d_strain = strain_total - strain_total_old
+        d_strain = strain_total - strain_total_old
+
+        # 更新 strain_total_e 累计值
+        strain_total_e = strain_total.copy()
+
+        return True, plastic_strain_new, D_ep, strain_total_e
+    else:
+        return True, plastic_strain_old, material.elastic_matrix(),strain_total_e
+
 parser = argparse.ArgumentParser(description="Solve linear elasticity problems in arbitrary order Lagrange finite element space on QuadrangleMesh.")
 parser.add_argument('--backend',
                     choices=('numpy', 'pytorch'), 
@@ -138,10 +227,10 @@ parser.add_argument('--degree',
                     default=1, type=int, 
                     help='Degree of the Lagrange finite element space, default is 2.')
 parser.add_argument('--nx', 
-                    default=20, type=int, 
+                    default=4, type=int, 
                     help='Initial number of grid cells in the x direction, default is 4.')
 parser.add_argument('--ny',
-                    default=20, type=int,
+                    default=4, type=int,
                     help='Initial number of grid cells in the y direction, default is 4.')
 args = parser.parse_args()
 bm.set_backend(args.backend)
@@ -193,9 +282,11 @@ for increment in range(max_increment):
     converged = False
     
     for iter in range(max_iter):
+        # Step 1: 材料点更新（本构积分）
+        
         # 组装系统
-        elasticintegrator= ElasticoplasticIntegrator(D_ep_global, material=pfcm,space=tensor_space, 
-                                    q=tensor_space.p+3, equivalent_plastic_strain=equivalent_plastic_strain)
+        elasticintegrator= ElastoplasticIntegrator(D_ep_global, material=pfcm,space=tensor_space, 
+                                    q=tensor_space.p+3)
         bform = BilinearForm(tensor_space)
         bform.add_integrator(elasticintegrator)
         K = bform.assembly(format='csr')
@@ -234,15 +325,13 @@ for increment in range(max_increment):
         #du = cg(K, R, maxiter=1000, atol=1e-14, rtol=1e-14)
         du = spsolve(K, R,solver='scipy')
         uh += du
-        
         # 本构积分更新
         yield_stress = sigma_y
-        success, plastic_strain, D_ep_global,strain_total_e = elasticintegrator.constitutive_update(
-            uh, plastic_strain, pfcm,yield_stress=yield_stress,strain_total_e=strain_total_e)
+        success, plastic_strain, D_ep_global,strain_total_e = constitutive_update(
+           tensor_space, uh, plastic_strain, pfcm,yield_stress=yield_stress,strain_total_e=strain_total_e)
         strain_total_e = strain_total_e
         if not success:
             break
-            
         # 收敛判断
         norm = bm.linalg.norm(du)
         if norm < tol:
