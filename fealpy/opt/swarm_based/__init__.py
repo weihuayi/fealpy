@@ -11,6 +11,7 @@ from .harris_hawks_opt import HarrisHawksOpt
 from .hippopotamus_opt_alg import HippopotamusOptAlg
 from .honeybadger_alg import HoneybadgerAlg
 from .jellyfish_search_opt import JellyfishSearchOpt
+from .kangaroo_escape_opt import KangarooEscapeOpt
 from .marine_predators_alg import (
     MarinePredatorsAlg, 
     GLS_MarinePredatorsAlg, 
