@@ -137,10 +137,10 @@ class PDEModelManager(ModelManager):
         "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
         "polyharmonic": "fealpy.model.polyharmonic",
         "stokes": "fealpy.model.stokes",
-        "linear_elasticity": "fealpy.model.linear_elasticity",
         "allen_cahn": "fealpy.model.allen_cahn",
         "optimal_control": "fealpy.model.optimal_control",
         "helmholtz": "fealpy.model.helmholtz",
         "surface_poisson": "fealpy.model.surface_poisson",
-        "curlcurl":"fealpy.model.curlcurl"
+        "curlcurl":"fealpy.model.curlcurl",
+        "darcyforchheimer":"fealpy.model.darcyforchheimer",
     }

@@ -1,9 +1,11 @@
-from typing import Sequence
-from ...decorator import cartesian
-from ...backend import TensorLike
+from typing import Optional, Sequence
 from ...backend import backend_manager as bm
+from ...decorator import cartesian
+from ...typing import TensorLike
+from ...mesher import BoxMesher2d
 
-class CosCosData2D:
+
+class Exp0002(BoxMesher2d):
     """
     2D Darcy-Forchheimer problem on Ω = [0,1]×[0,1]:
 
@@ -26,8 +28,11 @@ class CosCosData2D:
     """
     def __init__(self):
         # physical parameters
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
         self.mu = 2.0
         self.beta = 5.0
+        self.rho = 1.0
         self.tol = 1e-12
 
     def geo_dimension(self) -> int:
