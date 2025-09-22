@@ -78,6 +78,8 @@ class PoissonPENNModel(ComputationalModel):
         
         pred(TensorLike): Final prediction results.
 
+        solution_flag(bool): Mark exact solution as nonexistent. Default is True.
+
     Methods:
         get_options(): Get default configuration parameters for the model.
         
@@ -97,7 +99,8 @@ class PoissonPENNModel(ComputationalModel):
 
         predict(): Make predictions using the trained network.
 
-        fem(): Solve Poisson's equation using Finite Element Method (FEM) for comparison.
+        fem(): Solve Poisson's equation using Finite Element Method (FEM) for comparison 
+            if PDE don't have an analytical solution.
 
         run(): Start training the model.
 
@@ -393,11 +396,21 @@ class PoissonPENNModel(ComputationalModel):
                 self.steplr.step()
 
             if epoch % 100  == 0:
+                try:
+                    if hasattr(self.pde, 'solution'):
+                        self.solution_flag = True
+                        error = self.net.estimate_error(self.pde.solution, mesh, coordtype='c')
+                        self.error.append(error.item())
+                except NotImplementedError:
+                    # The exact solution is unknown，so Mark exact solution as nonexistent .
+                    self.solution_flag = False
                 self.Loss.append(loss.item())
                 self.logger.info(f"epoch: {epoch}, Loss: {loss.item():.6f}")
         
         self.pred = pred
         self.tmr.send(f'PENN training completed time')
+        if self.solution_flag:
+            next(self.tmr)
 
     def predict(self, p: TensorLike) -> TensorLike:
         """Make predictions using the trained network.
@@ -417,6 +430,7 @@ class PoissonPENNModel(ComputationalModel):
     
     def fem(self):
         """Solve Poisson's equation using Finite Element Method (FEM) for comparison
+        if PDE don't have an analytical solution.
         
         Returns:
             uh(TensorLike): FEM solution results
@@ -431,8 +445,6 @@ class PoissonPENNModel(ComputationalModel):
         from fealpy.solver import spsolve
 
         pde = self.pde
-        # mesh_size = tuple(x - 1 for x in self.mesh_size)
-        # mesh = pde.init_mesh(*mesh_size)
         mesh = self.mesh
         p = 1
         q = p + 2
@@ -466,64 +478,86 @@ class PoissonPENNModel(ComputationalModel):
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
 
-        node = self.mesh.entity('node').detach().numpy()
-        net_pred = self.pred.flatten().detach().numpy()
-        fem_pred = self.fem().detach().numpy()
-        er = net_pred - fem_pred
-
         # plot loss curve
         fig = plt.figure()
         ax1 = fig.add_subplot()
 
         Loss = bm.tensor(self.Loss)
         ax1.plot(bm.log10(Loss).numpy(), 'r-', linewidth=2)
-        ax1.set_title('Training Loss', fontsize=12)
+        ax1.set_title('PENN Training Loss', fontsize=12)
         ax1.set_xlabel('training epochs*100', fontsize=10)
         ax1.set_ylabel('log10(Loss)', fontsize=10)
         ax1.grid(True)
-        fig = plt.figure()
-        if self.gd == 1:
-            ax2 = fig.add_subplot()
-            ax2.plot(node, net_pred, 'b-', label="PENN Prediction")
-            ax2.plot(node, fem_pred, 'y--', label="FEM Prediction")
-            ax2.plot(node, er, 'r--', label="Error: PENN - FEM")
-            plt.xlabel('x', fontsize=12)
-            plt.ylabel('u(x)', fontsize=12)
-            plt.title('Comparison between PENN and FEM Solution', fontsize=14)
-            plt.legend(fontsize=12)
-            plt.grid(True, linestyle=':')
 
-        elif self.gd == 2:
-            ax2 = fig.add_subplot(131, projection="3d")
-            surf1 = ax2.plot_trisurf(node[:, 0], node[:, 1], net_pred,
-                                     cmap='viridis', edgecolor='k', linewidth=0.2, alpha=0.8)
-            ax2.set_title('PENN Solution', fontsize=12)
-            ax2.set_xlabel('x', fontsize=10)
-            ax2.set_ylabel('y', fontsize=10)    
-            ax2.set_zlabel('u(x,y)', fontsize=10)
-            fig.colorbar(surf1, ax=ax2, shrink=0.5, label='value')
+        # PENN vs exact error 
+        if self.solution_flag:
+            fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
+            error = bm.log10(bm.tensor(self.error)).numpy()
+            axes.plot(error, 'b--', linewidth=2)
+            axes.set_title('L2 Error between PENN Solution and Exact Solution', fontsize=12)
+            axes.set_ylabel('log10(Error)', fontsize=10)
+            axes.set_xlabel('training epochs*100', fontsize=10)
+            axes.grid(True)
 
-            ax3 = fig.add_subplot(132, projection="3d")
-            surf2 = ax3.plot_trisurf(node[:, 0], node[:, 1],
-                                     fem_pred, cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
-            ax3.set_title('FEM Solution', fontsize=12)
-            ax3.set_xlabel('x', fontsize=10)
-            ax3.set_ylabel('y', fontsize=10)    
-            ax3.set_zlabel('u(x,y)', fontsize=10)
-            fig.colorbar(surf2, ax=ax3, shrink=0.5, label='value')
+        if self.gd <= 2:
+            node = self.mesh.entity('node')
+            net_pred = self.pred.flatten().detach().numpy()
 
-            ax4 = fig.add_subplot(133, projection="3d")
-            surf3 = ax4.plot_trisurf(node[:, 0], node[:, 1],
-                                     er, cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
-            ax4.set_title('Error: PENN - FEM', fontsize=12)
-            ax4.set_xlabel('x', fontsize=10)
-            ax4.set_ylabel('y', fontsize=10)    
-            ax4.set_zlabel('u(x,y)', fontsize=10)
-            fig.colorbar(surf3, ax=ax4, shrink=0.5, label='value')
+            if self.solution_flag:
+                u_true = self.pde.solution(node).detach().numpy()   # exact solution
+            else:
+                u_true = self.fem().detach().numpy()  # FEM solution
+            er = net_pred - u_true
+            fig = plt.figure()
+            node = node.detach().numpy()
 
-            fig.suptitle('Comparison between PENN and FEM Solution', fontsize=14)
-            plt.legend(fontsize=12)
-            plt.grid(True, linestyle=':')
+            if self.gd == 1:
+                ax2 = fig.add_subplot()
+                ax2.plot(node, net_pred, 'b-', label="PENN Prediction")
+                ax2.plot(node, u_true, 'y--', label="Exact\FEM Prediction")
+                ax2.plot(node, er, 'r--', label="Error: PENN - Exact\FEM")
+                plt.xlabel('x', fontsize=12)
+                plt.ylabel('u(x)', fontsize=12)
+                plt.title('Comparison between PENN and Exact\FEM Solution', fontsize=14)
+                plt.legend(fontsize=12)
+                plt.grid(True, linestyle=':')
+
+            elif self.gd == 2:
+                ax2 = fig.add_subplot(131, projection="3d")
+                surf1 = ax2.plot_trisurf(node[:, 0], node[:, 1], net_pred,
+                                        cmap='viridis', edgecolor='k', linewidth=0.2, alpha=0.8)
+                ax2.set_title('PENN Solution', fontsize=12)
+                ax2.set_xlabel('x', fontsize=10)
+                ax2.set_ylabel('y', fontsize=10)    
+                ax2.set_zlabel('u(x,y)', fontsize=10)
+                fig.colorbar(surf1, ax=ax2, shrink=0.5, label='value')
+
+                ax3 = fig.add_subplot(132, projection="3d")
+                surf2 = ax3.plot_trisurf(node[:, 0], node[:, 1],
+                                        u_true, cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
+                ax3.set_xlabel('x', fontsize=10)
+                ax3.set_ylabel('y', fontsize=10)    
+                ax3.set_zlabel('u(x,y)', fontsize=10)
+                fig.colorbar(surf2, ax=ax3, shrink=0.5, label='value')
+
+                ax4 = fig.add_subplot(133, projection="3d")
+                surf3 = ax4.plot_trisurf(node[:, 0], node[:, 1],
+                                        er, cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
+                ax4.set_xlabel('x', fontsize=10)
+                ax4.set_ylabel('y', fontsize=10)    
+                ax4.set_zlabel('u(x,y)', fontsize=10)
+                fig.colorbar(surf3, ax=ax4, shrink=0.5, label='value')
+
+                if self.solution_flag:
+                    ax3.set_title('Exact Solution')
+                    ax4.set_title('Error: PINN - Exact', fontsize=12)
+                    plt.suptitle('Comparison between PINN and Exact Solution')
+                else:
+                    ax3.set_title('FEM Solution')
+                    ax4.set_title('Error: PINN - FEM', fontsize=12)
+                    plt.suptitle('Comparison between PINN and FEM Solution')
+                plt.legend(fontsize=12)
+                plt.grid(True, linestyle=':')
 
         plt.tight_layout()      
         plt.show() 

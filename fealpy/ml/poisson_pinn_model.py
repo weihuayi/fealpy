@@ -60,6 +60,8 @@ class PoissonPINNModel(ComputationalModel):
 
         scheduler(torch.optim.lr_scheduler.StepLR): Learning rate scheduler.
 
+        tmr(timer): Timer object for recording training and solution process times.
+
         mesh(TriangleMesh or UniformMesh): Discretization mesh for error estimation.
 
         net(nn.Module): Neural network architecture.
@@ -69,6 +71,8 @@ class PoissonPINNModel(ComputationalModel):
         error_fem(list): Error history compared with finite element method.
 
         options(dict): Configuration dictionary passed during initialization.
+
+        solution_flag(bool): Mark exact solution as nonexistent. Default is True.
             
     Methods:
         get_options(): Get default configuration parameters for the model.
@@ -84,6 +88,9 @@ class PoissonPINNModel(ComputationalModel):
         bc_residual(): Compute boundary condition residual.
 
         predict(): Make predictions at given points.
+
+        fem(): Solve Poisson's equation using Finite Element Method (FEM) for comparison
+            if PDE don't have an analytical solution.
 
         run(): Execute training and prediction process.
 
@@ -109,18 +116,18 @@ class PoissonPINNModel(ComputationalModel):
         self.log_level = self.options['log_level']
         super().__init__(pbar_log=self.pbar_log, log_level=self.log_level)
   
-        self.lr = self.options['lr']   # 学习率
-        self.epochs = self.options['epochs']  # 迭代次数
-        self.hidden_size = self.options['hidden_size']     # 网络层数与节点数
-        self.activation = activations[self.options['activation']]    # 激活函数
-        self.npde = self.options['npde']   # 内部采样点数
-        self.nbc = self.options['nbc']   # 边界点数
-        self.weights = self.options['weights']   # 权重
-        self.tmr = timer()   # 计时器
+        self.lr = self.options['lr']   # learning rate
+        self.epochs = self.options['epochs']  # epochs
+        self.hidden_size = self.options['hidden_size']     # hidden layer sizes
+        self.activation = activations[self.options['activation']]    # activation function
+        self.npde = self.options['npde']   # number of PDE collocation points
+        self.nbc = self.options['nbc']   # number of boundary collocation points
+        self.weights = self.options['weights']   # weights
+        self.tmr = timer()   # timer
 
         self.set_pde(self.options['pde'])  # PDE 
-        self.set_mesh(self.options['mesh_size'])  # 网格
-        self.set_network()  # 网络
+        self.set_mesh(self.options['mesh_size'])  # mesh
+        self.set_network()  # network
 
     @classmethod
     def get_options(cls):
@@ -286,13 +293,12 @@ class PoissonPINNModel(ComputationalModel):
         """
         u = self.net(p)
         f = self.pde.source(p)
-        
-        # 一阶导数计算
+
         grad_u = gradient(u, p, create_graph=True)  ## (npde, dim)
-        laplacian = bm.zeros(u.shape[0])    # 拉普拉斯项初始化
+        laplacian = bm.zeros(u.shape[0])    
         
         for i in range(p.shape[-1]):
-            u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # 计算 ∂²u/∂x_i²
+            u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # compute ∂²u/∂x_i²
             laplacian += u_ii.flatten()
 
         assert f.shape == laplacian.shape, \
@@ -332,8 +338,7 @@ class PoissonPINNModel(ComputationalModel):
             
             The loss function combines PDE residual and boundary condition terms.
         """
-        tmr = timer()
-        next(tmr)
+        next(self.tmr)
         # sampler
         sampler_pde = ISampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
         sampler_bc = BoxBoundarySampler(self.domain, requires_grad=True, mode=self.options['sampling_mode'])
@@ -371,14 +376,20 @@ class PoissonPINNModel(ComputationalModel):
 
             if epoch % 100 == 0:
                 # L² error 
-                if hasattr(self.pde, 'solution'):
-                    error = self.net.estimate_error(self.pde.solution, mesh, coordtype='c')
-                    self.error.append(error.item())
+                try:
+                    if hasattr(self.pde, 'solution'):
+                        self.solution_flag = True
+                        error = self.net.estimate_error(self.pde.solution, mesh, coordtype='c')
+                        self.error.append(error.item())
+                except NotImplementedError:
+                    # The exact solution is unknown，so Mark exact solution as nonexistent .
+                    self.solution_flag = False
                 self.Loss.append(loss.item())
                 self.logger.info(f"epoch: {epoch}, Loss: {loss.item():.6f}")  
                
-        tmr.send(f'PINN training time')
-        next(tmr)
+        self.tmr.send(f'PINN training time')
+        if self.solution_flag:
+            next(self.tmr)
 
     def predict(self, p: TensorLike) -> TensorLike:
         """Make predictions using the trained network.
@@ -390,6 +401,51 @@ class PoissonPINNModel(ComputationalModel):
             TensorLike: Network predictions at input points.
         """
         return self.net(p)
+    
+    def fem(self):
+        """Solve Poisson's equation using Finite Element Method (FEM) for comparison 
+        if PDE don't have an analytical solution.
+        
+        Returns:
+            uh(TensorLike): FEM solution results
+
+        Notes:
+            q=1, p=q+2, where p is the polynomial degree of the finite element space.
+        """
+        from fealpy.functionspace import LagrangeFESpace
+        from fealpy.fem import BilinearForm, LinearForm
+        from fealpy.fem  import ScalarDiffusionIntegrator, ScalarSourceIntegrator
+        from fealpy.fem import DirichletBC
+        from fealpy.solver import spsolve
+
+        pde = self.pde
+        mesh = self.mesh
+        p = 1
+        q = p + 2
+        space = LagrangeFESpace(mesh, p)
+        S = BilinearForm(space)
+        S.add_integrator(ScalarDiffusionIntegrator(q=q))
+        A = S.assembly()
+
+        b = LinearForm(space)
+        b.add_integrator(ScalarSourceIntegrator(pde.source, q=q))
+
+        F = b.assembly()
+
+        node = mesh.entity('node')
+        
+        if hasattr(self.pde, 'identify_boundary_edge'):
+            if self.gd == 1:
+                bcf = pde.is_dirichlet_boundary(node).flatten()
+            else:
+                bcf = pde.is_dirichlet_boundary(node)
+            A, F = DirichletBC(space=space, gd=pde.dirichlet, threshold=bcf).apply(A, F)
+        else:
+            A, F = DirichletBC(space=space, gd=pde.dirichlet).apply(A, F)
+        uh = spsolve(A, F)
+        self.tmr.send(f'FEM solving time')
+        next(self.tmr)
+        return uh
 
     def show(self):
         """Visualize training results and solution comparisons.
@@ -403,34 +459,35 @@ class PoissonPINNModel(ComputationalModel):
             Uses matplotlib for visualization with separate subplots for different metrics.
         """
         import matplotlib.pyplot as plt
-
-        fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(8, 6))
+        
+        fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
         Loss = bm.log10(bm.tensor(self.Loss)).numpy()
 
         # loss curve
-        axes[0].plot(Loss, 'r-', linewidth=2)
-        axes[0].set_title('Training Loss', fontsize=12)
-        axes[0].set_xlabel('training epochs*100', fontsize=10)
-        axes[0].set_ylabel('log10(Loss)', fontsize=10)
-        axes[0].grid(True)
+        axes.plot(Loss, 'r-', linewidth=2)
+        axes.set_title('PINN Training Loss', fontsize=12)
+        axes.set_xlabel('training epochs*100', fontsize=10)
+        axes.set_ylabel('log10(Loss)', fontsize=10)
+        axes.grid(True)
 
         # PINN vs exact error 
-        if hasattr(self.pde, 'solution'):
+        if self.solution_flag:
+            fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(8, 6))
             error = bm.log10(bm.tensor(self.error)).numpy()
-            axes[1].plot(error, 'b--', linewidth=2)
-            axes[1].set_title('L2 Error between PINN Solution and Exact Solution', fontsize=12)
-            axes[1].set_ylabel('log10(Error)', fontsize=10)
-            axes[1].set_xlabel('training epochs*100', fontsize=10)
-            axes[1].grid(True)
+            axes.plot(error, 'b--', linewidth=2)
+            axes.set_title('L2 Error between PINN Solution and Exact Solution', fontsize=12)
+            axes.set_ylabel('log10(Error)', fontsize=10)
+            axes.set_xlabel('training epochs*100', fontsize=10)
+            axes.grid(True)
 
         if self.gd <= 2:
             mesh = self.mesh
             node = mesh.entity('node')
-            u_pred = self.net(node).detach().numpy().flatten()  # PINN solution
-            if hasattr(self.pde, 'solution'):
+            u_pred = self.net(node).detach().numpy().flatten()  # PINN solution            
+            if self.solution_flag:
                 u_true = self.pde.solution(node).detach().numpy()   # exact solution
             else:
-                pass
+                u_true = self.fem().detach().numpy()  # FEM solution
             node = node.detach().numpy()
             fig = plt.figure()
             if self.gd == 1:
@@ -460,7 +517,6 @@ class PoissonPINNModel(ComputationalModel):
                 surf2 = ax2_3d.plot_trisurf(
                     node[:, 0], node[:, 1], u_true,
                     cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
-                ax2_3d.set_title('Exact Solution')
                 ax2_3d.set_xlabel('X')
                 ax2_3d.set_ylabel('Y')
                 ax2_3d.set_zlabel('u(x,y)')
@@ -469,12 +525,19 @@ class PoissonPINNModel(ComputationalModel):
                 ax4 = fig.add_subplot(133, projection="3d")
                 surf3 = ax4.plot_trisurf(node[:, 0], node[:, 1],
                                         u_pred - u_true, cmap='plasma', edgecolor='k', linewidth=0.2, alpha=0.8)
-                ax4.set_title('Error: PINN - Exact', fontsize=12)
                 ax4.set_xlabel('x', fontsize=10)
                 ax4.set_ylabel('y', fontsize=10)    
                 ax4.set_zlabel('u(x,y)', fontsize=10)
                 fig.colorbar(surf3, ax=ax4, shrink=0.5, label='value')
-                plt.suptitle('Comparison between PINN and Exact Solution')
+
+                if self.solution_flag:
+                    ax2_3d.set_title('Exact Solution')
+                    ax4.set_title('Error: PINN - Exact', fontsize=12)
+                    plt.suptitle('Comparison between PINN and Exact Solution')
+                else:
+                    ax2_3d.set_title('FEM Solution')
+                    ax4.set_title('Error: PINN - FEM', fontsize=12)
+                    plt.suptitle('Comparison between PINN and FEM Solution')
 
         plt.tight_layout()      
         plt.show()  
