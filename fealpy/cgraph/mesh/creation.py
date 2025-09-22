@@ -41,3 +41,30 @@ class Box2d(CNodeType):
         if domain is not None:
             kwds["box"] = domain
         return MeshClass.from_box(**kwds)
+
+class SphericalShell3d(CNodeType):
+    r"""Create a tetrahedral mesh in a spherical shell region.
+
+    Inputs:
+        r1 (float, optional): Inner radius of the spherical shell.
+        r2 (float, optional): Outer radius of the spherical shell.
+        h (float, optional): Mesh size parameter.
+
+    Outputs:
+        mesh (MeshType): The mesh object created.
+    """
+    TITLE: str = "带空腔的球体网格"
+    PATH: str = "网格.构造"
+    INPUT_SLOTS = [
+        PortConf("r1", DataType.FLOAT, title="内半径", default=0.05, min_val=0.0),
+        PortConf("r2", DataType.FLOAT, title="外半径", default=0.5, min_val=0.0),
+        PortConf("h", DataType.FLOAT, title="网格尺度", default=0.04, min_val=1e-6),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH, title="网格")
+    ]
+    @staticmethod
+    def run(r1, r2, h):
+        from fealpy.mesh import TetrahedronMesh
+        mesh = TetrahedronMesh.from_spherical_shell(r1=r1, r2=r2, h=h)
+        return mesh
