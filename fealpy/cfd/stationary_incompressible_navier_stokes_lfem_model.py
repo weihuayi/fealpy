@@ -1,11 +1,7 @@
-from typing import Union
 from fealpy.backend import backend_manager as bm
-from fealpy.decorator import variantmethod, cartesian
+from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
-from fealpy.mesh import Mesh
-from fealpy.utils import timer
 from fealpy.cfd.equation import StationaryIncompressibleNS
-from scipy.interpolate import griddata
 
 class StationaryIncompressibleNSLFEMModel(ComputationalModel):
     """
@@ -181,7 +177,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         b = LForm.assembly()
         A, b = self.fem.apply_bc(A, b, self.pde)
         if self.equation.pressure_neumann == True:
-            A, b = self.fem.lagrange_multiplier(A, b)
+            A, b = self.fem.lagrange_multiplier(A, b, c = self.pde.pressure_integral_target())
         x = self.solve(A, b)
 
         ugdof = self.fem.uspace.number_of_global_dofs()
@@ -200,10 +196,21 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         maxit = self.maxit if self.options is not None else maxit
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
+        u_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
+        p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         for i in range(maxit):
             self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
             uh1, ph1 = self.run['main'](maxstep, tol)
+            uerror, perror = self.error(uh1, ph1)
+            u_errorMatrix[0, i] = uerror
+            p_errorMatrix[0, i] = perror
             self.mesh.uniform_refine()
+        order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
+        order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
+        self.logger.info(f"速度最终误差:" + ",".join(f"{uerror:.15e}" for uerror in u_errorMatrix[0,]))
+        self.logger.info(f"order_u: " + ", ".join(f"{order_u:.15e}" for order_u in order_u))
+        self.logger.info(f"压力最终误差:" + ",".join(f"{perror:.15e}" for perror in p_errorMatrix[0,]))  
+        self.logger.info(f"order_p: " + ", ".join(f"{order_p:.15e}" for order_p in order_p))
         return uh1, ph1
 
     @variantmethod('direct')
@@ -221,70 +228,4 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         uerror = self.mesh.error(self.pde.velocity, uh)
         perror = self.mesh.error(self.pde.pressure, ph)
         return uerror, perror
-    
-    @error.register('benchmark')
-    def error(self, uh, ph):
-        """
-        Compute the error in benchmark form.
-        """
-        self.error_str = 'benchmark'
-        fem = self.fem
-        mesh = self.mesh
-        location = mesh.location
-        ipoints = fem.uspace.interpolation_points()
-        qf = mesh.quadrature_formula(q=4, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        vd = fem.uspace.function()
-        vl = fem.uspace.function()
-        vd[:len(ipoints)][self.pde.is_obstacle_boundary(ipoints)] = 1.0
-        vl[len(ipoints):][self.pde.is_obstacle_boundary(ipoints)] = 1.0
-        
-        cellmeasure = self.mesh.entity_measure("cell")
-        p = ph(bcs = bcs)
-        grad_vd = self.fem.uspace.grad_value(uh = vd, 
-                                             bc = bcs)
-        grad_uh = self.fem.uspace.grad_value(uh = uh, 
-                                             bc = bcs)
-        cd = self.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vd, cellmeasure) 
-        cd += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
-                                                    grad_uh,
-                                                    vd(bcs = bcs), cellmeasure)  
-        cd -= bm.einsum('n, kn, knii, k -> ', ws, p, grad_vd, cellmeasure) 
-
-        grad_vl = self.fem.uspace.grad_value(uh = vl, 
-                                             bc = bcs)
-        grad_uh = self.fem.uspace.grad_value(uh = uh, 
-                                             bc = bcs)
-        cl = self.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vl, cellmeasure)
-        cl += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ', ws, 
-                                                                    uh(bcs = bcs), 
-                                                                    grad_uh, 
-                                                                    vl(bcs = bcs),
-                                                                    cellmeasure)
-        cl -= bm.einsum('n, knii, kn, k -> ', ws, grad_vl, p, cellmeasure)
-        
-        point0 = bm.array([[0.15, 0.2]])
-        point1 = bm.array([[0.25, 0.2]])
-        index0 = location(points=point0)
-        index1 = location(points=point1)
-
-        def get_bcs(point, index):
-            node_points = mesh.entity("node")
-            c2n = mesh.cell_to_node()
-            cell = node_points[c2n][index][0]
-            S = 0.5 * bm.cross(cell[1]-cell[0], cell[2]-cell[0])
-            lambda1 = 0.5 * bm.cross(cell[1]-point[0], cell[2]-point[0]) / S
-            lambda2 = 0.5 * bm.cross(cell[2]-point[0], cell[0]-point[0]) / S
-            lambda3 = 1.0 - lambda1 - lambda2
-            bcs = bm.array([[lambda1, lambda2, lambda3]])
-            return bcs
-        
-        bcs0 = get_bcs(point=point0, index = index0)
-        bcs1 = get_bcs(point=point1, index = index1)
-
-        cd = -500 * cd
-        cl = -500 * cl
-        delta_p = ph(bcs = bcs0, index = index0) - ph(bcs = bcs1, index = index1)
-        return cd, cl, delta_p
     

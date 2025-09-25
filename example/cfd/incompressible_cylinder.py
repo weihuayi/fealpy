@@ -1,0 +1,252 @@
+from fealpy.backend import backend_manager as bm
+from fealpy.cfd.model import CFDPDEModelManager
+from fealpy.cfd.incompressible_navier_stokes_lfem_2d_model import IncompressibleNSLFEM2DModel
+import argparse
+
+
+## 参数解析
+parser = argparse.ArgumentParser(description=
+    """
+    Solve elliptic equations using the lowest order Raviart-Thomas element and piecewise constant mixed finite element method.
+    """)
+
+parser.add_argument('--backend',
+    default='numpy', type=str,
+    help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
+
+parser.add_argument('--pde',
+    default = 2, type=str,
+    help="Name of the PDE model, default is sinsin")
+
+parser.add_argument('--rho',
+    default=1.0, type=float,
+    help="Density of the fluid, default is 1.0")
+
+parser.add_argument('--mu',
+    default=1.0, type=float,
+    help="Viscosity of the fluid, default is 1.0")
+
+parser.add_argument('--T0',
+    default=0.0, type=float,
+    help="Initial time, default is 0.0")
+
+parser.add_argument('--T1',
+    default=6.0, type=float,
+    help="Final time, default is 0.5")
+
+parser.add_argument('--nt',
+    default=24000, type=int,
+    help="Number of time steps, default is 1000")
+
+parser.add_argument('--init_mesh',
+    default = 'tri', type=str,
+    help="Type of initial mesh, default is tri")
+
+parser.add_argument('--box',
+    default = [0.0, 2.2, 0.0, 0.41], type=int,
+    help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 2.2, 0.0, 0.41].")
+
+parser.add_argument('--center',
+    default = (0.2, 0.2), type=float,
+    help="Center of the first circle, default is (0.2, 0.2).")
+
+parser.add_argument('--radius',
+    default = 0.05, type=int,
+    help="Radius of the circles, default is 0.05.")
+
+parser.add_argument('--n_circle',
+    default = 400, type=int,
+    help="Number of divisions in the circle, default is 60")
+
+parser.add_argument('--lc',
+    default = 0.01, type=float,
+    help="Target mesh element size (characteristic length). Default: 0.01.")
+
+parser.add_argument('--method',
+    default='IPCS', type=str,
+    help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
+
+parser.add_argument('--solve',
+    default='direct', type=str,
+    help="Type of solver, default is direct, options are direct, iterative")
+
+parser.add_argument('--apply_bc',
+    default='cylinder', type=str,
+    help="Type of boundary condition application, default is dirichlet, options are dirichlet, neumann, cylinder, None")
+
+parser.add_argument('--postprocess',
+    default='res', type=str,
+    help="Post-processing method, default is error, options are error, plot")
+
+parser.add_argument('--run',
+    default='main_cylinder', type=str,
+    help="Type of refinement strategy, default is uniform_refine")
+
+parser.add_argument('--maxit',
+    default=5, type=int,
+    help="Maximum number of iterations for the solver, default is 5")
+
+parser.add_argument('--maxstep',
+    default=10, type=int,
+    help="Maximum number of steps for the refinement, default is 1000")
+
+parser.add_argument('--tol',
+    default=1e-10, type=float,
+    help="Tolerance for the solver, default is 1e-10")
+
+# 解析参数
+options = vars(parser.parse_args())
+
+bm.set_backend(options['backend'])
+# bm.set_default_device('cpu')
+manager = CFDPDEModelManager('incompressible_navier_stokes')
+pde = manager.get_example(options['pde'], **options)
+mesh = pde.init_mesh()
+model = IncompressibleNSLFEM2DModel(pde=pde, mesh = mesh, options = options)
+model.equation.set_constitutive(1)
+model.equation.set_coefficient('viscosity', pde.mu)
+
+mesh = model.mesh         
+pde = model.pde
+fem = model.fem
+fem.dt = model.timeline.dt
+maxstep = model.maxstep 
+tol = model.tol 
+
+def benchmark(uh, ph, uh0):
+    location = mesh.location
+    qf = mesh.quadrature_formula(q=4, etype='cell')
+    bcs, ws = qf.get_quadrature_points_and_weights()
+
+    vd = fem.uspace.function()
+    ipoints = fem.uspace.interpolation_points()
+    vd[:len(ipoints)][model.pde.is_obstacle_boundary(ipoints)] = 1.0
+    vl = fem.uspace.function()
+    vl[len(ipoints):][model.pde.is_obstacle_boundary(ipoints)] = 1.0
+
+    cellmeasure = model.mesh.entity_measure("cell")
+    p = ph(bcs = bcs)
+    u = uh(bcs = bcs)
+    u0 = uh0(bcs = bcs)
+    grad_vd = model.fem.uspace.grad_value(uh = vd, 
+                                            bc = bcs)
+    grad_vl = model.fem.uspace.grad_value(uh = vl, 
+                                            bc = bcs)
+    grad_uh = model.fem.uspace.grad_value(uh = uh, 
+                                            bc = bcs)
+    
+    cd = (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u, vd(bcs = bcs), cellmeasure)
+    cd -= (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u0, vd(bcs = bcs), cellmeasure)
+    cd += model.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vd, cellmeasure) 
+    cd += model.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
+                                                grad_uh,
+                                                vd(bcs = bcs), cellmeasure)  
+    cd -= bm.einsum('n, knii, kn, k -> ', ws, grad_vd, p, cellmeasure) 
+
+    cl = (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u, vl(bcs = bcs), cellmeasure)
+    cl -= (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u0, vl(bcs = bcs), cellmeasure)
+    cl += model.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vl, cellmeasure) 
+    cl += model.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
+                                                grad_uh,
+                                                vl(bcs = bcs), cellmeasure)  
+    cl -= bm.einsum('n, knii, kn, k -> ', ws, grad_vl, p, cellmeasure)  
+
+    point0 = bm.array([[0.15, 0.2]])
+    point1 = bm.array([[0.25, 0.2]])
+    index0 = location(points=point0)
+    index1 = location(points=point1)
+
+    def get_bcs(point, index):
+        node_points = mesh.entity("node")
+        c2n = mesh.cell_to_node()
+        cell = node_points[c2n][index][0]
+        S = 0.5 * bm.cross(cell[1]-cell[0], cell[2]-cell[0])
+        lambda1 = 0.5 * bm.cross(cell[1]-point[0], cell[2]-point[0]) / S
+        lambda2 = 0.5 * bm.cross(cell[2]-point[0], cell[0]-point[0]) / S
+        lambda3 = 1.0 - lambda1 - lambda2
+        bcs = bm.array([[lambda1, lambda2, lambda3]])
+        return bcs
+    
+    bcs0 = get_bcs(point=point0, index = index0)
+    bcs1 = get_bcs(point=point1, index = index1)
+
+    cd = -20 * cd
+    cl = -20 * cl
+    delta_p = ph(bcs = bcs0, index = index0) - ph(bcs = bcs1, index = index1)
+    return cd, cl, delta_p
+
+
+
+from fealpy.decorator import cartesian
+# import vtk
+
+# reader = vtk.vtkXMLUnstructuredGridReader()
+# reader.SetFileName("/home/libz/Bob FEALPY/ns2d_0000014370.vtu")
+# reader.Update()
+
+# ugrid = reader.GetOutput()
+# points = ugrid.GetPoints().GetData()
+# print(points)
+
+# exit()
+u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, model.timeline.T0)))
+p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, model.timeline.T0)))
+cd = bm.zeros(model.timeline.NL-1)
+cl = bm.zeros(model.timeline.NL-1)
+delta_p = bm.zeros(model.timeline.NL-1)
+
+mesh.nodedata['ph'] = p0
+mesh.nodedata['uh'] = u0.reshape(model.mesh.GD,-1).T
+mesh.to_vtk(f'ns2d_{str(0).zfill(10)}.vtu')
+for i in range(model.timeline.NL-1):
+    t  = model.timeline.current_time()
+    model.logger.info(f"time={t}")
+    
+    u1,p1 = model.run['one_step'](u0, p0, maxstep, tol)
+    
+    cd[i], cl[i], delta_p[i] = benchmark(u1, p1, u0)
+    print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
+    u0[:] = u1
+    p0[:] = p1
+
+    if i < 20000 :
+        mesh.nodedata['ph'] = p1
+        mesh.nodedata['uh'] = u1.reshape(model.mesh.GD,-1).T
+        mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+
+    model.timeline.advance()
+
+
+# uh, ph = model.run()
+# cd = model.cd
+# cl = model.cl
+# delta_p = model.delta_p
+# x = bm.linspace(0.0, 6.0, model.timeline.NL)
+# model.__str__()
+
+# import matplotlib.pyplot as plt
+
+# plt.figure(figsize=(10, 6))
+# plt.plot(x[16000:], cd[15999:], marker=None, linestyle='-', color='black')
+# plt.xscale('linear')
+# plt.yscale('linear')
+# plt.xlabel('Time', fontsize=14)
+# plt.ylabel('Drag coefficient', fontsize=14)
+# plt.show()
+
+
+# plt.figure(figsize=(10, 6))
+# plt.plot(x[16000:], cl[15999:], marker=None, linestyle='-', color='black')
+# plt.xscale('linear')
+# plt.yscale('linear')
+# plt.xlabel('Time', fontsize=14)
+# plt.ylabel('Lift coefficient', fontsize=14)
+# plt.show()
+
+# plt.figure(figsize=(10, 6))
+# plt.plot(x[16000:], delta_p[15999:], marker=None, linestyle='-', color='black')
+# plt.xscale('linear')
+# plt.yscale('linear')
+# plt.xlabel('Time', fontsize=14)
+# plt.ylabel('Pressure difference', fontsize=14)
+# plt.show()

@@ -132,46 +132,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         uerror, perror = self.error(u0, p0, t= self.timeline.T1)  
         return u0, p0
     
-    @run.register('main_cylinder')
-    def run(self, maxstep = 10, tol = 1e-10):
-        self.run_str = "main_cylinder"
-        mesh = self.mesh         
-        pde = self.pde
-        fem = self.fem
-        fem.dt = self.timeline.dt
-        maxstep = self.maxstep if self.options is not None else maxstep
-        tol = self.tol if self.options is not None else tol
-
-        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, self.timeline.T0)))
-        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, self.timeline.T0)))
-        cd = bm.zeros(self.timeline.NL-1)
-        cl = bm.zeros(self.timeline.NL-1)
-        delta_p = bm.zeros(self.timeline.NL-1)
-        
-        mesh.nodedata['ph'] = p0
-        mesh.nodedata['uh'] = u0.reshape(self.mesh.GD,-1).T
-        mesh.to_vtk(f'ns2d_{str(0).zfill(10)}.vtu')
-        for i in range(self.timeline.NL-1):
-            t  = self.timeline.current_time()
-            self.logger.info(f"time={t}")
-            
-            u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)
-            
-            cd[i], cl[i], delta_p[i] = self.error['benchmark'](u1, p1, u0)
-            print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
-            u0[:] = u1
-            p0[:] = p1
-
-            mesh.nodedata['ph'] = p1
-            mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
-            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
-
-            self.timeline.advance()
-        self.cd = cd
-        self.cl = cl
-        self.delta_p = delta_p
-        return u0, p0
-    
     @run.register('one_step')
     def run(self, u0, p0, maxstep=10, tol=1e-12):
         self.run_str = "one_step"
@@ -249,7 +209,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
 
     @run.register('uniform_refine')
-    def run(self, maxit=5, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'): 
+    def run(self, maxit=5, maxstep = 10, tol = 1e-12): 
         self.run_str = "uniform_refine"       
         maxit = self.maxit if self.options is not None else maxit
         maxstep = self.maxstep if self.options is not None else maxstep
@@ -265,13 +225,14 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uerror, perror = self.error(uh, ph, t= self.T1)
             u_errorMatrix[0, i] = uerror
             p_errorMatrix[0, i] = perror
-            order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
-            order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
             self.mesh.uniform_refine()
+        order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
+        order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
         self.logger.info(f"速度最终误差:" + ",".join(f"{uerror:.15e}" for uerror in u_errorMatrix[0,]))
         self.logger.info(f"order_u: " + ", ".join(f"{order_u:.15e}" for order_u in order_u))
         self.logger.info(f"压力最终误差:" + ",".join(f"{perror:.15e}" for perror in p_errorMatrix[0,]))  
         self.logger.info(f"order_p: " + ", ".join(f"{order_p:.15e}" for order_p in order_p))
+        return uh, ph
         
     @variantmethod('L2')
     def error(self, uh, ph, t):
@@ -282,68 +243,3 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         self.logger.info(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror
     
-    @error.register('benchmark')
-    def error(self, uh, ph, uh0):
-        self.error_str = 'benchmark'
-        fem = self.fem
-        mesh = self.mesh
-        location = mesh.location
-        qf = mesh.quadrature_formula(q=4, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        vd = fem.uspace.function()
-        ipoints = fem.uspace.interpolation_points()
-        vd[:len(ipoints)][self.pde.is_obstacle_boundary(ipoints)] = 1.0
-        vl = fem.uspace.function()
-        vl[len(ipoints):][self.pde.is_obstacle_boundary(ipoints)] = 1.0
-
-        cellmeasure = self.mesh.entity_measure("cell")
-        p = ph(bcs = bcs)
-        u = uh(bcs = bcs)
-        u0 = uh0(bcs = bcs)
-        grad_vd = self.fem.uspace.grad_value(uh = vd, 
-                                             bc = bcs)
-        grad_vl = self.fem.uspace.grad_value(uh = vl, 
-                                             bc = bcs)
-        grad_uh = self.fem.uspace.grad_value(uh = uh, 
-                                             bc = bcs)
-        
-        cd = (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u, vd(bcs = bcs), cellmeasure)
-        cd -= (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u0, vd(bcs = bcs), cellmeasure)
-        cd += self.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vd, cellmeasure) 
-        cd += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
-                                                    grad_uh,
-                                                    vd(bcs = bcs), cellmeasure)  
-        cd -= bm.einsum('n, knii, kn, k -> ', ws, grad_vd, p, cellmeasure) 
-
-        cl = (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u, vl(bcs = bcs), cellmeasure)
-        cl -= (1/fem.dt) * bm.einsum('n, kni, kni, k -> ', ws, u0, vl(bcs = bcs), cellmeasure)
-        cl += self.pde.mu * bm.einsum('n, knij, knij, k-> ', ws, grad_uh, grad_vl, cellmeasure) 
-        cl += self.pde.rho * bm.einsum('n, knj, knij, kni, k -> ',ws, uh(bcs = bcs), 
-                                                    grad_uh,
-                                                    vl(bcs = bcs), cellmeasure)  
-        cl -= bm.einsum('n, knii, kn, k -> ', ws, grad_vl, p, cellmeasure)  
-
-        point0 = bm.array([[0.15, 0.2]])
-        point1 = bm.array([[0.25, 0.2]])
-        index0 = location(points=point0)
-        index1 = location(points=point1)
-
-        def get_bcs(point, index):
-            node_points = mesh.entity("node")
-            c2n = mesh.cell_to_node()
-            cell = node_points[c2n][index][0]
-            S = 0.5 * bm.cross(cell[1]-cell[0], cell[2]-cell[0])
-            lambda1 = 0.5 * bm.cross(cell[1]-point[0], cell[2]-point[0]) / S
-            lambda2 = 0.5 * bm.cross(cell[2]-point[0], cell[0]-point[0]) / S
-            lambda3 = 1.0 - lambda1 - lambda2
-            bcs = bm.array([[lambda1, lambda2, lambda3]])
-            return bcs
-        
-        bcs0 = get_bcs(point=point0, index = index0)
-        bcs1 = get_bcs(point=point1, index = index1)
-
-        cd = -20 * cd
-        cl = -20 * cl
-        delta_p = ph(bcs = bcs0, index = index0) - ph(bcs = bcs1, index = index1)
-        return cd, cl, delta_p

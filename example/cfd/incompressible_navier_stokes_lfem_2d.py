@@ -55,11 +55,11 @@ parser.add_argument('--radius',
     help="Radius of the circles, default is 0.05.")
 
 parser.add_argument('--n_circle',
-    default = 400, type=int,
+    default = 60, type=int,
     help="Number of divisions in the circle, default is 60")
 
 parser.add_argument('--lc',
-    default = 0.01, type=float,
+    default = 0.1, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--method',
@@ -99,7 +99,6 @@ options = vars(parser.parse_args())
 
 from fealpy.old.pde.navier_stokes_equation_2d import FlowPastCylinder
 bm.set_backend(options['backend'])
-# bm.set_default_device('cpu')
 manager = CFDPDEModelManager('incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
@@ -107,60 +106,3 @@ model = IncompressibleNSLFEM2DModel(pde=pde, mesh = mesh, options = options)
 model.equation.set_constitutive(1)
 model.equation.set_coefficient('viscosity', pde.mu)
 uh, ph = model.run()
-cd = model.cd
-cl = model.cl
-delta_p = model.delta_p
-x = bm.linspace(0.0, 5.0, model.timeline.NL)
-# model.__str__()
-
-import matplotlib.pyplot as plt
-
-plt.figure(figsize=(10, 6))
-plt.plot(x[16000:20000], cd[15999:19999], marker=None, linestyle='-', color='black')
-plt.xscale('linear')
-plt.yscale('linear')
-plt.xlabel('Time', fontsize=14)
-plt.ylabel('Drag coefficient', fontsize=14)
-plt.show()
-
-plt.figure(figsize=(10, 6))
-plt.plot(x[16000:20000], cl[15999:19999], marker=None, linestyle='-', color='black')
-plt.xscale('linear')
-plt.yscale('linear')
-plt.xlabel('Time', fontsize=14)
-plt.ylabel('Lift coefficient', fontsize=14)
-plt.show()
-
-plt.figure(figsize=(10, 6))
-plt.plot(x[16000:20000], delta_p[15999:19999], marker=None, linestyle='-', color='black')
-plt.xscale('linear')
-plt.yscale('linear')
-plt.xlabel('Time', fontsize=14)
-plt.ylabel('Pressure difference', fontsize=14)
-plt.show()
-
-
-plt.figure(figsize=(10, 6))
-plt.plot(x[16000:], cd[15999:], marker=None, linestyle='-', color='black')
-plt.xscale('linear')
-plt.yscale('linear')
-plt.xlabel('Time', fontsize=14)
-plt.ylabel('Drag coefficient', fontsize=14)
-plt.show()
-
-
-plt.figure(figsize=(10, 6))
-plt.plot(x[16000:], cl[15999:], marker=None, linestyle='-', color='black')
-plt.xscale('linear')
-plt.yscale('linear')
-plt.xlabel('Time', fontsize=14)
-plt.ylabel('Lift coefficient', fontsize=14)
-plt.show()
-
-plt.figure(figsize=(10, 6))
-plt.plot(x[16000:], delta_p[15999:], marker=None, linestyle='-', color='black')
-plt.xscale('linear')
-plt.yscale('linear')
-plt.xlabel('Time', fontsize=14)
-plt.ylabel('Pressure difference', fontsize=14)
-plt.show()

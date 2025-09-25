@@ -1,6 +1,5 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
-from fealpy.cfd.equation import StationaryIncompressibleNS
+from fealpy.cfd.stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
 from fealpy.cfd.model import CFDTestModelManager
 import matplotlib.pyplot as plt
 import argparse

@@ -13,6 +13,7 @@ class Exp0003(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         super().__init__(box=self.box)
+        self.mesh = self.init_mesh[options.get('init_mesh', 'uniform_tri')](nx=options.get('nx', 8), ny=options.get('ny', 8))
 
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the PDE configuration."""
@@ -54,6 +55,10 @@ class Exp0003(BoxMesher2d):
         y = p[..., 1]
         pi = bm.pi
         return -0.25 * (bm.cos(4*pi*x) + bm.sin(4*pi*y))
+    
+    def pressure_integral_target(self) -> float:
+        """Integral of the exact pressure over the domain."""
+        return 0.0
     
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:
