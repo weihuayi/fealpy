@@ -24,21 +24,21 @@ class PoissonPINNModel(ComputationalModel):
     Parameters:
         options(dict): If None, default parameters from get_options() will be used.
             Configuration dictionary containing:
-            - pde: PDE definition (int or HelmholtzPDEDataT);
-            - lr: Learning rate (float);
-            - epochs: Number of training epochs (int);
-            - weights: Weight for the equation loss and boundary loss (tuple);
-            - hidden_size: Tuple of hidden layer sizes (tuple);
-            - npde: Number of PDE collocation points (int);
-            - nbc: Number of boundary collocation points (int);
-            - activation: Activation function (str, options: 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax');
-            - optimizer: Optimization algorithm (str, options: 'Adam', 'SGD');
-            - sampling_mode: Sampling strategy (str, options: 'linspace' or 'random');
-            - step_size: Period of learning rate decay (int);
-            - gamma: Multiplicative factor of learning rate decay (float);
-            - pbar_log: Whether to use progress bar for logging (bool);
-            - log_level: Logging level (str, options: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
-        
+            - pde(int or HelmholtzPDEDataT): PDE definition;
+            - lr(float): Learning rate;
+            - epochs(int): Number of training epochs;
+            - weights(tuple): Weight for the equation loss and boundary loss;
+            - hidden_size(tuple): Tuple of hidden layer sizes;
+            - npde(int): Number of PDE collocation points;
+            - nbc(int): Number of boundary collocation points;
+            - activation(str): Activation function (options: 'Tanh', 'ReLU', 'LeakyReLU', 'Sigmoid', 'LogSigmoid', 'Softmax', 'LogSoftmax');
+            - optimizer(str): Optimization algorithm (options: 'Adam', 'SGD');
+            - sampling_mode(str): Sampling strategy (options: 'linspace' or 'random');
+            - step_size(int): Period of learning rate decay;
+            - gamma(float): Multiplicative factor of learning rate decay;
+            - pbar_log(bool): Whether to use progress bar for logging;
+            - log_level(str): Logging level (options: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL').
+            
     Attributes:
         pde(PoissonPDEDataT): The Poisson PDE problem definition.
 
@@ -72,7 +72,7 @@ class PoissonPINNModel(ComputationalModel):
 
         options(dict): Configuration dictionary passed during initialization.
 
-        solution_flag(bool): Mark exact solution as nonexistent. Default is True.
+        solution_flag(bool): Used to mark whether the true solution exists. Default is True.
             
     Methods:
         get_options(): Get default configuration parameters for the model.
@@ -352,7 +352,7 @@ class PoissonPINNModel(ComputationalModel):
         for epoch in range(self.epochs+1):
             self.optimizer.zero_grad()
 
-            # 采样点
+            # sample
             if (self.options['sampling_mode'] == 'linspace') :
                 if epoch == 0:
                     ''' 'linspace' sampling mode only works one times '''

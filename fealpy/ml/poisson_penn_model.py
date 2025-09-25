@@ -550,12 +550,12 @@ class PoissonPENNModel(ComputationalModel):
 
                 if self.solution_flag:
                     ax3.set_title('Exact Solution')
-                    ax4.set_title('Error: PINN - Exact', fontsize=12)
-                    plt.suptitle('Comparison between PINN and Exact Solution')
+                    ax4.set_title('Error: PENN - Exact', fontsize=12)
+                    plt.suptitle('Comparison between PENN and Exact Solution')
                 else:
                     ax3.set_title('FEM Solution')
-                    ax4.set_title('Error: PINN - FEM', fontsize=12)
-                    plt.suptitle('Comparison between PINN and FEM Solution')
+                    ax4.set_title('Error: PENN - FEM', fontsize=12)
+                    plt.suptitle('Comparison between PENN and FEM Solution')
                 plt.legend(fontsize=12)
                 plt.grid(True, linestyle=':')
 

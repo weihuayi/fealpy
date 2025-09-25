@@ -87,7 +87,7 @@ class DiffusionReactionPENNModel(ComputationalModel):
         set_mesh(): Create computational mesh.
         
         set_steplr(): Set the learning rate scheduler.
-=
+
         shape_function(): Compute shape function values at given points.
 
         scaling_function(): Compute scaling function values at given points.
@@ -101,9 +101,6 @@ class DiffusionReactionPENNModel(ComputationalModel):
         run(): Start training the model.
 
         show(): Visualize the solution results.
-
-    Reference:
-        https://wnesm678i4.feishu.cn/wiki/Xc2iw6mDUiOBZCkQtFcczVcZnW9?from=from_copylink
 
     Examples:
         >>> from fealpy.backend import bm
@@ -279,8 +276,7 @@ class DiffusionReactionPENNModel(ComputationalModel):
         Returns:
             val(TensorLike): Tensor of shape (n_points, ) representing shape function values at each point.
         """
-        # a = 32
-        a=64
+        a = 32
         c = math.sqrt(math.pi * a) ** self.gd
         domain = self.domain
        
@@ -364,7 +360,7 @@ class DiffusionReactionPENNModel(ComputationalModel):
         for i in range(p.shape[-1]):
             u_ii = gradient(grad_u[..., i], p, create_graph=True, split=True)[i]   # computes ∂²u/∂x_i²
             laplacian += u_ii
-        val = laplacian + reaction
+        val = laplacian - reaction
         return val 
     
     def run(self):
@@ -439,7 +435,7 @@ class DiffusionReactionPENNModel(ComputationalModel):
         r = pde.reaction_coef()
         S = BilinearForm(space)
         S.add_integrator(ScalarDiffusionIntegrator(q=q))
-        S.add_integrator(ScalarMassIntegrator(coef=-r, q=q))
+        S.add_integrator(ScalarMassIntegrator(coef=r, q=q))
         A = S.assembly()
 
         b = LinearForm(space)
