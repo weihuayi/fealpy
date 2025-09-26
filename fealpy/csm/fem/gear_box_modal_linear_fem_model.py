@@ -5,7 +5,7 @@ import os
 from mpi4py import MPI
 from petsc4py import PETSc
 from slepc4py import SLEPc
-from scipy.sparse import bmat
+from scipy.sparse import bmat, block_diag
 
 from scipy.io import loadmat
 from scipy.sparse import csr_matrix
@@ -306,9 +306,12 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
         # 构造轴承的刚度矩阵
         B = shaft_system['bearing_stiffness_matrix']
+        nb = B.shape[0]//6
+        B = [B[i*6:(i+1)*6, 1:] for i in range(nb)]
+        BS = block_diag(B, format='csr')
 
 
-        return [[S00, S01], [S01.T, S11]], [[M00, M01], [M01.T, M11]]
+        return [[S00, S01], [S01.T, S11]], [[M00, M01], [M01.T, M11]], BS
 
 
     @variantmethod('direct')
@@ -344,7 +347,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         Construct the global linear system for the gearbox modal analysis.
         """
 
-        S0, M0 = self.shaft_linear_system()
+        S0, M0, BS = self.shaft_linear_system()
         self.rbe2_matrix()
         S1, M1 = self.box_linear_system()
 
@@ -353,9 +356,9 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         N2 = S0[1][1].shape[0]  # number of coupling dofs
 
         S = bmat([[S0[0][0],     S0[0][1],        None,     None],
-                  [S0[1][0],     S0[1][1],        None,     None],
+                  [S0[1][0],     S0[1][1],        None,       BS],
                   [    None,         None,    S1[0][0], S1[0][1]],
-                  [    None,         None,    S1[1][0], S1[1][1]]]).tocsr()
+                  [    None,           BS,    S1[1][0], S1[1][1]]]).tocsr()
         
         M = bmat([[M0[0][0],     M0[0][1],        None,     None],
                   [M0[1][0],     M0[1][1],        None,     None],
