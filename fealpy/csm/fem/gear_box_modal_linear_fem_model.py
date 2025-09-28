@@ -366,7 +366,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         M = bmat([[M0[0][0],     M0[0][1],        None,     None],
                   [M0[1][0],     M0[1][1]+BM,        None,     None],
                   [    None,         None,    M1[0][0], M1[0][1]],
-                  [    None,         None,    M1[1][0], M1[1][1]+BM]]).tocsr()
+                  [    None,         None,    M1[1][0], M1[1][1]]+BM]).tocsr()
 
         self.S = S
         self.M = M
@@ -492,7 +492,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         Construct the global linear system for the gearbox modal analysis.
         """
 
-        S0, M0 = self.shaft_linear_system()
+        S0, M0, BS, BM = self.shaft_linear_system()
         self.rbe2_matrix()
         S1, M1 = self.box_linear_system()
 
@@ -537,7 +537,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
         eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
 
-        sigma = 0.0  # 更贴近你的目标最小特征值（基于经验）
+        sigma = 2.0e+9  # 更贴近你的目标最小特征值（基于经验）
         eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
         eps.setTarget(sigma)  # ← 显式设置目标
 
@@ -591,7 +591,8 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         for i, val in enumerate(eigvecs):
             phi = bm.zeros((NN * 3,), dtype=self.ftype)
             idx, = bm.where(isFreeDof)
-            phi = bm.set_at(phi, idx, val[start:end])
+            if (end-start) == idx.shape[0]:
+                phi = bm.set_at(phi, idx, val[start:end])
             # transform the dof values of coupling nodes to surface nodes
             # constrained by the coupling nodes.
             idx, = bm.where(isCSDof)

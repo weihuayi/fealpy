@@ -47,7 +47,7 @@ fname = options['mesh_file'].stem + '.vtu'
 
 from fealpy.csm.fem import GearBoxModalLinearFEMModel
 model = GearBoxModalLinearFEMModel(options)
-PS, PM, NS, dof_nodes, dof_comps = model.construct_system['all']()
+PS, PM, NS, dof_nodes, dof_comps = model.construct_system['shaft']()
 eps = model.solve(PS, PM)
 model.post_process(eps, NS)
 #model.mesh.to_vtk(fname=fname)
