@@ -364,9 +364,9 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
                   [    None,          -BS, S1[1][0], S1[1][1]+BS]]).tocsr()
         
         M = bmat([[M0[0][0],     M0[0][1],        None,     None],
-                  [M0[1][0],     M0[1][1]+0.5*BM,        None,     None],
+                  [M0[1][0],     M0[1][1]+BM,        None,     None],
                   [    None,         None,    M1[0][0], M1[0][1]],
-                  [    None,         None,    M1[1][0], M1[1][1]+0.5*BM]]).tocsr()
+                  [    None,         None,    M1[1][0], M1[1][1]+BM]]).tocsr()
 
         self.S = S
         self.M = M
