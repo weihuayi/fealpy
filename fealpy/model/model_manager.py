@@ -141,5 +141,6 @@ class PDEModelManager(ModelManager):
         "optimal_control": "fealpy.model.optimal_control",
         "helmholtz": "fealpy.model.helmholtz",
         "surface_poisson": "fealpy.model.surface_poisson",
-        "curlcurl":"fealpy.model.curlcurl"
+        "curlcurl":"fealpy.model.curlcurl",
+        "dld_microfluidic_chip":"fealpy.model.dld_microfluidic_chip"
     }
