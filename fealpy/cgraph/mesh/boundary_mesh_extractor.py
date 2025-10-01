@@ -30,15 +30,15 @@ class BoundaryMeshExtractor(CNodeType):
             face_idx (array): the index of cells in the boundary mesh
                 within faces of original mesh.
     """
-    TITLE: str = "Boundary Mesh Extractor"
-    PATH: str = "mesh.operations"
+    TITLE: str = "提取边界网格"
+    PATH: str = "网格.操作"
     INPUT_SLOTS = [
-        PortConf("input_mesh", DataType.MESH)
+        PortConf("input_mesh", DataType.MESH, title="网格")
     ]
     OUTPUT_SLOTS = [
-        PortConf("boundary_mesh", DataType.MESH),
-        PortConf("node_idx", DataType.TENSOR),
-        PortConf("face_idx", DataType.TENSOR)
+        PortConf("boundary_mesh", DataType.MESH, title="边界网格"),
+        PortConf("node_idx", DataType.TENSOR, title="点编号"),
+        PortConf("face_idx", DataType.TENSOR, title="面编号")
     ]
 
     @staticmethod

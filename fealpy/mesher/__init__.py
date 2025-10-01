@@ -8,3 +8,6 @@ from .sphere_shell_mesher import SphereShellMesher
 from .hollowblock_mesher import HollowBlockMesher
 from .interface_mesher import InterfaceFittedMesher2d
 from .dld_microfluidic_chip_mesher import DLDMicrofluidicChipMesher
+from .naca0012_mesher import NACA0012Mesher
+from .stp_mesher import STPSurfaceMesher
+from .box_with_sphere_mesher import BoxWithSphereMesher

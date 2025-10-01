@@ -1,8 +1,8 @@
 from ..backend import backend_manager as bm
 from ..typing import TensorLike
-from ..solver import cg
 from ..sparse import CSRTensor,COOTensor
 from .opt import SumObjective
+
 
 class RadiusRatioSumObjective(SumObjective):
     '''
@@ -189,6 +189,8 @@ class RadiusRatioSumObjective(SumObjective):
             TensorLike
                 Preconditioned vector
         """
+        from ..solver import cg
+
         r = cg(self.P,x)
         return r
 

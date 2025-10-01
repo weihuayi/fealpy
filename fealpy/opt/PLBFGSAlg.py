@@ -27,9 +27,7 @@ class PLBFGS(Optimizer):
         x0: TensorLike,
         objective,
         Preconditioner: MatrixLike = None,
-        update_Preconditioner = None, 
         MaxIters: int = 500,
-        FunValDiff: float = 1e-6,
         StepLengthTol: float = 1e-6,
         NormGradTol: float = 1e-6,
         NumGrad = 10,
@@ -39,9 +37,7 @@ class PLBFGS(Optimizer):
             x0=x0,
             objective=objective,
             Preconditioner=Preconditioner,
-            update_Preconditioner=update_Preconditioner,
             MaxIters=MaxIters,
-            FunValDiff = FunValDiff, 
             StepLengthTol=StepLengthTol,
             NormGradTol=NormGradTol,
             NumGrad=NumGrad
@@ -56,6 +52,7 @@ class PLBFGS(Optimizer):
             rho = bm.set_at(rho, i, 1/bm.dot(self.S[i], self.Y[i]))
             alpha = bm.set_at(alpha, i, bm.dot(self.S[i], q)*rho[i])
             q = q - alpha[i]*self.Y[i]
+
         if self.P is not None:
             r = self.P@q
         else:
@@ -71,18 +68,21 @@ class PLBFGS(Optimizer):
         options = self.options
         x = options["x0"]
         strongwolfe = StrongWolfeLineSearch()
+
         f, g = self.fun(x)
         gnorm = bm.linalg.norm(g)
         pg = g
 
         alpha = options["StepLength"]
         if options["Print"]:
-            print(f'initial: f = {f}, gnorm = {gnorm}')
+            print('initial: f = {f}, gnorm = {gnorm}')
+
         flag = 0 # The convergence flag
         j = 0
         for i in range(1, options["MaxIters"]):
             d = -self.hessian_gradient_prod(g)
             gtd = bm.dot(g, d)
+
             if gtd >= 0 or bm.isnan(gtd):
                 print(f'Not descent direction, quit at iteration {i} witht statt {f}, grad:{gnorm}')
                 break
@@ -95,11 +95,6 @@ class PLBFGS(Optimizer):
             f = falpha
             g = galpha
             gnorm = bm.linalg.norm(g)
-            
-            if options["update_Preconditioner"] is None:
-                pass
-            else:
-                options["update_Preconditioner"](x)
 
             if options["Print"]:
                 print(f'current step {i}, StepLength = {alpha}, ', end='')
