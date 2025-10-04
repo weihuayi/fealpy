@@ -48,7 +48,8 @@ CurlCurlPDEDataT = TypeVar('CurlCurlPDEDataT', bound=CurlCurlPDEDataProtocol)
 
 
 DATA_TABLE = {
-        1 : ("exp0001", "Exp0001")
+        1 : ("exp0001", "Exp0001"),
+        2 : ("exp0002", "Exp0002")
 }
 
 

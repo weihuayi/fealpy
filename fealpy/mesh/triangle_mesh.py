@@ -1486,7 +1486,71 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         """
         import gmsh
-        pass
+
+        assert len(box) == 4, "box must be [xmin, xmax, ymin, ymax]"
+        xmin, xmax, ymin, ymax = map(float, box)
+        assert h > 0, "h must be positive."
+
+        print("[step] init gmsh")
+        gmsh.initialize()
+        gmsh.option.setNumber("General.Terminal", 1)
+
+        try:
+            print("[step] build geometry")
+            gmsh.model.add("box_with_holes")
+            xmin, xmax, ymin, ymax = map(float, box)
+
+            p1 = gmsh.model.occ.addPoint(xmin, ymin, 0)
+            p2 = gmsh.model.occ.addPoint(xmax, ymin, 0)
+            p3 = gmsh.model.occ.addPoint(xmax, ymax, 0)
+            p4 = gmsh.model.occ.addPoint(xmin, ymax, 0)
+            l1 = gmsh.model.occ.addLine(p1, p2)
+            l2 = gmsh.model.occ.addLine(p2, p3)
+            l3 = gmsh.model.occ.addLine(p3, p4)
+            l4 = gmsh.model.occ.addLine(p4, p1)
+            outer_loop = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
+
+            hole_loops = []
+            for cx, cy, r in holes or []:
+                circle = gmsh.model.occ.addCircle(cx, cy, 0, r)
+                loop = gmsh.model.occ.addCurveLoop([circle])
+                hole_loops.append(loop)
+
+            surf = gmsh.model.occ.addPlaneSurface([outer_loop] + hole_loops)
+
+            gmsh.model.occ.synchronize()
+
+            print("[step] mesh options & generate")
+            gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h)
+            gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
+            gmsh.model.mesh.generate(2)
+
+            # --- minimal stats ---
+            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+            node = bm.from_numpy(node_coords.reshape(-1, 3)[:, 0:2]) # only 2D
+
+            tri_type = gmsh.model.mesh.getElementType("triangle", 1)
+            types, elemTags, elemNodeTags = gmsh.model.mesh.getElements(2)
+            print(f"[step] found {len(elemTags)} elements of type {tri_type} with {len(node_tags)} nodes")
+            cell = None
+            for etype, cell in zip(types, elemNodeTags):
+                if etype == tri_type:
+                    nn = gmsh.model.mesh.getElementProperties(etype)[3]
+                    cell = bm.array(cell, dtype=bm.int32).reshape(-1, nn) - 1
+                    break
+
+        finally:
+            print("[step] finalize gmsh")
+            gmsh.finalize()
+            NN = len(node)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode = bm.set_at(isValidNode, cell, True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype)
+            idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=bm.int64))
+            cell = idxMap[cell]
+
+            return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod

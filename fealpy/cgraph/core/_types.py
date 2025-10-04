@@ -3,7 +3,7 @@ from enum import IntEnum, auto
 from typing import Protocol, NamedTuple, Any
 from collections.abc import Mapping
 
-__all__ = ["SlotStatus", "InputSlot", "OutputSlot",
+__all__ = ["SlotStatus", "Slot", "TransSlot", "InputSlot", "OutputSlot",
            "CNode", "NodeExceptionData", "NodeIOError", "NodeTopologyError"]
 
 
