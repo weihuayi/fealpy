@@ -15,7 +15,7 @@ class Exp0001(BoxMesher2d):
         self.mu = 1.0
         self.rho = 1.0
         super().__init__(box=self.box)
-        self.mesh = self.init_mesh['uniform_tri'](nx=options.get('nx', 8), ny=options.get('ny', 8))
+        self.mesh = self.init_mesh[options.get('init_mesh', 'uniform_tri')](nx=options.get('nx', 8), ny=options.get('ny', 8))
 
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the PDE configuration."""
@@ -35,13 +35,13 @@ class Exp0001(BoxMesher2d):
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
     
-    def set_mesh(self, nx, ny):
+    def set_mesh(self, nx: int, ny: int):
         mesh = super().init_mesh['uniform_tri'](nx=nx, ny=ny)
         self.mesh = mesh 
         return mesh
      
     @cartesian
-    def velocity(self, p: TensorLike, t) -> TensorLike:
+    def velocity(self, p: TensorLike, t: int) -> TensorLike:
         """Compute exact solution of velocity."""
         x = p[..., 0]
         y = p[..., 1]
@@ -51,24 +51,14 @@ class Exp0001(BoxMesher2d):
         return result
     
     @cartesian
-    def velocity_0(self, p):
-        return self.velocity(p, self.t0)
-
-    @cartesian
-    def pressure_0(self, p: TensorLike) -> TensorLike:
+    def pressure(self, p: TensorLike, t: float) -> TensorLike:
         """Compute exact solution of pressure."""
-        x = p[..., 0]
-        y = p[..., 1]
-        return self.pressure(p, self.t0)
-    
-    @cartesian
-    def pressure(self, p, t):
         x = p[..., 0]
         y = p[..., 1]
         return 10 * (2 * x - 1) * (2 * y - 1) * bm.cos(t)
     
     @cartesian
-    def source(self, p: TensorLike, t) -> TensorLike:
+    def source(self, p: TensorLike, t: float) -> TensorLike:
         """Compute exact source """
         x = p[..., 0]
         y = p[..., 1]
@@ -80,8 +70,6 @@ class Exp0001(BoxMesher2d):
     @cartesian
     def is_velocity_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point where velocity is defined is on boundary."""
-        # result = bm.ones_like(p[..., 0], dtype=bm.bool)
-        # return result
         return None
 
     @cartesian
@@ -90,14 +78,16 @@ class Exp0001(BoxMesher2d):
         return 0
 
     @cartesian
-    def velocity_dirichlet(self, p: TensorLike, t) -> TensorLike:
+    def velocity_dirichlet(self, p: TensorLike, t: float) -> TensorLike:
+        '''Compute Dirichlet boundary condition for velocity.'''
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
         return result
     
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike, t) -> TensorLike:
+    def pressure_dirichlet(self, p: TensorLike, t: float) -> TensorLike:
+        '''Compute Dirichlet boundary condition for pressure.'''
         x = p[..., 0]
         y = p[..., 1]
-        return None
+        return self.pressure(p, t)

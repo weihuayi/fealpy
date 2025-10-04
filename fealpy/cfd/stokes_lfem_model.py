@@ -6,7 +6,7 @@ from fealpy.mesh import Mesh
 from fealpy.utils import timer
 from fealpy.cfd.equation import StationaryIncompressibleNS
 
-class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
+class StokesLFEMModel(ComputationalModel):
     """
     StationaryIncompressibleNSLFEMModel: Stationary Incompressible Navier-Stokes Finite Element Solver
 
