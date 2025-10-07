@@ -62,19 +62,22 @@ class TensorPrismMesh(HomogeneousMesh, Plotable):
         qface = bm.concat([all_edge[:-tNE], all_edge[tNE:][:,::-1]], axis=1)
         self.node = node
         self.cell = cell
+        # from .prism_mesh import PrismMesh
+        # import matplotlib.pyplot as plt
+        # pm = PrismMesh(node, cell)
+        # ipoints = self.interpolation_points(p=2)
+        # fig = plt.figure()
+        # axes = fig.add_subplot(111, projection='3d')
+        # pm.add_plot(axes, cellcolor="#80e673")
+        # pm.find_node(axes, node=ipoints,
+        #                showindex=True, color='r', fontsize='20')
+        # pm.find_cell(axes=axes, showindex=True, fontsize='20')
+        # plt.show()
 
         self.tface = all_cell
         self.qface = qface
         self.edge = all_edge
     
-    def total_face(self) -> TensorLike:
-        cell = self.entity(self.TD)
-        local_face = self.localFace
-        NVF = local_face.shape[-1]
-        cell2face = bm.set_at(cell[..., local_face], (slice(None), bm.arange(2), -1), -1)
-        total_face = cell2face.reshape(-1, NVF)
-        return total_face
-
     # entity
     def entity_barycenter(self, etype: Union[int, str], index: Optional[Index]=None) -> TensorLike:
         """Calculate barycenters of mesh entities.
@@ -114,14 +117,10 @@ class TensorPrismMesh(HomogeneousMesh, Plotable):
 
     def cell_volume(self, index=_S):
         """Compute the volume of an element.
-
-        The volume is calculated using the formula:
-            ∫_c dx = ∫_τ |J| dξ
-        where c is the physical element, τ is the reference element, and J is the Jacobian matrix.
         """
         s0 = self.tmesh.entity_measure('cell')
         s1 = self.imesh.entity_measure('cell')
-        s = bm.einsum('i,j->ij', s0, s1).ravel()
+        s = bm.einsum('i,j->ij', s1, s0).ravel()
         return s
     
     def face_area(self, index=_S):
@@ -332,6 +331,4 @@ class TensorPrismMesh(HomogeneousMesh, Plotable):
         elif etype in {'edge', 1}:
             return qf1 
     
-
-
 
