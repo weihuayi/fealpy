@@ -363,10 +363,10 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
                   [    None,         None, S1[0][0],    S1[0][1]],
                   [    None,          -BS, S1[1][0], S1[1][1]+BS]]).tocsr()
         
-        M = bmat([[M0[0][0],     M0[0][1],        None,     None],
+        M = bmat([[M0[0][0],     M0[0][1],           None,     None],
                   [M0[1][0],     M0[1][1]+BM,        None,     None],
-                  [    None,         None,    M1[0][0], M1[0][1]],
-                  [    None,         None,    M1[1][0], M1[1][1]]+BM]).tocsr()
+                  [    None,         None,    M1[0][0],    M1[0][1]],
+                  [    None,         None,    M1[1][0], M1[1][1]+BM]]).tocsr()
 
         self.S = S
         self.M = M
@@ -537,7 +537,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
         eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
 
-        sigma = 2.0e+9  # 更贴近你的目标最小特征值（基于经验）
+        sigma = 1e-04  # 更贴近你的目标最小特征值（基于经验）
         eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
         eps.setTarget(sigma)  # ← 显式设置目标
 
