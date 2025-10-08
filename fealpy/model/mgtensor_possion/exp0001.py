@@ -6,7 +6,7 @@ from fealpy.mesher import BoxMesher3d
 from fealpy.backend import bm
 
 
-class Possion3d(BoxMesher3d):
+class Exp0001(BoxMesher3d):
     """
     3D Poisson problem:
 
