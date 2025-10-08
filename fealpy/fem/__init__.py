@@ -73,4 +73,4 @@ from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
 from .stokes_lfem_model import StokesLFEMModel
 from .dld_microfluidic_chip_lfem_model import DLDMicrofluidicChipLFEMModel
 from .curlcurl_upml_model import CurlCurlUPMLModel
-
+from .mgtensor_possion_lfem_model import MGTensorPossionLFEMModel
