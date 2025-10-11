@@ -78,3 +78,85 @@ class StationaryNSRun(CNodeType):
         uh_y = uh_y[:NN]
 
         return uh1, uh_x, uh_y, ph1
+    
+class IncompressibleNSIPCSRun(CNodeType):
+    TITLE: str = "IPCS 求解非稳态 NS 方程"
+    PATH: str = "流体.NS 方程有限元迭代求解"
+    INPUT_SLOTS = [
+        PortConf("T0", DataType.FLOAT, 0, title="初始时间"),
+        PortConf("T1", DataType.FLOAT, 0, title="结束时间"),
+        PortConf("nt", DataType.INT, 0, title="时间剖分数"),
+        PortConf("uspace", DataType.SPACE, title="速度函数空间"),
+        PortConf("pspace", DataType.SPACE, title="压力函数空间"),
+        PortConf("velocity_0", DataType.FUNCTION, title="初始速度"),
+        PortConf("pressure_0", DataType.FUNCTION, title="初始压力"),
+        PortConf("is_pressure_boundary", DataType.FUNCTION, title="压力边界"),
+        PortConf("predict_velocity", DataType.FUNCTION, title="预测速度方程离散"),
+        PortConf("correct_pressure", DataType.FUNCTION, title="压力修正方程离散"),
+        PortConf("correct_velocity", DataType.FUNCTION, title="速度修正方程离散"),
+        PortConf("mesh", DataType.MESH, title="网格")
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("uh", DataType.FUNCTION, title="速度数值解"),
+        PortConf("uh_x", DataType.FUNCTION, title="速度x分量数值解"),
+        PortConf("uh_y", DataType.FUNCTION, title="速度y分量数值解"),
+        PortConf("ph", DataType.FUNCTION, title="压力数值解")
+    ]
+    def run(T0, T1, nt, uspace, pspace, velocity_0, pressure_0, is_pressure_boundary,
+            predict_velocity, correct_pressure, correct_velocity, mesh):
+        from fealpy.backend import backend_manager as bm
+        from fealpy.decorator import cartesian
+        from fealpy.solver import spsolve
+        from fealpy.cfd.simulation.time import UniformTimeLine
+        
+        timeline = UniformTimeLine(T0, T1, nt)
+        dt = timeline.dt
+        u0 = uspace.interpolate(cartesian(lambda p: velocity_0(p, timeline.T0)))
+        p0 = pspace.interpolate(cartesian(lambda p: pressure_0(p, timeline.T0)))
+        ugdof = uspace.number_of_global_dofs()
+        pgdof = pspace.number_of_global_dofs()
+        NN = mesh.number_of_nodes()
+        uh = bm.zeros((nt, ugdof))
+        uh_x = bm.zeros((nt, NN))
+        uh_y = bm.zeros((nt, NN))
+        ph = bm.zeros((nt, NN))
+
+        for i in range(nt):
+            t  = timeline.current_time()
+            # print(f"time={t}")
+            
+            uh1 = u0.space.function()
+            uhs = u0.space.function()
+            ph1 = p0.space.function()
+             
+            A0, b0 = predict_velocity(u0, p0, t = timeline.next_time(), dt = dt)
+            uhs[:] = spsolve(A0, b0)
+
+            A1, b1 = correct_pressure(uhs, p0, t = timeline.next_time(), dt = dt)
+            if is_pressure_boundary() == 0:
+                ph1[:] = spsolve(A1, b1)[:-1]
+            else:
+                ph1[:] = spsolve(A1, b1)
+
+            A2, b2 = correct_velocity(uhs, p0, ph1, t = timeline.next_time(), dt = dt)
+            uh1[:] = spsolve(A2, b2)
+
+            u1 = uh1 
+            p1 = ph1
+            
+            u0[:] = u1
+            p0[:] = p1
+
+            # mesh.nodedata['ph'] = p1
+            # mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
+            # mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+
+            uh[i, :] = u1
+            uh_x[i, :] = u1[:int(ugdof/2)][:NN]
+            uh_y[i, :] = u1[int(ugdof/2):][:NN]
+            ph[i, :] = p1[:NN]
+ 
+            timeline.advance()
+
+        return uh, uh_x, uh_y, ph
+        

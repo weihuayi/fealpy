@@ -1,4 +1,5 @@
 
 from .stationary_ns_simulation import StationaryNSNewton, StationaryNSOssen, StationaryNSStokes
-from .ns_run import StationaryNSRun
-from .ns_dirichlet_bc import StationaryNSDBC
+from .ns_run import StationaryNSRun, IncompressibleNSProjectRun
+from .ns_dirichlet_bc import StationaryNSDBC, IncompressibleNSDBC
+from .incompressible_ns_simulation import IncompressibleNSIPCS

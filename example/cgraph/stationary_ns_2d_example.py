@@ -7,7 +7,7 @@ pde = cgraph.create("StationaryNS2d")
 mesher = cgraph.create("Box2d")
 uspacer = cgraph.create("TensorFunctionSpace")
 pspacer = cgraph.create("FunctionSpace")
-simulation = cgraph.create("StationaryNSStokes")
+simulation = cgraph.create("StationaryNSNewton")
 dbc = cgraph.create("StationaryNSDBC")
 StationaryNSRun = cgraph.create("StationaryNSRun")
 
