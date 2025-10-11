@@ -34,11 +34,10 @@ class ElastoplasticityData2D(LshapeMesher):
         self.E = 206900             # Young's modulus in MPa
         self.nu = 0.29              # Poisson's ratio
         self.hardening_modulus = 10000              # Hardening modulus a in MPa
-        self.yield_stress = 450 * (2/3)**0.5  # Initial yield stress in MPa
+        self.yield_stress = 450 # Initial yield stress in MPa
 
         self.dim = 2
-        self.Ft_max = 200         # N: max traction force
-        self.n = 2                  # Mesh refine level
+        self.Ft_max = 200        # N: max traction force
 
         self.lam = self.compute_lambda()
         self.mu = self.compute_mu()
@@ -47,7 +46,7 @@ class ElastoplasticityData2D(LshapeMesher):
         """Return a multi-line summary including PDE type and key params."""
         return (
             f"\n  elastoplasticity (2D Elasto-Plastic)\n"
-            f"  Box dimensions: L = 5.0, W = 5.0 dm\n"
+            f"  Box dimensions: L = 5.0, W = 5.0 m\n"
             f"  Young's modulus: E = {self.E} MPa\n"
             f"  Poisson's ratio: nu = {self.nu}\n"
             f"  Hardening modulus: a = {self.a} MPa\n"
@@ -66,16 +65,12 @@ class ElastoplasticityData2D(LshapeMesher):
 
     def domain(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         return self.box  
-     
+         
     @cartesian
-    def body_force(self, x):
-        return bm.zeros((x.shape[0], self.dim))  # No body force
-    
-    @cartesian
-    def source(self, p: TensorLike) -> TensorLike:
+    def body_force(self, p: TensorLike) -> TensorLike:
         shape = p.shape[:-1]
         f1 = bm.zeros(shape)       
-        f2 = self.Ft_max * bm.ones(shape) 
+        f2 = bm.zeros(shape)
         return bm.stack([f1, f2], axis=-1)
         
     @cartesian
@@ -90,7 +85,7 @@ class ElastoplasticityData2D(LshapeMesher):
         """
         shape = p.shape[:-1]
         f1 = bm.zeros(shape)  # x 方向无牵引
-        f2 = self.Ft_max * bm.ones(shape)/10.0  # y 方向
+        f2 = self.Ft_max * bm.ones(shape)  # y 方向
         return bm.stack([f1, f2], axis=-1)
 
     def dirichlet_boundary(self, p):

@@ -40,7 +40,7 @@ axes = fig.add_subplot(111)
 mesh = model.mesh
 mesh.add_plot(axes) # 画出网格背景
 mesh.find_cell(axes, showindex=True) # 找到单元重心
-plt.show()
+#plt.show()
 
 model.solve()
 
