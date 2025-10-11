@@ -1,7 +1,9 @@
-from fealpy.mesh import EdgeMesh
+
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.backend import TensorLike
+
+from fealpy.mesh import EdgeMesh
 
 class BarData1D:
     """

@@ -1,7 +1,9 @@
 ### Cell Operator
+from .elastoplasticity_diffusion_integrator import ElastoplasticDiffusionIntegrator
 from .euler_bernoulli_beam_diffusion_integrator import EulerBernoulliBeamDiffusionIntegrator
 from .euler_bernoulli_beam_uniform_source_integrator   import EulerBernoulliBeamSourceIntegrator
 from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliBeamPLSourceIntegrator
+from .elastoplasticity_source_internal_integrator import ElastoplasticitySourceIntIntegrator
 
 from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
 
