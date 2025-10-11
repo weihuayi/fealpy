@@ -28,7 +28,7 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
     def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
 
-    def _coord_transfrom(self) -> TensorLike:
+    def _coord_transform(self) -> TensorLike:
         """Construct the coordinate transformation matrix for 3D axle elements."""
         mesh = self.space.mesh
         node= mesh.entity('node')
@@ -115,6 +115,6 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         
         # 刚度矩阵
         Ke_batch = bm.repeat(Ke[None, :, :], NC, axis=0)  # (NC, 12, 12)
-        R = self._coord_transfrom()
+        R = self._coord_transform()
         KE = bm.einsum('cij, cjk, clk -> cil', R, Ke_batch, R)
         return KE
