@@ -28,7 +28,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
     def to_global_dof(self, space: _FS) -> TensorLike:
         return space.cell_to_dof()[self.index]
 
-    def _coord_transfrom(self) -> TensorLike:
+    def _coord_transform(self) -> TensorLike:
         """Construct the coordinate transformation matrix for 3D beam elements."""
         mesh = self.space.mesh
         node= mesh.entity('node')
@@ -113,7 +113,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Iz = mesh.celldata["Iz"]
 
         # 坐标变换矩阵
-        R = self._coord_transfrom()
+        R = self._coord_transform()
         
         return E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R, len(cells)
 
