@@ -1,6 +1,6 @@
 
 from ..backend import backend_manager as bm
-bm.set_backend('pytorch')
+
 
 from ..typing import TensorLike
 from ..decorator import cartesian

@@ -9,11 +9,12 @@ from ..fem import BilinearForm, LinearForm, BlockForm
 from ..fem import VectorSourceIntegrator
 from ..fem.huzhang_stress_integrator import HuZhangStressIntegrator
 from ..fem.huzhang_mix_integrator import HuZhangMixIntegrator
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.linear_elasticity import LinearElasticityPDEDataT
 from ..decorator import variantmethod
 from ..solver import spsolve,LinearElasticityHZFEMFastSolver
 from ..tools.show import show_error_table, showmultirate
+
 
 class LinearElasticityHuzhangFEMModel(ComputationalModel):
     """
@@ -31,9 +32,9 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
         self.set_init_mesh(options['init_mesh'])
         self.set_space_degree(options['space_degree'])
 
-    def set_pde(self, pde: Union[LinearElasticityPDEDataT, str]="boxtri2d"):
-        if isinstance(pde, str):
-            self.pde = PDEDataManager('linear_elasticity').get_example(pde)
+    def set_pde(self, pde: Union[LinearElasticityPDEDataT, int] = 1):
+        if isinstance(pde, int) or isinstance(pde, str):
+            self.pde = PDEModelManager('linear_elasticity').get_example(pde)
             self.logger.info(f"PDE initialized from string: '{pde}'")
         else:
             self.pde = pde
@@ -59,7 +60,7 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
     def set_material_parameters(self, lam: float, mu: float):
         self.material = LinearElasticMaterial("isoparametric", lame_lambda=lam, shear_modulus=mu)
         self.logger.info(f"Material parameters set: λ (Lamé first parameter) = {lam}, μ (shear modulus) = {mu}")
-<<<<<<< HEAD
+
 
 
     def set_space_degree(self, p: int):
@@ -149,12 +150,6 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
         showmultirate(plt, 2, h, errorMatrix,  errorType, propsize=20)
         plt.show()
 
-    
-
-
-=======
-
-
     def set_space_degree(self, p: int):
         self.p = p
 
@@ -208,9 +203,19 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
     
     @solve.register('gmres')
     def solve(self):
+        import time 
+        start_time1 = time.time()
         A, F, space_sigma, space_u = self.linear_system(self.mesh, self.p)
-        X,info = LinearElasticityHZFEMFastSolve(A, F, self.space, solver='gmres', rtol=1e-8, restart=20, maxit=None).solve()
-    
+        end_time1 = time.time()
+        print(f"Time elapsed: {end_time1 - start_time1} seconds")
+        
+        start_time2 = time.time()
+        # X,info = LinearElasticityHZFEMFastSolver(A, F, self.space, solver='gmres', rtol=1e-8, restart=20, maxit=None).solve()
+        X, info =  LinearElasticityHZFEMFastSolver(A, F, self.space, solver='gmres', rtol=1e-8).solve()
+
+        print(info)
+        end_time2 = time.time()
+        print(f"Time elapsed: {end_time2 - start_time2} seconds")
         gdof_sigma = space_sigma.number_of_global_dofs()
         sigma_h = space_sigma.function()
         u_h = space_u.function()
@@ -237,11 +242,11 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
     
     @variantmethod('onestep')
     def run(self):
-        sigma_h, u_h = self.solve['direct']()
-        l2_u = self.mesh.error(u_h, self.pde.displacement)
-        l2_sigma = self.mesh.error(sigma_h, self.pde.stress)
+        sigma_h, u_h,_ = self.solve['gmres']()
+        # l2_u = self.mesh.error(u_h, self.pde.disp_solution)
+        # l2_sigma = self.mesh.error(sigma_h, self.pde.stress_solution)
 
-        self.logger.info(f"u L2 error (u): {l2_u}, L2 error (σ): {l2_sigma}")
+        # self.logger.info(f"u L2 error (u): {l2_u}, L2 error (σ): {l2_sigma}")
 
     @run.register('uniform_refine')
     def run(self, maxit=4):
@@ -254,7 +259,7 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
 
         for i in range(maxit):
             N =  2**(i+1)
-            sigma_h, u_h = self.solve()
+            sigma_h, u_h,_ = self.solve()
             l2_u = self.mesh.error(u_h, self.pde.displacement)
             l2_sigma = self.mesh.error(sigma_h, self.pde.stress)
 
@@ -318,4 +323,3 @@ class LinearElasticityHuzhangFEMModel(ComputationalModel):
                 it = results[m]['iters'][i]
                 row += f'| {it if it is not None else "   N/A":6} '
             print(row)
->>>>>>> 2eda85e9f2470a4a38a7ba1c9160938776b2fd84

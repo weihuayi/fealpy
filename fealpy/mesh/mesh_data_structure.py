@@ -1,4 +1,5 @@
 
+import sys
 from typing import Union, Optional, Dict, overload, Callable, Any
 from logging import Logger
 
@@ -38,6 +39,31 @@ class MeshDS(metaclass=MeshMeta):
         self.TD = TD
         self.itype = itype
         self.ftype = ftype
+
+    def __str__(self) -> str:
+        """Return a summary of the mesh: type, entity counts, and memory usage.
+        """
+        return ("\n"
+            f"Mesh type: {self.__class__.__name__}:\n"
+            f"Number of nodes: {self.number_of_nodes()}\n"
+            f"Number of edges: {self.number_of_edges()}\n"
+            f"Number of faces: {self.number_of_faces()}\n"
+            f"Number of cells: {self.number_of_cells()}\n"
+            )
+
+    def __str__(self) -> str:
+        """Return a summary of the mesh: type, entity counts, and memory usage.
+
+        TODO: add memory usage for each entity type.
+        """
+
+        lines = []
+        lines.append(f"\n  Mesh type: {self.__class__.__name__}")
+        for name in self._STORAGE_ATTR:
+            count = getattr(self, f"number_of_{name}s")()
+            lines.append(f"  Number of {name}s: {count}")
+
+        return "\n".join(lines)
 
     @overload
     def __getattr__(self, name: EntityName) -> TensorLike: ...

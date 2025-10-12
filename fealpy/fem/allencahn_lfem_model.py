@@ -1,7 +1,7 @@
 from typing import Optional, Union
 from ..backend import bm
 from ..typing import TensorLike
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.allen_cahn import AllenCahnPDEDataProtocol
 from ..decorator import variantmethod,barycentric
 from ..mesh import Mesh
@@ -27,7 +27,7 @@ class AllenCahnLFEMModel(ComputationalModel):
                          log_level=options['log_level'])
         self.options = options
         self.assemble_method = None
-        self.pdm = PDEDataManager("allen_cahn")
+        self.pdm = PDEModelManager("allen_cahn")
         
         self.set_pde(options['pde'])
         self.set_init_mesh(options['init_mesh'])

@@ -10,86 +10,89 @@ from .quadrangle_mesh import QuadrangleMesh
 
 
 class LagrangeQuadrangleMesh(TensorMesh):
-    def __init__(self, node: TensorLike, cell: TensorLike, p=1, surface=None,
-            construct=False):
-        """
-        Parameters
-        ----------
-        node : TensorLike
-
-        Note
-        ----
-        1. node 中网格顶点必须排在前面
-        """
+    def __init__(self, node: TensorLike, cell: TensorLike, p=None, curve=None,
+                 surface=None,construct=False):
         super().__init__(TD=2, itype=cell.dtype, ftype=node.dtype)
 
         kwargs = bm.context(cell)
-        GD = node.shape[1]
-        self.p = p
+        
+        if p is None:
+            NV = cell.shape[-1]
+            self.p = int(-1 + bm.sqrt(NV))
+        else:
+            NV = (p+1) * (p+1)
+            if cell.shape[-1] != NV:
+                raise ValueError(f"cell.shape[-1] != {NV}, p = {p}.")
+            else:
+                self.p = p
+        
+        self.GD = node.shape[1]
+        self.node = node
         self.cell = cell
         self.surface = surface
 
-        self.node = node
-        self.localEdge = self.generate_local_lagrange_edges(p)
+        self.construct_local_edge()
         self.localFace = self.localEdge
-        self.ccw = bm.tensor([0, 2, 3, 1], **kwargs)
-
+        self.construct_local_cell()
+        
         if construct:
             self.construct()
 
         self.meshtype = 'lquad'
-        self.linearmesh = None
-
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
         self.meshdata = {}
 
-
     def reference_cell_measure(self):
-        return 1
+        return 1.0
     
-    def generate_local_lagrange_edges(self, p: int) -> TensorLike:
-        """
-        Generate the local edges for Lagrange elements of order p.
-        """
-        k = bm.arange((p + 1)**2, dtype=self.itype , device=self.device)
-        k = k.reshape((p + 1, p + 1)).T
+    def construct_local_edge(self) -> None:
+        """Generate the local edges for Lagrange elements of order p."""
+        k = bm.arange((self.p + 1)**2, dtype=self.itype , device=self.device)
+        k = k.reshape((self.p + 1, self.p + 1))  # (p+1, p+1), row: y direction, col: x direction
+    
+        # Extract the four edges of the quadrilateral in consistent order
+        edge0 = k[0, :]                # bottom edge, left to right
+        edge1 = k[:, -1]               # right edge, bottom to top
+        edge2 = bm.flip(k[-1, :])      # top edge, right to left
+        edge3 = bm.flip(k[:, 0])       # left edge, top to bottom
+    
+        self.localEdge = bm.stack([edge0, edge1, edge2, edge3], axis=0)
         
-        kwargs = bm.context(k)
-        localEdge = bm.zeros((4, p+1), **kwargs)
-        localEdge = bm.set_at(localEdge, (0, slice(None)), k[0, :])
-        localEdge = bm.set_at(localEdge, (1, slice(None)), k[:, -1])
-        localEdge = bm.set_at(localEdge, (2, slice(None)), bm.flip(k[-1, :]))
-        localEdge = bm.set_at(localEdge, (3, slice(None)), bm.flip(k[:, 0]))
-
-        return localEdge
+    def construct_local_cell(self):
+        """Generate the local cell for Lagrange elements of order p."""
+        self.localcell = None
     
-    def interpolation_points(self, p: int, index: Index = _S):
-        """
-        @brief Get all p-th order interpolation points on the quadrilateral mesh
-        """
-        node = self.linearmesh.entity('node')
-        if p == 1:
-            return node[index]
-        if p <= 0:
-            raise ValueError("p must be a integer larger than 0.")
-
+    def interpolation_points(self, p: int):
+        """Fetch all p-order interpolation points on the quadrilateral mesh."""
+    
+        if p < 1:
+            raise ValueError(f"p must be at least 1, but got {p}.")
+        
+        node = self.entity('node')
         GD = self.geo_dimension()
 
         multiIndex = self.multi_index_matrix(p, 1, dtype=self.ftype)
         w = multiIndex[1:-1, :] / p
         ipoints0 = self.bc_to_point((w,)).reshape(-1, GD)
         ipoints1 = bm.zeros((0, GD), dtype=self.ftype) 
+        
         if p >= 3:
             ipoints1 = self.bc_to_point((w, w)).reshape(-1, GD) 
 
         ipoints = bm.concatenate((node, ipoints0, ipoints1), axis=0)
-        return ipoints[index]
-
+        return ipoints
+    
+    @classmethod
+    def from_box(cls, box, p: int, nx=2, ny=2):
+        mesh = QuadrangleMesh.from_box(box, nx, ny)
+        return cls.from_quadrangle_mesh(mesh, p)
+    
     @classmethod
     def from_quadrangle_mesh(cls, mesh, p: int, surface=None):
         init_node = mesh.entity('node')
+        
         node = mesh.interpolation_points(p)
         cell = mesh.cell_to_ipoint(p)
         if surface is not None:
@@ -97,13 +100,15 @@ class LagrangeQuadrangleMesh(TensorMesh):
             node,_ = surface.project(node)
 
         lmesh = cls(node, cell, p=p, construct=True)
-        lmesh.linearmesh = mesh
 
         lmesh.edge2cell = mesh.edge2cell # (NF, 4)
         lmesh.cell2edge = mesh.cell2edge
         lmesh.edge  = mesh.edge_to_ipoint(p)
         return lmesh
-
+    
+    def uniform_refine(self, n: int = 1):
+        pass
+    
     # quadrature
     def quadrature_formula(self, q, etype: Union[int, str] = 'cell'):
         from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
@@ -118,9 +123,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             raise ValueError(f"entity type: {etype} is wrong!")
 
     def bc_to_point(self, bc: TensorLike, index: Index=_S, etype='cell'):
-        """
-        @brief 把参考单元上的坐标映射到实际单元上
-        """
+        """"Map coordinates from the reference element to the physical element."""
         node = self.node
         TD = len(bc) 
         entity = self.entity(TD, index=index) # 
@@ -130,24 +133,18 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     # ipoints
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
-        """
-        @berif 每个lquad单元上插值点的个数
-        """
+        """The number of interpolation points on each lquad element."""
         if isinstance(iptype, str):
             iptype = estr2dim(self, iptype)
         return tensor_ldof(p, iptype)
 
     def number_of_global_ipoints(self, p:int) -> int:
-        """
-        @berif lquad网格上插值点总数
-        """
+        """The total number of interpolation points on the lquad mesh."""
         num = [self.entity(i).shape[0] for i in range(self.TD+1)]
         return tensor_gdof(p, num)
 
     def cell_to_ipoint(self, p:int, index:Index=_S):
-        """
-        @brief 获取单元上的双 p 次插值点    
-        """
+        """Obtain the bi-p interpolation points on the element."""
         sp = self.p
         cell = self.cell[:, [0, -sp-1, 1]]  # 取角点
         NC = self.number_of_cells()
@@ -192,7 +189,21 @@ class LagrangeQuadrangleMesh(TensorMesh):
                         bm.arange(NC * (p - 1) * (p - 1)).reshape(NC, p - 1, p - 1))
 
         return cell2ipoint[index]
-
+    
+    def edge_to_ipoint(self, p: int, index: Index=_S) -> TensorLike:
+        """Get the relationship between edges and integration points."""
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        
+        edges = self.edge[index]
+        kwargs = bm.context(edges)
+        indices = bm.arange(NE, **kwargs)[index]
+        return bm.concatenate([
+            edges[:, 0].reshape(-1, 1),
+            (p-1) * indices.reshape(-1, 1) + bm.arange(0, p-1, **kwargs) + NN,
+            edges[:, 1].reshape(-1, 1),
+        ], axis=-1)
+    
     def face_to_ipoint(self, p: int, index: Index=_S):
         return self.edge_to_ipoint(p, index)
 
@@ -211,23 +222,9 @@ class LagrangeQuadrangleMesh(TensorMesh):
             return self.cell_area(index=index)
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
-   
-    """ 
-    def entity_measure(self, etype=2, index:Index=_S):
-        if etype in {'cell', 2}:
-            return self.cell_area(index=index)
-        elif etype in {'edge', 1}:
-            return self.edge_length(index=index)
-        elif etype in {'node', 0}:
-            return bm.zeros(1, dtype=bm.float64)
-        else:
-            raise ValueError(f"entity type:{etype} is erong!")
-    """
 
     def cell_area(self, q=None, index: Index=_S):
-        """
-        Calculate the area of a cell.
-        """
+        """Calculate the area of a cell."""
         p = self.p
         q = p if q is None else q
 
@@ -240,9 +237,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
         return a
 
     def edge_length(self, q=None, index: Index=_S):
-        """
-        Calculate the length of the side.
-        """
+        """Calculate the length of the side."""
         p = self.p
         q = p if q is None else q
         qf = self.quadrature_formula(q, etype='edge')
@@ -254,9 +249,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
         return a
 
     def cell_unit_normal(self, bc: TensorLike, index: Index=_S):
-        """
-        When calculating the surface,the direction of the unit normal at the integration point.
-        """
+        """When calculating the surface,the direction of the unit normal at the integration point."""
         J = self.jacobi_matrix(bc, index=index)
         n = bm.cross(J[..., 0], J[..., 1], axis=-1)
         if self.GD == 3:
@@ -265,10 +258,10 @@ class LagrangeQuadrangleMesh(TensorMesh):
         return n
 
     def jacobi_matrix(self, bc: tuple, index: Index=_S, return_grad=False):
-        """
-        @berif 计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
-
-        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        """Compute the Jacobian matrix of the mapping from the reference element (xi, eta) to the physical Lagrange quadrilateral (x).
+        
+        Notes:
+            x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
         TD = len(bc)
         entity = self.entity(TD, index)
@@ -282,9 +275,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     # fundamental form
     def first_fundamental_form(self, J: TensorLike, index: Index=_S):
-        """
-        Compute the first fundamental form of a mesh surface at integration points.
-        """
+        """Compute the first fundamental form of a mesh surface at integration points."""
         TD = J.shape[-1]
         shape = J.shape[0:-2] + (TD, TD)
         G = bm.zeros(shape, dtype=self.ftype)
@@ -297,9 +288,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     # tools
     def integral(self, f, q=3, celltype=False) -> TensorLike:
-        """
-        @brief 在网格中数值积分一个函数
-        """
+        """Numerically integrate a function over the mesh."""
         GD = self.geo_dimension()
         qf = self.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -335,9 +324,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
             return bm.sum(e)
 
     def error(self, u, v, q=3, power=2, celltype=False) -> TensorLike:
-        """
-        @brief Calculate the error between two functions.
-        """
+        """Calculate the error between two functions."""
         GD = self.geo_dimension()
         qf = self.quadrature_formula(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -387,12 +374,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
     # 可视化
     def vtk_cell_type(self, etype='cell'):
-        """
-
-        Notes
-        -----
-            返回网格单元对应的 vtk 类型。
-        """
+        """Return the corresponding VTK type of the mesh cell."""
         if etype in {'cell', 2}:
             VTK_LAGRANGE_QUADRILATERAL = 70 
             return VTK_LAGRANGE_QUADRILATERAL
@@ -402,12 +384,7 @@ class LagrangeQuadrangleMesh(TensorMesh):
 
 
     def to_vtk(self, etype='cell', index: Index=_S, fname=None):
-        """
-        Parameters
-        ----------
-
-        @berif 把网格转化为 VTK 的格式
-        """
+        """Convert the mesh to VTK format."""
         from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
@@ -431,4 +408,3 @@ class LagrangeQuadrangleMesh(TensorMesh):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
-

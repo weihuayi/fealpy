@@ -1,6 +1,6 @@
 from typing import Optional, Union
 from ..backend import bm
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ..model.elliptic import EllipticPDEDataT
 from ..decorator import variantmethod
 
@@ -19,7 +19,7 @@ class PolyharmonicCrFEMModel:
         if timer is None:
             from ..utils import timer
         self.timer = timer
-        self.pdm = PDEDataManager("elliptic")
+        self.pdm = PDEModelManager("elliptic")
 
     def set_pde(self, pde: Union[EllipticPDEDataT, str]="biharm2d"):
         """

@@ -2,9 +2,9 @@ from typing import Optional,Sequence
 from ...decorator import cartesian
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..mesher.box_mesher import BoxDomainMesher2d
+from ...mesher import BoxMesher2d
 
-class Exp0002(BoxDomainMesher2d):
+class Exp0002(BoxMesher2d):
     """
     2D Poisson problem:
     
@@ -21,17 +21,17 @@ class Exp0002(BoxDomainMesher2d):
 
     Homogeneous Dirichlet boundary conditions are applied on all edges.
     """
-    def configure(self, box: Optional[Sequence[float]] = None):
-        """Configure the relevant parameters of PDE."""
-        self.box = box
+    def __init__(self):
+        self.box = [0.0, 1.0, 0.0, 1.0] 
+        super().__init__(box=self.box)
 
-    def get_dimension(self) -> int:
+    def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2
 
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
-        return [0.0, 1.0, 0.0, 1.0]
+        return self.box
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
@@ -76,4 +76,7 @@ class Exp0002(BoxDomainMesher2d):
             (bm.abs(y - 1.) < atol) | (bm.abs(y + 1.) < atol)
         )
         return on_boundary 
-
+    
+    def scaling_function(self, p: TensorLike) -> TensorLike:
+        """Compute scaling function that satisfies the boundary conditions."""
+        return bm.zeros_like(p[..., 0])

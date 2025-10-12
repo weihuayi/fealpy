@@ -1,96 +1,141 @@
-from fealpy.backend import backend_manager as bm
-
 from builtins import float, str
-
-from fealpy.typing import TensorLike
 from typing import Optional, Tuple, List
+
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike
+
 from fealpy.material.elastic_material import LinearElasticMaterial
 
 
-class PlasticMaterial(LinearElasticMaterial):
-    '''
-    PlasticMaterial represents a linear elastoplastic material with optional linear hardening.
-    This class models materials that exhibit both elastic and plastic behavior according to the von Mises yield criterion, with support for linear isotropic hardening. It extends LinearElasticMaterial by adding yield stress and hardening modulus, and provides methods for computing the elastoplastic tangent matrix and related quantities. Suitable for finite element analysis of elastoplastic solids.
-    Parameters
-    name : str
-        Name of the material.
-    yield_stress : float
-        Initial yield stress (scalar), i.e., the stress at which plastic deformation begins.
-    hardening_modulus : float, optional, default=0.0
-        Linear hardening modulus (H'), representing the slope of the yield surface in stress-plastic strain space.
-    **kwargs
-        Additional keyword arguments passed to the base LinearElasticMaterial class (e.g., elastic_modulus, poisson_ratio).
-    Attributes
-    yield_stress : float
-        Initial yield stress of the material.
-    hardening_modulus : float
-        Linear hardening modulus (H'). If zero, perfect plasticity is assumed.
-    is_hardening : bool
-        Whether the material considers hardening effects (True if hardening_modulus > 0).
-    Methods
-    df_dsigma(stress)
-        Compute the derivative of the yield function with respect to the Cauchy stress (for von Mises criterion).
-    deviatoric_stress(stress)
-        Compute the deviatoric (traceless) part of the stress tensor in Voigt notation.
-    elastico_plastic_matrix(stress=None, df_dsigma=None)
-        Compute the elastoplastic tangent matrix D^p at the current stress state.
-    elastico_plastic_hardening_matrix(stress=None, plastic_strain=None, df_dsigma=None)
-        Compute the elastoplastic tangent matrix D^p considering linear hardening.
-    Notes
-    - The class assumes small strain theory and uses Voigt notation for stress and strain tensors.
-    - Only linear (isotropic) hardening is supported; nonlinear hardening requires further extension.
-    - The elastoplastic tangent operator is computed using the return mapping algorithm for von Mises plasticity.
-    Examples
-    >>> mat = PlasticMaterial(name="Steel", yield_stress=250.0, elastic_modulus=210e3, poisson_ratio=0.3)
-    >>> stress = np.array([260.0, 240.0, 0.0])
-    >>> df = mat.df_dsigma(stress)
-    >>> Dp = mat.elastico_plastic_matrix(stress=stress)
-    '''
+class ElastoplasticMaterial(LinearElasticMaterial):
+    """
+    ElastoplasticMaterial represents an isotropic elastoplastic material supporting the von Mises yield criterion and isotropic linear hardening.
+    
+    This class is suitable for small deformation theory and uses the Voigt notation, making it applicable for finite element elastoplastic analysis.
+
+    Parameters:
+        name : str
+            Material name
+        yield_stress : float
+            Initial yield stress (stress at which material begins to plastically deform)
+        hardening_modulus : float, optional, default=0.0
+            Linear hardening modulus (H'), slope of the yield surface with respect to equivalent plastic strain
+        **kwargs
+            Additional parameters passed to the base class LinearElasticMaterial (e.g., elastic_modulus, poisson_ratio)
+
+    Attributes:
+        yield_stress : float
+            Initial yield stress (MPa)
+        hardening_modulus : float
+            Linear hardening modulus; if zero, ideal elastoplastic behavior
+        is_hardening : bool
+            Whether hardening is considered (hardening_modulus > 0)
+
+    Methods:
+        df_dsigma(stress)
+            Compute the derivative of the von Mises yield function with respect to Cauchy stress
+        deviatoric_stress(stress)
+            Compute the deviatoric part of the stress (removing volumetric component)
+        elastico_plastic_matrix(stress=None, df_dsigma=None)
+            Compute the elastoplastic tangent matrix D^p for the current stress state
+        elastico_plastic_hardening_matrix(stress=None, plastic_strain=None, df_dsigma=None)
+            Compute the elastoplastic tangent matrix D^p considering linear hardening
+    """
     def __init__(self, 
                  name: str,
-                 yield_stress: float,          # 初始屈服应力
-                 hardening_modulus: float = 0.0, # 硬化模量 (H')
+                 yield_stress: float,          
+                 hardening_modulus: float = 0.0, 
                  **kwargs):
         """
-        Args:
-            yield_stress: 初始屈服应力 (标量)
-            hardening_modulus: 硬化模量 (H' = dsigma_y/dε_p)
-            **kwargs: 基类参数 (elastic_modulus, poisson_ratio等)
+        Initialize the elastoplastic material with yield stress and optional hardening modulus.
+        
+        Parameters:
+            name : str
+                Material name
+            yield_stress : float
+                Initial yield stress (MPa)
+            hardening_modulus : float, optional, default=0.0
+                Linear hardening modulus (H'), slope of the yield surface with respect to equivalent plastic strain
+            **kwargs
+                Additional parameters passed to the base class LinearElasticMaterial (e.g., elastic_modulus, poisson_ratio)
         """
         super().__init__(name, **kwargs)
         self.yield_stress = yield_stress
-        self.hardening_modulus = hardening_modulus  # 考虑线性硬化参数
+        self.hardening_modulus = hardening_modulus  # Linear hardening modulus parameter
+
+    def yield_function(self, stress: TensorLike, alpha: TensorLike) -> TensorLike:
+        """
+        compute the von Mises yield function value
+
+        Parameters:
+            stress(Tensor): Cauchy stress tensor (NC, NQ, N)
+            alpha(Tensor): Equivalent plastic strain (NC, NQ)
+                
+        Returns:
+            f(Tensor): Yield function value (NC, NQ)
+        """
+        s = self.deviatoric_stress(stress)
+        norm_s = bm.sqrt(bm.sum(s**2, axis=-1))
+        seq = bm.sqrt(3.0 / 2.0) * norm_s
+        f = seq - (self.yield_stress + self.hardening_modulus * alpha)
+        return f
+
+    def plastic_normal(self, stress: TensorLike) -> TensorLike:
+        """
+        Return the derivative (normal vector) of the von Mises yield function with respect to stress.
+
+        N = sqrt(3/2) * s / ||s||, where s is the deviatoric stress.
+
+        Parameters:
+            stress(Tensor): Current stress tensor (NC, NQ, N)
+
+        Returns:
+            N(Tensor): Unit normal vector to the yield surface (NC, NQ, N)
+        """
+        s = self.deviatoric_stress(stress)
+        norm_s = bm.sqrt(bm.sum(s**2, axis=-1))
+        norm_s = bm.maximum(norm_s, 1e-10)  
+        N = bm.sqrt(3.0 / 2.0) * s / norm_s[..., None]
+        return N
+
 
     def df_dsigma(self, stress: TensorLike) -> TensorLike:
         """
-        计算屈服函数对柯西应力的导数 (von Mises准则)
-        
-        Args:
-            stress: 柯西应力张量 (Voigt表示法)
-                - 3D: (..., 6) [sigma_11, sigma_22, sigma_33, sigma_12, sigma_23, sigma_13]
-                - 2D: (..., 3) [sigma_11, sigma_22, sigma_12]
-        
+        Compute the derivative of the yield function with respect to Cauchy stress (von Mises criterion).
+
+        Parameters:
+            stress: Cauchy stress tensor (Voigt notation)
+            - 3D: (..., 6) [sigma_11, sigma_22, sigma_33, sigma_12, sigma_23, sigma_13]
+            - 2D: (..., 3) [sigma_11, sigma_22, sigma_12]
+
         Returns:
-            df_dsigma: 导数张量 (与stress同维度)
+            df_dsigma: Derivative tensor (same shape as stress)
         """
-        # 计算偏应力 (deviatoric stress)
+        # Compute deviatoric stress
         s = self.deviatoric_stress(stress)
         
-        # 计算等效应力 (von Mises应力)
+        # Compute equivalent stress (von Mises stress)
         if self.hypo == "3D":
             J2 = 0.5 * (s[...,0]**2 + s[...,1]**2 + s[...,2]**2) + \
-                 s[...,3]**2 + s[...,4]**2 + s[...,5]**2
-        else:  # 2D情况
+             s[...,3]**2 + s[...,4]**2 + s[...,5]**2
+        else:  # 2D case
             J2 = (s[...,0]**2 + s[...,1]**2 - s[...,0]*s[...,1])/3 + \
-                 s[...,2]**2
+             s[...,2]**2
             
-        J2 = bm.maximum(J2, 1e-10)  # 防止除零
+        J2 = bm.maximum(J2, 1e-10)  # Prevent division by zero
         df = 1.5 * s / bm.sqrt(3*J2)[..., None]
         return df
 
     def deviatoric_stress(self, stress: TensorLike) -> TensorLike:
         """
-        计算偏应力张量 (Voigt表示法)
+        Compute the deviatoric stress tensor.
+        This removes the hydrostatic part of the stress tensor, leaving only the deviatoric component.
+        
+        Parameters:
+            stress(Tensor): Cauchy stress tensor (NC, NQ, N) in Voigt
+
+        Returns:
+            deviatoric_stress(Tensor): Deviatoric stress tensor (NC, NQ, N)
         """
         s = stress.copy()
         if self.hypo == "3D":
@@ -98,49 +143,72 @@ class PlasticMaterial(LinearElasticMaterial):
             s[...,0] -= mean
             s[...,1] -= mean
             s[...,2] -= mean
-        else:  # 平面应力/应变
+        else:  # 2D case
             mean = (stress[...,0] + stress[...,1])/3
             s[...,0] -= mean
             s[...,1] -= mean
             if self.hypo == "plane_strain":
-                s[...,2] -= mean  # σ33分量
+                s[...,2] -= mean  
+                s[...,2] -= mean  
         return s
+    
+    def elastico_plastic_matrix_isotropic(self, 
+                     stress: Optional[TensorLike] = None) -> TensorLike:
+        """
+        Compute the elastoplastic tangent matrix D^p.
+
+        Parameters:
+            stress(Tensor): Current stress tensor (used to automatically compute df_dsigma)
+            df_dsigma(Tensor): Directly provide the derivative tensor (optional)
+            
+        Returns:
+            Dp(Tensor): Elastoplastic tangent matrix, same shape as the base class D matrix, computed independently for each integration point
+        """
+        E = self.elastic_modulus
+        nu = self.poisson_ratio
+        H = self.hardening_modulus
+        G = E / (2 * (1 + nu))
+        De = self.elastic_matrix()  #  (1,1,N,N)
+        N = self.plastic_normal(stress) 
+        value = bm.einsum('...i,...j->...ij', N, N)  # (NC,NQ,N,N)
+        coef = 6 * G**2 / (3 * G + H)
+        D_ep = De - coef * value  # (NC,NQ,N,N)
+        
+        return D_ep
+        
+        
 
     def elastico_plastic_matrix(self, 
                      stress: Optional[TensorLike] = None, 
                      df_dsigma: Optional[TensorLike] = None) -> TensorLike:
         """
-        计算弹塑性矩阵 D^p
+        Compute the elastoplastic tangent matrix D^p.
 
-        Args:
-            stress: 当前应力张量 (用于自动计算df_dsigma)
-            df_dsigma: 直接提供导数张量 (可选)
-        
+        Parameters:
+            stress(Tensor): Current stress tensor (used to automatically compute df_dsigma)
+            df_dsigma(Tensor): Directly provide the derivative tensor (optional)
+
         Returns:
-            Dp: 弹塑性矩阵,形状与基类D矩阵相同,但每个积分点独立计算
+            Dp(Tensor): Elastoplastic tangent matrix, same shape as the base class D matrix, computed independently for each integration point
         """
-        # 获取弹性矩阵
         De = super().elastic_matrix()  # (1,1,N,N)
         
-        # 获取导数张量
+        
         if df_dsigma is None:
             if stress is None:
                 raise ValueError("需要提供stress或df_dsigma")
-            df = self.df_dsigma(stress)  # (NC,NQ,N)
+            df = self.plastic_normal(stress)  # (NC,NQ,N)
+            df = self.plastic_normal(stress)  # (NC,NQ,N)
         else:
             df = df_dsigma
 
-        # 扩展De到匹配df的维度
         De_exp = bm.broadcast_to(De, df.shape[:-1] + De.shape[-2:])  # (NC,NQ,N,N)
         
-        # 计算 a = De : df
         a = bm.einsum('...ij,...j->...i', De_exp, df)  # (NC,NQ,N)
         
-        # 计算分母 H = df:De:df + H'
         H = bm.einsum('...i,...i->...', df, a) + self.hardening_modulus  # (NC,NQ)
-        H = bm.maximum(H, 1e-10)  # 避免除零
+        H = bm.maximum(H, 1e-10)  
         
-        # 计算塑性修正项
         numerator = bm.einsum('...i,...j->...ij', a, a)  # (NC,NQ,N,N)
         Dp = De_exp - numerator / H[..., None, None]      # (NC,NQ,N,N)
         
@@ -148,53 +216,89 @@ class PlasticMaterial(LinearElasticMaterial):
 
     @property
     def is_hardening(self) -> bool:
-        """是否考虑硬化效应"""
-        return self.hardening_modulus > 0
-    
-    def elastico_plastic_hardening_matrix(self, 
-                     stress: Optional[TensorLike] = None, 
-                     plastic_strain: Optional[TensorLike] = None,
-                     df_dsigma: Optional[TensorLike] = None) -> TensorLike:
         """
-        计算弹塑性矩阵 D^p
-
-        Args:
-            stress: 当前应力张量 (用于自动计算df_dsigma)
-            df_dsigma: 直接提供导数张量 (可选)
+        Check if the material has hardening behavior.
         
         Returns:
-            Dp: 弹塑性矩阵,形状与基类D矩阵相同,但每个积分点独立计算
+            bool(Bool): True if hardening_modulus > 0, False otherwise.
         """
-        # 获取弹性矩阵
-        De = super().elastic_matrix()  # (1,1,N,N)
-        
-        # 获取导数张量
-        if df_dsigma is None:
-            if stress is None:
-                raise ValueError("需要提供stress或df_dsigma")
-            df = self.df_dsigma(stress)  # (NC,NQ,N)
-        else:
-            df = df_dsigma
+        return self.hardening_modulus > 0
 
-        # 扩展De到匹配df的维度
-        De_exp = bm.broadcast_to(De, df.shape[:-1] + De.shape[-2:])  # (NC,NQ,N,N)
         
-        # 计算当前屈服应力（考虑线性硬化）#TODO: 未考虑非线性硬化
-        if plastic_strain is not None:
-            # σ_y = σ_y0 + H' * ε_p
-            current_yield = self.yield_stress + self.hardening_modulus * plastic_strain
-        else:
-            current_yield = self.yield_stress
+    def material_point_update(self, strain_total, strain_pl_n, strain_e_n):
+        '''
+        Perform the elastoplastic constitutive update for a material point.
         
-        # 计算 a = De : df
-        a = bm.einsum('...ij,...j->...i', De_exp, df)  # (NC,NQ,N)
+        This method computes the updated stress, plastic strain, 
+        and equivalent plastic strain based on the current strain increment and previous state variables.
         
-        # 计算分母 H = df:De:df + H'
-        H = bm.einsum('...i,...i->...', df, a) + self.hardening_modulus  # (NC,NQ)
-        H = bm.maximum(H, 1e-10)  # 避免除零
+        Parameters:
+            delta_strain(TensorLike):
+                Incremental strain tensor (NC, NQ, 3) at the current time step
+            strain_pl_n(TensorLike):
+                Previous plastic strain tensor (NC, NQ, 3)
+            strain_e_n(TensorLike):
+                Previous equivalent plastic strain (scalar) at the current time step (NC, NQ)
+                
+        Returns:
+            sigma_np1(TensorLike):
+                Updated Cauchy stress tensor (NC, NQ, 3)
+            strain_pl_n1(TensorLike):
+                Updated plastic strain tensor (NC, NQ, 3)
+            strain_e_n1(TensorLike):
+                Updated equivalent plastic strain (scalar) at the current time step (NC, NQ)
+            Ctang(TensorLike):
+                Elastoplastic tangent matrix (NC, NQ, 3, 3)
+            is_plastic(TensorLike):
+                Boolean mask indicating whether the point is in the plastic regime (NC, NQ)
+        '''
+        E = self.elastic_modulus
+        nu = self.poisson_ratio
+        H = self.hardening_modulus
+        G = E / (2 * (1 + nu))
         
-        # 计算塑性修正项
-        numerator = bm.einsum('...i,...j->...ij', a, a)  # (NC,NQ,N,N)
-        Dp = De_exp - numerator / H[..., None, None]      # (NC,NQ,N,N)
-        
-        return Dp
+        De = self.elastic_matrix()  # (NC, NQ, 3, 3)
+
+        sigma_trial = bm.einsum('...ij,...j->...i', De, strain_total)  # (NC, NQ, 3)
+        s_trial = self.deviatoric_stress(sigma_trial)  # (NC, NQ, 3)
+        stress_trial_e = bm.sqrt(3.0 / 2.0) * bm.sqrt(bm.sum(s_trial ** 2, axis=-1))  # (NC, NQ)
+
+        f_trial = self.yield_function(sigma_trial, strain_e_n)  # (NC, NQ)
+        is_plastic = f_trial > 0  # (NC, NQ) 
+
+        gamma = f_trial / (3 * G + H)  # (NC, NQ)
+        stress_trial_e = bm.maximum(stress_trial_e, 1e-12)
+        n = s_trial / (2 / 3 * stress_trial_e[..., None])  # (NC, NQ, 3)
+
+        sigma_np1 = bm.where(
+            is_plastic[..., None],
+            sigma_trial - 2 * G * gamma[..., None] * n,
+            sigma_trial
+        )
+
+        strain_pl_n1 = bm.where(
+            is_plastic[..., None],
+            strain_pl_n + gamma[..., None] * n,
+            strain_pl_n
+        )
+
+        strain_e_n1 = bm.where(
+            is_plastic,
+            strain_e_n + gamma,
+            strain_e_n
+        )
+
+        NC = sigma_np1.shape[0]
+        NQ = sigma_np1.shape[1]
+        Ctang = bm.broadcast_to(De, (NC, NQ, 3, 3))  # (NC, NQ, 3, 3)
+       
+        # Compute Ctang for plastic points
+        if bm.any(is_plastic):
+            sigma_pl = bm.where(is_plastic[..., None], sigma_np1, 0.0)  # (NC, NQ, 3)
+            df = self.plastic_normal(sigma_pl)                          # (NC, NQ, 3)
+            #Ctang_plastic = self.elastico_plastic_matrix(sigma_pl, df)  # (NC, NQ, 3, 3)
+            Ctang_plastic = self.elastico_plastic_matrix_isotropic(sigma_pl)  # (NC, NQ, 3, 3)
+            Ctang = bm.where(is_plastic[..., None, None], Ctang_plastic, De)  # (NC, NQ, 3, 3)
+
+
+        return sigma_np1, strain_pl_n1, strain_e_n1, Ctang, is_plastic

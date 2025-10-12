@@ -11,8 +11,8 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='boxtri2d', type=str,
-                    help='Name of the PDE model, default is boxtri2d')
+                    default=3, type=int,
+                    help='Name of the PDE model, default is 1')
 
 parser.add_argument('--init_mesh',
                     default='uniform_tri', type=str,

@@ -1,6 +1,6 @@
 from typing import Optional, Union
 from ..backend import bm
-from ..model import PDEDataManager, ComputationalModel
+from ..model import PDEModelManager, ComputationalModel
 from ..model.polyharmonic import PolyharmonicPDEDataT
 from ..decorator import variantmethod
 
@@ -39,7 +39,7 @@ class PolyharmonicCrFEMModel(ComputationalModel):
         """
         """
         if isinstance(pde, str):
-            self.pde = PDEDataManager('polyharmonic').get_example(pde)
+            self.pde = PDEModelManager('polyharmonic').get_example(pde)
         else:
             self.pde = pde
 

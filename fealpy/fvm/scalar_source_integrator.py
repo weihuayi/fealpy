@@ -1,12 +1,12 @@
 from typing import Optional, Literal
 
-from ..backend import backend_manager as bm
-from ..typing import TensorLike, Index, _S, SourceLike
+from fealpy.backend import backend_manager as bm
+from fealpy.typing import TensorLike, SourceLike
+from fealpy.utils import process_coef_func
+from fealpy.decorator import variantmethod
 
-from ..functionspace.space import FunctionSpace as _FS
-from ..utils import process_coef_func
-from ..functional import linear_integral
-from ..decorator.variantmethod import variantmethod
+from fealpy.functionspace.space import FunctionSpace as _FS
+
 from fealpy.fem.integrator import LinearInt, SrcInt, CellInt, enable_cache
 
 
@@ -33,28 +33,39 @@ class ScalarSourceIntegrator(LinearInt, SrcInt, CellInt):
     def fetch(self, space: _FS, /, inidces=None):
         index = self.entity_selection(inidces)
         mesh = getattr(space, 'mesh', None)
-        # if not isinstance(mesh, HomogeneousMesh):
-        #     raise RuntimeError("The ScalarSourceIntegrator only support spaces on"
-        #                        f"homogeneous meshes, but {type(mesh).__name__} is"
-        #                        "not a subclass of HomoMesh.")
         cm = mesh.entity_measure('cell', index=index)
         q = space.p+3 if self.q is None else self.q
         qf = mesh.quadrature_formula(q, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        if isinstance(bcs, tuple): 
-            bcs = bm.stack(bcs, axis=-1)
-            ws = bm.stack(ws, axis=-1)  
-        phi = space.basis(bcs, index=index)
-        return bcs, ws, phi, cm, index
+        bcs, ws = qf.get_quadrature_points_and_weights() 
+        phi = space.basis(bcs, index=index) 
+        return bcs, ws, cm, index, phi
 
     @variantmethod
     def assembly(self, space: _FS, indices=None) -> TensorLike:
-        f = self.source
+        source = self.source
         mesh = getattr(space, 'mesh', None)
-        bcs, ws, phi, cm, index = self.fetch(space, indices)
-        val = process_coef_func(f, bcs=bcs, mesh=mesh, etype='cell', index=index)
-        # if self.batched:
-        #    result = bm.einsum('q, cq..., ij, c -> ...ci', ws, val, phi, cm)
-        # else:
-        result = bm.einsum('j, qj,q -> q', ws, val, cm)
-        return result 
+        bcs, ws, cm, index, phi = self.fetch(space, indices)
+        val = process_coef_func(source, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        D = phi.shape[-1]
+        if D ==1:
+            integrator = bm.einsum('j, qj,q -> q', ws, val, cm)
+            return integrator
+        elif D == 2:
+            val1 = val[...,0]
+            val2 = val[...,1]
+            integrator1 = bm.einsum('j, qj,q -> q', ws, val1, cm)
+            integrator2 = bm.einsum('j, qj,q -> q', ws, val2, cm)
+            integrator = bm.stack((integrator1, integrator2), axis=-1)
+            return integrator
+        elif D == 3:
+            val1 = val[...,0]
+            val2 = val[...,1]
+            val3 = val[...,1]
+            integrator1 = bm.einsum('j, qj,q -> q', ws, val1, cm)
+            integrator2 = bm.einsum('j, qj,q -> q', ws, val2, cm)
+            integrator3 = bm.einsum('j, qj,q -> q', ws, val3, cm)
+            integrator = bm.stack((integrator1, integrator2, integrator3), axis=-1)
+            return integrator
+        else:
+            raise TypeError(f"source should be int, float or TensorLike, but got {type(source)}.")
+        

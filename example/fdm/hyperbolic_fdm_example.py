@@ -20,8 +20,8 @@ parser.add_argument('--example',
         default='piecewise', type=str,
         help="求解的 hyperbolic 方程的算例, 默认是'piecewise',其他可选算例还有: 'sinsincos', " \
         "还可以用下面的代码可查看可用的算例： \
-        from fealpy.model import PDEDataManager \
-        PDEDataManager('hyperbolic').show_examples().")
+        from fealpy.model import PDEModelManager \
+        PDEModelManager('hyperbolic').show_examples().")
 
 parser.add_argument('--maxit',
         default=4, type=int,

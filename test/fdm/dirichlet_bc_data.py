@@ -1,9 +1,9 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 from fealpy.sparse import CSRTensor 
 from scipy import sparse
 
-pde = PDEDataManager('poisson').get_example('coscos')
+pde = PDEModelManager('poisson').get_example(3)
 domain = pde.domain()  # [-1, 1, -1, 1]
 extent = [0, 2, 0, 2]
 

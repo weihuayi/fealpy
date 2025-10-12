@@ -161,6 +161,16 @@ class CSRTensor(SparseTensor):
         return self
 
     ### 4. Object Conversion ###
+    def to_petsc(self):
+        from petsc4py import PETSc
+
+        if self.dense_ndim != 0:
+            raise ValueError("Only CSRTensor with 0 dense dimension "
+                             "can be converted to PETSc sparse matrix")
+
+        return PETSc.Mat().createAIJ(
+                size=self._spshape, csr=(self._crow, self._col, self._values))
+
     def to_scipy(self):
         from scipy.sparse import csr_matrix
 
@@ -548,3 +558,33 @@ class CSRTensor(SparseTensor):
         new_crow = bm.concat(([0], bm.cumsum(nrz[isfindnode == 1])))
         
         return CSRTensor(new_crow, new_col, new_values, spshape=(new_row_shape, new_col_shape))
+    
+    def sum_duplicates(self):
+        indptr, indices, data = self.indptr, self.indices, self.data
+        nrow, ncol = self.shape
+
+        counts = indptr[1:] - indptr[:-1]
+        row = bm.repeat(bm.arange(nrow), counts)         
+        flat = row * ncol + indices                     
+        summed = bm.bincount(flat, weights=data, minlength=nrow * ncol)
+
+        nnz = bm.nonzero(summed)[0]
+        if nnz.size == 0:
+
+            return CSRTensor((bm.zeros((nrow + 1,), dtype=indptr.dtype),
+                            bm.zeros((0,), dtype=indices.dtype),
+                            bm.zeros((0,), dtype=data.dtype)),
+                            spshape=(nrow, ncol))
+
+        order = bm.argsort(nnz)          
+        nnz = nnz[order]
+        new_data = summed[nnz]
+        new_row = nnz // ncol
+        new_col = nnz % ncol
+
+        counts_per_row = bm.bincount(new_row, minlength=nrow)
+        indptr_new = bm.empty((nrow + 1,), dtype=indptr.dtype)
+        indptr_new[0] = 0
+        indptr_new[1:] = bm.cumsum(counts_per_row)
+
+        return CSRTensor(indptr_new, new_col, new_data, spshape=(nrow, ncol))

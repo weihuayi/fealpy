@@ -2,7 +2,7 @@ from ..backend import backend_manager as bm
 import matplotlib.pyplot as plt
 from ..mesh import UniformMesh
 from ..model import ComputationalModel
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ..solver import spsolve
 from . import LaplaceOperator, DirichletBC
 
@@ -28,7 +28,7 @@ class PoissonFDMModel(ComputationalModel):
         
     Attributes
     ----------
-        pde : PDEDataManager
+        pde : PDEModelManager
             Manages PDE problem data (domain, solution, source term, etc.)
         maxit : int
             Maximum refinement iterations
@@ -44,9 +44,9 @@ class PoissonFDMModel(ComputationalModel):
             Error matrix storing L∞, L2 and H1 errors for each refinement
     """
 
-    def __init__(self, example: str = 'sinsin', maxit: int = 4, ns: int = 20, solver=spsolve):
+    def __init__(self, example: int = 2, maxit: int = 4, ns: int = 20, solver=spsolve):
         """Initialize Poisson FDM solver with given parameters"""
-        self.pde = PDEDataManager('poisson').get_example(example) 
+        self.pde = PDEModelManager('poisson').get_example(example) 
         self.maxit = maxit
         self.ns = ns
         self.solver = spsolve

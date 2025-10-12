@@ -1,10 +1,10 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ...mesher import BoxMesher2d
 from ...decorator import cartesian
 
-class EXP0002(BoxDomainMesher2d):
+class Exp0002(BoxMesher2d):
     """
     2D Helmholtz problem with complex Robin (impedance-type) boundary condition:
 
@@ -22,20 +22,23 @@ class EXP0002(BoxDomainMesher2d):
         k : wave number (float)
         beta : dimensionless propagation parameter (β > 1)
 
-    Source: 
+    Reference: 
         https://www.sciencedirect.com/science/article/pii/S0045794917302602#e0010
     """
 
-    def set(self, k: float=1.0, beta: float=1.001):
-        self.k = k
-        self.beta = beta
-        self.gamma = bm.sqrt(beta**2 - 1.0)  # decay rate in x
+    def __init__(self, option: dict = {}):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
+        self.k  = bm.tensor(option.get('k', 1.0))
+        self.beta = bm.tensor(option.get('beta', 1.001))
+        self.gamma = bm.sqrt(self.beta**2 - 1.0) # decay rate in x
+
 
     def geo_dimension(self) -> int:
         return 2
 
     def domain(self) -> Sequence[float]:
-        return [0.0, 1.0, 0.0, 1.0]
+        return self.box
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:
@@ -60,10 +63,17 @@ class EXP0002(BoxDomainMesher2d):
     @cartesian
     def robin(self, p: TensorLike, n: TensorLike) -> TensorLike:
         """g(x, y) = ∂u/∂n + i·k·u"""
-        grad_u = self.gradient(p)
-        u_val = self.solution(p)
-        normal_derivative = bm.sum(grad_u * n[:, None, :], axis=-1)
-        return normal_derivative + 1j * self.k * u_val
+        kappa = 1j * self.k
+        grad = self.gradient(p)
+        if len(grad.shape) == self.geo_dimension():
+            val = bm.sum(grad * n, axis=-1)
+        else:
+            val = bm.sum(grad * n[:, None, :], axis=-1)
+        val += kappa * self.solution(p)
+        
+        return val
+    
+  
 
     @cartesian
     def is_robin_boundary(self, p: TensorLike) -> TensorLike:
@@ -77,6 +87,3 @@ class EXP0002(BoxDomainMesher2d):
             (bm.abs(y - 1.0) < atol)
         )
         return on_boundary
-
-
-

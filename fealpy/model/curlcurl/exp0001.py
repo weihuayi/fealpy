@@ -1,11 +1,11 @@
 from typing import Sequence
 from ...backend import backend_manager as bm
 from ...backend import TensorLike
-from ..box_domain_mesher import BoxDomainMesher2d
+from ...mesher import BoxMesher2d
 from ...decorator import cartesian
 
 
-class EXP0001(BoxDomainMesher2d):
+class Exp0001(BoxMesher2d):
     """
     2D Maxwell-type problem with complex Robin boundary condition:
 
@@ -18,14 +18,16 @@ class EXP0001(BoxDomainMesher2d):
     Boundary condition mimics absorbing (impedance-type) boundary.
     """
 
-    def set(self, k: float=1.0):
-        self.k = k
+    def __init__(self, options: dict = {}):
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(box=self.box)
+        self.k = options.get('k', 1.0)
 
     def geo_dimension(self) -> int:
         return 2
 
     def domain(self) -> Sequence[float]:
-        return [0.0, 1.0, 0.0, 1.0]
+        return self.box
 
     @cartesian
     def solution(self, p: TensorLike) -> TensorLike:

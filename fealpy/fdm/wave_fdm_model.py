@@ -5,7 +5,7 @@ from ..mesh import UniformMesh
 from ..fdm import LaplaceOperator, DirichletBC
 from ..sparse import spdiags
 from ..solver import spsolve
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 
 class WaveFDMModel:
     """Finite Difference solver for second-order wave equations using theta-scheme
@@ -18,7 +18,7 @@ class WaveFDMModel:
     Parameters
     ----------
         example : str, optional, default='sincos'
-            Name of the example problem to solve (must be available in PDEDataManager)
+            Name of the example problem to solve (must be available in PDEModelManager)
         maxit : int, optional, default=4
             Number of mesh refinement levels to perform
         ns : int, optional, default=20
@@ -35,7 +35,7 @@ class WaveFDMModel:
         
     Attributes
     ----------
-        pde : PDEDataManager
+        pde : PDEModelManager
             Manages PDE problem data including domain, initial/boundary conditions
         a : float
             Wave speed constant from the PDE
@@ -81,7 +81,7 @@ class WaveFDMModel:
             nt : int, optional, default=400
                 Number of time steps
         """
-        self.pde = PDEDataManager('wave').get_example(example) 
+        self.pde = PDEModelManager('wave').get_example(example) 
         self.a = self.pde.speed()
         self.theta = theta
         self.nt = nt

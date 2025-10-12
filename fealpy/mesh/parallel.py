@@ -23,7 +23,9 @@ def split_homogeneous_mesh(mesh: _MT, /, masks: Tuple[_DT, ...]):
     # source id and virtual table
     src_id: Dict[str, _DT] = {}
     local_id: Dict[str, _DT] = {}
-    for etype in ('node', 'cell'):
+    for etype in ('node', 'cell', 'face'):
+        if etype == 'face' and mesh.TD < 2:
+            continue
         num = mesh.count(etype)
         src_id[etype] = bm.zeros((num,), dtype=bm.uint8, device=mesh.device)
         local_id[etype] = bm.zeros((num,), dtype=mesh.itype, device=mesh.device)
@@ -49,6 +51,36 @@ def split_homogeneous_mesh(mesh: _MT, /, masks: Tuple[_DT, ...]):
         )
         flags_rev.append({'node': node_flag})
 
+        # split faces
+        if mesh.TD >= 2:
+            # Find faces belonging to these cells
+            cell2face = mesh.cell_to_face()
+            face_flag = bm.zeros((mesh.number_of_faces(),), dtype=bm.bool, device=mesh.device)
+            
+            # Mark faces that belong to the current cell group
+            if flag.dtype == bm.bool:
+                selected_cells = bm.where(flag)[0]
+            else:
+                selected_cells = flag
+                
+            # Get all faces connected to selected cells
+            connected_faces = cell2face[selected_cells].reshape(-1)
+            face_flag = bm.set_at(face_flag, connected_faces, True)
+            
+            # Remove duplicate faces
+            unique_faces = bm.unique(connected_faces)
+            face_flag = bm.zeros_like(face_flag)
+            face_flag = bm.set_at(face_flag, unique_faces, True)
+            
+            flags_rev[-1]['face'] = face_flag
+            src_id['face'] = bm.set_at(src_id['face'], unique_faces, idx)
+            
+            NF_LOCAL = bm.sum(face_flag)
+            local_id['face'] = bm.set_at(
+                local_id['face'], face_flag,
+                bm.arange(NF_LOCAL, dtype=mesh.itype, device=mesh.device)
+            )
+
         # split cells
         flags_rev[-1]['cell'] = flag
         src_id['cell'] = bm.set_at(src_id['cell'], flag, idx)
@@ -71,7 +103,7 @@ def split_homogeneous_mesh(mesh: _MT, /, masks: Tuple[_DT, ...]):
         local_id_on_bdry: Dict[str, _DT] = {}
         global_indices: Dict[str, _DT] = {}
 
-        for etype in ('node', 'cell'):
+        for etype in ('node', 'cell', 'face'):
             local_bdry_flag = getattr(local_mesh, f"boundary_{etype}_flag")()
             global_flags_on_bdry[etype] = global_bdry_flags[etype][flags[etype]][local_bdry_flag]
             src_id_on_bdry[etype] = src_id[etype][flags[etype]][local_bdry_flag]
@@ -81,7 +113,6 @@ def split_homogeneous_mesh(mesh: _MT, /, masks: Tuple[_DT, ...]):
             global_indices[etype] = all_global_indices[flags[etype]]
 
         yield (local_mesh, global_flags_on_bdry, src_id_on_bdry, local_id_on_bdry, global_indices)
-
 
 ### Genearte Tensor data on a field, such as mesh entities.
 
