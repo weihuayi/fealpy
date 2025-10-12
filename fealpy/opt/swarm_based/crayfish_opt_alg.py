@@ -273,19 +273,19 @@ class ModifiedCrayfishOptAlg(Optimizer):
 
             v = self.discretize_v_roulette(fit)
 
-            x_new = (
-                (v[:, None] > 3) * (self.environment_update_mechanism(global_position, v[:, None])) + 
-                (v[:, None] <= 3) * ((temp > 30) * ((rand < 0.5) * 
-                                                    (self.x + C * bm.random.rand(self.N, self.dim) * (xf - self.x)) + 
-                                                    (rand > 0.5) * 
-                                                    (self.x - self.x[bm.random.randint(0, self.N, (self.N,))] + xf)) + 
-                                    (temp <= 30) * ((P[:, None] > 2) * 
-                                                    (self.x + (bm.cos(2 * bm.random.rand(self.N, self.dim) * bm.pi) - 
-                                                    bm.sin(2 * bm.pi * bm.random.rand(self.N, self.dim))) * 
-                                                    bm.exp(bm.array(-1 / P[:, None])) * self.gbest * p) + 
-                                                    (P[:, None] <= 2) * 
-                                                    ((self.x - self.gbest) * p + p * bm.random.rand(self.N, self.dim) * self.x)))
-            )
+            x_new = (v[:, None] > 3) * (self.environment_update_mechanism(global_position, v[:, None])) + (v[:, None] <= 3) * self.x
+
+            x_new = ((temp > 30) * ((rand < 0.5) * 
+                                    (x_new + C * bm.random.rand(self.N, self.dim) * (xf - x_new)) + 
+                                    (rand > 0.5) * 
+                                    (x_new - x_new[bm.random.randint(0, self.N, (self.N,))] + xf)) + 
+                    (temp <= 30) * ((P[:, None] > 2) * 
+                                    (x_new + (bm.cos(2 * bm.random.rand(self.N, self.dim) * bm.pi) - 
+                                    bm.sin(2 * bm.pi * bm.random.rand(self.N, self.dim))) * 
+                                    bm.exp(bm.array(-1 / P[:, None])) * self.gbest * p) + 
+                                    (P[:, None] <= 2) * 
+                                    ((x_new - self.gbest) * p + p * bm.random.rand(self.N, self.dim) * x_new)))
+            
             x_new = bm.clip(x_new, self.lb, self.ub)
             fit_new = self.fun(x_new)
             self.Fes += self.N

@@ -72,7 +72,7 @@ class KangarooEscapeOpt(Optimizer):
             array: New positions after long jumps
         """
         # Long jump strategy (global exploration)
-        jump = 2 * bm.random.randn(self.N, 1) * self.x  # Gaussian-distributed jumps
+        jump = 2 * bm.random.randn(self.N, 1) * self.x * self.decoy_drop  # Gaussian-distributed jumps
         x_new = self.x + jump
         return x_new
 

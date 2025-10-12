@@ -89,7 +89,7 @@ class WhaleOptAlg(Optimizer):
             l = (a2 - 1) * bm.random.rand(self.N, 1) + 1
 
             # Randomly select a leader solution for exploration
-            x_rand = self.x[rand_leader_index]
+            x_rand = self.x[bm.random.randint(0, self.N, (self.N,))]
 
             # Exploration phase and shrinking encircling mechanism
             self.x = ((p < 0.5) * ((bm.abs(A) >= 1) * (x_rand - A * bm.abs(C * x_rand - self.x)) +  # Exploration phase

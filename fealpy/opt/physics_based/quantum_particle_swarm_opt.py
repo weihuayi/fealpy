@@ -1,5 +1,6 @@
 from ...backend import backend_manager as bm
 from ..optimizer_base import Optimizer
+from ..opt_function import levy, initialize
 
 class QuantumParticleSwarmOpt(Optimizer):
     """
@@ -79,10 +80,6 @@ class QuantumParticleSwarmOpt(Optimizer):
             # Track the global best fitness for the current iteration
             self.curve[it] = self.gbest_f
 
-
-from ...backend import backend_manager as bm
-from ..optimizer_base import Optimizer
-from ..opt_function import levy, initialize
 
 class LevyQuantumParticleSwarmOpt(Optimizer):
     """
