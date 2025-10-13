@@ -2,6 +2,8 @@
 from typing import Any, Optional, Union, Callable, Tuple, Sequence, Literal
 import os
 
+import ipdb
+
 from mpi4py import MPI
 from petsc4py import PETSc
 from slepc4py import SLEPc
@@ -535,7 +537,12 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         eps = SLEPc.EPS().create()
         eps.setOperators(PS, PM)
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-        eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+        #eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+        eps.setType(SLEPc.EPS.Type.LANCZOS)
+
+        opts = PETSc.Options()
+        opts['eps_lanczos_reorthog'] = 'local'
+        eps.setFromOptions()
 
         sigma = 1e-04  # 更贴近你的目标最小特征值（基于经验）
         eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
