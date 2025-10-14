@@ -54,25 +54,15 @@ bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import TimobeamAxleModel
 model = TimobeamAxleModel(options)
-model.__str__()
-model.timo_axle_system()
-# K, F = model.apply_bc_penalty(K, F)
+# model.__str__()
+# K, F = model.timo_axle_system()
+# model.apply_bc_penalty(K, F)
+uh = model.solve()
+# uh = model.cgsolve()
+#print(uh)
+
+# print(model.solve())
 # K_dense = K.toarray()
 # print('K', K_dense.shape)
 # u_data = model.solve()
 # print("u", u_data.reshape(-1, 6))
-
-
-import pandas as pd
-import numpy as np
-file_path = r"C:\Users\Administrator\Desktop\K.xlsx"
-df = pd.read_excel(file_path, header=None)
-k_data = df.to_numpy()
-# print("数组形状:", k_data.shape)
-# print(np.array_equal(K_dense, k_data))   # 判断是否完全一样
-# print(np.allclose(K_dense, k_data, rtol=1e-8, atol=1e-12))  # 判断数值上是否近似相等
-
-# mask = ~np.isclose(K_dense, k_data, rtol=1e-8, atol=1e-12)
-# rows, cols = np.where(mask)
-# for r, c in zip(rows, cols):
-#     print(f"不同元素在[{r}, {c}]: K_dense={K_dense[r,c]} k_data={k_data[r,c]}")
