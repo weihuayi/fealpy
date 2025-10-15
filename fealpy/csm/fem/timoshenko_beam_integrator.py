@@ -168,19 +168,11 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ke[:, 10, 10] = Ke[:, 4, 4]
         Ke[:, 11, 11] = Ke[:, 5, 5]
 
-        # TODO
-        Ke0 = Ke[0]
         # Symmetrize
         for j in range(11):
             for k in range(j + 1, 12):
                 Ke[:, k, j] = Ke[:, j, k]
-        
 
         KE = bm.einsum('cji, cjk, ckl -> cil', R, Ke, R)
-        # KE0 = KE[0]
-
-        # KE_test = bm.zeros((NC, 12, 12))
-        # for i in range(NC):
-            # KE_test[i] = R[i].T @ Ke[i] @ R[i]
-        # KE_test0 = KE_test[0]
+        
         return KE

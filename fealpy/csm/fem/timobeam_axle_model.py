@@ -1,5 +1,5 @@
 from typing import Union
-from scipy.sparse import csr_matrix
+from scipy.sparse import coo_matrix
 
 from fealpy.backend import bm
 from fealpy.decorator import variantmethod
@@ -71,46 +71,6 @@ class TimobeamAxleModel(ComputationalModel):
               
         def set_space_degree(self, p: int) -> None:
                 self.p = p
-
-        # def timo_axle_system(self):
-        #         """"Construct the linear system for the 3D timoshenko beam problem.
-
-        #         Parameters:
-        #             E (float): Young's modulus in MPa.
-        #             nu (float): Poisson's ratio.
-        #         """
-        #         self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
-        #         self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
-        #         Dofs = self.tspace.number_of_global_dofs()
-        #         K = bm.zeros((Dofs, Dofs))
-
-        #         Timo = TimoshenkoBeamMaterial(name="timobeam",
-        #                               elastic_modulus=self.beam_E,
-        #                               poisson_ratio=self.beam_nu)
-                
-        #         Axle = AxleMaterial(name="axle",
-        #                         elastic_modulus=self.axle_E,
-        #                         poisson_ratio=self.axle_nu)
-                 
-        #         mesh = self.tspace.mesh
-        #         n_cells = mesh.number_of_cells()
-
-        #         bform_beam = BilinearForm(self.tspace)
-        #         bform_beam.add_integrator(TimoshenkoBeamIntegrator(self.tspace, Timo, 
-        #                                         index=bm.arange(0, n_cells-10)))
-        #         beam_K = bform_beam.assembly(format='csr')
-
-        #         bform_axle = BilinearForm(self.tspace)
-        #         bform_axle.add_integrator(AxleIntegrator(self.tspace, Axle, 
-        #                                         index=bm.arange(n_cells-10, n_cells)))
-        #         axle_K = bform_axle.assembly(format='csr')
-
-        #         # 直接相加
-        #         K = beam_K + axle_K
-        #         F = self.pde.external_load()
-                
-        #         return K, F
-        
         
         def timo_axle_system(self):
                 """Construct the linear system for the 3D timoshenko beam problem.
@@ -138,8 +98,6 @@ class TimobeamAxleModel(ComputationalModel):
                 timo_integrator = TimoshenkoBeamIntegrator(self.tspace, Timo, 
                                         index=bm.arange(0, n_cells-10))
                 KE_beam = timo_integrator.assembly(self.tspace)
-                KE_beam0 = KE_beam[0]
-                KE_beam1 = KE_beam[21]
                 ele_dofs_beam = timo_integrator.to_global_dof(self.tspace)
 
                 for i, dof in enumerate(ele_dofs_beam):
@@ -148,34 +106,14 @@ class TimobeamAxleModel(ComputationalModel):
                 axle_integrator = AxleIntegrator(self.tspace, Axle, 
                                         index=bm.arange(n_cells-10, n_cells))
                 KE_axle = axle_integrator.assembly(self.tspace)
-                KE_axle0 = KE_axle[0]
-                KE_axle1 = KE_axle[9]
                 ele_dofs_axle = axle_integrator.to_global_dof(self.tspace)   
 
                 for i, dof in enumerate(ele_dofs_axle):
                        K[dof[:, None], dof] += KE_axle[i]
 
-
                 F = self.pde.external_load()
                 
                 return K, F
-        
-        # def apply_bc_penalty(self, K, F):
-        #         """Apply Dirichlet boundary conditions using Penalty Method."""
-        #         penalty = 1e20
-        #         fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
-                
-        #         F[fixed_dofs] *= penalty
-
-        #         crow, col, values = K._crow, K._col, K._values
-        #         for dof in fixed_dofs:
-        #                 row_start, row_end = crow[dof], crow[dof+1]
-        #                 for idx in range(row_start, row_end):
-        #                         if col[idx] == dof:   # 找到对角线位置
-        #                                 values[idx] *= penalty
-        #                                 break     
-                
-        #         return K, F
         
         def apply_bc_penalty(self, K, F):
                 """Apply Dirichlet boundary conditions using Penalty Method."""
@@ -187,24 +125,13 @@ class TimobeamAxleModel(ComputationalModel):
                         K[dof, dof] = penalty
                 return K, F
 
-        @variantmethod("direct")
         def solve(self):
                 K, F = self.timo_axle_system()
                 K, F = self.apply_bc_penalty(K, F)
-                import numpy as np
 
-                x = np.linalg.solve(K, F)
-                #spsolve(K, F, solver='scipy')
-                return  x  
-        
-        # @variantmethod("cg")
-        # def cgsolve(self):
-        #         K, F = self.timo_axle_system()
-        #         K, F = self.apply_bc_penalty(K, F)
-        #         uh, info = cg(K, F, maxit=5000, atol=1e-14, rtol=1e-14, returninfo=True)
-        #         res = info['residual']
-        #         res_0 = bm.linalg.norm(F)
-        #         stop_res = res/res_0
-        #         self.logger.info(f"CG solver with {info['niter']} iterations"
-        #                         f" and relative residual {stop_res:.4e}")
-        #         return uh
+                # uh = spsolve(K, F, solver='scipy')
+
+                import numpy as np
+                uh = np.linalg.solve(K, F)
+                self.logger.info(f"Solution uh:\n{uh.reshape(-1, 6)}")
+                return  uh

@@ -115,13 +115,8 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         Ke = bm.concatenate((row1, row2, row3, row4), axis=0) # (12,12)
         
         # 刚度矩阵
-        Ke_batch = bm.repeat(Ke[None, :, :], NC, axis=0)  # (NC, 12, 12)
-        # Ke_batch0 = Ke_batch[0]
+        # Ke_batch = bm.repeat(Ke[None, :, :], NC, axis=0)  # (NC, 12, 12)
         R = self._coord_transform()
-        # R0T = R[0].T
-        # RK = R0T @ Ke_batch0
-        # RKR = RK @ R[0] 
-        KE = bm.einsum('cji, cjk, ckl -> cil', R, Ke_batch, R)
-        KE0 = KE[0]
-        # KE = bm.einsum('cij, cjk, clk -> cil', R, Ke_batch, R)
+        KE = bm.einsum('cji, ...jk, ckl -> cil', R, Ke, R)
+       
         return KE
