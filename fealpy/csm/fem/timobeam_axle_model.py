@@ -122,7 +122,7 @@ class TimobeamAxleModel(ComputationalModel):
                 
                 F[fixed_dofs] *= penalty
                 for dof in fixed_dofs:
-                        K[dof, dof] = penalty
+                        K[dof, dof] *= penalty
                 return K, F
 
         def solve(self):
@@ -130,7 +130,6 @@ class TimobeamAxleModel(ComputationalModel):
                 K, F = self.apply_bc_penalty(K, F)
 
                 # uh = spsolve(K, F, solver='scipy')
-
                 import numpy as np
                 uh = np.linalg.solve(K, F)
                 self.logger.info(f"Solution uh:\n{uh.reshape(-1, 6)}")
