@@ -1,6 +1,6 @@
 import argparse
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import StokesFVMRCModel
+from fealpy.fvm import NSFVMRCModel
 
 
 def main():
@@ -26,15 +26,16 @@ def main():
     options = vars(parser.parse_args())
     bm.set_backend(options["backend"])
 
-    model = StokesFVMRCModel(options)
+    model = NSFVMRCModel(options)
     print(model)
 
     model.solve_rhie_chow()
     uerr, verr, perr = model.compute_error()
-    model.plot()
+    
     print(f"L2 error (u) = {uerr}")
     print(f"L2 error (v) = {verr}")
     print(f"L2 error (p) = {perr}")
+    model.plot()
     if options["plot"]:
         model.plot()
 

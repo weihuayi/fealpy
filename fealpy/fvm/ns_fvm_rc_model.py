@@ -20,11 +20,11 @@ from fealpy.fvm import (
 )
 
 
-class StokesFVMRCModel(ComputationalModel):
+class NSFVMRCModel(ComputationalModel):
     """
-    A 2D Stokes equation solver using the finite volume method (FVM).
+    A 2D NS equation solver using the finite volume method (FVM).
 
-    This computational model solves the 2D Stokes equation on a uniform grid, 
+    This computational model solves the 2D NS equation on a uniform grid, 
     incorporating Rhie-Chow interpolation correction to mitigate oscillations in the numerical pressure solution.
 
     Parameters:
@@ -59,7 +59,7 @@ class StokesFVMRCModel(ComputationalModel):
     
     def set_pde(self, pde: Union[str, object]) -> None:
         if isinstance(pde, int):
-            self.pde = PDEModelManager('stokes').get_example(pde)
+            self.pde = PDEModelManager('navier_stokes').get_example(pde)
         else:
             self.pde = pde
 
@@ -67,23 +67,28 @@ class StokesFVMRCModel(ComputationalModel):
 
     def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
         self.mesh = self.pde.init_mesh['uniform_qrad'](nx=nx, ny=ny)
-        self.NC = self.mesh.number_of_cells()   
+        self.NC = self.mesh.number_of_cells()
+        self.h = 1/nx   
 
     def set_space(self, degree: int = 0) -> None:
         self.p = degree
         self.pspace = ScaledMonomialSpace2d(self.mesh, self.p)
         self.uspace = TensorFunctionSpace(self.pspace, shape=(2, -1))
 
-    def assembly_velocity(self) -> Tuple[TensorLike, TensorLike]:
+    def assembly_velocity(self,uf) -> Tuple[TensorLike, TensorLike]:
         """
         Discretize the velocity term
         """
-        AB = BilinearForm(self.uspace).add_integrator(
-            ScalarDiffusionIntegrator(q=2)).assembly()
+        bform = BilinearForm(self.uspace).add_integrator(
+            ScalarDiffusionIntegrator(q=2))
+        bform.add_integrator(ConvectionIntegrator(q=2,coef=uf))
+        AB = bform.assembly()
+        # AB = BilinearForm(self.uspace).add_integrator(
+        #     ScalarDiffusionIntegrator(q=2)).assembly()
 
         f = LinearForm(self.uspace).add_integrator(
             ScalarSourceIntegrator(self.pde.source, q=2)).assembly()
-
+    
         return AB, f
 
     def assembly_pressure(self) -> Tuple[TensorLike, TensorLike]:
@@ -116,19 +121,20 @@ class StokesFVMRCModel(ComputationalModel):
         )
         return A1
     
-    def assembly_base_system(self) -> Tuple:
+    def assembly_base_system(self,uf=None) -> Tuple:
         """
         Apply boundary conditions to the discretized velocity 
         and pressure terms, and assemble them into basic matrix blocks using BlockForm
         """
-        AB, f = self.assembly_velocity()
+        AB, f = self.assembly_velocity(uf)
         M1, M2 = self.assembly_pressure()
         M3 = BlockForm([[M1, M2]]).assembly_sparse_matrix(format='csr')
         dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
         nbc = NeumannBC(self.mesh, self.pde.neumann_pressure)
         AB, f = dbc.DiffusionApply(AB, f)
         ap = AB.diags().values
-        
+        # f[:self.NC] = dbc.ConvectionApplyX(f[:self.NC],self.pde.dirichlet_velocity)
+        # f[self.NC:] = dbc.ConvectionApplyX(f[self.NC:],self.pde.dirichlet_velocity)
         M1, f[:self.NC] = nbc.ConvectionApplyX(M1, f[:self.NC])
         M2, f[self.NC:] = nbc.ConvectionApplyY(M2, f[self.NC:])
         
@@ -142,78 +148,74 @@ class StokesFVMRCModel(ComputationalModel):
         the assembled matrix M5 corresponds to the discretization of the true gradient of pressure p at control volume edges, 
         while rc corresponds to the gradient of pressure p obtained by direct interpolation at control volume edges
         """
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        e2c = mesh.edge_to_cell()
+        NC = self.mesh.number_of_cells()
+        e2c = self.mesh.edge_to_cell()
+        Sf = self.mesh.edge_normal()
         ap_edge = (ap[e2c[:, 0]] + ap[e2c[:, 1]]) / 2
+        # grad_f1 = (ph0[e2c[:, 1]] - ph0[e2c[:, 0]]) / self.h
+        grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(ph0, self.pde.neumann_pressure)
+        grad_f2 = GradientReconstruct(self.mesh).reconstruct(grad_p)
 
-        grad_p = GradientReconstruct(mesh).AverageGradientreNeumann(ph0, self.pde.neumann_pressure)
-        grad_f = GradientReconstruct(mesh).reconstruct(grad_p)
-
-        x = mesh.boundary_face_index()
-        mask = bm.ones(grad_f.shape[0], dtype=bool)
+        x = self.mesh.boundary_face_index()
+        mask = bm.ones(grad_f2.shape[0], dtype=bool)
         mask[x] = False
-
-        r = bm.einsum('i,ij->ij', ap_edge, grad_f)
-        Sf = mesh.edge_normal()
-        c = bm.einsum('ij,ij->i', Sf, r)
-
+        # r1 = bm.einsum('i,i->i', ap_edge, grad_f1)
+        r2 = bm.einsum('i,ij->ij', ap_edge, grad_f2)
+        c = bm.einsum('ij,ij->i', Sf, r2)
         rc = bm.zeros(NC)
         bm.add.at(rc, e2c[mask, 0], c[mask])
         bm.add.at(rc, e2c[mask, 1], -c[mask])
-
-        bdu = self.pde.dirichlet_velocity(mesh.entity_barycenter('edge')[x])
+        bdu = self.pde.dirichlet_velocity(self.mesh.entity_barycenter('edge')[x])
         d = bm.einsum('ij,ij->i', bdu, Sf[x])
         bm.add.at(rc, e2c[x, 0], d)
-
         M5 = BilinearForm(self.pspace).add_integrator(
             ScalarDiffusionIntegrator(q=2, coef=ap_edge)).assembly()
 
-        return M5, rc
-
-    def solve_base(self) -> Tuple[TensorLike, TensorLike]:
-        """
-        Assemble the linear system without Rhie-Chow interpolation correction to obtain the numerical solution. 
-        However, the pressure solution exhibits oscillations, which does not meet our requirements. 
-        This solution is computed solely to construct the Rhie-Chow interpolation correction.
-        """
-        AB, M3, M4, f, ap = self.assembly_base_system()
-        A1 = self.lagrange_multiplier()
-        ABC = BlockForm([[AB, M4], [M3, None]]).assembly_sparse_matrix(format='csr')
-        S = BlockForm([[ABC, A1.T], [A1, None]]).assembly_sparse_matrix(format='csr')
-        b0 = bm.array([self.pde.pressure_integral_target()])
-        # b0 = bm.array([0.0])
-        b = bm.concatenate([f,bm.zeros(self.NC),b0], axis=0)
-        
-        sol = spsolve(S, b, "mumps")
-        ph0 = sol[2 * self.NC:-1]
-        self.ph0 = ph0
-        return ph0, ap
+        return M5,rc
 
 
-    def solve_rhie_chow(self) -> Tuple:
-        """
-        Reassemble the linear system with Rhie-Chow interpolation correction 
-        and solve it to obtain the desired numerical solution, 
-        where the pressure solution no longer exhibits oscillations
-        """
-        ph0, ap = self.solve_base()
-        M5, ct = self.assembly_rhie_chow_corrected_system(ph0, ap)
-        AB, M3, M4, f, ap = self.assembly_base_system()
-        A1 = self.lagrange_multiplier()
-        AB2 = BlockForm([[AB,M4],[M3,M5]]).assembly_sparse_matrix(format='csr')
-        S2 = BlockForm([[AB2, A1.T], [A1, None]])
-        S2 = S2.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([self.pde.pressure_integral_target()])
-        b2 = bm.concatenate([f,-ct,b0], axis=0)
+    def solve_rhie_chow(self, max_iter: int = 1, tol: float = 1e-7) -> Tuple:
+        Sf = self.mesh.edge_normal()
+        # Uf = bm.stack([bm.ones_like(Sf[:,0]), bm.zeros_like(Sf[:,0])], axis=1)
+        self.uI = self.pde.velocity_u(self.mesh.entity_barycenter("edge"))
+        self.vI = self.pde.velocity_v(self.mesh.entity_barycenter("edge"))
+        Uf = bm.stack([self.uI, self.vI], axis=1)
+        ph = bm.zeros(self.NC)
+        e2c = self.mesh.edge_to_cell()
+        for i in range(max_iter):
+            AB, M3, M4, f, ap = self.assembly_base_system(Uf)
+            A1 = self.lagrange_multiplier()
+            ABC = BlockForm([[AB, M4], [M3, None]]).assembly_sparse_matrix(format='csr')
+            S = BlockForm([[ABC, A1.T], [A1, None]]).assembly_sparse_matrix(format='csr')
+            b0 = bm.array([self.pde.pressure_integral_target()])
+            b = bm.concatenate([f,bm.zeros(self.NC),b0], axis=0)
+            sol = spsolve(S, b, "mumps")
+            ph0 = sol[2 * self.NC:-1]
+            # uh = sol[:self.NC]
+            # vh = sol[self.NC:2*self.NC]
+            # ph = sol[2*self.NC:-1]
 
-        sol = spsolve(S2, b2, "mumps")
-        uh = sol[:self.NC]
-        vh = sol[self.NC:2*self.NC]
-        ph = sol[2*self.NC:-1]
+            M5,rc = self.assembly_rhie_chow_corrected_system(ph0, ap)
+            AB2 = BlockForm([[AB,M4],[M3,M5]]).assembly_sparse_matrix(format='csr')
+            S2 = BlockForm([[AB2, A1.T], [A1, None]])
+            S2 = S2.assembly_sparse_matrix(format='csr')
+            b2 = bm.concatenate([f,-rc,b0], axis=0)
+            
+            sol = spsolve(S2, b2, "mumps")
+            uh = sol[:self.NC]
+            vh = sol[self.NC:2*self.NC]
+            ph = sol[2*self.NC:-1]
+            uf1 = (uh[e2c[:,0]] + uh[e2c[:,1]])/2
+            vf1 = (vh[e2c[:,0]] + vh[e2c[:,1]])/2
+            Uf1 = bm.stack([uf1,vf1],axis=1)
+            res = bm.max(bm.abs(Uf1[:,0] - Uf[:,0]))
+            Uf = Uf1
+            self.logger.info(f"Iteration {i+1}, Residual: {res:.6e}")
+            if res < tol:
+                break
         self.uh, self.vh, self.ph = uh, vh, ph
         return uh, vh, ph
-
+        
     
     def compute_error(self) -> Tuple:
         """
@@ -223,10 +225,12 @@ class StokesFVMRCModel(ComputationalModel):
         self.uI = self.pde.velocity_u(self.mesh.entity_barycenter("cell"))
         self.vI = self.pde.velocity_v(self.mesh.entity_barycenter("cell"))
         self.pI = self.pde.pressure(self.mesh.entity_barycenter("cell"))
-
-        uerr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.uh - self.uI)**2))
-        verr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.vh - self.vI)**2))
-        perr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        uerr = bm.max(bm.abs(self.uh - self.uI))
+        verr = bm.max(bm.abs(self.vh - self.vI))
+        perr = bm.max(bm.abs(self.ph - self.pI))
+        # uerr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.uh - self.uI)**2))
+        # verr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.vh - self.vI)**2))
+        # perr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph - self.pI)**2))
         return uerr, verr, perr
     
 
@@ -242,7 +246,6 @@ class StokesFVMRCModel(ComputationalModel):
                 (self.uh - self.uI, "Error u'"),
                 (self.vh - self.vI, "Error v'"),
                 (self.ph - self.pI, " Error p(RC)'"),
-                (self.ph0 - self.pI, " Error p(non-RC)'"),
                 ]):
                 ax = fig.add_subplot(2, 3, i+1, projection='3d')
                 ax.plot_trisurf(x, y, data, cmap='viridis')

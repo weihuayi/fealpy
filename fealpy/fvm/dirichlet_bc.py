@@ -171,23 +171,25 @@ class DirichletBC:
         bm.add_at(b, bde2c, -bd_correct)
         return b
     
-    def ConvectionApplyX(self,b):
+    def ConvectionApplyX(self,b,gd):
         Sf = self.mesh.edge_normal()
         bdedge = self.mesh.boundary_face_index()
         epoints = self.mesh.entity_barycenter('face')[bdedge, :]
+        bdU = gd(epoints)
         bdu = self.gd(epoints)
-        bdflux1 = bm.einsum('ij,ij->i', Sf[bdedge, :], bdu)
+        bdflux1 = bm.einsum('ij,ij,i->i', Sf[bdedge, :], bdU, bdu)
         e2c = self.mesh.edge_to_cell()
         bde2c = e2c[bdedge, 0]
         bm.add_at(b, bde2c, -bdflux1)
         return b
     
-    def ConvectionApplyY(self,b):
+    def ConvectionApplyY(self,b,gd):
         Sf = self.mesh.edge_normal()
         bdedge = self.mesh.boundary_face_index()
         epoints = self.mesh.entity_barycenter('face')[bdedge, :]
-        bdu = self.gd(epoints)
-        bdflux2 = bm.einsum('i,i->i', Sf[bdedge, 1], bdu)
+        bdU = gd(epoints)
+        bdv = self.gd(epoints)
+        bdflux2 = bm.einsum('ij,ij,i->i', Sf[bdedge, :], bdU, bdv)
         e2c = self.mesh.edge_to_cell()
         bde2c = e2c[bdedge, 0]
         bm.add_at(b, bde2c, -bdflux2)

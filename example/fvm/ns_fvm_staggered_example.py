@@ -1,12 +1,12 @@
 import argparse
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import StokesFVMRCModel
+from fealpy.fvm import NSFVMStaggeredModel
 
 
 def main():
     parser = argparse.ArgumentParser(description="FVM Stokes solver on staggered mesh")
 
-    parser.add_argument('--pde', default=1, type=int,
+    parser.add_argument('--pde', default=2, type=int,
                         help='PDE example ID from Stokes PDE manager.')
     
     parser.add_argument('--nx', default=20, type=int,
@@ -26,15 +26,15 @@ def main():
     options = vars(parser.parse_args())
     bm.set_backend(options["backend"])
 
-    model = StokesFVMRCModel(options)
+    model = NSFVMStaggeredModel(options)
     print(model)
 
-    model.solve_rhie_chow()
+    model.solve()
     uerr, verr, perr = model.compute_error()
-    model.plot()
     print(f"L2 error (u) = {uerr}")
     print(f"L2 error (v) = {verr}")
     print(f"L2 error (p) = {perr}")
+    model.plot()
     if options["plot"]:
         model.plot()
 
