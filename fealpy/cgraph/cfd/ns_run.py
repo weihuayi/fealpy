@@ -83,9 +83,9 @@ class IncompressibleNSIPCSRun(CNodeType):
     TITLE: str = "IPCS 求解非稳态 NS 方程"
     PATH: str = "流体.NS 方程有限元迭代求解"
     INPUT_SLOTS = [
-        PortConf("T0", DataType.FLOAT, 0, title="初始时间"),
-        PortConf("T1", DataType.FLOAT, 0, title="结束时间"),
-        PortConf("nt", DataType.INT, 0, title="时间剖分数"),
+        PortConf("T0", DataType.FLOAT, title="初始时间"),
+        PortConf("T1", DataType.FLOAT, title="结束时间"),
+        PortConf("NL", DataType.INT, title="时间层数"),
         PortConf("uspace", DataType.SPACE, title="速度函数空间"),
         PortConf("pspace", DataType.SPACE, title="压力函数空间"),
         PortConf("velocity_0", DataType.FUNCTION, title="初始速度"),
@@ -98,17 +98,18 @@ class IncompressibleNSIPCSRun(CNodeType):
     ]
     OUTPUT_SLOTS = [
         PortConf("uh", DataType.FUNCTION, title="速度数值解"),
+        PortConf("ph", DataType.FUNCTION, title="压力数值解"),
         PortConf("uh_x", DataType.FUNCTION, title="速度x分量数值解"),
-        PortConf("uh_y", DataType.FUNCTION, title="速度y分量数值解"),
-        PortConf("ph", DataType.FUNCTION, title="压力数值解")
+        PortConf("uh_y", DataType.FUNCTION, title="速度y分量数值解")
     ]
-    def run(T0, T1, nt, uspace, pspace, velocity_0, pressure_0, is_pressure_boundary,
+    def run(T0, T1, NL, uspace, pspace, velocity_0, pressure_0, is_pressure_boundary,
             predict_velocity, correct_pressure, correct_velocity, mesh):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import cartesian
         from fealpy.solver import spsolve
         from fealpy.cfd.simulation.time import UniformTimeLine
         
+        nt = NL - 1
         timeline = UniformTimeLine(T0, T1, nt)
         dt = timeline.dt
         u0 = uspace.interpolate(cartesian(lambda p: velocity_0(p, timeline.T0)))
@@ -123,7 +124,7 @@ class IncompressibleNSIPCSRun(CNodeType):
 
         for i in range(nt):
             t  = timeline.current_time()
-            # print(f"time={t}")
+            print(f"time={t}")
             
             uh1 = u0.space.function()
             uhs = u0.space.function()
@@ -158,5 +159,4 @@ class IncompressibleNSIPCSRun(CNodeType):
  
             timeline.advance()
 
-        return uh, uh_x, uh_y, ph
-        
+        return uh, ph, uh_x, uh_y

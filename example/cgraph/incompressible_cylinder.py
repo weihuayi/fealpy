@@ -5,16 +5,23 @@ import fealpy.cgraph as cgraph
 WORLD_GRAPH = cgraph.WORLD_GRAPH
 
 pde = cgraph.create("IncompressibleCylinder2d")
-# mesher = cgraph.create("SquareHole")
 uspacer = cgraph.create("TensorFunctionSpace")
 pspacer = cgraph.create("FunctionSpace")
 dbc_u = cgraph.create("ProjectDBC")
 dbc_p = cgraph.create("ProjectDBC")
 simulation = cgraph.create("IncompressibleNSIPCS")
-IncompressibleNSRun = cgraph.create("IncompressibleNSProjectRun")
+timeline = cgraph.create("CFDTimeline")
+IncompressibleNSRun = cgraph.create("IncompressibleNSIPCSRun")
+show = cgraph.create("OutputVideo")
 
-pde(n_circle = 300,
-    h = 0.05)
+pde(
+    mu = 0.001,
+    rho = 1.0,
+    cx = 0.5,
+    cy = 0.2,
+    radius = 0.07,
+    n_circle = 300,
+    h = 0.04)
 uspacer(mesh = pde().mesh, p=2, gd = 2)
 pspacer(mesh = pde().mesh, p=1)
 dbc_u(
@@ -39,11 +46,15 @@ simulation(
     apply_bcp = dbc_p().apply_bc,
     q = 2
 ) 
-
+timeline(
+    T0 = 0.0,
+    T1 = 6.0,
+    NT = 6000
+)
 IncompressibleNSRun(
-    T0=0.0,
-    T1=1.0,
-    nt = 1000,
+    T0=timeline().T0,
+    T1=timeline().T1,
+    NL=timeline().NL,
     uspace = uspacer(), 
     pspace = pspacer(), 
     velocity_0 = pde().velocity_0,
@@ -54,8 +65,25 @@ IncompressibleNSRun(
     correct_velocity = simulation().correct_velocity,
     mesh = pde().mesh
 )
+show(
+    T0 = timeline().T0,
+    T1 = timeline().T1,
+    NL = timeline().NL,
+    domain = pde().domain,
+    mesh = pde().mesh,
+    out = IncompressibleNSRun().uh_x,
+    dpi = 500,
+    bitrate = 8000,
+    figsize_x = 6.0,
+    figsize_y = 3.0,
+    cmap = 'cividis',
+    clim_vmin = 0.0,
+    clim_vmax = 1.8,
+    filename = "Cylinder_01",
+    title = "velocity_x"
+)
 
-WORLD_GRAPH.output(uh = IncompressibleNSRun().uh, ph = IncompressibleNSRun().ph)
+WORLD_GRAPH.output(out = show().out)
 WORLD_GRAPH.error_listeners.append(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())
