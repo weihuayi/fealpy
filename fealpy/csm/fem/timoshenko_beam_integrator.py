@@ -108,14 +108,14 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ax = mesh.celldata["Ax"]
         Ay = mesh.celldata["Ay"]
         Az = mesh.celldata["Az"]
-        Ix = mesh.celldata["Ix"]
+        J = mesh.celldata["Ix"]
         Iy = mesh.celldata["Iy"]
         Iz = mesh.celldata["Iz"]
 
         # 坐标变换矩阵
         R = self._coord_transform()
         
-        return E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R, len(cells)
+        return E, mu, l, Ax, Ay, Az, J, Iy, Iz, R, len(cells)
 
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
@@ -127,7 +127,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         """
         assert space is self.space 
         
-        E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R, NC = self.fetch(space)
+        E, mu, l, Ax, Ay, Az, J, Iy, Iz, R, NC = self.fetch(space)
 
         phi_y = 12 * E * Iz / mu / Ay / (l**2)
         phi_z = 12 * E * Iy / mu / Az / (l**2)
@@ -147,7 +147,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ke[:, 2, 8] = -Ke[:, 2, 2]
         Ke[:, 2, 10] = Ke[:, 2, 4]
 
-        Ke[:, 3, 3] = mu * Ix / l
+        Ke[:, 3, 3] = mu * J / l
         Ke[:, 3, 9] = -Ke[:, 3, 3]
 
         Ke[:, 4, 4] = (4+phi_z) * E * Iy / (1+phi_z) / l
