@@ -1,8 +1,8 @@
 from ..nodetype import CNodeType, PortConf, DataType
 
 class UAVPathPlanning(CNodeType):
-    TITLE: str = "UAV Path Planning"
-    PATH: str = "opt.path_planning"
+    TITLE: str = "UAV 路径规划"
+    PATH: str = "优化.路径规划"
     INPUT_SLOTS = [
         PortConf("start_x", DataType.FLOAT, min_val=900, max_val=1045),
         PortConf("start_y", DataType.FLOAT, min_val=0, max_val=200),

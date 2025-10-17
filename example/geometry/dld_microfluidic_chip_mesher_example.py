@@ -22,39 +22,43 @@ parser.add_argument('--init_point',
     help = "Initial point for chip positioning.")
 
 parser.add_argument('--chip_height',
-    default = 5.0, type = float,
+    default = 1.0, type = float,
     help = "Height of the microfluidic chip.")
 
 parser.add_argument('--inlet_length',
-    default = 1.0, type = float,
+    default = 0.0, type = float,
     help = "Length of the inlet section.")
 
 parser.add_argument('--outlet_length',
-    default = 1.0, type = float,
+    default = 0.0, type = float,
     help = "Length of the outlet section.")
 
 parser.add_argument('--radius',
-    default = 0.1, type = float,
+    default = 1 / (3 * 4), type = float,
     help = "Radius of the pillars.")
 
 parser.add_argument('--n_rows',
-    default = 8, type = int,
+    default = 4, type = int,
     help = "Number of rows of pillars in each stage.")
 
 parser.add_argument('--n_cols',
-    default = 6, type = int,
+    default = 4, type = int,
     help = "Number of columns of pillars in each stage.")
 
 parser.add_argument('--tan_angle',
-    default = 1/10, type = float,
+    default = 0, type = float,
     help = "Tangent of the deflection angle.")
 
 parser.add_argument('--n_stages',
-    default = 3, type = int,
+    default = 1, type = int,
+    help = "Number of stages (or periods) in the chip.")
+
+parser.add_argument('--stage_length',
+    default = 1, type = float,
     help = "Number of stages (or periods) in the chip.")
 
 parser.add_argument('--lc',
-    default = 0.2, type = float,
+    default = 0.01, type = float,
     help = "Grid size for meshing.")
 
 parser.add_argument('--show_figure',
