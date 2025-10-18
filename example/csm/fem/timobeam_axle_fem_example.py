@@ -56,4 +56,3 @@ from fealpy.csm.fem import TimobeamAxleModel
 model = TimobeamAxleModel(options)
 # model.__str__()
 model.solve()
-model.test()

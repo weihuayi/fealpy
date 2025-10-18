@@ -136,26 +136,3 @@ class TimobeamAxleModel(ComputationalModel):
                 uh = np.linalg.solve(K, F)
                 self.logger.info(f"Solution uh:\n{uh}")
                 return  uh
-        
-        def test(self):
-                Timo = TimoshenkoBeamMaterial(model=self.pde,
-                                        name="timobeam",
-                                        elastic_modulus=self.beam_E,
-                                        poisson_ratio=self.beam_nu,
-                                        shear_factor=9/10)
-
-                Axle = AxleMaterial(model=self.pde,
-                                name="axle",
-                                elastic_modulus=self.axle_E,
-                                poisson_ratio=self.axle_nu)
-                
-                x = 0.5 
-                l = 34.0  
-                
-                b = Timo.linear_basis(x, l)
-                h = Timo.hermite_basis(x, l)
-                N, Nt = Timo.shape_function(x, l, plane='xy')
-                self.logger.info(f"b:\n{b.shape}\n")
-                self.logger.info(f"h:\n{h.shape}\n")
-                self.logger.info(f"N:\n{N.shape}\nNt:\n{Nt.shape}")
-                return b, h, N, Nt
