@@ -9,10 +9,10 @@ def main():
     parser.add_argument('--pde', default=1, type=int,
                         help='PDE example ID from Stokes PDE manager.')
     
-    parser.add_argument('--nx', default=40, type=int,
+    parser.add_argument('--nx', default=20, type=int,
                         help='Number of cells in x-direction.')
     
-    parser.add_argument('--ny', default=40, type=int,
+    parser.add_argument('--ny', default=20, type=int,
                         help='Number of cells in y-direction.')
     
     parser.add_argument('--backend', default='numpy', type=str,
@@ -31,9 +31,10 @@ def main():
 
     model.solve()
     uerr, verr, perr = model.compute_error()
-    print(f"L2 error (u) = {uerr:.4e}")
-    print(f"L2 error (v) = {verr:.4e}")
-    print(f"L2 error (p) = {perr:.4e}")
+    model.plot()
+    print(f"L2 error (u) = {uerr}")
+    print(f"L2 error (v) = {verr}")
+    print(f"L2 error (p) = {perr}")
     if options["plot"]:
         model.plot()
 

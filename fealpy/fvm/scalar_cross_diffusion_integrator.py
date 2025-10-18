@@ -41,25 +41,54 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         Tf = VectorDecomposition(mesh).tangential_vector_calculation() # (NE, 2)
         edge_to_cell = mesh.edge_to_cell(index=index)[:,:2]
         NC = mesh.number_of_cells()
-        return Tf,edge_to_cell,NC
+        q = space.p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights() 
+        phi = space.basis(bcs, index=index) 
+        return Tf,edge_to_cell,NC,phi
         
 
     @variantmethod 
     def assembly(self, space: _FS) -> TensorLike:
-        Tf,edge_to_cell,NC= self.fetch(space)
-        Cross_diffusion = bm.einsum('ij,ij->i', Tf, self.grad_f)
-        NE = Cross_diffusion.shape[0]
-        flux = bm.zeros((NE, 2))
-        is_boundary = edge_to_cell[:, 0] == edge_to_cell[:, 1]
-        is_internal = ~is_boundary
-        flux[is_internal, 0] =  Cross_diffusion[is_internal]
-        flux[is_internal, 1] = -Cross_diffusion[is_internal]
-        flux[is_boundary, 0] = Cross_diffusion[is_boundary]
-        result = bm.zeros((NC,))
-        bm.add_at(result, edge_to_cell[:, 0], flux[:, 0])
-        bm.add_at(result, edge_to_cell[:, 1], flux[:, 1])
+        Tf,edge_to_cell,NC,phi= self.fetch(space)
+        D = phi.shape[-1]
+        if D ==1:
+            Cross_diffusion = bm.einsum('ij,ij->i', Tf, self.grad_f)
+            NE = Cross_diffusion.shape[0]
+            flux = bm.zeros((NE, 2))
+            is_boundary = edge_to_cell[:, 0] == edge_to_cell[:, 1]
+            is_internal = ~is_boundary
+            flux[is_internal, 0] =  Cross_diffusion[is_internal]
+            flux[is_internal, 1] = -Cross_diffusion[is_internal]
+            flux[is_boundary, 0] = Cross_diffusion[is_boundary]
+            result = bm.zeros((NC,))
+            bm.add_at(result, edge_to_cell[:, 0], flux[:, 0])
+            bm.add_at(result, edge_to_cell[:, 1], flux[:, 1])
+            return result
+        elif D == 2:
+            grad_f_u = self.grad_f[:,0,:]
+            grad_f_v = self.grad_f[:,1,:]
+            is_boundary = edge_to_cell[:, 0] == edge_to_cell[:, 1]
+            is_internal = ~is_boundary
+            Cross_diffusion_u = bm.einsum('ij,ij->i', Tf, grad_f_u)
+            Cross_diffusion_v = bm.einsum('ij,ij->i', Tf, grad_f_v)
+            NE = Cross_diffusion_u.shape[0]
+            flux = bm.zeros((NE, 4))
+            flux[is_internal, 0] =  Cross_diffusion_u[is_internal]
+            flux[is_internal, 1] = -Cross_diffusion_u[is_internal]
+            flux[is_boundary, 0] = Cross_diffusion_u[is_boundary]
+            flux[is_internal, 2] =  Cross_diffusion_v[is_internal]
+            flux[is_internal, 3] = -Cross_diffusion_v[is_internal]
+            flux[is_boundary, 2] = Cross_diffusion_v[is_boundary]
+            result = bm.zeros((NC,2))
+            bm.add_at(result[:,0], edge_to_cell[:, 0], flux[:, 0])
+            bm.add_at(result[:,0], edge_to_cell[:, 1], flux[:, 1])
+            bm.add_at(result[:,1], edge_to_cell[:, 0], flux[:, 2])
+            bm.add_at(result[:,1], edge_to_cell[:, 1], flux[:, 3])
+            return result
+        
 
-        return result
+        
 
 
         

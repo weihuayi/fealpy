@@ -83,7 +83,7 @@ class StokesFVMRCModel(ComputationalModel):
 
         f = LinearForm(self.uspace).add_integrator(
             ScalarSourceIntegrator(self.pde.source, q=2)).assembly()
-    
+
         return AB, f
 
     def assembly_pressure(self) -> Tuple[TensorLike, TensorLike]:
@@ -182,6 +182,7 @@ class StokesFVMRCModel(ComputationalModel):
         ABC = BlockForm([[AB, M4], [M3, None]]).assembly_sparse_matrix(format='csr')
         S = BlockForm([[ABC, A1.T], [A1, None]]).assembly_sparse_matrix(format='csr')
         b0 = bm.array([self.pde.pressure_integral_target()])
+        # b0 = bm.array([0.0])
         b = bm.concatenate([f,bm.zeros(self.NC),b0], axis=0)
         
         sol = spsolve(S, b, "mumps")

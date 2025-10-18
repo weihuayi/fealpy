@@ -6,28 +6,51 @@ class GradientReconstruct:
         self.Sf = self.mesh.edge_normal()  
         self.e2c = self.mesh.edge_to_cell() 
 
-    def GreenGauss(self, uh):
-          
+    def GreenGauss(self, U):
+        GD = U[..., None].shape[1]
         NC = self.mesh.number_of_cells()
-        GD = 2
-        uh_i = uh[self.e2c[:, 0]]  
-        uh_j = uh[self.e2c[:, 1]]  
-        uh_f = 0.5 * (uh_i + uh_j) 
-        grad_u = bm.zeros((NC, GD)) 
-        bm.add.at(grad_u, self.e2c[:, 0], uh_f[:, None] * self.Sf)
-        #mask = e2c[:, 0] != e2c[:, 1]  # 非边界边
-        bm.add.at(grad_u, self.e2c[:, 1], -uh_f[:, None] * self.Sf)
-        return grad_u
+        if GD == 1:
+            grad_U = bm.zeros((NC, 2))
+            uh_i = U[self.e2c[:, 0]]  
+            uh_j = U[self.e2c[:, 1]]  
+            uh_f = 0.5 * (uh_i + uh_j) 
+            bm.add.at(grad_U, self.e2c[:, 0], uh_f[:, None] * self.Sf)
+            bm.add.at(grad_U, self.e2c[:, 1], -uh_f[:, None] * self.Sf)
+        elif GD == 2:
+            grad_u = bm.zeros((NC, 2))
+            uh_i = U[self.e2c[:, 0],0]  
+            uh_j = U[self.e2c[:, 1],0]  
+            uh_f = 0.5 * (uh_i + uh_j) 
+            bm.add.at(grad_u, self.e2c[:, 0], uh_f[:, None] * self.Sf)
+            bm.add.at(grad_u, self.e2c[:, 1], -uh_f[:, None] * self.Sf)
+            grad_v = bm.zeros((NC, 2))
+            vh_i = U[self.e2c[:, 0],1]  
+            vh_j = U[self.e2c[:, 1],1]  
+            vh_f = 0.5 * (vh_i + vh_j) 
+            bm.add.at(grad_v, self.e2c[:, 0], vh_f[:, None] * self.Sf)
+            bm.add.at(grad_v, self.e2c[:, 1], -vh_f[:, None] * self.Sf)
+            # print(NC)
+            # print(grad_u.shape, grad_v.shape)
+            grad_U = bm.stack([grad_u,grad_v], axis=1)
+        return grad_U
 
-    def AverageGradientreDirichlet(self, uh, gd):
+    def AverageGradientreDirichlet(self, U, gd):
         cell_measure = self.mesh.entity_measure('cell')
-        grad_u = self.GreenGauss(uh)
+        grad_U = self.GreenGauss(U)
         bdedge = self.mesh.boundary_face_index()
         epoints = self.mesh.entity_barycenter('face')[bdedge, :]
         bdu = gd(epoints)
-        bm.add.at(grad_u, self.e2c[bdedge, 0], bdu[:, None] * self.Sf[bdedge, :])
-        grad_u /= cell_measure[:, None]  # (NC, 2)
-        return grad_u
+        # print(bdu.shape, self.Sf[bdedge, :].s+hape)
+        GD = U[..., None].shape[1]
+        if GD == 1:
+            bm.add.at(grad_U, self.e2c[bdedge, 0], bdu[:, None] * self.Sf[bdedge, :])
+            grad_U /= cell_measure[:, None]  # (NC, 2)
+        elif GD == 2:
+            # print(grad_U.shape, bdu[:, 0, None].shape , self.Sf[bdedge, :].shape)
+            bm.add.at(grad_U[:,0,:], self.e2c[bdedge, 0], bdu[:, 0, None] * self.Sf[bdedge, :])
+            bm.add.at(grad_U[:,1,:], self.e2c[bdedge, 0], bdu[:, 1, None] * self.Sf[bdedge, :])
+            grad_U /= cell_measure[:, None, None]
+        return grad_U
 
     def AverageGradientreNeumann(self, uh, gd):
         cell_measure = self.mesh.entity_measure('cell')

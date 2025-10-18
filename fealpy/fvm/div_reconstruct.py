@@ -19,11 +19,11 @@ class DivergenceReconstruct:
         mask = pe2c[:, 1] != pe2c[:, 0]  # 非边界边
         bm.add.at(div_u, pe2c[mask, 0], veloin[mask])   # 左侧/下侧单元正贡献
         bm.add.at(div_u, pe2c[mask, 1], -veloin[mask])
-        bd_u = edge_velocity[bd_idx]
-        bd_n = self.mesh.edge_normal()[[bd_idx]]
-        bd_n = bm.sum(bd_n, axis=2, keepdims=True)
-        bd_in = bm.einsum('j,ijk->j', bd_u, bd_n)
-        bm.add.at(div_u, pe2c[bd_idx, 0], bd_in)
+        # bd_u = edge_velocity[bd_idx]
+        # bd_n = self.mesh.edge_normal()[[bd_idx]]
+        # bd_n = bm.sum(bd_n, axis=2, keepdims=True)
+        # bd_in = bm.einsum('j,ijk->j', bd_u, bd_n)
+        # bm.add.at(div_u, pe2c[bd_idx, 0], bd_in)
         return div_u
     
     def Reconstruct(self, edge_velocity):

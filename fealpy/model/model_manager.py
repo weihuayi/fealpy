@@ -131,6 +131,7 @@ class PDEModelManager(ModelManager):
         "hyperbolic":"fealpy.model.hyperbolic",
         "interface_poisson":"fealpy.model.interface_poisson",
         "ion_flow":"fealpy.model.ion_flow",
+        "navier_stokes":"fealpy.model.navier_stokes",
         "nonlinear":"fealpy.model.nonlinear",
         "linear_elasticity": "fealpy.model.linear_elasticity",
         "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
@@ -141,5 +142,6 @@ class PDEModelManager(ModelManager):
         "optimal_control": "fealpy.model.optimal_control",
         "helmholtz": "fealpy.model.helmholtz",
         "surface_poisson": "fealpy.model.surface_poisson",
-        "curlcurl":"fealpy.model.curlcurl"
+        "curlcurl":"fealpy.model.curlcurl",
+        "dld_microfluidic_chip":"fealpy.model.dld_microfluidic_chip"
     }
