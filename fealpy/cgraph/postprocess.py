@@ -22,6 +22,9 @@ class VPDecoupling(CNodeType):
         ugdof = uspace.number_of_global_dofs()
         NN = mesh.number_of_nodes()
         uh = out[:ugdof]
+        uh = uh.reshape(mesh.GD,-1).T
+        uh = uh[:NN,:]
+        print(uh.shape)
         u_x = out[:int(ugdof/2)]
         u_x = u_x[:NN]
         u_y = out[int(ugdof/2):ugdof]

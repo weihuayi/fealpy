@@ -124,7 +124,7 @@ class IncompressibleNSIPCSRun(CNodeType):
 
         for i in range(nt):
             t  = timeline.current_time()
-            print(f"time={t}")
+            # print(f"time={t}")
             
             uh1 = u0.space.function()
             uhs = u0.space.function()

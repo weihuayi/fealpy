@@ -20,8 +20,8 @@ pde(
     cx = 0.5,
     cy = 0.2,
     radius = 0.07,
-    n_circle = 300,
-    h = 0.04)
+    n_circle = 100,
+    h = 0.06)
 uspacer(mesh = pde().mesh, p=2, gd = 2)
 pspacer(mesh = pde().mesh, p=1)
 dbc_u(
@@ -48,8 +48,8 @@ simulation(
 ) 
 timeline(
     T0 = 0.0,
-    T1 = 6.0,
-    NT = 6000
+    T1 = 0.2,
+    NT = 200
 )
 IncompressibleNSRun(
     T0=timeline().T0,
@@ -70,16 +70,16 @@ show(
     T1 = timeline().T1,
     NL = timeline().NL,
     domain = pde().domain,
-    mesh = pde().mesh,
+    mesh = pde().mesh,  
     out = IncompressibleNSRun().uh_x,
-    dpi = 500,
-    bitrate = 8000,
+    dpi = 300,
+    bitrate = 3000,
     figsize_x = 6.0,
     figsize_y = 3.0,
     cmap = 'cividis',
     clim_vmin = 0.0,
     clim_vmax = 1.8,
-    filename = "Cylinder_01",
+    # filename = "Cylinder_04",
     title = "velocity_x"
 )
 
