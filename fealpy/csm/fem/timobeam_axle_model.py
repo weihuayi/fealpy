@@ -1,4 +1,5 @@
 from typing import Union
+from scipy.sparse import coo_matrix
 
 from fealpy.backend import bm
 from fealpy.decorator import variantmethod
@@ -9,10 +10,7 @@ from fealpy.functionspace import (
         LagrangeFESpace, 
         TensorFunctionSpace
         )
-from fealpy.fem import (
-        BilinearForm,
-        DirichletBC
-        )
+from fealpy.fem import BilinearForm
 from fealpy.solver import spsolve, cg
 
 from ..model.beam import BeamPDEDataT
@@ -73,9 +71,9 @@ class TimobeamAxleModel(ComputationalModel):
               
         def set_space_degree(self, p: int) -> None:
                 self.p = p
-
+        
         def timo_axle_system(self):
-                """"Construct the linear system for the 3D timoshenko beam problem.
+                """Construct the linear system for the 3D timoshenko beam problem.
 
                 Parameters:
                     E (float): Young's modulus in MPa.
@@ -86,27 +84,35 @@ class TimobeamAxleModel(ComputationalModel):
                 Dofs = self.tspace.number_of_global_dofs()
                 K = bm.zeros((Dofs, Dofs))
 
-                Timo = TimoshenkoBeamMaterial(name="timobeam",
-                                      elastic_modulus=self.beam_E,
-                                      poisson_ratio=self.beam_nu)
-                
-                Axle = AxleMaterial(name="axle",
+                Timo = TimoshenkoBeamMaterial(model=self.pde,
+                                        name="timobeam",
+                                        elastic_modulus=self.beam_E,
+                                        poisson_ratio=self.beam_nu)
+
+                Axle = AxleMaterial(model=self.pde,
+                                name="axle",
                                 elastic_modulus=self.axle_E,
                                 poisson_ratio=self.axle_nu)
                  
                 mesh = self.tspace.mesh
-                bform_beam = BilinearForm(self.tspace)
-                bform_beam.add_integrator(TimoshenkoBeamIntegrator(self.tspace, Timo, 
-                                                index=bm.arange(0, mesh.number_of_cells()-10)))
-                beam_K = bform_beam.assembly(format='csr')
+                n_cells = mesh.number_of_cells()
 
-                bform_axle = BilinearForm(self.tspace)
-                bform_axle.add_integrator(AxleIntegrator(self.tspace, Axle, 
-                                                index=bm.arange(mesh.number_of_cells()-10, mesh.number_of_cells())))
-                axle_K = bform_axle.assembly(format='csr')
+                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, Timo, 
+                                        index=bm.arange(0, n_cells-10))
+                KE_beam = timo_integrator.assembly(self.tspace)
+                ele_dofs_beam = timo_integrator.to_global_dof(self.tspace)
 
-                # 直接相加
-                K = beam_K + axle_K
+                for i, dof in enumerate(ele_dofs_beam):
+                       K[dof[:, None], dof] += KE_beam[i]
+
+                axle_integrator = AxleIntegrator(self.tspace, Axle, 
+                                        index=bm.arange(n_cells-10, n_cells))
+                KE_axle = axle_integrator.assembly(self.tspace)
+                ele_dofs_axle = axle_integrator.to_global_dof(self.tspace)   
+
+                for i, dof in enumerate(ele_dofs_axle):
+                       K[dof[:, None], dof] += KE_axle[i]
+
                 F = self.pde.external_load()
                 
                 return K, F
@@ -117,19 +123,58 @@ class TimobeamAxleModel(ComputationalModel):
                 fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
                 
                 F[fixed_dofs] *= penalty
-
-                crow, col, values = K._crow, K._col, K._values
                 for dof in fixed_dofs:
-                        row_start, row_end = crow[dof], crow[dof+1]
-                        for idx in range(row_start, row_end):
-                                if col[idx] == dof:   # 找到对角线位置
-                                        values[idx] *= penalty
-                                        break     
-                
+                        K[dof, dof] *= penalty
                 return K, F
 
-        @variantmethod("direct")
         def solve(self):
                 K, F = self.timo_axle_system()
                 K, F = self.apply_bc_penalty(K, F)
-                return  spsolve(K, F, solver='scipy')  
+
+                # uh = spsolve(K, F, solver='scipy')
+                import numpy as np
+                uh = np.linalg.solve(K, F)
+                self.logger.info(f"Solution uh:\n{uh}")
+                return  uh
+        
+        def test(self):
+                Timo = TimoshenkoBeamMaterial(model=self.pde,
+                                        name="timobeam",
+                                        elastic_modulus=self.beam_E,
+                                        poisson_ratio=self.beam_nu,
+                                        shear_factor=9/10)
+
+                Axle = AxleMaterial(model=self.pde,
+                                name="axle",
+                                elastic_modulus=self.axle_E,
+                                poisson_ratio=self.axle_nu)
+
+                self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
+                self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
+                mesh = self.tspace.mesh
+                x = 2.0
+                y = 8.0
+                z = 1.0
+                l = 2.0
+                
+                # b = Timo.linear_basis(x, l)
+                # h = Timo.hermite_basis(x, l)
+                
+                # self.logger.info(f"b:\n{b[0, 0]}\n")
+                # self.logger.info(f"h:\n{h[0, 2]}\n")
+                
+                B = Timo.strain_matrix(x, y, z, l)
+                #self.logger.info(f"B:\n{B}\n")
+                
+                K, F = self.timo_axle_system()
+                K, F = self.apply_bc_penalty(K, F)
+
+                import numpy as np
+                uh = np.linalg.solve(K, F)
+
+                strain, stress = Timo.calculate_strain_and_stress(uh, x, y, z, l)
+                self.logger.info(f"B:\n{strain, stress}\n")
+
+                #N, Nt = Timo.shape_function(x, l, plane='xy')
+                #self.logger.info(f"N:\n{N.shape}\nNt:\n{Nt.shape}")
+                return B, strain, stress

@@ -39,9 +39,9 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         bars_length = mesh.entity_measure('cell')[self.index]
         
         # 第一行（轴向单位向量）
-        T11 = -(x[..., 1] - x[..., 0]) / bars_length
-        T12 = -(y[..., 1] - y[..., 0]) / bars_length
-        T13 = -(z[..., 1] - z[..., 0]) / bars_length
+        T11 = (x[..., 1] - x[..., 0]) / bars_length
+        T12 = (y[..., 1] - y[..., 0]) / bars_length
+        T13 = (z[..., 1] - z[..., 0]) / bars_length
         
         # 固定的参考向量 (全局y方向)
         vy = bm.array([0, 1, 0], dtype=bm.float64)
@@ -52,18 +52,18 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
                     (T13 * k1 - T11 * k3)**2 +
                     (T11 * k2 - T12 * k1)**2)
        
-        T21 = (T12 * k3 - T13 * k2) / A
-        T22 = (T13 * k1 - T11 * k3) / A
-        T23 = (T11 * k2 - T12 * k1) / A
+        T21 = -(T12 * k3 - T13 * k2) / A
+        T22 = -(T13 * k1 - T11 * k3) / A
+        T23 = -(T11 * k2 - T12 * k1) / A
 
          # 第三行（局部z方向 = 第一行 × 第二行）
         B = bm.sqrt((T12 * T23 - T13 * T22)**2 +
                     (T13 * T21 - T11 * T23)**2 +
                     (T11 * T22 - T12 * T21)**2)
         
-        T31 = -(T12 * T23 - T13 * T22) / B
-        T32 = -(T13 * T21 - T11 * T23) / B
-        T33 = -(T11 * T22 - T12 * T21) / B
+        T31 = (T12 * T23 - T13 * T22) / B
+        T32 = (T13 * T21 - T11 * T23) / B
+        T33 = (T11 * T22 - T12 * T21) / B
         
         # 构造3x3基础旋转矩阵 T0
         T0 = bm.stack([
@@ -108,14 +108,14 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ax = mesh.celldata["Ax"]
         Ay = mesh.celldata["Ay"]
         Az = mesh.celldata["Az"]
-        Ix = mesh.celldata["Ix"]
+        J = mesh.celldata["Ix"]
         Iy = mesh.celldata["Iy"]
         Iz = mesh.celldata["Iz"]
 
         # 坐标变换矩阵
         R = self._coord_transform()
         
-        return E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R, len(cells)
+        return E, mu, l, Ax, Ay, Az, J, Iy, Iz, R, len(cells)
 
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
@@ -127,7 +127,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         """
         assert space is self.space 
         
-        E, mu, l, Ax, Ay, Az, Ix, Iy, Iz, R, NC = self.fetch(space)
+        E, mu, l, Ax, Ay, Az, J, Iy, Iz, R, NC = self.fetch(space)
 
         phi_y = 12 * E * Iz / mu / Ay / (l**2)
         phi_z = 12 * E * Iy / mu / Az / (l**2)
@@ -140,14 +140,14 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         Ke[:, 1, 1] = 12 * E * Iz / (1+phi_y) /(l**3)
         Ke[:, 1, 5] = 6 * E *Iz / (1+phi_y) / (l**2)
         Ke[:, 1, 7] = -Ke[:, 1, 1]
-        Ke[:, 1, 11] = -Ke[:, 1, 5]
+        Ke[:, 1, 11] = Ke[:, 1, 5]
 
         Ke[:, 2, 2] = 12 * E * Iy / (1+phi_z) /(l**3)
         Ke[:, 2, 4] = -6 * E *Iy / (1+phi_z) / (l**2)
         Ke[:, 2, 8] = -Ke[:, 2, 2]
         Ke[:, 2, 10] = Ke[:, 2, 4]
 
-        Ke[:, 3, 3] = mu * Ix / l
+        Ke[:, 3, 3] = mu * J / l
         Ke[:, 3, 9] = -Ke[:, 3, 3]
 
         Ke[:, 4, 4] = (4+phi_z) * E * Iy / (1+phi_z) / l
@@ -173,5 +173,6 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
             for k in range(j + 1, 12):
                 Ke[:, k, j] = Ke[:, j, k]
 
-        KE = bm.einsum('cij, cjk, clk -> cil', R, Ke, R)
+        KE = bm.einsum('cji, cjk, ckl -> cil', R, Ke, R)
+        
         return KE

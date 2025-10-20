@@ -22,7 +22,7 @@ class TimobeamAxleData3D:
             FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
     """
     def __init__(self, para: TensorLike=None, 
-                 FSY: float=10/9, FSZ: float=10/9):
+                 kappa: float=10/9):
         self.beam_para = bm.array([
             [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
             [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
@@ -35,9 +35,9 @@ class TimobeamAxleData3D:
         self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
         self.axle_D = bm.repeat(self.axle_para[:, 0], self.axle_para[:, 2].astype(int))
         
-        self.FSY = FSY
-        self.FSZ = FSZ
-        
+        self.FSY = kappa
+        self.FSZ = kappa
+
         # === 计算 beam 截面 & 惯性矩 ===
         self.beam_Ax, self.beam_Ay, self.beam_Az = self.calculate_beam_cross_section()
         self.beam_Ix, self.beam_Iy, self.beam_Iz = self.calculate_beam_inertia()

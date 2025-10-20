@@ -29,7 +29,7 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         return space.cell_to_dof()[self.index]
 
     def _coord_transform(self) -> TensorLike:
-        """Construct the coordinate transformation matrix for 3D axle elements."""
+        """Construct the coordinate transformation matrix for 3D beam elements."""
         mesh = self.space.mesh
         node= mesh.entity('node')
         cell = mesh.entity('cell')[self.index]
@@ -39,9 +39,9 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         bars_length = mesh.entity_measure('cell')[self.index]
         
         # 第一行（轴向单位向量）
-        T11 = -(x[..., 1] - x[..., 0]) / bars_length
-        T12 = -(y[..., 1] - y[..., 0]) / bars_length
-        T13 = -(z[..., 1] - z[..., 0]) / bars_length
+        T11 = (x[..., 1] - x[..., 0]) / bars_length
+        T12 = (y[..., 1] - y[..., 0]) / bars_length
+        T13 = (z[..., 1] - z[..., 0]) / bars_length
         
         # 固定的参考向量 (全局y方向)
         vy = bm.array([0, 1, 0], dtype=bm.float64)
@@ -52,18 +52,18 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
                     (T13 * k1 - T11 * k3)**2 +
                     (T11 * k2 - T12 * k1)**2)
        
-        T21 = (T12 * k3 - T13 * k2) / A
-        T22 = (T13 * k1 - T11 * k3) / A
-        T23 = (T11 * k2 - T12 * k1) / A
+        T21 = -(T12 * k3 - T13 * k2) / A
+        T22 = -(T13 * k1 - T11 * k3) / A
+        T23 = -(T11 * k2 - T12 * k1) / A
 
          # 第三行（局部z方向 = 第一行 × 第二行）
         B = bm.sqrt((T12 * T23 - T13 * T22)**2 +
                     (T13 * T21 - T11 * T23)**2 +
                     (T11 * T22 - T12 * T21)**2)
         
-        T31 = -(T12 * T23 - T13 * T22) / B
-        T32 = -(T13 * T21 - T11 * T23) / B
-        T33 = -(T11 * T22 - T12 * T21) / B
+        T31 = (T12 * T23 - T13 * T22) / B
+        T32 = (T13 * T21 - T11 * T23) / B
+        T33 = (T11 * T22 - T12 * T21) / B
         
         # 构造3x3基础旋转矩阵 T0
         T0 = bm.stack([
@@ -71,7 +71,7 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
                     bm.stack([T21, T22, T23], axis=-1),
                     bm.stack([T31, T32, T33], axis=-1)
                 ], axis=1)  # shape: (NC, 3, 3)
-    
+        
         # 构造12x12旋转变换矩阵 R
         NC = T0.shape[0]
         O = bm.zeros((NC, 3, 3))
@@ -82,6 +82,7 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
 
         R = bm.concatenate([row1, row2, row3, row4], axis=1)  #shape: (NC, 12, 12)
         return R
+    
     
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
@@ -114,7 +115,7 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         Ke = bm.concatenate((row1, row2, row3, row4), axis=0) # (12,12)
         
         # 刚度矩阵
-        Ke_batch = bm.repeat(Ke[None, :, :], NC, axis=0)  # (NC, 12, 12)
         R = self._coord_transform()
-        KE = bm.einsum('cij, cjk, clk -> cil', R, Ke_batch, R)
+        KE = bm.einsum('cji, ...jk, ckl -> cil', R, Ke, R)
+       
         return KE
