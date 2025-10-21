@@ -6,7 +6,7 @@ from fealpy.fvm import NSFVMStaggeredModel
 def main():
     parser = argparse.ArgumentParser(description="FVM Stokes solver on staggered mesh")
 
-    parser.add_argument('--pde', default=2, type=int,
+    parser.add_argument('--pde', default=1, type=int,
                         help='PDE example ID from Stokes PDE manager.')
     
     parser.add_argument('--nx', default=20, type=int,
@@ -30,10 +30,10 @@ def main():
     print(model)
 
     model.solve()
-    uerr, verr, perr = model.compute_error()
-    print(f"L2 error (u) = {uerr}")
-    print(f"L2 error (v) = {verr}")
-    print(f"L2 error (p) = {perr}")
+    uerror, verror, perror = model.compute_error()
+    print(f"L2 error (u) = {uerror}")
+    print(f"L2 error (v) = {verror}")
+    print(f"L2 error (p) = {perror}")
     model.plot()
     if options["plot"]:
         model.plot()

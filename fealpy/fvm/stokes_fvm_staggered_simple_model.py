@@ -17,7 +17,6 @@ from fealpy.fvm import (
     GradientReconstruct,
     DivergenceReconstruct,
     DirichletBC,
-    NeumannBC,
 )
 
 class StokesFVMStaggeredSimpleModel(ComputationalModel):
@@ -63,13 +62,13 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         A = BilinearForm(uspace).add_integrator(ScalarDiffusionIntegrator(q=2)).assembly()
         f = LinearForm(uspace).add_integrator(ScalarSourceIntegrator(self.pde.source_u, q=2)).assembly()
         grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
+        # grad_p = GradientReconstruct(self.umesh).AverageGradientreDirichlet(p_u, self.pde.dirichlet_pressure)
         f -= bm.einsum('i,i->i', grad_p[:, 0], self.ucm)
         dbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
                           threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
         A, f = dbc.DiffusionApply(A, f)
         A, f = dbc.ThresholdApply(A, f)
         uap = A.diags().values
-        # print(A.to_dense())
         return spsolve(A, f,"mumps"), uap
 
     def compute_velocity_v(self, p_v) -> Tuple[TensorLike, TensorLike]:
@@ -78,13 +77,13 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         A = BilinearForm(vspace).add_integrator(ScalarDiffusionIntegrator(q=2)).assembly()
         f = LinearForm(vspace).add_integrator(ScalarSourceIntegrator(self.pde.source_v, q=2)).assembly()
         grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
+        # grad_p = GradientReconstruct(self.vmesh).AverageGradientreDirichlet(p_v,self.pde.dirichlet_pressure)
         f -= bm.einsum('i,i->i', grad_p[:, 1], self.vcm)
         dbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
                           threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
         A, f = dbc.DiffusionApply(A, f)
         A, f = dbc.ThresholdApply(A, f)
         vap = A.diags().values
-        # print(A.to_dense())
         return spsolve(A, f,"mumps"), vap
 
     def correct_pressure_compute(self, f: TensorLike, a_p_edge: TensorLike) -> TensorLike:
@@ -95,10 +94,6 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         A = BilinearForm(pspace).add_integrator(
             ScalarDiffusionIntegrator(q=2,coef=1 / a_p_edge)
         ).assembly()  
-        # print(1 / a_p_edge)
-        # print(A.to_dense())
-        nbc = NeumannBC(self.pmesh, self.pde.neumann_pressure)
-        f = nbc.DiffusionApply(f)
         LagA = self.pmesh.entity_measure('cell')
         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                              bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
@@ -115,49 +110,40 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         Solve the Stokes equation using the SIMPLE algorithm.
         """
         p = bm.zeros(self.ppoints.shape[0])
-        # p = self.pde.pressure(self.ppoints)
         self.residuals = []
         for i in range(max_iter):
             
-            p_u, p_v = self.staggered_mesh.interpolate_pressure_to_edges(p)
+            p_u, p_v = self.staggered_mesh.map_pressure_pcell_to_uvedge(p)
             uh, a_p_u = self.compute_velocity_u(p_u)
             vh, a_p_v = self.compute_velocity_v(p_v)
-            edge_vel, a_p_edge = self.staggered_mesh.map_velocity_cell_to_edge(uh, vh, a_p_u, a_p_v)
+            edge_vel, a_p_edge = self.staggered_mesh.map_velocity_uvcell_to_pedge(uh, vh, a_p_u, a_p_v)
             self.div_rhs = self.div.StagReconstruct(edge_vel)
             p_corr = self.correct_pressure_compute(-self.div_rhs, a_p_edge)
-            err = bm.sqrt(bm.sum(self.pcm * p_corr ** 2))
-            self.residuals.append(float(err))
-            self.logger.info(f"[Iter {i+1}] Pressure correction residual: {err:.2e}")
-            if err < tol:
+            L2_p_corr = bm.sqrt(bm.sum(self.pcm * (p_corr)**2))
+            self.residuals.append(float(L2_p_corr))
+            self.logger.info(f"[Iter {i+1}] L2 norm of the pressure correction : {L2_p_corr:.6e}")
+            if L2_p_corr < tol:
                 self.logger.info("Converged.")
                 break
-            p += 0.8*p_corr  
-        
-        self.pI = self.pde.pressure(self.ppoints)
-        self.pgrad_ph = GradientReconstruct(self.pmesh).AverageGradientreNeumann(p,self.pde.neumann_pressure)
-        self.pgrad_pI1 = GradientReconstruct(self.pmesh).AverageGradientreNeumann(self.pI,self.pde.neumann_pressure)
-        self.pgrad_pI2 = self.pde.grad_pressure(self.ppoints)
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_ph[:,0] - self.pgrad_pI1[:,0])**2)))
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_ph[:,0] - self.pgrad_pI2[:,0])**2)))
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_pI1[:,0] - self.pgrad_pI2[:,0])**2)))
+            p += 0.8*p_corr
         self.uh, self.vh, self.ph = uh, vh, p
-        self.p_correct = p_corr
         return uh, vh, p
 
     def compute_error(self) -> Tuple[float, float, float]:
         """
-        Compute L2 errors for velocity and pressure.
+        Compute errors for velocity and pressure.
         """
         self.uI = self.pde.velocity_u(self.upoints)
         self.vI = self.pde.velocity_v(self.vpoints)
         self.pI = self.pde.pressure(self.ppoints)
-        ue = bm.sqrt(bm.sum(self.ucm * (self.uh - self.uI)**2))
-        ve = bm.sqrt(bm.sum(self.vcm * (self.vh - self.vI)**2))
-        pe0 = bm.sqrt(bm.sum(self.pcm * (self.ph - self.pI)**2))
-        # ue = bm.max(bm.abs(self.uh - self.uI))
-        # ve = bm.max(bm.abs(self.vh - self.vI))
-        # pe0 = bm.max(bm.abs(self.ph - self.pI))
-        return ue, ve, pe0
+        
+        uerror = bm.sqrt(bm.sum(self.ucm * (self.uh - self.uI)**2))
+        verror = bm.sqrt(bm.sum(self.vcm * (self.vh - self.vI)**2))
+        perror = bm.sqrt(bm.sum(self.pcm * (self.ph - self.pI)**2))
+        # uerror = bm.max(bm.abs(self.uh - self.uI))
+        # verror = bm.max(bm.abs(self.vh - self.vI))
+        # perror = bm.max(bm.abs(self.ph - self.pI))
+        return uerror, verror, perror
 
     def plot(self) -> None:
         import matplotlib.pyplot as plt
@@ -168,16 +154,16 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         vx, vy = self.vmesh.entity_barycenter("cell").T
 
         ax1 = fig.add_subplot(1, 3, 1, projection="3d")
-        ax1.plot_trisurf(px, py, self.ph-self.pI, cmap="viridis")
-        ax1.set_title("Pressure")
+        ax1.plot_trisurf(ux, uy, self.uh-self.uI, cmap="viridis")
+        ax1.set_title("Error u")
 
         ax2 = fig.add_subplot(1, 3, 2, projection="3d")
-        ax2.plot_trisurf(ux, uy, self.uh-self.uI, cmap="viridis")
-        ax2.set_title("U velocity")
+        ax2.plot_trisurf(vx, vy, self.vh-self.vI, cmap="viridis")
+        ax2.set_title("Error v")
 
         ax3 = fig.add_subplot(1, 3, 3, projection="3d")
-        ax3.plot_trisurf(vx, vy, self.vh-self.vI, cmap="viridis")
-        ax3.set_title("V velocity")
+        ax3.plot_trisurf(px, py, self.ph-self.pI, cmap="viridis")
+        ax3.set_title("Error p")
 
         plt.tight_layout()
         plt.show()

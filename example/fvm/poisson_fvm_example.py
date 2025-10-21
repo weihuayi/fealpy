@@ -7,7 +7,7 @@ from fealpy.fvm import PoissonFVMModel
 def main():
     parser = argparse.ArgumentParser(description="FVM Poisson solver with cross-diffusion")
 
-    parser.add_argument('--pde', default=3, type=int,
+    parser.add_argument('--pde', default=2, type=int,
                         help='PDE example ID from Poisson PDE manager.')
 
     parser.add_argument('--nx', default=40, type=int,
@@ -31,7 +31,7 @@ def main():
     parser.add_argument('--max_iter', default=6, type=int,
                         help='Maximum number of nonlinear iterations.')
     
-    parser.add_argument('--tol', default=1e-6, type=float,
+    parser.add_argument('--tol', default=1e-7, type=float,
                         help='Convergence tolerance for fixed-point iterations.')
 
     parser.add_argument('--plot', action='store_true',
@@ -46,8 +46,8 @@ def main():
 
     model.solve(max_iter=options["max_iter"], tol=options["tol"])
     l2_error = model.compute_error()
-    print(f"L2 error = {l2_error:.4e}")
-    
+    print(f"L2 error = {l2_error}")
+    model.plot()
     if options["plot"]:
         model.plot()
 

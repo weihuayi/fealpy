@@ -11,7 +11,7 @@ def main():
     
     parser.add_argument('--nx', default=20, type=int,
                         help='Number of cells in x-direction.')
-    
+
     parser.add_argument('--ny', default=20, type=int,
                         help='Number of cells in y-direction.')
     
@@ -30,11 +30,11 @@ def main():
     print(model)
 
     model.solve()
-    uerr, verr, perr = model.compute_error()
+    uerror, verror, perror = model.compute_error()
+    print(f"L2 error (u) = {uerror}")
+    print(f"L2 error (v) = {verror}")
+    print(f"L2 error (p) = {perror}")
     model.plot()
-    print(f"L2 error (u) = {uerr}")
-    print(f"L2 error (v) = {verr}")
-    print(f"L2 error (p) = {perr}")
     if options["plot"]:
         model.plot()
 
