@@ -120,9 +120,9 @@ class TimobeamAxleModel(ComputationalModel):
                 
                 return K, F
         
-        def apply_bc_penalty(self, K, F):
+        def apply_bc_penalty(self, K, F, penalty=1e20):
                 """Apply Dirichlet boundary conditions using Penalty Method."""
-                penalty = 1e20
+                penalty = penalty
                 fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
                 
                 F[fixed_dofs] *= penalty
@@ -137,6 +137,20 @@ class TimobeamAxleModel(ComputationalModel):
                 # u = spsolve(K, F, solver='scipy')
                 import numpy as np
                 u = np.linalg.solve(K, F).reshape(-1, 6)
-                self.logger.info(f"Solution u:\n{u}")
+                # self.logger.info(f"Solution u:\n{u}")
 
                 return u
+        
+        def show(self, displacement):
+                """
+                Visualize the mesh and the displacement field.
+                """
+                
+                mesh = self.mesh
+
+                u = displacement[:, :3]
+                mesh.nodedata['disp'] = u
+
+                frname = f"disp.vtu"
+                mesh.to_vtk(fname=frname)
+

@@ -111,19 +111,6 @@ class TimobeamAxleData3D:
              [14, 28], [15, 29],[16, 30], [17, 31], [18,32]], dtype=bm.int32)
         
         mesh = EdgeMesh(node, cell)
-        beam_props = {
-            "Ax": self.beam_Ax,
-            "Ay": self.beam_Ay,
-            "Az": self.beam_Az,
-            "Ix": self.beam_Ix,
-            "Iy": self.beam_Iy,
-            "Iz": self.beam_Iz,
-        }
-        
-        for key, value in beam_props.items():
-            arr = bm.zeros(22)
-            arr[:22] = value
-            mesh.celldata[key] = arr
         return mesh
     
     @cartesian

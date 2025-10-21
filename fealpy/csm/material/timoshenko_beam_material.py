@@ -37,7 +37,9 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
 
         model = TimobeamAxleData3D()
 
-        self.A = model.beam_Ax  # 截面面积
+        self.Ax = model.beam_Ax  # 截面面积
+        self.Ay = model.beam_Ay  
+        self.Az = model.beam_Az  
         self.Iy = model.beam_Iy  # 绕 y 轴惯性矩
         self.Iz = model.beam_Iz  # 绕 z 轴惯性矩
         self.J = model.beam_Ix  # 极惯性矩
@@ -121,9 +123,9 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
             Nt (ndarray) :Rotation interpolation matrix (derivative form).
         """
         if plane == 'xy':
-            Lambda = self.E * self.Iz / (self.kappa * self.mu * self.A)
+            Lambda = self.E * self.Iz / (self.kappa * self.mu * self.Ax)
         elif plane == 'zx':
-            Lambda = self.E * self.Iy / (self.kappa * self.mu * self.A)
+            Lambda = self.E * self.Iy / (self.kappa * self.mu * self.Ax)
         else:
             raise ValueError("plane must be 'yz' or 'xz'")
 

@@ -105,12 +105,8 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         # 参数
         l = mesh.entity_measure('cell')[cells]
         E, mu = self.material.E, self.material.mu
-        Ax = mesh.celldata["Ax"]
-        Ay = mesh.celldata["Ay"]
-        Az = mesh.celldata["Az"]
-        J = mesh.celldata["Ix"]
-        Iy = mesh.celldata["Iy"]
-        Iz = mesh.celldata["Iz"]
+        Ax, Ay, Az = self.material.Ax, self.material.Ay, self.material.Az
+        J, Iy, Iz = self.material.J, self.material.Iy, self.material.Iz
 
         # 坐标变换矩阵
         R = self._coord_transform()
