@@ -117,10 +117,6 @@ class IncompressibleNSIPCSRun(CNodeType):
         ugdof = uspace.number_of_global_dofs()
         pgdof = pspace.number_of_global_dofs()
         NN = mesh.number_of_nodes()
-        uh = bm.zeros((nt, ugdof))
-        uh_x = bm.zeros((nt, NN))
-        uh_y = bm.zeros((nt, NN))
-        ph = bm.zeros((nt, NN))
 
         for i in range(nt):
             t  = timeline.current_time()
@@ -148,15 +144,18 @@ class IncompressibleNSIPCSRun(CNodeType):
             u0[:] = u1
             p0[:] = p1
 
-            # mesh.nodedata['ph'] = p1
-            # mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
-            # mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+            uh = u1
+            uh = uh.reshape(mesh.GD,-1).T
+            uh = uh[:NN,:]
+            uh_x = u1[:int(ugdof/2)][:NN]
+            uh_y = u1[int(ugdof/2):][:NN]
+            ph = p1[:NN]
 
-            uh[i, :] = u1
-            uh_x[i, :] = u1[:int(ugdof/2)][:NN]
-            uh_y[i, :] = u1[int(ugdof/2):][:NN]
-            ph[i, :] = p1[:NN]
- 
+            mesh.nodedata['ph'] = p1
+            mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
+            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+
+            
             timeline.advance()
 
         return uh, ph, uh_x, uh_y

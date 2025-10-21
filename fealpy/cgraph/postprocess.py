@@ -24,7 +24,6 @@ class VPDecoupling(CNodeType):
         uh = out[:ugdof]
         uh = uh.reshape(mesh.GD,-1).T
         uh = uh[:NN,:]
-        print(uh.shape)
         u_x = out[:int(ugdof/2)]
         u_x = u_x[:NN]
         u_y = out[int(ugdof/2):ugdof]
