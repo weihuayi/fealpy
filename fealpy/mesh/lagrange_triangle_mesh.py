@@ -393,6 +393,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             cell2edge = bm.set_at(cell2edge, (edge2cell[:, 1], edge2cell[:, 3]), range(len(edge)))
 
             self.node = node
+            if self.surface is not None:
+                self.node, _ = self.surface.project(self.node)
             self.face = edge
             self.edge = edge 
             self.edge2cell = edge2cell
