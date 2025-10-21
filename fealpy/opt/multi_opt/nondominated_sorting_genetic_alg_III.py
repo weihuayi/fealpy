@@ -65,6 +65,62 @@ class NondominatedSortingGeneticAlgIII():
         self.smin = bm.full((1, M), bm.inf)
         self.zmax = bm.zeros((M, M))
         self.sigma = 0.1 * (ub - lb)
+        self.PF = self.generate_dtlz1_pf()
+
+    def cal_IGD(self) -> float:
+        """
+        Calculate the Inverted Generational Distance (IGD) metric.
+
+        IGD measures the average distance from each point in the true Pareto front
+        to the nearest point in the obtained solution set. Lower values indicate
+        better convergence and diversity.
+
+        Returns:
+            float: The IGD value for the current population.
+        """
+        N = self.pop['fitness'].shape[0]
+        total = 0
+        for i in range(N):
+            dis = bm.sqrt(bm.sum((self.PF - self.pop['fitness'][i])**2, axis = 1))
+            min_dis = bm.min(dis)
+            total = total + min_dis
+        return total / N
+
+    def generate_dtlz1_pf(self, n_points: int = 1000) -> TensorLike:
+        """
+        Generate the true Pareto front for the DTLZ1 problem.
+
+        Creates a set of points uniformly distributed on the DTLZ1 Pareto front
+        for performance metric calculations.
+
+        Parameters:
+            n_points (int, optional): Number of points to generate on the Pareto front.
+                Defaults to 1000.
+
+        Returns:
+            TensorLike: A matrix of shape (n_points, M) containing Pareto optimal points,
+                where M is the number of objectives.
+        """
+        x = bm.random.rand(n_points, self.M)
+        x = x / bm.sum(x, axis=1, keepdims=True) 
+        pf = 0.5 * x  
+        return pf
+    
+    def cal_spacing(self) -> float:
+        """
+        Calculate the spacing metric for the population.
+
+        Spacing measures the distribution of solutions along the Pareto front.
+        Lower values indicate more uniform distribution of solutions.
+
+        Returns:
+            float: The spacing value for the current population.
+        """
+        sorted_id = bm.argsort(self.pop['fitness'][:, 0])
+        sorted_front = self.pop['fitness'][sorted_id]
+        distances = bm.linalg.norm(sorted_front[1:] - sorted_front[:-1], axis=1)
+        spacing_value = bm.std(distances)
+        return spacing_value 
     
     def update_ideal_point(self):
         """
@@ -363,7 +419,7 @@ class NondominatedSortingGeneticAlgIII():
         m1 = bm.random.randint(0, self.N, (self.N_m,))
         x_m = self.pop['x'][m1].copy()
         j_m = bm.random.randint(0, self.dim, (self.N_m,))
-        noise = bm.random.randn(self.N_m) * self.sigma
+        noise = bm.random.randn(self.N_m) * self.sigma[j_m]
         x_m[bm.arange(self.N_m), j_m] += noise
         x_m = bm.clip(x_m, self.lb, self.ub)
         f_m = self.fun(x_m)

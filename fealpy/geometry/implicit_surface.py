@@ -32,8 +32,9 @@ class SphereSurface():
     
     @cartesian
     def gradient(self, p:TensorLike) -> TensorLike:
-        l = bm.sqrt(bm.sum((p - self.center)**2, axis=-1))
-        n = (p - self.center)/l[..., None]
+        center = bm.tensor(self.center, dtype=p.dtype)
+        l = bm.sqrt(bm.sum((p - center)**2, axis=-1))
+        n = (p - center)/l[..., None]
         return n
     
     @cartesian

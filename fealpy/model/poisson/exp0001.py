@@ -25,7 +25,7 @@ class Exp0001(IntervalMesher):
         self.interval = [0.0, 1.0]
         super().__init__(interval=self.interval)
 
-    def get_dimension(self) -> int: 
+    def geo_dimension(self) -> int: 
         """Return the geometric dimension of the domain."""
         return 1
 
@@ -75,4 +75,7 @@ class Exp0001(IntervalMesher):
         # 检查是否接近 x=±1 或 y=±1
         on_boundary = ((bm.abs(x - 1.) < atol) | (bm.abs(x) < atol) )
         return on_boundary 
-
+    
+    def scaling_function(self, p: TensorLike) -> TensorLike:
+        """Compute scaling function that satisfies the boundary conditions."""
+        return bm.zeros_like(p[..., 0])

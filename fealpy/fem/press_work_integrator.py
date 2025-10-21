@@ -7,12 +7,13 @@
 	@bref 
 	@ref 
 '''  
-from typing import Optional
+from typing import Optional, Literal
 
 from ..mesh import HomogeneousMesh
 from ..functionspace.space import FunctionSpace as _FS
 from ..utils import process_coef_func
 from ..functional import bilinear_integral
+from ..decorator.variantmethod import variantmethod
 from .integrator import LinearInt, OpInt, CellInt, FaceInt, enable_cache
 from ..typing import Threshold, TensorLike, Index, _S, CoefLike 
 from ..backend import backend_manager as bm
@@ -24,12 +25,14 @@ from ..functionspace import TensorFunctionSpace
 class PressWorkIntegrator(LinearInt, OpInt, CellInt):
     def __init__(self, coef: Optional[CoefLike]=None, q: Optional[int]=None, *,
                  index: Index=_S,
-                 batched: bool=False) -> None:
+                 batched: bool=False,
+                 method: Literal['isopara', None] = None) -> None:
         super().__init__()
         self.coef = coef
         self.q = q
         self.index = index
         self.batched = batched
+        self.assembly.set(method)
 
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
@@ -58,6 +61,7 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         gphi = space1.grad_basis(bcs ,index=index)
         return phi, gphi, cm, bcs, ws, index
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         assert space[0].mesh == space[1].mesh, "The mesh should be same for two space " 
         coef = self.coef
@@ -69,6 +73,45 @@ class PressWorkIntegrator(LinearInt, OpInt, CellInt):
         else:
             gphi = bm.einsum('...ii->...', gphi)
         result = bilinear_integral(gphi, phi, ws, cm, val, batched=self.batched)
+        return result
+
+    @assembly.register('isopara')
+    def assembly(self, space: _FS) -> TensorLike:
+        """
+        曲面等参有限元积分子组装
+        """
+        space0 = space[0]
+        space1 = space[1]
+        
+        coef = self.coef
+        index = self.index
+        mesh = getattr(space[0], 'mesh', None)
+        rm = space1.mesh.reference_cell_measure()
+
+        q = space[0].p+3 if self.q is None else self.q
+        qf = mesh.quadrature_formula(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        
+        J = space1.mesh.jacobi_matrix(bcs, index=index)
+        G = space1.mesh.first_fundamental_form(J) 
+        d = bm.sqrt(bm.linalg.det(G))
+
+        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        phi = space0.basis(bcs, index=index)
+        gphi = space1.grad_basis(bcs ,index=index)
+        if isinstance(space[0], TensorFunctionSpace):
+            gphi = gphi
+        else:
+            gphi = bm.einsum('...ii->...', gphi)
+        phi = phi.reshape(*phi.shape[:3], -1) # (C, Q, I, dof_numel)
+        gphi = gphi.reshape(*gphi.shape[:3], -1) # (C, Q, J, dof_numel)
+
+        if coef is None:
+            result = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, phi, d)
+        elif isinstance(coef, (int, float)):
+            result = bm.einsum('q, cqim, cqjm, cq -> cij', ws*rm, gphi, phi, d) * val
+        else:
+            raise NotImplementedError("The 'isopara' method only support constant coef.")
         return result
 
 class BoundaryPressWorkIntegrator(LinearInt, OpInt, FaceInt):

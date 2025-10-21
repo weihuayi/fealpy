@@ -27,12 +27,13 @@ class Exp0001(BoxMesher2d):
     """
     2D Helmholtz problem with complex Robin boundary conditions:
     
-        -Δu - k^2 u = f   in Ω = [-0.5, 0.5]^2
+        -Δu - k^2 u = f   in Ω = (-0.5, 0.5)^2
          iku + ∂u/∂n = g  on ∂Ω
 
     Exact solution:
         u(x, y) = (cos(k·r) - c·J0(k·r)) / k
-        where r = sqrt(x^2 + y^2), c = (cos(k) + i·sin(k)) / (J0(k) + i·J1(k))
+        where r = sqrt(x^2 + y^2), c = (cos(k) + i·sin(k)) / (J0(k) + i·J1(k)),
+        J0 and J1 are Bessel functions.
 
     Source:
         f(x, y) = sin(k·r)/r
@@ -47,7 +48,7 @@ class Exp0001(BoxMesher2d):
     def __init__(self, options: dict = {}):
         self.box = [-0.5, 0.5, -0.5, 0.5]
         super().__init__(box=self.box)
-        self.k = options.get('k', 1.0)
+        self.k = bm.tensor(options.get('k', 1.0))
         c1 = bm.cos(self.k) + bm.sin(self.k) * 1j
         c2 = bessel_function(0, self.k) + 1j * bessel_function(1, self.k)
         self.c = c1 / c2

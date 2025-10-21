@@ -18,7 +18,7 @@ num = 0
 lb, ub = iopt_data[num]['domain']
 NP = 100
 MaxIters = 1000
-dim = 30
+dim = iopt_data[num]['ndim']
 x0 = initialize(NP, dim, ub, lb, method=None)
 option = opt_alg_options(x0, iopt_data[num]['objective'], iopt_data[num]['domain'], NP, MaxIters=MaxIters)
 optimizer = DifferentialEvolutionParticleSwarmOpt(option)

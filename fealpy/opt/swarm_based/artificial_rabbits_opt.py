@@ -81,7 +81,7 @@ class ArtificialRabbitsOpt(Optimizer):
             A = 4 * (1 - it / self.MaxIT) * bm.log(1 / bm.random.rand(1))
             
             # Eq.(2) - Random movement factor (R)
-            R = ((bm.exp(bm.array(1)) - bm.exp(bm.array(((it - 1) / self.MaxIT) ** 2))) * 
+            R = ((bm.exp(bm.array(1)) - bm.exp(bm.array((it / self.MaxIT) ** 2))) * 
                  bm.sin(2 * bm.pi * bm.random.rand(self.N, 1)) * 
                  bm.random.randint(0, 2, (self.N, self.dim)))
 
@@ -112,7 +112,7 @@ class ArtificialRabbitsOpt(Optimizer):
                 x_new = self.x + R * (r4 * b - self.x)
 
             # Check and adjust the new positions to ensure they stay within the search space boundaries
-            x_new = x_new + (self.lb - x_new) * (x_new < self.lb) + (self.ub - x_new) * (x_new > self.ub)
+            x_new = bm.clip(x_new, self.lb, self.ub)
 
             # Evaluate the fitness of the new population
             fit_new = self.fun(x_new)

@@ -12,8 +12,11 @@ __nodes__ = [
     "mesh",
     "functionspace",
     "solver",
+    "postprocess",
     "fem",
-    "cfd"
+    "cfd",
+    "opt",
+    "pathplanning"
 ]
 
 register_all_nodes()

@@ -36,7 +36,6 @@ parser.add_argument('--space_degree',
 parser.add_argument('--neigen',
         default=6, type=int,
         help='Number of eigenvalues to compute, default is 6')
-
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True')
