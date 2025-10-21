@@ -45,6 +45,27 @@ class AxleMaterial(LinearElasticMaterial):
         s += ")"
         return s
     
+    def linear_basis(self, x: float, l: float) -> TensorLike:
+        """Linear shape functions for a axle material.
+
+        Parameters:
+            x (float): Local coordinate along the axle axis.
+            l (float): Length of the axle element.
+
+        Returns:
+            b (TensorLike): Linear shape functions evaluated at xi.
+        """
+        xi = x / l  
+        t = 1.0 / l
+        
+        b = bm.zeros((2, 2), dtype=bm.float64)
+        
+        b[0, 0] = 1 - xi
+        b[0, 1] = xi
+        b[1, 0] = -t
+        b[1, 1] = t
+        return b
+    
     def stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for axle material."""
         E = self.E
@@ -55,6 +76,28 @@ class AxleMaterial(LinearElasticMaterial):
     
         return D
     
-    def strain_matrix(self) -> TensorLike:  
-        pass
-    
+    def calculate_strain_and_stress(self,
+                    uh: TensorLike,
+                    x: float,
+                    y: float,
+                    z: float,
+                    l: float) -> Tuple[TensorLike, TensorLike]:
+        """Calculate the strain and stress.
+                    ε = B * u_e
+                    σ = D * ε
+                    
+        Parameters:
+            uh (TensorLike): Nodal displacement vector.
+            x (float): Local coordinate in the axle cross-section along the x-axis.
+            y (float): Local coordinate in the axle cross-section along the y-axis.
+            z (float): Local coordinate in the axle cross-section along the z-axis.
+            l (float): Length of the beam element.
+            
+        Returns:
+            Tuple[TensorLike, TensorLike]: Strain and stress vectors.
+        """
+        L = self.linear_basis(x, l)
+        
+        strain = L @ uh
+        stress = self.stress_matrix() @ strain
+        return strain, stress

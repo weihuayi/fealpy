@@ -81,8 +81,12 @@ class TimobeamAxleModel(ComputationalModel):
                 """
                 self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
                 self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
+                mesh = self.tspace.mesh
+                n_cells = mesh.number_of_cells()
+
                 Dofs = self.tspace.number_of_global_dofs()
-                K = bm.zeros((Dofs, Dofs))
+                K = bm.zeros((Dofs, Dofs), dtype=bm.float64)
+                F = bm.zeros(Dofs, dtype=bm.float64)
 
                 Timo = TimoshenkoBeamMaterial(model=self.pde,
                                         name="timobeam",
@@ -94,8 +98,7 @@ class TimobeamAxleModel(ComputationalModel):
                                 elastic_modulus=self.axle_E,
                                 poisson_ratio=self.axle_nu)
                  
-                mesh = self.tspace.mesh
-                n_cells = mesh.number_of_cells()
+                
 
                 timo_integrator = TimoshenkoBeamIntegrator(self.tspace, Timo, 
                                         index=bm.arange(0, n_cells-10))
@@ -113,7 +116,7 @@ class TimobeamAxleModel(ComputationalModel):
                 for i, dof in enumerate(ele_dofs_axle):
                        K[dof[:, None], dof] += KE_axle[i]
 
-                F = self.pde.external_load()
+                F[:] = self.pde.external_load()
                 
                 return K, F
         
@@ -130,51 +133,10 @@ class TimobeamAxleModel(ComputationalModel):
         def solve(self):
                 K, F = self.timo_axle_system()
                 K, F = self.apply_bc_penalty(K, F)
-
-                # uh = spsolve(K, F, solver='scipy')
-                import numpy as np
-                uh = np.linalg.solve(K, F)
-                self.logger.info(f"Solution uh:\n{uh}")
-                return  uh
         
-        def test(self):
-                Timo = TimoshenkoBeamMaterial(model=self.pde,
-                                        name="timobeam",
-                                        elastic_modulus=self.beam_E,
-                                        poisson_ratio=self.beam_nu,
-                                        shear_factor=9/10)
-
-                Axle = AxleMaterial(model=self.pde,
-                                name="axle",
-                                elastic_modulus=self.axle_E,
-                                poisson_ratio=self.axle_nu)
-
-                self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
-                self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
-                mesh = self.tspace.mesh
-                x = 2.0
-                y = 8.0
-                z = 1.0
-                l = 2.0
-                
-                # b = Timo.linear_basis(x, l)
-                # h = Timo.hermite_basis(x, l)
-                
-                # self.logger.info(f"b:\n{b[0, 0]}\n")
-                # self.logger.info(f"h:\n{h[0, 2]}\n")
-                
-                B = Timo.strain_matrix(x, y, z, l)
-                #self.logger.info(f"B:\n{B}\n")
-                
-                K, F = self.timo_axle_system()
-                K, F = self.apply_bc_penalty(K, F)
-
+                # u = spsolve(K, F, solver='scipy')
                 import numpy as np
-                uh = np.linalg.solve(K, F)
+                u = np.linalg.solve(K, F).reshape(-1, 6)
+                self.logger.info(f"Solution u:\n{u}")
 
-                strain, stress = Timo.calculate_strain_and_stress(uh, x, y, z, l)
-                self.logger.info(f"B:\n{strain, stress}\n")
-
-                #N, Nt = Timo.shape_function(x, l, plane='xy')
-                #self.logger.info(f"N:\n{N.shape}\nNt:\n{Nt.shape}")
-                return B, strain, stress
+                return u
