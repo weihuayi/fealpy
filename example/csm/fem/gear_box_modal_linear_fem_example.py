@@ -47,11 +47,11 @@ fname = options['mesh_file'].stem + '.vtu'
 
 from fealpy.csm.fem import GearBoxModalLinearFEMModel
 model = GearBoxModalLinearFEMModel(options)
-PS, PM, N0, N1, N2, dof_nodes, dof_comps = model.construct_system['shaft']()
+PS, PM, NS, dof_nodes, dof_comps = model.construct_system['all']()
 eps = model.solve(PS, PM)
-model.post_process(eps, N0, N1, N2)
-model.mesh.to_vtk(fname=fname)
+model.post_process(eps, NS)
+#model.mesh.to_vtk(fname=fname)
 #model.to_mtx(fname=options['mesh_file'].stem+'.mtx', S=PS, M=PM)
-model.to_abaqus(S=PS, M=PM, dof_nodes=dof_nodes, dof_comps=dof_comps)
-model.write_abaqus_frequency_input()
+#model.to_abaqus(S=PS, M=PM, dof_nodes=dof_nodes, dof_comps=dof_comps)
+#model.write_abaqus_frequency_input()
 
