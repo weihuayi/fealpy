@@ -67,38 +67,37 @@ def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
     from .nodetype import create
     from .core.edge import connect_from_address, AddrHandler
 
-    num_graphs = max(cnode["ref"] for cnode in data["cnodes"]) + 1
     cnode_table, slots_table, conns_table = data["cnodes"], data["slots"], data["conns"]
     del data
 
     # Same order as the data
     cnode_list = []
-    graph_list = [None] * num_graphs
+    graph_dict = {}
 
     # Create cnodes and graphs
     for cnode_item in cnode_table:
         # Skip graph IO nodes
-        if cnode_item["gin"] > -1 or cnode_item["gout"] > -1:
+        if cnode_item["gin"] is not None or cnode_item["gout"] is not None:
             # use a placeholder to keep index, as the graph may not be created yet
             cnode_list.append(None)
             continue
 
-        if cnode_item["ref"] == -1:
+        if cnode_item["ref"] is None:
             cnode = create(cnode_item["name"])
         else:
             cnode = Graph(cnode_item["name"])
-            graph_list[cnode_item["ref"]] = cnode
+            graph_dict[cnode_item["ref"]] = cnode
 
         cnode_list.append(cnode)
 
     # Loop again to replace placeholders with actual graph IO nodes
     for idx, cnode_item in enumerate(cnode_table):
-        if cnode_item["gin"] > -1:
-            graph = graph_list[cnode_item["gin"]]
+        if cnode_item["gin"] is not None:
+            graph = graph_dict[cnode_item["gin"]]
             assert cnode_list[idx] is None
             cnode_list[idx] = graph._input_node
-        elif cnode_item["gout"] > -1:
-            graph = graph_list[cnode_item["gout"]]
+        elif cnode_item["gout"] is not None:
+            graph = graph_dict[cnode_item["gout"]]
             assert cnode_list[idx] is None
             cnode_list[idx] = graph._output_node
 
@@ -111,13 +110,13 @@ def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
             # Register IO slots got subgraphs:
             # Operations are done through the graph, but not their IO nodes which
             # are only wrappers.
-            if cnode_item["gout"] > -1: # input slot of the output node of a graph
-                graph = graph_list[cnode_item["gout"]]
+            if cnode_item["gout"] is not None: # input slot of the output node of a graph
+                graph = graph_dict[cnode_item["gout"]]
                 graph.register_output(slot_item["name"], default=slot_item["val"])
                 graph.output_slots[slot_item["name"]].default = slot_item["val"]
             else:
                 cnode = cnode_list[cnode_id]
-                if cnode_item["ref"] > -1: # input slot of a subgraph
+                if cnode_item["ref"] is not None: # input slot of a subgraph
                     cnode.register_input(slot_item["name"], default=slot_item["val"])
                 cnode.input_slots[slot_item["name"]].default = slot_item["val"]
 

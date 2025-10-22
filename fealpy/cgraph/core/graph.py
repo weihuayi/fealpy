@@ -4,6 +4,7 @@ from typing import Any
 from collections import deque, OrderedDict
 from collections.abc import Callable, Mapping, Iterable
 import threading
+import traceback
 
 from . import edge as _E
 from ._types import CNode, NodeExceptionData, Slot, TransSlot, InputSlot, NodeIOError
@@ -103,7 +104,7 @@ class Graph:
     error_listeners : list[Callable[[NodeExceptionData], Any]]
     status_listeners : list[Callable[[GraphStatus], Any]]
 
-    def __init__(self, name: str | None = None):
+    def __init__(self, name: str | None = None, /):
         self.name = name
         self.status = GraphStatus.READY
         self._input_slots = OrderedDict()
@@ -114,6 +115,7 @@ class Graph:
         self.status_listeners = []
         self._input_node = GraphInputNode(self)
         self._output_node = GraphOutputNode(self)
+        self._log_message = []
 
     def __repr__(self):
         if self.name is None:
@@ -235,6 +237,7 @@ class Graph:
                 timestamp=time.time(),
                 errtype=type(error),
                 message=str(error),
+                traceback=traceback.format_exc(),
                 positional_inputs=args,
                 keyword_inputs=kwargs
             )
@@ -348,6 +351,16 @@ class Graph:
 
     def register_status_change_hook(self, callback: Callable[[GraphStatus], Any]):
         self.status_listeners.append(callback)
+
+    def new_log_handler(self):
+        from .loghandler import StringListHandler
+        return StringListHandler(self._log_message)
+
+    def log_message(self) -> list[str]:
+        return self._log_message
+
+    def clear_log_message(self):
+        self._log_message.clear()
 
 
 class GraphInputNode:
