@@ -1,5 +1,5 @@
 from typing import Union
-from scipy.sparse import coo_matrix
+from fealpy.sparse import COOTensor
 
 from fealpy.backend import bm
 from fealpy.decorator import variantmethod
@@ -128,16 +128,19 @@ class TimobeamAxleModel(ComputationalModel):
                 F[fixed_dofs] *= penalty
                 for dof in fixed_dofs:
                         K[dof, dof] *= penalty
+                        
+                rows, cols = bm.nonzero(K)
+                values = K[rows, cols]
+                K = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
+                
                 return K, F
 
         def solve(self):
                 K, F = self.timo_axle_system()
-                K, F = self.apply_bc_penalty(K, F)
-        
-                # u = spsolve(K, F, solver='scipy')
-                import numpy as np
-                u = np.linalg.solve(K, F).reshape(-1, 6)
-                # self.logger.info(f"Solution u:\n{u}")
+                K, F = self.apply_bc_penalty(K, F)  
+
+                u = spsolve(K, F, solver='scipy').reshape(-1, 6)
+                self.logger.info(f"Solution u:\n{u}")
 
                 return u
         
