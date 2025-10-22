@@ -4,6 +4,25 @@ from ..nodetype import CNodeType, PortConf, DataType
 __all__ = ["StationaryNS2d", "IncompressibleNS2d"]
 
 class StationaryNSDBC(CNodeType):
+    r"""Boundary condition handler for the stationary Navier-Stokes equations.
+
+    This computational node constructs and applies Dirichlet boundary conditions 
+    for both velocity and pressure fields in the stationary Navier-Stokes equations.
+    It provides a unified interface to generate the boundary condition application function 
+    used by subsequent solver nodes.
+
+    Inputs:
+        uspace(space): Function space for the velocity field.
+        pspace(space): Function space for the pressure field.
+        velocity_dirichlet (function): Dirichlet boundary function for velocity.
+        pressure_dirichlet (function): Dirichlet boundary function for pressure.
+        is_velocity_boundary (function): Predicate function identifying velocity boundary regions.
+        is_pressure_boundary (function): Predicate function identifying pressure boundary regions.
+
+    Outputs:
+        apply_bc (function): Function that applies the specified Dirichlet boundary conditions 
+            to the assembled system matrices and right-hand side vectors.
+    """
     TITLE: str = "稳态 NS 方程边界处理"
     PATH: str = "流体.边界处理"
     INPUT_SLOTS = [
@@ -29,7 +48,27 @@ class StationaryNSDBC(CNodeType):
         return apply_bc
     
 
-class IterativeNSDBC(CNodeType):
+class IterativeDBC(CNodeType):
+    r"""Boundary condition handler for unsteady Navier-Stokes iterative solvers.
+
+    This computational node defines a unified boundary condition processor 
+    for unsteady (time-dependent) incompressible Navier-Stokes equations
+    when iterative schemes (e.g. Oseen, or Newton methods) are used.  
+    It provides a callable function that applies both velocity and pressure 
+    Dirichlet boundary conditions at a given time step.
+
+    Inputs:
+        uspace(space): Function space for the velocity field.
+        pspace(space): Function space for the pressure field.
+        velocity_dirichlet (function): Dirichlet boundary condition for velocity.
+        pressure_dirichlet (function): Dirichlet boundary condition for pressure.
+        is_velocity_boundary (function): Predicate function identifying velocity boundary regions.
+        is_pressure_boundary (function): Predicate function identifying pressure boundary regions.
+
+    Outputs:
+        apply_bc (function): Function to apply the time-dependent Dirichlet boundary 
+            conditions to system matrices and right-hand side vectors.
+    """
     TITLE: str = "非稳态 NS 方程迭代法边界处理"
     PATH: str = "流体.边界处理"
     INPUT_SLOTS = [
@@ -74,6 +113,16 @@ class IterativeNSDBC(CNodeType):
         return apply_bc
     
 class ProjectDBC(CNodeType):
+    r"""Boundary condition handler for unsteady Navier-Stokes projection methods. 
+
+    Inputs:
+        space(space): Function space for the velocity field.
+        dirichlet (function): Dirichlet boundary condition for velocity.
+        is_boundary (function): Predicate function identifying velocity boundary regions.
+    Outputs:
+        apply_bc (function): Function to apply the time-dependent Dirichlet boundary 
+            conditions to system matrices and right-hand side vectors.
+    """
     TITLE: str = "非稳态 NS 方程投影法边界处理"
     PATH: str = "流体.边界处理"
     INPUT_SLOTS = [

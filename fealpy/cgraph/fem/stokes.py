@@ -5,6 +5,20 @@ __all__ = ["StokesEquation"]
 
 
 class StokesEquation(CNodeType):
+    r"""Stokes equations with Dirichlet boundary conditions.
+
+    Inputs:
+        uspace(space): Function space for the velocity field.
+        pspace(space): Function space for the pressure field.
+        velocity_dirichlet (function): Dirichlet boundary condition for velocity.
+        pressure_dirichlet (function): Dirichlet boundary condition for pressure.
+        is_velocity_boundary (function): Predicate function identifying velocity boundary regions.
+        is_pressure_boundary (function): Predicate function identifying pressure boundary regions.
+    
+    Outputs:
+        bform (tensor): Assembled system operator.
+        lform (tensor): Assembled right-hand side vector.
+    """
     TITLE: str = "Stokes 方程 (第一类边界条件)"
     PATH: str = "有限元.方程离散"
     INPUT_SLOTS = [

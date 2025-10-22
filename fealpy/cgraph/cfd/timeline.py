@@ -1,6 +1,18 @@
 from ..nodetype import CNodeType, PortConf, DataType
 
 class CFDTimeline(CNodeType):
+    r"""Uniform time discretization for CFD simulations.
+
+    Inputs:
+        T0 (float): Initial time.
+        T1 (float): Final time.
+        NT (int): Number of time intervals.
+    
+    Outputs:
+        T0 (float): Initial time.
+        T1 (float): Final time.
+        NL (int): Number of time levels.
+    """
     TITLE: str = "均匀时间剖分"
     PATH: str = "流体.时间剖分"
     INPUT_SLOTS = [

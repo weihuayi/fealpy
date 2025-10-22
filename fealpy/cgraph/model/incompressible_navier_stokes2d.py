@@ -4,6 +4,23 @@ from ..nodetype import CNodeType, PortConf, DataType
 __all__ = ["IncompressibleNS2d", "IncompressibleCylinder2d"]
 
 class IncompressibleNS2d(CNodeType):
+    r"""2D unsteady incompressible Navier-Stokes equations problem model.
+
+    Inputs:
+        example (int): Example number.
+    
+    Outputs:
+        mu (float): Viscosity coefficient.
+        rho (float): Density.
+        domain (domain): Computational domain.
+        velocity (function): Exact velocity solution.
+        pressure (function): Exact pressure solution.
+        source (function): Source term.
+        velocity_dirichlet (function): Dirichlet boundary condition for velocity.
+        pressure_dirichlet (function): Dirichlet boundary condition for pressure.
+        is_velocity_boundary (function): Predicate function for velocity boundary regions.
+        is_pressure_boundary (function): Predicate function for pressure boundary regions.
+    """
     TITLE: str = "二维非稳态不可压缩 NS 方程问题模型"
     PATH: str = "模型.非稳态 NS"
     INPUT_SLOTS = [
@@ -35,6 +52,30 @@ class IncompressibleNS2d(CNodeType):
     
 
 class IncompressibleCylinder2d(CNodeType):
+    r"""2D unsteady incompressible Navier-Stokes equations model for flow around a cylinder.
+
+    Inputs:
+        mu (float): Viscosity coefficient.
+        rho (float): Density.
+        cx (float): x-coordinate of the cylinder center.
+        cy (float): y-coordinate of the cylinder center.
+        radius (float): Radius of the cylinder.
+        n_circle (int): Number of discretization points on the circle.
+        h (float): Mesh size.
+    
+    Outputs:
+        mu (float): Viscosity coefficient.
+        rho (float): Density.
+        domain (domain): Computational domain.
+        source (function): Source term.
+        velocity_0 (function): Initial velocity field.
+        pressure_0 (function): Initial pressure field.
+        velocity_dirichlet (function): Dirichlet boundary condition for velocity.
+        pressure_dirichlet (function): Dirichlet boundary condition for pressure.
+        is_velocity_boundary (function): Predicate function for velocity boundary regions.
+        is_pressure_boundary (function): Predicate function for pressure boundary regions.
+        mesh (mesh): Computational mesh.
+    """
     TITLE: str = "二维非稳态圆柱绕流问题模型"
     PATH: str = "模型.非稳态 NS"
     INPUT_SLOTS = [

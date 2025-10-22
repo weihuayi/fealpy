@@ -22,6 +22,25 @@ def lagrange_multiplier(pspace, A, b, c=0):
     return A, b
 
 class IncompressibleNSIPCS(CNodeType):
+    r"""Unsteady Incompressible Navier-Stokes solver using the IPCS algorithm.
+
+    Inputs:
+        constitutive (int): Constitutive relation type (1: Newtonian, 2: generalized).
+        mu (float): Dynamic viscosity.
+        rho (float): Fluid density.
+        source (function): Source term (external force) as a function of space and time.
+        uspace(space): Function space for the velocity field.
+        pspace(space): Function space for the pressure field.
+        is_pressure_boundary (function): Predicate function for identifying pressure boundaries.
+        apply_bcu (function): Function to apply velocity boundary conditions.
+        apply_bcp (function): Function to apply pressure boundary conditions.
+        q (int): Quadrature order for numerical integration (default: 3).
+
+    Outputs:
+        predict_velocity (function): Function that assembles the predicted velocity system.
+        correct_pressure (function): Function that assembles the pressure correction system.
+        correct_velocity (function): Function that assembles the velocity correction system.
+    """
     TITLE: str = "非稳态 NS 方程 IPCS 算法"
     PATH: str = "流体.有限元算法"
     INPUT_SLOTS = [

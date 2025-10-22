@@ -43,7 +43,8 @@ StationaryNSRun(
     mesh = mesher()
 )
 
-WORLD_GRAPH.output(uh = StationaryNSRun().uh, ph = StationaryNSRun().ph)
+WORLD_GRAPH.output(uh = StationaryNSRun().uh, ph = StationaryNSRun().ph, 
+                   uh_x = StationaryNSRun().uh_x, uh_y = StationaryNSRun().uh_y)
 WORLD_GRAPH.error_listeners.append(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

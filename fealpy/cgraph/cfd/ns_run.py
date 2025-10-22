@@ -27,6 +27,25 @@ def lagrange_multiplier(A, b, c=0, uspace=None, pspace=None):
 __all__ = ["StationaryNSRun"]
 
 class StationaryNSRun(CNodeType):
+    r"""Finite element iterative solver for steady incompressible Navier-Stokes equations.
+
+    Inputs:
+        maxstep (int): Maximum number of nonlinear iterations.
+        tol (float): Convergence tolerance based on velocity and pressure residuals.
+        update (function): Function to update coefficients or nonlinear terms.
+        apply_bc (function): Function to apply Dirichlet boundary conditions.
+        BForm (linops): Bilinear form operator for system matrix assembly.
+        LForm (linops): Linear form operator for right-hand side vector assembly.
+        uspace(space): Velocity function space.
+        pspace(space): Pressure function space.
+        mesh(mesh): Computational mesh.
+
+    Outputs:
+        uh (tensor): Final numerical velocity field.
+        uh_x (tensor): x-component of the velocity field.
+        uh_y (tensor): y-component of the velocity field.
+        ph (tensor): Final numerical pressure field.
+    """
     TITLE: str = "稳态 NS 方程有限元迭代求解"
     PATH: str = "流体.NS 方程有限元迭代求解"
     INPUT_SLOTS = [
@@ -41,10 +60,10 @@ class StationaryNSRun(CNodeType):
         PortConf("mesh", DataType.MESH, title="网格")
     ]
     OUTPUT_SLOTS = [
-        PortConf("uh", DataType.FUNCTION, title="速度数值解"),
-        PortConf("uh_x", DataType.FUNCTION, title="速度x分量数值解"),
-        PortConf("uh_y", DataType.FUNCTION, title="速度y分量数值解"),
-        PortConf("ph", DataType.FUNCTION, title="压力数值解")
+        PortConf("uh", DataType.TENSOR, title="速度数值解"),
+        PortConf("uh_x", DataType.TENSOR, title="速度x分量数值解"),
+        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解"),
+        PortConf("ph", DataType.TENSOR, title="压力数值解")
     ]
     @staticmethod
     def run(maxstep, tol, update, apply_bc, BForm, LForm, uspace, pspace, mesh):
@@ -80,6 +99,27 @@ class StationaryNSRun(CNodeType):
         return uh1, uh_x, uh_y, ph1
     
 class IncompressibleNSIPCSRun(CNodeType):
+    r"""IPCS iterative solver for unsteady incompressible Navier-Stokes equations.
+
+    Inputs:
+        T0 (float): Initial time.
+        T1 (float): Final time.
+        NL (int): Number of time levels.
+        uspace(space): Velocity function space.
+        pspace(space): Pressure function space.
+        velocity_0 (function): Initial velocity field.
+        pressure_0 (function): Initial pressure field.
+        is_pressure_boundary (function): Predicate function for pressure boundary regions.
+        predict_velocity (function): Function to assemble predicted velocity system.
+        correct_pressure (function): Function to assemble pressure correction system.
+        correct_velocity (function): Function to assemble velocity correction system.
+        mesh(mesh): Computational mesh. 
+    Outputs:
+        uh (tensor): Final numerical velocity field.
+        ph (tensor): Final numerical pressure field.
+        uh_x (tensor): x-component of the velocity field.
+        uh_y (tensor): y-component of the velocity field.
+    """
     TITLE: str = "IPCS 求解非稳态 NS 方程"
     PATH: str = "流体.NS 方程有限元迭代求解"
     INPUT_SLOTS = [
@@ -97,10 +137,10 @@ class IncompressibleNSIPCSRun(CNodeType):
         PortConf("mesh", DataType.MESH, title="网格")
     ]
     OUTPUT_SLOTS = [
-        PortConf("uh", DataType.FUNCTION, title="速度数值解"),
-        PortConf("ph", DataType.FUNCTION, title="压力数值解"),
-        PortConf("uh_x", DataType.FUNCTION, title="速度x分量数值解"),
-        PortConf("uh_y", DataType.FUNCTION, title="速度y分量数值解")
+        PortConf("uh", DataType.TENSOR, title="速度数值解"),
+        PortConf("ph", DataType.TENSOR, title="压力数值解"),
+        PortConf("uh_x", DataType.TENSOR, title="速度x分量数值解"),
+        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解")
     ]
     def run(T0, T1, NL, uspace, pspace, velocity_0, pressure_0, is_pressure_boundary,
             predict_velocity, correct_pressure, correct_velocity, mesh):
