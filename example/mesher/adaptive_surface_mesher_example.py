@@ -5,6 +5,8 @@ from fealpy.mesh import TriangleMesh
 from fealpy.mesher import SphereSurfaceMesher
 from fealpy.mmesh.tool import high_order_meshploter
 
+from aabbtree import AABBTree
+
 bm.set_backend('numpy')
 
 
@@ -14,7 +16,6 @@ mesh = mesher.init_mesh(2)
 mesh.uniform_refine(3)
 
 ps = mesh.entity_barycenter('cell')
-print(ps)
 
 
 # 生成对应的线性网格单元
@@ -27,6 +28,17 @@ idmap = bm.set_at(idmap, bm.where(isCornerNode)[0], bm.arange(NN, dtype=bm.int32
 cell = idmap[cell]
 
 linearMesh = TriangleMesh(node, cell)
+
+
+print(cell.dtype)
+
+tree = AABBTree(node, cell)
+
+idxs, bc = tree.query(ps)
+print(idxs.dtype)
+print(bc.dtype)
+
+ps = mesh.bc_to_point_1(bc, idxs)
 
 
 fig = plt.figure()
