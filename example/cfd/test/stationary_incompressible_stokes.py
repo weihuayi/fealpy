@@ -1,5 +1,5 @@
 from fealpy.backend import backend_manager as bm
-from fealpy.cfd.stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
+from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
 from fealpy.cfd.model import CFDTestModelManager
 import matplotlib.pyplot as plt
 import argparse
@@ -54,58 +54,49 @@ parser.add_argument('--maxit',
     default = 5, type = int,
     help = "Maximum number of iterations for the solver, default is 5")
 
-parser.add_argument('--maxstep',
-    default = 10, type = int,
-    help = "Maximum number of steps for the refinement, default is 1000")
-
-parser.add_argument('--tol',
-    default = 1e-10, type = float,
-    help = "Tolerance for the solver, default is 1e-10")
-
 # 解析参数
 options = vars(parser.parse_args())
 
 bm.set_backend(options['backend'])
-manager = CFDTestModelManager('stationary_stokes')
+manager = CFDTestModelManager('stationary_incompressible_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.mesh
 model = StationaryIncompressibleStokesLFEMModel(pde=pde, mesh = mesh, options = options)
+model.equation.set_constitutive = 1
 uh, ph = model.run()
-model.__str__()
-
 
 # 可视化
-mesh = model.mesh
-uh = uh.reshape(2, -1).T
-points_u = model.fem.uspace.interpolation_points()
-points_p = model.fem.pspace.interpolation_points()
+# mesh = model.mesh
+# uh = uh.reshape(2, -1).T
+# points_u = model.fem.uspace.interpolation_points()
+# points_p = model.fem.pspace.interpolation_points()
 
-plt.figure(figsize=(18, 15))
-plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 0], levels = 50, cmap='viridis')
-plt.colorbar(label = 'uh0')
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Velocity uh0')
-plt.grid(True)
-plt.show()
+# plt.figure(figsize=(18, 15))
+# plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 0], levels = 50, cmap='viridis')
+# plt.colorbar(label = 'uh0')
+# plt.xlabel('x')
+# plt.ylabel('y')
+# plt.title('Velocity uh0')
+# plt.grid(True)
+# plt.show()
 
-plt.figure(figsize=(18, 15))
-plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 1], levels = 50, cmap='viridis')
-plt.colorbar(label = 'uh1')
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Velocity uh1')
-plt.grid(True)
-plt.show()
+# plt.figure(figsize=(18, 15))
+# plt.tricontourf(points_u[:, 0], points_u[:, 1], mesh.cell, uh[..., 1], levels = 50, cmap='viridis')
+# plt.colorbar(label = 'uh1')
+# plt.xlabel('x')
+# plt.ylabel('y')
+# plt.title('Velocity uh1')
+# plt.grid(True)
+# plt.show()
 
-plt.figure(figsize=(18, 15))
-plt.tricontourf(points_p[:, 0], points_p[:, 1], mesh.cell, ph, levels = 50, cmap='viridis')
-plt.colorbar(label = 'ph')
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Pressure ph')
-plt.grid(True)
-plt.show()
+# plt.figure(figsize=(18, 15))
+# plt.tricontourf(points_p[:, 0], points_p[:, 1], mesh.cell, ph, levels = 50, cmap='viridis')
+# plt.colorbar(label = 'ph')
+# plt.xlabel('x')
+# plt.ylabel('y')
+# plt.title('Pressure ph')
+# plt.grid(True)
+# plt.show()
 
 # from scipy.interpolate import griddata
 # x, y = points_u[:, 0], points_u[:, 1]
@@ -130,9 +121,9 @@ plt.show()
 # plt.tight_layout()
 # plt.show()
 
-fig = plt.figure()
-ax = fig.gca()
-mesh.add_plot(ax)
-plt.axis("equal")
-plt.show()
+# fig = plt.figure()
+# ax = fig.gca()
+# mesh.add_plot(ax)
+# plt.axis("equal")
+# plt.show()
 

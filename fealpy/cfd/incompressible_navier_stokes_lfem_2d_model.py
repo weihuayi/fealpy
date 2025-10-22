@@ -221,7 +221,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uh,ph = self.run['main']( maxstep, tol)
             self.nt = self.nt*4
             self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
-            # self.equation = IncompressibleNS(self.pde)
             uerror, perror = self.error(uh, ph, t= self.T1)
             u_errorMatrix[0, i] = uerror
             p_errorMatrix[0, i] = perror

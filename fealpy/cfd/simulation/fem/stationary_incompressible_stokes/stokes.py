@@ -44,12 +44,12 @@ class Stokes(IterativeMethod):
 
         L0 = LinearForm(uspace)
         self.u_source_LSI = SourceIntegrator(q=q)
-        L0.add_integrator(self.u_source_LSI)
+        L0.add_integrator(self.u_source_LSI) 
         L1 = LinearForm(pspace)
         L = LinearBlockForm([L0, L1])
         return L
 
-    def update(self, u0): 
+    def update(self): 
         equation = self.equation
         cv = equation.coef_viscosity
         pc = equation.coef_pressure

@@ -21,9 +21,9 @@ class FromSympy(BoxMesher2d):
     @variantmethod("poly2d")
     def select_pde(self):
         x, y = sp.symbols('x, y')
-        self.u1 = 1000 * x**2 * (1 - x)**4 * y**2 * (1 - y) * (3 - 5*y)
-        self.u2 = 1000 * (-2) * x * (1 - x)**3 * (1 - 3*x) * y**3 * (1 - y)**2
-        self.p = sp.pi**2 * (x*y**3 * sp.cos(2*sp.pi*x**2*y) - x**2*y * sp.sin(2*sp.pi*x*y)) + sp.Rational(1, 8)
+        self.u1 = 4*(2*y-1)*x*(1-x)
+        self.u2 = -4*(2*x-1)*y*(1-y)
+        self.p = 3*(x**3 + y**3 -sp.Rational(1,2))
         self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
 
     @select_pde.register("custom")

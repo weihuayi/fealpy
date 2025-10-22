@@ -4,9 +4,9 @@ from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
 from fealpy.mesh import Mesh
 from fealpy.utils import timer
-from fealpy.cfd.equation import StationaryIncompressibleNS
+from fealpy.cfd.equation.stationary_incompressible_stokes import StationaryIncompressibleStokes
 
-class StokesLFEMModel(ComputationalModel):
+class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
     """
     StationaryIncompressibleNSLFEMModel: Stationary Incompressible Navier-Stokes Finite Element Solver
 
@@ -66,7 +66,7 @@ class StokesLFEMModel(ComputationalModel):
         super().__init__(pbar_log=True, log_level="INFO")
         self.options = options
         self.pde = pde
-        self.equation = StationaryIncompressibleNS(pde)
+        self.equation = StationaryIncompressibleStokes(pde)
         
         if mesh is None:
             if hasattr(pde, 'init_mesh'):
@@ -107,7 +107,7 @@ class StokesLFEMModel(ComputationalModel):
         """
         Use Newton iteration method to solve the Navier-Stokes equations.
         """
-        from .simulation.fem.stationary_stokes.stokes import Stokes
+        from .simulation.fem.stationary_incompressible_stokes.stokes import Stokes
         self.fem = Stokes(self.equation, self.mesh)
         self.method_str = "Newton"
         return self.fem
@@ -131,36 +131,12 @@ class StokesLFEMModel(ComputationalModel):
         return BForm, LForm
     
     
-    @variantmethod('main')
-    def run(self, maxstep=1000, tol=1e-10):
-        self.run_str = 'main'
-        maxstep = self.maxstep if self.options is not None else maxstep
-        tol = self.tol if self.options is not None else tol
-        uh0 = self.fem.uspace.function()
-        ph0 = self.fem.pspace.function()
-        
-        for i in range(maxstep):
-            uh1, ph1 = self.run['one_step']()
-            res_u = self.mesh.error(uh0, uh1)
-            res_p = self.mesh.error(ph0, ph1)
-            self.logger.info(f"res_u: {res_u}, res_p: {res_p}")
-            if res_u + res_p < tol:
-                self.logger.info(f"Converged at iteration {i+1}")
-                break 
-            uh0[:] = uh1
-            ph0[:] = ph1
-        # uerror, perror = self.error(uh1, ph1) 
-        # self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
-        return uh1, ph1
-    
-    @run.register('one_step')
+    @variantmethod('one_step')
     def run(self):
         self.run_str = 'one_step'
         BForm, LForm = self.linear_system()  
-        # self.fem.update(uh)
+        self.fem.update()
         A = BForm.assembly() 
-        import ipdb
-        ipdb.set_trace()
         b = LForm.assembly()
         A, b = self.fem.apply_bc(A, b, self.pde)
         A, b = self.fem.lagrange_multiplier(A, b)
@@ -174,14 +150,16 @@ class StokesLFEMModel(ComputationalModel):
         return u, p
 
     @run.register('uniform_refine')
-    def run(self, maxit = 5, maxstep = 1000, tol = 1e-10):
+    def run(self, maxit = 5):
         self.run_str = 'uniform_refine'
         maxit = self.maxit if self.options is not None else maxit
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
         for i in range(maxit):
             self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
-            uh1, ph1 = self.run['main'](maxstep, tol)
+            uh1, ph1 = self.run['one_step']()
+            uerror, perror = self.error(uh1, ph1)
+            self.logger.info(f"error_u: {uerror}, error_p: {perror}")
             self.mesh.uniform_refine()
         return uh1, ph1
 

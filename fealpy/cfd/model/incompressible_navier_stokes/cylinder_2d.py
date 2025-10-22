@@ -9,7 +9,7 @@ class Cylinder2D():
         self.options = options
         self.atol = 1e-10
         self.mu = 0.001
-        self.rho = 0.1
+        self.rho = 1.0
 
         if options is not None:
             self.box = options.get('box', [0.0, 2.2, 0.0, 0.41])
@@ -173,10 +173,6 @@ class Cylinder2D():
     def is_velocity_boundary(self, p):
         # is_out = self.is_outlet_boundary(p)
         # return ~is_out
-        # inlet = self.is_inlet_boundary(p)
-        # wall = self.is_wall_boundary(p)
-        # obstacle = self.is_obstacle_boundary(p)
-        # return inlet|wall|obstacle
         return None
     
     @cartesian

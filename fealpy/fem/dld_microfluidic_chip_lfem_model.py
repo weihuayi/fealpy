@@ -13,7 +13,7 @@ from fealpy.fem import DirichletBC
 from fealpy.fem import PressWorkIntegrator, SourceIntegrator
 
 from fealpy.cfd.model import CFDTestModelManager
-from fealpy.cfd.equation.stationary_stokes import StationaryStokes
+from fealpy.cfd.equation.stationary_incompressible_stokes import StationaryIncompressibleStokes
 
 
 class DLDMicrofluidicChipLFEMModel(ComputationalModel):
@@ -82,7 +82,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
             raise ValueError("PDE not set. Call set_pde(pde) first.")
         if self.mesh is None:
             raise ValueError("Mesh not set. Call set_mesh(mesh) first.")
-        self.equation = StationaryStokes(self.pde)
+        self.equation = StationaryIncompressibleStokes(self.pde)
         self.fem = self.method()
 
     @variantmethod("Stokes")
@@ -90,7 +90,7 @@ class DLDMicrofluidicChipLFEMModel(ComputationalModel):
         """
         Use Newton iteration method to solve the Navier-Stokes equations.
         """
-        from ..cfd.simulation.fem.stationary_stokes.stokes import Stokes
+        from ..cfd.simulation.fem.stationary_incompressible_stokes.stokes import Stokes
         self.fem = Stokes(self.equation, self.mesh)
         self.method_str = "Stokes"
         return self.fem

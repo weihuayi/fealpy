@@ -2,7 +2,7 @@ from .base import BaseEquation
 from typing import Union, Callable, Dict
 CoefType = Union[int, float, Callable]
 
-class StationaryStokes(BaseEquation):
+class StationaryIncompressibleStokes(BaseEquation):
     def __init__(self, pde):
         super().__init__(pde)
         self._coefs = {
@@ -33,7 +33,7 @@ class StationaryStokes(BaseEquation):
             mu = 1.0
 
         # 设置系数 
-        self._coefs['pressure'] = 1
+        self._coefs['pressure'] = 1.0
         self._coefs['viscosity'] = mu
         self._coefs['body_force'] = getattr(pde, 'source', 0)
 

@@ -94,7 +94,7 @@ class Exp0001(BoxMesher2d):
 
         result = bm.set_at(result, (..., 1), term1 + term2 + term3 + term4 + term5 + term6 + term7 + trig_y)
 
-        return result
+        return -result
 
     @cartesian
     def is_velocity_boundary(self, p: TensorLike) -> TensorLike:
