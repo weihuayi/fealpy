@@ -15,6 +15,8 @@ class CFDTimeline(CNodeType):
     """
     TITLE: str = "均匀时间剖分"
     PATH: str = "流体.时间剖分"
+    DESC: str = """该节点实现流体力学计算中的均匀时间剖分, 依据起止时间与时间步数生成时间
+                层信息, 为瞬态CFD模拟提供时间推进基础。"""
     INPUT_SLOTS = [
         PortConf("T0", DataType.FLOAT, 0, title="初始时间",default=0.0),
         PortConf("T1", DataType.FLOAT, 0, title="结束时间", default=1.0),

@@ -17,6 +17,8 @@ class Cylinder3d(CNodeType):
     """
     TITLE: str = "圆柱体网格"
     PATH: str = "网格.构造"
+    DESC: str = """该节点用于在三维圆柱体区域内生成有限元网格，用户可指定圆柱体的半径、高度及目标网格尺寸，
+                以满足不同几何与精度需求的数值模拟。"""
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tetrahedron", items=["tetrahedron"]),
         PortConf("radius", DataType.FLOAT, 1, title="圆柱体半径", default=1.0, min_val=1e-6),
