@@ -21,17 +21,19 @@ class TimobeamAxleData3D:
         Notes:
             FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
     """
-    def __init__(self, para: TensorLike=None, 
-                 kappa: float=10/9):
-        self.beam_para = bm.array([
-            [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
-            [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
-            [120, 141, 2]], dtype=bm.float64)
-        self.axle_para =  bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
-    
-        # self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
+    def __init__(self, beam_para=None, axle_para=None, kappa: float=10/9):
+        if beam_para is None:
+            beam_para = bm.array([
+                [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
+                [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
+                [120, 141, 2]], dtype=bm.float64)
+        if axle_para is None:
+            axle_para = bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
         
-        # diameter
+         # diameter
+        self.beam_para = bm.asarray(beam_para)
+        self.axle_para = bm.asarray(axle_para)
+       
         self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
         self.axle_D = bm.repeat(self.axle_para[:, 0], self.axle_para[:, 2].astype(int))
         

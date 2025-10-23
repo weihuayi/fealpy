@@ -20,8 +20,9 @@ class CreateMesh(CNodeType):
     """
     TITLE: str = "构造网格"
     PATH: str = "网格.构造"
+    DESC: str = "根据节点坐标和单元编号构造网格对象，支持多种网格类型"
     INPUT_SLOTS = [
-        PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="triangle", 
+        PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="edge", 
                  items=["triangle", "quadrangle", "tetrahedron", "hexahedron", "edge"]),
         PortConf("node", DataType.TENSOR, 1, title="节点坐标"),
         PortConf("cell", DataType.TENSOR, 1, title="单元")

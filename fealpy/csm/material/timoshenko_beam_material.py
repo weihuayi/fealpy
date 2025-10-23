@@ -5,8 +5,6 @@ from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
 
-from ..model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
-
 
 class TimoshenkoBeamMaterial(LinearElasticMaterial):
     """Material properties for 3D Timoshenko beams.
@@ -34,8 +32,6 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
         self.kappa = shear_factor
-
-        model = TimobeamAxleData3D()
 
         self.Ax = model.beam_Ax  # 截面面积
         self.Ay = model.beam_Ay  
