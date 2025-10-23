@@ -5,12 +5,13 @@ WORLD_GRAPH = cgraph.WORLD_GRAPH
 
 model = cgraph.create("Timoaxle3d")
 mesher = cgraph.create("CreateMesh")
-materialer = cgraph.create("TimoaxleMaterial")
+beam_materialer = cgraph.create("TimoMaterial")
+axle_materialer = cgraph.create("AxleMaterial")
 spacer = cgraph.create("FunctionSpace")
 timoaxle_model = cgraph.create("Timoaxle")
+solver = cgraph.create("DirectSolver")
 
 # 连接节点
-
 node = bm.array([[0.0, 0.0, 0.0], [70.5, 0.0, 0.0], [141.0, 0.0, 0.0], [155.0, 0.0, 0.0],
             [169.0, 0.0, 0.0], [213.25, 0.0, 0.0], [257.5, 0.0, 0.0], [301.75, 0.0, 0.0],
             [346.0, 0.0, 0.0], [480.0, 0.0, 0.0], [614.0, 0.0, 0.0], [853.0, 0.0, 0.0],
@@ -30,23 +31,34 @@ cell = bm.array([[0, 1], [1, 2], [2, 3], [3, 4], [4, 5],
 
 mesher(node = node, cell = cell)
 spacer(mesh=mesher(), p=1)
-materialer(beam_E=2.1e11, beam_nu=0.3, axle_E=1.976e6, axle_nu=-0.5)
+beam_materialer(property="Steel", beam_type="Timoshemko beam", beam_E=2.1e11, beam_nu=0.3)
+axle_materialer(property="Steel", axle_type="Bar", axle_E=1.976e6, axle_nu=-0.5)
+
 timoaxle_model(
-    space=spacer(),
-    beam_material=materialer[0],
-    axle_material=materialer[1],
-    cell_index=10, 
-    external_load=model().external_load,
-    dirichlet_idx=model().dirichlet_dof_index, 
-    boundary_type=None, 
-    load_type=None, 
-    load_value=None,
-    penalty=1e20
+    space = spacer(),
+    beam_E = beam_materialer().E,
+    beam_mu = beam_materialer().mu,
+    Ax =  beam_materialer().Ax,
+    Ay = beam_materialer().Ay,
+    Az = beam_materialer().Az,
+    J = beam_materialer().J,
+    Iy = beam_materialer().Iy,
+    Iz = beam_materialer().Iz,
+    axle_E = axle_materialer().E,
+    axle_mu = axle_materialer().mu,
+    cindex = 32,
+    external_load = model().external_load,
+    dirichlet_idx = model().dirichlet_dof_index,
+    penalty = 1e20,
+    boundary_type = "force",
+    load_type = "fixed"  ,
 )
 
+solver(A = timoaxle_model().K,
+       b = timoaxle_model().F)
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher(), uh=timoaxle_model())
+WORLD_GRAPH.output(mesh=mesher(), uh=solver().out)
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

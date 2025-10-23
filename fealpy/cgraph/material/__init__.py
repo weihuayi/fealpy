@@ -1,1 +1,1 @@
-from .timoaxle_material import TimoaxleMaterial
+from .timoaxle_material import *

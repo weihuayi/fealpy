@@ -54,6 +54,6 @@ bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import TimobeamAxleModel
 model = TimobeamAxleModel(options)
-# model.__str__()
+model.__str__()
 u = model.solve()
 model.show(u)

@@ -139,8 +139,8 @@ class TimobeamAxleModel(ComputationalModel):
                 K, F = self.timo_axle_system()
                 K, F = self.apply_bc_penalty(K, F)  
 
-                u = spsolve(K, F, solver='scipy').reshape(-1, 6)
-                self.logger.info(f"Solution u:\n{u}")
+                u = spsolve(K, F, solver='scipy')
+                # self.logger.info(f"Solution u:\n{u}")
 
                 return u
         
@@ -150,9 +150,10 @@ class TimobeamAxleModel(ComputationalModel):
                 """
                 
                 mesh = self.mesh
-
-                u = displacement[:, :3]
-                mesh.nodedata['disp'] = u
+                u = displacement.reshape(-1, 6)
+                
+                uh = u[:, :3]
+                mesh.nodedata['disp'] = uh
 
                 frname = f"disp.vtu"
                 mesh.to_vtk(fname=frname)
