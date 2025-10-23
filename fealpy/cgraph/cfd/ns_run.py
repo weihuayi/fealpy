@@ -138,16 +138,18 @@ class IncompressibleNSIPCSRun(CNodeType):
         PortConf("predict_velocity", DataType.FUNCTION, title="预测速度方程离散"),
         PortConf("correct_pressure", DataType.FUNCTION, title="压力修正方程离散"),
         PortConf("correct_velocity", DataType.FUNCTION, title="速度修正方程离散"),
-        PortConf("mesh", DataType.MESH, title="网格")
+        PortConf("mesh", DataType.MESH, title="网格"),
+        PortConf("output_dir", DataType.STRING, title="输出目录")
     ]
     OUTPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, title="速度数值解"),
         PortConf("ph", DataType.TENSOR, title="压力数值解"),
         PortConf("uh_x", DataType.TENSOR, title="速度x分量数值解"),
-        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解")
+        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解"),
+        PortConf("uh_z", DataType.TENSOR, title="速度z分量数值解")
     ]
     def run(T0, T1, NL, uspace, pspace, velocity_0, pressure_0, is_pressure_boundary,
-            predict_velocity, correct_pressure, correct_velocity, mesh):
+            predict_velocity, correct_pressure, correct_velocity, mesh, output_dir):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import cartesian
         from fealpy.solver import spsolve
@@ -167,6 +169,8 @@ class IncompressibleNSIPCSRun(CNodeType):
 
         node = mesh.interpolation_points(p=1)
         cell = mesh.entity('cell')
+        data = []
+        j = 0
 
         for i in range(nt):
             t  = timeline.current_time()
@@ -197,36 +201,47 @@ class IncompressibleNSIPCSRun(CNodeType):
             uh = u1
             uh = uh.reshape(mesh.GD,-1).T
             uh = uh[:NN,:]
-            uh_x = u1[:int(ugdof/2)][:NN]
-            uh_y = u1[int(ugdof/2):][:NN]
+            uh_x = uh[..., 0]
+            uh_y = uh[..., 1]
+            if mesh.GD == 3:
+                uh_z = uh[..., 2]
+            else:
+                uh_z = bm.zeros_like(uh_x)
             ph = p1[:NN]
 
-            # mesh.nodedata['ph'] = p1
-            # mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
+            # mesh.nodedata['ph'] = ph
+            # mesh.nodedata['uh'] = uh.reshape(mesh.GD,-1).T
             # mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
-            os.makedirs(name="cylinder", exist_ok=True)  # 创建目录
+            if (i+1) % 10 == 0:
 
-            data = {
-            "time": float(t),
-            "值":{
-                "uh" : uh.tolist(),  # ndarray -> list
-                "uh_x" : uh_x.tolist(),  # ndarray -> list
-                "uh_y" : uh_y.tolist(),  # ndarray -> list
-                "ph" : ph.tolist()
-            }, 
-            "几何": {
-                "cell": cell.tolist(),  # ndarray -> list
-                "node": node.tolist()   # ndarray -> list
-            }
-            }
+                os.makedirs(output_dir, exist_ok=True)  # 创建目录
 
-            file_name = f"step_{(i):05d}.json.gz"
-            file_path = os.path.join("cylinder", file_name)
+                data.append ({
+                "time": round(t+dt, 8),
+                "值":{
+                    "uh" : uh.tolist(),  # ndarray -> list
+                    "uh_x" : uh_x.tolist(),  # ndarray -> list
+                    "uh_y" : uh_y.tolist(),  # ndarray -> list
+                    "uh_z" : uh_z.tolist(),  # ndarray -> list
+                    "ph" : ph.tolist()
+                }, 
+                "几何": {
+                    "cell": cell.tolist(),  # ndarray -> list
+                    "node": node.tolist()   # ndarray -> list
+                }
+                })
+            
+            if len(data) == 10 :
+                j += 1
+                file_name = f"file_{j:08d}.json.gz"
+                file_path = os.path.join(output_dir, file_name)
 
-            with gzip.open(file_path, "wt", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
+                with gzip.open(file_path, "wt", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+                
+                data.clear()
             
             timeline.advance()
 
-        return uh, ph, uh_x, uh_y
+        return uh, ph, uh_x, uh_y, uh_z
