@@ -14,11 +14,13 @@ class TestCreationFunctionsInterfaces:
         bm.set_backend(backend)
         # 解决浮点数精度问题
         is_float = expected.dtype.kind == 'f'
+        # pytorch 不支持 None 类型，使用默认值代替
         if stop is None:
             stop = start
             start = 0
         if step is None:
             step = 1
+        # 转换为后端数组
         expected = bm.from_numpy(expected)
         # 测试
         if is_float:
