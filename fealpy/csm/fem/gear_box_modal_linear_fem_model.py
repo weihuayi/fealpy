@@ -2,10 +2,12 @@
 from typing import Any, Optional, Union, Callable, Tuple, Sequence, Literal
 import os
 
+import ipdb
+
 from mpi4py import MPI
 from petsc4py import PETSc
 from slepc4py import SLEPc
-from scipy.sparse import bmat
+from scipy.sparse import bmat, block_diag, spdiags
 
 from scipy.io import loadmat
 from scipy.sparse import csr_matrix
@@ -304,7 +306,16 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         M01 = csr_matrix(M01[:, idx])
         M11 = csr_matrix(M11[idx, :][:, idx])
 
-        return [[S00, S01], [S01.T, S11]], [[M00, M01], [M01.T, M11]]
+        # 构造轴承的刚度矩阵
+        B = shaft_system['bearing_stiffness_matrix']
+        nb = B.shape[0]//6
+        B = [B[i*6:(i+1)*6, 1:] for i in range(nb)]
+        BS = block_diag(B, format='csr')
+
+        BM = shaft_system['bearing_mass_matrix'].diagonal()[isCDof][idx]
+        BM = spdiags(BM, 0, BM.shape[0], BM.shape[0], format='csr')
+
+        return [[S00, S01], [S01.T, S11]], [[M00, M01], [M01.T, M11]], BS, BM
 
 
     @variantmethod('direct')
@@ -335,6 +346,64 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
 
 
     @variantmethod('all')
+    def construct_system(self):
+        """
+        Construct the global linear system for the gearbox modal analysis.
+        """
+
+        S0, M0, BS, BM = self.shaft_linear_system()
+        self.rbe2_matrix()
+        S1, M1 = self.box_linear_system()
+
+        N0 = S0[0][0].shape[0]  # number of free dofs in the shaft system
+        N1 = S0[1][1].shape[0]  # number of coupling dofs
+        N2 = S1[0][0].shape[0]  # number of free dofs in the gearbox shell model
+        N3 = S1[1][1].shape[0]  # number of coupling dofs
+
+        S = bmat([[S0[0][0],     S0[0][1],    None,         None],
+                  [S0[1][0],  S0[1][1]+BS,    None,          -BS],
+                  [    None,         None, S1[0][0],    S1[0][1]],
+                  [    None,          -BS, S1[1][0], S1[1][1]+BS]]).tocsr()
+        
+        M = bmat([[M0[0][0],     M0[0][1],           None,     None],
+                  [M0[1][0],     M0[1][1]+BM,        None,     None],
+                  [    None,         None,    M1[0][0],    M1[0][1]],
+                  [    None,         None,    M1[1][0], M1[1][1]+BM]]).tocsr()
+
+        self.S = S
+        self.M = M
+
+
+        self.logger.info(f"Global system: {S.shape}, {M.shape}")
+
+        PS = PETSc.Mat().createAIJ(
+                size=S.shape, 
+                csr=(S.indptr, S.indices, S.data))
+        PS.assemble()
+        PM = PETSc.Mat().createAIJ(
+                size=M.shape, 
+                csr=(M.indptr, M.indices, M.data))
+        PM.assemble()
+
+        NN0 = N0//6
+        NN1 = N1//6
+        NN2 = N2//3
+        NN3 = N3//6
+        dof_nodes = bm.concat((
+            bm.arange(N0)//6, 
+            bm.arange(N1)//6 + NN0, 
+            bm.arange(N2)//3 + NN0 + NN1,
+            bm.arange(N3)//6 + NN0 + NN1 + NN2))
+        dof_comps = bm.concat((
+            bm.arange(N0)%6, 
+            bm.arange(N1)%6, 
+            bm.arange(N2)%3,
+            bm.arange(N3)%6))
+
+        return PS, PM, [N0, N1, N2, N3], dof_nodes, dof_comps
+
+
+    @construct_system.register('old')
     def construct_system(self):
         """
         Construct the global linear system for the gearbox modal analysis.
@@ -377,7 +446,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         dof_nodes = bm.concat((bm.arange(N0)//6, bm.arange(N1)//3 + NN0, bm.arange(N2)//6 + NN0 + NN1))
         dof_comps = bm.concat((bm.arange(N0)%6, bm.arange(N1)%3, bm.arange(N2)%6))
 
-        return PS, PM, N0, N1, N2, dof_nodes, dof_comps
+        return PS, PM, [N0, N1, N2], dof_nodes, dof_comps
 
     @construct_system.register('box')
     def construct_system(self):
@@ -417,7 +486,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         dof_nodes = bm.concat((bm.arange(N0)//6, bm.arange(N1)//3 + NN0, bm.arange(N2)//6 + NN0 + NN1))
         dof_comps = bm.concat((bm.arange(N0)%6, bm.arange(N1)%3, bm.arange(N2)%6))
 
-        return PS, PM, N0, N1, N2, dof_nodes, dof_comps
+        return PS, PM, [N0, N1, N2], dof_nodes, dof_comps
 
     @construct_system.register('shaft')
     def construct_system(self):
@@ -425,7 +494,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         Construct the global linear system for the gearbox modal analysis.
         """
 
-        S0, M0 = self.shaft_linear_system()
+        S0, M0, BS, BM = self.shaft_linear_system()
         self.rbe2_matrix()
         S1, M1 = self.box_linear_system()
 
@@ -457,7 +526,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         dof_nodes = bm.concat((bm.arange(N0)//6, bm.arange(N1)//3 + NN0, bm.arange(N2)//6 + NN0 + NN1))
         dof_comps = bm.concat((bm.arange(N0)%6, bm.arange(N1)%3, bm.arange(N2)%6))
 
-        return PS, PM, N0, N1, N2, dof_nodes, dof_comps
+        return PS, PM, [N0, N1, N2], dof_nodes, dof_comps
 
 
     @variantmethod('slepc')
@@ -468,9 +537,14 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         eps = SLEPc.EPS().create()
         eps.setOperators(PS, PM)
         eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-        eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+        #eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
+        eps.setType(SLEPc.EPS.Type.LANCZOS)
 
-        sigma = 0.0  # 更贴近你的目标最小特征值（基于经验）
+        opts = PETSc.Options()
+        opts['eps_lanczos_reorthog'] = 'local'
+        eps.setFromOptions()
+
+        sigma = 1e-04  # 更贴近你的目标最小特征值（基于经验）
         eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
         eps.setTarget(sigma)  # ← 显式设置目标
 
@@ -492,7 +566,7 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         return eps
 
 
-    def post_process(self, eps, N0, N1, N2) -> None:
+    def post_process(self, eps, NS) -> None:
         """
         Post-process the eigenvalue problem solution.
         """
@@ -519,14 +593,17 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         isCSNode = self.mesh.data.get_node_data('isCSNode')
         isCSDof = bm.repeat(isCSNode, 3)
         vec = [] 
+        start = sum(NS[0:-2])
+        end = start + NS[-2]
         for i, val in enumerate(eigvecs):
             phi = bm.zeros((NN * 3,), dtype=self.ftype)
             idx, = bm.where(isFreeDof)
-            phi = bm.set_at(phi, idx, val[N0:N0 + N1])
+            if (end-start) == idx.shape[0]:
+                phi = bm.set_at(phi, idx, val[start:end])
             # transform the dof values of coupling nodes to surface nodes
             # constrained by the coupling nodes.
             idx, = bm.where(isCSDof)
-            phi = bm.set_at(phi, idx, self.G @ val[N0 + N1:])
+            phi = bm.set_at(phi, idx, self.G @ val[end:])
             phi = phi.reshape((NN, 3))
             # put into the mesh node data 
             self.mesh.nodedata[f'eigenvalue-{i}-{eigvals[i]:0.5e}'] = phi

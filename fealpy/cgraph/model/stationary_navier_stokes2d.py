@@ -4,8 +4,25 @@ from ..nodetype import CNodeType, PortConf, DataType
 __all__ = ["StationaryNS2d"]
 
 class StationaryNS2d(CNodeType):
-    TITLE: str = "Stationary NS 2D"
-    PATH: str = "model.stationary_navier_stokes"
+    r"""2D stationary Navier-Stokes equations problem model.
+
+    Inputs:
+        example (int): Example number.
+
+    Outputs:
+        mu (float): Viscosity coefficient.
+        rho (float): Density.
+        domain (domain): Computational domain.
+        velocity (function): Exact velocity solution.
+        pressure (function): Exact pressure solution.
+        source (function): Source term.
+        velocity_dirichlet (function): Dirichlet boundary condition for velocity.
+        pressure_dirichlet (function): Dirichlet boundary condition for pressure.
+        is_velocity_boundary (function): Predicate function for velocity boundary regions.
+        is_pressure_boundary (function): Predicate function for pressure boundary regions.
+    """
+    TITLE: str = "二维稳态 NS 方程问题模型"
+    PATH: str = "模型.稳态NS"
     INPUT_SLOTS = [
         PortConf("example", DataType.MENU, 0, title="例子编号", default=1, items=[i for i in range(1, 3)])
     ]

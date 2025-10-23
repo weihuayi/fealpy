@@ -142,5 +142,6 @@ class PDEModelManager(ModelManager):
         "helmholtz": "fealpy.model.helmholtz",
         "surface_poisson": "fealpy.model.surface_poisson",
         "curlcurl":"fealpy.model.curlcurl",
-        "dld_microfluidic_chip":"fealpy.model.dld_microfluidic_chip"
+        "dld_microfluidic_chip":"fealpy.model.dld_microfluidic_chip",
+        "mgtensor_possion":"fealpy.model.mgtensor_possion"
     }

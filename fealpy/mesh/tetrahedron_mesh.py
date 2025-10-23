@@ -6,6 +6,7 @@ from .mesh_base import SimplexMesh
 from .plot import Plotable
 from fealpy.sparse import coo_matrix,csr_matrix
 
+
 class TetrahedronMesh(SimplexMesh, Plotable): 
     def __init__(self, node, cell):
         super().__init__(TD=3, itype=cell.dtype, ftype=node.dtype)
@@ -1315,6 +1316,168 @@ class TetrahedronMesh(SimplexMesh, Plotable):
 
         gmsh.finalize()
 
+        return cls(node, cell)
+    
+    @classmethod
+    def from_cube_with_spherical_hole(cls,box=[0,1,0,1,0,1],
+                                      scenter=[0,0,0], r=0.5,
+                                      h=0.1):
+        """
+        使用 Gmsh 生成一个立方体减去一个球体（3D 体网格）
+        Parameters:
+            box(list): 立方体的对角点坐标 [xmin,xmax,ymin,ymax,zmin,zmax]
+            sphere_center(list): 球心 [sx,sy,sz]
+            sphere_radius(float): 球半径
+            h(float): 网格尺寸
+        Returns:
+            nodes (ndarray, (N,3)): 节点坐标
+            cells (ndarray, (M,4)): 四面体单元顶点索引
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("CubeMinusSphere")
+        box_center = [(box[0]+box[1])/2, (box[2]+box[3])/2, (box[4]+box[5])/2]
+        box_size_x = box[1] - box[0]
+        box_size_y = box[3] - box[2]
+        box_size_z = box[5] - box[4]
+        cx, cy, cz = box_center
+        half_x = box_size_x / 2.0
+        half_y = box_size_y / 2.0
+        half_z = box_size_z / 2.0
+        x0, y0, z0 = cx - half_x, cy - half_y, cz - half_z
+        # 添加立方体和球体
+        box_tag = gmsh.model.occ.addBox(x0, y0, z0, box_size_x, box_size_y, box_size_z, tag=1)
+        sx, sy, sz = scenter
+        sphere_tag = gmsh.model.occ.addSphere(sx, sy, sz, r, tag=2)
+        # 检查包围盒是否相交
+        box_bb = gmsh.model.occ.getBoundingBox(3, box_tag)   # (xmin,ymin,zmin,xmax,ymax,zmax)
+        sphere_bb = gmsh.model.occ.getBoundingBox(3, sphere_tag)
+        no_intersect = (box_bb[0] > sphere_bb[3] or box_bb[3] < sphere_bb[0] or
+                        box_bb[1] > sphere_bb[4] or box_bb[4] < sphere_bb[1] or
+                        box_bb[2] > sphere_bb[5] or box_bb[5] < sphere_bb[2])
+        if no_intersect:
+            print("Warning: sphere does not intersect box — skipping subtraction.")
+            out = [(3, box_tag)]
+        else:
+            # boolean cut: 从立方体中减去球体
+            out = gmsh.model.occ.cut([(3, box_tag)], [(3, sphere_tag)])
+        gmsh.model.occ.synchronize()
+        # 获取生成的体（取第一个体）
+        volumes = gmsh.model.getEntities(dim=3)
+        if len(volumes) == 0:
+            raise RuntimeError("No volume found after boolean cut.")
+        vol_tag = volumes[0][1]
+        # 网格尺寸，设置所有点尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+        # 生成三维网格（四面体）
+        gmsh.model.mesh.generate(3)
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)
+        #节点的编号映射
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+        # 获取四面体单元信息
+        tetrahedron_type = 4  # 四面体单元的类型编号为 4
+        tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
+        evid = bm.array([nodetags_map[j] for j in tetrahedron_connectivity])
+        cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of tetrahedra: {cell.shape[0]}")
+  
+        gmsh.finalize()
+        return cls(node, cell)
+    
+    @classmethod
+    def from_box_minus_cylinder(cls, box=[0,1,0,1,0,1],
+                                cyl_center=[0.5,0.5,0.5],
+                                cyl_axis=[1,1,1],
+                                cyl_radius=0.2,
+                                cyl_height=None,
+                                h=0.1,):
+        """
+        使用 Gmsh 生成一个矩体减去一个圆柱体（3D 体网格）
+        Parameters:
+            box(list): 立方体的对角点坐标 [xmin,xmax,ymin,ymax,zmin,zmax]
+            cyl_center(list): 圆柱中心（圆柱轴中点）[cx,cy,cz]
+            cyl_axis(list): 圆柱轴方向向量（不必归一化）
+            cyl_radius(float): 圆柱半径
+            cyl_height(float|None): 圆柱高度；若为 None，将自动设置为 box 对角线长度的 2 倍以确保贯穿
+            h(float): 网格尺寸
+            filename(str|None): 若提供则写出 .msh 文件
+            show_gui(bool): 是否显示 Gmsh GUI（blocking）
+        Returns:
+            nodes (ndarray, (N,3)): 节点坐标
+            cells (ndarray, (M,4)): 四面体单元顶点索引
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("BoxMinusCylinder")
+        # box geometry
+        xmin, xmax, ymin, ymax, zmin, zmax = box
+        box_size_x = xmax - xmin
+        box_size_y = ymax - ymin
+        box_size_z = zmax - zmin
+        box_center = [(xmin + xmax)/2.0, (ymin + ymax)/2.0, (zmin + zmax)/2.0]
+        x0, y0, z0 = xmin, ymin, zmin
+        # create box
+        box_tag = gmsh.model.occ.addBox(x0, y0, z0, box_size_x, box_size_y, box_size_z, tag=1)
+        # cylinder parameters
+        cx, cy, cz = cyl_center
+        axis = bm.asarray(cyl_axis, dtype=float)
+        norm = bm.linalg.norm(axis)
+        if norm == 0:
+            gmsh.finalize()
+            raise ValueError("cyl_axis must be non-zero.")
+        axis_unit = axis / norm
+        # 默认的圆柱高度为 box 对角线长度的 2 倍，确保圆柱贯穿 box
+        if cyl_height is None:
+            # 对角长度
+            diag = bm.sqrt(box_size_x**2 + box_size_y**2 + box_size_z**2)
+            cyl_height = diag * 2.0
+        # 计算圆柱起点和方向向量
+        # 找到圆柱轴的中点，向两端各延伸 cyl_height/2
+        half_vec = 0.5 * cyl_height * axis_unit
+        start_point = [cx - half_vec[0], cy - half_vec[1], cz - half_vec[2]]
+        vec = [half_vec[0]*2.0, half_vec[1]*2.0, half_vec[2]*2.0]  # equals cyl_height * axis_unit
+        # 添加圆柱体
+        cyl_tag = gmsh.model.occ.addCylinder(start_point[0], start_point[1], start_point[2],
+                                            vec[0], vec[1], vec[2], cyl_radius, tag=2)
+        # 检查包围盒是否相交
+        box_bb = gmsh.model.occ.getBoundingBox(3, box_tag)   # (xmin,ymin,zmin,xmax,ymax,zmax)
+        cyl_bb = gmsh.model.occ.getBoundingBox(3, cyl_tag)
+        no_intersect = (box_bb[0] > cyl_bb[3] or box_bb[3] < cyl_bb[0] or
+                        box_bb[1] > cyl_bb[4] or box_bb[4] < cyl_bb[1] or
+                        box_bb[2] > cyl_bb[5] or box_bb[5] < cyl_bb[2])
+        if no_intersect:
+            print("Warning: cylinder does not intersect box — skipping subtraction.")
+            out = [(3, box_tag)]
+        else:
+            out = gmsh.model.occ.cut([(3, box_tag)], [(3, cyl_tag)])
+        gmsh.model.occ.synchronize()
+        # choose resulting volume (pick first volume)
+        volumes = gmsh.model.getEntities(dim=3)
+        if len(volumes) == 0:
+            gmsh.finalize()
+            raise RuntimeError("No volume found after boolean cut.")
+        vol_tag = volumes[0][1]
+        # mesh sizing and generation
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0), h)
+        gmsh.model.mesh.generate(3)
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)
+        #节点的编号映射
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
+        # 获取四面体单元信息
+        tetrahedron_type = 4  # 四面体单元的类型编号为 4
+        tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
+        evid = bm.array([nodetags_map[j] for j in tetrahedron_connectivity])
+        cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of tetrahedra: {cell.shape[0]}")
+        gmsh.finalize()
         return cls(node, cell)
 
     @classmethod
