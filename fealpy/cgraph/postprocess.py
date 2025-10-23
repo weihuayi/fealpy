@@ -1,6 +1,6 @@
 from .nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["VPDecoupling"]
+__all__ = ["VPDecoupling", "UDecoupling"]
 
 class VPDecoupling(CNodeType):
     r"""Decouple velocity and pressure components from the combined output vector.
@@ -47,5 +47,38 @@ class VPDecoupling(CNodeType):
         else:
             uh_z = bm.zeros_like(uh_x)
         ph = out[ugdof:]
-        
+
         return uh, ph, uh_x, uh_y, uh_z
+
+
+class UDecoupling(CNodeType):
+    r"""Decouple translational and rotational displacement components 
+    from the combined output vector.
+    
+    Inputs:
+        out (tensor): Combined displacement vector of all nodes.Each node contains six components in the order 
+            [u, v, w, θx, θy, θz].
+            
+    Outputs:
+        uh (tensor): Translational displacement field (X, Y, Z components).
+        theta_xyz (tensor): Rotational displacement field (rotations around X, Y, Z axes).
+    """
+    TITLE: str = "位移解耦"
+    PATH: str = "后处理.解耦"
+    DESC: str = "将平动位移和转动位移做解耦处理"
+    INPUT_SLOTS = [
+        PortConf("out", DataType.TENSOR, 1, desc="六个自由度的位移", title="结果")
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("uh", DataType.TENSOR, desc="X,Y,Z三个方向上的位移", title="平动位移"),
+        PortConf("theta_xyz", DataType.TENSOR, desc="X,Y,Z三个方向的弯曲和剪切产生的位移", title="转动位移"),
+    ]
+
+    @staticmethod
+    def run(out):
+        u = out.reshape(-1, 6)
+        
+        uh = u[:, :3]
+        theta_xyz = u[:, 3:]
+
+        return uh, theta_xyz

@@ -5,5 +5,5 @@ from .helmholtz2d import Helmholtz2d
 from .stationary_navier_stokes2d import StationaryNS2d
 from .dld_microfluidic_chip2d import DLDMicrofluidicChip2D
 from .dld_microfluidic_chip3d import DLDMicrofluidicChip3D
-from .timobeam_axle3d import TimobeamAxle3d
+from .timoaxle3d import Timoaxle3d
 from .incompressible_navier_stokes2d import IncompressibleCylinder2d
