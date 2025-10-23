@@ -43,6 +43,8 @@ class IncompressibleNSIPCS(CNodeType):
     """
     TITLE: str = "非稳态 NS 方程 IPCS 算法"
     PATH: str = "流体.有限元算法"
+    DESC: str = """该节点基于有限元法实现不可压 Navier-Stokes 方程的非稳态求解，采用 IPCS 分步算法
+                构建预测速度、压力修正和速度修正三个离散系统，支持多种本构模型与边界条件设置。"""
     INPUT_SLOTS = [
         PortConf("constitutive", DataType.MENU, 0, title="本构方程", default=1, items=[i for i in range(1, 2)]),
         PortConf("mu", DataType.FLOAT, title="粘度系数"),
