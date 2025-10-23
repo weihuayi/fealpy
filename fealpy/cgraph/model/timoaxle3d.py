@@ -29,10 +29,6 @@ class Timoaxle3d(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("FSY", DataType.FLOAT, desc="Y 方向剪切修正因子(推荐值 10/9)",
-                 title="Y 方向剪切修正因子"),
-        PortConf("FSZ", DataType.FLOAT, desc="Z 方向剪切修正因子(推荐值 10/9)",
-                 title="Z 方向剪切修正因子"),
         PortConf("external_load", DataType.FUNCTION, desc="全局载荷向量的函数", title="外部载荷"),
         PortConf("dirichlet_dof_index", DataType.FUNCTION, desc="Dirichlet 自由度索引的函数", title="边界自由度索引")
         
@@ -44,5 +40,5 @@ class Timoaxle3d(CNodeType):
         model = TimobeamAxleData3D( beam_para, axle_para, kappa)
         return tuple(
             getattr(model, name)
-            for name in ["FSY", "FSZ", "external_load", "dirichlet_dof_index"]
+            for name in ["external_load", "dirichlet_dof_index"]
         )
