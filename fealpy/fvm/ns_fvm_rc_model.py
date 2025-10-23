@@ -175,7 +175,7 @@ class NSFVMRCModel(ComputationalModel):
 
 
     def solve_rhie_chow(self, max_iter: int = 1, tol: float = 1e-7) -> Tuple:
-        Sf = self.mesh.edge_normal()
+        # Sf = self.mesh.edge_normal()
         # Uf = bm.stack([bm.ones_like(Sf[:,0]), bm.zeros_like(Sf[:,0])], axis=1)
         self.uI = self.pde.velocity_u(self.mesh.entity_barycenter("edge"))
         self.vI = self.pde.velocity_v(self.mesh.entity_barycenter("edge"))
@@ -213,8 +213,8 @@ class NSFVMRCModel(ComputationalModel):
             self.logger.info(f"Iteration {i+1}, Residual: {res:.6e}")
             if res < tol:
                 break
-        self.uh, self.vh, self.ph = uh, vh, ph
-        return uh, vh, ph
+        self.uh, self.vh, self.ph, self.ph0 = uh, vh, ph, ph0
+        return self.uh, self.vh, self.ph
         
     
     def compute_error(self) -> Tuple:
@@ -246,6 +246,7 @@ class NSFVMRCModel(ComputationalModel):
                 (self.uh - self.uI, "Error u'"),
                 (self.vh - self.vI, "Error v'"),
                 (self.ph - self.pI, " Error p(RC)'"),
+                (self.ph0 - self.pI, " Error p(non-RC)"),
                 ]):
                 ax = fig.add_subplot(2, 3, i+1, projection='3d')
                 ax.plot_trisurf(x, y, data, cmap='viridis')

@@ -78,12 +78,8 @@ class NSFVMStaggeredModel(ComputationalModel):
         """Assemble the diffusion and convection matrix A on the u-mesh"""
         bform = BilinearForm(self.uspace).add_integrator(
             ScalarDiffusionIntegrator(q=2))
-        uedge_centers = self.umesh.entity_barycenter('edge')
-        vedge_centers = self.vmesh.entity_barycenter('edge')
-        dist = bm.sum((uedge_centers[:, None, :] - vedge_centers[None, :, :])**2, axis=2)
-        vedge2uedge = bm.argmin(dist, axis=1)
-        # print("vedge2uedge:", vedge2uedge)
-        vf = vf[vedge2uedge]
+        vedge2uedge = self.staggered_mesh.get_dof_mapping_vedge2uedge()
+        vf = vf[vedge2uedge.astype(int)]
         Uf = bm.stack([uf, vf], axis=1)
         bform.add_integrator(ConvectionIntegrator(q=2,coef=Uf))
         Au = bform.assembly()
@@ -92,21 +88,15 @@ class NSFVMStaggeredModel(ComputationalModel):
         udbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
                            threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
         Au, fu = udbc.DiffusionApply(Au, fu)
-        # fu = udbc.ConvectionApplyX(fu,self.pde.dirichlet_velocity)
         Au, fu = udbc.ThresholdApply(Au, fu)
         return Au, fu
 
     def assemble_v(self,uf,vf) -> Tuple[TensorLike, TensorLike]:
         """Assemble the diffusion and convection matrix B on the v-mesh"""
-
         bform = BilinearForm(self.vspace).add_integrator(
             ScalarDiffusionIntegrator(q=2))
-        uedge_centers = self.umesh.entity_barycenter('edge')
-        vedge_centers = self.vmesh.entity_barycenter('edge')
-        dist = bm.sum((uedge_centers[:, None, :] - vedge_centers[None, :, :])**2, axis=2)
-        uedge2vedge = bm.argmin(dist, axis=0)
-        # print("uedge2vedge:", uedge2vedge)
-        uf = uf[uedge2vedge]
+        uedge2vedge = self.staggered_mesh.get_dof_mapping_uedge2vedge()
+        uf = uf[uedge2vedge.astype(int)]
         Uf = bm.stack([uf, vf], axis=1)
         bform.add_integrator(ConvectionIntegrator(q=2,coef=Uf))
         Av = bform.assembly()
@@ -115,17 +105,12 @@ class NSFVMStaggeredModel(ComputationalModel):
         vdbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
                            threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
         Av, fv = vdbc.DiffusionApply(Av, fv)
-        # fv = vdbc.ConvectionApplyX(fv,self.pde.dirichlet_velocity)
         Av, fv = vdbc.ThresholdApply(Av, fv)
         return Av, fv
 
     def assemble_pressure_gradient_u(self) -> TensorLike:
         """Assemble the pressure gradient matrix M1 on the u-mesh"""
-        pedge_centers = self.pmesh.entity_barycenter('edge')
-        ucell_centers = self.umesh.entity_barycenter('cell')
-        dist1 = bm.sum((pedge_centers[:, None, :] - ucell_centers[None, :, :])**2, axis=2)
-        ucell2pedge = bm.argmin(dist1, axis=0)
-        # print("ucell2pedge:", ucell2pedge)
+        ucell2pedge = self.staggered_mesh.get_dof_mapping_ucell2pedge()
         pedge2cell = self.pmesh.edge_to_cell()
         upressurecell = pedge2cell[ucell2pedge, :2]
         M1 = COOTensor(
@@ -137,11 +122,7 @@ class NSFVMStaggeredModel(ComputationalModel):
     
     def assemble_pressure_gradient_v(self) -> TensorLike:
         """Assemble the pressure gradient matrix M2 on the v-mesh"""
-        vcell_centers = self.vmesh.entity_barycenter('cell')
-        pedge_centers = self.pmesh.entity_barycenter('edge')
-        dist2 = bm.sum((pedge_centers[:, None, :] - vcell_centers[None, :, :])**2, axis=2)
-        vcell2pedge = bm.argmin(dist2, axis=0)
-        # print("vcell2pedge:", vcell2pedge)
+        vcell2pedge = self.staggered_mesh.get_dof_mapping_vcell2pedge()
         pedge2cell = self.pmesh.edge_to_cell()
         vpressurecell = pedge2cell[vcell2pedge, :2]
         M2 = COOTensor(
@@ -153,11 +134,7 @@ class NSFVMStaggeredModel(ComputationalModel):
 
     def assemble_divergence_u(self) -> TensorLike:
         """Assemble the continuity equation matrix M3 (corresponding to u velocity) on the p-mesh"""
-        uedge_centers = self.umesh.entity_barycenter('edge')
-        pcell_centers = self.pmesh.entity_barycenter('cell')
-        dist3 = bm.sum((uedge_centers[:, None, :] - pcell_centers[None, :, :])**2, axis=2)
-        pcell2uedge = bm.argmin(dist3, axis=0)
-        # print("pcell2uedge:", pcell2uedge)
+        pcell2uedge = self.staggered_mesh.get_dof_mapping_pcell2uedge()
         uedge2cell = self.umesh.edge_to_cell()
         uvelocitycell = uedge2cell[pcell2uedge, :2]
         M3 = COOTensor(
@@ -169,11 +146,7 @@ class NSFVMStaggeredModel(ComputationalModel):
 
     def assemble_divergence_v(self) -> TensorLike:
         """Assemble the continuity equation matrix M4 (corresponding to v velocity) on the p-mesh"""
-        vedge_centers = self.vmesh.entity_barycenter('edge')
-        pcell_centers = self.pmesh.entity_barycenter('cell')
-        dist4 = bm.sum((vedge_centers[:, None, :] - pcell_centers[None, :, :])**2, axis=2)
-        pcell2vedge = bm.argmin(dist4, axis=0)
-        # print("pcell2vedge:", pcell2vedge)
+        pcell2vedge = self.staggered_mesh.get_dof_mapping_pcell2vedge()
         vedge2cell = self.vmesh.edge_to_cell()
         vvelocitycell = vedge2cell[pcell2vedge, :2]
         M4 = COOTensor(
@@ -216,8 +189,6 @@ class NSFVMStaggeredModel(ComputationalModel):
         UNE = self.umesh.number_of_edges()
         uf = bm.ones(UNE)
         vf = bm.ones(UNE)
-        # uf = self.pde.velocity_u(self.umesh.entity_barycenter("edge"))
-        # vf = self.pde.velocity_v(self.vmesh.entity_barycenter("edge"))
         ue2c = self.umesh.edge_to_cell()
         ve2c = self.vmesh.edge_to_cell()
         for i in range(max_iter):
@@ -242,13 +213,13 @@ class NSFVMStaggeredModel(ComputationalModel):
         self.vI = self.pde.velocity_v(self.vmesh.entity_barycenter("cell"))
         self.pI = self.pde.pressure(self.pmesh.entity_barycenter("cell"))
 
-        uerr = bm.sqrt(bm.sum(self.umesh.entity_measure("cell") * (self.uh - self.uI)**2))
-        verr = bm.sqrt(bm.sum(self.vmesh.entity_measure("cell") * (self.vh - self.vI)**2))
-        perr = bm.sqrt(bm.sum(self.pmesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        uerror = bm.sqrt(bm.sum(self.umesh.entity_measure("cell") * (self.uh - self.uI)**2))
+        verror = bm.sqrt(bm.sum(self.vmesh.entity_measure("cell") * (self.vh - self.vI)**2))
+        perror = bm.sqrt(bm.sum(self.pmesh.entity_measure("cell") * (self.ph - self.pI)**2))
         # uerr = bm.max(bm.abs(self.uh - self.uI))
         # verr = bm.max(bm.abs(self.vh - self.vI))
         # perr = bm.max(bm.abs(self.ph - self.pI))
-        return uerr, verr, perr
+        return uerror, verror, perror
 
     def plot(self) -> None:
         import matplotlib.pyplot as plt

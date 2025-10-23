@@ -95,7 +95,6 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         A, f = dbc.DiffusionApply(A, f)
         A, f = dbc.ThresholdApply(A, f)
         vap = A.diags().values
-        # print(A.to_dense())
         return spsolve(A, f,"mumps"), vap
 
     def correct_pressure_compute(self, f: TensorLike, a_p_edge: TensorLike) -> TensorLike:
@@ -148,8 +147,8 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         ue2c = self.umesh.edge_to_cell()
         ve2c = self.vmesh.edge_to_cell()
         for i in range(max_iter):
-            
-            p_u, p_v = self.staggered_mesh.interpolate_pressure_to_edges(p)
+
+            p_u, p_v = self.staggered_mesh.map_pressure_pcell_to_uvedge(p)
             uh, a_p_u = self.compute_temporary_velocity_u(p_u,Uf)
             vh, a_p_v = self.compute_temporary_velocity_v(p_v,Vf)
             uf1 = (uh[ue2c[:,0]] + uh[ue2c[:,1]])/2
@@ -158,7 +157,7 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
             Uf = bm.stack([uf1, vf_umesh], axis=1)
             uf_vmesh = uf1[uedge2vedge]
             Vf = bm.stack([uf_vmesh, vf1], axis=1)
-            edge_vel, a_p_edge = self.staggered_mesh.map_velocity_cell_to_edge(uh, vh, a_p_u, a_p_v)
+            edge_vel, a_p_edge = self.staggered_mesh.map_velocity_uvcell_to_pedge(uh, vh, a_p_u, a_p_v)
             self.div_rhs = self.div.StagReconstruct(edge_vel)
             p_corr = self.correct_pressure_compute(-self.div_rhs, a_p_edge)
             err = bm.sqrt(bm.sum(self.pcm * p_corr ** 2))
@@ -169,13 +168,6 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
                 break
             p += 0.8*p_corr  
         
-        # self.pI = self.pde.pressure(self.ppoints)
-        # self.pgrad_ph = GradientReconstruct(self.pmesh).AverageGradientreNeumann(p,self.pde.neumann_pressure)
-        # self.pgrad_pI1 = GradientReconstruct(self.pmesh).AverageGradientreNeumann(self.pI,self.pde.neumann_pressure)
-        # self.pgrad_pI2 = self.pde.grad_pressure(self.ppoints)
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_ph[:,0] - self.pgrad_pI1[:,0])**2)))
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_ph[:,0] - self.pgrad_pI2[:,0])**2)))
-        # print(bm.sqrt(bm.sum(self.pcm * (self.pgrad_pI1[:,0] - self.pgrad_pI2[:,0])**2)))
         self.uh, self.vh, self.ph = uh, vh, p
         self.p_correct = p_corr
         return uh, vh, p
@@ -184,16 +176,17 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         """
         Compute L2 errors for velocity and pressure.
         """
-        self.uI = self.pde.velocity_u(self.upoints)
-        self.vI = self.pde.velocity_v(self.vpoints)
-        self.pI = self.pde.pressure(self.ppoints)
-        ue = bm.sqrt(bm.sum(self.ucm * (self.uh - self.uI)**2))
-        ve = bm.sqrt(bm.sum(self.vcm * (self.vh - self.vI)**2))
-        pe0 = bm.sqrt(bm.sum(self.pcm * (self.ph - self.pI)**2))
-        # ue = bm.max(bm.abs(self.uh - self.uI))
-        # ve = bm.max(bm.abs(self.vh - self.vI))
-        # pe0 = bm.max(bm.abs(self.ph - self.pI))
-        return ue, ve, pe0
+        self.uI = self.pde.velocity_u(self.umesh.entity_barycenter("cell"))
+        self.vI = self.pde.velocity_v(self.vmesh.entity_barycenter("cell"))
+        self.pI = self.pde.pressure(self.pmesh.entity_barycenter("cell"))
+
+        uerror = bm.sqrt(bm.sum(self.umesh.entity_measure("cell") * (self.uh - self.uI)**2))
+        verror = bm.sqrt(bm.sum(self.vmesh.entity_measure("cell") * (self.vh - self.vI)**2))
+        perror = bm.sqrt(bm.sum(self.pmesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        # uerr = bm.max(bm.abs(self.uh - self.uI))
+        # verr = bm.max(bm.abs(self.vh - self.vI))
+        # perr = bm.max(bm.abs(self.ph - self.pI))
+        return uerror, verror, perror
 
     def plot(self) -> None:
         import matplotlib.pyplot as plt

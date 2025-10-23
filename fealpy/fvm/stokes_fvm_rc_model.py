@@ -182,7 +182,6 @@ class StokesFVMRCModel(ComputationalModel):
         ABC = BlockForm([[AB, M4], [M3, None]]).assembly_sparse_matrix(format='csr')
         S = BlockForm([[ABC, A1.T], [A1, None]]).assembly_sparse_matrix(format='csr')
         b0 = bm.array([self.pde.pressure_integral_target()])
-        # b0 = bm.array([0.0])
         b = bm.concatenate([f,bm.zeros(self.NC),b0], axis=0)
         
         sol = spsolve(S, b, "mumps")
@@ -212,7 +211,7 @@ class StokesFVMRCModel(ComputationalModel):
         vh = sol[self.NC:2*self.NC]
         ph = sol[2*self.NC:-1]
         self.uh, self.vh, self.ph = uh, vh, ph
-        return uh, vh, ph
+        return self.uh, self.vh, self.ph
 
     
     def compute_error(self) -> Tuple:
@@ -224,10 +223,13 @@ class StokesFVMRCModel(ComputationalModel):
         self.vI = self.pde.velocity_v(self.mesh.entity_barycenter("cell"))
         self.pI = self.pde.pressure(self.mesh.entity_barycenter("cell"))
 
-        uerr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.uh - self.uI)**2))
-        verr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.vh - self.vI)**2))
-        perr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph - self.pI)**2))
-        return uerr, verr, perr
+        uerror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.uh - self.uI)**2))
+        verror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.vh - self.vI)**2))
+        perror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        # uerror = bm.max(bm.abs(self.uh - self.uI))
+        # verror = bm.max(bm.abs(self.vh - self.vI))
+        # perror = bm.max(bm.abs(self.ph - self.pI))
+        return uerror, verror, perror
     
 
     def plot(self) -> None:
@@ -239,10 +241,10 @@ class StokesFVMRCModel(ComputationalModel):
         x, y = ppoints[:, 0], ppoints[:, 1]
         fig = plt.figure(figsize=(12, 8))
         for i, (data, title) in enumerate([
-                (self.uh - self.uI, "Error u'"),
-                (self.vh - self.vI, "Error v'"),
-                (self.ph - self.pI, " Error p(RC)'"),
-                (self.ph0 - self.pI, " Error p(non-RC)'"),
+                (self.uh - self.uI, "Error u"),
+                (self.vh - self.vI, "Error v"),
+                (self.ph - self.pI, " Error p(RC)"),
+                (self.ph0 - self.pI, " Error p(non-RC)"),
                 ]):
                 ax = fig.add_subplot(2, 3, i+1, projection='3d')
                 ax.plot_trisurf(x, y, data, cmap='viridis')

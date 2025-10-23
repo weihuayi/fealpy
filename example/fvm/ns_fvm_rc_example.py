@@ -30,11 +30,10 @@ def main():
     print(model)
 
     model.solve_rhie_chow()
-    uerr, verr, perr = model.compute_error()
-    
-    print(f"L2 error (u) = {uerr}")
-    print(f"L2 error (v) = {verr}")
-    print(f"L2 error (p) = {perr}")
+    uerror, verror, perror = model.compute_error()
+    print(f"L2 error (u) = {uerror}")
+    print(f"L2 error (v) = {verror}")
+    print(f"L2 error (p) = {perror}")
     model.plot()
     if options["plot"]:
         model.plot()
