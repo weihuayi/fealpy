@@ -17,6 +17,8 @@ class VPDecoupling(CNodeType):
     """
     TITLE: str = "速度-压力解耦"
     PATH: str = "后处理.解耦"
+    DESC: str = """该节点用于将包含速度和压力分量的联合输出向量进行解耦，提取速度场及其各分量与压力场，
+                便于后续的流体力学结果分析与可视化处理。"""
     INPUT_SLOTS = [
         PortConf("out", DataType.TENSOR, title="结果"),
         PortConf("uspace", DataType.SPACE, title="速度函数空间"),

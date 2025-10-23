@@ -65,6 +65,8 @@ class DLDMicrofluidicChipMesh2d(CNodeType):
     """
     TITLE: str = "二维 DLD 微流芯片网格"
     PATH: str = "网格.构造"
+    DESC: str = """该节点生成二维DLD微流控芯片的结构化网格, 依据几何与周期参数自动构建微柱
+                阵列及流道边界，为微流体数值模拟提供几何与网格基础。"""
     INPUT_SLOTS = [
         PortConf("init_point_x", DataType.FLOAT, 1, default=0.0, title="初始点 X"),
         PortConf("init_point_y", DataType.FLOAT, 1, default=0.0, title="初始点 Y"),

@@ -12,7 +12,7 @@ dbc_p = cgraph.create("ProjectDBC")
 simulation = cgraph.create("IncompressibleNSIPCS")
 timeline = cgraph.create("CFDTimeline")
 IncompressibleNSRun = cgraph.create("IncompressibleNSIPCSRun")
-show = cgraph.create("OutputVideo")
+# show = cgraph.create("OutputVideo")
 
 pde(
     mu = 0.001,
@@ -65,25 +65,25 @@ IncompressibleNSRun(
     correct_velocity = simulation().correct_velocity,
     mesh = pde().mesh
 )
-show(
-    T0 = timeline().T0,
-    T1 = timeline().T1,
-    NL = timeline().NL,
-    domain = pde().domain,
-    mesh = pde().mesh,  
-    out = IncompressibleNSRun().uh_x,
-    dpi = 300,
-    bitrate = 3000,
-    figsize_x = 6.0,
-    figsize_y = 3.0,
-    cmap = 'cividis',
-    clim_vmin = 0.0,
-    clim_vmax = 1.8,
-    # filename = "Cylinder_04",
-    title = "velocity_x"
-)
+# show(
+#     T0 = timeline().T0,
+#     T1 = timeline().T1,
+#     NL = timeline().NL,
+#     domain = pde().domain,
+#     mesh = pde().mesh,  
+#     out = IncompressibleNSRun().uh_x,
+#     dpi = 300,
+#     bitrate = 3000,
+#     figsize_x = 6.0,
+#     figsize_y = 3.0,
+#     cmap = 'cividis',
+#     clim_vmin = 0.0,
+#     clim_vmax = 1.8,
+#     # filename = "Cylinder_04",
+#     title = "velocity_x"
+# )
 
-WORLD_GRAPH.output(out = show().out)
+WORLD_GRAPH.output(uh_x = IncompressibleNSRun().uh_x)
 WORLD_GRAPH.error_listeners.append(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())
