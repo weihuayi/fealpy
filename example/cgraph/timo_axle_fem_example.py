@@ -10,6 +10,7 @@ axle_materialer = cgraph.create("AxleMaterial")
 spacer = cgraph.create("FunctionSpace")
 timoaxle_model = cgraph.create("Timoaxle")
 solver = cgraph.create("DirectSolver")
+postprocess = cgraph.create("UDecoupling")
 
 # 连接节点
 node = bm.array([[0.0, 0.0, 0.0], [70.5, 0.0, 0.0], [141.0, 0.0, 0.0], [155.0, 0.0, 0.0],
@@ -57,8 +58,10 @@ timoaxle_model(
 solver(A = timoaxle_model().K,
        b = timoaxle_model().F)
 
+postprocess(out = solver().out)
+
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher(), uh=solver().out)
+WORLD_GRAPH.output(mesh=mesher(), u=solver().out, uh=postprocess().uh, theta_xyz=postprocess().theta_xyz)
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

@@ -4,40 +4,39 @@ __all__ = ["Timoaxle"]
 
 
 class Timoaxle(CNodeType):
-    r"""Train Wheel-Axle Finite Element Model Node.
+    r"""Assemble the global stiffness matrix and load vector for the train axle finite element model.
+    
     Inputs:
-        space (SPACE): Scalar function space, e.g., Lagrange function space.
-        beam_material (FUNCTION): Timoshenko beam material object.
-        axle_material (FUNCTION): Axle material object.
-        external_load (TENSON): Returns the global load vector.
-        dirichlet_idx (TENSON): Returns Dirichlet degrees of freedom indices.
-
-    Attributes:
-        boundary_type (MENU): Type of boundary condition.
-            Options:
-                - fixed_left: Fixed at left end
-                - simply_supported: Simply supported
-                - custom: Custom constraints (requires extension in code)
-        load_type (MENU): Type of applied load.
-            Options:
-                - axial_force: Axial force
-                - bending_moment: Bending moment
-                - distributed_load: Distributed load
-        load_value (FLOAT): Magnitude of the applied load (unit depends on load type)
-        submesh_index (TENSOR): Element indices handled by this integrator.
-        coord_transform (TENSOR): Local-to-global coordinate transformation matrix.
-        penalty (FLOAT): Penalty factor for Dirichlet boundary condition enforcement (default: 1e20).
-
+        space (Space): Scalar function space.
+        beam_E (float): Elastic modulus of the beam component.
+        beam_mu (float): Shear modulus of the beam component.
+        Ax (float): Cross-sectional area in the X direction.
+        Ay (float): Cross-sectional area in the Y direction.
+        Az (float): Cross-sectional area in the Z direction.
+        J (float): Polar moment of inertia of the beam cross-section.
+        Iy (float): Second moment of inertia about the Y axis.
+        Iz (float): Second moment of inertia about the Z axis.
+        axle_E (float): Elastic modulus of the axle (shaft) component.
+        axle_mu (float): Shear modulus of the axle (shaft) component.
+        cindex (int): Total number of elements in the beam–axle model.
+        external_load (function): Function that returns the global load vector.
+        dirichlet_idx (function): Function that returns the Dirichlet boundary degree-of-freedom indices.
+        penalty (float, optional): Penalty coefficient used for enforcing Dirichlet boundary conditions.
+        boundary_type (str, optional): Type of boundary constraint to apply.
+        load_type (str, optional): Type of external load to apply.
+        
     Outputs:
-        K (TENSOR): Global stiffness matrix including boundary condition treatment.
-        F (TENSOR): Global load vector including boundary condition effects.
+        boundary_type (str): Applied boundary constraint type.
+        load_type (str): Applied load type.
+        K (tensor): Global stiffness matrix after applying boundary constraints.
+        F (tensor): Global load vector after applying the selected load type and boundary conditions.
     
     """
     TITLE: str = "列车轮轴有限元模型"
     PATH: str = "有限元.方程离散"
     DESC: str = "组装轮轴系统的刚度矩阵和载荷"
     INPUT_SLOTS = [
-        PortConf("space", DataType.SPACE, 1, desc="标量函数空间", title="拉格朗日函数空间"),
+        PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),
         PortConf("beam_E", DataType.FLOAT, 1, desc="弹性模量",  title="梁的材料属性"),
         PortConf("beam_mu", DataType.FLOAT, 1, desc="剪切模量",  title="梁的材料属性"),
         PortConf("Ax", DataType.FLOAT, 1, desc="X 轴横截面积",  title="横截面积"),
