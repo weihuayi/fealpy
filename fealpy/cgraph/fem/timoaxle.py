@@ -37,18 +37,18 @@ class Timoaxle(CNodeType):
     DESC: str = "组装轮轴系统的刚度矩阵和载荷"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),
-        PortConf("beam_E", DataType.FLOAT, 1, desc="弹性模量",  title="梁的材料属性"),
-        PortConf("beam_mu", DataType.FLOAT, 1, desc="剪切模量",  title="梁的材料属性"),
-        PortConf("Ax", DataType.FLOAT, 1, desc="X 轴横截面积",  title="横截面积"),
-        PortConf("Ay", DataType.FLOAT, 1, desc="Y 轴的横截面积",  title="横截面积"),
-        PortConf("Az", DataType.FLOAT, 1, desc="Z 轴的横截面积",  title="横截面积"),
-        PortConf("J", DataType.FLOAT, 1, desc="X 轴的惯性矩",  title="极性矩"),
-        PortConf("Iy", DataType.FLOAT, 1, desc="Y 轴的惯性矩",  title="惯性矩"),
-        PortConf("Iz", DataType.FLOAT, 1, desc="Z 轴的惯性矩",  title="惯性矩"),
-        PortConf("axle_E", DataType.FLOAT, 1, desc="弹性模量",  title="杆的材料属性"),
-        PortConf("axle_mu", DataType.FLOAT, 1, desc="剪切模量",  title="杆的材料属性"),
+        PortConf("beam_E", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的材料属性"),
+        PortConf("beam_mu", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的材料属性"),
+        PortConf("Ax", DataType.FLOAT, 1, desc="横截面积",  title="X 方向的横截面积"),
+        PortConf("Ay", DataType.FLOAT, 1, desc="横截面积",  title="Y 方向的横截面积"),
+        PortConf("Az", DataType.FLOAT, 1, desc="横截面积",  title="Z 方向的横截面积"),
+        PortConf("J", DataType.FLOAT, 1, desc="极性矩",  title="极性矩"),
+        PortConf("Iy", DataType.FLOAT, 1, desc="惯性矩",  title="Y 方向的惯性矩"),
+        PortConf("Iz", DataType.FLOAT, 1, desc="惯性矩",  title="Z 方向的惯性矩"),
+        PortConf("axle_E", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的弹性模量"),
+        PortConf("axle_mu", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的剪切模量"),
         
-        PortConf("cindex", DataType.INT, 0, desc="轮轴模型的单元单元总数", title="单元总数"),
+        PortConf("cindex", DataType.INT, 0, desc="轮轴模型的单元单元总数", title="单元总数", default=32),
         PortConf("external_load", DataType.FUNCTION, 1, desc="返回全局载荷向量", title="外部载荷"),
         PortConf("dirichlet_idx", DataType.FUNCTION, 1, desc="返回 Dirichlet 自由度索引", title="边界自由度索引"),
         
@@ -59,8 +59,6 @@ class Timoaxle(CNodeType):
                  items=["force", "bending", "distributed_load"])
     ]
     OUTPUT_SLOTS = [
-         PortConf("boundary_type", DataType.MENU, desc="约束条件类型",title="边界条件类型"),
-        PortConf("load_type", DataType.MENU, desc="载荷类型",title="载荷类型"),
         PortConf("K", DataType.TENSOR, desc="含边界条件处理后的刚度矩阵", title="全局刚度矩阵",),
         PortConf("F", DataType.TENSOR, desc="含边界条件作用的全局载荷向量",  title="全局载荷向量"),
     ]
@@ -139,4 +137,4 @@ class Timoaxle(CNodeType):
         values = K[rows, cols]
         K = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
         
-        return boundary_type, load_type, K, F
+        return K, F
