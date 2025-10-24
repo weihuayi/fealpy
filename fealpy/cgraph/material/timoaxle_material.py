@@ -25,8 +25,8 @@ class TimoMaterial(CNodeType):
             Iy (float): Moment of inertia about the Y axis.
             Iz (float): Moment of inertia about the Z axis.
     """
-    TITLE: str = "列车轮轴材料"
-    PATH: str = "模型.材料"
+    TITLE: str = "列车轮轴梁材料属性"
+    PATH: str = "材料.固体"
     DESC: str = "定义列车轮轴系统的梁材料属性"
     INPUT_SLOTS = [
         PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
@@ -37,16 +37,14 @@ class TimoMaterial(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("property", DataType.STRING, desc="材料名称（如钢、铝等）", title="材料材质"),
-        PortConf("beam_type", DataType.MENU, desc="梁模型类型", title="材料类型"),
-        PortConf("E", DataType.FLOAT, desc="弹性模量",  title="梁的材料属性"),
-        PortConf("mu", DataType.FLOAT, desc="剪切模量",  title="梁的材料属性"),
-        PortConf("Ax", DataType.FLOAT, desc="X 方向横截面积",  title="横截面积"),
-        PortConf("Ay", DataType.FLOAT, desc="Y 方向横截面积",  title="横截面积"),
-        PortConf("Az", DataType.FLOAT, desc="Z 方向横截面积",  title="横截面积"),
-        PortConf("J", DataType.FLOAT, desc="X 轴极惯性矩（扭转惯性矩）",  title="极性矩"),
-        PortConf("Iy", DataType.FLOAT, desc="Y 轴惯性矩",  title="惯性矩"),
-        PortConf("Iz", DataType.FLOAT, desc="Z 轴惯性矩",  title="惯性矩")
+        PortConf("E", DataType.FLOAT, title="梁的弹性模量 E"),
+        PortConf("mu", DataType.FLOAT, title="梁的剪切模量 mu"),
+        PortConf("Ax", DataType.TENSOR, title="X 方向横截面积"),
+        PortConf("Ay", DataType.TENSOR, title="Y 方向横截面积"),
+        PortConf("Az", DataType.TENSOR, title="Z 方向横截面积"),
+        PortConf("J", DataType.TENSOR,  title="X 轴极惯性矩（扭转惯性矩）"),
+        PortConf("Iy", DataType.TENSOR, title="Y 轴惯性矩"),
+        PortConf("Iz", DataType.TENSOR, title="Z 轴惯性矩")
     ]
     
     @staticmethod
@@ -59,7 +57,7 @@ class TimoMaterial(CNodeType):
                                         elastic_modulus=beam_E,
                                         poisson_ratio=beam_nu)
         
-        return (property, beam_type) + tuple(
+        return tuple(
             getattr(beam_material, name)
             for name in ["E", "mu", "Ax", "Ay", "Az", "J", "Iy", "Iz"]
         )
@@ -81,21 +79,19 @@ class AxleMaterial(CNodeType):
             mu (float): Shear modulus, computed as `E / [2(1 + nu)]`.
     
     """
-    TITLE: str = "列车轮轴材料"
-    PATH: str = "模型.材料"
+    TITLE: str = "列车轮轴杆件材料属性"
+    PATH: str = "材料.固体"
     DESC: str = "定义列车轮轴系统中杆件的材料属性"
     INPUT_SLOTS = [
         PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
         PortConf("axle_type", DataType.MENU, 0, desc="轮轴材料类型选择", title="轮轴材料类型", items=["Bar", "other"]),
-        PortConf("axle_E", DataType.FLOAT, 0, desc="杆的弹性模量", title="弹性模量", default=1.976e6),
-        PortConf("axle_nu", DataType.FLOAT, 0, desc="杆的泊松比", title="泊松比", param="axle_nu", default=-0.5)
+        PortConf("axle_E", DataType.FLOAT, 0, desc="弹性模量", title="杆的弹性模量", default=1.976e6),
+        PortConf("axle_nu", DataType.FLOAT, 0, desc="泊松比", title="杆的泊松比", default=-0.5)
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("property", DataType.STRING, desc="材料名称（如钢、铝等）", title="材料材质"),
-        PortConf("axle_type", DataType.MENU, desc="轮轴材料类型", title="轮轴材料类型"),
-        PortConf("E", DataType.FLOAT, desc="弹性模量",  title="杆的材料属性"),
-        PortConf("mu", DataType.FLOAT, desc="剪切模量",  title="杆的材料属性")
+        PortConf("E", DataType.FLOAT, title="杆的弹性模量"),
+        PortConf("mu", DataType.FLOAT, title="杆的剪切模量")
     ]
         
     @staticmethod
@@ -107,5 +103,5 @@ class AxleMaterial(CNodeType):
                                 name="axle",
                                 elastic_modulus=axle_E,
                                 poisson_ratio=axle_nu)
-        return (property, axle_type) + tuple(
+        return tuple(
             getattr(axle_material, name) for name in ["E", "mu"])

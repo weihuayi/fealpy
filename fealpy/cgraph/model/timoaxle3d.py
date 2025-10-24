@@ -10,6 +10,7 @@ class Timoaxle3d(CNodeType):
      Inputs:
         beam_para (TENSOR): Beam section parameters, each row represents [Diameter, Length, Count].
         axle_para (TENSOR): Axle section parameters, each row represents [Diameter, Length, Count].
+        section_shapes (MENU): Beam cross-section shape configuration parameter.
         shear_factors (FLOAT): Shear correction factor. Default 10/9.
 
     Outputs:
@@ -24,25 +25,23 @@ class Timoaxle3d(CNodeType):
     INPUT_SLOTS = [
         PortConf("beam_para", DataType.TENSOR, 0, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
         PortConf("axle_para", DataType.TENSOR, 0, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),
+        PortConf("section_shapes", DataType.MENU, 0, desc="梁的截面形状", title="梁截面形状", default="circular", 
+                 items=["circular", "rectangular", "I-shaped", "H-shaped"]),
         PortConf("shear_factors",DataType.FLOAT, 0, desc="梁剪切变形计算中的修因子，圆截面推荐值为 10/9",
                  title="剪切修正因子", param="kappa", default=10/9, min_val=0.0)    
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("FSY", DataType.FLOAT, desc="Y 方向剪切修正因子(推荐值 10/9)",
-                 title="Y 方向剪切修正因子"),
-        PortConf("FSZ", DataType.FLOAT, desc="Z 方向剪切修正因子(推荐值 10/9)",
-                 title="Z 方向剪切修正因子"),
         PortConf("external_load", DataType.FUNCTION, desc="全局载荷向量的函数", title="外部载荷"),
         PortConf("dirichlet_dof_index", DataType.FUNCTION, desc="Dirichlet 自由度索引的函数", title="边界自由度索引")
         
     ]
 
     @staticmethod
-    def run(beam_para=None, axle_para=None, kappa=10/9):
+    def run(beam_para=None, axle_para=None, section_shapes="circular", kappa=10/9):
         from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         model = TimobeamAxleData3D( beam_para, axle_para, kappa)
         return tuple(
             getattr(model, name)
-            for name in ["FSY", "FSZ", "external_load", "dirichlet_dof_index"]
+            for name in ["external_load", "dirichlet_dof_index"]
         )
