@@ -37,8 +37,8 @@ class Timoaxle(CNodeType):
     DESC: str = "组装轮轴系统的刚度矩阵和载荷"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),
-        PortConf("beam_E", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的材料属性"),
-        PortConf("beam_mu", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的材料属性"),
+        PortConf("beam_E", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的弹性模量"),
+        PortConf("beam_mu", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的剪切模量"),
         PortConf("Ax", DataType.TENSOR, 1, desc="横截面积",  title="X 方向的横截面积"),
         PortConf("Ay", DataType.TENSOR, 1, desc="横截面积",  title="Y 方向的横截面积"),
         PortConf("Az", DataType.TENSOR, 1, desc="横截面积",  title="Z 方向的横截面积"),
