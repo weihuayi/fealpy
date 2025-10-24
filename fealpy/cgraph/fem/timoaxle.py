@@ -37,8 +37,8 @@ class Timoaxle(CNodeType):
     DESC: str = "组装轮轴系统的刚度矩阵和载荷"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),
-        PortConf("beam_E", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的材料属性"),
-        PortConf("beam_mu", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的材料属性"),
+        PortConf("beam_E", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的弹性模量"),
+        PortConf("beam_mu", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的弹性模量"),
         PortConf("Ax", DataType.TENSOR, 1, desc="横截面积",  title="X 方向的横截面积"),
         PortConf("Ay", DataType.TENSOR, 1, desc="横截面积",  title="Y 方向的横截面积"),
         PortConf("Az", DataType.TENSOR, 1, desc="横截面积",  title="Z 方向的横截面积"),
@@ -46,7 +46,7 @@ class Timoaxle(CNodeType):
         PortConf("Iy", DataType.TENSOR, 1, desc="惯性矩",  title="Y 方向的惯性矩"),
         PortConf("Iz", DataType.TENSOR, 1, desc="惯性矩",  title="Z 方向的惯性矩"),
         PortConf("axle_E", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的弹性模量"),
-        PortConf("axle_mu", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的剪切模量"),
+        PortConf("axle_mu", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的弹性模量"),
         
         PortConf("cindex", DataType.INT, 0, desc="轮轴模型的单元单元总数", title="单元总数", default=32),
         PortConf("external_load", DataType.FUNCTION, 1, desc="返回全局载荷向量", title="外部载荷"),

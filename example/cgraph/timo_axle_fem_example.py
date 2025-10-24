@@ -8,6 +8,7 @@ mesher = cgraph.create("CreateMesh")
 beam_materialer = cgraph.create("TimoMaterial")
 axle_materialer = cgraph.create("AxleMaterial")
 spacer = cgraph.create("FunctionSpace")
+#spacer = cgraph.create("TensorFunctionSpace")
 timoaxle_model = cgraph.create("Timoaxle")
 solver = cgraph.create("DirectSolver")
 postprocess = cgraph.create("UDecoupling")
@@ -31,7 +32,8 @@ cell = bm.array([[0, 1], [1, 2], [2, 3], [3, 4], [4, 5],
         [14, 28], [15, 29],[16, 30], [17, 31], [18,32]], dtype=bm.int32)
 
 mesher(node = node, cell = cell)
-spacer(mesh=mesher(), p=1)
+spacer(type="lagrange", mesh=mesher(), p=1)
+#spacer(type="lagrange", mesh=mesher(), p=1, gd=6)
 beam_materialer(property="Steel", beam_type="Timoshemko beam", beam_E=2.1e11, beam_nu=0.3)
 axle_materialer(property="Steel", axle_type="Bar", axle_E=1.976e6, axle_nu=-0.5)
 
