@@ -39,12 +39,12 @@ class TimoMaterial(CNodeType):
     OUTPUT_SLOTS = [
         PortConf("E", DataType.FLOAT, title="梁的弹性模量 E"),
         PortConf("mu", DataType.FLOAT, title="梁的剪切模量 mu"),
-        PortConf("Ax", DataType.FLOAT, title="X 方向横截面积"),
-        PortConf("Ay", DataType.FLOAT, title="Y 方向横截面积"),
-        PortConf("Az", DataType.FLOAT, title="Z 方向横截面积"),
-        PortConf("J", DataType.FLOAT,  title="X 轴极惯性矩（扭转惯性矩）"),
-        PortConf("Iy", DataType.FLOAT, title="Y 轴惯性矩"),
-        PortConf("Iz", DataType.FLOAT, title="Z 轴惯性矩")
+        PortConf("Ax", DataType.TENSOR, title="X 方向横截面积"),
+        PortConf("Ay", DataType.TENSOR, title="Y 方向横截面积"),
+        PortConf("Az", DataType.TENSOR, title="Z 方向横截面积"),
+        PortConf("J", DataType.TENSOR,  title="X 轴极惯性矩（扭转惯性矩）"),
+        PortConf("Iy", DataType.TENSOR, title="Y 轴惯性矩"),
+        PortConf("Iz", DataType.TENSOR, title="Z 轴惯性矩")
     ]
     
     @staticmethod
