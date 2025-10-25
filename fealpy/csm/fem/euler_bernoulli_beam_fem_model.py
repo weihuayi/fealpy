@@ -1,6 +1,7 @@
 
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
+from fealpy.decorator import variantmethod
 
 from fealpy.mesh import Mesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
@@ -12,6 +13,7 @@ from fealpy.fem import DirichletBC
 from fealpy.solver import spsolve
 
 from ..model import CSMModelManager
+from ..material import EulerBernoulliBeamMaterial
 
 from . import EulerBernoulliBeamSourceIntegrator
 from . import EulerBernoulliBeamDiffusionIntegrator
@@ -79,15 +81,10 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
         self.set_pde(options['pde'])
         self.beam_type = options['beam_type']
         self.E = options['modulus']
-        self.A = options['area']
         self.I = options['inertia']
-        self.f = options['load']
-        self.l = options['length']
         mesh = self.pde.init_mesh()
         self.set_mesh(mesh)
-    
-    def set_mesh(self, mesh: Mesh) -> None:
-        self.mesh = mesh
+        self.set_material()
         
     def set_pde(self, pde=1) -> None:
         '''
@@ -104,7 +101,18 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
         else:
             self.pde = pde
         self.logger.info(self.pde)
-
+        
+    def set_material(self) -> None:
+        self.material = EulerBernoulliBeamMaterial(
+            model=self.pde,
+            name='euler_bernoulli_beam_material',
+            elastic_modulus=self.E,
+            poisson_ratio=0.3,
+            I=self.I
+        )
+    
+    def set_mesh(self, mesh: Mesh) -> None:
+        self.mesh = mesh
 
     def run(self):
         '''
@@ -124,15 +132,12 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
             F (ndarray): Load vector.
         '''
         mesh = self.mesh
-        E = self.E
-        A = self.A
-        I = self.I
-        f = self.f
+        f = self.material.f
         l = mesh.cell_length()
         scalar_space = LagrangeFESpace(mesh, 1)
         tensor_space = TensorFunctionSpace(scalar_space=scalar_space, shape=(-1, 2))
         bform = BilinearForm(tensor_space)
-        beamintegrator = EulerBernoulliBeamDiffusionIntegrator(tensor_space, self.beam_type, E, A=A, I=I, l=l)
+        beamintegrator = EulerBernoulliBeamDiffusionIntegrator(tensor_space, self.beam_type, material=self.material)
         bform.add_integrator(beamintegrator)
         K = bform.assembly()
         lform = LinearForm(tensor_space)
@@ -176,6 +181,29 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
         K,F= bc.apply(K, F)
         uh = spsolve(K, F, 'scipy')
         return uh
-    
+
+    @variantmethod("displacement")
+    def show(self, x):
         
+        mesh = self.mesh
+        uh = x[::2]
+        theta = x[1::2]
+        mesh.nodedata['displacement']=uh
+        save_path = "../beam_result"
+        mesh.to_vtk(f"{save_path}/beam.vtu")
         
+    @show.register("strain")
+    def show(self,strain_top, strain_bottom):
+        mesh = self.mesh
+        mesh.nodedata['strain_top']=strain_top
+        mesh.nodedata['strain_bottom']=strain_bottom
+        save_path = "../beam_result"
+        mesh.to_vtk(f"{save_path}/beam_strain.vtu")
+        
+    @show.register("stress")
+    def show(self, stress_top, stress_bottom):
+        mesh = self.mesh
+        mesh.nodedata['stress_top'] = stress_top
+        mesh.nodedata['stress_bottom'] = stress_bottom
+        save_path = "../beam_result"
+        mesh.to_vtk(f"{save_path}/beam_stress.vtu")

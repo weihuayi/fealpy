@@ -72,7 +72,7 @@ class EulerBernoulliBeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
     """
     def __init__(self, 
                  space, beam_type, 
-                 E, l, A=None, I=None, Iy=None, Iz=None, G=None, J=None,
+                 material,
                  method: Optional[str]=None) -> None:
         """
         Parameters
@@ -88,25 +88,30 @@ class EulerBernoulliBeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         """
         self.space = space
         self.type = beam_type.lower()
-        self.E, self.l = E, l
-        self.I = I
-        self.A = A
+        self.E = material.E
+        self.I = material.I
+        self.A = material.A
+        self.Iy = material.Iy
+        self.Iz = material.Iz
+        self.G = material.G
+        self.J = material.J
+        self.l = space.mesh.cell_length()
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)
 
         if self.type == 'euler_bernoulli_2d':
-            assert I is not None
-            self.EIz = E * I
+            assert self.I is not None
+            self.EIz = self.E * self.I
         elif self.type == 'normal_2d':
-            assert A is not None and I is not None
-            self.EA = E * A
-            self.EI = E * I
+            assert self.A is not None and self.I is not None
+            self.EA = self.E * self.A
+            self.EI = self.E * self.I
         elif self.type == 'euler_bernoulli_3d':
-            assert all(v is not None for v in [A, Iy, Iz, G, J])
-            self.EA = E * A
-            self.EIy = E * Iy
-            self.EIz = E * Iz
-            self.GJ = G * J
+            assert all(v is not None for v in [self.A, self.Iy, self.Iz, self.G, self.J])
+            self.EA = self.E * self.A
+            self.EIy = self.E * self.Iy
+            self.EIz = self.E * self.Iz
+            self.GJ = self.G * self.J
         else:
             raise ValueError(f"未知梁类型: {self.type}")
         
