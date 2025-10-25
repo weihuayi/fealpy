@@ -52,8 +52,9 @@ class Exp0003(CurlCurlSpherePML):
         super(Exp0003, self).__init__(r0, r1, self.omega, mu, epsilon, s, p)
 
     @cartesian
-    def source(self, p) :
-        return 0
+    def source(self, p):
+        shape = p.shape[:-1]
+        return bm.zeros((*shape, 3), dtype=bm.complex128)
 
     @cartesian
     def dirichlet(self, p, n):

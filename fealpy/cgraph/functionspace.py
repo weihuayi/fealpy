@@ -11,7 +11,8 @@ __all__ = [
 
 SPACE_CLASSES = {
     "bernstein": ("bernstein_fe_space", "BernsteinFESpace"),
-    "lagrange": ("lagrange_fe_space", "LagrangeFESpace")
+    "lagrange": ("lagrange_fe_space", "LagrangeFESpace"),
+    "first_nedelec": ("first_nedelec_fe_space", "FirstNedelecFESpace")
 }
 
 
@@ -27,7 +28,7 @@ class FunctionSpace(CNodeType):
     TITLE: str = "标量函数空间"
     PATH: str = "函数空间.构造"
     INPUT_SLOTS = [
-        PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein"]),
+        PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein", "first_nedelec"]),
         PortConf("mesh", DataType.MESH, 1, title="网格"),
         PortConf("p", DataType.INT, 1, title="次数", default=1, min_val=1, max_val=10)
     ]
@@ -45,7 +46,7 @@ class TensorFunctionSpace(CNodeType):
     TITLE: str = "张量函数空间"
     PATH: str = "函数空间.构造"
     INPUT_SLOTS = [
-        PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein"]),
+        PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein", "first_nedelec"]),
         PortConf("mesh", DataType.MESH, 1, title="网格"),
         PortConf("p", DataType.INT, 1, title="次数", default=1, min_val=1, max_val=10),
         PortConf("gd", DataType.INT, 1, title="自由度长度", param="GD", default=2)
