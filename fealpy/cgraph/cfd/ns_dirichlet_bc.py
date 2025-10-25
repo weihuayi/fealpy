@@ -25,6 +25,8 @@ class StationaryNSDBC(CNodeType):
     """
     TITLE: str = "稳态 NS 方程边界处理"
     PATH: str = "流体.边界处理"
+    DESC: str = """该节点用于稳态 Navier-Stokes 方程的边界条件处理，构建统一的 Dirichlet 边界约束应用函数，
+                    实现速度与压力场的边界识别与施加，供后续求解节点调用。"""
     INPUT_SLOTS = [
         PortConf("uspace", DataType.SPACE, title="速度函数空间"),
         PortConf("pspace", DataType.SPACE, title="压力函数空间"),
@@ -71,6 +73,8 @@ class IterativeDBC(CNodeType):
     """
     TITLE: str = "非稳态 NS 方程迭代法边界处理"
     PATH: str = "流体.边界处理"
+    DESC: str = """该节点用于非稳态不可压 Navier-Stokes 方程迭代算法的边界处理，动态生成时间相关的 Dirichlet 边界约束函数，
+                对速度与压力场施加相应边界条件，确保每步迭代物理一致性。"""
     INPUT_SLOTS = [
         PortConf("uspace", DataType.SPACE, title="速度函数空间"),
         PortConf("pspace", DataType.SPACE, title="压力函数空间"),
@@ -125,6 +129,8 @@ class ProjectDBC(CNodeType):
     """
     TITLE: str = "非稳态 NS 方程投影法边界处理"
     PATH: str = "流体.边界处理"
+    DESC: str = """该节点用于非稳态 Navier-Stokes 方程投影法的边界条件处理，生成时间相关的 Dirichlet 约束应用函数，
+                对速度场在指定边界上施加边界条件，保证时间步推进过程的物理正确性。"""
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, title="函数空间"),
         PortConf("dirichlet", DataType.FUNCTION, title="边界条件"),

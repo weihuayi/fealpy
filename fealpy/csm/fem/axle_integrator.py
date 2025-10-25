@@ -83,6 +83,28 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         R = bm.concatenate([row1, row2, row3, row4], axis=1)  #shape: (NC, 12, 12)
         return R
     
+    @enable_cache
+    def fetch(self, space: _FS):
+        """Retrieve material and geometric parameters for the 3D Timoshenko beam.
+        
+        Parameters:
+            E(float) : Young's modulus.
+            mu(float): shear modulus.
+            l(float): Length of the axle element.
+        """
+        assert space is self.space  
+        mesh = space.mesh
+        cells = bm.arange(mesh.number_of_cells()) if self.index is _S else self.index
+        
+        # 参数
+        NC = len(cells)
+        l = mesh.entity_measure('cell')[cells]
+        E, mu = self.material.E, self.material.mu
+
+        # 坐标变换矩阵
+        R = self._coord_transform()
+        
+        return E, mu, l, R, NC
     
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:

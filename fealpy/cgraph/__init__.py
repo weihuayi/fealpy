@@ -19,7 +19,8 @@ __nodes__ = [
     "cfd",
     "opt",
     "pathplanning",
-    "sampling"
+    "sampling",
+    "material"
 ]
 
 register_all_nodes()
