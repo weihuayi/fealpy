@@ -25,10 +25,6 @@ class EulerBernoulliBeamMaterial(LinearElasticMaterial):
                 poisson_ratio: Optional[float] = None,
                 shear_modulus: Optional[float] = None,
                 I: Optional[float] = None,
-                Iy: Optional[float] = None,
-                Iz: Optional[float] = None,
-                G: Optional[float] = None,
-                J: Optional[float] = None
                 ) -> None:
         super().__init__(name=name, 
                         elastic_modulus= elastic_modulus, 
@@ -39,11 +35,6 @@ class EulerBernoulliBeamMaterial(LinearElasticMaterial):
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
         self.I = I
-        self.Iy = Iy
-        self.Iz = Iz
-        self.G = G
-        self.J = J
-
         pdemodel = model
 
         self.L = pdemodel.L

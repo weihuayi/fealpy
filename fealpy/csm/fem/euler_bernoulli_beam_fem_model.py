@@ -132,7 +132,7 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
             F (ndarray): Load vector.
         '''
         mesh = self.mesh
-        f = self.material.f
+        f = self.pde.f
         l = mesh.cell_length()
         scalar_space = LagrangeFESpace(mesh, 1)
         tensor_space = TensorFunctionSpace(scalar_space=scalar_space, shape=(-1, 2))
