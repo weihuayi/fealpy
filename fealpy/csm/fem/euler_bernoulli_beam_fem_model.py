@@ -190,6 +190,8 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
         theta = x[1::2]
         mesh.nodedata['displacement']=uh
         save_path = "../beam_result"
+        import os
+        os.makedirs(save_path, exist_ok=True)
         mesh.to_vtk(f"{save_path}/beam.vtu")
         
     @show.register("strain")
@@ -198,6 +200,8 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
         mesh.nodedata['strain_top']=strain_top
         mesh.nodedata['strain_bottom']=strain_bottom
         save_path = "../beam_result"
+        import os
+        os.makedirs(save_path, exist_ok=True)
         mesh.to_vtk(f"{save_path}/beam_strain.vtu")
         
     @show.register("stress")
@@ -206,4 +210,6 @@ class EulerBernoulliBeamFEMModel(ComputationalModel):
         mesh.nodedata['stress_top'] = stress_top
         mesh.nodedata['stress_bottom'] = stress_bottom
         save_path = "../beam_result"
+        import os
+        os.makedirs(save_path, exist_ok=True)
         mesh.to_vtk(f"{save_path}/beam_stress.vtu")
