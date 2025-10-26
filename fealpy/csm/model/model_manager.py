@@ -10,4 +10,5 @@ class CSMModelManager(ModelManager):
         "beam": "fealpy.csm.model.beam",
         "timoshenko_beam": "fealpy.csm.model.beam",
         "elastoplasticity": "fealpy.csm.model.elastoplasticity",
+        "truss": "fealpy.csm.model.truss",
     }
