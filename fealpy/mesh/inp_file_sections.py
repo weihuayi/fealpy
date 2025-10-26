@@ -156,11 +156,8 @@ class ElementSection(Section):
         # final arrays
         self.id: Optional[Any] = None
         self.cell: Optional[Any] = None
-<<<<<<< HEAD
-=======
         
         self.element_type = self.options.get('TYPE', 'C3D4').upper()
->>>>>>> upstream/develop
 
     def parse_line(self, line: str) -> None:
         line = line.strip()
@@ -199,11 +196,7 @@ class ElementSection(Section):
             vertex_conn = bm.array(self._cell)[:,:4]
 
         self.id = bm.array(self._id)
-<<<<<<< HEAD
-        self.cell = bm.array(self._cell)
-=======
         self.cell = vertex_conn
->>>>>>> upstream/develop
 
     def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata.add_cell_data("id", self.id)
@@ -393,11 +386,7 @@ class SurfaceSection(Section):
     def parse_line(self, line: str) -> None:
         parts = re.split(r'\s*,\s*', line.strip())
         if len(parts) >= 2:
-<<<<<<< HEAD
-            self.data.append((parts[0], float(parts[1])))
-=======
             self.data.append((parts[0], parts[1]))
->>>>>>> upstream/develop
 
     def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata.add_surface(

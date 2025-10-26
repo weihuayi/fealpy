@@ -82,3 +82,50 @@ class UDecoupling(CNodeType):
         theta_xyz = u[:, 3:]
 
         return uh, theta_xyz
+
+class StrainStressPostprocess(CNodeType):
+    r"""
+    Compute strain, stress, and reshaped displacement for each bar element.
+
+    Inputs:
+        uh (tensor): Raw displacement vector from the solver.
+        mesh (mesh): Computational mesh containing node and edge information.
+        E (float): Young's modulus of the bar material.
+
+    Outputs:
+        uh (tensor): Reshaped displacement field.
+        strain (tensor): Strain for each bar element.
+        stress (tensor): Stress for each bar element.
+    """
+    TITLE: str = "应力应变后处理"
+    PATH: str = "后处理.应力应变"
+    DESC: str = "根据节点位移和材料参数计算每个杆单元的应变和应力, 并输出整形后的位移"
+    INPUT_SLOTS = [
+        PortConf("uh", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
+        PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
+        PortConf("E", DataType.FLOAT, 1, desc="杆的弹性模量", title="弹性模量"),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("uh", DataType.TENSOR, desc="整形后的节点位移场", title="节点位移"),
+        PortConf("strain", DataType.TENSOR, desc="每个杆单元的应变", title="应变"),
+        PortConf("stress", DataType.TENSOR, desc="每个杆单元的应力", title="应力")
+    ]
+
+    @staticmethod
+    def run(uh, mesh, E):
+        from fealpy.backend import backend_manager as bm
+        
+        uh = uh.reshape(-1, 3) 
+
+        edge = mesh.entity('edge')
+        l = mesh.edge_length()
+        tan = mesh.edge_tangent()
+        unit_tan = tan / l.reshape(-1, 1)
+
+        u_edge = uh[edge]
+        delta_u = u_edge[:, 1, :] - u_edge[:, 0, :]
+        delta_l = bm.einsum('ij,ij->i', delta_u, unit_tan)
+        strain = delta_l / l
+        stress = E * strain
+        
+        return uh, strain, stress
