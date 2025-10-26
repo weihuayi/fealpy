@@ -7,17 +7,18 @@ from fealpy.cgraph.core import CNode
 
 class DataType(IntEnum):
     NONE     = 0
-    MESH     = auto()
-    BOOL     = auto()
-    INT      = auto()
-    FLOAT    = auto()
-    TENSOR   = auto()
-    LINOPS   = auto()
-    STRING   = auto()
-    MENU     = auto()
-    SPACE    = auto()
-    DOMAIN   = auto()
-    FUNCTION = auto()
+    MESH     = 1
+    BOOL     = 2
+    INT      = 3
+    FLOAT    = 4
+    TENSOR   = 5
+    LINOPS   = 6
+    STRING   = 7
+    MENU     = 8
+    SPACE    = 9
+    DOMAIN   = 10
+    FUNCTION = 11
+    TEXT     = 12
 
 
 @dataclass(slots=True)
@@ -47,11 +48,14 @@ class PortConf:
             self.param = self.name
         if self.title is None:
             self.title = self.name
+        if self.desc == "":
+            self.desc = self.title
 
 
 class CNodeType:
     TITLE: str
     PATH: str = ""
+    DESC: str = ""
     INPUT_SLOTS: list[PortConf] = []
     OUTPUT_SLOTS: list[PortConf] = []
     VARIABLE: bool = False

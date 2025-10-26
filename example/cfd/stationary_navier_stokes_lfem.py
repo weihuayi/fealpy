@@ -1,7 +1,9 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.cfd.stationary_incompressible_navier_stokes_lfem_model import StationaryIncompressibleNSLFEMModel
+from fealpy.cfd.stationary_incompressible_stokes_lfem_model import StationaryIncompressibleStokesLFEMModel
+from fealpy.cfd.equation import StationaryIncompressibleNS
 from fealpy.cfd.model import CFDPDEModelManager
-from fealpy.mesher.chip_mesher import ChipMesher
+from fealpy.mesher.dld_mesher import DLDMesher
 import matplotlib.pyplot as plt
 import argparse
 
@@ -31,82 +33,48 @@ parser.add_argument('--init_mesh',
     default = 'tri', type=str,
     help="Type of initial mesh, default is tri")
 
-parser.add_argument('--box',
-    default = [0.0, 7e-3, 0.0, 2e-3], type=int,
+parser.add_argument('--bar',
+    default = [0.0, 1, 0.0, 5], type=int,
     help="Computational domain [xmin, xmax, ymin, ymax]. Default: [0.0, 3, 0.0, 0.41].")
 
-parser.add_argument('--center',
-    default = (2e-4, 1.5e-4), type=float,
-    help="Center of the first circle, default is (0.1, 0.05).")
-
-parser.add_argument('--start_center',
-    default = (0.015, 0.015), type=int,
-    help="N")
-
-parser.add_argument('--radius',
-    default = 0.7e-4, type=int,
+parser.add_argument('--m',
+    default = 6, type=int,
     help="Radius of the circles, default is 0.029.")
 
-parser.add_argument('--nx',
-    default = 7, type=int,
-    help="N")
+parser.add_argument('--n',
+    default = 8, type=int,
+    help="Radius of the circles, default is 0.029.")
 
-parser.add_argument('--ny',
-    default = 7, type=int,
-    help="N")
+parser.add_argument('--theta',
+    default = bm.pi / 10, type=float,
+    help="Radius of the circles, default is 0.029.")
 
-parser.add_argument('--dx',
-    default = 0.20, type=int,
-    help="N")
+parser.add_argument('--radius',
+    default = 0.1, type=float,
+    help="Radius of the circles, default is 0.029.")
 
-parser.add_argument('--dy',
-    default = 0.08, type=int,
-    help="N")
-
-parser.add_argument('--shift_angle',
-    default = 7, type=int,
-    help="N")
-
-parser.add_argument('--n_circle',
-    default = 100, type=int,
-    help="Number of divisions in the circle, default is 60")
-
-parser.add_argument('--l1',
-    default = 3e-4, type=float,
-    help="Vertical spacing between circles in a column. Default: 0.1.")
-
-parser.add_argument('--l2',
-    default = 3e-4, type=float,
-    help="Horizontal spacing between circle columns. Default: 0.1.")
-
-parser.add_argument('--h',
-    default = 5e-5, type=float,
-    help="Mesh size, default is 0.05")
+parser.add_argument('--T',
+    default = 3, type=int,
+    help="Radius of the circles, default is 0.029.")
 
 parser.add_argument('--lc',
-    default = 1e-4, type=float,
+    default = 1e-1, type=float,
     help="Target mesh element size (characteristic length). Default: 0.01.")
 
 parser.add_argument('--hole_lc',
-    default = 8e-6, type=float,
+    default = 8e-3, type=float,
     help="Mesh size, default is 0.006")
 
-parser.add_argument('--m',
-    default = 7, type=float,
-    help="Number of divisions in the x direction, default is 10")
-parser.add_argument('--n',
-    default = 7, type=float,
-    help="Number of divisions in the y direction, default is 10")
-parser.add_argument('--hole_method',
-    default = 'aligned', type=str,
-    help="Method for generating holes, default is 'aligned' (holes are generated in a regular, aligned grid layout)")
+parser.add_argument('--return_project_edge',
+    default='True', type=str,
+    help='Whether to generate mesh, default is True')
 
 parser.add_argument('--return_mesh',
     default='True', type=str,
     help='Whether to generate mesh, default is True')
 
 parser.add_argument('--show_figure',
-    default='False', type=str,
+    default='True', type=str,
     help='Whether to show figure in Gmsh, default is True')
 
 parser.add_argument('--method',
@@ -147,7 +115,19 @@ options = vars(parser.parse_args())
 bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
-mesh = pde.mesh
+
+mesh = pde.init_mesh()
+
+
+fig = plt.figure()
+axes = fig.add_subplot(111)
+mesh.add_plot(axes)
+mesh.find_node(axes, 
+               showindex=True, color='r', fontsize='2')
+# mesh.find_cell(axes, showindex=True, fontsize='35')
+plt.show()
+
+
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
 uh, ph = model.run()
 # model.__str__()

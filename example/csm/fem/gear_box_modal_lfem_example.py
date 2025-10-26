@@ -42,6 +42,9 @@ bm.set_backend(options['backend'])
 from fealpy.csm.fem import GearBoxModalLFEMModel
 model = GearBoxModalLFEMModel(options)
 
-redge = model.mesh.data.get_rbe2_edge()
-model.logger.info(redge)
+model.mesh.to_vtk('gear_box.vtk')
+
+
+
+
 

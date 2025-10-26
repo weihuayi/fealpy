@@ -46,6 +46,8 @@ class GeometryKernelManager:
     # geometry operate
     def translate(self, shape, vec) -> Any: ...  # 平移（需扩展参数）
     def rotate(self, shape, rotation_point, rotation_axis, angle) -> Any: ...  # 旋转（需支持任意轴）
+    def revolve(self, section_shape, axis_point, axis_dir, angle) -> Any: ...  # 旋转体（待定参数）
+    def periodize(self, shape, axis_point, axis_dir, n_periods) -> Any: ... # 周期化
     # def mirror(self, shape, plane) -> Any: ...  # 镜像
     # def scale(self, shape, factor) -> Any: ...  # 均匀缩放
 

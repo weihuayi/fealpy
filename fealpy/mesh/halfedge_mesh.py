@@ -1082,11 +1082,23 @@ class HalfEdgeMesh2d(Mesh, Plotable):
     def from_bdf(cls, file_path:str):
         from ..tools.bdf_reader import read_bdf_mesh
         from collections import defaultdict
+        from .bdf_file_parser import BdfFileParser, NodeSection, ElementSection
 
-        node, cell = read_bdf_mesh(file_path)
+        bdf_parser = BdfFileParser().parse(file_path)
+        node_section = bdf_parser.get_section(NodeSection)
+        cell_section = bdf_parser.get_section(ElementSection)
+        node = node_section.node
+        node_map = node_section.node_map
+        cell = []
+        for key, value in cell_section.cell.items():
+            cell_ = node_map[value]
+            cell.extend(bm.tolist(cell_))
+
+        # node, cell = read_bdf_mesh(file_path)
 
         NC = len(cell)
         face_lens = [len(f) for f in cell]
+        # TODO: 这一行是否不需要
         assert all(l in (3, 4) for l in face_lens), "Only triangles and quads supported."
 
         half_edge_list = []

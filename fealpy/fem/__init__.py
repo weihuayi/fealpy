@@ -23,6 +23,7 @@ from .viscous_work_integrator import ViscousWorkIntegrator
 from .scalar_biharmonic_integrator import ScalarBiharmonicIntegrator
 from .mthlaplace_integrator import MthLaplaceIntegrator
 from .mass_integrator import MassIntegrator
+from .diffusion_integrator import DiffusionIntegrator
 from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator
 from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
@@ -69,3 +70,8 @@ from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
 from .helmholtz_lfem_model import HelmholtzLFEMModel
 from .curlcurl_lfem_model import CurlCurlLFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
+from .stokes_lfem_model import StokesLFEMModel
+from .dld_microfluidic_chip_lfem_model import DLDMicrofluidicChipLFEMModel
+from .dld_microfluidic_chip_lfem_model_3d import DLDMicrofluidicChipLFEMModel3D
+from .curlcurl_upml_model import CurlCurlUPMLModel
+from .mgtensor_possion_lfem_model import MGTensorPossionLFEMModel

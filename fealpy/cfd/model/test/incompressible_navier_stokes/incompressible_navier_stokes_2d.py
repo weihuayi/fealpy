@@ -19,10 +19,7 @@ class FromSympy(BoxMesher2d):
         self.mu = mu
         self.rho = rho
         self.x, self.y, self.t = sp.symbols('x, y, t')
-        self.select_pde["polycos"]()
-    
-
-    
+        self.select_pde["polycos"]() 
 
     @variantmethod("polycos")
     def select_pde(self):
@@ -46,6 +43,15 @@ class FromSympy(BoxMesher2d):
         self.u1 = 2* sp.pi *sp.sin(t) * sp.sin(sp.pi*x)**2 * sp.sin(sp.pi*y) * sp.cos(sp.pi*y)
         self.u2 = -2* sp.pi *sp.sin(t) * sp.sin(sp.pi*x) * sp.cos(sp.pi*x) * sp.sin(sp.pi*y)**2
         self.p = 20*sp.sin(t)*(x**2*y-1/6)
+        self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
+    
+    @select_pde.register("TaylorGreen")
+    def select_pde(self):
+        x, y, t = sp.symbols('x, y, t')
+        mu = self.mu
+        self.u1 = -sp.sin(sp.pi*y) * sp.cos(sp.pi*x) * sp.exp(-2*sp.pi**2*mu*t)
+        self.u2 = sp.sin(sp.pi*x) * sp.cos(sp.pi*y) * sp.exp(-2*sp.pi**2*mu*t)
+        self.p = -1/4 * (sp.cos(2*sp.pi*x) + sp.cos(2*sp.pi*y)) * sp.exp(-4*sp.pi**2*mu*t)
         self._init_expr(self.u1, self.u2, self.p, self.mu, self.rho)
 
     @select_pde.register("channel")

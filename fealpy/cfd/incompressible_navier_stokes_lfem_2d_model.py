@@ -4,7 +4,6 @@ from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
 from .equation import IncompressibleNS
 from .simulation.time import UniformTimeLine
-from fealpy.utils import timer
 
 
 class IncompressibleNSLFEM2DModel(ComputationalModel):

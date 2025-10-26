@@ -1,5 +1,6 @@
 from typing import Protocol, Sequence, TypeVar
-from ...backend import TensorLike
+
+from fealpy.backend import TensorLike
 
 class ParabolicPDEDataProtocol(Protocol):
     def geo_dimension(self) -> int: ...

@@ -104,6 +104,10 @@ class NodeSection(Section):
         self._node.append(coords)
 
     def finalize(self) -> None:
+        dim = max(len(coords) for coords in self._node)
+        for coords in self._node:
+            if len(coords) < dim:
+                coords.extend([0.0] * (dim - len(coords)))
         self.id = bm.array(self._id)
         self.node = bm.array(self._node)
 
@@ -134,24 +138,72 @@ class ElementSection(Section):
     """
     keyword = 'ELEMENT'
 
+    ELEMENT_TYPE_MAP = {
+        'C3D4': 4,  # 4-node linear tetrahedral element (1st-order)
+        'C3D10': 10,  # 10-node quadratic tetrahedral element (2nd-order)
+        'C3D8': 8,  # 8-node linear hexahedral element (1st-order)
+        'C3D20': 20,  # 20-node quadratic hexahedral element (2nd-order)
+        # Additional element types can be added here
+    }
+
     def __init__(self, options: Dict[str, str]):
         super().__init__(options)
         self._id: List[int] = []
         self._cell: List[List[int]] = []
+        self._line_buffer: str = ""
+        self.multi_line = False
+
         # final arrays
         self.id: Optional[Any] = None
         self.cell: Optional[Any] = None
+<<<<<<< HEAD
+=======
+        
+        self.element_type = self.options.get('TYPE', 'C3D4').upper()
+>>>>>>> upstream/develop
 
     def parse_line(self, line: str) -> None:
-        parts = [s.strip() for s in line.split(',')]
-        eid = int(parts[0])
-        conn = [int(val) for val in parts[1:]]
-        self._id.append(eid)
-        self._cell.append(conn)
+        line = line.strip()
+
+        if line.endswith(','):
+            self._line_buffer += line[:-1].strip()
+            self.multi_line = True
+        else:
+            if self.multi_line:  
+                self._line_buffer += ',' + line.strip()
+            else:
+                self._line_buffer += line.strip()
+
+            parts = [s.strip() for s in self._line_buffer.split(',')]
+            eid = int(parts[0])
+            
+            conn = [int(val) for val in parts[1:]]
+            
+            expected_nodes = self.ELEMENT_TYPE_MAP.get(self.element_type, None)
+            if expected_nodes is None:
+                raise ValueError(f"Unknown element type: {self.element_type}")
+
+            if len(conn) != expected_nodes:
+                
+                raise ValueError(f"Element {eid} has {len(conn)} nodes, expected {expected_nodes} nodes.")
+
+            self._id.append(eid)
+            self._cell.append(conn)
+
+            self._line_buffer = ""
 
     def finalize(self) -> None:
+        if self.element_type == 'C3D4':
+            vertex_conn = bm.array(self._cell)
+        if self.element_type == 'C3D10':
+            vertex_conn = bm.array(self._cell)[:,:4]
+
         self.id = bm.array(self._id)
+<<<<<<< HEAD
         self.cell = bm.array(self._cell)
+=======
+        self.cell = vertex_conn
+>>>>>>> upstream/develop
 
     def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata.add_cell_data("id", self.id)
@@ -341,7 +393,11 @@ class SurfaceSection(Section):
     def parse_line(self, line: str) -> None:
         parts = re.split(r'\s*,\s*', line.strip())
         if len(parts) >= 2:
+<<<<<<< HEAD
             self.data.append((parts[0], float(parts[1])))
+=======
+            self.data.append((parts[0], parts[1]))
+>>>>>>> upstream/develop
 
     def attach(self, meshdata: Dict[str, Any]) -> None:
         meshdata.add_surface(
@@ -469,15 +525,22 @@ class BoundarySection(Section):
         self.data = []
 
     def parse_line(self, line: str) -> None:
-        # 跳过空行和注释
+        """
+        Parses a line defining boundary conditions.
+        """
+        # Skip empty lines or comments
         if not line.strip() or line.strip().startswith('**'):
             return
-
-        parts = [p.strip() for p in line.strip().split(',')]
+        parts = [p.strip() for p in line.strip().split(',') if p.strip() != ""]
         nset = parts[0]
         dof_start = int(parts[1]) - 1
-        dof_end = int(parts[2]) 
-        magnitude = float(parts[3]) if len(parts) > 3 else 0.0
+        dof_end = float(parts[2]) 
+        if dof_end == 0.0:
+            dof_end = dof_start + 1
+            magnitude = 0.0
+        else:
+            dof_end = int(dof_end)
+            magnitude = float(parts[3]) if len(parts) > 3 else 0.0
         self.data.append((nset, dof_start, dof_end, magnitude))
 
     def attach(self, meshdata: Dict[str, Any]):

@@ -33,11 +33,11 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--nx',
-    default = 4, type=int,
+    default = 64, type=int,
     help="Number of divisions in the x direction, default is 8")
 
 parser.add_argument('--ny',
-    default = 4, type=int,
+    default =64, type=int,
     help="Number of divisions in the y direction, default is 8")
 
 parser.add_argument('--nz',
@@ -53,11 +53,11 @@ parser.add_argument('--T1',
     help="Final time, default is 0.5")
 
 parser.add_argument('--nt',
-    default=25, type=int,
+    default=6400, type=int,
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--method',
-    default='Ossen', type=str,
+    default='Newton', type=str,
     help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',
@@ -96,3 +96,4 @@ pde = manager.get_example(options['pde'], **options)
 model = IncompressibleNSLFEM2DModel(pde, options = options)
 model.run()
 model.__str__()
+

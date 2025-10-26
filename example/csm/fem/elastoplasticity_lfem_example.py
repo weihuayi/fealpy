@@ -32,7 +32,6 @@ bm.set_backend('numpy')
 
 from fealpy.csm.fem import ElastoplasticityFEMModel
 model = ElastoplasticityFEMModel(options)
-
 # 网格可视化
 from matplotlib import pyplot as plt
 fig = plt.figure()

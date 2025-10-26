@@ -23,7 +23,6 @@ from fealpy.fem import BilinearForm
 from fealpy.fem import LinearForm
 
 # 积分子
-from fealpy.fem import VectorMassIntegrator
 from fealpy.fem import CurlCurlIntegrator
 from fealpy.fem import VectorSourceIntegrator,ScalarMassIntegrator
 from fealpy.fem import DirichletBC
