@@ -31,7 +31,6 @@ class Timoaxle3d(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("init_mesh", DataType.MESH, desc="网格生成", title="网格"),
         PortConf("external_load", DataType.FUNCTION, desc="全局载荷向量的函数", title="外部载荷"),
         PortConf("dirichlet_dof_index", DataType.FUNCTION, desc="Dirichlet 自由度索引的函数", title="边界自由度索引")
         
@@ -43,5 +42,5 @@ class Timoaxle3d(CNodeType):
         model = TimobeamAxleData3D( beam_para, axle_para, kappa)
         return tuple(
             getattr(model, name)
-            for name in ["init_mesh", "external_load", "dirichlet_dof_index"]
+            for name in ["external_load", "dirichlet_dof_index"]
         )
