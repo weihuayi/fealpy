@@ -1,5 +1,6 @@
 from ...backend import backend_manager as bm
 from ..optimizer_base import Optimizer
+from ..opt_function import levy
 
 class KangarooEscapeOpt(Optimizer):
     """
@@ -140,7 +141,7 @@ class KangarooEscapeOpt(Optimizer):
         # Safe zone selection rule based on optimization phase
         if self.it < (3 * self.MaxIT // 4):
             # Early phase (first 75%): prefer random exploration
-            x_safe = x_rand
+            x_safe = bm.copy(x_rand)
         else:
             # Later phase (last 25%): 75% chance use group-best, 25% chance use global best
             mask2 = bm.random.rand(self.N, 1) < 0.75
@@ -204,6 +205,126 @@ class KangarooEscapeOpt(Optimizer):
 
             # Fitness evaluation of new positions
             fit_new = self.fun(x_new)
+
+            # Greedy selection: replace if better fitness
+            mask = fit_new < self.fit
+            self.x, self.fit = bm.where(mask[:, None], x_new, self.x), bm.where(mask, fit_new, self.fit)
+
+            # Update global best solution
+            self.update_gbest(self.x, self.fit)
+            self.curve[self.it] = self.gbest_f  # Record convergence curve
+
+class HybridCrossoverKangarooEscapeOpt(KangarooEscapeOpt):
+    def __init__(self, options):
+        super().__init__(options)
+        self.energy = bm.ones((self.N, 1))
+
+    def strategy1(self):
+        """
+        Levy long jump crossover strategy for global exploration.
+        
+        Simulates kangaroo's long-distance jumping behavior for escaping predators
+        and exploring new areas of the search space.
+        
+        Returns:
+            array: New positions after long jumps
+        """
+        # Levy long jump crossover strategy (global exploration)
+        L = levy(self.N, 1, 1.5)
+        long_jump_crossover = 2 * bm.random.randn(self.N, 1) * (self.x[bm.random.randint(0, self.N, (self.N,))] - self.gbest) * self.decoy_drop
+        k = 2 * bm.random.rand(self.N, 1) * (self.MaxIT - self.it) / self.MaxIT
+        levy_crossover = k * L * (self.x[bm.random.randint(0, self.N, (self.N,))] - self.x)
+        jump = long_jump_crossover + levy_crossover  # Gaussian-distributed jumps
+        x_new = self.x + jump
+        return x_new
+    
+    def horizontal_vertical_crossover_strategy(self, x, fit):
+        r1 = bm.random.rand(self.N//2, self.dim)
+        r2 = bm.random.rand(self.N//2, self.dim)
+        c1 = -1 + 2 * bm.random.rand(self.N//2, self.dim)
+        c2 = -1 + 2 * bm.random.rand(self.N//2, self.dim)
+        x_odd = x[bm.arange(0, self.N, 2)]
+        x_even = x[bm.arange(1, self.N, 2)]
+        x_new1 = r1 * x_odd + (1 - r1) * x_even + c1 * (x_odd - x_even)
+        x_new2 = r2 * x_even + (1 - r2) * x_odd + c2 * (x_even - x_odd)
+        x_new = bm.zeros((self.N, self.dim))
+        x_new[bm.arange(0, self.N, 2)] = bm.copy(x_new1)
+        x_new[bm.arange(1, self.N, 2)] = bm.copy(x_new2)
+        x_new = bm.clip(x_new, self.lb, self.ub)
+        fit_new = self.fun(x_new)
+        mask = fit_new < fit
+        x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
+        q1 = bm.random.randint(0, self.dim, (self.N,))
+        offset = bm.random.randint(1, self.dim, (self.N,))
+        q2 = (q1 + offset) % self.dim
+        r = bm.random.rand(self.N,)
+        x_new[bm.arange(self.N), q1] = r * x[bm.arange(self.N), q1] + (1 - r) * x[bm.arange(self.N), q2]
+        x_new = bm.clip(x_new, self.lb, self.ub)
+        fit_new = self.fun(x_new)
+        mask = fit_new < fit
+        x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
+        return x, fit
+    
+    def cal_energy(self):
+        # Energy update using chaotic logistic map (nonlinear dynamics)
+        r = bm.random.rand(self.N, 1)
+        for i in range(self.N):
+            self.chaotic_val = 4 * self.chaotic_val * (1 - self.chaotic_val)  # Logistic map update
+            self.energy[i] = (1 - r[i] * (self.it / self.MaxIT)) * (0.95 + 0.05 * self.chaotic_val)
+    
+    def run(self, params={'beta':1, 'energy_threshold':0.5, 'chaotic_val':0.7}):
+        """
+        Execute the kangaroo escape optimization process.
+        
+        params (dict): Algorithm control parameters with:
+            - 'beta': Zigzag step size control (default: 1)
+            - 'energy_threshold': Energy level for strategy switching (default: 0.5)
+            - 'chaotic_val': Initial chaotic value for energy dynamics (default: 0.7)
+        
+        The algorithm features energy-based strategy selection using chaotic logistic maps
+        and three distinct escape behaviors modeled after real kangaroo predator avoidance.
+        """
+        # Initialize parameters
+        beta = params.get('beta')  # Zigzag step size control
+        energy_threshold = params.get('energy_threshold')  # Strategy switching threshold
+        self.chaotic_val = params.get('chaotic_val')  # Initial chaotic value
+
+        # Evaluate initial population
+        self.fit = self.fun(self.x)
+        gbest_idx = bm.argmin(self.fit)
+        self.gbest_f = self.fit[gbest_idx]
+        self.gbest = self.x[gbest_idx]
+
+        # Main optimization loop
+        for self.it in range(self.MaxIT):
+            # Apply boundary control (if any in parent class)
+            self.D_pl_pt(self.it)
+
+            # Generate decoy drop pattern for current iteration
+            self.cal_decoy_drop()
+
+            # Random selection between strategies
+            r = bm.random.rand(self.N, 1)
+
+            self.cal_energy()
+
+            # Select strategy according to probability and energy level
+            mask1 = r < 0.5  # 50% chance for safe zone strategy
+            mask2 = self.energy < energy_threshold  # Low energy → long jumps
+
+            # Update positions using three strategies with priority:
+            # 1. Safe zone strategy (50% chance)
+            # 2. Levy long jump crossover strategy (low energy)
+            # 3. Zigzag strategy (high energy)
+            x_new = bm.where(mask1, self.strategy3(), bm.where(mask2, self.strategy1(), self.strategy2(beta)))
+
+            # Apply boundary constraints
+            x_new = bm.clip(x_new, self.lb, self.ub)
+
+            # Fitness evaluation of new positions
+            fit_new = self.fun(x_new)
+
+            x_new, fit_new = self.horizontal_vertical_crossover_strategy(x_new, fit_new)
 
             # Greedy selection: replace if better fitness
             mask = fit_new < self.fit
