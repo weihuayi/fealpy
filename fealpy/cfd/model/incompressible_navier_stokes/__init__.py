@@ -40,6 +40,6 @@ follow the existing examples to register them in the registry.
 DATA_TABLE = {
     # example name: (file_name, class_name)
     1: ("poiseuille_2d", "Poiseuille2D"),
-    2: ("cylinder_2d", "Cylinder2D")
-    # 3: ("exp0003", "Exp0003"),
+    2: ("cylinder_2d", "Cylinder2D"),
+    3: ("flowpastfoil_2d", "FlowPastFoil2D"),
 }

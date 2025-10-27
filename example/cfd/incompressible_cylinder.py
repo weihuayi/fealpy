@@ -20,12 +20,7 @@ options ={
     'lc': 0.05,
     'method': 'IPCS',
     'solve': 'direct',
-    'apply_bc': 'cylinder',
-    'postprocess': 'res',
-    'run': 'main_cylinder',
-    'maxit': 5,
-    'maxstep': 10,
-    'tol': 1e-10
+    'run': 'mainr'
 }
 
 bm.set_backend(options['backend'])
