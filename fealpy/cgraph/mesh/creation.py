@@ -204,7 +204,6 @@ class DLDMicrofluidicChipMesh3d(CNodeType):
         modeler.build(gmsh)
         mesher = DLDMicrofluidicChipMesher3D(options)
         mesher.generate(modeler, gmsh)
-        gmsh.fltk.run()
         gmsh.finalize()
 
         return (mesher.mesh, mesher.options.get('thickness'),mesher.radius, mesher.centers, mesher.inlet_boundary, 
