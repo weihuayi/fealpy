@@ -2,7 +2,7 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 class DipoleAntenna3D(CNodeType):
     TITLE: str = "三维 偶极子天线 问题模型"
-    PATH: str = "model.curlcurl"
+    PATH: str = "模型.curlcurl"
     DESC: str = "三维 偶极子天线 问题模型"
     INPUT_SLOTS = [
         PortConf("r0", DataType.FLOAT, desc="开始时球体半径", default=1.9),
