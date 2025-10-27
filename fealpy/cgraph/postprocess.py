@@ -78,8 +78,8 @@ class UDecoupling(CNodeType):
     def run(out):
         u = out.reshape(-1, 6)
         
-        uh = u[:, :3]
-        theta_xyz = u[:, 3:]
+        uh = u[:, 3:]
+        theta_xyz = u[:, :3]
 
         return uh, theta_xyz
 

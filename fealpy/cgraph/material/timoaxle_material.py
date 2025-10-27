@@ -37,8 +37,8 @@ class TimoMaterial(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("E", DataType.FLOAT, title="梁的弹性模量 E"),
-        PortConf("mu", DataType.FLOAT, title="梁的剪切模量 mu"),
+        PortConf("E", DataType.FLOAT, title="梁的弹性模量"),
+        PortConf("mu", DataType.FLOAT, title="梁的剪切模量"),
         PortConf("Ax", DataType.TENSOR, title="X 方向横截面积"),
         PortConf("Ay", DataType.TENSOR, title="Y 方向横截面积"),
         PortConf("Az", DataType.TENSOR, title="Z 方向横截面积"),
