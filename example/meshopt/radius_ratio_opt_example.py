@@ -89,7 +89,7 @@ def test_triangle_domain(P=0,optmethod='LBFGS'):
         opt = PLBFGS(options)
 
     t1 = time.time()
-    x, f, g, flag = opt.run()
+    x, f, g = opt.run()
     t2 = time.time()
     print('time:',t2-t1)
     print('NF:',opt.NF)
@@ -155,7 +155,7 @@ def test_square_hole(P=0, optmethod='LBFGS'):
         opt = PLBFGS(options)
 
     t1 = time.time()
-    x, f, g, flag = opt.run()
+    x, f, g = opt.run()
     t2 = time.time()
     print('time:',t2-t1)
     print('NF:',opt.NF)
@@ -215,7 +215,7 @@ def test_sphere(P=0,optmethod='LBFGS'):
                 FunValDiff = 1e-8)
         opt = PLBFGS(options)
     t1 = time.time()
-    x, f, g, flag = opt.run()
+    x, f, g = opt.run()
     t2 = time.time()
     print('time:',t2-t1)
     print('NF:',opt.NF)
@@ -232,7 +232,6 @@ def test_sphere(P=0,optmethod='LBFGS'):
 
     show_mesh_quality(bm.to_numpy(q),ylim=2500,title='optimize mesh quality')
     return mesh
-
 
 def test_sphere_intersection(P=0,optmethod='LBFGS'):
     mesh = MeshModel.sphere_intersection()
@@ -272,7 +271,7 @@ def test_sphere_intersection(P=0,optmethod='LBFGS'):
                 FunValDiff = 1e-4)
         opt = PLBFGS(options)
     t1 = time.time()
-    x, f, g, flag = opt.run()
+    x, f, g = opt.run()
     t2 = time.time()
     print('time:',t2-t1)
     print('NF:',opt.NF)
