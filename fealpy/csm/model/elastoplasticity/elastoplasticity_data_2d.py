@@ -5,9 +5,9 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.backend import TensorLike
 
-from fealpy.mesh import TriangleMesh
+from fealpy.mesher import LshapeMesher
 
-class ElastoplasticityData2D:
+class ElastoplasticityData2D(LshapeMesher):
     """
     2D Elasto-Plastic Beam with von Mises Yield and Ziegler Hardening
 
@@ -25,7 +25,7 @@ class ElastoplasticityData2D:
         n : int
             Mesh refinement level.
 
-    Domain: (0, 1) x (0, 0.25) dm.
+    Domain: 
     The left and bottom boundaries are clamped (zero displacement).
     A time-dependent Neumann traction is applied on the top boundary (y=0.25).
     """
@@ -34,11 +34,10 @@ class ElastoplasticityData2D:
         self.E = 206900             # Young's modulus in MPa
         self.nu = 0.29              # Poisson's ratio
         self.hardening_modulus = 10000              # Hardening modulus a in MPa
-        self.yield_stress = 450 * (2/3)**0.5  # Initial yield stress in MPa
+        self.yield_stress = 450 # Initial yield stress in MPa
 
         self.dim = 2
-        self.Ft_max = 200         # N: max traction force
-        self.n = 2                  # Mesh refine level
+        self.Ft_max = 200        # N: max traction force
 
         self.lam = self.compute_lambda()
         self.mu = self.compute_mu()
@@ -47,7 +46,7 @@ class ElastoplasticityData2D:
         """Return a multi-line summary including PDE type and key params."""
         return (
             f"\n  elastoplasticity (2D Elasto-Plastic)\n"
-            f"  Box dimensions: L = 5.0, W = 5.0 dm\n"
+            f"  Box dimensions: L = 5.0, W = 5.0 m\n"
             f"  Young's modulus: E = {self.E} MPa\n"
             f"  Poisson's ratio: nu = {self.nu}\n"
             f"  Hardening modulus: a = {self.a} MPa\n"
@@ -65,34 +64,13 @@ class ElastoplasticityData2D:
         return self.E / (2 * (1 + self.nu))
 
     def domain(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
-        return (0.0, 1.0), (0.0, 0.25)  # [0,1] x [0,0.25] dm
-
-    def init_mesh(self):
-        node = bm.array([
-            [-5, -5], [0, -5], [-5, 0],
-            [0, 0], [5, 0], [-5, 5],
-            [0, 5], [5, 5]
-        ], dtype=bm.float64)
-
-        cell = bm.array([
-            [1, 3, 0], [2, 0, 3],
-            [3, 6, 2], [5, 2, 6],
-            [4, 7, 3], [6, 3, 7]
-        ], dtype=bm.int32)
-
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(self.n)
-        return mesh
-
+        return self.box  
+         
     @cartesian
-    def body_force(self, x):
-        return bm.zeros((x.shape[0], self.dim))  # No body force
-    
-    @cartesian
-    def source(self, p: TensorLike) -> TensorLike:
+    def body_force(self, p: TensorLike) -> TensorLike:
         shape = p.shape[:-1]
         f1 = bm.zeros(shape)       
-        f2 = self.Ft_max * bm.ones(shape) 
+        f2 = bm.zeros(shape)
         return bm.stack([f1, f2], axis=-1)
         
     @cartesian
@@ -107,7 +85,7 @@ class ElastoplasticityData2D:
         """
         shape = p.shape[:-1]
         f1 = bm.zeros(shape)  # x 方向无牵引
-        f2 = self.Ft_max * bm.ones(shape)/10.0  # y 方向
+        f2 = self.Ft_max * bm.ones(shape)  # y 方向
         return bm.stack([f1, f2], axis=-1)
 
     def dirichlet_boundary(self, p):
@@ -120,7 +98,7 @@ class ElastoplasticityData2D:
         Returns:
             TensorLike: Boolean array indicating if points are on the Dirichlet boundary.
         """
-        return (bm.abs(p[:, 0] - 5) < 1e-12) | (bm.abs(p[:, 1] + 5) < 1e-12)
+        return (bm.abs(p[:, 0] + 5) < 1e-12) | (bm.abs(p[:, 1] + 5) < 1e-12)
 
     @cartesian
     def dirichlet(self, p):

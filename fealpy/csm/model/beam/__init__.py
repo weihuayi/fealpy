@@ -50,5 +50,5 @@ follow the existing examples to register them in the registry.
 DATA_TABLE = {
     # Add beam PDE models here (file_name, class_name)
     1: ("euler_bernoulli_beam_data_2d", "EulerBernoulliBeamData2D"),
-    2: ("timoshenko_beam_data_3d", "TimoshenkoBeamData3D"),
+    2: ("timobeam_axle_data_3d", "TimobeamAxleData3D"),
 }
