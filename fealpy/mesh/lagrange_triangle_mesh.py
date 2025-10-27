@@ -582,19 +582,33 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             Dlambda = bm.array([[-1, -1], [1, 0], [0, 1]], dtype=bm.float64)
         else:
             Dlambda = bm.array([[-1], [1]], dtype=bm.float64)
-        R = bm.simplex_grad_shape_function(bc, p=p) # (NQ or NC, ldof, TD+1)
-        gphi = bm.einsum('qij, jn -> qin', R, Dlambda) # (NQ or NC, ldof, TD)
+        R = bm.simplex_grad_shape_function(bc, p=p) # (NQ, ldof, TD+1)
+        gphi = bm.einsum('qij, jn -> qin', R, Dlambda) # (NQ, ldof, TD)
 
         if map_mode == 'all':
             if variables == 'u':
                 return gphi[None, :, :, :] #(1, ..., ldof, TD)
             elif variables == 'x':
-                J = self.jacobi_matrix(bc, index=index, map_mode='all') #(NC, NQ, GD, TD)
+                J = self.jacobi_matrix(bc, index=index, map_mode='all', gphi=gphi)
                 G = self.first_fundamental_form(J)
                 d = bm.linalg.inv(G)
                 gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, d, gphi) 
                 return gphi
+            else:
+                raise ValueError(f"Unsupported variables: {variables}. Should be 'u' or 'x'.")
         elif map_mode == 'pair':
+            if variables == 'u':
+                return gphi
+            elif variables == 'x':
+                J = self.jacobi_matrix(bc, index=index, map_mode='pair', gphi=gphi)
+                G = self.first_fundamental_form(J)
+                d = bm.linalg.inv(G)
+                gphi = bm.einsum('ckm, cmn, cln -> cqlk', J, d, gphi) 
+                return gphi
+            else:
+                raise ValueError(f"Unsupported variables: {variables}. Should be 'u' or 'x'.")
+        else:
+            raise ValueError(f"Unsupported map_mode: {map_mode}. Should be 'all' or 'pair'.")
 
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
         """
@@ -747,6 +761,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
                       bc: TensorLike, 
                       index: Index=_S, 
                       return_grad=False,
+                      gphi: Optional[TensorLike]=None,
                       map_mode: str='all'):
         """
         Compute the Jacobi matrix of the mapping from reference Lagrange
@@ -764,24 +779,27 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index)
-        gphi = self.grad_shape_function(bc, variables='u', map_mode='all')
+        if gphi is None:
+            gphi = self.grad_shape_function(bc, variables='u', map_mode='pair')
+        else:
+            assert gphi.shape[0] == bc.shape[0] 
+
         if map_mode == 'all':
             J = bm.einsum(
-                    'cin, cqim -> cqnm',
-                    self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
+                    'cin, qim -> cqnm',
+                    self.node[entity, :], gphi)
         elif map_mode == 'pair':
-            pass
+            J = bm.einsum(
+                    'cin, cim -> cnm',
+                    self.node[entity, :], gphi)
         else:
-            raise 
+            raise ValueError(f"Unsupported map_mode: {map_mode}. Should be 'all' or 'pair'.")
 
         if return_grad is False:
-            return J #(NC,NQ,GD,TD) or (NC, GD, TD)
+            return J
         else:
             return J, gphi
           
-
-    def jacobi_matrix_1(self, bc: TensorLike, index: Index):
-        pass
 
     # fundamental form
     def first_fundamental_form(self, J: TensorLike, index: Index=_S):

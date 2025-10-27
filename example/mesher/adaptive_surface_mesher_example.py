@@ -38,8 +38,7 @@ idxs, bc = tree.query(ps)
 print(idxs.dtype)
 print(bc.dtype)
 
-ps = mesh.bc_to_point_1(bc, idxs)
-
+ps = mesh.bc_to_point(bc, idxs, map_mode='pair')
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
