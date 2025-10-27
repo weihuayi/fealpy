@@ -1,2 +1,3 @@
 from .timoaxle_material import *
-from .bar_meterial import *
+from .beam_material import *
+from .bar_material import *

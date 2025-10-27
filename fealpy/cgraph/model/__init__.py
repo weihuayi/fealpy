@@ -8,3 +8,4 @@ from .dld_microfluidic_chip3d import DLDMicrofluidicChip3D
 from .timoaxle3d import Timoaxle3d
 from .incompressible_navier_stokes2d import IncompressibleCylinder2d
 from .dipole_antenna3d import DipoleAntenna3D
+from .beam2d import Beam2d
