@@ -59,7 +59,7 @@ IncompressibleNSRun(
     correct_pressure = simulation().correct_pressure,
     correct_velocity = simulation().correct_velocity,
     mesh = pde().mesh,
-    output_dir = "/home/libz/cylinder"
+    output_dir = "/home/libz/naca0012"
 )
 
 WORLD_GRAPH.output(uh = IncompressibleNSRun().uh)
