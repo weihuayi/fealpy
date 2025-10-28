@@ -20,7 +20,8 @@ __nodes__ = [
     "opt",
     "pathplanning",
     "sampling",
-    "material"
+    "material",
+    "postreport"
 ]
 
 register_all_nodes()

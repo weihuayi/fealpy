@@ -63,11 +63,11 @@ class UDecoupling(CNodeType):
         uh (tensor): Translational displacement field (X, Y, Z components).
         theta_xyz (tensor): Rotational displacement field (rotations around X, Y, Z axes).
     """
-    TITLE: str = "位移解耦"
+    TITLE: str = "位移后处理"
     PATH: str = "后处理.解耦"
-    DESC: str = "将平动位移和转动位移做解耦处理"
+    DESC: str = "将轮轴的平动位移和转动位移做解耦处理"
     INPUT_SLOTS = [
-        PortConf("out", DataType.TENSOR, 1, desc="六个自由度的位移", title="结果")
+        PortConf("out", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量")
     ]
     OUTPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, desc="X,Y,Z三个方向上的位移", title="平动位移"),

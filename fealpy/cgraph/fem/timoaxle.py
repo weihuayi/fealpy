@@ -45,8 +45,8 @@ class Timoaxle(CNodeType):
         PortConf("J", DataType.TENSOR, 1, desc="极性矩",  title="极性矩"),
         PortConf("Iy", DataType.TENSOR, 1, desc="惯性矩",  title="Y 轴的惯性矩"),
         PortConf("Iz", DataType.TENSOR, 1, desc="惯性矩",  title="Z 轴的惯性矩"),
-        PortConf("axle_E", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的弹性模量"),
-        PortConf("axle_mu", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的剪切模量"),
+        PortConf("axle_E", DataType.FLOAT, 1, desc="弹簧材料属性",  title="弹簧的弹性模量"),
+        PortConf("axle_mu", DataType.FLOAT, 1, desc="弹簧材料属性",  title="弹簧的剪切模量"),
         
         PortConf("cindex", DataType.INT, 0, desc="轮轴模型的单元单元总数", title="单元总数", default=32),
         PortConf("external_load", DataType.FUNCTION, 1, desc="返回全局载荷向量", title="外部载荷"),
