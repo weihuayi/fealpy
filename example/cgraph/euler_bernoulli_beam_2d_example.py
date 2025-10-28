@@ -10,7 +10,7 @@ spacer = cgraph.create("FunctionSpace")
 beam_model = cgraph.create("Beam")
 dbc = cgraph.create("StructuralDirichletBC")
 solver = cgraph.create("DirectSolver")
-postprocess = cgraph.create("UDecoupling")
+postprocess = cgraph.create("BeamPostprocess")
 
 # 连接节点
 node = bm.array([[0], [5],[7.5]], dtype=bm.float64)
@@ -41,9 +41,11 @@ dbc(
 solver(A = dbc().K,
        b = dbc().F)
 
+postprocess(out = solver().out)
+
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher(), u=solver())
+WORLD_GRAPH.output(mesh=mesher(), u=solver(), uh=postprocess().uh, theta_xyz=postprocess().theta_xyz)
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

@@ -43,8 +43,8 @@ class Timoaxle(CNodeType):
         PortConf("Ay", DataType.TENSOR, 1, desc="横截面积",  title="Y 方向的横截面积"),
         PortConf("Az", DataType.TENSOR, 1, desc="横截面积",  title="Z 方向的横截面积"),
         PortConf("J", DataType.TENSOR, 1, desc="极性矩",  title="极性矩"),
-        PortConf("Iy", DataType.TENSOR, 1, desc="惯性矩",  title="Y 方向的惯性矩"),
-        PortConf("Iz", DataType.TENSOR, 1, desc="惯性矩",  title="Z 方向的惯性矩"),
+        PortConf("Iy", DataType.TENSOR, 1, desc="惯性矩",  title="Y 轴的惯性矩"),
+        PortConf("Iz", DataType.TENSOR, 1, desc="惯性矩",  title="Z 轴的惯性矩"),
         PortConf("axle_E", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的弹性模量"),
         PortConf("axle_mu", DataType.FLOAT, 1, desc="杆件材料属性",  title="杆的剪切模量"),
         

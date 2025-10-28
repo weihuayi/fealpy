@@ -4,7 +4,7 @@ import fealpy.cgraph as cgraph
 
 WORLD_GRAPH = cgraph.WORLD_GRAPH
 
-pde = cgraph.create("IncompressibleCylinder2d")
+pde = cgraph.create("FlowPastFoil")
 uspacer = cgraph.create("TensorFunctionSpace")
 pspacer = cgraph.create("FunctionSpace")
 dbc_u = cgraph.create("ProjectDBC")
@@ -16,11 +16,7 @@ IncompressibleNSRun = cgraph.create("IncompressibleNSIPCSRun")
 pde(
     mu = 0.001,
     rho = 1.0,
-    cx = 0.2,
-    cy = 0.2,
-    radius = 0.05,
-    n_circle = 100,
-    h = 0.06)
+    h = 0.05)
 uspacer(mesh = pde().mesh, p=2, gd = 2)
 pspacer(mesh = pde().mesh, p=1)
 dbc_u(
@@ -48,7 +44,7 @@ simulation(
 timeline(
     T0 = 0.0,
     T1 = 1.0,
-    NT = 1000
+    NT = 10000
 )
 IncompressibleNSRun(
     T0=timeline().T0,
@@ -63,10 +59,10 @@ IncompressibleNSRun(
     correct_pressure = simulation().correct_pressure,
     correct_velocity = simulation().correct_velocity,
     mesh = pde().mesh,
-    output_dir = "/home/libz/cylinder"
+    output_dir = "/home/libz/naca0012"
 )
 
-WORLD_GRAPH.output(uh_x = IncompressibleNSRun().uh_x)
+WORLD_GRAPH.output(uh = IncompressibleNSRun().uh)
 WORLD_GRAPH.error_listeners.append(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())
