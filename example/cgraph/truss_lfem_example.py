@@ -34,7 +34,7 @@ post(uh=solver().out, mesh=mesh_creator().mesh, E=materialer().E)
 
 WORLD_GRAPH.output(
     mesh=mesh_creator().mesh,
-    uh_reshaped=post().uh_reshaped,
+    u=post().u,
     strain=post().strain, 
     stress=post().stress
     )

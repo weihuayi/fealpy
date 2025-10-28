@@ -121,11 +121,11 @@ class TrussPostprocess(CNodeType):
     Outputs:
         strain (tensor): Strain of each rod element.
         stress (tensor): Stress of each rod element.
-        uh_reshaped (tensor): Reshaped displacement tensor (NN, GD).
+        u (tensor): Reshaped displacement tensor (NN, GD).
     """
-    TITLE: str = "桁架后处理"
+    TITLE: str = "结果后处理"
     PATH: str = "后处理.位移应力应变"
-    DESC: str = "根据求解器输出的原始位移向量和材料参数，计算每个节点的位移和每个杆单元的应变应力"
+    DESC: str = "根据求解器输出的桁架原始位移向量和材料参数，计算每个节点的位移和每个杆单元的应变应力"
     INPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
         PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
@@ -134,24 +134,24 @@ class TrussPostprocess(CNodeType):
     OUTPUT_SLOTS = [
         PortConf("strain", DataType.TENSOR, desc="每个杆单元的应变", title="应变"),
         PortConf("stress", DataType.TENSOR, desc="每个杆单元的应力", title="应力"),
-        PortConf("uh_reshaped", DataType.TENSOR, desc="重塑后的位移张量 (NN, GD)", title="重塑位移")
+        PortConf("u", DataType.TENSOR, desc="重塑后的位移张量 (NN, GD)", title="位移")
     ]
 
     @staticmethod
     def run(uh, mesh, E):
         from fealpy.backend import backend_manager as bm
         
-        uh_reshaped = uh.reshape(-1, 3) 
+        u = uh.reshape(-1, 3) 
 
         edge = mesh.entity('edge')
         l = mesh.edge_length()
         tan = mesh.edge_tangent()
         unit_tan = tan / l.reshape(-1, 1)
 
-        u_edge = uh_reshaped[edge]
+        u_edge = u[edge]
         delta_u = u_edge[:, 1, :] - u_edge[:, 0, :]
         delta_l = bm.einsum('ij,ij->i', delta_u, unit_tan)
         strain = delta_l / l
         stress = E * strain
         
-        return strain, stress, uh_reshaped
+        return strain, stress, u
