@@ -20,6 +20,8 @@ class DLDMicrofluidicChip2D(CNodeType):
     """
     TITLE: str = "二维 DLD 微流控芯片流体数学模型"
     PATH: str = "模型.DLD 微流控芯片"
+    DESC: str = """该节点基于DLD微流控芯片几何参数构建二维流体数学模型, 定义速度与压力的Dirichlet边界条
+                件及其识别函数，用于后续流场有限元或有限体积求解。"""
     INPUT_SLOTS = [
         PortConf("radius", DataType.FLOAT, title="微柱半径"),
         PortConf("centers", DataType.TENSOR, title="微柱圆心坐标"),

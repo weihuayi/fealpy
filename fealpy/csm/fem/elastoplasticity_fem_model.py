@@ -1,4 +1,6 @@
 
+from typing import Union
+
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
 
@@ -70,11 +72,10 @@ class ElastoplasticityFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        mesh = self.pde.init_mesh()
-        self.set_mesh(mesh)
+        self.set_init_mesh(options['init_mesh'])
         self.set_space_degree(options['space_degree'])
         self.set_space()
-        self.set_material_parameters(E=2.069e5, nu=0.29)  # Set material parameters
+        self.set_material_parameters(E=206900, nu=0.29)  # Set material parameters
         self.E = self.pde.E
         self.nu = self.pde.nu
         self.f = self.pde.Ft_max
@@ -97,7 +98,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
         '''
         self.p = p
 
-    def set_mesh(self, mesh: Mesh) -> Mesh:
+    def set_init_mesh(self, mesh: Union[Mesh, str] = "tri_threshold", **kwargs ):
         '''
         This method generates the mesh according to the domain and boundary conditions defined in the PDE data.
         
@@ -107,7 +108,10 @@ class ElastoplasticityFEMModel(ComputationalModel):
         Returns:
             Mesh: The initialized mesh object.
         '''
-        self.mesh = mesh
+        if isinstance(mesh, str):
+            self.mesh = self.pde.init_mesh[mesh](big_box=(-5,5,-5,5), small_box=(-5,0,-5,0), nx=10, ny=10)
+        else:
+            self.mesh = mesh
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
@@ -171,12 +175,12 @@ class ElastoplasticityFEMModel(ComputationalModel):
         strain = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
         return strain
 
-    def linear_system(self, loading_source, loading_neumann, D_ep, stress):
+    def linear_system(self, loading_neumann, D_ep, stress):
         '''
         Construct the linear system for the elastoplasticity problem.
         
         Parameters:
-            loading_source (callable): Function defining the external load vector.
+            loading_neumann (callable): Function defining the Neumann boundary load vector.
             D_ep (TensorLike): Elastoplastic material stiffness matrix.
             stress (TensorLike): Stress tensor for the cells.
 
@@ -191,16 +195,13 @@ class ElastoplasticityFEMModel(ComputationalModel):
         bform = BilinearForm(self.space)
         bform.add_integrator(elastoplasticintegrator)
         K = bform.assembly(format='csr')
-
-        lform = LinearForm(self.space) 
-        lform.add_integrator(ScalarSourceIntegrator(source=loading_source))
-        lform.add_integrator(ScalarNeumannBCIntegrator(
+        lform2 = LinearForm(self.space)
+        lform2.add_integrator(ScalarNeumannBCIntegrator(
             source=loading_neumann,
             threshold=self.pde.neumann_boundary,
             q=self.space.scalar_space.p + 3
         ))
-        F_ext = lform.assembly()
-        
+        F_ext = lform2.assembly()
         lform2 = LinearForm(self.space)
         elastoplasticintintegrator = ElastoplasticitySourceIntIntegrator(strain_matrix=self.B, stress=stress,
             q=self.space.p + 3,
@@ -228,10 +229,6 @@ class ElastoplasticityFEMModel(ComputationalModel):
 
             # 固定的加载项
             from fealpy.decorator import cartesian
-            @cartesian
-            def loading_source(p):
-                coef = (n + 1) / N
-                return coef * self.pde.source(p)
 
             @cartesian
             def loading_neumann(p):
@@ -260,8 +257,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
                 else:
                     print(f"====== 当前为塑性阶段：{num_plastic}/{num_total} 个点屈服 ======")
 
-                K, F_int, F_ext = self.linear_system(loading_source=loading_source,
-                                                    loading_neumann=loading_neumann,
+                K, F_int, F_ext = self.linear_system(loading_neumann=loading_neumann,
                                                     D_ep=Ctang_trial,
                                                     stress=stress_trial)
 
@@ -288,6 +284,7 @@ class ElastoplasticityFEMModel(ComputationalModel):
                     stress = stress_trial
                     strain_pl = strain_pl_trial
                     strain_e = strain_e_trial
+                    print(strain_e.max())
                     strain_total = strain_total_trial
                 iter_count += 1
 
@@ -303,11 +300,17 @@ class ElastoplasticityFEMModel(ComputationalModel):
         Visualize the mesh and the displacement field.
         """
         save_path = "../elastoplastic_result"
-        self.mesh.nodedata['displacement'] = displacement
+        NN = self.mesh.number_of_nodes()
+        u1 = displacement[:NN]
+        u2 = displacement[NN:]
+        u = bm.stack([u1, u2], axis=-1)
+        self.mesh.nodedata['displacement_vector'] = u
         self.mesh.to_vtk(f"{save_path}/incremental_iter_{n:03d}.vtu")
 
-    def save_data(self, filename):
-        pass
+    def save_data(self):
+        print("等效塑性应变:", self.strain_e)
+        print("塑性应变:", self.strain_pl)
+        print("应力:", self.stress)
 
     
 
