@@ -207,10 +207,10 @@ class IncompressibleNSIPCSRun(CNodeType):
                 uh_z = uh[..., 2]
             else:
                 uh_z = bm.zeros_like(uh_x)
-            ph = p1[:NN]
+            ph = p1
 
-            # mesh.nodedata['ph'] = ph
-            # mesh.nodedata['uh'] = uh.reshape(mesh.GD,-1).T
+            # mesh.nodedata['ph'] = p1
+            # mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
             # mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
             if (i+1) % 10 == 0:
