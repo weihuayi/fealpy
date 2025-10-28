@@ -43,7 +43,7 @@ simulation(
     is_pressure_boundary = pde().is_pressure_boundary,
     apply_bcu = dbc_u().apply_bc,
     apply_bcp = dbc_p().apply_bc,
-    q = 2
+    q = 3
 ) 
 timeline(
     T0 = 0.0,
