@@ -5,12 +5,12 @@ bm.set_backend("numpy")
 WORLD_GRAPH = cgraph.WORLD_GRAPH
 
 problem_data = cgraph.create("Truss3dData")
-mesh_creator = cgraph.create("CreateMesh") # 新增网格创建节点
+mesh_creator = cgraph.create("CreateMesh") 
 spacer = cgraph.create("FunctionSpace")
 materialer = cgraph.create("BarMaterial")
 truss = cgraph.create("Truss")
 solver = cgraph.create("DirectSolver")
-post = cgraph.create("StrainStressPostprocess")
+post = cgraph.create("TrussPostprocess")
 
 problem_data()
 
@@ -34,7 +34,7 @@ post(uh=solver().out, mesh=mesh_creator().mesh, E=materialer().E)
 
 WORLD_GRAPH.output(
     mesh=mesh_creator().mesh,
-    u=solver().out,     
+    uh_reshaped=post().uh_reshaped,
     strain=post().strain, 
     stress=post().stress
     )
