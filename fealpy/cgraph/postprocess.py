@@ -82,23 +82,50 @@ class UDecoupling(CNodeType):
         theta_xyz = u[:, :3]
 
         return uh, theta_xyz
-
-class StrainStressPostprocess(CNodeType):
+    
+class BeamPostprocess(CNodeType):
     r"""
-    Compute strain and stress for each bar element.
+    Postprocess the beam element results to extract nodal displacements and rotations.
 
     Inputs:
-        uh (tensor): Raw displacement vector from the solver.
-        mesh (mesh): Computational mesh containing node and edge information.
-        E (float): Young's modulus of the bar material.
-
+    out (tensor): Combined displacement vector of all nodes. Each node contains six components in the order
+    [u, θx, v, θy, w, θz].
     Outputs:
-        strain (tensor): Strain for each bar element.
-        stress (tensor): Stress for each bar element.
+    uh (tensor): Nodal translational displacements (u, v, w).
+    theta_xyz (tensor): Nodal rotational displacements (θx, θy, θz).
     """
-    TITLE: str = "应力应变后处理"
-    PATH: str = "后处理.应力应变"
-    DESC: str = "根据节点位移和材料参数计算每个杆单元的应变和应力"
+    TITLE: str = "梁单元后处理"
+    PATH: str = "后处理.梁单元"
+    DESC: str = "提取梁单元的节点位移和旋转"
+    INPUT_SLOTS = [
+        PortConf("out", DataType.TENSOR, 1, desc="六个自由度的位移", title="结果")
+    ]
+    OUTPUT_SLOTS = [   
+        PortConf("uh", DataType.TENSOR, desc="节点平动位移", title="平动位移"),
+        PortConf("theta_xyz", DataType.TENSOR, desc="节点转动位移", title="转动位移"),
+    ]
+    @staticmethod
+    def run(out):   
+        uh = out[::2]
+        theta = out[1::2]
+        return uh, theta
+
+class TrussPostprocess(CNodeType):
+    r"""Calculates the displacement of each node and the strain and stress of each rod element 
+    based on the raw displacement vector output by the solver and material parameters.
+
+    Inputs:
+        uh (tensor): Raw displacement vector output by the solver.
+        mesh (mesh): Mesh containing node and cell information.
+        E (float): Elastic modulus of the rod.
+    Outputs:
+        strain (tensor): Strain of each rod element.
+        stress (tensor): Stress of each rod element.
+        uh_reshaped (tensor): Reshaped displacement tensor (NN, GD).
+    """
+    TITLE: str = "桁架后处理"
+    PATH: str = "后处理.位移应力应变"
+    DESC: str = "根据求解器输出的原始位移向量和材料参数，计算每个节点的位移和每个杆单元的应变应力"
     INPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
         PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
@@ -106,7 +133,8 @@ class StrainStressPostprocess(CNodeType):
     ]
     OUTPUT_SLOTS = [
         PortConf("strain", DataType.TENSOR, desc="每个杆单元的应变", title="应变"),
-        PortConf("stress", DataType.TENSOR, desc="每个杆单元的应力", title="应力")
+        PortConf("stress", DataType.TENSOR, desc="每个杆单元的应力", title="应力"),
+        PortConf("uh_reshaped", DataType.TENSOR, desc="重塑后的位移张量 (NN, GD)", title="重塑位移")
     ]
 
     @staticmethod
@@ -126,4 +154,4 @@ class StrainStressPostprocess(CNodeType):
         strain = delta_l / l
         stress = E * strain
         
-        return strain, stress
+        return strain, stress, uh_reshaped
