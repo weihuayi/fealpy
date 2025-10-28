@@ -12,4 +12,3 @@ from .bdf_mesh_reader import BdfMeshReader
 from .inp_mesh_reader import InpMeshReader
 from .boundary_mesh_extractor import BoundaryMeshExtractor
 from .dipole_mesh import Dipole3d
-from .truss_data import *

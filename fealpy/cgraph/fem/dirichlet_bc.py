@@ -31,15 +31,15 @@ class StructuralDirichletBC(DirichletBC):
     TITLE: str = "结构力学 Dirichlet 边界条件处理"
     PATH: str = "有限元.边界条件.结构力学"
     INPUT_SLOTS =[
-        PortConf("gd", DataType.FUNCTION),
-        PortConf("isDDof", DataType.TENSOR),
-        PortConf("K", DataType.TENSOR),
-        PortConf("F", DataType.TENSOR),
-        PortConf("space", DataType.SPACE)
+        PortConf("gd", DataType.FUNCTION, 1, desc="Dirichlet 边界条件", title="边界条件"),
+        PortConf("isDDof", DataType.TENSOR,1, desc="Dirichlet 自由度标记", title="Dirichlet 自由度"),
+        PortConf("K", DataType.TENSOR,  desc="刚度矩阵", title="全局刚度矩阵"),
+        PortConf("F", DataType.TENSOR,  desc="载荷向量", title="全局载荷向量"),
+        PortConf("space", DataType.SPACE,  desc="函数空间", title="函数空间")
     ]
     OUTPUT_SLOTS = [
-        PortConf("K", DataType.TENSOR),
-        PortConf("F", DataType.TENSOR),
+        PortConf("K", DataType.TENSOR,  desc="刚度矩阵", title="边界条件处理过的全局刚度矩阵"),
+        PortConf("F", DataType.TENSOR,  desc="载荷向量", title="边界条件处理过的全局载荷向量"),
     ]
     
     @staticmethod

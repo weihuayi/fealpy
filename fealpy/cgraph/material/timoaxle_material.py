@@ -37,8 +37,8 @@ class TimoMaterial(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("E", DataType.FLOAT, title="梁的弹性模量 E"),
-        PortConf("mu", DataType.FLOAT, title="梁的剪切模量 mu"),
+        PortConf("E", DataType.FLOAT, title="梁的弹性模量"),
+        PortConf("mu", DataType.FLOAT, title="梁的剪切模量"),
         PortConf("Ax", DataType.TENSOR, title="X 方向横截面积"),
         PortConf("Ay", DataType.TENSOR, title="Y 方向横截面积"),
         PortConf("Az", DataType.TENSOR, title="Z 方向横截面积"),
@@ -48,7 +48,7 @@ class TimoMaterial(CNodeType):
     ]
     
     @staticmethod
-    def run(property="Steel", beam_type="Timoshemko beam", beam_E=2.1e11, beam_nu=0.3):
+    def run(property="Steel", beam_type="Timoshemko beam", beam_E=None, beam_nu=None):
         from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         from fealpy.csm.material import TimoshenkoBeamMaterial
         model = TimobeamAxleData3D()
@@ -95,7 +95,7 @@ class AxleMaterial(CNodeType):
     ]
         
     @staticmethod
-    def run(property="Steel", axle_type="Bar",axle_E=1.97e6, axle_nu=-0.5):
+    def run(property="Steel", axle_type="Bar",axle_E=None, axle_nu=None):
         from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         from fealpy.csm.material import AxleMaterial
         model = TimobeamAxleData3D()
