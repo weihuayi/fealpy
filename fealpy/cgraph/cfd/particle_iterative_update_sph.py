@@ -101,7 +101,6 @@ class ParticleIterativeUpdateSPH(CNodeType):
                 
                 data.clear()
             
-        import numpy as np
         velocity = sph_solver.ps.particles["velocity"]
         pressure = sph_solver.ps.particles["pressure"]
-        return np.sum(velocity), np.sum(pressure)
+        return velocity, pressure
