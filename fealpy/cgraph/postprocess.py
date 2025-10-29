@@ -69,7 +69,7 @@ class UDecoupling(CNodeType):
     DESC: str = "将模型的平动位移和转动位移做后处理"
     INPUT_SLOTS = [
         PortConf("out", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
-        PortConf("node_ldof", DataType.INT, 0, desc="节点的自由度个数", title="自由度长度", default=2, items=[2, 3, 4, 6]),
+        PortConf("node_ldof", DataType.MENU, 0, desc="节点的自由度个数", title="自由度长度", default=2, items=[2, 3, 4, 6]),
         PortConf("type", DataType.MENU, 0, desc="单元的类型", title="单元类型", default="Truss", items=["Truss", "Euler_beam", "Timo_beam"]),
     ]
     OUTPUT_SLOTS = [

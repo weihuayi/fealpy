@@ -30,7 +30,8 @@ class TimoMaterial(CNodeType):
     DESC: str = "定义列车轮轴系统的梁材料属性"
     INPUT_SLOTS = [
         PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
-        PortConf("beam_type", DataType.STRING, 0, desc="轮轴材料类型选择", title="梁材料类型", default="Timoshenko"),
+        PortConf("beam_type", DataType.MENU, 0, desc="轮轴材料类型选择", title="梁材料", default="Timo_beam", 
+                 items=["Euler_beam", "Timo_beam"]),
         PortConf("beam_E", DataType.FLOAT, 0, desc="梁的弹性模量", title="梁弹性模量", default=2.1e11),
         PortConf("beam_nu", DataType.FLOAT, 0, desc="梁的泊松比", title="梁泊松比", default=0.3)
     ]
@@ -79,12 +80,12 @@ class AxleMaterial(CNodeType):
             mu (float): Shear modulus, computed as `E / [2(1 + nu)]`.
     
     """
-    TITLE: str = "列车轮轴杆件材料属性"
+    TITLE: str = "列车轮轴弹簧材料属性"
     PATH: str = "材料.固体"
     DESC: str = "定义列车轮轴系统中弹簧的材料属性"
     INPUT_SLOTS = [
         PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
-        PortConf("axle_type", DataType.MENU, 0, desc="轮轴材料类型选择", title="弹簧材料类型", default="Spring", items=["Bar", "other"]),
+        PortConf("axle_type", DataType.STRING, 0, desc="轮轴材料类型", title="弹簧材料", default="Spring"),
         PortConf("axle_stiffness", DataType.FLOAT, 0, desc="弹簧刚度", title="弹簧的刚度", default=1.976e6),
         PortConf("axle_E", DataType.FLOAT, 0, desc="弹性模量", title="弹簧的弹性模量", default=1.976e6),
         PortConf("axle_nu", DataType.FLOAT, 0, desc="泊松比", title="弹簧的泊松比", default=-0.5)
