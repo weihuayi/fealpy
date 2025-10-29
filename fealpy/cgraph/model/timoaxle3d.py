@@ -31,6 +31,8 @@ class Timoaxle3d(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
+        PortConf("beam_para", DataType.TENSOR, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
+        PortConf("axle_para", DataType.TENSOR, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),
         PortConf("external_load", DataType.FUNCTION, desc="全局载荷向量的函数", title="外部载荷"),
         PortConf("dirichlet_dof_index", DataType.FUNCTION, desc="Dirichlet 自由度索引的函数", title="边界自由度索引")
         
@@ -42,5 +44,5 @@ class Timoaxle3d(CNodeType):
         model = TimobeamAxleData3D( beam_para, axle_para, kappa)
         return tuple(
             getattr(model, name)
-            for name in ["external_load", "dirichlet_dof_index"]
+            for name in ["beam_para", "axle_para", "external_load", "dirichlet_dof_index"]
         )

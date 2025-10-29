@@ -56,58 +56,42 @@ class UDecoupling(CNodeType):
     from the combined output vector.
     
     Inputs:
-        out (tensor): Combined displacement vector of all nodes.Each node contains six components in the order 
-            [u, v, w, θx, θy, θz].
+        out (tensor): Combined displacement vector of all nodes. 
+        node_ldof (INT): Number of local degrees of freedom (DOFs) per node. 
+        type (MENU): Type of finite element.
             
     Outputs:
-        uh (tensor): Translational displacement field (X, Y, Z components).
-        theta_xyz (tensor): Rotational displacement field (rotations around X, Y, Z axes).
+        uh (tensor): Translational displacement field.
+        theta (tensor): Rotational displacement field.
     """
     TITLE: str = "位移后处理"
-    PATH: str = "后处理.解耦"
-    DESC: str = "将轮轴的平动位移和转动位移做解耦处理"
+    PATH: str = "后处理.位移"
+    DESC: str = "将模型的平动位移和转动位移做后处理"
     INPUT_SLOTS = [
-        PortConf("out", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量")
+        PortConf("out", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
+        PortConf("node_ldof", DataType.INT, 0, desc="节点的自由度个数", title="自由度长度", default=2, items=[2, 3, 4, 6]),
+        PortConf("type", DataType.MENU, 0, desc="单元的类型", title="单元类型", default="Truss", items=["Truss", "Euler_beam", "Timo_beam"]),
     ]
     OUTPUT_SLOTS = [
-        PortConf("uh", DataType.TENSOR, desc="X,Y,Z三个方向上的位移", title="平动位移"),
-        PortConf("theta_xyz", DataType.TENSOR, desc="X,Y,Z三个方向的弯曲和剪切产生的位移", title="转动位移"),
+        PortConf("uh", DataType.TENSOR,  title="平动位移"),
+        PortConf("theta", DataType.TENSOR, title="转动位移"),
     ]
 
     @staticmethod
-    def run(out):
-        u = out.reshape(-1, 6)
+    def run(out, node_ldof, type):
         
-        uh = u[:, 3:]
-        theta_xyz = u[:, :3]
+        u = out.reshape(-1, node_ldof)
+        if type == "Truss":
+            uh = u
+        elif type == "Euler_beam":
+            uh = u[:, :1]
+            theta = u[:, 1:]
+        elif type == "Timo_beam":
+            uh = u[:, :3]
+            theta = u[:, 3:]
+        else: 
+            raise ValueError(f'post-processing for this type of displacement is not supported yet.')
 
-        return uh, theta_xyz
-    
-class BeamPostprocess(CNodeType):
-    r"""
-    Postprocess the beam element results to extract nodal displacements and rotations.
-
-    Inputs:
-    out (tensor): Combined displacement vector of all nodes. Each node contains six components in the order
-    [u, θx, v, θy, w, θz].
-    Outputs:
-    uh (tensor): Nodal translational displacements (u, v, w).
-    theta_xyz (tensor): Nodal rotational displacements (θx, θy, θz).
-    """
-    TITLE: str = "梁单元后处理"
-    PATH: str = "后处理.梁单元"
-    DESC: str = "提取梁单元的节点位移和旋转"
-    INPUT_SLOTS = [
-        PortConf("out", DataType.TENSOR, 1, desc="六个自由度的位移", title="结果")
-    ]
-    OUTPUT_SLOTS = [   
-        PortConf("uh", DataType.TENSOR, desc="节点平动位移", title="平动位移"),
-        PortConf("theta_xyz", DataType.TENSOR, desc="节点转动位移", title="转动位移"),
-    ]
-    @staticmethod
-    def run(out):   
-        uh = out[::2]
-        theta = out[1::2]
         return uh, theta
 
 class TrussPostprocess(CNodeType):

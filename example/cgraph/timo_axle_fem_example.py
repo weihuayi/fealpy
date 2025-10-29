@@ -61,17 +61,16 @@ timoaxle_model(
 solver(A = timoaxle_model().K,
        b = timoaxle_model().F)
 
-postprocess(out = solver().out)
+postprocess(out = solver().out, node_ldof=6, type="Timo_beam")
 report(
+    beam_para = model().beam_para,
+    axle_para = model().axle_para,
+    section_shapes = "circular",
+    shear_factors = 10/9,
     mesh=mesher(), 
+    property="Steel",
     beam_E = beam_materialer().E,
     beam_mu = beam_materialer().mu,
-    Ax =  beam_materialer().Ax,
-    Ay = beam_materialer().Ay,
-    Az = beam_materialer().Az,
-    J = beam_materialer().J,
-    Iy = beam_materialer().Iy,
-    Iz = beam_materialer().Iz,
     axle_E = axle_materialer().E,
     axle_mu = axle_materialer().mu,
     uh = solver().out
@@ -79,7 +78,7 @@ report(
 
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher(), u=solver().out, uh=postprocess().uh, theta_xyz=postprocess().theta_xyz, report=report())
+WORLD_GRAPH.output(mesh=mesher(), u=solver().out, uh=postprocess().uh, theta=postprocess().theta, report=report())
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())
