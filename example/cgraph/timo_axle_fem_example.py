@@ -63,6 +63,7 @@ solver(A = timoaxle_model().K,
 
 postprocess(out = solver().out, node_ldof=6, type="Timo_beam")
 report(
+    path = r"C:\Users\Administrator\Desktop",
     beam_para = model().beam_para,
     axle_para = model().axle_para,
     section_shapes = "circular",

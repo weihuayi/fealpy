@@ -8,6 +8,7 @@ class SolidReport(CNodeType):
     r"""Solid Mechanics Computation Report Node.
     
     Inputs:
+        path(string): 
         beam_para (TENSOR): Beam section parameters, each row represents [Diameter, Length, Count].
         axle_para (TENSOR): Axle section parameters, each row represents [Diameter, Length, Count].
         section_shapes (MENU): Beam cross-section shape configuration parameter.
@@ -31,6 +32,7 @@ class SolidReport(CNodeType):
     PATH: str = "后处理.报告生成"
     DESC: str = "生成包含几何、网格、材料与计算结果信息的固体力学分析报告"
     INPUT_SLOTS = [
+        PortConf("path", DataType.STRING, 1, desc="仿真报告的存储路径", title="存储路径"),
         PortConf("beam_para", DataType.TENSOR, 0, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
         PortConf("axle_para", DataType.TENSOR, 0, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),
         PortConf("section_shapes", DataType.MENU, 0, desc="梁的截面形状", title="梁截面形状", default="circular", 
@@ -50,7 +52,7 @@ class SolidReport(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("report", DataType.NONE, title="报告文件(PDF)")  
+        PortConf("report", DataType.NONE, title="报告文件路径")
     ]
 
     @staticmethod
@@ -71,8 +73,12 @@ class SolidReport(CNodeType):
         for name in styles.byName:
             styles[name].fontName = "STSong-Light"
         
-        filename = "solid_report.pdf"
-        filepath = os.path.abspath(filename)
+        path = options.get("path")
+        file = "solid_report"
+        filename ="列车轮轴场景仿真结果报告.pdf"
+        folder = os.path.join(path, file)
+        os.makedirs(folder, exist_ok=True)
+        filepath = os.path.join(folder, filename)
         
         doc = SimpleDocTemplate(filepath, pagesize=A4)
         story = []
@@ -119,7 +125,7 @@ class SolidReport(CNodeType):
         geometry_table = Table(geometry_data, hAlign="LEFT", colWidths=[5*cm, 11*cm])
         geometry_table.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (-1, -1), "STSong-Light"),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),  # 只表头灰色
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),  # 表头灰色
             ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
             ("ALIGN", (0, 0), (-1, -1), "LEFT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -192,7 +198,7 @@ class SolidReport(CNodeType):
               colWidths=[1.5*cm] + [2.5*cm]*6)
         
         table.setStyle(TableStyle([
-            ("FONTNAME", (0, 0), (-1, -1), "STSong-Light"),  # 中文兼容字体
+            ("FONTNAME", (0, 0), (-1, -1), "STSong-Light"),  
             ("FONTSIZE", (0, 0), (-1, -1), 8),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),  # 表头灰底
             ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
@@ -207,6 +213,6 @@ class SolidReport(CNodeType):
         story.append(Paragraph("<b>4.2 位移云图</b>", styles["Heading3"]))
         
         doc.build(story)
-        print(f"✅ PDF report generated: {filepath}")
+        print(f"PDF report generated: {filepath}")
         
         return {"report": filepath}
