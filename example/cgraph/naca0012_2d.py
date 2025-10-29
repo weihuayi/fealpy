@@ -16,7 +16,7 @@ IncompressibleNSRun = cgraph.create("IncompressibleNSIPCSRun")
 pde(
     mu = 0.001,
     rho = 1.0,
-    h = 0.05)
+    h = 0.04)
 uspacer(mesh = pde().mesh, p=2, gd = 2)
 pspacer(mesh = pde().mesh, p=1)
 dbc_u(

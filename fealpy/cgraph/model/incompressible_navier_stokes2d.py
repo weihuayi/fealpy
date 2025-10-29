@@ -366,7 +366,7 @@ class FlowPastFoil(CNodeType):
         class PDE():
             def __init__(self, options : dict = None ):
                 self.eps = 1e-10
-                self.box = [-0.5, 2.7, -0.5, 0.5]
+                self.box = [-0.5, 2.7, -0.4, 0.4]
                 self.options = options
                 self.rho = options.get('rho', 1.0)
                 self.mu = options.get('mu', 0.001)
