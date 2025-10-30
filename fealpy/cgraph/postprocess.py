@@ -139,3 +139,38 @@ class TrussPostprocess(CNodeType):
         stress = E * strain
         
         return strain, stress, u
+
+class AntennaPostprocess(CNodeType):
+    r"""Compute the real-valued electric field at each antenna element 
+    from the complex-valued finite element solution.
+    
+    Inputs:
+        uh (tensor): Complex-valued finite element solution vector (nodal degrees of freedom).
+        space (Space): Finite element space containing mesh and basis function information.
+            
+    Outputs:
+        E (tensor): Real part of the electric field evaluated at the centroid of each element.
+    """
+
+    TITLE: str = "天线单元后处理"
+    PATH: str = "后处理.天线单元"
+    DESC: str = "将天线的自由度平分到各自单元"
+    INPUT_SLOTS = [
+        PortConf("uh", DataType.FUNCTION, 1, desc="求解器输出的复数场自由度", title="有限元解"),
+        PortConf("space", DataType.SPACE, 1, desc="包含节点与单元拓扑的有限元空间", title="有限元空间"),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("E", DataType.TENSOR, desc="各单元重心处的电场强度（实部）", title="单元电场"),
+    ]
+
+    @staticmethod
+    def run(uh, space):
+        from fealpy.backend import backend_manager as bm
+        uh_real = uh.copy()
+        uh_real[:] = bm.real(uh[:])
+        mesh = space.mesh
+        bc = bm.array([[1/3, 1/3, 1/3, 1/3]], dtype=bm.float64)
+        val = space.value(uh_real, bc)
+        E = val.reshape(mesh.number_of_cells(), -1)
+
+        return E
