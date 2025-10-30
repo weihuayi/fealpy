@@ -1,6 +1,5 @@
 from ..nodetype import CNodeType, PortConf, DataType
 
-
 class ParticleIterativeUpdateSPH(CNodeType):
     r"""Dam Break Particle Iteration Update.
 
@@ -57,6 +56,9 @@ class ParticleIterativeUpdateSPH(CNodeType):
         import json
         import os
         import gzip
+        from fealpy.cfd.simulation.utils import VTKWriter
+        writer = VTKWriter()
+        
         particles = ParticleSystem.initialize_particles(pp, bpp, rho0)
         sph_solver = BamBreakSolver(particles)
         data = []
@@ -78,28 +80,41 @@ class ParticleIterativeUpdateSPH(CNodeType):
 
             if i % 30 == 0 and i != 0:
                 sph_solver.rein_rho(idx)
-            os.makedirs(output_dir, exist_ok=True)
-        
-            data.append ({
-                "time": round(i * dt, 8),
-                "值":{
-                    "uh" : sph_solver.ps.particles["velocity"].tolist(),  # ndarray -> list
-                    "ph" : sph_solver.ps.particles["pressure"].tolist(),  # ndarray -> list
-                }, 
-                "几何": {
-                    "position": sph_solver.ps.particles["position"].tolist(),  # ndarray -> list
-                }
-                })
-            
-            if len(data) == 10 :
-                j += 1
-                file_name = f"file_{j:08d}.json.gz"
-                file_path = os.path.join(output_dir, file_name)
-
-                with gzip.open(file_path, "wt", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
                 
-                data.clear()
+            # current_data = {
+            # "time": round(i * dt, 8),
+            # "position": sph_solver.ps.particles["position"].tolist(),  # ndarray -> list
+            # "velocity": sph_solver.ps.particles["velocity"].tolist(),  # ndarray -> list
+            # "pressure": sph_solver.ps.particles["pressure"].tolist(),  # ndarray -> list
+            # }    
+            
+            # path = "./dambreak/"
+            # zfname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'    
+            # writer.write_vtk(current_data, zfname) 
+                
+            os.makedirs(output_dir, exist_ok=True)
+            if i % 10 == 0:
+                data.append ({
+                    "time": round(i * dt, 8),
+                    "值":{
+                        "uh" : sph_solver.ps.particles["velocity"].tolist(),  # ndarray -> list
+                        "ph" : sph_solver.ps.particles["pressure"].tolist(),  # ndarray -> list
+                    }, 
+                    "几何": {
+                        "position": sph_solver.ps.particles["position"].tolist(),  # ndarray -> list
+                    }
+                    })
+                
+                if len(data) == 10 :
+                    j += 1
+                    file_name = f"file_{j:08d}.json.gz"
+                    file_path = os.path.join(output_dir, file_name)
+
+                    with gzip.open(file_path, "wt", encoding="utf-8") as f:
+                        json.dump(data, f, indent=4, ensure_ascii=False)
+                    
+                    data.clear()
+            
             
         velocity = sph_solver.ps.particles["velocity"]
         pressure = sph_solver.ps.particles["pressure"]

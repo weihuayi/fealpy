@@ -7,11 +7,11 @@ generation = cgraph.create("ParticleGenerationSPH")
 iterative = cgraph.create("ParticleIterativeUpdateSPH")
 
 generation(
-    dx=0.2,
-    dy=0.2,
+    dx=0.03,
+    dy=0.03,
 )
 
-iterative(maxstep=200, dx=0.03, dy=0.03, 
+iterative(maxstep=2000, dx=0.03, dy=0.03, 
           rhomin=995, dt=0.001, c0=10, gamma=7, alpha=0.01,rho0=1000,
     pp=generation().pp,
     bpp=generation().bpp,output_dir="/home/peter/output")
