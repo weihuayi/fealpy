@@ -32,8 +32,8 @@ class ParticleIterativeUpdateSPH(CNodeType):
     包含完整的SPH算法流程：邻居搜索、密度更新、压力计算、速度更新、位置更新等。"""
     INPUT_SLOTS = [
         PortConf("maxstep", DataType.INT, ttype=0, title="最大迭代步数"),
-        PortConf("dx", dtype=DataType.FLOAT, ttype=0, title="水平粒子间隔"),
-        PortConf("dy", dtype=DataType.FLOAT, ttype=0, title="垂直粒子间隔"),
+        PortConf("dx", dtype=DataType.FLOAT, ttype=1, title="水平粒子间隔"),
+        PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔"),
         PortConf("rhomin", dtype=DataType.FLOAT, ttype=0, title="最小参考密度"),
         PortConf("dt", dtype=DataType.FLOAT, ttype=0, title="时间步长"),
         PortConf("c0", dtype=DataType.FLOAT, ttype=0, title="初始声速"),

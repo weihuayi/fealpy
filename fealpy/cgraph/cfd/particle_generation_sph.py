@@ -28,6 +28,8 @@ class ParticleGenerationSPH(CNodeType):
         PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔"),
     ]
     OUTPUT_SLOTS = [
+        PortConf("dx", dtype=DataType.FLOAT, title="水平粒子间隔"),
+        PortConf("dy", dtype=DataType.FLOAT, title="垂直粒子间隔"),
         PortConf("pp", dtype=DataType.TENSOR, title="流体粒子坐标"),
         PortConf("bpp", dtype=DataType.TENSOR, title="边界粒子坐标"),
     ]
