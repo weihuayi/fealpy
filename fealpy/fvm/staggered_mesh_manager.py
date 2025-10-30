@@ -3,22 +3,23 @@ from fealpy.mesh import QuadrangleMesh
 class StaggeredMeshManager:
     
 
-    def __init__(self, pde_model, nx, ny):
-        self.nx = nx
-        self.ny = ny
-        self.hx = 1.0 / nx
-        self.hy = 1.0 / ny
-        self.pde = pde_model
+    def __init__(self, domain, nx, ny):
+        x_left = domain[0]
+        x_right = domain[1]
+        y_bottom = domain[2]
+        y_top = domain[3]
+        hx = (x_right-x_left)/ nx
+        hy = (y_top-y_bottom)/ ny
 
         self.umesh = QuadrangleMesh.from_box(
-            box=[-self.hx / 2, 1 + self.hx / 2, 0, 1],
+            box=[-hx / 2 + x_left, hx / 2 + x_right, y_bottom, y_top],
             nx=nx + 1, ny=ny
         )
         self.vmesh = QuadrangleMesh.from_box(
-            box=[0, 1, -self.hy / 2, 1 + self.hy / 2],
+            box=[x_left, x_right, -hy / 2 + y_bottom, hy / 2 + y_top],
             nx=nx, ny=ny + 1
         )
-        self.pmesh = pde_model.init_mesh['uniform_qrad'](nx=nx, ny=ny)
+        self.pmesh = QuadrangleMesh.from_box(box=domain, nx=nx, ny=ny)
 
     def get_dof_mapping_ucell2pedge(self):
         pc2e = self.pmesh.cell_to_edge()

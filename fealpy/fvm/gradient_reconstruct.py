@@ -29,9 +29,13 @@ class GradientReconstruct:
             vh_f = 0.5 * (vh_i + vh_j) 
             bm.add.at(grad_v, self.e2c[:, 0], vh_f[:, None] * self.Sf)
             bm.add.at(grad_v, self.e2c[:, 1], -vh_f[:, None] * self.Sf)
-            # print(NC)
-            # print(grad_u.shape, grad_v.shape)
             grad_U = bm.stack([grad_u,grad_v], axis=1)
+        return grad_U
+
+    def test(self, U):
+        cell_measure = self.mesh.entity_measure('cell')
+        grad_U = self.GreenGauss(U)
+        grad_U /= cell_measure[:, None]  # (NC, 2)
         return grad_U
 
     def AverageGradientreDirichlet(self, U, gd):
@@ -40,13 +44,11 @@ class GradientReconstruct:
         bdedge = self.mesh.boundary_face_index()
         epoints = self.mesh.entity_barycenter('face')[bdedge, :]
         bdu = gd(epoints)
-        # print(bdu.shape, self.Sf[bdedge, :].s+hape)
         GD = U[..., None].shape[1]
         if GD == 1:
             bm.add.at(grad_U, self.e2c[bdedge, 0], bdu[:, None] * self.Sf[bdedge, :])
             grad_U /= cell_measure[:, None]  # (NC, 2)
         elif GD == 2:
-            # print(grad_U.shape, bdu[:, 0, None].shape , self.Sf[bdedge, :].shape)
             bm.add.at(grad_U[:,0,:], self.e2c[bdedge, 0], bdu[:, 0, None] * self.Sf[bdedge, :])
             bm.add.at(grad_U[:,1,:], self.e2c[bdedge, 0], bdu[:, 1, None] * self.Sf[bdedge, :])
             grad_U /= cell_measure[:, None, None]
@@ -58,7 +60,6 @@ class GradientReconstruct:
         grad_u = self.GreenGauss(uh)
         LNE = self.mesh.number_of_vertices_of_cells()
         bdedge = self.mesh.boundary_face_index()
-        # print(bdcell)
         d = 2*cell_measure[self.e2c[bdedge, 0]]/(LNE*face_measure[bdedge])
         bduh = uh[self.e2c[bdedge, 0]]
         gf = gd(self.mesh.entity_barycenter('face')[bdedge, :])

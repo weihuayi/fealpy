@@ -40,7 +40,7 @@ class NSFVMSimpleModel(ComputationalModel):
         )
 
     def set_pde(self, pde: Union[int, object]) -> None:
-        """Set PDE model (Stokes/Navier–Stokes example)."""
+        """Set PDE model (Navier–Stokes example)."""
         self.pde = PDEModelManager("navier_stokes").get_example(pde) if isinstance(pde, int) else pde
 
     def set_mesh(self, nx: int, ny: int) -> None:

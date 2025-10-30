@@ -129,9 +129,12 @@ class StokesFVMRCModel(ComputationalModel):
         AB, f = dbc.DiffusionApply(AB, f)
         ap = AB.diags().values
         
-        M1, f[:self.NC] = nbc.ConvectionApplyX(M1, f[:self.NC])
-        M2, f[self.NC:] = nbc.ConvectionApplyY(M2, f[self.NC:])
+        M1 = nbc.ConvectionApplyX(M1, f[:self.NC])
+        M2 = nbc.ConvectionApplyY(M2, f[self.NC:])
         
+        M1 = nbc.ConvectionApplyX(M1, f[:self.NC])
+        M2 = nbc.ConvectionApplyY(M2, f[self.NC:])
+
         M4 = BlockForm([[M1], [M2]]).assembly_sparse_matrix(format='csr')
 
         return AB, M3, M4, f, ap
@@ -148,6 +151,7 @@ class StokesFVMRCModel(ComputationalModel):
         ap_edge = (ap[e2c[:, 0]] + ap[e2c[:, 1]]) / 2
 
         grad_p = GradientReconstruct(mesh).AverageGradientreNeumann(ph0, self.pde.neumann_pressure)
+        # grad_p = GradientReconstruct(mesh).test(ph0)
         grad_f = GradientReconstruct(mesh).reconstruct(grad_p)
 
         x = mesh.boundary_face_index()

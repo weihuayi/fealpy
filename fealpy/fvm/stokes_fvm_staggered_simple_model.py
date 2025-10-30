@@ -44,7 +44,7 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
 
     def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
         """Set the computational staggered mesh."""
-        self.staggered_mesh = StaggeredMeshManager(self.pde, nx, ny)
+        self.staggered_mesh = StaggeredMeshManager(self.pde.domain(), nx, ny)
         self.umesh = self.staggered_mesh.umesh
         self.vmesh = self.staggered_mesh.vmesh
         self.pmesh = self.staggered_mesh.pmesh

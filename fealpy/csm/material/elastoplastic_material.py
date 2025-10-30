@@ -171,7 +171,7 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         De = self.elastic_matrix()  #  (1,1,N,N)
         N = self.plastic_normal(stress) 
         value = bm.einsum('...i,...j->...ij', N, N)  # (NC,NQ,N,N)
-        coef = 6 * G**2 / (3 * G + H)
+        coef = 4 * G**2 / (3 * G + H)
         D_ep = De - coef * value  # (NC,NQ,N,N)
         
         return D_ep
@@ -259,9 +259,10 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         
         De = self.elastic_matrix()  # (NC, NQ, 3, 3)
 
-        sigma_trial = bm.einsum('...ij,...j->...i', De, strain_total)  # (NC, NQ, 3)
+        sigma_trial = bm.einsum('...ij,...j->...i', De, strain_total-strain_pl_n)  # (NC, NQ, 3)
         s_trial = self.deviatoric_stress(sigma_trial)  # (NC, NQ, 3)
         stress_trial_e = bm.sqrt(3.0 / 2.0) * bm.sqrt(bm.sum(s_trial ** 2, axis=-1))  # (NC, NQ)
+        print(stress_trial_e.max())
 
         f_trial = self.yield_function(sigma_trial, strain_e_n)  # (NC, NQ)
         is_plastic = f_trial > 0  # (NC, NQ) 
@@ -302,3 +303,4 @@ class ElastoplasticMaterial(LinearElasticMaterial):
 
 
         return sigma_np1, strain_pl_n1, strain_e_n1, Ctang, is_plastic
+    

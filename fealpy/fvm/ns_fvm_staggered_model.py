@@ -60,7 +60,7 @@ class NSFVMStaggeredModel(ComputationalModel):
             self.pde = pde
 
     def set_mesh(self, nx: int, ny: int) -> None:
-        self.staggered_mesh = StaggeredMeshManager(self.pde, nx=nx, ny=ny)
+        self.staggered_mesh = StaggeredMeshManager(self.pde.domain(), nx=nx, ny=ny)
         self.umesh = self.staggered_mesh.umesh
         self.vmesh = self.staggered_mesh.vmesh
         self.pmesh = self.staggered_mesh.pmesh

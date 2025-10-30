@@ -90,14 +90,14 @@ class NeumannBC:
         A_0 = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
         A = A + A_0
 
-        cell_measure = self.mesh.entity_measure('cell')
-        face_measure = self.mesh.entity_measure('face')
-        LNE = self.mesh.number_of_vertices_of_cells()
-        d = 2*cell_measure[e2c[bdedge, 0]]/(LNE*face_measure[bdedge])
-        gf = self.gd(self.mesh.entity_barycenter('face')[bdedge, :])
-        bm.add_at(b, bde2c, -gf * d * Sf[bdedge, 0])
+        # cell_measure = self.mesh.entity_measure('cell')
+        # face_measure = self.mesh.entity_measure('face')
+        # LNE = self.mesh.number_of_vertices_of_cells()
+        # d = 2*cell_measure[e2c[bdedge, 0]]/(LNE*face_measure[bdedge])
+        # gf = self.gd(self.mesh.entity_barycenter('face')[bdedge, :])
+        # bm.add_at(b, bde2c, -gf * d * Sf[bdedge, 0])
         
-        return A,b
+        return A
 
     def ConvectionApplyY(self,A,b):
 
@@ -111,13 +111,13 @@ class NeumannBC:
         A_0 = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
         A = A + A_0
 
-        cell_measure = self.mesh.entity_measure('cell')
-        face_measure = self.mesh.entity_measure('face')
-        LNE = self.mesh.number_of_vertices_of_cells()
-        d = 2*cell_measure[e2c[bdedge, 0]]/(LNE*face_measure[bdedge])
-        gf = self.gd(self.mesh.entity_barycenter('face')[bdedge, :])
-        bm.add_at(b, bde2c, -gf * d * Sf[bdedge, 1])
+        # cell_measure = self.mesh.entity_measure('cell')
+        # face_measure = self.mesh.entity_measure('face')
+        # LNE = self.mesh.number_of_vertices_of_cells()
+        # d = 2*cell_measure[e2c[bdedge, 0]]/(LNE*face_measure[bdedge])
+        # gf = self.gd(self.mesh.entity_barycenter('face')[bdedge, :])
+        # bm.add_at(b, bde2c, -gf * d * Sf[bdedge, 1])
         
-        return A,b
+        return A
 
     

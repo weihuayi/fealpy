@@ -103,6 +103,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         cells = bm.arange(mesh.number_of_cells()) if self.index is _S else self.index
         
         # 参数
+        NC = len(cells)
         l = mesh.entity_measure('cell')[cells]
         E, mu = self.material.E, self.material.mu
         Ax, Ay, Az = self.material.Ax, self.material.Ay, self.material.Az
@@ -111,7 +112,7 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         # 坐标变换矩阵
         R = self._coord_transform()
         
-        return E, mu, l, Ax, Ay, Az, J, Iy, Iz, R, len(cells)
+        return E, mu, l, Ax, Ay, Az, J, Iy, Iz, R, NC
 
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:

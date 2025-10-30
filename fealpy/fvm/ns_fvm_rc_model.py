@@ -135,8 +135,8 @@ class NSFVMRCModel(ComputationalModel):
         ap = AB.diags().values
         # f[:self.NC] = dbc.ConvectionApplyX(f[:self.NC],self.pde.dirichlet_velocity)
         # f[self.NC:] = dbc.ConvectionApplyX(f[self.NC:],self.pde.dirichlet_velocity)
-        M1, f[:self.NC] = nbc.ConvectionApplyX(M1, f[:self.NC])
-        M2, f[self.NC:] = nbc.ConvectionApplyY(M2, f[self.NC:])
+        M1 = nbc.ConvectionApplyX(M1, f[:self.NC])
+        M2 = nbc.ConvectionApplyY(M2, f[self.NC:])
         
         M4 = BlockForm([[M1], [M2]]).assembly_sparse_matrix(format='csr')
 

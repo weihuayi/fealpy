@@ -59,7 +59,7 @@ class StokesFVMStaggeredModel(ComputationalModel):
             self.pde = pde
 
     def set_mesh(self, nx: int, ny: int) -> None:
-        self.staggered_mesh = StaggeredMeshManager(self.pde, nx=nx, ny=ny)
+        self.staggered_mesh = StaggeredMeshManager(self.pde.domain(), nx=nx, ny=ny)
         self.umesh = self.staggered_mesh.umesh
         self.vmesh = self.staggered_mesh.vmesh
         self.pmesh = self.staggered_mesh.pmesh
@@ -99,10 +99,7 @@ class StokesFVMStaggeredModel(ComputationalModel):
 
     def assemble_pressure_gradient_u(self) -> TensorLike:
         """Assemble the pressure gradient matrix M1 on the u-mesh"""
-        pedge_centers = self.pmesh.entity_barycenter('edge')
-        ucell_centers = self.umesh.entity_barycenter('cell')
-        dist1 = bm.sum((pedge_centers[:, None, :] - ucell_centers[None, :, :])**2, axis=2)
-        ucell2pedge = bm.argmin(dist1, axis=0)
+        ucell2pedge = self.staggered_mesh.get_dof_mapping_ucell2pedge()
         pedge2cell = self.pmesh.edge_to_cell()
         upressurecell = pedge2cell[ucell2pedge, :2]
         M1 = COOTensor(
@@ -114,10 +111,7 @@ class StokesFVMStaggeredModel(ComputationalModel):
     
     def assemble_pressure_gradient_v(self) -> TensorLike:
         """Assemble the pressure gradient matrix M2 on the v-mesh"""
-        vcell_centers = self.vmesh.entity_barycenter('cell')
-        pedge_centers = self.pmesh.entity_barycenter('edge')
-        dist2 = bm.sum((pedge_centers[:, None, :] - vcell_centers[None, :, :])**2, axis=2)
-        vcell2pedge = bm.argmin(dist2, axis=0)
+        vcell2pedge = self.staggered_mesh.get_dof_mapping_vcell2pedge()
         pedge2cell = self.pmesh.edge_to_cell()
         vpressurecell = pedge2cell[vcell2pedge, :2]
         M2 = COOTensor(
@@ -129,10 +123,7 @@ class StokesFVMStaggeredModel(ComputationalModel):
 
     def assemble_divergence_u(self) -> TensorLike:
         """Assemble the continuity equation matrix M3 (corresponding to u velocity) on the p-mesh"""
-        uedge_centers = self.umesh.entity_barycenter('edge')
-        pcell_centers = self.pmesh.entity_barycenter('cell')
-        dist3 = bm.sum((uedge_centers[:, None, :] - pcell_centers[None, :, :])**2, axis=2)
-        pcell2uedge = bm.argmin(dist3, axis=0)
+        pcell2uedge = self.staggered_mesh.get_dof_mapping_pcell2uedge()
         uedge2cell = self.umesh.edge_to_cell()
         uvelocitycell = uedge2cell[pcell2uedge, :2]
         M3 = COOTensor(
@@ -144,10 +135,7 @@ class StokesFVMStaggeredModel(ComputationalModel):
 
     def assemble_divergence_v(self) -> TensorLike:
         """Assemble the continuity equation matrix M4 (corresponding to v velocity) on the p-mesh"""
-        vedge_centers = self.vmesh.entity_barycenter('edge')
-        pcell_centers = self.pmesh.entity_barycenter('cell')
-        dist4 = bm.sum((vedge_centers[:, None, :] - pcell_centers[None, :, :])**2, axis=2)
-        pcell2vedge = bm.argmin(dist4, axis=0)
+        pcell2vedge = self.staggered_mesh.get_dof_mapping_pcell2vedge()
         vedge2cell = self.vmesh.edge_to_cell()
         vvelocitycell = vedge2cell[pcell2vedge, :2]
         M4 = COOTensor(
@@ -188,7 +176,8 @@ class StokesFVMStaggeredModel(ComputationalModel):
 
     def solve(self) -> Tuple:
         S, b = self.assemble_system()
-        sol = spsolve(S, b, "scipy")
+        # sol = spsolve(S, b,"mumps")
+        sol = spsolve(S, b,"scipy")
         self.uh = sol[:self.UNC]
         self.vh = sol[self.UNC:self.UNC+self.VNC]
         self.ph = sol[self.UNC+self.VNC:-1]
