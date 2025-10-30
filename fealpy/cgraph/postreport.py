@@ -74,7 +74,7 @@ class SolidReport(CNodeType):
             styles[name].fontName = "STSong-Light"
         
         path = options.get("path")
-        file = "solid_report"
+        file = "report"
         filename ="列车轮轴场景仿真结果报告.pdf"
         folder = os.path.join(path, file)
         os.makedirs(folder, exist_ok=True)
