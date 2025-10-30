@@ -131,9 +131,6 @@ class StokesFVMRCModel(ComputationalModel):
         
         M1 = nbc.ConvectionApplyX(M1, f[:self.NC])
         M2 = nbc.ConvectionApplyY(M2, f[self.NC:])
-        
-        M1 = nbc.ConvectionApplyX(M1, f[:self.NC])
-        M2 = nbc.ConvectionApplyY(M2, f[self.NC:])
 
         M4 = BlockForm([[M1], [M2]]).assembly_sparse_matrix(format='csr')
 
