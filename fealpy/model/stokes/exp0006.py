@@ -40,8 +40,8 @@ class Exp0006(BoxMesher2d):
     def init_mesh(self):
         #box = [0, 1, 0, 1]
         box = [0, 2.2, 0, 0.41]
-        center = [0.205, 0.205]
-        #center = [0.2, 0.2]
+        #center = [0.205, 0.205]
+        center = [0.2, 0.2]
         radius = 0.05
         #h = 0.5
         h = 0.01
@@ -146,8 +146,8 @@ class Exp0006(BoxMesher2d):
         flag3 = self.is_wall_boundary(p)
         #flag4 = self.is_cylinder_boundary(p)
         u = bm.zeros_like(p)
-        u[flag1, 0] = 1000*1.2 * y[flag1] * (0.41 - y[flag1])/(0.41**2)
-        u[flag2, 0] = 1000*1.2 * y[flag2] * (0.41 - y[flag2])/(0.41**2)
+        u[flag1, 0] = 1.2 * y[flag1] * (0.41 - y[flag1])/(0.41**2)
+        u[flag2, 0] = 1.2 * y[flag2] * (0.41 - y[flag2])/(0.41**2)
         return u
 
     @cartesian
@@ -240,7 +240,7 @@ class Exp0006(BoxMesher2d):
     def stream_function_boundary(self, p):
         #p = bm.array([0.25374, 0.21612])
         is_boundary_edge = self.is_cylinder_boundary(p)
-        value = self.stream_function_boundary1(bm.array([[[0, 0.205]]]))
+        value = self.stream_function_boundary1(bm.array([[[0, 0.2]]]))
         value1 = self.stream_function_boundary1(p)
         value1[is_boundary_edge] = bm.float64(value)
         return value1
