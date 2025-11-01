@@ -12,7 +12,7 @@ parser.add_argument('--backend',
     help='Default backend is numpy')
 
 parser.add_argument('--pde',
-    default='SinSin_Sin_Dir_2D', type=str,
+    default=1, type=int,
     help='Name of the PDE model')
 
 parser.add_argument('--mesh_type',

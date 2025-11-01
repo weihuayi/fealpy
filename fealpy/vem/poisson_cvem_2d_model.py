@@ -2,7 +2,7 @@ from typing import Any, Optional, Union
 from ..backend import bm
 from ..typing import TensorLike
 from ..decorator import variantmethod
-from ..model import ComputationalModel, PDEDataManager
+from ..model import ComputationalModel, PDEModelManager
 from ..model.poisson import PoissonPDEDataT
 
 from ..mesh import Mesh, PolygonMesh
@@ -43,7 +43,7 @@ class PoissonCVEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        GD = self.pde.geo_dimension()
+        #GD = self.pde.geo_dimension()
         self.set_init_mesh(options['mesh_type'], nx=options['nx'], ny=options['ny'])
         self.set_space_degree(options['space_degree'])
 

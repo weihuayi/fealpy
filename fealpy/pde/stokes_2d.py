@@ -109,6 +109,10 @@ class StokesStreamPDE():
         return bm.stack((self.u1(x_cpu, y_cpu), self.u2(x_cpu, y_cpu)), axis=-1) 
 
     @cartesian
+    def velocity_boundary(self, p):
+        return self.velocity(p)
+
+    @cartesian
     def pressure(self, p):
         x, y = p[..., 0], p[..., 1]
         x_cpu = bm.to_numpy(x)
@@ -142,7 +146,81 @@ class StokesStreamPDE():
         y_cpu = bm.to_numpy(y)
         return bm.stack((self.Lu1(x_cpu, y_cpu), self.Lu2(x_cpu, y_cpu)), axis=-1)
 
+    @cartesian                                                                      
+    def grad_stream_function_boundary(self, p, t):                                     
+        x = p[..., 0]                                                               
+        y = p[..., 1]                                                               
+        #g = -self.u_boundary(p)                                                     
+        g = -self.velocity(p)
+        val = bm.einsum('eqd,ed->eq', g, t)                                     
+        return val                                                                  
+                                                                                    
+    def order_edge(self,mesh, num):                                                      
+        edge = mesh.entity('edge')                                                  
+        is_boundary_edge = mesh.boundary_edge_flag()                                
+        edge = edge[is_boundary_edge]                                               
+        dist = {}                                                                   
+        i = 0                                                                       
+        for u,v in edge:                                                            
+            dist[u] = [u, v, i]                                                     
+            i = i+ 1                                                                
+        res = []                                                                    
+        res.append(dist[num])                                                       
+        for i in range(len(edge)-1):                                                
+            temp = dist[dist[num][1]]                                               
+            res.append(temp)                                                        
+            num = temp[0]                                                           
+        res = bm.array(res)                                                         
+        bedge = res[..., :2]  # (BNE, 2, 2)                                           
+        index = res[..., 2]   # (BNE,)                                              
+        return bedge, index      
+    @cartesian
+    def stream_function_boundary(self, p):                                                
+                                                                                    
+        ## 判断点在第几个边界上                                                     
 
+        value = bm.zeros_like(p.shape[:-1])                                         
+        node = mesh.entity('node')                                                  
+        is_boundary_edge = mesh.boundary_edge_flag()                                
+        bedge, index = self.order_edge(mesh, 0)                                          
+        bnode = mesh.entity('node')[bedge]                                          
+        BNE = bedge.shape[0]                                                        
+        k = bm.zeros(p.shape[:-1], dtype=np.int32)                                  
+        eps = 1e-10                                                                 
+        for i in range(BNE):                                                        
+            PA = p - bnode[i, 0, :]                                                 
+            PB = p - bnode[i, 1, :]                                                 
+            flag1 = bm.abs(bm.cross(PA, PB)) <= eps                                 
+            flag2 = bm.sum(PA*PB,axis=-1 ) <= 0                                     
+            flag = flag1 & flag2                                                    
+            k[flag] = i                                                             
+        # 计算边积分                                                                
+        q = 9                                                                       
+        qf = mesh.quadrature_formula(q, 'edge')                                     
+        bcs, ws = qf.get_quadrature_points_and_weights()                            
+        point = bm.bc_to_points(bcs, node, entity = bedge) #(BNE, NQ, GD)           
+        ei = bm.zeros_like(bedge)                                                   
+        en = mesh.edge_unit_normal()[is_boundary_edge][index]                       
+        em = mesh.edge_length()[is_boundary_edge][index]                            
+        ei = np.einsum('eqd,q,e,ed->e', u(point),ws,em,en)                      
+                                                                                
+        # 计算第一部分的积分                                                        
+        eii = bm.zeros(BNE+1)                                                   
+        eii[0] = bm.cumsum(ei)[-1] # 最后一个元素                                   
+        eii[1:] = bm.cumsum(ei)                                                 
+        value = eii[k]                                                          
+                                                                                
+        # 计算第二部分的积分                                                        
+        innode = bm.zeros(p.shape+(2,))                                         
+        innode[..., 0, :] = bnode[k, 0]                                         
+        innode[..., 1, :] = p                                                   
+        emm = bm.sqrt((innode[...,0,0] - innode[...,1,0])**2 + (innode[...,0,1] - innode[...,1,1])**2)
+        nnn = mesh.edge_unit_normal()[is_boundary_edge][index][k]               
+        bcpoint = bm.einsum('abcd,qc->abqd',innode, bcs)                        
+        vvalue = bm.einsum('q, ..., ...d, ...qd->...', ws,emm,nnn, u(bcpoint))  
+        value = value + vvalue                                                  
+                                                                                
+        return value 
     @cartesian
     def stream_function(self, p):
         x, y = p[..., 0], p[..., 1]
