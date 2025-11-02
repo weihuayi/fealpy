@@ -172,7 +172,7 @@ class Dipole3d(CNodeType):
         ID1[robinBC] = True
 
         # NE = mesh.number_of_edges()
-        ID2 = bm.zeros(550838, dtype=bool)
+        ID2 = bm.zeros(550980, dtype=bool)
         ID2[dirichletBC] = True
 
         return mesh, ID1, ID2
