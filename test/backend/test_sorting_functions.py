@@ -5,8 +5,8 @@ from data_sorting_functions import *
 class TestSortingFunctionsInterfaces:
     
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
-    @pytest.mark.parametrize("x,axis,descending,stable,expected", argsort_test_data)
-    def test_argsort(self, backend, x, axis, descending, stable, expected):
+    @pytest.mark.parametrize("x,axis,descending,stable,exp", argsort_test_data)
+    def test_argsort(self, backend, x, axis, descending, stable, exp):
         '''
         Returns the indices that sort an array x along a specified axis.
         '''
@@ -14,13 +14,16 @@ class TestSortingFunctionsInterfaces:
         bm.set_backend(backend)
         # 转换为后端数组
         x = bm.from_numpy(x)
-        expected = bm.from_numpy(expected)
+        exp = bm.from_numpy(exp)
+        # 计算结果
+        result = bm.argsort(x, axis=axis, descending=descending, stable=stable)
         # 测试
-        assert bm.all(bm.argsort(x, axis=axis, descending=descending, stable=stable) == expected)
+        assert result.shape == exp.shape
+        assert bm.all(result == exp)
         
     @pytest.mark.parametrize("backend", ['numpy', 'pytorch'])
-    @pytest.mark.parametrize("x,axis,descending,stable,expected", sort_test_data)
-    def test_sort(self, backend, x, axis, descending, stable, expected):
+    @pytest.mark.parametrize("x,axis,descending,stable,exp", sort_test_data)
+    def test_sort(self, backend, x, axis, descending, stable, exp):
         '''
         Returns the sorted array x along a specified axis.
         '''
@@ -28,9 +31,12 @@ class TestSortingFunctionsInterfaces:
         bm.set_backend(backend)
         # 转换为后端数组
         x = bm.from_numpy(x)
-        expected = bm.from_numpy(expected)
+        exp = bm.from_numpy(exp)
+        # 计算结果
+        result = bm.sort(x, axis=axis, descending=descending, stable=stable)
         # 测试
-        assert bm.all(bm.sort(x, axis=axis, descending=descending, stable=stable) == expected)
+        assert result.shape == exp.shape
+        assert bm.all(result == exp)
         
 
 if __name__ == '__main__':

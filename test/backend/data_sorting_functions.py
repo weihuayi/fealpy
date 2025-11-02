@@ -1,7 +1,7 @@
 import numpy as np
 
 argsort_test_data = [
-    # 格式:(x, axis, descending, stable, expected)
+    # 格式:(x, axis, descending, stable, exp)
     # ---------- 1D ----------
     # 一维数组，升序，稳定
     (np.array([5, 3, 1, 6, 7]), -1, False, True, np.array([2, 1, 0, 3, 4])),
@@ -45,8 +45,9 @@ argsort_test_data = [
                 [0, 1]]])),
 ]
 
+
 sort_test_data = [
-    # 格式:(x, axis, descending, stable, expected)
+    # 格式:(x, axis, descending, stable, exp)
     # ---------- 1D ----------
     # 一维数组，升序，稳定
     (np.array([5, 3, 1, 6, 7]), -1, False, True, np.array([1, 3, 5, 6, 7])),
