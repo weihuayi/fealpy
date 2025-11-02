@@ -99,7 +99,35 @@ sum_test_data = [
     (np.array([]),None,False,0), # 空数组情况
 ]
     
-    
+std_test_data = [
+# 格式：(input, axis, correction, keepdims, expected)
+# ===== 基础功能 =====
+    (np.array([1, 2, 3]), None, 0.0, False, np.sqrt(2/3)),  # 无轴指定,c = 0.0
+    (np.array([1, 2, 3]), None, 1.0, False, np.sqrt(2/2)),  # 无轴指定，c = 1.0
+    (np.array([[1, 2], [3, 4]]), None, 0.0, False, np.sqrt(5/4)),  # 无轴指定，c = 0.0
+    (np.array([[1, 2],[3, 4]]),None, 1.0, False,np.sqrt(5/3)), # 无轴指定,c = 1.0
+    (np.array([1, 2, 3]), 0, 0.0, False, np.sqrt(2/3)),  # 轴0,c = 0.0
+    (np.array([1, 2, 3]), 0, 1.0, False, np.sqrt(2/2)),  # 轴0,c = 1.0
+    (np.array([[1, 2], [3, 4]]), 0, 0.0, False, np.array([np.sqrt(1), np.sqrt(1)])),  # 轴0,c = 0.0
+    (np.array([[1, 2], [3, 4]]), 0, 1.0, False, np.array([np.sqrt(2), np.sqrt(2)])),  # 轴1,c = 0.0
+    (np.array([[1, 2], [3, 4]]), 1, 0.0, False, np.array([np.sqrt(1/4), np.sqrt(1/4)])),  # 轴1,c = 1.0
+    (np.array([[1, 2], [3, 4]]), 1, 1.0, False, np.array([np.sqrt(1/2), np.sqrt(1/2)])),  # 轴1,c = 0.0
+    # ===== keepdims为True的情况 =====
+    (np.array([1, 2, 3]), None, 0.0, True, np.array([np.sqrt(2/3)])),  # 无轴指定+keepdims,c = 0.0
+    (np.array([1, 2, 3]), None, 1.0, True, np.array([np.sqrt(2/2)])),  # 无轴指定+keepdims,c = 1.0
+    (np.array([[1, 2], [3, 4]]), None, 0.0, True, np.array([[np.sqrt(5/4)]])),  # 无轴指定+keepdims,c = 0.0
+    (np.array([[1, 2], [3, 4]]), None, 1.0, True, np.array([[np.sqrt(5/3)]])),   # 无轴指定+keepdims,c = 1.0
+    (np.array([1, 2, 3]), 0, 0.0, True, np.array([np.sqrt(2/3)])),  # 轴0+keepdims,c = 0.0
+    (np.array([1, 2, 3]), 0, 1.0, True, np.array([np.sqrt(2/2)])),  # 轴0+keepdims,c = 1.0
+    (np.array([[1, 2], [3, 4]]), 0, 0.0, True, np.array([[np.sqrt(1), np.sqrt(1)]])),  # 轴0+keepdims,c = 0.0
+    (np.array([[1, 2], [3, 4]]), 0, 1.0, True, np.array([[np.sqrt(2), np.sqrt(2)]])),  # 轴0+keepdims,c = 1.0
+    (np.array([[1, 2], [3, 4]]), 1, 0.0, True, np.array([[np.sqrt(1/4)], [np.sqrt(1/4)]])),  # 轴1+keepdims,c = 0.0
+    (np.array([[1, 2], [3, 4]]), 1, 1.0, True, np.array([[np.sqrt(1/2)], [np.sqrt(1/2)]])),  # 轴1+keepdims,c = 1.0
+    # ===== 特殊情况 =====
+    (np.array([np.nan, 1, 2]), None, 0.0, False, np.nan),  # 包含NaN
+    (np.array([np.nan, np.nan, np.nan]), None, 0.0, False, np.nan),  # 全NaN
+    (np.array([]),None, 0.0, False,np.nan), # 空数组情况(N=0的情况)
+]
     
     
     
