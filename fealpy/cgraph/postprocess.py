@@ -166,10 +166,17 @@ class AntennaPostprocess(CNodeType):
     @staticmethod
     def run(uh, space):
         from fealpy.backend import backend_manager as bm
-        uh_real = uh.copy()
-        uh_real[:] = bm.real(uh[:])
+        from fealpy.functionspace import Function
         mesh = space.mesh
         bc = bm.array([[1/3, 1/3, 1/3, 1/3]], dtype=bm.float64)
+
+        if isinstance(uh, Function):  
+            uh_real = uh.copy()
+            uh_real[:] = bm.real(uh[:])
+        else:  
+            uh_real = space.function()      
+            uh_real[:] = bm.real(uh)       
+
         val = space.value(uh_real, bc)
         E = val.reshape(mesh.number_of_cells(), -1)
 
