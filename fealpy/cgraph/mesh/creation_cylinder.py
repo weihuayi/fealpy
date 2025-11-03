@@ -17,8 +17,14 @@ class Cylinder3d(CNodeType):
     """
     TITLE: str = "圆柱体网格"
     PATH: str = "网格.构造"
-    DESC: str = """该节点用于在三维圆柱体区域内生成有限元网格，用户可指定圆柱体的半径、高度及目标网格尺寸，
-                以满足不同几何与精度需求的数值模拟。"""
+    DESC: str = """创建三维空间中，圆柱体区域对应的四面体网格。
+                该节点创建圆柱体区域对应的四面体网格，底面圆心半径为原点，半径由输入参数（radius）确定，
+                圆柱高度由输入参数（height）设置，使用 gmsh 生成网格，并根据输入的网格尺寸（lc）控制网格密度，
+                可以通过输入参数 mesh_type 选择生成的网格类型，但目前只支持四面体网格（tetrahedron）。
+                使用例子：通过 MENU 类型的输入参数 mesh_type 选择需要生成的网格类型，
+                并向该节点的相应输入槽输入表示底面圆半径（radius）、圆柱高度（height）、网格尺寸（lc）的三个浮点数，
+                再将该节点连接到输出，即可查看网格构造效果。
+                """
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tetrahedron", items=["tetrahedron"]),
         PortConf("radius", DataType.FLOAT, 1, title="圆柱体半径", default=1.0, min_val=1e-6),
