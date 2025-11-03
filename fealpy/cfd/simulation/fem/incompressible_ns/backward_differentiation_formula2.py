@@ -9,8 +9,8 @@ from ..fem_base import FEM
 
 class BDF2(FEM):
     
-    def __init__(self, equation):
-        super().__init__(equation)
+    def __init__(self, equation, mesh):
+        super().__init__(equation, mesh)
      
     def BForm(self):
         pspace = self.pspace
