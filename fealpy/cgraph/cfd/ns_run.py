@@ -48,6 +48,8 @@ class StationaryNSRun(CNodeType):
     """
     TITLE: str = "稳态 NS 方程有限元迭代求解"
     PATH: str = "流体.NS 方程有限元迭代求解"
+    DESC: str = """该节点实现稳态不可压 Navier-Stokes 方程的有限元迭代求解器，通过系数更新与边界
+                条件施加，逐步组装并求解线性系统，输出速度场与压力场的稳态数值解。"""
     INPUT_SLOTS = [
         PortConf("maxstep", DataType.INT, 0, default=1000, min_val=1, title="最大迭代步数"),
         PortConf("tol", DataType.FLOAT, 0, default=1e-6, min_val=1e-12, max_val=1e-2, title="残差"),
@@ -122,6 +124,8 @@ class IncompressibleNSIPCSRun(CNodeType):
     """
     TITLE: str = "IPCS 求解非稳态 NS 方程"
     PATH: str = "流体.NS 方程有限元迭代求解"
+    DESC: str  = """该节点实现非稳态不可压 Navier-Stokes 方程的 IPCS 分步算法求解器，按时间步推进依次完成速度预测、
+                压力修正与速度校正，并输出速度与压力场的时序数值结果。"""
     INPUT_SLOTS = [
         PortConf("T0", DataType.FLOAT, title="初始时间"),
         PortConf("T1", DataType.FLOAT, title="结束时间"),
@@ -134,20 +138,25 @@ class IncompressibleNSIPCSRun(CNodeType):
         PortConf("predict_velocity", DataType.FUNCTION, title="预测速度方程离散"),
         PortConf("correct_pressure", DataType.FUNCTION, title="压力修正方程离散"),
         PortConf("correct_velocity", DataType.FUNCTION, title="速度修正方程离散"),
-        PortConf("mesh", DataType.MESH, title="网格")
+        PortConf("mesh", DataType.MESH, title="网格"),
+        PortConf("output_dir", DataType.STRING, title="输出目录")
     ]
     OUTPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, title="速度数值解"),
         PortConf("ph", DataType.TENSOR, title="压力数值解"),
         PortConf("uh_x", DataType.TENSOR, title="速度x分量数值解"),
-        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解")
+        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解"),
+        PortConf("uh_z", DataType.TENSOR, title="速度z分量数值解")
     ]
     def run(T0, T1, NL, uspace, pspace, velocity_0, pressure_0, is_pressure_boundary,
-            predict_velocity, correct_pressure, correct_velocity, mesh):
+            predict_velocity, correct_pressure, correct_velocity, mesh, output_dir):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import cartesian
         from fealpy.solver import spsolve
         from fealpy.cfd.simulation.time import UniformTimeLine
+        import json
+        import os
+        import gzip
         
         nt = NL - 1
         timeline = UniformTimeLine(T0, T1, nt)
@@ -157,6 +166,11 @@ class IncompressibleNSIPCSRun(CNodeType):
         ugdof = uspace.number_of_global_dofs()
         pgdof = pspace.number_of_global_dofs()
         NN = mesh.number_of_nodes()
+
+        node = mesh.interpolation_points(p=1)
+        cell = mesh.entity('cell')
+        data = []
+        j = 0
 
         for i in range(nt):
             t  = timeline.current_time()
@@ -187,15 +201,47 @@ class IncompressibleNSIPCSRun(CNodeType):
             uh = u1
             uh = uh.reshape(mesh.GD,-1).T
             uh = uh[:NN,:]
-            uh_x = u1[:int(ugdof/2)][:NN]
-            uh_y = u1[int(ugdof/2):][:NN]
+            uh_x = uh[..., 0]
+            uh_y = uh[..., 1]
+            if mesh.GD == 3:
+                uh_z = uh[..., 2]
+            else:
+                uh_z = bm.zeros_like(uh_x)
             ph = p1[:NN]
 
-            mesh.nodedata['ph'] = p1
-            mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
-            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+            # mesh.nodedata['ph'] = ph
+            # mesh.nodedata['uh'] = uh.reshape(mesh.GD,-1).T
+            # mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
+            if (i+1) % 10 == 0:
+
+                os.makedirs(output_dir, exist_ok=True)  # 创建目录
+
+                data.append ({
+                "time": round(t+dt, 8),
+                "值":{
+                    "uh" : uh.tolist(),  # ndarray -> list
+                    "uh_x" : uh_x.tolist(),  # ndarray -> list
+                    "uh_y" : uh_y.tolist(),  # ndarray -> list
+                    "uh_z" : uh_z.tolist(),  # ndarray -> list
+                    "ph" : ph.tolist()
+                }, 
+                "几何": {
+                    "cell": cell.tolist(),  # ndarray -> list
+                    "node": node.tolist()   # ndarray -> list
+                }
+                })
+            
+            if len(data) == 10 :
+                j += 1
+                file_name = f"file_{j:08d}.json.gz"
+                file_path = os.path.join(output_dir, file_name)
+
+                with gzip.open(file_path, "wt", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+                
+                data.clear()
             
             timeline.advance()
 
-        return uh, ph, uh_x, uh_y
+        return uh, ph, uh_x, uh_y, uh_z
