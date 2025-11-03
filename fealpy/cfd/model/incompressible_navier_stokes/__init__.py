@@ -42,4 +42,5 @@ DATA_TABLE = {
     1: ("poiseuille_2d", "Poiseuille2D"),
     2: ("cylinder_2d", "Cylinder2D"),
     3: ("flowpastfoil_2d", "FlowPastFoil2D"),
+    4: ("cylinder_3d", "Cylinder3D")
 }

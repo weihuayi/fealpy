@@ -12,8 +12,8 @@ class FlowPastFoil2D():
         self.options = options
 
         if options is not None:
-            self.box = options.get('box', [-0.5, 2.7, -0.5, 0.5])
-            self.h = options.get('lc', 0.05)
+            self.box = options.get('box', [-0.5, 2.7, -0.4, 0.4])
+            self.h = options.get('lc', 0.04)
         self.mesh = self.init_mesh()
 
     def init_mesh(self):

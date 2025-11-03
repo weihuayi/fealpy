@@ -9,10 +9,10 @@ options ={
     'rho': 1.0,
     'mu': 0.001,
     'T0': 0.0,
-    'T1': 0.2,
-    'nt': 2000,
+    'T1': 1.0,
+    'nt': 10000,
     'init_mesh': 'tri',
-    'lc': 0.05,
+    'lc': 0.04,
     'method': 'IPCS',
     'solve': 'direct',
     'run': 'main'
@@ -34,9 +34,6 @@ tol = model.tol
 
 u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, model.timeline.T0)))
 p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, model.timeline.T0)))
-cd = bm.zeros(model.timeline.NL-1)
-cl = bm.zeros(model.timeline.NL-1)
-delta_p = bm.zeros(model.timeline.NL-1)
 
 mesh.nodedata['ph'] = p0
 mesh.nodedata['uh'] = u0.reshape(model.mesh.GD,-1).T
