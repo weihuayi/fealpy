@@ -12,8 +12,8 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default=3, type=int,
-                    help='id of the PDE model, default is 3.')
+                    default=4, type=int,
+                    help='id of the PDE model, default is 4.')
 
 parser.add_argument('--init_mesh',
                     default='edgemesh', type=str,
@@ -43,3 +43,7 @@ options = vars(parser.parse_args())
 
 from fealpy.backend import backend_manager as bm
 bm.set_backend(options['backend'])
+
+from fealpy.csm.fem import TrussTowerModel
+model = TrussTowerModel(options)
+model.__str__()

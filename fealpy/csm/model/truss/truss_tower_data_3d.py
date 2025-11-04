@@ -56,6 +56,7 @@ class TrussTowerData3D:
         """
         node, cell = TrussTower.build_truss_3d_zbar(n_panel=19, Lz=19, Wx=0.45, Wy=0.40, lc=0.1, ne_per_bar=1)
         mesh = EdgeMesh(node, cell)
+        print("newnode", mesh.entity)
         return mesh
     
     def load(self):

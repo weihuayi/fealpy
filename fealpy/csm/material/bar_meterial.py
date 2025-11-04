@@ -3,7 +3,8 @@ from builtins import float, str
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
-from ..model.truss.truss_data_3d import TrussData3D
+
+
 class BarMaterial(LinearElasticMaterial):
     """Material properties for 3D bars.
     Parameters:

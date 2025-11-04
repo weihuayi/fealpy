@@ -20,5 +20,6 @@ from .elastoplastic_integrator import ElastoplasticIntegrator
 from .euler_bernoulli_beam_fem_model import EulerBernoulliBeamFEMModel
 from .timobeam_axle_model import TimobeamAxleModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
-from .gear_box_modal_linear_fem_model import GearBoxModalLinearFEMModel
+#from .gear_box_modal_linear_fem_model import GearBoxModalLinearFEMModel
 from .channel_beam_model import ChannelBeamModel
+from .truss_tower_model import TrussTowerModel
