@@ -2,6 +2,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.typing import TensorLike
 
 from .optimizer_base import Optimizer, opt_alg_options
+from .line_search_rules import ArmijoLineSearch
 
 class GradientDescent(Optimizer):
     def __init__(self,options):
@@ -36,12 +37,14 @@ class GradientDescent(Optimizer):
         alpha = options['StepLength']
         f0,g0 = self.fun(x0)
         gnorm = bm.linalg.norm(g0)
-
+        Armijo = ArmijoLineSearch() 
         if options['Print']:
             print(f'initial:  f = {f0}, gnorm = {gnorm}')
 
         for i in range(1,options["MaxIters"]):
-            x1 =x0 - alpha*g0
+            direction = -g0
+            alpha = Armijo.search(x0,self.fun, direction, alpha)
+            x1 =x0 + alpha*direction
             f1, g1 = self.fun(x1)
             diff = bm.abs(f1 - f0)
             f0 = f1
@@ -55,10 +58,10 @@ class GradientDescent(Optimizer):
 
             if diff < options["FunValDiff"]:
                 print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
-                break
+                return x0, f0, g0
 
             if (gnorm < options['NormGradTol']):
                 print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {self.problem.NormGradTol}")
-                break
-
-        return x0, f0, g0, diff
+                return x0, f0, g0
+        print(f"Reached the Maximum number of iterations {options['MaxIters']} times")
+        return x0, f0, g0

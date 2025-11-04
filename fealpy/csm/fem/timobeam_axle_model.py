@@ -128,6 +128,11 @@ class TimobeamAxleModel(ComputationalModel):
                 F[fixed_dofs] *= penalty
                 for dof in fixed_dofs:
                         K[dof, dof] *= penalty
+                        
+                rows, cols = bm.nonzero(K)
+                values = K[rows, cols]
+                K = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
+                
                 return K, F
 
         def solve(self):

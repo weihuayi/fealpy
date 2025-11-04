@@ -38,21 +38,24 @@ class EulerBernoulliBeamData2D:
             n (int): Number of mesh elements.
         """
         self.mesh = self.init_mesh()
-        self.E = 200e9  # Young's modulus in Pascals
-        self.I = 118.6e-6  # Moment of inertia in m^
+        #self.E = 200e9  # Young's modulus in Pascals
+        #self.I = 118.6e-6  # Moment of inertia in m^
         self.A = 10.3  # Cross-sectional area in m^2
         self.f = -25000  # Distributed load in N/m
-        self.L = 10.0  # Beam length in meters
+        self.L = 7.5  # Beam length in meters
+        self.h = 0.317  # Distance from neutral axis to outer fiber in meters
+        self.l = self.mesh.cell_length()
     
     def __str__(self) -> str:
         """Return a multi-line summary including PDE type and key params."""
         return (
             f"\n  euler_bernoulli (2D Euler-Bernoulli PDE on  domain)\n"
             f"  Box dimensions: L = {self.L}\n"
-            f"  young's modulus: E = {self.E}\n"
-            f"  moment of inertia: I = {self.I}\n"
+            #f"  young's modulus: E = {self.E}\n"
+            #f"  moment of inertia: I = {self.I}\n"
             f"  cross-sectional area: A = {self.A}\n"
             f"  distributed load: f = {self.f}\n"
+            f"  section height: h = {self.h}\n"
         )
 
     def geo_dimension(self) -> int:

@@ -3,21 +3,22 @@ from typing import Union, Tuple
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.model import PDEModelManager, ComputationalModel
+from fealpy.sparse import COOTensor
 
 from fealpy.functionspace import ScaledMonomialSpace2d, TensorFunctionSpace
-from fealpy.fem import BilinearForm, LinearForm
+from fealpy.fem import BilinearForm, LinearForm, BlockForm
 
 from fealpy.solver import spsolve
 
-from ..fvm import (
+from . import (
     ScalarDiffusionIntegrator,
     ScalarSourceIntegrator,
-    DivIntegrator,
     GradientReconstruct,
+    DivergenceReconstruct,
     DirichletBC,
 )
 
-class StokesFVMModel(ComputationalModel):
+class StokesFVMSimpleModel(ComputationalModel):
     """
     The Stokes equation in two-dimensional cases is solved by the finite volume method
     using the SIMPLE algorithm. The velocity and pressure are iteratively corrected
@@ -46,7 +47,7 @@ class StokesFVMModel(ComputationalModel):
         """Set the computational mesh."""
         self.mesh = self.pde.init_mesh['uniform_qrad'](nx=nx, ny=ny)
         self.cm = self.mesh.entity_measure('cell')
-        self.cmv = bm.tile(self.cm, 2)
+        
 
     def set_space(self, degree: int = 0) -> None:
         """Set the function spaces for velocity and pressure."""
@@ -60,91 +61,105 @@ class StokesFVMModel(ComputationalModel):
         bform = BilinearForm(self.velocity_space)
         bform.add_integrator(ScalarDiffusionIntegrator(q=self.p + 2))
         B = bform.assembly()
-
+        ap = B.diags().values
         lform = LinearForm(self.velocity_space)
         lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p + 2))
         f = lform.assembly()
 
         dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
         B, f = dbc.DiffusionApply(B, f)
-        A = B.diags()
+        
+        grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(p, self.pde.neumann_pressure)  # (NC, 2)
+        # grad_p = GradientReconstruct(self.mesh).AverageGradientreDirichlet(p, self.pde.dirichlet_pressure)  # (NC, 2)
+        p1 = bm.einsum('i,i->i', grad_p[:,0], self.cm)
+        p2 = bm.einsum('i,i->i', grad_p[:,1], self.cm)
+        p_grad_integrator = bm.concatenate((p1,p2))
+        f = f - p_grad_integrator
 
-        grad_p = GradientReconstruct(self.mesh).AverageGradientreconstruct(p)
-        px = bm.transpose(grad_p).flatten()
-        pin = bm.einsum('i,i->i', px, self.cmv)
-        f = f - pin
-
-        u = spsolve(B, f)
-        return A, u
-
-    def pressure_correct(self, A: TensorLike, u: TensorLike) -> TensorLike:
+        u = spsolve(B, f,"mumps")
+        return ap, u
+    
+    def Ucell2edge(self,u,gd):
+        u = bm.stack([u[:self.NC],u[self.NC:]],axis=-1)
+        bd_edge = self.mesh.boundary_face_index()
+        edge_middle_point = self.mesh.entity_barycenter('edge')
+        e2c = self.mesh.edge_to_cell()
+        bdedgepoint = edge_middle_point[bd_edge]
+        bdedgeu = gd(bdedgepoint)
+        uf = bm.zeros((self.mesh.number_of_faces(), 2), dtype=u.dtype)
+        uf += (u[e2c[:,0]]+u[e2c[:,1]])/2
+        uf[bd_edge, :] = bdedgeu
+        uf = bm.reshape(uf, (-1, 2))
+        return uf
+    
+    def pressure_correct(self, ap: TensorLike, uf: TensorLike) -> TensorLike:
         """Solve for pressure correction p' to enforce continuity."""
-        bform3 = BilinearForm(self.velocity_space)
-        bform3.add_integrator(DivIntegrator(q=self.p + 2))
-        D = bform3.assembly()
-        div_u = D @ u
 
-        F = bm.zeros(2 * self.NC)
-        dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
-        F = dbc.DivApply(F)
-        div_u = div_u - F
-        div_u = A @ div_u
-        div_u = div_u[:self.NC] + div_u[self.NC:]
+        
+        div_u = DivergenceReconstruct(self.mesh).Reconstruct(uf)  # (NE,)
         
         bform2 = BilinearForm(self.space)
-        bform2.add_integrator(ScalarDiffusionIntegrator(q=self.p + 2))
-        C = bform2.assembly()
-        dbc2 = DirichletBC(self.mesh, self.pde.dirichlet_pressure)
-        C, div_u = dbc2.DiffusionApply(C, div_u)
-
-        p_c = spsolve(C, div_u)
+        bform2.add_integrator(ScalarDiffusionIntegrator(q=2))
+        A = bform2.assembly()
+        LagA = self.mesh.entity_measure('cell')
+        div_u = ap[:len(LagA)]*div_u
+        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
+                             bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
+        A = BlockForm([[A, A1.T], [A1, None]])
+        A = A.assembly_sparse_matrix(format='csr')
+        b0 = bm.array([0])
+        b = bm.concatenate([-div_u, b0], axis=0)
+        sol = spsolve(A, b,"mumps")
+        p_c = sol[:-1]
         return p_c
 
     def solve(self, max_iter: int = 10, tol: float = 1e-5) -> Tuple[TensorLike, TensorLike]:
         """Solve the Stokes equation using the SIMPLE algorithm."""
         p = bm.zeros(self.NC)
-        A, u = self.temporary_velocity(p)
+        ap, u = self.temporary_velocity(p)
         self.residuals = []
         for i in range(max_iter):
-            p_c = self.pressure_correct(A, u)
-            L2p_c = bm.sqrt(bm.sum(self.cm * (p_c)**2))
-            self.residuals.append(float(L2p_c))
-            self.logger.info(f"[Iter {i+1}] pressure_correct = {L2p_c:.4e}")
-            if L2p_c < tol:
+            uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
+            p_corr = self.pressure_correct(ap, uf)
+            L2_p_corr = bm.sqrt(bm.sum(self.cm * (p_corr)**2))
+            self.residuals.append(float(L2_p_corr))
+            self.logger.info(f"[Iter {i+1}] L2 norm of the pressure correction : {L2_p_corr:.6e}")
+            if L2_p_corr < tol:
                 self.logger.info("Converged.")
                 break
-            p = p - p_c
-            A, u = self.temporary_velocity(p)
+            p += 0.8*p_corr
+            _, u = self.temporary_velocity(p)
 
-        self.uh = u
+        self.uh = u[:self.NC]
+        self.vh = u[self.NC:]
         self.ph = p
-        return u, p
+        return self.uh, self.vh, self.ph
 
     def compute_error(self) -> Tuple[float, float]:
-        """Compute L2 errors for velocity and pressure."""
+        """Compute errors for velocity and pressure."""
         cell_centers = self.mesh.entity_barycenter('cell')
-        u_exact = self.pde.velocity(cell_centers)
-        u_exact = bm.transpose(u_exact).flatten()
-        p_exact = self.pde.pressure(cell_centers)
-        Verror = bm.sqrt(bm.sum(self.cmv * (self.uh - u_exact)**2))
-        Perror = bm.sqrt(bm.sum(self.cm * (self.ph - p_exact)**2))
-        return Verror, Perror
+        self.uI = self.pde.velocity(cell_centers)[:, 0]
+        self.vI = self.pde.velocity(cell_centers)[:, 1]
+        self.pI = self.pde.pressure(cell_centers)
+        uerror = bm.sqrt(bm.sum(self.cm * (self.uh - self.uI)**2))
+        verror = bm.sqrt(bm.sum(self.cm * (self.vh - self.vI)**2))
+        perror = bm.sqrt(bm.sum(self.cm * (self.ph - self.pI)**2))
+        # uerror = bm.max(bm.abs(self.uh - self.uI))
+        # verror = bm.max(bm.abs(self.vh - self.vI))
+        # perror = bm.max(bm.abs(self.ph - self.pI))
+        return uerror, verror, perror
 
     def plot(self) -> None:
-        """Plot numerical and exact solutions for u1, u2, and p."""
+        """Plot numerical and exact solutions for u, v, and p."""
         import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
         cell_centers = self.mesh.entity_barycenter('cell')
         x, y = cell_centers[:, 0], cell_centers[:, 1]
-        u1, u2 = self.uh[:self.NC], self.uh[self.NC:]
-        u_exact = self.pde.velocity(cell_centers)
-        p_exact = self.pde.pressure(cell_centers)
 
         fig = plt.figure(figsize=(15, 10))
         titles = [
-            ("Numerical u1", u1), ("Exact u1", u_exact[:, 0]),
-            ("Numerical u2", u2), ("Exact u2", u_exact[:, 1]),
-            ("Numerical p", self.ph), ("Exact p", p_exact),
+            ("Error u", self.uh - self.uI),
+            ("Error v", self.vh - self.vI),
+            ("Error p", self.ph - self.pI),
         ]
         for i, (title, data) in enumerate(titles):
             ax = fig.add_subplot(2, 3, i + 1, projection='3d')

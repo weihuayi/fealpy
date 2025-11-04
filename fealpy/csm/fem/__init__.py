@@ -4,6 +4,7 @@ from .euler_bernoulli_beam_diffusion_integrator import EulerBernoulliBeamDiffusi
 from .euler_bernoulli_beam_uniform_source_integrator   import EulerBernoulliBeamSourceIntegrator
 from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliBeamPLSourceIntegrator
 from .elastoplasticity_source_internal_integrator import ElastoplasticitySourceIntIntegrator
+from .bar_integrator import BarIntegrator
 
 from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
 
@@ -12,6 +13,7 @@ from .elastoplastic_integrator import ElastoplasticIntegrator
 from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
 from .axle_integrator import AxleIntegrator
 from .elastoplastic_integrator import ElastoplasticIntegrator
+
 
 
 ### Model Operator

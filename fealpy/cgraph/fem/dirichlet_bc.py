@@ -1,7 +1,7 @@
 
 from ..nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["DirichletBC"]
+__all__ = ["DirichletBC", "StructuralDirichletBC"]
 
 
 class DirichletBC(CNodeType):
@@ -26,3 +26,32 @@ class DirichletBC(CNodeType):
         uh = dbc.init_solution()
         F = dbc.apply(F, uh)
         return dbc, F, uh
+    
+class StructuralDirichletBC(DirichletBC):
+    TITLE: str = "结构力学 Dirichlet 边界条件处理"
+    PATH: str = "有限元.边界条件.结构力学"
+    INPUT_SLOTS =[
+        PortConf("gd", DataType.FUNCTION),
+        PortConf("isDDof", DataType.TENSOR),
+        PortConf("K", DataType.TENSOR),
+        PortConf("F", DataType.TENSOR),
+        PortConf("space", DataType.SPACE)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("K", DataType.TENSOR),
+        PortConf("F", DataType.TENSOR),
+    ]
+    
+    @staticmethod
+    def run(gd, isDDof, K, F, space):
+        from fealpy.functionspace import TensorFunctionSpace
+        tspace = TensorFunctionSpace(space, shape=(-1, 2))
+        gdof = tspace.number_of_global_dofs()
+        from fealpy.backend import bm
+        threshold = bm.zeros(gdof, dtype=bool)
+        threshold[isDDof()] = True
+        from ...fem import DirichletBC
+        bc = DirichletBC(space=tspace, gd=gd, threshold=threshold)
+        K, F = bc.apply(K, F)
+
+        return K, F

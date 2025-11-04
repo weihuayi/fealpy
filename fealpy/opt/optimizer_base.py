@@ -46,7 +46,6 @@ class Optimizer():
         self.N = options["NP"]
         self.MaxIT = options["MaxIters"]
         self.dim = options["ndim"]
-        self.MaxFes = self.dim * 10000
         if options["domain"] is not None:
             self.lb, self.ub = options["domain"]
         self.curve = bm.zeros((self.MaxIT,))
@@ -79,7 +78,7 @@ class Optimizer():
         Returns:
             The function value (and gradient if applicable for gradient-based methods).
         """
-        self.__NF += x.shape[0]
+        self.__NF += self.options['NP'] 
         return self.options['objective'](x)
 
     def update_gbest(self, x, f):
@@ -189,194 +188,7 @@ class Optimizer():
             min_dis = bm.min(dis)
             total = total + min_dis
         return total / N
-    
-    def memory_backtracking(self, pop):
-        """
-        Applies the Memory Backtracking Strategy (MBS) to refine a candidate solution.
 
-        If the individual is found in memory, a subset of its dimensions are 
-        either updated by:
-            - Guidance mechanism: using mean values from selected memory entries.
-            - Confusion mechanism: using a perturbation driven by tangent distribution.
-
-        The updated solution is clipped to the search space bounds, evaluated, 
-        and conditionally accepted if an improvement is found.
-
-        Parameters:
-            pop (Tensor): The candidate individual of shape (1, dim).
-
-        Returns:
-            Tuple[Tensor, float]: The possibly updated solution and its fitness value.
-        """
-        which1 = self.find_memory(pop)
-        if which1 is not None and bm.allclose(self.Memory[which1], pop, rtol=1e-8):
-            how = bm.int64(bm.ceil(self.dim / 5))
-            if bm.backend_name == 'numpy':
-                what1 = bm.random.permutation(self.dim)
-            elif bm.backend_name == 'pytorch':
-                what1 = bm.random.randperm(self.dim)
-            what2 = what1[:how]
-
-            x_new = bm.copy(pop)
-            fit = bm.copy(self.Memory_f[which1])
-
-            if bm.random.rand(1) < 0.8 and self.Fes > self.Max:
-                start = int(self.Max - self.dim + bm.ceil(bm.sign(bm.random.rand() - 0.5) * bm.random.rand(1) * self.dim / 2))
-                x_new[0, what2] = bm.mean(self.Memory[start:self.Max, what2], axis=0)
-            else:
-                x_new[0, what2] = (
-                    x_new[0, what2] 
-                    + bm.tan(bm.pi * (bm.random.rand(1, how) - 0.5)) 
-                    * (self.ub[what2] - self.lb[what2]) 
-                    / bm.log(self.Fes + 1e-8)
-                )
-
-            x_new = bm.clip(x_new, self.lb, self.ub)
-
-            which1 = self.find_memory(x_new)
-            if which1 is not None and bm.allclose(self.Memory[which1], x_new, rtol=1e-8):
-                f_new = bm.copy(self.Memory_f[which1])
-            else:
-                f_new = self.fun(x_new)
-                self.Fes += 1
-                self.save_memory(x_new, f_new)
-
-            if f_new < fit:
-                pop = bm.copy(x_new)
-                fit = bm.copy(f_new)
-
-        else:
-            fit = self.fun(pop)
-            self.Fes += 1
-            self.save_memory(pop, fit)
-
-        return pop, fit
-    
-    def find_memory(self, pop):
-        """
-        Locates a population individual in the memory archive.
-
-        Parameters:
-            pop (Tensor): The candidate individual of shape (1, dim).
-
-        Returns:
-            int | None: The index of the matching memory entry if found, otherwise None.
-        """
-        which1 = bm.where(self.Memory[:, 0] == pop[0, 0])[0]
-        i = 1
-        while len(which1) > 1:
-            which1 = which1[bm.where(self.Memory[which1, i] == pop[0, i])[0]]
-            i += 1
-        if len(which1) == 1:
-            return which1[0]  
-        else:
-            return None
-    
-    def save_memory(self, pop, fit):
-        """
-        Saves a solution and its fitness into the memory archive.
-
-        If the memory is full, the archive is sorted in descending order 
-        of fitness to retain higher-quality solutions.
-
-        Parameters:
-            pop (Tensor): The solution vector to save.
-            fit (float): The corresponding fitness value.
-        """
-        self.Mw += 1
-        if self.Mw > self.Max - 1:
-            self.Mw = 0
-            sy = bm.argsort(-self.Memory_f)
-            self.Memory_f = self.Memory_f[sy]
-            self.Memory = self.Memory[sy]
-        self.Memory[self.Mw] = bm.copy(pop)
-        self.Memory_f[self.Mw] = bm.copy(fit)
-    
-    def guided_learning_strategy(self, V0, x, fit, Fes):
-        """
-        Apply guided learning strategy to update solutions.
-
-        This strategy uses a combination of global best information and random
-        exploration to guide the search process.
-
-        Parameters:
-            V0 (TensorLike): Velocity vector for guidance.
-            x (TensorLike): Current population positions.
-            fit (TensorLike): Current fitness values.
-            Fes (int): Current function evaluation count.
-
-        Returns:
-            tuple: Updated positions, fitness values, and evaluation count.
-            Returns None if maximum evaluations reached.
-        """
-        which_dim = V0 > self.A
-        x_new = (which_dim * (self.gbest + bm.tan(bm.pi * (bm.random.rand(self.N, self.dim) - 0.5)) * (self.ub - self.lb) / V0) + 
-                 ~which_dim * (bm.random.rand(self.N, self.dim) * (self.ub - self.lb)))
-        x_new = bm.clip(x_new, self.lb, self.ub)
-        fit_new = self.fun(x_new)
-        mask = fit_new < fit
-        x, fit = bm.where(mask[:, None], x_new, x), bm.where(mask, fit_new, fit)
-        self.update_gbest(x, fit)
-        Fes = Fes + self.N
-        if Fes >= self.MaxFes:
-            return
-        return x, fit, Fes
-    
-    def thinking_innovation_strategy(self, pop):
-        """
-        Applies the Thinking Innovation Strategy (TIS) to update a population in a metaheuristic algorithm
-        based on Depth of Knowledge (DOK) and Information Events (IE), improving exploration and exploitation.
-
-        Parameters:
-            pop (Tensor): The current individual's position vector in the search space.
-            pop_f (float or Tensor): The fitness value of the current individual.
-
-        Attributes used:
-            self.fes (int): Current number of function evaluations.
-            self.max_fes (int): Maximum allowed function evaluations.
-            self.person (Tensor): The stored successful individual used as the Information Event (IE).
-            self.person_f (float or Tensor): The fitness value of `self.person`.
-            self.fun (Callable): The objective function to evaluate fitness.
-
-        Process:
-            1. Recall out-of-bound solutions for `pop` to ensure all variables are within `[lu[0], lu[1]]`.
-            2. Compute the Depth of Knowledge (DOK) according to Eq. (1)-(3) from the TIS paper.
-            3. Retrieve the Information Event (IE) from `self.person`.
-            4. Compute imagination (IM) based on Eq. (4).
-            5. Generate a new candidate `pop_new` using Eq. (5).
-            6. Recall out-of-bound solutions for `pop_new`.
-            7. Evaluate the new candidate and update `pop` or `self.person` based on survival-of-the-fittest.
-
-        Returns:
-            Tuple[Tensor, float or Tensor]:
-                - Updated individual position (`pop`)
-                - Updated fitness value (`pop_f`)
-        
-        Reference:
-        Heming Jia, Xuelian Zhou, Jinrui Zhang.
-        Thinking Innovation Strategy (TIS): A novel mechanism for metaheuristic algorithm design and evolutionary update.
-        Applied Soft Computing, 2025, 178: 113071.
-        """
-        pop_f = self.fun(pop)
-        C = 0.5
-        DOK1 = C + (self.fes/ self.max_fes) ** C
-        DOK2 = self.fes ** 10
-        DOK = DOK1 + DOK2
-
-        IM = bm.pi * self.person * bm.random.rand(1)
-
-        pop_new = bm.tan(IM - 0.5) * bm.pi + (pop / DOK + self.person)
-        pop_new = bm.clip(pop_new, self.lb, self.ub)
-        pop_new_f = self.fun(pop_new)
-        self.fes = self.fes + 1
-        if pop_new_f < pop_f:
-            pop = pop_new
-            pop_f = pop_new_f
-        
-        self.person = pop
-        self.person_f = pop_f
-        
-        return pop, pop_f
 
 def opt_alg_options(
     x0: TensorLike,
@@ -387,6 +199,7 @@ def opt_alg_options(
     ngrid = None,
     PF = None,
     Preconditioner = None,
+    update_Preconditioner = None,
     MaxIters: int = 1000,
     MaxFunEvals: int = 10000,
     NormGradTol: float = 1e-6,
@@ -406,6 +219,7 @@ def opt_alg_options(
         domain (optional): Domain constraints for the optimization problem. Defaults to None.
         NP (int, optional): Number of solution points (population size). Defaults to 1.
         Preconditioner (optional): Preconditioner for the optimization algorithm. Defaults to None.
+        update_Preconditioner(optional): Function to update the preconditioner. Defaults to None.
         MaxIters (int, optional): Maximum number of iterations. Defaults to 1000.
         MaxFunEvals (int, optional): Maximum number of function evaluations. Defaults to 10000.
         NormGradTol (float, optional): Tolerance for the norm of the gradient. Defaults to 1e-6.
@@ -426,6 +240,7 @@ def opt_alg_options(
             "ndim": x0.shape[-1],
             "domain": domain,
             "Preconditioner": Preconditioner,
+            "update_Preconditioner": update_Preconditioner,
             "NR": NR,
             "PF": PF,
             "ngrid": ngrid,
