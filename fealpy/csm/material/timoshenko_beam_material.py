@@ -33,12 +33,12 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         self.mu = self.get_property('shear_modulus')
         self.kappa = shear_factor
 
-        self.Ax = model.beam_Ax  # 截面面积
-        self.Ay = model.beam_Ay  
-        self.Az = model.beam_Az  
-        self.Iy = model.beam_Iy  # 绕 y 轴惯性矩
-        self.Iz = model.beam_Iz  # 绕 z 轴惯性矩
-        self.J = model.beam_Ix  # 极惯性矩
+        self.Ax = model.Ax  # 截面面积
+        self.Ay = model.Ay  
+        self.Az = model.Az  
+        self.Iy = model.Iy  # 绕 y 轴惯性矩
+        self.Iz = model.Iz  # 绕 z 轴惯性矩
+        self.J = model.Ix  # 极惯性矩
         
         
     def __str__(self) -> str:

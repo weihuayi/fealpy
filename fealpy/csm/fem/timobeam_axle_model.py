@@ -150,7 +150,7 @@ class TimobeamAxleModel(ComputationalModel):
                 
                 mesh = self.mesh
                 
-                uh = disp.rshape(-1, 6)
+                uh = disp.reshape(-1, 6)
                 u = uh[:, :3]
                 mesh.nodedata['disp'] = u
 
