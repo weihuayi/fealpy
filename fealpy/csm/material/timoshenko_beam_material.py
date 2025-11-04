@@ -33,12 +33,12 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         self.mu = self.get_property('shear_modulus')
         self.kappa = shear_factor
 
-        self.Ax = model.beam_Ax  # 截面面积
-        self.Ay = model.beam_Ay  
-        self.Az = model.beam_Az  
-        self.Iy = model.beam_Iy  # 绕 y 轴惯性矩
-        self.Iz = model.beam_Iz  # 绕 z 轴惯性矩
-        self.J = model.beam_Ix  # 极惯性矩
+        self.Ax = model.Ax  # 截面面积
+        self.Ay = model.Ay  
+        self.Az = model.Az  
+        self.Iy = model.Iy  # 绕 y 轴惯性矩
+        self.Iz = model.Iz  # 绕 z 轴惯性矩
+        self.J = model.Ix  # 极惯性矩
         
         
     def __str__(self) -> str:
@@ -168,31 +168,3 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                       [0, 0, mu*kappa]], dtype=bm.float64)
 
         return D
-    
-    def calculate_strain_and_stress(self,
-                    uh: TensorLike,
-                    x: float,
-                    y: float,
-                    z: float,
-                    l: float) -> Tuple[TensorLike, TensorLike]:
-        """Calculate the strain and stress.
-                    ε = B * u_e
-                    σ = D * ε
-                    
-        Parameters:
-            uh (TensorLike): Nodal displacement vector.
-            x (float): Local coordinate in the beam cross-section along the x-axis.
-            y (float): Local coordinate in the beam cross-section along the y-axis.
-            z (float): Local coordinate in the beam cross-section along the z-axis.
-            l (float): Length of the beam element.
-            
-        Returns:
-            Tuple[TensorLike, TensorLike]: Strain and stress vectors.
-        """
-        L = self.linear_basis(x, l)
-        H = self.hermite_basis(x, l) 
-        B = self.strain_matrix(x, y, z, l)
-        
-        strain = B @ uh
-        stress = self.stress_matrix() @ strain
-        return strain, stress
