@@ -64,13 +64,13 @@ def search_node(name: str):
 
 
 def is_group_input(cnode_item: dict[str, Any]):
-    return isinstance(cnode_item.get("gin", None), int)
+    return cnode_item.get("gin", None) is not None
 
 def is_group_output(cnode_item: dict[str, Any]):
-    return isinstance(cnode_item.get("gout", None), int)
+    return cnode_item.get("gout", None) is not None
 
 def is_group(cnode_item: dict[str, Any]):
-    return isinstance(cnode_item.get("ref", None), int)
+    return cnode_item.get("ref", None) is not None
 
 def is_output_slot(slot_item: dict[str, Any]):
     return bool(slot_item["src"])
