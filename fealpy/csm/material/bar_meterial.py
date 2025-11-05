@@ -3,7 +3,8 @@ from builtins import float, str
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
-from ..model.truss.truss_data_3d import TrussData3D
+
+
 class BarMaterial(LinearElasticMaterial):
     """Material properties for 3D bars.
     Parameters:
@@ -17,33 +18,34 @@ class BarMaterial(LinearElasticMaterial):
                 name: str, 
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,
-                shear_modulus: Optional[float] = None,
-                A: Optional[float] = None,) -> None:
+                shear_modulus: Optional[float] = None) -> None:
+        
         super().__init__(name=name, 
                         elastic_modulus= elastic_modulus, 
                         poisson_ratio=poisson_ratio,
                         shear_modulus=shear_modulus)
+        
         self.E = self.get_property('elastic_modulus')
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
-        self.A = A
         
+        self.A = model.A 
         
     def __str__(self) -> str:
         s = f"{self.__class__.__name__}(\n"
         s += "  === Material Parameters ===\n"
         s += f"  Name              : {self.get_property('name')}\n"
-        s += f"  [Axle]  E           : {self.E}\n"
-        s += f"  [Axle]  nu          : {self.nu}\n"
-        s += f"  [Axle]  mu          : {self.mu}\n"
+        s += f"   E           : {self.E}\n"
+        s += f"   nu          : {self.nu}\n"
+        s += f"   mu          : {self.mu}\n"
         s += ")"
         return s
     
     def linear_basis(self, x: float, l: float) -> TensorLike:
-        """Linear shape functions for a axle material.
+        """Linear shape functions for a bar material.
         Parameters:
-            x (float): Local coordinate along the axle axis.
-            l (float): Length of the axle element.
+            x (float): Local coordinate along the bar axis.
+            l (float): Length of the bar element.
         Returns:
             b (TensorLike): Linear shape functions evaluated at xi.
         """
@@ -57,7 +59,7 @@ class BarMaterial(LinearElasticMaterial):
         return b
     
     def stress_matrix(self) -> TensorLike:
-        """Returns the stress matrix for axle material."""
+        """Returns the stress matrix for bar material."""
         E = self.E
         D = bm.array([[E, 0, 0],
                       [0, E, 0],
@@ -75,9 +77,9 @@ class BarMaterial(LinearElasticMaterial):
                     σ = D * ε
         Parameters:
             uh (TensorLike): Nodal displacement vector.
-            x (float): Local coordinate in the axle cross-section along the x-axis.
-            y (float): Local coordinate in the axle cross-section along the y-axis.
-            z (float): Local coordinate in the axle cross-section along the z-axis.
+            x (float): Local coordinate in the bar cross-section along the x-axis.
+            y (float): Local coordinate in the bar cross-section along the y-axis.
+            z (float): Local coordinate in the bar cross-section along the z-axis.
             l (float): Length of the beam element.
         Returns:
             Tuple[TensorLike, TensorLike]: Strain and stress vectors.

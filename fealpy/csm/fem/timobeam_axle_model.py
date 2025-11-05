@@ -39,6 +39,7 @@ class TimobeamAxleModel(ComputationalModel):
                self.axle_E = options['axle_E']
                self.axle_nu = options['axle_nu']
                
+               self.Timo, self.Axle = self.set_material()
         
         def __str__(self) -> str:
                 """Returns a formatted multi-line string summarizing the configuration of the Timoshenko beam model.
@@ -72,6 +73,18 @@ class TimobeamAxleModel(ComputationalModel):
         def set_space_degree(self, p: int) -> None:
                 self.p = p
         
+        def set_material(self) -> None:
+                Timo = TimoshenkoBeamMaterial(model=self.pde,
+                                        name="timobeam",
+                                        elastic_modulus=self.beam_E,
+                                        poisson_ratio=self.beam_nu)
+                
+                Axle = AxleMaterial(model=self.pde,
+                                name="axle",
+                                elastic_modulus=self.axle_E,
+                                poisson_ratio=self.axle_nu)
+                return Timo, Axle
+                
         def timo_axle_system(self):
                 """Construct the linear system for the 3D timoshenko beam problem.
 
@@ -88,19 +101,7 @@ class TimobeamAxleModel(ComputationalModel):
                 K = bm.zeros((Dofs, Dofs), dtype=bm.float64)
                 F = bm.zeros(Dofs, dtype=bm.float64)
 
-                Timo = TimoshenkoBeamMaterial(model=self.pde,
-                                        name="timobeam",
-                                        elastic_modulus=self.beam_E,
-                                        poisson_ratio=self.beam_nu)
-
-                Axle = AxleMaterial(model=self.pde,
-                                name="axle",
-                                elastic_modulus=self.axle_E,
-                                poisson_ratio=self.axle_nu)
-                 
-                
-
-                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, Timo, 
+                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, self.Timo, 
                                         index=bm.arange(0, n_cells-10))
                 KE_beam = timo_integrator.assembly(self.tspace)
                 ele_dofs_beam = timo_integrator.to_global_dof(self.tspace)
@@ -108,7 +109,7 @@ class TimobeamAxleModel(ComputationalModel):
                 for i, dof in enumerate(ele_dofs_beam):
                        K[dof[:, None], dof] += KE_beam[i]
 
-                axle_integrator = AxleIntegrator(self.tspace, Axle, 
+                axle_integrator = AxleIntegrator(self.tspace, self.Axle, 
                                         index=bm.arange(n_cells-10, n_cells))
                 KE_axle = axle_integrator.assembly(self.tspace)
                 ele_dofs_axle = axle_integrator.to_global_dof(self.tspace)   
@@ -138,13 +139,9 @@ class TimobeamAxleModel(ComputationalModel):
         def solve(self):
                 K, F = self.timo_axle_system()
                 K, F = self.apply_bc_penalty(K, F)
-        
-                rows, cols = bm.nonzero(K)
-                values = K[rows, cols]
-                K = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
 
                 u = spsolve(K, F, solver='scipy')
-                # self.logger.info(f"Solution u:\n{u}")
+                self.logger.info(f"Solution u:\n{u}")
 
                 return u
         
@@ -180,19 +177,9 @@ class TimobeamAxleModel(ComputationalModel):
                 mesh = self.mesh
                 u = disp.rshape(-1, 6)
                 
-                Timo = TimoshenkoBeamMaterial(model=self.pde,
-                                        name="timobeam",
-                                        elastic_modulus=self.beam_E,
-                                        poisson_ratio=self.beam_nu)
-
-                Axle = AxleMaterial(model=self.pde,
-                                name="axle",
-                                elastic_modulus=self.axle_E,
-                                poisson_ratio=self.axle_nu)
-                
                 l = mesh.entity_measure('cell')
-                L = Timo.linear_basis(x, l)
-                H = Timo.hermite_basis(x, l) 
-                B = Timo.strain_matrix(x, y, z, l)
+                L = self.Timo.linear_basis(x, l)
+                H = self.Timo.hermite_basis(x, l) 
+                B = self.Timo.strain_matrix(x, y, z, l)
                 
                 e_xx = u[0]*L[0]

@@ -1,3 +1,4 @@
+from typing import Union
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
 from fealpy.decorator import variantmethod
@@ -8,10 +9,11 @@ from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import BilinearForm, DirichletBC, LinearForm
 from fealpy.solver import spsolve
 
-from fealpy.csm.fem.bar_integrator import BarIntegrator
-from fealpy.csm.material import BarMaterial
-from fealpy.csm.model.truss.truss_data_3d import TrussData3D
-from fealpy.csm.model.model_manager import CSMModelManager
+from ..fem.bar_integrator import BarIntegrator
+from ..material import BarMaterial
+from ..model.truss import TrussPDEDataT
+from ..model.model_manager import CSMModelManager
+
 
 class BarLFEMModel(ComputationalModel):
     """
@@ -56,9 +58,9 @@ class BarLFEMModel(ComputationalModel):
         self.E = options['E']
         self.nu = options['nu']
         self.A = options['A']
-        self.set_material(E=self.E, nu=self.nu, A=self.A)
-        
-    def set_pde(self, pde=3) -> None:
+        self.set_material(E=self.E, nu=self.nu)
+    
+    def set_pde(self, pde: Union[TrussPDEDataT, int] = 3) -> None:
         """
         Set PDE parameters and update model.
 
@@ -91,20 +93,18 @@ class BarLFEMModel(ComputationalModel):
         scalar_space = LagrangeFESpace(self.mesh, p)
         self.space = TensorFunctionSpace(scalar_space=scalar_space, shape=(-1, self.GD))
 
-    def set_material(self, E: float, nu: float, A: float) -> None:
+    def set_material(self, E: float, nu: float) -> None:
         """
         Set material properties.
 
         Parameters:
             E (float): Young's modulus.
             nu (float): Poisson's ratio.
-            A (float): Cross-sectional area.
         """
         self.material = BarMaterial(model=self.pde,
                                     name='BarMaterial',
                                     elastic_modulus=E,
-                                    poisson_ratio=nu,
-                                    A=A)
+                                    poisson_ratio=nu)
         
     def linear_system(self):
         """
@@ -190,18 +190,10 @@ class BarLFEMModel(ComputationalModel):
         uh_mat = bm.to_numpy(uh_mat)
         strain = bm.to_numpy(strain)
         stress = bm.to_numpy(stress)
-
-        print("--- Displacement (uh) ---")
-        print(uh_mat)
-        print("------------------------")
-
-        print("\n--- Strain per element ---")
-        print(strain)
-        print("--------------------------")
-
-        print("\n--- Stress per element ---")
-        print(stress)
-        print("--------------------------")
+        
+        self.logger.info(f"Displacement uh:\n{uh_mat}")
+        self.logger.info(f"Strain per element:\n{strain}")
+        self.logger.info(f"Stress per element:\n{stress}")
         return uh_mat, strain, stress
 
     def run(self):
