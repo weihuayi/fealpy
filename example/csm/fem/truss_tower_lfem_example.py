@@ -24,7 +24,7 @@ parser.add_argument('--space_degree',
         help='Degree of Finite Element Space, default is 1.')
 
 parser.add_argument('--E',
-                    default=2.1e11, type=float,
+                    default=2.0e11, type=float,
                     help='Type of mesh, default is the truss Young modulus.')
 
 parser.add_argument('--nu',
@@ -46,4 +46,6 @@ bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import TrussTowerModel
 model = TrussTowerModel(options)
-model.__str__()
+# model.__str__()
+model.set_pde()
+model.critical_buckling_load()

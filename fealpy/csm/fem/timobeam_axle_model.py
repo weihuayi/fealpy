@@ -74,13 +74,11 @@ class TimobeamAxleModel(ComputationalModel):
                 self.p = p
         
         def set_material(self) -> None:
-                Timo = TimoshenkoBeamMaterial(model=self.pde,
-                                        name="timobeam",
+                Timo = TimoshenkoBeamMaterial(name="timobeam",
                                         elastic_modulus=self.beam_E,
                                         poisson_ratio=self.beam_nu)
                 
-                Axle = AxleMaterial(model=self.pde,
-                                name="axle",
+                Axle = AxleMaterial(name="axle",
                                 elastic_modulus=self.axle_E,
                                 poisson_ratio=self.axle_nu)
                 return Timo, Axle
@@ -101,7 +99,7 @@ class TimobeamAxleModel(ComputationalModel):
                 K = bm.zeros((Dofs, Dofs), dtype=bm.float64)
                 F = bm.zeros(Dofs, dtype=bm.float64)
 
-                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, self.Timo, 
+                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, self.pde, self.Timo, 
                                         index=bm.arange(0, n_cells-10))
                 KE_beam = timo_integrator.assembly(self.tspace)
                 ele_dofs_beam = timo_integrator.to_global_dof(self.tspace)
@@ -109,7 +107,7 @@ class TimobeamAxleModel(ComputationalModel):
                 for i, dof in enumerate(ele_dofs_beam):
                        K[dof[:, None], dof] += KE_beam[i]
 
-                axle_integrator = AxleIntegrator(self.tspace, self.Axle, 
+                axle_integrator = AxleIntegrator(self.tspace, self.pde, self.Axle, 
                                         index=bm.arange(n_cells-10, n_cells))
                 KE_axle = axle_integrator.assembly(self.tspace)
                 ele_dofs_axle = axle_integrator.to_global_dof(self.tspace)   
@@ -182,4 +180,5 @@ class TimobeamAxleModel(ComputationalModel):
                 H = self.Timo.hermite_basis(x, l) 
                 B = self.Timo.strain_matrix(x, y, z, l)
                 
+                # TODO
                 e_xx = u[0]*L[0]

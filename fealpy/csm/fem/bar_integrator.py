@@ -30,12 +30,14 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
     """
     def __init__(self, 
                  space: _FS, 
+                 model,
                  material, 
                  index: Index=_S,
                  method: Optional[str]=None )-> None:
         super().__init__()
 
         self.space = space
+        self.model = model
         self.material = material
         self.index = index
         
@@ -65,7 +67,7 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
         mesh = space.mesh
         GD = 3
         self.E = self.material.E
-        self.A = self.material.A
+        self.A = self.model.A
 
         l = mesh.edge_length().reshape(-1, 1)
         tan = mesh.edge_tangent()

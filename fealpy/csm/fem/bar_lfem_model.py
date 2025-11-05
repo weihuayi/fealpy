@@ -101,8 +101,7 @@ class BarLFEMModel(ComputationalModel):
             E (float): Young's modulus.
             nu (float): Poisson's ratio.
         """
-        self.material = BarMaterial(model=self.pde,
-                                    name='BarMaterial',
+        self.material = BarMaterial(name='BarMaterial',
                                     elastic_modulus=E,
                                     poisson_ratio=nu)
         
@@ -115,7 +114,7 @@ class BarLFEMModel(ComputationalModel):
             F_load: Load vector.
         """
         bform = BilinearForm(self.space)
-        bform.add_integrator(BarIntegrator(space=self.space, material=self.material))
+        bform.add_integrator(BarIntegrator(space=self.space, model=self.pde, material=self.material))
         K = bform.assembly()
         
         lform = LinearForm(self.space)

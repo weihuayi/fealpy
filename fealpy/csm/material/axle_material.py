@@ -17,7 +17,6 @@ class AxleMaterial(LinearElasticMaterial):
     """
     
     def __init__(self, 
-                model,
                 name: str, 
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,

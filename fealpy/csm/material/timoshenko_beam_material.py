@@ -17,7 +17,6 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
     """
     
     def __init__(self, 
-                model,
                 name: str, 
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,
@@ -32,14 +31,6 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
         self.kappa = shear_factor
-
-        self.Ax = model.Ax  # 截面面积
-        self.Ay = model.Ay  
-        self.Az = model.Az  
-        self.Iy = model.Iy  # 绕 y 轴惯性矩
-        self.Iz = model.Iz  # 绕 z 轴惯性矩
-        self.J = model.Ix  # 极惯性矩
-        
         
     def __str__(self) -> str:
         s = f"{self.__class__.__name__}(\n"

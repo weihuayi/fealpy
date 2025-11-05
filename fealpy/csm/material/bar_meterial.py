@@ -14,7 +14,6 @@ class BarMaterial(LinearElasticMaterial):
         mu (float): The shear modulus of the material.
     """
     def __init__(self, 
-                model,
                 name: str, 
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,
@@ -28,8 +27,7 @@ class BarMaterial(LinearElasticMaterial):
         self.E = self.get_property('elastic_modulus')
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
-        
-        self.A = model.A 
+
         
     def __str__(self) -> str:
         s = f"{self.__class__.__name__}(\n"

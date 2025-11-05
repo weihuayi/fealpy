@@ -14,7 +14,7 @@ from fealpy.solver import spsolve, cg
 from ..model.truss import TrussPDEDataT
 from ..model import CSMModelManager
 from ..material import bar_meterial
-from ..fem.truss_integrator import TrussIntegrator
+from ..fem.bar_integrator import BarIntegrator
 
 
 class TrussTowerModel(ComputationalModel):
@@ -56,12 +56,48 @@ class TrussTowerModel(ComputationalModel):
             self.pde = CSMModelManager("truss_tower").get_example(pde)
         else:
             self.pde = pde
+        # self.logger.info(f"\n{self.pde.external_load()}")
+        # self.logger.info(f"\n{self.pde.dirichlet_dof()}")
                 
     def set_mesh(self, mesh: Mesh) -> None:
             self.mesh = mesh
               
     def set_space_degree(self, p: int) -> None:
             self.p = p
+            
+    def set_material(self):
+        self.material = bar_meterial(self.E, self.nu)
+        
+    def critical_buckling_load(self):
+        """Compute critical buckling loads.
+        
+        Parameters:
+            K: Effective length factor (dimensionless)
+            E: Young's modulus (Pa)
+            L: Total height (m)
+            I1, I2: Area moments of inertia (m^4)
+            
+        Returns:
+            (Fc1, Fc2) : Critical buckling loads (N)
+            Fc1: Critical load for buckling about X-axis (in Y-Z plane).
+            Fc2: Critical load for buckling about Y-axis (in X-Z plane)
+            
+        Note:
+            Fc = pi^2 * E * I / (K*L)^2
+        """
+        K = 2.0
+        node = self.mesh.entity('node')
+        L = bm.max(node[:, 2]) - bm.min(node[:, 2])  # Height in z-direction
+        
+        I1, I2 = self.pde.structural_inertia()
+        
+        Fc1 = bm.pi**2 * self.E * I1 / (K*L)**2  
+        Fc2 = bm.pi**2 * self.E * I2 / (K*L)**2  
+        
+        # self.logger.info(f"\n{L}")
+        # self.logger.info(f"\n{I1}, {I2}")
+        # self.logger.info(f"\n{Fc1}, {Fc2}")
+        return Fc1, Fc2
             
     def truss_tower_system(self):
         pass
