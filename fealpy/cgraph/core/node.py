@@ -15,7 +15,7 @@ class CNode():
     _input_slots: OrderedDict[str, InputSlot]
     _output_slots: OrderedDict[str, OutputSlot]
 
-    def __init__(self, target: Callable | None = None, variable=False):
+    def __init__(self, target: Callable | None = None, var_in=False, var_out=False):
         r"""Initialize a compute node."""
         super().__init__()
         self._input_slots = OrderedDict()
@@ -23,7 +23,8 @@ class CNode():
         self._connection_hooks = OrderedDict()
         self._status_hooks = OrderedDict()
         self._target = target
-        self._variable = variable
+        self._var_in = var_in
+        self._var_out = var_out
 
     def register_input(
             self,
@@ -90,12 +91,12 @@ class CNode():
             return self._target(*args, **kwargs)
 
     def __call__(self, **kwargs: _E.AddrHandler | Any):
-        if self._variable:
+        if self._var_in:
             for name in kwargs.keys():
                 if name not in self.input_slots:
                     self.register_input(name, variable=False)
         _E.connect_from_address(self.input_slots, kwargs)
-        return _E.AddrHandler(self, None)
+        return _E.AddrHandler(self, None, self._var_out)
 
     def __repr__(self):
         if hasattr(self, "__node_type__"):

@@ -52,12 +52,27 @@ def search_node(name: str):
 
     if name in CNodeType.REGISTRY:
         nodetype = CNodeType.REGISTRY[name]
+        inputs, outputs = [], []
+        var_in, var_out = False, False
+
+        for slot in nodetype.INPUT_SLOTS:
+            if slot.name.startswith("*"):
+                var_in = True
+                continue
+            inputs.append(asdict(slot))
+
+        for slot in nodetype.OUTPUT_SLOTS:
+            if slot.name.startswith("*"):
+                var_out = True
+                continue
+            outputs.append(asdict(slot))
 
         return {
             "title": nodetype.TITLE,
-            "inputs": [asdict(d) for d in nodetype.INPUT_SLOTS],
-            "outputs": [asdict(d) for d in nodetype.OUTPUT_SLOTS],
-            "variable": nodetype.VARIABLE,
+            "inputs": inputs,
+            "outputs": outputs,
+            "var_in": var_in,
+            "var_out": var_out,
         }
 
     raise ValueError(f"Node {name} not found")
