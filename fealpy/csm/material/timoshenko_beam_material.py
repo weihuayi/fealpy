@@ -20,8 +20,7 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                 name: str, 
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,
-                shear_modulus: Optional[float] = None,
-                shear_factor: Optional[float] = None) -> None:
+                shear_modulus: Optional[float] = None) -> None:
         super().__init__(name=name, 
                         elastic_modulus= elastic_modulus, 
                         poisson_ratio=poisson_ratio,
@@ -30,7 +29,6 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         self.E = self.get_property('elastic_modulus')
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
-        self.kappa = shear_factor
         
     def __str__(self) -> str:
         s = f"{self.__class__.__name__}(\n"
@@ -151,11 +149,11 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                     [0,     0,     G/κ   ] ]
         """
         E = self.E
-        mu = self.mu
-        kappa = self.kappa
+        G = self.mu
+        kappa = 9/10
         
         D = bm.array([[E, 0, 0],
-                      [0, mu*kappa, 0],
-                      [0, 0, mu*kappa]], dtype=bm.float64)
+                      [0, G/kappa, 0],
+                      [0, 0, G/kappa]], dtype=bm.float64)
 
         return D

@@ -15,14 +15,10 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
 
     Parameters:
         space (_FS): The function space.
-        material: Material properties with attributes E and A.
+        model: PDE model.
+        material: Material properties.
         index (Index, optional): Index for integration.
         method (str, optional): Integration method.
-
-    Attributes:
-        space (_FS): The function space.
-        material: Material properties.
-        index (Index): Integration index.
 
     Methods:
         to_global_dof(space): Returns the mapping from cell to global DOF.
@@ -43,20 +39,19 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
         
     @enable_cache
     def to_global_dof(self, space: _FS) -> TensorLike:
-        """
-        Returns the mapping from cell to global DOF.
-
-        Parameters:
-            space (_FS): The function space.
-
-        Returns:
-            TensorLike: The cell-to-DOF mapping.
-        """
-        return space.cell_to_dof()
-
+        """Returns the mapping from cell to global DOF for selected cells."""
+        cell2dof = space.cell_to_dof()  # (NC, ldof)
+        index = self.index
+         # 如果 index 是 slice 对象 (例如 _S 即 slice(None))
+        if isinstance(index, slice):
+            mesh = space.mesh
+            NC = mesh.number_of_cells()
+            index = bm.arange(NC)[index]  # 转换为数组
+        return cell2dof[index]  # (NC_selected, ldof)
+        
+        
     def assembly(self, space: _FS) -> TensorLike:
-        """
-        Assembles the local stiffness matrices for all bar elements.
+        """Assembles the local stiffness matrices for all bar elements.
 
         Parameters:
             space (_FS): The function space.
@@ -66,22 +61,44 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
         """
         mesh = space.mesh
         GD = 3
-        self.E = self.material.E
-        self.A = self.model.A
+        E = self.material.E
+        
+        index = self.index
+        NC = mesh.number_of_cells()
+        
+        # 如果 index 是 slice 对象 (例如 _S 即 slice(None))
+        if isinstance(index, slice):
+            index = bm.arange(NC)[index]  # 转换为数组
 
-        l = mesh.edge_length().reshape(-1, 1)
-        tan = mesh.edge_tangent()
-        unit_tan = tan / l
+        A = self.model.A  # (NC,) cross-sectional areas for selected elements
+        if isinstance(A, (int, float)):
+            # A 是标量,所有单元相同
+            A_selected = A  
+        else:
+            # A 是数组,取出对应子集
+            A_selected = A[index]  # (NC_selected,)
+    
+        # 只计算选定单元的长度和方向
+        l = mesh.edge_length()[index].reshape(-1, 1)  # (NC_selected, 1)
+        tan = mesh.edge_tangent()[index]  # (NC_selected, 3)
+        unit_tan = tan / l  # (NC_selected, 3)
 
-        R = bm.einsum('ik,im->ikm', unit_tan, unit_tan)
+        R = bm.einsum('ik,im->ikm', unit_tan, unit_tan)  # (NC, 3, 3)
 
-        NE = mesh.number_of_edges()
-        k = bm.zeros((NE, GD*2, GD*2), dtype=bm.float64)
+        NC = index.shape[0]  # Number of selected cells
+        k = bm.zeros((NC, GD*2, GD*2), dtype=bm.float64)
         k[:, :GD, :GD] = R
         k[:, -GD:, :GD] = -R
         k[:, :GD, -GD:] = -R
         k[:, -GD:, -GD:] = R
-        k *= (self.E * self.A)
-        k /= l[:, None]
-
+        
+        EA = E * A_selected  # 标量或 (NC_selected,)
+        if not isinstance(EA, (int, float)):
+            # EA 是数组,需要 reshape
+            k *= EA[:, None, None]  # 广播到 (NC_selected, 6, 6)
+        else:
+            # EA 是标量,直接相乘
+            k *= EA
+            
+        k /= l[:, None]  # l 已经是 (NC_selected, 1), 可以直接广播
         return k

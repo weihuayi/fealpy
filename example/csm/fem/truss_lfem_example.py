@@ -15,6 +15,14 @@ parser.add_argument('--pde',
                     default=3, type=int,
                     help='id of the PDE model, default is 3')
 
+parser.add_argument('--init_mesh',
+                    default='edgemesh', type=str,
+                    help='Type of mesh, default is EdgeMesh')
+
+parser.add_argument('--space_degree',
+        default=1, type=int,
+        help='Degree of Finite Element Space, default is 1')
+
 parser.add_argument('--E', 
                     default=1500.0, type=float, 
                     help="Young's modulus")
@@ -22,10 +30,6 @@ parser.add_argument('--E',
 parser.add_argument('--nu',
                     default=0.3, type=float,
                     help='Type of mesh, default is the bar Poisson ratio')
-
-parser.add_argument('--A', 
-                    default=2000.0, type=float,
-                    help="Cross-sectional area")
 
 parser.add_argument('--plot', 
                     action='store_true', 

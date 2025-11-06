@@ -152,3 +152,20 @@ class TrussTowerData3D:
         fixed_dofs = bm.concatenate(node_dofs)
         
         return fixed_dofs
+    
+    def is_displacement_boundary(self):
+        """Return boolean array indicating which DOFs are on the boundary.
+        
+        Returns:
+            Array of shape (gdof,) with True for boundary DOFs
+        """
+        return self.dirichlet_dof()
+
+    def displacement_bc(self):
+        """Return displacement boundary conditions.
+        
+        Returns:
+            Displacement values at boundary DOFs (all zeros for fixed boundary)
+        """
+        fixed_dofs = self.dirichlet_dof()
+        return bm.zeros(len(fixed_dofs), dtype=bm.float64)
