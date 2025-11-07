@@ -260,11 +260,8 @@ class TrussTowerModel(ComputationalModel):
         return uh
     
     def show(self, uh, filename='truss_result.vtu'):
-        """输出 VTU 文件用于 ParaView 可视化
+        """输出 VTU 文件用于 ParaView 可视化."""
         
-        Parameters:
-            filename: 输出文件名
-        """
         mesh = self.space.mesh
         NN = mesh.number_of_nodes()
         

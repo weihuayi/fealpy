@@ -37,7 +37,7 @@ class BarLFEMModel(ComputationalModel):
         set_pde(pde): Set PDE parameters and update model.
         set_mesh(mesh): Set the mesh.
         set_space(p): Set the finite element space.
-        set_material(E, nu, A): Set material properties.
+        set_material(): Set material properties.
         linear_system(): Assemble and return stiffness matrix and load vector.
         solve(): Solve the linear system and return the solution.
         post_process(uh): Compute displacement, strain, and stress.
@@ -152,7 +152,7 @@ class BarLFEMModel(ComputationalModel):
         K,F= bc.apply(K, F)
         uh[:] = spsolve(K, F, solver='scipy')
         return uh
-
+   
     def post_process(self,uh):
         """
         Compute displacement, strain, and stress.

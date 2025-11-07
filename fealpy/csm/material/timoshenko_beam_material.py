@@ -111,10 +111,10 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         H[0, 3] = l * Phi_bar_z * (-xi**2 + xi**3 + Phi_z*(-xi + xi**2)/2)
 
         # w方向的形函数 (考虑y方向弯曲)
-        H[1, 0] = Phi_bar_y * (1 - 3*xi**2 + 2*xi**3 + Phi_y*(1 - xi))
-        H[1, 1] = -l * Phi_bar_y * (xi - 2*xi**2 + xi**3 + Phi_y*(xi - xi**2)/2)
-        H[1, 2] = Phi_bar_y * (3*xi**2 - 2*xi**3 + Phi_y*xi)
-        H[1, 3] = -l * Phi_bar_y * (-xi**2 + xi**3 + Phi_y*(-xi + xi**2)/2)
+        H[0, 4] = Phi_bar_y * (1 - 3*xi**2 + 2*xi**3 + Phi_y*(1 - xi))
+        H[0, 5] = -l * Phi_bar_y * (xi - 2*xi**2 + xi**3 + Phi_y*(xi - xi**2)/2)
+        H[0, 6] = Phi_bar_y * (3*xi**2 - 2*xi**3 + Phi_y*xi)
+        H[0, 7] = -l * Phi_bar_y * (-xi**2 + xi**3 + Phi_y*(-xi + xi**2)/2)
         
         # 一阶导数
         H[1, 0] = Phi_bar_z * (-6*xi + 6*xi**2 - Phi_z) / l
@@ -167,3 +167,84 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                       [0, 0, G/kappa]], dtype=bm.float64)
 
         return D
+    
+    def compute_strain_and_stress(self,
+                                mesh,
+                                disp,
+                                cross_section_coords=(0.0, 0.0),
+                                axial_position=None,
+                                coord_transform=None,
+                                ele_indices=None) -> Tuple[TensorLike, TensorLike]:
+        """Compute the beam element strain and stress.
+            ε = B * u_e
+            σ = D * ε
+            
+        Parameters:
+            mesh: Mesh object containing beam elements.
+            disp (TensorLike): Nodal displacement vector, shape (n_nodes * 6,).
+            cross_section_coords (Tuple[float, float]): Local coordinates (y, z) in the beam cross-section.
+            axial_position (Optional[float]): Evaluation position along the beam axis ∈ [0, L].
+                If None, the value is evaluated at the element midpoint L/2
+            coord_transform: Coordinate transformation matrices R, shape (NC, 12, 12).
+        
+        Returns:
+            strain (TensorLike): Strain vectors [e_xx, e_xy, e_xz], shape (n_elements, 3).
+            stress (TensorLike): Stress vectors [σ_xx, τ_xy, τ_xz], shape (n_elements, 3).
+        """
+        NC = mesh.number_of_cells()
+        cells = mesh.entity('cell')
+        lengths = mesh.entity_measure('cell')
+        
+        if ele_indices is None:
+            ele_indices = range(NC)
+            num_elements = NC
+        else:
+            num_elements = len(ele_indices)
+
+        strain = bm.zeros((num_elements, 3))
+        stress = bm.zeros((num_elements, 3))
+        
+        if axial_position is None:
+            mid_x = lengths / 2.0  # 在单元中点 L/2 处计算
+        else:
+            mid_x = bm.full(num_elements, axial_position, dtype=bm.float64)
+
+        y, z = cross_section_coords  # 截面局部坐标
+
+        for idx, i in enumerate(ele_indices):
+            node_indices = cells[i]  # [node0_idx, node1_idx]
+            element_disp = bm.concatenate([
+                uh[node_indices[0]], 
+                uh[node_indices[1]]
+            ])  # shape: (12,)
+            
+            # 提取局部位移和转角
+            local_disp = R[i] @ element_disp  # shape: (12,)
+            u0 = local_disp[0:3]
+            a0 = local_disp[3:6]
+            u1 = local_disp[6:9]
+            a1 = local_disp[9:12]
+            
+            L = self.linear_basis(mid_x[i], lengths[i])
+            H = self.hermite_basis(mid_x[i], lengths[i], index=i)
+
+            # 轴向应变: εxx = ∂u/∂x - y*∂θz/∂x + z*∂θy/∂x
+            e_xx = (u0[0]*L[1, 0] + u1[0]*L[1, 1] -
+                    y*(u0[1]*H[1, 0] + a0[2]*H[1, 1] + u1[1]*H[1, 2] + a1[2]*H[1, 3]) +
+                    z*(-u0[2]*H[1, 4] + a0[1]*H[1, 5] - u1[2]*H[1, 6] + a1[1]*H[1, 7]))
+            
+            # xy平面剪切应变: γxy = ∂v/∂x - θz
+            dv_dx = u0[1]*H[1, 0] + a0[2]*H[1, 1] + u1[1]*H[1, 2] + a1[2]*H[1, 3]  # ∂v/∂x
+            theta_z = u0[1]*H[0, 0] + a0[2]*H[0, 1] + u1[1]*H[0, 2] + a1[2]*H[0, 3]  # θz插值
+            e_xy = dv_dx - theta_z
+            
+            # xz平面剪切应变: γxz = ∂w/∂x + θy  
+            dw_dx = u0[2]*H[1, 4] + a0[1]*H[1, 5] + u1[2]*H[1, 6] + a1[1]*H[1, 7]  # ∂w/∂x
+            theta_y = -u0[2]*H[0, 4] - a0[1]*H[0, 5] - u1[2]*H[0, 6] - a1[1]*H[0, 7]  # θy插值
+            e_xz = dw_dx + theta_y
+            
+            strain[i, 0] = e_xx
+            strain[i, 1] = e_xy
+            strain[i, 2] = e_xz
+        
+        return strain, stress
