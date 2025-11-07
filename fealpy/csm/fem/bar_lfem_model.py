@@ -59,7 +59,6 @@ class BarLFEMModel(ComputationalModel):
 
         self.E = options['E']
         self.nu = options['nu']
-        # self.A = options['A']
         
         self.set_space()
         self.set_material()
@@ -107,6 +106,7 @@ class BarLFEMModel(ComputationalModel):
             nu (float): Poisson's ratio.
         """
         self.material = BarMaterial(name='BarMaterial',
+                                    model=self.pde,
                                     elastic_modulus=self.E,
                                     poisson_ratio=self.nu)
 

@@ -40,6 +40,7 @@ class TimobeamAxleModel(ComputationalModel):
                self.axle_nu = options['axle_nu']
                
                self.Timo, self.Axle = self.set_material()
+               self.set_space()
         
         def __str__(self) -> str:
                 """Returns a formatted multi-line string summarizing the configuration of the Timoshenko beam model.
@@ -72,13 +73,23 @@ class TimobeamAxleModel(ComputationalModel):
               
         def set_space_degree(self, p: int) -> None:
                 self.p = p
+                
+        def set_space(self):
+                """Initialize the finite element space."""
+                mesh = self.mesh
+                p = self.p
+                
+                scalar_space = LagrangeFESpace(mesh, p=p, ctype='C')
+                self.space = TensorFunctionSpace(scalar_space, shape=(-1, self.GD*2))
         
         def set_material(self) -> None:
                 Timo = TimoshenkoBeamMaterial(name="timobeam",
+                                        model=self.pde,
                                         elastic_modulus=self.beam_E,
                                         poisson_ratio=self.beam_nu)
                 
                 Axle = AxleMaterial(name="axle",
+                                model=self.pde,
                                 elastic_modulus=self.axle_E,
                                 poisson_ratio=self.axle_nu)
                 return Timo, Axle
@@ -90,27 +101,25 @@ class TimobeamAxleModel(ComputationalModel):
                     E (float): Young's modulus in MPa.
                     nu (float): Poisson's ratio.
                 """
-                self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
-                self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
-                mesh = self.tspace.mesh
-                n_cells = mesh.number_of_cells()
+                mesh = self.mesh
+                NC = mesh.number_of_cells()
 
-                Dofs = self.tspace.number_of_global_dofs()
+                Dofs = self.space.number_of_global_dofs()
                 K = bm.zeros((Dofs, Dofs), dtype=bm.float64)
                 F = bm.zeros(Dofs, dtype=bm.float64)
 
-                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, self.pde, self.Timo, 
-                                        index=bm.arange(0, n_cells-10))
-                KE_beam = timo_integrator.assembly(self.tspace)
-                ele_dofs_beam = timo_integrator.to_global_dof(self.tspace)
+                timo_integrator = TimoshenkoBeamIntegrator(self.space, self.pde, self.Timo, 
+                                        index=bm.arange(0, NC-10))
+                KE_beam = timo_integrator.assembly(self.space)
+                ele_dofs_beam = timo_integrator.to_global_dof(self.space)
 
                 for i, dof in enumerate(ele_dofs_beam):
                        K[dof[:, None], dof] += KE_beam[i]
 
-                axle_integrator = AxleIntegrator(self.tspace, self.pde, self.Axle, 
-                                        index=bm.arange(n_cells-10, n_cells))
-                KE_axle = axle_integrator.assembly(self.tspace)
-                ele_dofs_axle = axle_integrator.to_global_dof(self.tspace)   
+                axle_integrator = AxleIntegrator(self.space, self.pde, self.Axle, 
+                                        index=bm.arange(NC-10, NC))
+                KE_axle = axle_integrator.assembly(self.space)
+                ele_dofs_axle = axle_integrator.to_global_dof(self.space)
 
                 for i, dof in enumerate(ele_dofs_axle):
                        K[dof[:, None], dof] += KE_axle[i]
@@ -143,20 +152,6 @@ class TimobeamAxleModel(ComputationalModel):
 
                 return u
         
-        def show(self, disp):
-                """
-                Visualize the mesh and the displacement field.
-                """
-                
-                mesh = self.mesh
-                
-                uh = disp.reshape(-1, 6)
-                u = uh[:, :3]
-                mesh.nodedata['disp'] = u
-
-                frname = f"disp.vtu"
-                mesh.to_vtk(fname=frname)
-
         def calculate_beam_element_strain_and_stress(self,
                                 disp,
                                 cross_section_coords=(0.0, 0.0),
@@ -177,7 +172,7 @@ class TimobeamAxleModel(ComputationalModel):
                 """
                 uh = disp.reshape(-1, 6)
                 
-                mesh = self.tspace.mesh
+                mesh = self.mesh
                 cells = mesh.entity('cell')  # shape: (NC, 2)
                 NC = mesh.number_of_cells()
                 lengths = mesh.entity_measure('cell')
@@ -192,56 +187,64 @@ class TimobeamAxleModel(ComputationalModel):
                 y, z = cross_section_coords  # 截面局部坐标
                 
                 
-                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, self.pde, self.Timo, 
+                timo_integrator = TimoshenkoBeamIntegrator(self.space, self.pde, self.Timo, 
                                         index=bm.arange(0, beam_elements))
                 R = timo_integrator._coord_transform()  # 获取变换矩阵
                 
-                strain = bm.zeros((beam_elements, 3))
-                stress = bm.zeros((beam_elements, 3))
+                beam_strain = bm.zeros((beam_elements, 3))
+                beam_stress = bm.zeros((beam_elements, 3))
                 
                 for i in range(beam_elements):
                         node_indices = cells[i]  # [node0_idx, node1_idx]
-                        element_disp_vec = bm.concatenate([
+                        element_disp = bm.concatenate([
                                 uh[node_indices[0]], 
                                 uh[node_indices[1]]
                                 ])  # shape: (12,)
                         
                         # 提取局部位移和转角
-                        local_disp = R[i] @ element_disp_vec  # shape: (12,)
+                        local_disp = R[i] @ element_disp  # shape: (12,)
                         u0 = local_disp[0:3]
                         a0 = local_disp[3:6]
                         u1 = local_disp[6:9]
                         a1 = local_disp[9:12]
                         
                         L = self.Timo.linear_basis(mid_x[i], lengths[i])
-                        H = self.Timo.hermite_basis(mid_x[i], lengths[i])
-                        
-                        # 应变计算
+                        H = self.Timo.hermite_basis(mid_x[i], lengths[i], index=i)
+
+                        # 轴向应变: εxx = ∂u/∂x - y*∂θz/∂x + z*∂θy/∂x
                         e_xx = (u0[0]*L[1, 0] + u1[0]*L[1, 1] -
-                                y*(u0[1]*H[2, 0] + a0[2]*H[2, 1] + u1[1]*H[2, 2] + a1[2]*H[2, 3]) +
-                                z*(-u0[2]*H[2, 0] + a0[1]*H[2, 1] - u1[2]*H[2, 2] + a1[1]*H[2, 3]))
-                        e_xy = -z*(a0[0]*L[1, 0] + a1[0]*L[1, 1])
-                        e_xz = y*(a0[0]*L[1, 0] + a1[0]*L[1, 1])
+                                y*(u0[1]*H[1, 0] + a0[2]*H[1, 1] + u1[1]*H[1, 2] + a1[2]*H[1, 3]) +
+                                z*(-u0[2]*H[1, 4] + a0[1]*H[1, 5] - u1[2]*H[1, 6] + a1[1]*H[1, 7]))
                         
-                        strain[i, 0] = e_xx
-                        strain[i, 1] = e_xy
-                        strain[i, 2] = e_xz
+                        # xy平面剪切应变: γxy = ∂v/∂x - θz
+                        dv_dx = u0[1]*H[1, 0] + a0[2]*H[1, 1] + u1[1]*H[1, 2] + a1[2]*H[1, 3]  # ∂v/∂x
+                        theta_z = u0[1]*H[0, 0] + a0[2]*H[0, 1] + u1[1]*H[0, 2] + a1[2]*H[0, 3]  # θz插值
+                        e_xy = dv_dx - theta_z
+                        
+                        # xz平面剪切应变: γxz = ∂w/∂x + θy  
+                        dw_dx = u0[2]*H[1, 4] + a0[1]*H[1, 5] + u1[2]*H[1, 6] + a1[1]*H[1, 7]  # ∂w/∂x
+                        theta_y = -u0[2]*H[0, 4] - a0[1]*H[0, 5] - u1[2]*H[0, 6] - a1[1]*H[0, 7]  # θy插值
+                        e_xz = dw_dx + theta_y
+                        
+                        beam_strain[i, 0] = e_xx
+                        beam_strain[i, 1] = e_xy
+                        beam_strain[i, 2] = e_xz
                         
                         # 应力计算（方法一）
-                        # kappa = 9/10
-                        # stress[i, 0] = self.Timo.E * strain[i, 0]
-                        # stress[i, 1] = kappa*self.Timo.mu * strain[i, 1]
-                        # stress[i, 2] = kappa*self.Timo.mu * strain[i, 2]
+                        # kappa = 10/9
+                        # beam_stress[i, 0] = self.Timo.E * beam_strain[i, 0]
+                        # beam_stress[i, 1] = kappa*self.Timo.mu * beam_strain[i, 1]
+                        # beam_stress[i, 2] = kappa*self.Timo.mu * beam_strain[i, 2]
 
                 # 应力计算（方法二）
-                stress = strain @ self.Timo.stress_matrix()
-                
-                # self.logger.info(f"strain:\n{strain.shape}")
-                # self.logger.info(f"strain:\n{strain}")
-                # self.logger.info(f"strain:\n{stress.shape}")
-                # self.logger.info(f"strain:\n{stress}")
+                beam_stress = beam_strain @ self.Timo.stress_matrix()
 
-                return strain, stress
+                # self.logger.info(f"strain:\n{beam_strain.shape}")
+                # self.logger.info(f"strain:\n{beam_stress.shape}")
+                # self.logger.info(f"strain:\n{beam_strain}")
+                # self.logger.info(f"strain:\n{beam_stress}")
+
+                return beam_strain, beam_stress
 
         def calculate_axle_strain_and_stress(self, 
                                 disp,
@@ -253,7 +256,7 @@ class TimobeamAxleModel(ComputationalModel):
                 """
                 uh = disp.reshape(-1, 6)
                 
-                mesh = self.tspace.mesh
+                mesh = self.mesh
                 cells = mesh.entity('cell')  # shape: (NC, 2)
                 NC = mesh.number_of_cells()
                 lengths = mesh.entity_measure('cell')
@@ -267,23 +270,22 @@ class TimobeamAxleModel(ComputationalModel):
 
                 y, z = cross_section_coords  # 截面局部坐标
                 
-                
-                axle_integrator = AxleIntegrator(self.tspace, self.pde, self.Axle, 
+                axle_integrator = AxleIntegrator(self.space, self.pde, self.Axle, 
                                         index=bm.arange(NC-10, NC))
                 R = axle_integrator._coord_transform()  # 获取变换矩阵
 
-                strain = bm.zeros((axle_elements, 3))
-                stress = bm.zeros((axle_elements, 3))
+                axle_strain = bm.zeros((axle_elements, 3))
+                axle_stress = bm.zeros((axle_elements, 3))
 
                 for i in range(axle_elements):
                         node_indices = cells[i]  # [node0_idx, node1_idx]
-                        element_disp_vec = bm.concatenate([
+                        element_disp = bm.concatenate([
                                 uh[node_indices[0]], 
                                 uh[node_indices[1]]
                                 ])  # shape: (12,)
                         
                         # 提取局部位移和转角
-                        local_disp = R[i] @ element_disp_vec  # shape: (12,)
+                        local_disp = R[i] @ element_disp  # shape: (12,)
                         u0 = local_disp[0:3]
                         a0 = local_disp[3:6]
                         u1 = local_disp[6:9]
@@ -294,26 +296,101 @@ class TimobeamAxleModel(ComputationalModel):
                         # # 轴向应变：du/dx
                         e_xx = u0[0] * L[1, 0] + u1[0] * L[1, 1]
                         
-                        # 对于轴承单元，通常只考虑轴向应变，这里保持与梁单元一致的格式
-                        e_xy = -z * (a0[0] * L[1, 0] + a1[0] * L[1, 1])
-                        e_xz = y * (a0[0] * L[1, 0] + a1[0] * L[1, 1])
+                        # 对于轴承单元，通常只考虑轴向应变，剪切应变设为零
+                        e_xy = 0.0
+                        e_xz = 0.0
                         
-                        strain[i, 0] = e_xx
-                        strain[i, 1] = e_xy
-                        strain[i, 2] = e_xz
+                        axle_strain[i, 0] = e_xx
+                        axle_strain[i, 1] = e_xy
+                        axle_strain[i, 2] = e_xz
                         
-                        # 应力计算（方法一）
-                        # stress[i, 0] = self.Axle.E * strain[i, 0]
-                        # stress[i, 1] = self.Axle.E * strain[i, 1]
-                        # stress[i, 2] = self.Axle.E * strain[i, 2]
+                        # # 应力计算（方法一）
+                        # axle_stress[i, 0] = self.Axle.E * axle_strain[i, 0]
+                        # axle_stress[i, 1] = 0.0
+                        # axle_stress[i, 2] = 0.0
 
                 # 应力计算（方法二）
-                stress = strain @ self.Axle.stress_matrix()
-                
-                self.logger.info(f"strain:\n{strain.shape}")
-                self.logger.info(f"strain:\n{strain}")
-                self.logger.info(f"strain:\n{stress.shape}")
-                self.logger.info(f"strain:\n{stress}")
+                axle_stress = axle_strain @ self.Axle.stress_matrix()
 
+                # self.logger.info(f"axle_strain:\n{axle_strain.shape}")
+                # self.logger.info(f"axle_stress:\n{axle_stress.shape}")
+                # self.logger.info(f"axle_strain:\n{axle_strain}")
+                # self.logger.info(f"axle_stress:\n{axle_stress}")
+
+                return axle_strain, axle_stress
+         
+        def calculate_strain_and_stress(self, 
+                                      disp,
+                                      cross_section_coords=(0.0, 0.0),
+                                      evaluation_point=None):
+                """Calculate element strain and stress for beam and/or axle elements.
                 
+                Parameters:
+                        disp: Global displacement vector
+                        cross_section_coords: Cross-section coordinates (y, z)
+                        evaluation_point: Evaluation point along element length
+                        
+                Returns:
+                        strain: Strain array
+                        stress: Stress array
+                """
+                mesh = self.mesh
+                NC = mesh.number_of_cells()
+                lengths = mesh.entity_measure('cell')
+                
+                strain = bm.zeros((NC, 3))
+                stress = bm.zeros((NC, 3))
+                
+                if evaluation_point is None:
+                        mid_x = lengths / 2.0
+                else:
+                        mid_x = evaluation_point
+                
+                beam_strain, beam_stress = self.calculate_beam_element_strain_and_stress(
+                                disp, cross_section_coords, evaluation_point)
+                axle_strain, axle_stress = self.calculate_axle_strain_and_stress(
+                                disp, cross_section_coords, evaluation_point)
+                
+                # 单元索引映射
+                beam_elements = NC - 10
+                timo_integrator = TimoshenkoBeamIntegrator(self.space, self.pde, self.Timo, 
+                                        index=bm.arange(0, beam_elements))
+                ele_dof_beam = timo_integrator.index
+                
+                axle_integrator = AxleIntegrator(self.space, self.pde, self.Axle, 
+                                        index=bm.arange(NC-10, NC))
+                ele_dof_axle = axle_integrator.index
+
+
+                for i, ele_idx in enumerate(ele_dof_beam):
+                        strain[ele_idx, :] = beam_strain[i, :]
+                        stress[ele_idx, :] = beam_stress[i, :]
+                
+                for i, ele_idx in enumerate(ele_dof_axle):
+                        strain[ele_idx, :] = axle_strain[i, :]
+                        stress[ele_idx, :] = axle_stress[i, :]
+
+                # self.logger.info(f"Final strain shape: {strain}")
+                # self.logger.info(f"Final stress shape: {stress}")
+
                 return strain, stress
+        
+        def show(self, disp, strain, stress):
+                """Visualize mesh, displacement field, strain field, and stress field by saving to VTU files."""
+                
+                mesh = self.mesh
+                
+                uh = disp.reshape(-1, 6)
+                u = uh[:, :3]
+                mesh.nodedata['disp'] = u
+
+                # frname = f"disp.vtu"
+                # mesh.to_vtk(fname=frname)
+
+                mesh.edgedata['strain'] = strain
+                frname = f"strain.vtu"
+                mesh.to_vtk(fname=frname)
+
+                mesh.edgedata['stress'] = stress
+                frname = f"stress.vtu"
+                mesh.to_vtk(fname=frname)

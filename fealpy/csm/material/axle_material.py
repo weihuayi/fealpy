@@ -18,6 +18,7 @@ class AxleMaterial(LinearElasticMaterial):
     
     def __init__(self, 
                 name: str, 
+                model,
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,
                 shear_modulus: Optional[float] = None) -> None:
@@ -29,6 +30,8 @@ class AxleMaterial(LinearElasticMaterial):
         self.E = self.get_property('elastic_modulus')
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
+        
+        self.model = model
         
     def __str__(self) -> str:
         s = f"{self.__class__.__name__}(\n"

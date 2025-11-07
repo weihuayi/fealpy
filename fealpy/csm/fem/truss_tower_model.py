@@ -90,6 +90,7 @@ class TrussTowerModel(ComputationalModel):
     def set_material(self):
         self.material = BarMaterial(
             name='BarMaterial',
+            model=self.pde,
             elastic_modulus=self.E,
             poisson_ratio=self.nu
         )
