@@ -97,31 +97,40 @@ def load(data: dict, /, return_graph=True) -> CNode | NodeGroup | Graph:
 
     cnode_table, slots_table, conns_table = data["cnodes"], data["slots"], data["conns"]
     del data
-
     # Same order as the data
-    cnode_list = []
-    group_dict, graph_dict = {}, {}
+    cnode_list: list[CNode | NodeGroup | None] = []
+    graph_dict: dict[int, Graph] = {}
 
-    # Create cnodes and graphs
+    # STEP 1: Create cnode_list and graph_dict
     for cnode_item in cnode_table:
         # Skip graph IO nodes
         if is_group_input(cnode_item) or is_group_output(cnode_item):
             # use a placeholder to keep index, as the graph may not be created yet
             cnode_list.append(None)
             continue
-
         if is_group(cnode_item):
             graph_id = cnode_item["ref"]
             if graph_id not in graph_dict:
                 graph_dict[graph_id] = Graph(cnode_item["name"])
-            cnode = NodeGroup(graph_dict[graph_id])
-            group_dict[graph_id] = cnode
-        else:
-            cnode = create(cnode_item["name"])
+            cnode_list.append(None)
+            continue
 
-        cnode_list.append(cnode)
+        cnode_list.append(create(cnode_item["name"]))
 
-    # Loop again to replace placeholders with actual graph IO nodes
+    # STEP 2: Find graph IO slots to register source and drain for graphs.
+    for slot_item in slots_table:
+        cnode_id = slot_item["cnode"]
+        cnode_item = cnode_table[cnode_id]
+
+        if is_group_input(cnode_item):
+            graph = graph_dict[cnode_item["gin"]]
+            graph.register_source(slot_item["name"])
+
+        elif is_group_output(cnode_item): # input slot of the output node of a graph
+            graph = graph_dict[cnode_item["gout"]]
+            graph.register_drain(slot_item["name"], default=slot_item["val"])
+
+    # STEP 3: Generate actual graph IO nodes from graphs, and groups from graphs.
     for idx, cnode_item in enumerate(cnode_table):
         if is_group_input(cnode_item):
             graph = graph_dict[cnode_item["gin"]]
@@ -131,37 +140,24 @@ def load(data: dict, /, return_graph=True) -> CNode | NodeGroup | Graph:
             graph = graph_dict[cnode_item["gout"]]
             assert cnode_list[idx] is None
             cnode_list[idx] = graph._drain_node
+        elif is_group(cnode_item):
+            graph = graph_dict[cnode_item["ref"]]
+            assert cnode_list[idx] is None
+            cnode_list[idx] = NodeGroup(graph)
 
-    # Search graph IO to register source and drain
+    # STEP 4: Set all inputs and their defaults
     for slot_item in slots_table:
+        if is_output_slot(slot_item):
+            continue
         cnode_id = slot_item["cnode"]
-        cnode_item = cnode_table[cnode_id]
-
-        if is_group_input(cnode_item):
-            graph = graph_dict[cnode_item["gin"]]
-            assert isinstance(graph, Graph)
-            graph.register_source(slot_item["name"])
-
-        elif is_group_output(cnode_item): # input slot of the output node of a graph
-            graph = graph_dict[cnode_item["gout"]]
-            assert isinstance(graph, Graph)
-            graph.register_drain(slot_item["name"], default=slot_item["val"])
-
-    # Synchronize all node groups
-    for group in group_dict.values():
-        group.syncronize()
-
-    # Set all inputs and their defaults
-    for slot_item in slots_table:
-        cnode_id = slot_item["cnode"]
-        cnode_item = cnode_table[cnode_id]
-        if not is_output_slot(slot_item) and not is_group_input(cnode_item):
-            # for all common inputs
-            cnode = cnode_list[cnode_id]
+        cnode = cnode_list[cnode_id]
+        try:
             cnode.input_slots[slot_item["name"]].default = slot_item["val"]
             cnode.input_slots[slot_item["name"]].has_default = True
+        except (KeyError, AttributeError):
+            pass
 
-    # Recover connections
+    # STEP 5: Recover connections
     for src_id, dst_id in ((item["src"], item["dst"]) for item in conns_table):
         src_item = slots_table[src_id]
         dst_item = slots_table[dst_id]
