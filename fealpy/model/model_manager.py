@@ -132,6 +132,7 @@ class PDEModelManager(ModelManager):
         "darcyforchheimer":"fealpy.model.darcyforchheimer",
         "interface_poisson":"fealpy.model.interface_poisson",
         "ion_flow":"fealpy.model.ion_flow",
+        "navier_stokes":"fealpy.model.navier_stokes",
         "nonlinear":"fealpy.model.nonlinear",
         "linear_elasticity": "fealpy.model.linear_elasticity",
         "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
@@ -143,4 +144,6 @@ class PDEModelManager(ModelManager):
         "surface_poisson": "fealpy.model.surface_poisson",
         "curlcurl":"fealpy.model.curlcurl",
         "darcyforchheimer":"fealpy.model.darcyforchheimer",
+        "dld_microfluidic_chip":"fealpy.model.dld_microfluidic_chip",
+        "mgtensor_possion":"fealpy.model.mgtensor_possion"
     }

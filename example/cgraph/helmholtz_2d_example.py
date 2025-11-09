@@ -12,6 +12,7 @@ uher = cgraph.create("FEFunction")
 helmholtz_eq = cgraph.create("HelmholtzEquation")
 dbc = cgraph.create("DirichletBC")
 solver = cgraph.create("CGSolver")
+mesh2d3d = cgraph.create("MeshDimensionUpgrading")
 
 
 # 连接节点
@@ -35,7 +36,19 @@ solver(
     x0=dbc().uh
 )
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher(), uh=solver())
+WORLD_GRAPH.output(
+    mesh=mesh2d3d(mesh=mesher(), z=solver()),
+    uh=solver()
+)
 
 WORLD_GRAPH.execute()
-print(WORLD_GRAPH.get())
+result = WORLD_GRAPH.get()
+mesh = result["mesh"]
+
+from matplotlib import pyplot as plt
+
+fig = plt.figure()
+axes = fig.add_subplot(projection="3d")
+mesh.add_plot(axes)
+
+plt.show()

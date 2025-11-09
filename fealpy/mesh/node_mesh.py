@@ -501,3 +501,39 @@ class NeighborManager():
         fg_neighbors = fwvg_neighbors[wv_mask]
         w_dist = w_dist[wv_mask]
         return w_node, fg_neighbors, w_dist
+
+class BamBreak:
+    def __init__(self, node, nodedata):
+        self.node = node
+        self.nodedata = nodedata
+        
+    @classmethod
+    def from_bam_break_domain(cls, dx, dy):
+        # 流体粒子pp生成
+        x_pp = bm.arange(2 * dx, 1 + dx, dx)
+        y_pp = bm.arange(2 * dy, 2 + dy, dy)
+        X_pp, Y_pp = bm.meshgrid(x_pp, y_pp)
+        X_flat = X_pp.flatten()
+        Y_flat = Y_pp.flatten()
+        pp = bm.stack((X_flat, Y_flat), axis=1)
+
+        # 边界粒子bpp生成
+        x0 = bm.arange(0, 4, dx / 2)
+        x1 = bm.arange(-dx / 4, 4 + dx / 4, dx / 2)
+        y = bm.arange(dy, 4, dy / 2)
+
+        bp0 = bm.stack((x0, bm.zeros_like(x0)), axis=1)
+        bp1 = bm.stack((x1, bm.full_like(x1, dy / 2)), axis=1)
+        bp = bm.concatenate((bp0, bp1), axis=0)
+
+        lp0 = bm.stack((bm.zeros_like(y), y + dy / 2), axis=1)
+        lp1 = bm.stack((bm.full_like(y, dx / 2), y), axis=1)
+        lp = bm.concatenate((lp0, lp1), axis=0)
+
+        rp0 = bm.stack((bm.full_like(y, 4), y + dy / 2), axis=1)
+        rp1 = bm.stack((bm.full_like(y, 4 - dx / 2), y), axis=1)
+        rp = bm.concatenate((rp0, rp1), axis=0)
+
+        bpp = bm.concatenate((bp, lp, rp), axis=0)
+        
+        return cls(pp, bpp)

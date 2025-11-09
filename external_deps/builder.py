@@ -18,7 +18,8 @@ def build_ext():
         deps = json.load(f)
 
     for dep in deps:
-        if os.getenv(dep["env"]): # Check if the environment variable is set
+        env = dep.get("env", "")
+        if os.getenv(env): # Check if the environment variable is set
             module = importlib.import_module(dep["name"])
             module.build(dep, ext_modules)
     return ext_modules

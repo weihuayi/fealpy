@@ -160,6 +160,30 @@ class TestGeometryKernelBase:
         gkm.display(box_ori, box_trans, box_rotation1, box_rotation2, box_rotation3,
                     color=["blue", "red", "green", "yellow", "purple"], transpose=0.5)
 
+    @pytest.mark.parametrize("kernel", ['occ'])
+    @pytest.mark.parametrize("input_data", geometry_data)
+    def test_geometry_revolve(self, input_data, kernel):
+        gkm.set_adapter(kernel)
+
+        box_ori = gkm.add_rectangle(0, 0, 0, 3, 4)
+        box_temp1 = gkm.rotate(box_ori, (0, 0, 0), (1, 0, 0), 3.14/2)
+        box_temp2 = gkm.translate(box_temp1, (1, 0, 0))
+
+        box_revolved = gkm.translate(gkm.revolve(box_temp2, (0 , 0, 0), (0, 0, 1), 3.14), (0, 0, 5))
+        box_revolved2 = gkm.translate(gkm.revolve(box_temp2, (0 , 0, 0), (0, 0, 1)), (0, 0, 10))
+
+        gkm.display(box_temp2, box_revolved, box_revolved2, color=["r", "blue", "y"], transpose=0.5)
+
+    @pytest.mark.parametrize("kernel", ['occ'])
+    @pytest.mark.parametrize("input_data", geometry_data)
+    def test_geometry_periodize(self, input_data, kernel):
+        gkm.set_adapter(kernel)
+
+        cylinder = gkm.add_cylinder(5, 0, 0, 1, 3)
+        cylinder_periodized = gkm.periodize(cylinder, (0, 0, 0), (0, 0, 1), 12)
+
+        gkm.display(cylinder_periodized, color=["r"], transpose=0.5)
+
 
     @pytest.mark.parametrize("kernel", ['occ'])
     @pytest.mark.parametrize("input_data", geometry_data)

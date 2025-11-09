@@ -755,6 +755,72 @@ class OCCAdapter(GeometryKernelAdapterBase, adapter_name="occ"):
         trsf.SetRotation(axis, angle)
         return BRepBuilderAPI_Transform(shape, trsf, True).Shape()
 
+    @staticmethod
+    def revolve(
+            section_shape: TopoDS_Shape,
+            axis_point: Union[Tuple[float, float, float], gp_Pnt],
+            axis_dir: Union[Tuple[float, float, float], gp_Dir],
+            angle: float=2 * pi
+    ):
+        """
+        生成旋转体。
+        Parameters
+        section_shape: TopoDS_Shape 旋转截面，可以是边、线框或面
+        axis_point: Union[Tuple[float, float, float], gp_Pnt] 旋转轴上的一点
+        axis_dir: Union[Tuple[float, float, float], gp_Dir] 旋转轴方向
+        angle: float 旋转角度，弧度制，默认 2π 表示完整旋转
+        """
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeRevol
+        p = gp_Pnt(*axis_point)
+        d = gp_Dir(*axis_dir)
+        ax = gp_Ax1(p, d)
+        rev = BRepPrimAPI_MakeRevol(section_shape, ax, angle)
+        return rev.Shape()
+
+    @staticmethod
+    def periodize(
+            shape: TopoDS_Shape,
+            axis_point: Union[Tuple[float, float, float], gp_Pnt],
+            axis_dir: Union[Tuple[float, float, float], gp_Dir],
+            n_periods: int
+    ) -> TopoDS_Compound:
+        """
+        绕指定轴周期复制几何体
+        Parameters
+        shape : TopoDS_Shape 待复制的几何体
+        axis_point : Union[Tuple[float, float, float], gp_Pnt] 旋转轴上的一点
+        axis_dir : Union[Tuple[float, float, float], gp_Dir] 旋转轴方向
+        n_periods : int 重复份数（至少2份）
+        """
+        from OCC.Core.gp import gp_Trsf
+        from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+        from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse
+
+        if n_periods < 1:
+            raise ValueError("n_periods 必须 >= 1")
+        if n_periods == 1:
+            return shape
+
+        p = gp_Pnt(*axis_point)
+        d = gp_Dir(*axis_dir)
+        ax = gp_Ax1(p, d)
+
+        angle_step = 2 * pi / n_periods
+        shapes = [shape]
+
+        for i in range(1, n_periods):
+            trsf = gp_Trsf()
+            trsf.SetRotation(ax, angle_step * i)
+            moved = BRepBuilderAPI_Transform(shape, trsf, True).Shape()
+            shapes.append(moved)
+
+        # 逐步 fuse 合并
+        fused = shapes[0]
+        for s in shapes[1:]:
+            fused = BRepAlgoAPI_Fuse(fused, s).Shape()
+
+        return fused
+
 
     # ===========================================================
     # entity sample

@@ -666,3 +666,292 @@ class SPHSolver:
                 v = np.hstack([v, np.zeros((N, 1))])
             data_pv[k] = np.asarray(v)
         return data_pv
+class ParticleSystem:
+    def __init__(self, dx, dy, rho0=1000, rhomin=995, dt=0.001, c0=10, gamma=7, alpha=0.1):
+        self.dx = dx
+        self.dy = dy
+        self.rho0 = rho0
+        self.rhomin = rhomin
+        self.dt = dt
+        self.c0 = c0
+        self.gamma = gamma
+        self.alpha = alpha
+        self.g = bm.array([0.0, -9.8])
+        self.H = 0.92 * bm.sqrt(dx**2 + dy**2)
+        
+        self.dtype = [
+            ("position", "float64", (2,)),
+            ("velocity", "float64", (2,)),
+            ("rho", "float64"),
+            ("mass", "float64"),
+            ("pressure", "float64"),
+            ("sound", "float64"),
+            ("tag", "bool"),
+        ]
+        
+        self.particles = None
+        
+    def initialize_particles(self, pp, bpp):
+        num_particles = pp.shape[0] + bpp.shape[0]
+        self.particles = bm.zeros(num_particles, dtype=self.dtype)
+        self.particles["rho"] = self.rho0
+        self.particles["position"] = bm.concatenate((pp, bpp), axis=0)
+        self.particles["tag"][pp.shape[0]:] = True
+        self.particles["tag"][:pp.shape[0]] = False
+
+class BamBreakSolver:
+    def __init__(self, particle_system):
+        self.ps = particle_system
+        
+    # 使用 cKDTree 进行临近搜索
+    def find_neighbors_within_distance(self, points, h):
+        tree = cKDTree(points)
+        neighbors = tree.query_ball_tree(tree, h)
+        return [bm.array(neighbors) for neighbors in neighbors]
+
+    # 五次核函数
+    @staticmethod
+    def kernel(r, h):
+        d = bm.sqrt(bm.sum(r**2, axis=-1))
+        q = d / h
+        val = 7 * (1 - q / 2) ** 4 * (2 * q + 1) / (4 * bm.pi * h**2)
+        return val
+
+    # 核函数梯度
+    @staticmethod
+    def gradkernel(r, h):
+        d = bm.sqrt(bm.sum(r**2))
+        q = d / h
+        val = -35 / (4 * bm.pi * h**3) * q * (1 - q / 2) ** 3
+        val /= d
+        return val
+
+    # 计算密度的变化
+    def change_rho(self, idx):
+        particles = self.ps.particles
+        num = particles["rho"].shape[0]
+        position = particles["position"]
+        velocity = particles["velocity"]
+        mass = self.ps.dx * self.ps.dy * particles["rho"]
+        result = bm.zeros(num)
+        
+        for i in range(num):
+            for j in idx[i]:
+                if i != j:  # 排除自己
+                    rij = position[i] - position[j]
+                    gk = self.gradkernel(rij, self.ps.H) * rij
+                    vij = velocity[i] - velocity[j]
+                    result[i] += mass[j] * bm.dot(gk, vij)
+            particles["rho"][i] += self.ps.dt * result[i]
+            if self.ps.rhomin > 0 and particles["rho"][i] < self.ps.rhomin:
+                particles["rho"][i] = self.ps.rhomin
+
+    # 计算粒子位置的变化
+    def change_position(self, idx):
+        particles = self.ps.particles
+        num = particles["rho"].shape[0]
+        position = particles["position"]
+        velocity = particles["velocity"]
+        rho = particles["rho"]
+        mass = self.ps.dx * self.ps.dy * rho
+        result = bm.zeros((num, 2))
+        
+        for i in range(num):
+            for j in idx[i]:
+                rhoij = (rho[i] + rho[j]) / 2
+                vij = velocity[i] - velocity[j]
+                rij = position[i] - position[j]
+                ke = self.kernel(rij, self.ps.H)
+                result[i] += 0.5 * mass[j] * vij * ke / rhoij
+            result[i] = velocity[i] + 0.5 * result[i]
+        
+        # 边界粒子位置固定不动，只更新内部粒子的位置
+        tag = particles["tag"]
+        particles["position"][~tag] += self.ps.dt * result[~tag]
+
+    # 计算粒子压强
+    def change_p(self, step):
+        particles = self.ps.particles
+        B = self.ps.c0**2 * self.ps.rho0 / self.ps.gamma
+        particles["pressure"] = B * ((particles["rho"] / self.ps.rho0) ** self.ps.gamma - 1)
+        particles["sound"] = (
+            B * self.ps.gamma / self.ps.rho0 * (particles["rho"] / self.ps.rho0) ** (self.ps.gamma - 1)
+        ) ** 0.5
+
+    # 计算粒子加速度
+    def change_v(self, idx):
+        particles = self.ps.particles
+        num = particles["rho"].shape[0]
+        rho = particles["rho"]
+        mass = self.ps.dx * self.ps.dy * rho
+        position = particles["position"]
+        velocity = particles["velocity"]
+        sound = particles["sound"]
+        pressure = particles["pressure"]
+        result = bm.zeros((num, 2))
+        
+        for i in range(num):
+            for j in idx[i]:
+                if i != j:  # 排除自己
+                    val = pressure[i] / rho[i] ** 2 + pressure[j] / rho[j] ** 2
+                    rij = position[i] - position[j]
+                    gk = self.gradkernel(rij, self.ps.H) * rij
+                    vij = velocity[i] - velocity[j]
+                    pij = 0
+                    if bm.dot(rij, vij) < 0:
+                        pij = -self.ps.alpha * (sound[i] + sound[j]) / 2
+                        pij *= self.ps.H * bm.dot(rij, vij) / (bm.dot(rij, rij) + 0.01 * self.ps.H * self.ps.H)
+                        pij /= (rho[i] + rho[j]) / 2
+                    result[i] += mass[j] * (val + pij) * gk
+                    
+        result = -result + self.ps.g
+        tag = particles["tag"]
+        particles["velocity"][~tag] += self.ps.dt * result[~tag]
+
+    # 重置密度
+    def rein_rho(self, idx):
+        particles = self.ps.particles
+        num = particles["rho"].shape[0]
+        rho = particles["rho"]
+        mass = self.ps.dx * self.ps.dy * rho
+        position = particles["position"]
+        vol = mass / rho
+        A = bm.zeros((num, 3, 3))
+        
+        for i in range(num):
+            for j in idx[i]:
+                rij = position[i] - position[j]
+                wij = self.kernel(rij, self.ps.H)
+                Abar = bm.zeros((3, 3))
+                Abar[0, 1] = rij[0]
+                Abar[0, 2] = rij[1]
+                Abar[1, 2] = rij[0] * rij[1]
+                Abar += Abar.T
+                Abar[0, 0] = 1
+                Abar[1, 1] = rij[0] ** 2
+                Abar[2, 2] = rij[1] ** 2
+                A[i] += Abar * wij * vol[j]
+                
+        for i in range(num):
+            particles["rho"][i] = 0
+            condA = bm.linalg.cond(A[i])
+            if condA < 1e15:
+                invA = bm.linalg.inv(A[i])
+                for j in idx[i]:
+                    rij = position[i] - position[j]
+                    wij = self.kernel(rij, self.ps.H)
+                    wmls = invA[0, 0] + invA[1, 0] * rij[0] + invA[2, 0] * rij[1]
+                    particles["rho"][i] += wij * wmls * mass[j]
+            else:
+                # 当逆矩阵不存在时，使用改进的备用方法
+                sum_numer = 0
+                sum_denom = 0
+                has_valid_neighbors = False
+
+                for j in idx[i]:
+                    rij = position[i] - position[j]
+                    wij = self.kernel(rij, self.ps.H)
+                    mb = mass[j]
+                    rho_b = particles["rho"][j]
+
+                    # 避免除以零
+                    if rho_b > 1e-10:
+                        sum_numer += mb * wij
+                        sum_denom += (mb * wij) / rho_b
+                        has_valid_neighbors = True
+
+                if has_valid_neighbors and abs(sum_denom) > 1e-10:
+                    particles["rho"][i] = sum_numer / sum_denom
+                else:
+                    # 如果还是没有有效的密度值，使用标准SPH密度求和
+                    sum_rho = 0
+                    count = 0
+                    for j in idx[i]:
+                        rij = position[i] - position[j]
+                        wij = self.kernel(rij, self.ps.H)
+                        sum_rho += mass[j] * wij
+                        count += 1
+
+                    if count > 0:
+                        particles["rho"][i] = sum_rho
+                    else:
+                        # 如果连邻居都没有，保持当前密度不变
+                        particles["rho"][i] = rho[i]
+
+    def run_simulation(self, max_steps, draw_interval=1, reinitalize_interval=30):
+        visualizer = Visualizer(self.ps)
+        
+        # 初始可视化
+        visualizer.draw(0)
+        
+        for i in range(max_steps):
+            print(f"Step: {i}")
+            
+            # 邻居搜索
+            idx = self.find_neighbors_within_distance(self.ps.particles["position"], 2 * self.ps.H)
+            
+            # 更新步骤
+            self.change_rho(idx)
+            self.change_p(i)
+            self.change_v(idx)
+            self.change_position(idx)
+            
+            # 周期性密度重初始化
+            
+            if i % reinitalize_interval == 0 and i != 0:
+                self.rein_rho(idx)
+                
+            # 周期性可视化
+            if i % draw_interval == 0:
+                visualizer.draw(i)
+                
+class Visualizer:
+    def __init__(self, particle_system):
+        self.ps = particle_system
+        
+    def draw(self, step, x_min=0, x_max=4, y_min=0, y_max=4):
+        plt.clf()
+        # 过滤在边界范围内的粒子
+        positions = self.ps.particles["position"]
+        within_boundary = (
+            (positions[:, 0] >= x_min)
+            & (positions[:, 0] <= x_max)
+            & (positions[:, 1] >= y_min)
+            & (positions[:, 1] <= y_max)
+        )
+
+        # 只显示边界范围内的粒子
+        visible_positions = positions[within_boundary]
+        visible_pressure = self.ps.particles["pressure"][within_boundary]
+        visible_tag = self.ps.particles["tag"][within_boundary]
+
+        c = visible_pressure.copy()
+        c[visible_tag] = 0
+
+        plt.scatter(visible_positions[:, 0], visible_positions[:, 1], c=c, cmap="jet", s=5)
+        plt.clim(0, 16000)  # 设置压力表示范围
+        plt.colorbar(cmap="jet")
+
+        # 设置坐标轴范围以匹配边界
+        plt.xlim(x_min - 0.1, x_max + 0.1)
+        plt.ylim(y_min - 0.1, y_max + 0.1)
+
+        plt.title(f"Time Step: {step}")
+        plt.pause(0.01)
+        fname = "./SPH/" + "test_" + str(step + 1).zfill(10) + ".png"
+        plt.savefig(fname)
+
+    def final_plot(self):
+        color = bm.where(self.ps.particles["tag"], "red", "blue")
+        tag = bm.where(self.ps.particles["tag"])
+        c = self.ps.particles["pressure"]
+        c[tag] = max(c)
+        plt.scatter(
+            self.ps.particles["position"][:, 0], 
+            self.ps.particles["position"][:, 1], 
+            c=c, cmap="jet", s=5
+        )
+        plt.colorbar(cmap="jet")
+        plt.clim(0, 16000)  # 设置压力表示范围
+        plt.grid(True)
+        plt.show()
