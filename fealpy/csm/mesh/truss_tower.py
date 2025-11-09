@@ -151,4 +151,6 @@ class TrussTower:
 # fig = plt.figure()
 # axes = fig.add_subplot(111, projection='3d') 
 # mesh.add_plot(axes)
+# mesh.find_node(axes, showindex=True, color='g', markersize=8, fontsize=8, fontcolor='g')
+# mesh.find_cell(axes, showindex=True, color='b', markersize=16, fontsize=20, fontcolor='b')
 # plt.show()

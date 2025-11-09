@@ -147,7 +147,7 @@ class TimobeamAxleData3D:
         return F 
     
     @cartesian
-    def dirichlet_dof_index(self) -> TensorLike:
+    def dirichlet_dof(self) -> TensorLike:
         """Dirichlet boundary conditions are applied.
 
         Returns:

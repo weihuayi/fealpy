@@ -15,12 +15,14 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
 
     def __init__(self, 
                  space: _FS, 
+                 model,
                  material, 
                  index: Index=_S,
                  method: Optional[str]=None )-> None:
         super().__init__()
 
         self.space = space
+        self.model = model
         self.material = material
         self.index = index
 
@@ -106,8 +108,8 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         NC = len(cells)
         l = mesh.entity_measure('cell')[cells]
         E, mu = self.material.E, self.material.mu
-        Ax, Ay, Az = self.material.Ax, self.material.Ay, self.material.Az
-        J, Iy, Iz = self.material.J, self.material.Iy, self.material.Iz
+        Ax, Ay, Az = self.model.Ax, self.model.Ay, self.model.Az
+        J, Iy, Iz = self.model.Ix, self.model.Iy, self.model.Iz
 
         # 坐标变换矩阵
         R = self._coord_transform()

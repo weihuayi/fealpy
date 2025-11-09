@@ -57,7 +57,7 @@ class TrussData3D:
     def corss_section_area(self):
         """Return bar cross-sectional areas.
         """
-        return 2000
+        return 2000.0
         
     def init_mesh(self):
         """

@@ -15,9 +15,8 @@ from fealpy.solver import spsolve, cg
 
 from ..model.beam import BeamPDEDataT
 from ..model import CSMModelManager
-from ..material import TimoshenkoBeamMaterial,  AxleMaterial
+from ..material import TimoshenkoBeamMaterial
 from ..fem.timoshenko_beam_integrator import TimoshenkoBeamIntegrator
-from ..fem.axle_integrator import AxleIntegrator
 
 
 class ChannelBeamModel(ComputationalModel):
