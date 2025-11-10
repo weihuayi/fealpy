@@ -77,7 +77,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
     @method.register("BDF2")
     def method(self):
-        from .simulation.fem import BDF2
+        from .simulation.fem.incompressible_ns import BDF2
         self.fem = BDF2(self.equation, self.mesh)
         self.method_str = "BDF2"
         return self.fem

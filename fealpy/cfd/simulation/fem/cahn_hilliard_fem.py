@@ -6,7 +6,7 @@ from fealpy.fem import (ScalarMassIntegrator, ScalarConvectionIntegrator,PressWo
                      ScalarDiffusionIntegrator)
 from fealpy.fem import (BilinearForm, LinearForm, BlockForm, LinearBlockForm)
 
-class CahnHilliardModel:
+class CahnHilliardFEM:
     def __init__(self, equation, space):
         self.space = space
         self.equation = equation

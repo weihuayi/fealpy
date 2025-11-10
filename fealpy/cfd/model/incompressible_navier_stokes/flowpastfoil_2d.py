@@ -98,7 +98,8 @@ class FlowPastFoil2D():
         x = p[...,0]
         y = p[...,1]
         value = bm.zeros_like(p)
-        value[...,0] = 1.5*4*(y-self.box[2])*(self.box[3]-y)/(0.4**2)
+        # value[...,0] = 1.5*4*(y-self.box[2])*(self.box[3]-y)/(0.4**2)
+        value[...,0] = 4
         value[...,1] = 0
         return value
     

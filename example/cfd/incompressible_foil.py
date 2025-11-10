@@ -6,6 +6,7 @@ from fealpy.decorator import cartesian
 options ={
     'backend': 'numpy',
     'pde': 3,
+    'box':[-0.5, 2.7, -1.0, 1.0],
     'rho': 1.0,
     'mu': 0.001,
     'T0': 0.0,
