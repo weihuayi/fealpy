@@ -1,12 +1,12 @@
 from typing import Protocol, Sequence, TypeVar
 from ...backend import TensorLike
 
-class StokesPDEDataProtocol(Protocol):
-    """Protocol interface for incompressible Stokes equation PDE data components.
+class NavierStokesPDEDataProtocol(Protocol):
+    """Protocol interface for incompressible Navier-Stokes equation PDE data components.
 
     The Stokes system:
-        -μ Δu + ∇p = f   in Ω
-          ∇·u = 0        in Ω
+        -μ Δu + (u·∇)u + ∇p = f   in Ω
+        ∇·u = 0                   in Ω
 
     This protocol defines interfaces for:
         1. Domain and geometry
@@ -40,13 +40,12 @@ class StokesPDEDataProtocol(Protocol):
     def neumann_stress(self, p: TensorLike) -> TensorLike: ...
     def is_neumann_boundary(self, p: TensorLike) -> TensorLike: ...
 
-StokesPDEDataT = TypeVar('StokesPDEDataT', bound=StokesPDEDataProtocol)
+NavierStokesPDEDataT = TypeVar('NavierStokesPDEDataT', bound=NavierStokesPDEDataProtocol)
 
 DATA_TABLE = {
     # example name: (file_name, class_name)
     1: ("exp0001", "Exp0001"),
     2: ("exp0002", "Exp0002"),
-    3: ("exp0003", "Exp0003"),
-    4: ("exp0004", "Exp0004"),
+    
 }
 

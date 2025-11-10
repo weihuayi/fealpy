@@ -33,12 +33,12 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         self.mu = self.get_property('shear_modulus')
         self.kappa = shear_factor
 
-        self.Ax = model.beam_Ax  # 截面面积
-        self.Ay = model.beam_Ay  
-        self.Az = model.beam_Az  
-        self.Iy = model.beam_Iy  # 绕 y 轴惯性矩
-        self.Iz = model.beam_Iz  # 绕 z 轴惯性矩
-        self.J = model.beam_Ix  # 极惯性矩
+        self.Ax = model.Ax  # 截面面积
+        self.Ay = model.Ay  
+        self.Az = model.Az  
+        self.Iy = model.Iy  # 绕 y 轴惯性矩
+        self.Iz = model.Iz  # 绕 z 轴惯性矩
+        self.J = model.Ix  # 极惯性矩
         
         
     def __str__(self) -> str:
@@ -107,61 +107,6 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         h[2, 3] = t0 * (6*t1 - 2)
         return h
 
-    def strain_displacement_matrix(self, x: float, l: float, plane='xy') -> float:
-        """Construct the Hermite shape function blocks for bending and rotation.
-
-        Parameters:
-            l (float): Length of the beam element.
-            plane (str, optional): Plane of interest ('xy', 'zx').
-
-        Returns:
-            N (ndarray): Displacement interpolation matrix.shape(6, 12) 
-            Nt (ndarray) :Rotation interpolation matrix (derivative form).
-        """
-        if plane == 'xy':
-            Lambda = self.E * self.Iz / (self.kappa * self.mu * self.Ax)
-        elif plane == 'zx':
-            Lambda = self.E * self.Iy / (self.kappa * self.mu * self.Ax)
-        else:
-            raise ValueError("plane must be 'yz' or 'xz'")
-
-        phi = 12 * Lambda / l**2
-        psi = 1 / (1 + phi)
-
-        # === 轴向 (u) 和 扭转 (θx) ===
-        L = self.linear_basis(x, l)
-        H = self.hermite_basis(x, l) 
-       
-        # === 弯曲 (v, w) 和 旋转 (θy, θz) ===
-        N0 = psi * (H[0, 0] + phi*L[0, 0])
-        N1 = psi * (H[0, 1] + phi*(L[0, 1]-L[0, 1]**2)/2)
-        N2 = psi * (H[0, 2] + phi*L[0, 1])
-        N3 = psi * (H[0, 3] + phi*(-L[0, 1]+L[0, 1]**2)/2)
-
-        Nt0 =  psi * H[1, 0]
-        Nt1 = psi * (H[1, 1] + phi*L[0, 0])
-        Nt2 = -psi * H[1, 2]
-        Nt3 = psi * (H[1, 3] + phi*L[0, 1])
-        
-        N = bm.zeros((6, 12), dtype=bm.float64)
-        Nt = bm.zeros((6, 12), dtype=bm.float64)
-        
-        # ---- 组装轴向和扭转部分 ----
-        N[0, [0, 6]] = [L[0, 0], L[1, 0]]
-        N[3, [3, 9]] = [L[0, 1], L[1, 1]]
-        
-        # TODO 需要修改
-        # ---- 根据平面类型组装矩阵 ---- 
-        if plane == 'xy':  # v, θz 平面
-            # 对应节点自由度顺序 [u0, v0, w0, θx0, θy0, θz0, u1, v1, w1, θx1, θy1, θz1]
-            N[1, [1, 5, 7, 11]] = [N0, N1, N2, N3]   # v
-            N[5, [1, 5, 7, 11]] = [Nt0, Nt1, Nt2, Nt3]  # θz
-        elif plane == 'zx':  # w, θy 平面
-            N[2, [2, 4, 8, 10]] = [N0, N1, N2, N3]   # w
-            N[4, [2, 4, 8, 10]] = [Nt0, Nt1, Nt2, Nt3]  # θy
-
-        return N, Nt
-
     def strain_matrix(self, x: float, y: float,  z: float, l: float) -> TensorLike:
         """ Compute the strain-displacement matrix B for 3D Timoshenko beam element.
 
@@ -223,31 +168,3 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                       [0, 0, mu*kappa]], dtype=bm.float64)
 
         return D
-    
-    def calculate_strain_and_stress(self,
-                    uh: TensorLike,
-                    x: float,
-                    y: float,
-                    z: float,
-                    l: float) -> Tuple[TensorLike, TensorLike]:
-        """Calculate the strain and stress.
-                    ε = B * u_e
-                    σ = D * ε
-                    
-        Parameters:
-            uh (TensorLike): Nodal displacement vector.
-            x (float): Local coordinate in the beam cross-section along the x-axis.
-            y (float): Local coordinate in the beam cross-section along the y-axis.
-            z (float): Local coordinate in the beam cross-section along the z-axis.
-            l (float): Length of the beam element.
-            
-        Returns:
-            Tuple[TensorLike, TensorLike]: Strain and stress vectors.
-        """
-        L = self.linear_basis(x, l)
-        H = self.hermite_basis(x, l) 
-        B = self.strain_matrix(x, y, z, l)
-        
-        strain = B @ uh
-        stress = self.stress_matrix() @ strain
-        return strain, stress
