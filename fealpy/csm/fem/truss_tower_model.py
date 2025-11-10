@@ -70,8 +70,8 @@ class TrussTowerModel(ComputationalModel):
             self.pde = CSMModelManager("truss_tower").get_example(pde)
         else:
             self.pde = pde
-        self.logger.info(f"\n{self.pde.external_load()}")
-        self.logger.info(f"\n{self.pde.dirichlet_dof()}")
+        # self.logger.info(f"\n{self.pde.external_load()}")
+        # self.logger.info(f"\n{self.pde.dirichlet_dof()}")
                 
     def set_mesh(self, mesh: Mesh) -> None:
         self.mesh = mesh
@@ -171,9 +171,6 @@ class TrussTowerModel(ComputationalModel):
         Fc1 = bm.pi**2 * self.E * I1 / (K*L)**2  
         Fc2 = bm.pi**2 * self.E * I2 / (K*L)**2  
         
-        self.logger.info(f"\n{L}")
-        self.logger.info(f"\n{I1}, {I2}")
-        self.logger.info(f"\n{Fc1}, {Fc2}")
         return Fc1, Fc2
             
     def linear_system(self):
@@ -220,10 +217,6 @@ class TrussTowerModel(ComputationalModel):
 
         F = self.pde.external_load(load_total=1.0)
         
-        # self.logger.info(f"KE_vertical shape: {KE_vertical.shape}")
-        # self.logger.info(f"KE_other shape: {KE_other.shape}")
-        # self.logger.info(f"  Shape: {K.shape}")
-        # self.logger.info(f"  Shape: {F.shape}")
         return K, F
     
     def solve(self):
@@ -255,12 +248,26 @@ class TrussTowerModel(ComputationalModel):
         uh = spsolve(K_sparse, F, solver='scipy')
 
         # self.logger.info(f"Solution shape: {uh.shape}")
-        # self.logger.info(f"Solution : {uh}")
+        self.logger.info(f"Solution : {uh}")
     
         return uh
     
-    def show(self, uh, filename='truss_result.vtu'):
-        """输出 VTU 文件用于 ParaView 可视化."""
+    def compute_strain_and_stress(self, disp):
+        """Compute axial strain and stress for axle elements."""
+                
+        uh = disp.reshape(-1, 3)
+        strain, stress = self.material.compute_strain_and_stress(
+                        self.mesh,
+                        uh,
+                        ele_indices=None)
+        
+        self.logger.info(f"strain: {strain}")
+        self.logger.info(f"stress: {stress}")
+
+        return strain, stress
+
+    def show(self, uh, strain, stress):
+        """Visualize displacement field, strain field, and stress field by saving to VTU files."""
         
         mesh = self.space.mesh
         NN = mesh.number_of_nodes()
@@ -268,4 +275,13 @@ class TrussTowerModel(ComputationalModel):
         # (NN, GD)
         disp = uh.reshape(NN, self.GD)
         mesh.nodedata['displacement'] = disp
-        mesh.to_vtk(fname=filename)
+        frname = f"disp.vtu"
+        mesh.to_vtk(fname=frname)
+
+        mesh.edgedata['strain'] = strain
+        frname = f"strain.vtu"
+        mesh.to_vtk(fname=frname)
+
+        mesh.edgedata['stress'] = stress
+        frname = f"stress.vtu"
+        mesh.to_vtk(fname=frname)

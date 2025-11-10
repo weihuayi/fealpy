@@ -102,7 +102,7 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         Phi_bar_y = 1.0 / (1.0 + Phi_y)
         Phi_bar_z = 1.0 / (1.0 + Phi_z)
         
-        H = bm.zeros((3, 8), dtype=bm.float64)
+        H = bm.zeros((4, 8), dtype=bm.float64)
         
         # v方向的形函数 (考虑z方向弯曲)
         H[0, 0] = Phi_bar_z * (1 - 3*xi**2 + 2*xi**3 + Phi_z*(1 - xi))
@@ -116,28 +116,40 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         H[0, 6] = Phi_bar_y * (3*xi**2 - 2*xi**3 + Phi_y*xi)
         H[0, 7] = -l * Phi_bar_y * (-xi**2 + xi**3 + Phi_y*(-xi + xi**2)/2)
         
-        # 一阶导数
-        H[1, 0] = Phi_bar_z * (-6*xi + 6*xi**2 - Phi_z) / l
-        H[1, 1] = Phi_bar_z * (1 - 4*xi + 3*xi**2 + Phi_z*(1 - 2*xi)/2)
-        H[1, 2] = Phi_bar_z * (6*xi - 6*xi**2 + Phi_z) / l
-        H[1, 3] = Phi_bar_z * (-2*xi + 3*xi**2 + Phi_z*(-1 + 2*xi)/2)
-
-        H[1, 4] = Phi_bar_y * (-6*xi + 6*xi**2 - Phi_y) / l
-        H[1, 5] = -Phi_bar_y * (1 - 4*xi + 3*xi**2 + Phi_y*(1 - 2*xi)/2)
-        H[1, 6] = Phi_bar_y * (6*xi - 6*xi**2 + Phi_y) / l
-        H[1, 7] = -Phi_bar_y * (-2*xi + 3*xi**2 + Phi_y*(-1 + 2*xi)/2)
-
-        # 二阶导数
-        H[2, 0] = Phi_bar_z * (-6 + 12*xi) / l**2
-        H[2, 1] = Phi_bar_z * (-4 + 6*xi - Phi_z) / l
-        H[2, 2] = Phi_bar_z * (6 - 12*xi) / l**2
-        H[2, 3] = Phi_bar_z * (-2 + 6*xi + Phi_z) / l
-
-        H[2, 4] = Phi_bar_y * (-6 + 12*xi) / l**2
-        H[2, 5] = -Phi_bar_y * (-4 + 6*xi - Phi_y) / l
-        H[2, 6] = Phi_bar_y * (6 - 12*xi) / l**2
-        H[2, 7] = -Phi_bar_y * (-2 + 6*xi + Phi_y) / l
+        # θy的形函数
+        H[1, 0] = 6*Phi_bar_y * (-xi + 6*xi**2) / l
+        H[1, 1] = -Phi_bar_y * (1 - 4*xi + 3*xi**2 + Phi_y*(1 - xi))
+        H[1, 2] = -6*Phi_bar_y * (-xi + xi**2) / l
+        H[1, 3] = -Phi_bar_y * (-2*xi + 3*xi**2 + Phi_y*xi)
         
+        # θz的形函数
+        H[1, 4] = 6*Phi_bar_z * (-xi + xi**2) / l
+        H[1, 5] = Phi_bar_z * (1 - 4*xi + 3*xi**2 + Phi_z*(1 - xi))
+        H[1, 6] = -6*Phi_bar_z * (-xi + xi**2) / l
+        H[1, 7] = Phi_bar_z * (-2*xi + 3*xi**2 + Phi_z*xi)
+
+        # 一阶导数(v、w方向)
+        H[2, 0] = Phi_bar_z * (-6*xi + 6*xi**2 - Phi_z) / l
+        H[2, 1] = Phi_bar_z * (1 - 4*xi + 3*xi**2 + Phi_z*(1 - 2*xi)/2)
+        H[2, 2] = Phi_bar_z * (6*xi - 6*xi**2 + Phi_z) / l
+        H[2, 3] = Phi_bar_z * (-2*xi + 3*xi**2 + Phi_z*(-1 + 2*xi)/2)
+
+        H[2, 4] = Phi_bar_y * (-6*xi + 6*xi**2 - Phi_y) / l
+        H[2, 5] = -Phi_bar_y * (1 - 4*xi + 3*xi**2 + Phi_y*(1 - 2*xi)/2)
+        H[2, 6] = Phi_bar_y * (6*xi - 6*xi**2 + Phi_y) / l
+        H[2, 7] =  -Phi_bar_y * (-2*xi + 3*xi**2 + Phi_y*(-1 + 2*xi)/2)
+
+        # 一阶导数(θy、θz方向)
+        H[3, 0] = 6*Phi_bar_y * (-1 + 12*xi) / l**2
+        H[3, 1] = -Phi_bar_y * (-4 + 6*xi - Phi_y) / l
+        H[3, 2] = -6*Phi_bar_y * (-1 + 2*xi) / l**2
+        H[3, 3] = -Phi_bar_y * (-2 + 6*xi + Phi_y) / l
+        
+        H[3, 4] = 6*Phi_bar_z * (-1 + 2*xi) / l**2
+        H[3, 5] = Phi_bar_z * (-4 + 6*xi - Phi_z) / l
+        H[3, 6] = -6*Phi_bar_z * (-1 + 2*xi) / l**2
+        H[3, 7] = Phi_bar_z * (-2 + 6*xi + Phi_z) / l
+
         return H
     
     def stress_matrix(self) -> TensorLike:
@@ -200,51 +212,56 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
             num_elements = NC
         else:
             num_elements = len(ele_indices)
-
+            
+        if coord_transform is None:
+            raise ValueError("coord_transform must be provided.")
+        R = coord_transform
+    
         strain = bm.zeros((num_elements, 3))
         stress = bm.zeros((num_elements, 3))
         
+        
         if axial_position is None:
-            mid_x = lengths / 2.0  # 在单元中点 L/2 处计算
+            mid_x = lengths[ele_indices] / 2.0  # 单元中点
         else:
-            mid_x = bm.full(num_elements, axial_position, dtype=bm.float64)
+            mid_x = axial_position
 
         y, z = cross_section_coords  # 截面局部坐标
 
         for idx, i in enumerate(ele_indices):
             node_indices = cells[i]  # [node0_idx, node1_idx]
             element_disp = bm.concatenate([
-                uh[node_indices[0]], 
-                uh[node_indices[1]]
+                disp[node_indices[0]], 
+                disp[node_indices[1]]
             ])  # shape: (12,)
             
-            # 提取局部位移和转角
+            # 计算局部位移和转角
             local_disp = R[i] @ element_disp  # shape: (12,)
-            u0 = local_disp[0:3]
-            a0 = local_disp[3:6]
+            u0 = local_disp[0:3]   # 节点0的位移
+            a0 = local_disp[3:6]   # 节点0的转角
             u1 = local_disp[6:9]
             a1 = local_disp[9:12]
             
             L = self.linear_basis(mid_x[i], lengths[i])
             H = self.hermite_basis(mid_x[i], lengths[i], index=i)
 
-            # 轴向应变: εxx = ∂u/∂x - y*∂θz/∂x + z*∂θy/∂x
+            # 轴向应变: εxx = ∂u/∂x - y*∂θz/∂x + z*∂θy/∂x 
             e_xx = (u0[0]*L[1, 0] + u1[0]*L[1, 1] -
-                    y*(u0[1]*H[1, 0] + a0[2]*H[1, 1] + u1[1]*H[1, 2] + a1[2]*H[1, 3]) +
-                    z*(-u0[2]*H[1, 4] + a0[1]*H[1, 5] - u1[2]*H[1, 6] + a1[1]*H[1, 7]))
+                    y*(u0[1]*H[3, 4] + a0[2]*H[3, 5] + u1[1]*H[3, 6] + a1[2]*H[3, 7]) +
+                    z*(u0[2]*H[3, 0] + a0[1]*H[3, 1] + u1[2]*H[3, 2] + a1[1]*H[3, 3]))
             
             # xy平面剪切应变: γxy = ∂v/∂x - θz
-            dv_dx = u0[1]*H[1, 0] + a0[2]*H[1, 1] + u1[1]*H[1, 2] + a1[2]*H[1, 3]  # ∂v/∂x
-            theta_z = u0[1]*H[0, 0] + a0[2]*H[0, 1] + u1[1]*H[0, 2] + a1[2]*H[0, 3]  # θz插值
-            e_xy = dv_dx - theta_z
+            e_xy = ((u0[1]*H[2, 0] + a0[2]*H[2, 1] + u1[1]*H[2, 2] + a1[2]*H[2, 3]) - 
+                    (u0[1]*H[1, 4] + a0[2]*H[1, 5] + u1[1]*H[1, 6] + a1[2]*H[1, 7]))
+
+            # xz平面剪切应变: γxz = ∂w/∂x + θy
+            e_xz = ((u0[2]*H[2, 4] + a0[1]*H[2, 5] + u1[2]*H[2, 6] + a1[1]*H[2, 7]) +
+                     (u0[2]*H[1, 0] - a0[1]*H[1, 1] - u1[2]*H[1, 2] - a1[1]*H[1, 3]))
             
-            # xz平面剪切应变: γxz = ∂w/∂x + θy  
-            dw_dx = u0[2]*H[1, 4] + a0[1]*H[1, 5] + u1[2]*H[1, 6] + a1[1]*H[1, 7]  # ∂w/∂x
-            theta_y = -u0[2]*H[0, 4] - a0[1]*H[0, 5] - u1[2]*H[0, 6] - a1[1]*H[0, 7]  # θy插值
-            e_xz = dw_dx + theta_y
-            
-            strain[i, 0] = e_xx
-            strain[i, 1] = e_xy
-            strain[i, 2] = e_xz
+            strain[idx, 0] = e_xx
+            strain[idx, 1] = e_xy
+            strain[idx, 2] = e_xz
+        
+        stress = strain @ self.stress_matrix()
         
         return strain, stress

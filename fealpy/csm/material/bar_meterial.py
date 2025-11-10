@@ -88,8 +88,7 @@ class BarMaterial(LinearElasticMaterial):
             num_elements = NC
         else:
             num_elements = len(ele_indices)
-
-
+            
         strain = bm.zeros((num_elements, 3), dtype=bm.float64)
         stress = bm.zeros((num_elements, 3), dtype=bm.float64)
 

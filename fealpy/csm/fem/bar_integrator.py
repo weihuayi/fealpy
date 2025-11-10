@@ -95,10 +95,10 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
         EA = E * A_selected  # 标量或 (NC_selected,)
         if not isinstance(EA, (int, float)):
             # EA 是数组,需要 reshape
-            k *= EA[:, None, None]  # 广播到 (NC_selected, 6, 6)
+            k *= EA[:, None, None]  # (NC_selected, 6, 6)
         else:
             # EA 是标量,直接相乘
             k *= EA
             
-        k /= l[:, None]  # l 已经是 (NC_selected, 1), 可以直接广播
+        k /= l[:, None]  
         return k
