@@ -137,24 +137,62 @@ class TimobeamAxleModel(ComputationalModel):
 
         def solve(self):
                 K, F = self.timo_axle_system()
-                K, F = self.apply_bc_penalty(K, F)  
+                K, F = self.apply_bc_penalty(K, F)
+        
+                rows, cols = bm.nonzero(K)
+                values = K[rows, cols]
+                K = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
 
                 u = spsolve(K, F, solver='scipy')
                 # self.logger.info(f"Solution u:\n{u}")
 
                 return u
         
-        def show(self, displacement):
+        def show(self, disp):
                 """
                 Visualize the mesh and the displacement field.
                 """
                 
                 mesh = self.mesh
-                u = displacement.reshape(-1, 6)
                 
-                uh = u[:, :3]
-                mesh.nodedata['disp'] = uh
+                uh = disp.reshape(-1, 6)
+                u = uh[:, :3]
+                mesh.nodedata['disp'] = u
 
                 frname = f"disp.vtu"
                 mesh.to_vtk(fname=frname)
+                
+        def calculate_strain_and_stress(self, disp, x, y, z):
+                """Calculate the strain and stress.
+                    ε = B * u_e
+                    σ = D * ε
+                    
+                Parameters:
+                        disp (TensorLike): Nodal displacement vector.
+                        x (float): Local coordinate in the beam cross-section along the x-axis.
+                        y (float): Local coordinate in the beam cross-section along the y-axis.
+                        z (float): Local coordinate in the beam cross-section along the z-axis.
+                        l (float): Length of the beam and axle element.
+                
+                Returns:
+                        Tuple[TensorLike, TensorLike]: Strain and stress vectors.
+                """
+                mesh = self.mesh
+                u = disp.rshape(-1, 6)
+                
+                Timo = TimoshenkoBeamMaterial(model=self.pde,
+                                        name="timobeam",
+                                        elastic_modulus=self.beam_E,
+                                        poisson_ratio=self.beam_nu)
 
+                Axle = AxleMaterial(model=self.pde,
+                                name="axle",
+                                elastic_modulus=self.axle_E,
+                                poisson_ratio=self.axle_nu)
+                
+                l = mesh.entity_measure('cell')
+                L = Timo.linear_basis(x, l)
+                H = Timo.hermite_basis(x, l) 
+                B = Timo.strain_matrix(x, y, z, l)
+                
+                e_xx = u[0]*L[0]

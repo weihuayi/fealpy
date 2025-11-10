@@ -1,6 +1,6 @@
 import argparse
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import StokesFVMStaggeredModel
+from fealpy.fvm import StokesFVMRCModel
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
     
     parser.add_argument('--nx', default=20, type=int,
                         help='Number of cells in x-direction.')
-
+    
     parser.add_argument('--ny', default=20, type=int,
                         help='Number of cells in y-direction.')
     
@@ -26,10 +26,10 @@ def main():
     options = vars(parser.parse_args())
     bm.set_backend(options["backend"])
 
-    model = StokesFVMStaggeredModel(options)
+    model = StokesFVMRCModel(options)
     print(model)
 
-    model.solve()
+    model.solve_rhie_chow()
     uerror, verror, perror = model.compute_error()
     print(f"L2 error (u) = {uerror}")
     print(f"L2 error (v) = {verror}")

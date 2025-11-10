@@ -131,6 +131,7 @@ class PDEModelManager(ModelManager):
         "hyperbolic":"fealpy.model.hyperbolic",
         "interface_poisson":"fealpy.model.interface_poisson",
         "ion_flow":"fealpy.model.ion_flow",
+        "navier_stokes":"fealpy.model.navier_stokes",
         "nonlinear":"fealpy.model.nonlinear",
         "linear_elasticity": "fealpy.model.linear_elasticity",
         "quasilinear_elliptic": "fealpy.model.quasilinear_elliptic",
