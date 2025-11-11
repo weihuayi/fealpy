@@ -8,6 +8,8 @@ from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
 from fealpy.sparse import csr_matrix
 from fealpy.sparse import CSRTensor,COOTensor
+
+
 class TriangleMesh(SimplexMesh, Plotable):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
@@ -1486,7 +1488,71 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         """
         import gmsh
-        pass
+
+        assert len(box) == 4, "box must be [xmin, xmax, ymin, ymax]"
+        xmin, xmax, ymin, ymax = map(float, box)
+        assert h > 0, "h must be positive."
+
+        print("[step] init gmsh")
+        gmsh.initialize()
+        gmsh.option.setNumber("General.Terminal", 1)
+
+        try:
+            print("[step] build geometry")
+            gmsh.model.add("box_with_holes")
+            xmin, xmax, ymin, ymax = map(float, box)
+
+            p1 = gmsh.model.occ.addPoint(xmin, ymin, 0)
+            p2 = gmsh.model.occ.addPoint(xmax, ymin, 0)
+            p3 = gmsh.model.occ.addPoint(xmax, ymax, 0)
+            p4 = gmsh.model.occ.addPoint(xmin, ymax, 0)
+            l1 = gmsh.model.occ.addLine(p1, p2)
+            l2 = gmsh.model.occ.addLine(p2, p3)
+            l3 = gmsh.model.occ.addLine(p3, p4)
+            l4 = gmsh.model.occ.addLine(p4, p1)
+            outer_loop = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
+
+            hole_loops = []
+            for cx, cy, r in holes or []:
+                circle = gmsh.model.occ.addCircle(cx, cy, 0, r)
+                loop = gmsh.model.occ.addCurveLoop([circle])
+                hole_loops.append(loop)
+
+            surf = gmsh.model.occ.addPlaneSurface([outer_loop] + hole_loops)
+
+            gmsh.model.occ.synchronize()
+
+            print("[step] mesh options & generate")
+            gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h)
+            gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
+            gmsh.model.mesh.generate(2)
+
+            # --- minimal stats ---
+            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+            node = bm.from_numpy(node_coords.reshape(-1, 3)[:, 0:2]) # only 2D
+
+            tri_type = gmsh.model.mesh.getElementType("triangle", 1)
+            types, elemTags, elemNodeTags = gmsh.model.mesh.getElements(2)
+            print(f"[step] found {len(elemTags)} elements of type {tri_type} with {len(node_tags)} nodes")
+            cell = None
+            for etype, cell in zip(types, elemNodeTags):
+                if etype == tri_type:
+                    nn = gmsh.model.mesh.getElementProperties(etype)[3]
+                    cell = bm.array(cell, dtype=bm.int32).reshape(-1, nn) - 1
+                    break
+
+        finally:
+            print("[step] finalize gmsh")
+            gmsh.finalize()
+            NN = len(node)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode = bm.set_at(isValidNode, cell, True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype)
+            idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=bm.int64))
+            cell = idxMap[cell]
+
+            return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -1635,6 +1701,65 @@ class TriangleMesh(SimplexMesh, Plotable):
             return cls(node, cell), U.flatten(), V.flatten()
         else:
             return cls(node, cell)
+        
+    @classmethod        
+    def from_square_hole(cls, box = [0,1,0,1], scenter = [0.5,0.5], r=0.2 , h = 0.05):
+        import gmsh
+        gmsh.initialize()
+        lc = h
+
+        # 外框为矩形区域
+        t0,t1,t2,t3 = box
+        gmsh.model.geo.addPoint(t0, t2, 0, lc, 1)
+        gmsh.model.geo.addPoint(t1, t2, 0, lc, 2)
+        gmsh.model.geo.addPoint(t1, t3, 0, lc, 3)
+        gmsh.model.geo.addPoint(t0, t3, 0, lc, 4)
+
+        gmsh.model.geo.addLine(1, 2, 1)
+        gmsh.model.geo.addLine(3, 2, 2)
+        gmsh.model.geo.addLine(3, 4, 3)
+        gmsh.model.geo.addLine(4, 1, 4)
+
+        gmsh.model.geo.addCurveLoop([4, 1, -2, 3], 1)
+
+        # 圆的圆心和水平方向上的两个端点
+        c0,c1 = scenter
+        a0,a1 = c0-r, c1
+        b0,b1 = c0+r, c1
+        gmsh.model.geo.addPoint(c0,c1,0,lc,5)
+        gmsh.model.geo.addPoint(a0,a1,0,lc,6)
+        gmsh.model.geo.addPoint(b0,b1,0,lc,7)
+
+        gmsh.model.geo.addCircleArc(6,5,7,tag=5)
+        gmsh.model.geo.addCircleArc(7,5,6,tag=6)
+
+        gmsh.model.geo.addCurveLoop([5,6],2)
+
+        gmsh.model.geo.addPlaneSurface([1,2], 1)
+
+        gmsh.model.geo.synchronize() 
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),lc)
+
+        gmsh.model.mesh.generate(2)
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_tags = bm.from_numpy(node_tags)
+        node_coords = bm.from_numpy(node_coords)
+        node = node_coords.reshape((-1, 3))[:, :2]
+
+        # 节点编号映射
+        nodetags_map = dict({int(j): i for i, j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        # 节点编号映射到单元
+        evid = bm.array([nodetags_map[int(j)] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1], -1))
+
+        gmsh.finalize()
+        return cls(node, cell)
 
     ### 界面网格 ###
     # NOTE: 均匀网格改成作为一个参数传入，避免循环内调用本函数时反复实例化。

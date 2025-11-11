@@ -668,11 +668,11 @@ class PrismMesh(HomogeneousMesh, Plotable):
             1. x(eta, zeta, xi) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
             2. For p = 1, we have ldof = 6. And
                 phi_0 = (1 - eta - zeta) * (1 - xi),
-                phi_0 = (1 - eta - zeta) * xi,
-                phi_0 = eta * (1 - xi),
-                phi_0 = eta * xi,
-                phi_0 = zeta * (1 - xi),
-                phi_0 = zeta * xi.
+                phi_1 = (1 - eta - zeta) * xi,
+                phi_2 = eta * (1 - xi),
+                phi_3 = eta * xi,
+                phi_4 = zeta * (1 - xi),
+                phi_5 = zeta * xi.
         Parameters
             bcs: Tuple[TensorLike]
                 ((NQ0, 3), (NQ1, 2)), the integration points.
