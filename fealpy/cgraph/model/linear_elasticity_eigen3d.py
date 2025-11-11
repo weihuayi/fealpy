@@ -5,11 +5,8 @@ class LinearElasticityEigen3d(CNodeType):
     PATH: str = "模型.线弹性"
     INPUT_SLOTS = []
     OUTPUT_SLOTS = [
-        PortConf("domain", DataType.NONE,title="区域"),
-        PortConf("nx", DataType.INT, title="X 分段数"),
-        PortConf("ny", DataType.INT, title="Y 分段数"),
-        PortConf("nz", DataType.INT, title="Z 分段数"),
-        PortConf("material", DataType.NONE,title="材料属性"),
+        PortConf("domain", DataType.NONE),
+        PortConf("material", DataType.NONE),
         PortConf("displacement_bc", DataType.FUNCTION),
         PortConf("is_displacement_boundary", DataType.FUNCTION),
     ]

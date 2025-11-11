@@ -91,7 +91,7 @@ class IterativeSolver(CNodeType):
         mgr.set_tolerances(rtol=rtol, atol=atol, maxit=maxit)
         x = mgr.solve(b)
         return x
-
+    
 from .nodetype import CNodeType, PortConf, DataType
 
 __all__ = ["EigenSolver"]
