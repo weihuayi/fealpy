@@ -1,8 +1,8 @@
 from typing import Union
-from fealpy.sparse import COOTensor
+from scipy.sparse.linalg import eigsh
 
 from fealpy.backend import bm
-from fealpy.decorator import variantmethod
+from fealpy.sparse import COOTensor,  CSRTensor
 from fealpy.model import ComputationalModel
 
 from fealpy.mesh import Mesh
@@ -11,7 +11,7 @@ from fealpy.functionspace import (
         TensorFunctionSpace
         )
 from fealpy.fem import DirichletBC
-from fealpy.solver import spsolve, cg
+from fealpy.solver import spsolve
 
 from ..model.truss import TrussPDEDataT
 from ..model import CSMModelManager
@@ -35,10 +35,12 @@ class TrussTowerModel(ComputationalModel):
         self.GD = self.pde.geo_dimension()
         self.E = options['E']
         self.nu = options['nu']
+        self.neigen = options['neigen']
         
         self.set_space()
         self.set_material()
         self.set_bar_sections()
+        self.Fc1, self.Fc2 = self.critical_buckling_load()
                
     def __str__(self) -> str:
         """Returns a formatted multi-line string summarizing the configuration of the truss tower model.
@@ -70,8 +72,8 @@ class TrussTowerModel(ComputationalModel):
             self.pde = CSMModelManager("truss_tower").get_example(pde)
         else:
             self.pde = pde
-        self.logger.info(f"\n{self.pde.external_load()}")
-        self.logger.info(f"\n{self.pde.dirichlet_dof()}")
+        # self.logger.info(f"\n{self.pde.external_load()}")
+        # self.logger.info(f"\n{self.pde.dirichlet_dof()}")
                 
     def set_mesh(self, mesh: Mesh) -> None:
         self.mesh = mesh
@@ -171,13 +173,47 @@ class TrussTowerModel(ComputationalModel):
         Fc1 = bm.pi**2 * self.E * I1 / (K*L)**2  
         Fc2 = bm.pi**2 * self.E * I2 / (K*L)**2  
         
-        self.logger.info(f"\n{L}")
-        self.logger.info(f"\n{I1}, {I2}")
-        self.logger.info(f"\n{Fc1}, {Fc2}")
         return Fc1, Fc2
+    
+    def coo(self, K):
+        """Convert a dense matrix K to COO format.
+        
+        Parameters:
+            K: Dense matrix (NDOF, NDOF)
             
+        Returns:
+            K_coo: COO format matrix
+        """
+        rows, cols = bm.nonzero(K)
+        values = K[rows, cols]
+        K = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
+
+        return K
+    
+    def csr(self, K):
+        """Convert a dense matrix K to CSR format.
+        
+        Parameters:
+            K: Dense matrix (NDOF, NDOF)
+            
+        Returns:
+            K_csr: CSR format matrix
+        """
+        rows, cols = bm.nonzero(K)
+        values = K[rows, cols]
+        crow = bm.zeros(K.shape[0] + 1, dtype=bm.int64)
+        for i in range(len(rows)):
+            crow[rows[i] + 1] += 1
+        crow = bm.cumsum(crow)
+        
+        K = CSRTensor(crow, cols, values, spshape=K.shape)
+
+        return K
+
+
     def linear_system(self):
         """Assemble the linear system: K*u = F.
+        
         Returns:
             K: Global stiffness matrix (NDOF, NDOF)
             F: Load vector (NDOF,)
@@ -190,7 +226,6 @@ class TrussTowerModel(ComputationalModel):
         vertical_indices = bm.where(self.is_vertical)[0]
         other_indices = bm.where(~self.is_vertical)[0]
 
-        self.logger.info(f"Assembling vertical bars: {len(vertical_indices)} elements")
         vertical_integrator = BarIntegrator(
                 space=self.space,
                 model=self,
@@ -204,7 +239,6 @@ class TrussTowerModel(ComputationalModel):
             dof = ele_dofs_vertical[i]
             K[dof[:, None], dof] += KE_vertical[i]
         
-        self.logger.info(f"Assembling other bars: {len(other_indices)} elements")
         other_integrator = BarIntegrator(
                 space=self.space,
                 model=self,
@@ -220,12 +254,31 @@ class TrussTowerModel(ComputationalModel):
 
         F = self.pde.external_load(load_total=1.0)
         
-        # self.logger.info(f"KE_vertical shape: {KE_vertical.shape}")
-        # self.logger.info(f"KE_other shape: {KE_other.shape}")
-        # self.logger.info(f"  Shape: {K.shape}")
-        # self.logger.info(f"  Shape: {F.shape}")
         return K, F
     
+    def apply_bc(self, K, F):
+        """Apply Dirichlet boundary conditions to the system."""
+        
+        gdof = self.space.number_of_global_dofs()
+        
+        threshold = bm.zeros(gdof, dtype=bool)
+        fixed_dofs = self.pde.dirichlet_dof()
+        threshold[fixed_dofs] = True
+        
+        # K_sparse = self.coo(K)
+        K_sparse = self.csr(K)
+        bc = DirichletBC(
+                space=self.space,
+                gd=lambda p: bm.zeros(p.shape, dtype=bm.float64),  # 返回与插值点相同形状的零数组
+                threshold=threshold
+            )
+        K, F = bc.apply(K_sparse, F)
+        
+        isFreeDof = bm.logical_not(bc.is_boundary_dof)
+        S = K.to_scipy()[isFreeDof, :][:, isFreeDof]
+
+        return K, F, S
+
     def solve(self):
         """
         Solve the linear system and return the solution.
@@ -236,36 +289,140 @@ class TrussTowerModel(ComputationalModel):
         K, F = self.linear_system()
         gdof = self.space.number_of_global_dofs()
         
+        K_sparse, F, S = self.apply_bc(K, F)
+        uh = bm.zeros(gdof, dtype=bm.float64)
+        uh = spsolve(K_sparse, F, solver='scipy')
+
+        # self.logger.info(f"Solution : {uh}")
+    
+        return uh
+    
+    def compute_strain_and_stress(self, disp):
+        """Compute axial strain and stress for axle elements."""
+                
+        uh = disp.reshape(-1, 3)
+        strain, stress = self.material.compute_strain_and_stress(
+                        self.mesh,
+                        uh,
+                        ele_indices=None)
+        
+        # self.logger.info(f"strain: {strain}")
+        # self.logger.info(f"stress: {stress}")
+
+        return strain, stress
+
+    def show(self, uh, strain, stress):
+        """Visualize displacement field, strain field, and stress field by saving to VTU files."""
+        
+        mesh = self.space.mesh
+        NN = mesh.number_of_nodes()
+        
+        disp = uh.reshape(NN, self.GD)
+        mesh.nodedata['displacement'] = disp
+        frname = f"disp.vtu"
+        mesh.to_vtk(fname=frname)
+
+        mesh.edgedata['strain'] = strain
+        frname = f"strain.vtu"
+        mesh.to_vtk(fname=frname)
+
+        mesh.edgedata['stress'] = stress
+        frname = f"stress.vtu"
+        mesh.to_vtk(fname=frname)
+
+    def geometric_stiffness_matrix(self, stress):
+        """Assemble the global geometric stiffness matrix for buckling analysis.
+        
+        Parameters:
+            stress: (NC,) array of axial stresses in each bar element.
+            
+        Returns:
+            Kg: geometric stiffness matrix.
+        """
+        NDOF = self.space.number_of_global_dofs()
+        
+        Kg = bm.zeros((NDOF, NDOF), dtype=bm.float64)
+        
+        vertical_indices = bm.where(self.is_vertical)[0]
+        other_indices = bm.where(~self.is_vertical)[0]
+        vertical_integrator = BarIntegrator(
+                space=self.space,
+                model=self,
+                material=self.material,
+                index=vertical_indices,
+                method='geometric'
+            )
+        Kg_vertical = vertical_integrator.assembly(self.space, stress)
+        ele_dofs_vertical = vertical_integrator.to_global_dof(self.space)
+        
+        for i in range(len(ele_dofs_vertical)):
+            dof = ele_dofs_vertical[i]
+            Kg[dof[:, None], dof] += Kg_vertical[i]
+            
+        other_integrator = BarIntegrator(
+                space=self.space,
+                model=self,
+                material=self.material,
+                index=other_indices,
+                method='geometric'
+            )
+        Kg_other = other_integrator.assembly(self.space, stress)
+        ele_dofs_other = other_integrator.to_global_dof(self.space)
+    
+        for i in range(len(ele_dofs_other)):
+            dof = ele_dofs_other[i]
+            Kg[dof[:, None], dof] += Kg_other[i]
+        
+        # self.logger.info(f"kg: {Kg}")
+
+        return Kg
+    
+    def apply_matrix(self, K):
+        """Apply boundary conditions to matrix K."""
+        
+        gdof = self.space.number_of_global_dofs()
+        
         threshold = bm.zeros(gdof, dtype=bool)
         fixed_dofs = self.pde.dirichlet_dof()
         threshold[fixed_dofs] = True
         
-        rows, cols = bm.nonzero(K)
-        values = K[rows, cols]
-        K_sparse = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
-       
+        # K_sparse = self.coo(K)
+        K_sparse = self.csr(K)
+        
         bc = DirichletBC(
                 space=self.space,
                 gd=lambda p: bm.zeros(p.shape, dtype=bm.float64),  # 返回与插值点相同形状的零数组
                 threshold=threshold
             )
-        K_sparse, F = bc.apply(K_sparse, F)
+        Kg = bc.apply_matrix(K_sparse)
         
-        uh = bm.zeros(gdof, dtype=bm.float64)
-        uh = spsolve(K_sparse, F, solver='scipy')
+        isFreeDof = bm.logical_not(bc.is_boundary_dof)
+        M = Kg.to_scipy()[isFreeDof, :][:, isFreeDof]
 
-        # self.logger.info(f"Solution shape: {uh.shape}")
-        # self.logger.info(f"Solution : {uh}")
+        return Kg, M
     
-        return uh
+    def buckling_analysis(self, stress):
+        """Perform buckling analysis using the geometric stiffness matrix.
+        
+        Parameters:
+            stress: (NC,) array of axial stresses in each bar element
+            neigen: Number of eigenvalues to compute (default: 6)
+            
+        Returns:
+            val: Eigenvalues (buckling load factors)
+            vec: Eigenvectors (buckling modes)
+        """
+        K, F = self.linear_system()
+        K, F, S = self.apply_bc(K, F)
+        
+        Kg = self.geometric_stiffness_matrix(stress)
+        Kg, M = self.apply_matrix(Kg)
+       
+
+        # 求解广义特征值问题: K * v = λ * M * v
+        val, vec = eigsh(S, k=self.neigen, M=-M, which='SM', tol=1e-6, maxiter=1000)
+
+        self.logger.info(f"Buckling eigenvalues: {val}")
+        self.logger.info(f"Critical buckling load factor: {val[0]:.6e}")
     
-    def show(self, uh, filename='truss_result.vtu'):
-        """输出 VTU 文件用于 ParaView 可视化."""
-        
-        mesh = self.space.mesh
-        NN = mesh.number_of_nodes()
-        
-        # (NN, GD)
-        disp = uh.reshape(NN, self.GD)
-        mesh.nodedata['displacement'] = disp
-        mesh.to_vtk(fname=filename)
+        return val, vec

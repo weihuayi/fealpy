@@ -14,6 +14,7 @@ class TrussTowerData3D:
                  ):
         
         self.dofs_per_node = 3
+        self.GD = self.geo_dimension()
         self.mesh = self.init_mesh() 
         
         # Tube section geometry (in meters)
@@ -153,7 +154,7 @@ class TrussTowerData3D:
         
         return fixed_dofs
     
-    def is_displacement_boundary(self):
+    def is_dirichlet_boundary(self):
         """Return boolean array indicating which DOFs are on the boundary.
         
         Returns:
@@ -161,11 +162,11 @@ class TrussTowerData3D:
         """
         return self.dirichlet_dof()
 
-    def displacement_bc(self):
-        """Return displacement boundary conditions.
+    def dirichlet_bc(self):
+        """Return dirichlet boundary conditions.
         
         Returns:
-            Displacement values at boundary DOFs (all zeros for fixed boundary)
+            Dirichlet values at boundary DOFs (all zeros for fixed boundary)
         """
         fixed_dofs = self.dirichlet_dof()
         return bm.zeros(len(fixed_dofs), dtype=bm.float64)
