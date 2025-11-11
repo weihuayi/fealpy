@@ -152,9 +152,8 @@ def load(data: dict, /, return_graph=True) -> CNode | NodeGroup | Graph:
         cnode_id = slot_item["cnode"]
         cnode = cnode_list[cnode_id]
         try:
-            cnode.input_slots[slot_item["name"]].default = slot_item["val"]
-            cnode.input_slots[slot_item["name"]].has_default = True
-        except (KeyError, AttributeError):
+            cnode(**{slot_item["name"]: slot_item["val"]})
+        except TypeError:
             pass
 
     # STEP 5: Recover connections
@@ -166,7 +165,15 @@ def load(data: dict, /, return_graph=True) -> CNode | NodeGroup | Graph:
         src_node = cnode_list[src_node_id]
         dst_node = cnode_list[dst_node_id]
         # print(src_node, src_name, "->", dst_node, dst_name)
-        connect_from_address(dst_node.input_slots, {dst_name: AddrHandler(src_node, src_name)})
+        try:
+            addr = getattr(src_node(), src_name)
+        except TypeError:
+            addr = AddrHandler(src_node, src_name)
+
+        try:
+            dst_node(**{dst_name: addr})
+        except TypeError:
+            connect_from_address(dst_node.input_slots, {dst_name: addr})
 
     if return_graph and isinstance(cnode_list[0], NodeGroup):
         return cnode_list[0].graph
