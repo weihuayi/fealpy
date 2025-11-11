@@ -9,3 +9,4 @@ from .timoaxle3d import Timoaxle3d
 from .incompressible_navier_stokes2d import IncompressibleCylinder2d
 from .dipole_antenna3d import DipoleAntenna3D
 from .beam2d import Beam2d
+from .linear_elasticity_eigen3d import LinearElasticityEigen3d

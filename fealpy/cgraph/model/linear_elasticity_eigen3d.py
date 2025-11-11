@@ -7,8 +7,6 @@ class LinearElasticityEigen3d(CNodeType):
     OUTPUT_SLOTS = [
         PortConf("domain", DataType.NONE),
         PortConf("material", DataType.NONE),
-        PortConf("displacement", DataType.FUNCTION),
-        PortConf("body_force", DataType.FUNCTION),
         PortConf("displacement_bc", DataType.FUNCTION),
         PortConf("is_displacement_boundary", DataType.FUNCTION),
     ]
@@ -20,7 +18,7 @@ class LinearElasticityEigen3d(CNodeType):
         model = CSMModelManager("linear_elasticity").get_example(1)
         return (domain, model.material)+ tuple(
             getattr(model, name)
-            for name in ["displacement", "displacement_bc"]
+            for name in [ "displacement_bc",  "is_displacement_boundary"]
         )
 
 
