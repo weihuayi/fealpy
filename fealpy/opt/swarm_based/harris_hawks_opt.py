@@ -70,12 +70,15 @@ class HarrisHawksOpt(Optimizer):
                                                        (q >= 0.5) * 
                                                        (self.gbest - bm.mean(self.x, axis=0) - bm.random.rand(self.N, 1) * 
                                                         ((self.ub - self.lb) * bm.random.rand(self.N, 1) + self.lb))) + 
-                      (bm.abs(escaping_energy) < 1) * (((q >= 0.5)  + (bm.abs(escaping_energy) < 0.5)) * 
+                      (bm.abs(escaping_energy) < 1) * (((q >= 0.5) + (bm.abs(escaping_energy) < 0.5)) * 
                                                        (self.gbest - escaping_energy * bm.abs(self.gbest - self.x)) + 
-                                                       ((q >= 0.5)  + (bm.abs(escaping_energy) >= 0.5)) * 
+                                                       ((q >= 0.5) + (bm.abs(escaping_energy) >= 0.5)) * 
                                                        (self.gbest - self.x - escaping_energy * 
                                                         bm.abs(2 * (bm.random.rand(self.N, 1) - 1) * self.gbest - self.x)) + 
-                                                       ((q < 0.5)  + (bm.abs(escaping_energy) >= 0.5)) * 
+                                                       ((q < 0.5) + (bm.abs(escaping_energy) >= 0.5)) * 
+                                                       (self.gbest - escaping_energy * 
+                                                        bm.abs(2 * (bm.random.rand(self.N, 1) - 1) * self.gbest - self.x)) + 
+                                                       ((q < 0.5) + (bm.abs(escaping_energy) < 0.5)) * 
                                                        (self.gbest - escaping_energy * 
                                                         bm.abs(2 * (bm.random.rand(self.N, 1) - 1) * self.gbest - bm.mean(self.x, axis=0)))))
 
@@ -85,14 +88,14 @@ class HarrisHawksOpt(Optimizer):
 
             # Compare fitness and update positions accordingly
             x_new = ((fit_new < fit)[:, None] * (x_new) + 
-                     (fit_new >= fit)[:, None] * (((q < 0.5)  + (bm.abs(escaping_energy) >= 0.5)) * 
+                     (fit_new >= fit)[:, None] * (((q < 0.5) + (bm.abs(escaping_energy) >= 0.5)) * 
                                                   (self.gbest - escaping_energy * 
                                                    bm.abs(2 * (bm.random.rand(self.N, 1) - 1) * self.gbest - self.x) + 
                                                    bm.random.rand(self.N, self.dim) * levy(self.N, self.dim, 1.5)) + 
-                                                  ((q < 0.5)  + (bm.abs(escaping_energy) < 0.5)) * 
-                                                   (self.gbest - escaping_energy * 
-                                                    bm.abs(2 * (bm.random.rand(self.N, 1) - 1) * self.gbest - bm.mean(self.x, axis=0)) + 
-                                                    bm.random.rand(self.N, self.dim) * levy(self.N, self.dim, 1.5))))
+                                                  ((q < 0.5) + (bm.abs(escaping_energy) < 0.5)) * 
+                                                  (self.gbest - escaping_energy * 
+                                                   bm.abs(2 * (bm.random.rand(self.N, 1) - 1) * self.gbest - bm.mean(self.x, axis=0)) + 
+                                                   bm.random.rand(self.N, self.dim) * levy(self.N, self.dim, 1.5))))
 
             # Apply boundary constraints again
             x_new = x_new + (self.lb - x_new) * (x_new < self.lb) + (self.ub - x_new) * (x_new > self.ub)

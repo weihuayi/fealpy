@@ -63,20 +63,29 @@ class Exp0001(BoxMesher2d):
         self.rho = 1.0
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
         super().__init__(box=self.box)
+        self.mesh = self.init_mesh[options.get('init_mesh', 'uniform_tri')](nx=options.get('nx', 8), ny=options.get('ny', 8))
+        
 
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the PDE configuration."""
         s = f"{self.__class__.__name__}(\n"
         s += f"  problem            : 2D stationary incompressible Navier-Stokes\n"
         s += f"  domain             : {self.box}\n"
-        # s += f"  mesh size          : nx = {self.nx}, ny = {self.ny}\n"
         s += f"  density (ρ)        : {self.rho}\n"
         s += f"  viscosity (μ)      : {self.mu}\n"
-        s += f"  velocity_x   : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
-        s += f"  velocity_y   : u_2(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²\n"
-        s += f"  pressure     : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
+        s += f"  velocity_x         : u_1(x, y) = 10·x²·(x - 1)²·y·(y - 1)·(2y - 1)\n"
+        s += f"  velocity_y         : u_2(x, y) = -10·x·(x - 1)·(2x - 1)·y²·(y - 1)²\n"
+        s += f"  pressure           : p(x, y) = 10·(2x - 1)·(2y - 1)\n"
         s += f")"
         return s
+    
+    def domain(self) -> Sequence[float]:
+        """Return the computational domain [xmin, xmax, ymin, ymax]."""
+        return self.box
+    
+    def pressure_integral_target(self) -> float:
+        """Integral of the exact pressure over the domain."""
+        return 0.0
  
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
@@ -108,13 +117,13 @@ class Exp0001(BoxMesher2d):
     @cartesian
     def is_velocity_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point where velocity is defined is on boundary."""
-        # result = bm.ones_like(p[..., 0], dtype=bm.bool)
-        # return result
         return None
 
     @cartesian
-    def is_pressure_boundary(self, p: TensorLike) -> TensorLike:
+    def is_pressure_boundary(self, p: TensorLike = None) -> TensorLike:
         """Check if point where pressure is defined is on boundary."""
+        if p is None:
+            return 0
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
         return result
 

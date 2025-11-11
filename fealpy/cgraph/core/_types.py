@@ -3,7 +3,7 @@ from enum import IntEnum, auto
 from typing import Protocol, NamedTuple, Any
 from collections.abc import Mapping
 
-__all__ = ["SlotStatus", "InputSlot", "OutputSlot",
+__all__ = ["SlotStatus", "Slot", "TransSlot", "InputSlot", "OutputSlot",
            "CNode", "NodeExceptionData", "NodeIOError", "NodeTopologyError"]
 
 
@@ -90,6 +90,7 @@ class NodeExceptionData():
     timestamp : float = 0.
     errtype : type[Exception] = Exception
     message : str | None = None
+    traceback : str | None = None
     positional_inputs : list[Any] = field(default_factory=list)
     keyword_inputs : dict[str, Any] = field(default_factory=dict)
 

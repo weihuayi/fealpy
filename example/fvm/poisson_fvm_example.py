@@ -7,7 +7,7 @@ from fealpy.fvm import PoissonFVMModel
 def main():
     parser = argparse.ArgumentParser(description="FVM Poisson solver with cross-diffusion")
 
-    parser.add_argument('--pde', default=3, type=int,
+    parser.add_argument('--pde', default=2, type=int,
                         help='PDE example ID from Poisson PDE manager.')
 
     parser.add_argument('--nx', default=40, type=int,
@@ -18,17 +18,20 @@ def main():
     parser.add_argument('--space_degree', default=0, type=int,
                         help='Polynomial degree of ScaledMonomialSpace.')
 
-    parser.add_argument('--backend', default='numpy', choices=['numpy', 'cupy'],
-                        help='Backend type: numpy or cupy.')
+    parser.add_argument('--backend',default='numpy', type=str,
+                        help="the backend of fealpy, can be 'numpy', 'torch', 'tensorflow' or 'jax'.")
 
-    parser.add_argument('--pbar_log', action='store_true',
-                        help='Enable progress bar during execution.')
-    parser.add_argument('--log_level', default='INFO', type=str,
-                        help='Logging level: DEBUG, INFO, WARNING, or ERROR.')
+    parser.add_argument('--pbar_log', default=True, type=bool,
+                        help='Whether to show progress bar, default is True')
+    
+    parser.add_argument('--log_level',
+                        default='INFO', type=str,
+                        help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
     parser.add_argument('--max_iter', default=6, type=int,
                         help='Maximum number of nonlinear iterations.')
-    parser.add_argument('--tol', default=1e-6, type=float,
+    
+    parser.add_argument('--tol', default=1e-7, type=float,
                         help='Convergence tolerance for fixed-point iterations.')
 
     parser.add_argument('--plot', action='store_true',
@@ -43,8 +46,8 @@ def main():
 
     model.solve(max_iter=options["max_iter"], tol=options["tol"])
     l2_error = model.compute_error()
-    print(f"L2 error = {l2_error:.4e}")
-    
+    print(f"L2 error = {l2_error}")
+    model.plot()
     if options["plot"]:
         model.plot()
 
