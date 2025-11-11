@@ -167,6 +167,10 @@ class IncompressibleNSIPCSRun(CNodeType):
         pgdof = pspace.number_of_global_dofs()
         NN = mesh.number_of_nodes()
 
+        n_files = 10
+        n_makeder = 10
+        file_nt = nt // n_files + 1
+        makeder_nt = file_nt // n_makeder + 1
         node = mesh.interpolation_points(p=1)
         cell = mesh.entity('cell')
         data = []
@@ -213,7 +217,7 @@ class IncompressibleNSIPCSRun(CNodeType):
             # mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
             # mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
-            if (i+1) % 10 == 0:
+            if (i+1) % makeder_nt == 0 or i == 0 or (i+1) == nt:
 
                 os.makedirs(output_dir, exist_ok=True)  # 创建目录
 
@@ -232,7 +236,7 @@ class IncompressibleNSIPCSRun(CNodeType):
                 }
                 })
             
-            if len(data) == 10 :
+            if len(data) == 10 or i == nt -1:
                 j += 1
                 file_name = f"file_{j:08d}.json.gz"
                 file_path = os.path.join(output_dir, file_name)

@@ -1,8 +1,10 @@
 
 from .stationary_ns_simulation import StationaryNSNewton, StationaryNSOssen, StationaryNSStokes
 from .ns_run import StationaryNSRun, IncompressibleNSIPCSRun
+from .chns_fem_run import CHNSFEMRun
 from .ns_dirichlet_bc import StationaryNSDBC, ProjectDBC
-from .incompressible_ns_simulation import IncompressibleNSIPCS
+from .incompressible_ns_simulation import IncompressibleNSIPCS, IncompressibleNSBDF2
+from .cahn_hilliard_fem_simulation import CahnHilliardFEMSimulation
 from .timeline import CFDTimeline
 from .particle_generation_sph import ParticleGenerationSPH
 from .particle_iterative_update_sph import ParticleIterativeUpdateSPH
