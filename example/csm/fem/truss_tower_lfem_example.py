@@ -31,6 +31,10 @@ parser.add_argument('--nu',
                     default=0.3, type=float,
                     help='Type of mesh, default is the truss Poisson ratio.')
 
+parser.add_argument('--neigen',
+                    default=6, type=int,
+                    help='Number of eigenvalues to compute, default is 6.')
+
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
                     help='Whether to show progress bar, default is True.')
@@ -51,4 +55,5 @@ model = TrussTowerModel(options)
 # model.critical_buckling_load()
 uh = model.solve()
 strain, stress = model.compute_strain_and_stress(uh)
-model.show(uh, strain, stress)
+# model.show(uh, strain, stress)
+model.buckling_analysis(stress)
