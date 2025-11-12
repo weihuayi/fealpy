@@ -11,3 +11,4 @@ from .dld_microfluidic_chip_mesher import DLDMicrofluidicChipMesher
 from .naca0012_mesher import NACA0012Mesher
 from .stp_mesher import STPSurfaceMesher
 from .box_with_sphere_mesher import BoxWithSphereMesher
+from .naca4_mesher import NACA4Mesher
