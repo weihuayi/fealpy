@@ -11,3 +11,4 @@ from .dipole_antenna3d import DipoleAntenna3D
 from .beam2d import Beam2d
 from .truss3d import *
 from .rayleightaylor import RayleighTaylor
+from .linear_elasticity_eigen3d import LinearElasticityEigen3d
