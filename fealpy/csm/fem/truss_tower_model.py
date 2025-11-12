@@ -36,6 +36,7 @@ class TrussTowerModel(ComputationalModel):
         self.E = options['E']
         self.nu = options['nu']
         self.neigen = options['neigen']
+        self.load = options['load']
         
         self.set_space()
         self.set_material()
@@ -252,7 +253,7 @@ class TrussTowerModel(ComputationalModel):
             dof = ele_dofs_other[i]
             K[dof[:, None], dof] += KE_other[i]
 
-        F = self.pde.external_load(load_total=1.0)
+        F = self.pde.external_load(load_total=self.load)
         
         return K, F
     
@@ -420,9 +421,9 @@ class TrussTowerModel(ComputationalModel):
        
 
         # 求解广义特征值问题: K * v = λ * M * v
-        val, vec = eigsh(S, k=self.neigen, M=-M, which='SM', tol=1e-6, maxiter=1000)
+        val, vec = eigsh(S, k=self.neigen, M=M, which='SM', tol=1e-6, maxiter=1000)
 
-        self.logger.info(f"Buckling eigenvalues: {val}")
-        self.logger.info(f"Critical buckling load factor: {val[0]:.6e}")
+        # self.logger.info(f"Buckling eigenvalues: {val}")
+        # self.logger.info(f"Critical buckling load factor: {val[0]:.6e}")
     
         return val, vec
