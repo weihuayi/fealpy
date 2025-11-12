@@ -48,6 +48,7 @@ from .press_work_integrator import BoundaryPressWorkIntegrator
 from .face_source_integrator import BoundaryFaceSourceIntegrator, InterFaceSourceIntegrator
 ScalarNeumannBCIntegrator = BoundaryFaceSourceIntegrator
 ScalarRobinSourceIntegrator = BoundaryFaceSourceIntegrator
+from .tangent_face_mass_integrator import TangentFaceMassIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC
