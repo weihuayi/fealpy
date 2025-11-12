@@ -31,6 +31,10 @@ parser.add_argument('--nu',
                     default=0.3, type=float,
                     help='Type of mesh, default is the truss Poisson ratio.')
 
+parser.add_argument('--load',
+                    default=84820, type=float,
+                    help='Load applied to the structure, default is 84820.')
+
 parser.add_argument('--neigen',
                     default=6, type=int,
                     help='Number of eigenvalues to compute, default is 6.')
@@ -50,10 +54,8 @@ bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import TrussTowerModel
 model = TrussTowerModel(options)
-# model.__str__()
-# model.set_bar_sections()
-# model.critical_buckling_load()
+model.__str__()
 uh = model.solve()
 strain, stress = model.compute_strain_and_stress(uh)
-# model.show(uh, strain, stress)
-model.buckling_analysis(stress)
+model.show(uh, strain, stress)
+# model.buckling_analysis(stress)

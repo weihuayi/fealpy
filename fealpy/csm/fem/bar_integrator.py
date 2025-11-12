@@ -70,7 +70,6 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
         mesh = space.mesh
         NC = mesh.number_of_cells()
         
-        # 如果 index 是 slice 对象 (例如 _S 即 slice(None))
         if isinstance(index, slice):
             index = bm.arange(NC)[index]  # 转换为数组
 
@@ -80,7 +79,6 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
         else:
             A_selected = A[index]  # (NC_selected,)
     
-        # 只计算选定单元的长度和方向
         l = mesh.edge_length()[index].reshape(-1, 1)  # (NC_selected, 1)
         tan = mesh.edge_tangent()[index]  # (NC_selected, 3)
         unit_tan = tan / l  # (NC_selected, 3)
