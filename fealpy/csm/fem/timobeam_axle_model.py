@@ -49,15 +49,16 @@ class TimobeamAxleModel(ComputationalModel):
                         displaying information such as PDE, mesh, material properties, and more.
                 """
                 s = f"{self.__class__.__name__}(\n"
+                s += "  --- Timoshenko Beam and Axle Model ---\n"
                 s += f"  pde            : {self.pde.__class__.__name__}\n"  # Assuming pde is a class object
                 s += f"  mesh           : {self.mesh.__class__.__name__}\n"  # Assuming mesh is a class object
+                s += f"  geo_dimension  : {self.GD}\n"
                 s += f"  beam_E           : {self.beam_E}\n"
                 s += f"  beam_nu          : {self.beam_nu}\n"
                 s += f"  beam_mu          : {self.beam_E/(2*(1+self.beam_nu)):.3e}\n"  # 自动算梁剪切模量
                 s += f"  axle_E           : {self.axle_E}\n"
                 s += f"  axle_nu          : {self.axle_nu}\n"
                 s += f"  axle_mu          : {self.axle_E/(2*(1+self.axle_nu)):.3e}\n"  # 自动算轴承剪切模量
-                s += f"  geo_dimension  : {self.GD}\n"
                 s += ")"
                 self.logger.info(f"\n{s}")
                 return s
@@ -95,12 +96,7 @@ class TimobeamAxleModel(ComputationalModel):
                 return Timo, Axle
                 
         def timo_axle_system(self):
-                """Construct the linear system for the 3D timoshenko beam problem.
-
-                Parameters:
-                    E (float): Young's modulus in MPa.
-                    nu (float): Poisson's ratio.
-                """
+                """Construct the linear system for the 3D timoshenko beam problem."""
                 mesh = self.mesh
                 NC = mesh.number_of_cells()
 
@@ -208,27 +204,28 @@ class TimobeamAxleModel(ComputationalModel):
                 strain[axle_indices] = axle_strain
                 stress[axle_indices] = axle_stress
                 
-                self.logger.info(f"Final strain: {strain}")
-                self.logger.info(f"Final stress: {stress}")
+                # self.logger.info(f"Final strain: {strain}")
+                # self.logger.info(f"Final stress: {stress}")
 
                 return strain, stress
-        
-        def show(self, disp, strain, stress):
+                
+        def show(self, uh, strain, stress):
                 """Visualize displacement field, strain field, and stress field by saving to VTU files."""
                 
-                mesh = self.mesh
+                mesh = self.space.mesh
+                save_path = "../timo_axle_result"
                 
-                uh = disp.reshape(-1, 6)
-                u = uh[:, :3]
-                mesh.nodedata['disp'] = u
-
-                frname = f"disp.vtu"
-                mesh.to_vtk(fname=frname)
-
+                disp = uh.reshape(-1, self.GD*2)
+        
+                import os
+                os.makedirs(save_path, exist_ok=True)
+                
+                mesh.nodedata['displacement'] = disp
+                mesh.to_vtk(f"{save_path}/disp.vtu")
+                
                 mesh.edgedata['strain'] = strain
-                frname = f"strain.vtu"
-                mesh.to_vtk(fname=frname)
+                mesh.to_vtk(f"{save_path}/strain.vtu")
 
                 mesh.edgedata['stress'] = stress
-                frname = f"stress.vtu"
-                mesh.to_vtk(fname=frname)
+                mesh.to_vtk(f"{save_path}/stress.vtu")
+
