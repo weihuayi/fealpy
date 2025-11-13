@@ -54,10 +54,10 @@ class TrussTowerModel(ComputationalModel):
         s += "  --- Truss Tower Model ---\n"
         s += f"  pde            : {self.pde.__class__.__name__}\n"  # Assuming pde is a class object
         s += f"  mesh           : {self.mesh.__class__.__name__}\n"  # Assuming mesh is a class object
+        s += f"  geo_dimension  : {self.GD}\n"
         s += f"  E           : {self.E}\n"
         s += f"  nu          : {self.nu}\n"
-        s += f"  mu          : {self.E/(2*(1+self.nu)):.3e}\n"  # 自动算梁剪切模量
-        s += f"  geo_dimension  : {self.GD}\n"
+        s += f"  mu          : {self.E/(2*(1+self.nu)):.3e}\n"  
         s += "  --- Bar Sections ---\n"
         s += f"  Total bars     : {self.mesh.number_of_cells()}\n"
         s += f"  Vertical bars Area  : {self.pde.Av:.6e}\n"
@@ -316,20 +316,21 @@ class TrussTowerModel(ComputationalModel):
         """Visualize displacement field, strain field, and stress field by saving to VTU files."""
         
         mesh = self.space.mesh
-        NN = mesh.number_of_nodes()
+        save_path = "../truss_tower_result"
         
-        disp = uh.reshape(NN, self.GD)
+        disp = uh.reshape(-1, self.GD)
+    
+        import os
+        os.makedirs(save_path, exist_ok=True)
+        
         mesh.nodedata['displacement'] = disp
-        frname = f"disp.vtu"
-        mesh.to_vtk(fname=frname)
-
+        mesh.to_vtk(f"{save_path}/disp.vtu")
+        
         mesh.edgedata['strain'] = strain
-        frname = f"strain.vtu"
-        mesh.to_vtk(fname=frname)
+        mesh.to_vtk(f"{save_path}/strain.vtu")
 
         mesh.edgedata['stress'] = stress
-        frname = f"stress.vtu"
-        mesh.to_vtk(fname=frname)
+        mesh.to_vtk(f"{save_path}/stress.vtu")
 
     def geometric_stiffness_matrix(self, stress):
         """Assemble the global geometric stiffness matrix for buckling analysis.
