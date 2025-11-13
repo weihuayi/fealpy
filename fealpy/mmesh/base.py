@@ -74,6 +74,23 @@ class PREProcessor:
                 self.b_val0 = bcollection[0]
             self._space_preparation()
 
+        elif self.method in ['LMEAGAdaptive', 'LMEAGAdaptiveX','EAGAdaptiveHuang']:
+            self._data_and_device()
+            self._isinstance_mesh_type()
+            self._meshtop_preparation()
+            self._geometry_preparation()
+            self._space_preparation()
+            self.q = self.pspace.p + 2
+            qf = self.mesh.quadrature_formula(self.q)
+            self.bcs, self.ws = qf.get_quadrature_points_and_weights()
+            self.pcell2dof = self.pspace.cell_to_dof()
+            self.sm = bm.zeros(self.NN, **self.kwargs0)
+            self.sm = bm.index_add(self.sm , self.mesh.cell , self.cm[:, None])
+            logic_node = bm.copy(self.mesh.node)
+            logic_cell = bm.copy(self.mesh.cell)
+            self.logic_mesh = self.mesh_class(logic_node,logic_cell)
+            self.node2cell = self.mesh.node_to_cell()
+            
     def _meshtop_preparation(self):
         """
         save the mesh topology information

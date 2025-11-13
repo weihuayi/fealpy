@@ -268,7 +268,6 @@ class GFMMPDE2d(Monitor, Interpolater):
             pc_mea = x_n[1:] - x_n[:-1]
             sm = bm.zeros(part_NN, **self.kwargs0)
             sm = bm.index_add(sm, part_logic_cell, pc_mea[:, None])
-
             part_mesh = IntervalMesh(part_logic_node, part_logic_cell)
             space = LagrangeFESpace(part_mesh, p=1)
             qf = part_mesh.quadrature_formula(self.q)

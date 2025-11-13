@@ -389,7 +389,7 @@ class LagrangeFiniteElementSpace():
         p = self.p   # the degree of polynomial basis function
         TD = self.TD
 
-        multiIndex = self.multi_index_matrix[TD](p)
+        multiIndex = multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
@@ -430,7 +430,7 @@ class LagrangeFiniteElementSpace():
         """
         p = self.p   # the degree of polynomial basis function
         TD = bc.shape[1] - 1
-        multiIndex = self.multi_index_matrix[TD](p)
+        multiIndex = multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
@@ -475,7 +475,7 @@ class LagrangeFiniteElementSpace():
             phi = np.ones(shape, dtype=self.ftype)
 
         TD = bc.shape[-1] - 1 
-        multiIndex = self.multi_index_matrix[TD](p)
+        multiIndex = multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
@@ -517,7 +517,7 @@ class LagrangeFiniteElementSpace():
             p= self.p
         TD = self.TD
 
-        multiIndex = self.multi_index_matrix[TD](p)
+        multiIndex = multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
