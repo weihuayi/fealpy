@@ -21,7 +21,9 @@ __nodes__ = [
     "pathplanning",
     "sampling",
     "material",
-    "postreport"
+    "postreport",
+    "reports",
+    "paraviewtools",
 ]
 
 register_all_nodes()
