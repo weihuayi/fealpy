@@ -12,8 +12,11 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
     Parameters:
         name (str): The name of the material.
         model (object): The model containing the beam's geometric and material properties.
-        E (float): The elastic modulus of the material.
-        mu (float): The shear modulus of the material.
+        E (float): Young's modulus (elastic_modulus).
+        nu (float): Poisson's ratio.
+        lam (float): Lamé's first parameter (λ).
+        mu (float): Shear modulus (μ).
+        rho (float): Material density.
     """
     
     def __init__(self, 
@@ -21,15 +24,19 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
                 model,
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,
-                shear_modulus: Optional[float] = None) -> None:
+                shear_modulus: Optional[float] = None,
+                density: Optional[float] = None) -> None:
+        
         super().__init__(name=name, 
                         elastic_modulus= elastic_modulus, 
                         poisson_ratio=poisson_ratio,
-                        shear_modulus=shear_modulus)
+                        shear_modulus=shear_modulus,
+                        density=density)
 
         self.E = self.get_property('elastic_modulus')
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
+        self.rho = self.get_property('density')
         
         self.model = model
         
@@ -40,6 +47,7 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         s += f"  [Beam]  E           : {self.E}\n"
         s += f"  [Beam]  nu          : {self.nu}\n"
         s += f"  [Beam]  mu          : {self.mu}\n"
+        s += f"  [Beam]  rho         : {self.rho}\n"
         s += ")"
         return s
 
@@ -82,22 +90,24 @@ class TimoshenkoBeamMaterial(LinearElasticMaterial):
         
         # 从 pde model 中获取截面性质
         if index is not None and hasattr(self.model, 'Ay') and hasattr(self.model, 'Az'):
-            A_y = self.model.Ay[index]   # y方向有效剪切面积
-            A_z = self.model.Az[index]   # z方向有效剪切面积
-            I_yy = self.model.Iy[index]  # 绕y轴惯性矩
-            I_zz = self.model.Iz[index]  # 绕z轴惯性矩
-            kappa = self.model.FSY       # 剪切修正系数
-        else:
-            # 默认值
-            A_y = 1.0  
-            A_z = 1.0
-            I_yy = 1.0
-            I_zz = 1.0
-            kappa = 10.0/9.0
-        
+            if isinstance(self.model.Ay, (list, tuple)) or hasattr(self.model.Ay, '__getitem__'):
+                A_y = self.model.Ay[index]   # y方向有效剪切面积
+                A_z = self.model.Az[index]   # z方向有效剪切面积
+                I_yy = self.model.Iy[index]  # 绕y轴惯性矩
+                I_zz = self.model.Iz[index]  # 绕z轴惯性矩
+                mu_y = self.model.FSY       # 剪切修正系数
+                mu_z = self.model.FSZ       # 剪切修正系数
+            else:
+                A_y = self.model.Ay
+                A_z = self.model.Az
+                I_yy = self.model.Iy
+                I_zz = self.model.Iz
+        mu_y = self.model.FSY       # 剪切修正系数
+        mu_z = self.model.FSZ       # 剪切修正系数
+
         # 计算剪切变形参数
-        Phi_y = 12 * self.E * I_yy / (kappa * self.mu * A_z * l**2)
-        Phi_z = 12 * self.E * I_zz / (kappa * self.mu * A_y * l**2)
+        Phi_y = 12 * self.E * I_yy / (mu_y * self.mu * A_z * l**2)
+        Phi_z = 12 * self.E * I_zz / (mu_z * self.mu * A_y * l**2)
 
         Phi_bar_y = 1.0 / (1.0 + Phi_y)
         Phi_bar_z = 1.0 / (1.0 + Phi_z)

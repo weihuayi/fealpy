@@ -22,7 +22,7 @@ class ChannelBeamData3D:
         self.GD = self.geo_dimension()
         
         self.L = self.length()
-        self.A = self.cross_section()
+        self.Ax, self.Ay, self.Az = self.cross_section()
         self.Ix, self.Iy, self.Iz = self.inertia()
         
         self.e_z = 0.0148  # Shear center offset in z-direction (m)
@@ -68,7 +68,10 @@ class ChannelBeamData3D:
 
     def cross_section(self) -> float:
         """ Get the beam cross-sectional area."""
-        return  4.90e-4
+        Ax = 4.90e-4
+        Ay = 4.90e-4
+        Az = 4.90e-4
+        return  Ax, Ay, Az
 
     def inertia(self) -> Tuple[float, float, float]:
         """Get the beam moments of inertia.
@@ -83,8 +86,7 @@ class ChannelBeamData3D:
         Iy = 2.77e-8
         Iz = 1.69e-7
         return Ix, Iy, Iz
-    
-    
+
     def get_stress_points(self) -> TensorLike:
         """ Get the stress calculation points at the outermost corners of the 
         cross-section in local coordinates.
@@ -121,8 +123,8 @@ class ChannelBeamData3D:
         cell[:, 1] = bm.arange(1, n + 1)
         
         return EdgeMesh(node, cell)
-
-    def tip_load(self, load_case: int=1) -> TensorLike:
+    
+    def tip_load(self,  load_case: int=1) -> TensorLike:
         """ Get the concentrated load at the tip of the beam.
 
         Parameters:
@@ -141,10 +143,6 @@ class ChannelBeamData3D:
             load[1] = 50.0    # Fy
             load[2] = 100.0   # Fz
             load[3] = -10.0   # Mx
-        elif load_case == 2:
-            pass  # No concentrated load, only gravity
-        else:
-            raise ValueError("Invalid load_case. Choose 1 or 2.")
         return load
     
     def dirichlet(self, points: TensorLike) -> TensorLike:
