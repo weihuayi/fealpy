@@ -1,9 +1,6 @@
-from typing import Union
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
-from fealpy.mesh import Mesh
-from fealpy.utils import timer
 from fealpy.cfd.equation import StationaryIncompressibleNS
 
 class StationaryIncompressibleNSLFEMModel(ComputationalModel):
@@ -70,7 +67,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         
         if mesh is None:
             if hasattr(pde, 'init_mesh'):
-                self.mesh = pde.mesh
+                self.mesh = pde.init_mesh()
             else:
                 raise ValueError("Not found mesh!")
         else:
@@ -84,14 +81,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
             self.maxit = options.get('maxit', 5)
             self.maxstep = options.get('maxstep', 10)
             self.tol = options.get('tol', 1e-10)
-            # self.apply_bc = self.apply_bc[options['apply_bc']]
-
-
-            # if options['run'] == 'uniform_refine':
-            #     self.uh1, self.ph1 = run(maxit=options['maxit'], maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
-            # else:  # 'one_step' 或其他
-            #     self.uh1, self.ph1 = run(maxstep=options['maxstep'], tol=options['tol'], apply_bc=options['apply_bc'], error=options.get('error', 'error'))
-    
+            
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
         s = f"{self.__class__.__name__}(\n"
@@ -174,8 +164,8 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
                 break 
             uh0[:] = uh1
             ph0[:] = ph1
-        # uerror, perror = self.error(uh1, ph1) 
-        # self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
+        uerror, perror = self.error(uh1, ph1) 
+        self.logger.info(f"Final error: uerror = {uerror}, perror = {perror}")
         return uh1, ph1
     
     @run.register('one_step')
@@ -186,14 +176,18 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         A = BForm.assembly() 
         b = LForm.assembly()
         A, b = self.fem.apply_bc(A, b, self.pde)
-        A, b = self.fem.lagrange_multiplier(A, b)
+        if self.equation.pressure_neumann == True:
+            A, b = self.fem.lagrange_multiplier(A, b, c = self.pde.pressure_integral_target())
         x = self.solve(A, b)
 
         ugdof = self.fem.uspace.number_of_global_dofs()
         u = self.fem.uspace.function()
         p = self.fem.pspace.function()
         u[:] = x[:ugdof]
-        p[:] = x[ugdof:-1] 
+        if self.equation.pressure_neumann == True:
+            p[:] = x[ugdof:-1]
+        else:
+            p[:] = x[ugdof:]
         return u, p
 
     @run.register('uniform_refine')
@@ -202,10 +196,21 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         maxit = self.maxit if self.options is not None else maxit
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
+        u_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
+        p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         for i in range(maxit):
             self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
             uh1, ph1 = self.run['main'](maxstep, tol)
+            uerror, perror = self.error(uh1, ph1)
+            u_errorMatrix[0, i] = uerror
+            p_errorMatrix[0, i] = perror
             self.mesh.uniform_refine()
+        order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
+        order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
+        self.logger.info(f"速度最终误差:" + ",".join(f"{uerror:.15e}" for uerror in u_errorMatrix[0,]))
+        self.logger.info(f"order_u: " + ", ".join(f"{order_u:.15e}" for order_u in order_u))
+        self.logger.info(f"压力最终误差:" + ",".join(f"{perror:.15e}" for perror in p_errorMatrix[0,]))  
+        self.logger.info(f"order_p: " + ", ".join(f"{order_p:.15e}" for order_p in order_p))
         return uh1, ph1
 
     @variantmethod('direct')
@@ -214,7 +219,7 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         self.solve_str = 'direct'
         return spsolve(A, F, solver = solver)
 
-        
+    @variantmethod('L2')    
     def error(self, uh, ph):
         """
         Post-process the numerical solution to compute the error in L2 norm.
@@ -223,5 +228,4 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         uerror = self.mesh.error(self.pde.velocity, uh)
         perror = self.mesh.error(self.pde.pressure, ph)
         return uerror, perror
-
     

@@ -160,7 +160,7 @@ class CPLFEMDof2d():
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_edge_index()
+            index = self.mesh.boundary_face_index()
             if callable(threshold):
                 bc = self.mesh.entity_barycenter('edge', index=index)
                 flag = threshold(bc)
@@ -177,7 +177,7 @@ class CPLFEMDof2d():
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_edge_index()
+            index = self.mesh.boundary_face_index()
             if callable(threshold):
                 bc = self.mesh.entity_barycenter('edge', index=index)
                 flag = threshold(bc)
@@ -234,8 +234,8 @@ class CPLFEMDof2d():
 
             isEdgeDof = self.is_on_edge_local_dof()
             edge2dof = self.edge_to_dof()
-            cell2edgeSign = mesh.ds.cell_to_edge_sign()
-            cell2edge = mesh.ds.cell_to_edge()
+            cell2edgeSign = mesh.cell_to_face_sign()
+            cell2edge = mesh.cell_to_edge()
 
             cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
                     edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
@@ -274,7 +274,7 @@ class CPLFEMDof2d():
             ipoint = np.zeros((gdof, dim), dtype=np.float64)
             ipoint[:N, :] = node
             NE = mesh.number_of_edges()
-            edge = mesh.ds.edge
+            edge = mesh.edge
             w = np.zeros((p-1,2), dtype=np.float64)
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]

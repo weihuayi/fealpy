@@ -21,7 +21,9 @@ class Exp0004(BoxMesher3d):
         return self.box
     
     @cartesian
-    def is_pressure_boundary(self, p):
+    def is_pressure_boundary(self, p = None):
+        if p is None:
+            return 0
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
         return result
     
@@ -57,6 +59,10 @@ class Exp0004(BoxMesher3d):
         y = p[..., 1]
         z = p[..., 2]
         return (2*x-1)*(2*y-1)*(2*z-1)
+    
+    def pressure_integral_target(self) -> float:
+        """Integral of the exact pressure over the domain."""
+        return 0.0
     
     @cartesian
     def velocity_dirichlet(self, p):

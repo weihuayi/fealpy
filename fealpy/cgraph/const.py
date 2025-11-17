@@ -9,8 +9,8 @@ __all__ = [
 ]
 
 
-def _identity(x):
-    return x
+def _identity(*args, **kwargs):
+    return args + tuple(kwargs.values())
 
 
 class ConstDomain(CNodeType):

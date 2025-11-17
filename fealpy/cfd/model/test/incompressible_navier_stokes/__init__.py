@@ -44,5 +44,6 @@ DATA_TABLE = {
     # example name: (file_name, class_name)
     1: ("exp0001", "Exp0001"),
     2: ("exp0002", "Exp0002"),
-    3: ("exp0003", "Exp0003")
+    3: ("exp0003", "Exp0003"),
+    4: ("exp0004", "Exp0004")
 }

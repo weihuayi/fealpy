@@ -15,3 +15,4 @@ from .box_with_sphere_mesher import BoxWithSphereMesher
 from .ellipse_mesher import EllipseMesher
 from .torus_mesher import TorusMesher
 from .ellipsoid_mesher import EllipsoidMesher
+from .patch_antenna_mesher import PatchAntennaMesher
