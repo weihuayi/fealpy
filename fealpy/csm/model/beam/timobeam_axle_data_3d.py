@@ -21,7 +21,7 @@ class TimobeamAxleData3D:
         Notes:
             FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
     """
-    def __init__(self, beam_para=None, axle_para=None, kappa: float=10/9):
+    def __init__(self, beam_para=None, axle_para=None):
         if beam_para is None:
             beam_para = bm.array([
                 [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
@@ -37,14 +37,14 @@ class TimobeamAxleData3D:
         self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
         self.axle_D = bm.repeat(self.axle_para[:, 0], self.axle_para[:, 2].astype(int))
         
-        self.FSY = kappa
-        self.FSZ = kappa
+        self.FSY = 10/9
+        self.FSZ = 10/9
         
         self.GD = self.geo_dimension()
 
         # === 计算 beam 截面 & 惯性矩 ===
         self.Ax, self.Ay, self.Az = self.calculate_beam_cross_section()
-        self.Ix, self.Iy, self.Iz = self.calculate_beam_inertia()
+        self.J, self.Iy, self.Iz = self.calculate_beam_inertia()
         
         self.dofs_per_node = 6
         self.mesh = self.init_mesh() 
@@ -95,8 +95,8 @@ class TimobeamAxleData3D:
        """Beam moments of inertia."""
        Iy  = bm.pi * self.beam_D**4 / 64
        Iz = Iy
-       Ix = Iy +Iz
-       return Ix, Iy, Iz
+       J = Iy +Iz
+       return J, Iy, Iz
     
     def init_mesh(self):
         """Construct a mesh for the beam and axle.
