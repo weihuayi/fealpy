@@ -81,8 +81,10 @@ class UDecoupling(CNodeType):
     def run(out, node_ldof, type):
         
         u = out.reshape(-1, node_ldof)
+        
         if type == "Truss":
             uh = u
+            theta = None
         elif type == "Euler_beam":
             uh = u[:, :1]
             theta = u[:, 1:]

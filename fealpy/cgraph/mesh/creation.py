@@ -232,17 +232,19 @@ class TrussTowerMesh(CNodeType):
     """
     TITLE: str = "桁架塔网格"
     PATH: str = "preprocess.mesher"
-    DESC: str = """该节点生成三维桁架塔结构的网格剖分，沿z轴方向构建长条状桁架，
-                支持面板数量、截面尺寸、单元密度等配置。"""
+    DESC: str = """该节点生成三维桁架塔结构的网格，沿 z 方向构建长条状桁架结构。
+            用户可通过设置面板数量、塔身长度以及截面尺寸来控制塔体的整体几何特征，
+            并可指定每根杆件的单元划分密度，从而得到具有精细结构的三维桁架网格。
+            节点同时支持面内对角加劲杆的自动生成，用于增强塔体的结构稳定性。"""
                 
     INPUT_SLOTS = [
         PortConf("n_panel", DataType.INT, 1, desc="沿 z 方向的面板数量（≥1）", title="面板数量", default=19),
-        PortConf("Lz", DataType.FLOAT, 1, desc="桁架塔沿 z 方向的总长度", title="总长度 (z方向)", default=19.0),
-        PortConf("Wx", DataType.FLOAT, 1, desc="截面矩形的 x 方向半宽度", title="截面宽度 (x方向)", default=0.45),
-        PortConf("Wy", DataType.FLOAT, 1, desc="截面矩形的 y 方向半宽度", title="截面高度 (y方向)", default=0.40),
+        PortConf("Lz", DataType.FLOAT, 1, desc="桁架塔沿 z 方向的总长度", title="总长度", default=19.0),
+        PortConf("Wx", DataType.FLOAT, 1, desc="截面矩形的 x 方向半宽度", title="截面宽度", default=0.45),
+        PortConf("Wy", DataType.FLOAT, 1, desc="截面矩形的 y 方向半宽度", title="截面高度", default=0.40),
         PortConf("lc", DataType.FLOAT, 1, desc="用于控制网格尺寸的几何特征长度", title="几何点特征长度", default=0.1),
         PortConf("ne_per_bar", DataType.INT, 1, desc="每根杆件沿长度方向划分的单元数量（≥1）", title="每根杆件单元数", default=1),
-        PortConf("face_diag", DataType.BOOL, 0, desc="是否在四个侧面加入面内对角线加劲杆件（默认 True）", title="面内对角加劲", default=True)
+        PortConf("face_diag", DataType.BOOL, 0, desc="是否在四个侧面加入面内对角线加劲杆件（默认True）", title="面内对角加劲", default=True)
     ]
     OUTPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, desc="生成桁架塔网格", title="网格")

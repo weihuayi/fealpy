@@ -53,9 +53,10 @@ class TrussTower3d(CNodeType):
         div (float): Inner diameter of vertical rods (m).
         doo (float): Outer diameter of other rods (m).
         dio (float): Inner diameter of other rods (m).
-        load_total (float): Total vertical load applied at top nodes (N).
+        load (float): Total vertical load applied at top nodes (N).
         
     Outputs:
+        GD (INT): Geometric dimension of the model.
         Av (float): Cross-sectional area of vertical rods (m²).
         Ao (float): Cross-sectional area of other rods (m²).
         Iv (float): Area moment of inertia of vertical rods (m⁴).
@@ -67,23 +68,26 @@ class TrussTower3d(CNodeType):
     """
     TITLE: str = "桁架塔模型"
     PATH: str = "preprocess.modeling"
-    DESC: str = "生成三维桁架塔结构模型，包含管状截面几何参数、结构惯性矩、外部载荷向量及边界条件，用于桁架结构力学分析。"
+    DESC: str = """该节点用于建立三维桁架塔的基础物理模型。通过输入杆件的外径、内径以及整体载荷等参数，
+            计算竖向与其他类型杆件的截面积、惯性矩，以及结构在不同方向上的整体惯性属性。同时，
+            它根据塔顶总载荷生成全局载荷向量，并构造底部固定约束的边界自由度函数，
+            为后续有限元离散与求解提供所有必要的材料与几何信息。"""
+            
     INPUT_SLOTS = [
-        PortConf("dov", DataType.FLOAT, 1,  desc="竖向杆件的外径", title="竖杆外径", default=0.015),
-        PortConf("div", DataType.FLOAT, 1,  desc="竖向杆件的内径", title="竖杆内径", default=0.010),
-        PortConf("doo", DataType.FLOAT, 1,  desc="其他杆件的外径", title="其他杆外径", default=0.010),
-        PortConf("dio", DataType.FLOAT, 1,  desc="其他杆件的内径", title="其他杆内径", default=0.007),
-        PortConf("load_total", DataType.FLOAT, 1,  desc="施加在塔顶节点的总竖向载荷", title="总载荷", default=84820.0)
+        PortConf("dov", DataType.FLOAT, 0,  desc="竖向杆件的外径", title="竖杆外径", default=0.015),
+        PortConf("div", DataType.FLOAT, 0,  desc="竖向杆件的内径", title="竖杆内径", default=0.010),
+        PortConf("doo", DataType.FLOAT, 0,  desc="其他杆件的外径", title="其他杆外径", default=0.010),
+        PortConf("dio", DataType.FLOAT, 0,  desc="其他杆件的内径", title="其他杆内径", default=0.007),
+        PortConf("load", DataType.FLOAT, 1,  desc="施加在塔顶节点的总竖向载荷", title="总载荷", default=84820.0)
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("Av", DataType.FLOAT,  desc="竖向杆件的截面积", title="竖杆截面积"),
-        PortConf("Ao", DataType.FLOAT,  desc="其他杆件的截面积", title="其他杆截面积"),
-        PortConf("Iv", DataType.FLOAT,  desc="竖向杆件的面积惯性矩", title="竖杆惯性矩"),
-        PortConf("Io", DataType.FLOAT,  desc="其他杆件的面积惯性矩", title="其他杆惯性矩"),
-        PortConf("I1", DataType.FLOAT,  desc="深度方向的结构惯性矩", title="结构惯性矩I1"),
-        PortConf("I2", DataType.FLOAT,  desc="宽度方向的结构惯性矩", title="结构惯性矩I2"),
-        PortConf("external_load", DataType.FUNCTION, desc="全局载荷向量，表示总载荷如何分布到顶部节点", title="外部载荷"),
+        PortConf("GD", DataType.INT,  desc="模型的几何维数", title="几何维数"),
+        PortConf("dov", DataType.FLOAT, desc="竖向杆件的外径", title="竖杆外径"),
+        PortConf("div", DataType.FLOAT, desc="竖向杆件的内径", title="竖杆内径"),
+        PortConf("doo", DataType.FLOAT, desc="其他杆件的外径", title="其他杆外径"),
+        PortConf("dio", DataType.FLOAT, desc="其他杆件的内径", title="其他杆内径"),
+        PortConf("external_load", DataType.TENSOR, desc="全局载荷向量，表示总载荷如何分布到顶部节点", title="外部载荷"),
         PortConf("dirichlet_dof", DataType.FUNCTION, desc="Dirichlet边界条件的自由度索引", title="边界自由度")
     ]
 
@@ -99,9 +103,8 @@ class TrussTower3d(CNodeType):
             dio=options.get("dio")
         )
         
-        load_total = options.get("load_total")
-        
-        return tuple(
-            getattr(model, name)
-            for name in ["Av", "Ao", "Iv", "Io", "I1", "I2", "external_load", "dirichlet_dof"]
-        )
+        load = options.get("load")
+        external_load = model.external_load(load_total=load)
+
+        return (model.GD, model.dov, model.div, model.doo, model.dio, 
+           external_load, model.dirichlet_dof())
