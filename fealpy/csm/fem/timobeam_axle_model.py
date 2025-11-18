@@ -15,7 +15,7 @@ from fealpy.solver import spsolve, cg
 
 from ..model.beam import BeamPDEDataT
 from ..model import CSMModelManager
-from ..material import TimoshenkoBeamMaterial,  AxleMaterial
+from ..material import TimoshenkoBeamMaterial,  BarMaterial
 from ..fem.timoshenko_beam_integrator import TimoshenkoBeamIntegrator
 from ..fem.axle_integrator import AxleIntegrator
 
@@ -39,6 +39,8 @@ class TimobeamAxleModel(ComputationalModel):
                self.axle_E = options['axle_E']
                self.axle_nu = options['axle_nu']
                
+               self.Timo, self.Axle = self.set_material()
+               self.set_space()
         
         def __str__(self) -> str:
                 """Returns a formatted multi-line string summarizing the configuration of the Timoshenko beam model.
@@ -47,15 +49,16 @@ class TimobeamAxleModel(ComputationalModel):
                         displaying information such as PDE, mesh, material properties, and more.
                 """
                 s = f"{self.__class__.__name__}(\n"
+                s += "  --- Timoshenko Beam and Axle Model ---\n"
                 s += f"  pde            : {self.pde.__class__.__name__}\n"  # Assuming pde is a class object
                 s += f"  mesh           : {self.mesh.__class__.__name__}\n"  # Assuming mesh is a class object
+                s += f"  geo_dimension  : {self.GD}\n"
                 s += f"  beam_E           : {self.beam_E}\n"
                 s += f"  beam_nu          : {self.beam_nu}\n"
                 s += f"  beam_mu          : {self.beam_E/(2*(1+self.beam_nu)):.3e}\n"  # 自动算梁剪切模量
                 s += f"  axle_E           : {self.axle_E}\n"
                 s += f"  axle_nu          : {self.axle_nu}\n"
                 s += f"  axle_mu          : {self.axle_E/(2*(1+self.axle_nu)):.3e}\n"  # 自动算轴承剪切模量
-                s += f"  geo_dimension  : {self.GD}\n"
                 s += ")"
                 self.logger.info(f"\n{s}")
                 return s
@@ -71,47 +74,48 @@ class TimobeamAxleModel(ComputationalModel):
               
         def set_space_degree(self, p: int) -> None:
                 self.p = p
+                
+        def set_space(self):
+                """Initialize the finite element space."""
+                mesh = self.mesh
+                p = self.p
+                
+                scalar_space = LagrangeFESpace(mesh, p=p, ctype='C')
+                self.space = TensorFunctionSpace(scalar_space, shape=(-1, self.GD*2))
         
+        def set_material(self) -> None:
+                Timo = TimoshenkoBeamMaterial(name="timobeam",
+                                        model=self.pde,
+                                        elastic_modulus=self.beam_E,
+                                        poisson_ratio=self.beam_nu)
+                
+                Axle = BarMaterial(name="axle",
+                                model=self.pde,
+                                elastic_modulus=self.axle_E,
+                                poisson_ratio=self.axle_nu)
+                return Timo, Axle
+                
         def timo_axle_system(self):
-                """Construct the linear system for the 3D timoshenko beam problem.
+                """Construct the linear system for the 3D timoshenko beam problem."""
+                mesh = self.mesh
+                NC = mesh.number_of_cells()
 
-                Parameters:
-                    E (float): Young's modulus in MPa.
-                    nu (float): Poisson's ratio.
-                """
-                self.space = LagrangeFESpace(self.mesh, self.p, ctype='C')
-                self.tspace = TensorFunctionSpace(self.space, shape=(-1, 6))
-                mesh = self.tspace.mesh
-                n_cells = mesh.number_of_cells()
-
-                Dofs = self.tspace.number_of_global_dofs()
+                Dofs = self.space.number_of_global_dofs()
                 K = bm.zeros((Dofs, Dofs), dtype=bm.float64)
                 F = bm.zeros(Dofs, dtype=bm.float64)
 
-                Timo = TimoshenkoBeamMaterial(model=self.pde,
-                                        name="timobeam",
-                                        elastic_modulus=self.beam_E,
-                                        poisson_ratio=self.beam_nu)
-
-                Axle = AxleMaterial(model=self.pde,
-                                name="axle",
-                                elastic_modulus=self.axle_E,
-                                poisson_ratio=self.axle_nu)
-                 
-                
-
-                timo_integrator = TimoshenkoBeamIntegrator(self.tspace, Timo, 
-                                        index=bm.arange(0, n_cells-10))
-                KE_beam = timo_integrator.assembly(self.tspace)
-                ele_dofs_beam = timo_integrator.to_global_dof(self.tspace)
+                timo_integrator = TimoshenkoBeamIntegrator(self.space, self.pde, self.Timo, 
+                                        index=bm.arange(0, NC-10))
+                KE_beam = timo_integrator.assembly(self.space)
+                ele_dofs_beam = timo_integrator.to_global_dof(self.space)
 
                 for i, dof in enumerate(ele_dofs_beam):
                        K[dof[:, None], dof] += KE_beam[i]
 
-                axle_integrator = AxleIntegrator(self.tspace, Axle, 
-                                        index=bm.arange(n_cells-10, n_cells))
-                KE_axle = axle_integrator.assembly(self.tspace)
-                ele_dofs_axle = axle_integrator.to_global_dof(self.tspace)   
+                axle_integrator = AxleIntegrator(self.space, self.pde, self.Axle, 
+                                        index=bm.arange(NC-10, NC))
+                KE_axle = axle_integrator.assembly(self.space)
+                ele_dofs_axle = axle_integrator.to_global_dof(self.space)
 
                 for i, dof in enumerate(ele_dofs_axle):
                        K[dof[:, None], dof] += KE_axle[i]
@@ -123,7 +127,7 @@ class TimobeamAxleModel(ComputationalModel):
         def apply_bc_penalty(self, K, F, penalty=1e20):
                 """Apply Dirichlet boundary conditions using Penalty Method."""
                 penalty = penalty
-                fixed_dofs = bm.asarray(self.pde.dirichlet_dof_index(), dtype=int)
+                fixed_dofs = bm.asarray(self.pde.dirichlet_dof(), dtype=int)
                 
                 F[fixed_dofs] *= penalty
                 for dof in fixed_dofs:
@@ -138,61 +142,90 @@ class TimobeamAxleModel(ComputationalModel):
         def solve(self):
                 K, F = self.timo_axle_system()
                 K, F = self.apply_bc_penalty(K, F)
-        
-                rows, cols = bm.nonzero(K)
-                values = K[rows, cols]
-                K = COOTensor(bm.stack([rows, cols], axis=0), values, spshape=K.shape)
 
                 u = spsolve(K, F, solver='scipy')
                 # self.logger.info(f"Solution u:\n{u}")
 
                 return u
         
-        def show(self, disp):
-                """
-                Visualize the mesh and the displacement field.
-                """
+        def compute_beam_strain_and_stress(self, disp):
+                """Compute axial strain and stress for beam elements."""
+
+                uh = disp.reshape(-1, 6)
+                NC = self.mesh.number_of_cells()
+                beam_indices = bm.arange(0, NC-10)  # 获取前面所有梁单元的索引
+                timo_integrator = TimoshenkoBeamIntegrator(self.space, self.pde, self.Timo, 
+                                        index=beam_indices)
+                R = timo_integrator._coord_transform()  # 获取变换矩阵
                 
-                mesh = self.mesh
+                beam_strain, beam_stress = self.Timo.compute_strain_and_stress(
+                                self.mesh,
+                                uh,
+                                coord_transform=R,
+                                axial_position=None,
+                                ele_indices=beam_indices)
+                
+                # self.logger.info(f"strain: {beam_strain}")
+                # self.logger.info(f"stress: {beam_stress}")
+                return beam_strain, beam_stress
+
+        def compute_axle_strain_and_stress(self, disp):
+                """Compute axial strain and stress for axle elements."""
                 
                 uh = disp.reshape(-1, 6)
-                u = uh[:, :3]
-                mesh.nodedata['disp'] = u
+                NC = self.mesh.number_of_cells()
+                axle_indices = bm.arange(NC-10, NC)  # 获取最后10个单元的索引
+                
+                axle_strain, axle_stress = self.Axle.compute_strain_and_stress(
+                                self.mesh,
+                                uh,
+                                ele_indices=axle_indices)
+                
+                # self.logger.info(f"strain: {axle_strain}")
+                # self.logger.info(f"stress: {axle_stress}")
 
-                frname = f"disp.vtu"
-                mesh.to_vtk(fname=frname)
+                return axle_strain, axle_stress
+         
+        def compute_strain_and_stress(self, disp):
+                """Compute strain and stress for both beam and axle elements."""
                 
-        def calculate_strain_and_stress(self, disp, x, y, z):
-                """Calculate the strain and stress.
-                    ε = B * u_e
-                    σ = D * ε
-                    
-                Parameters:
-                        disp (TensorLike): Nodal displacement vector.
-                        x (float): Local coordinate in the beam cross-section along the x-axis.
-                        y (float): Local coordinate in the beam cross-section along the y-axis.
-                        z (float): Local coordinate in the beam cross-section along the z-axis.
-                        l (float): Length of the beam and axle element.
-                
-                Returns:
-                        Tuple[TensorLike, TensorLike]: Strain and stress vectors.
-                """
-                mesh = self.mesh
-                u = disp.rshape(-1, 6)
-                
-                Timo = TimoshenkoBeamMaterial(model=self.pde,
-                                        name="timobeam",
-                                        elastic_modulus=self.beam_E,
-                                        poisson_ratio=self.beam_nu)
+                NC = self.mesh.number_of_cells()
+                beam_strain, beam_stress = self.compute_beam_strain_and_stress(disp)
+                axle_strain, axle_stress = self.compute_axle_strain_and_stress(disp)
 
-                Axle = AxleMaterial(model=self.pde,
-                                name="axle",
-                                elastic_modulus=self.axle_E,
-                                poisson_ratio=self.axle_nu)
+                strain = bm.zeros((NC, 3), dtype=bm.float64)
+                stress = bm.zeros((NC, 3), dtype=bm.float64)
                 
-                l = mesh.entity_measure('cell')
-                L = Timo.linear_basis(x, l)
-                H = Timo.hermite_basis(x, l) 
-                B = Timo.strain_matrix(x, y, z, l)
+                beam_indices = bm.arange(0, NC-10)
+                strain[beam_indices] = beam_strain
+                stress[beam_indices] = beam_stress
                 
-                e_xx = u[0]*L[0]
+                axle_indices = bm.arange(NC-10, NC)
+                strain[axle_indices] = axle_strain
+                stress[axle_indices] = axle_stress
+                
+                # self.logger.info(f"Final strain: {strain}")
+                # self.logger.info(f"Final stress: {stress}")
+
+                return strain, stress
+                
+        def show(self, uh, strain, stress):
+                """Visualize displacement field, strain field, and stress field by saving to VTU files."""
+                
+                mesh = self.space.mesh
+                save_path = "../timo_axle_result"
+                
+                disp = uh.reshape(-1, self.GD*2)
+        
+                import os
+                os.makedirs(save_path, exist_ok=True)
+                
+                mesh.nodedata['displacement'] = disp
+                mesh.to_vtk(f"{save_path}/disp.vtu")
+                
+                mesh.edgedata['strain'] = strain
+                mesh.to_vtk(f"{save_path}/strain.vtu")
+
+                mesh.edgedata['stress'] = stress
+                mesh.to_vtk(f"{save_path}/stress.vtu")
+

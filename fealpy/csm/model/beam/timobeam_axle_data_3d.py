@@ -39,6 +39,8 @@ class TimobeamAxleData3D:
         
         self.FSY = kappa
         self.FSZ = kappa
+        
+        self.GD = self.geo_dimension()
 
         # === 计算 beam 截面 & 惯性矩 ===
         self.Ax, self.Ay, self.Az = self.calculate_beam_cross_section()
@@ -60,10 +62,17 @@ class TimobeamAxleData3D:
         s += f"  Mesh Type             : {self.mesh.__class__.__name__}\n"
         s += f"  Number of Nodes       : {self.mesh.number_of_nodes()}\n"
         s += f"  Number of Elements    : {self.mesh.number_of_cells()}\n"
-        s += f"  Geo Dimension         : {self.geo_dimension()}\n"
-        s += f"  Shear Factors     : {self.FSY}, {self.FSZ}\n"
-        s += f"  Ax, Ay, Az : {self.Ax[:5].tolist()} ...\n"
-        s += f"  Ix, Iy, Iz : {self.Ix[:5].tolist()} ...\n"
+        s += f"  Geo Dimension         : {self.GD}\n"
+        s += "\n  === Cross-Sectional Properties ===\n"
+        s += f"  Area (Ax)              : {self.Ax} m²\n"
+        s += f"  Area (Ay)              : {self.Ay} m²\n"
+        s += f"  Area (Az)              : {self.Az} m²\n"
+        s += f"  Torsional Constant (J): {self.Ix} m⁴\n"
+        s += f"  Moment of Inertia (Iy): {self.Iy} m⁴\n"
+        s += f"  Moment of Inertia (Iz): {self.Iz} m⁴\n"
+        s += "\n  === Shear Factors ===\n"
+        s += f"  mu_y                  : {self.FSY}\n"
+        s += f"  mu_z                  : {self.FSZ}\n"
         s += ")"
         return s
     
@@ -147,7 +156,7 @@ class TimobeamAxleData3D:
         return F 
     
     @cartesian
-    def dirichlet_dof_index(self) -> TensorLike:
+    def dirichlet_dof(self) -> TensorLike:
         """Dirichlet boundary conditions are applied.
 
         Returns:

@@ -56,76 +56,128 @@ class UDecoupling(CNodeType):
     from the combined output vector.
     
     Inputs:
-        out (tensor): Combined displacement vector of all nodes.Each node contains six components in the order 
-            [u, v, w, θx, θy, θz].
+        out (tensor): Combined displacement vector of all nodes. 
+        node_ldof (INT): Number of local degrees of freedom (DOFs) per node. 
+        type (MENU): Type of finite element.
             
     Outputs:
-        uh (tensor): Translational displacement field (X, Y, Z components).
-        theta_xyz (tensor): Rotational displacement field (rotations around X, Y, Z axes).
+        uh (tensor): Translational displacement field.
+        theta (tensor): Rotational displacement field.
     """
-    TITLE: str = "位移解耦"
-    PATH: str = "后处理.解耦"
-    DESC: str = "将平动位移和转动位移做解耦处理"
+    TITLE: str = "位移后处理"
+    PATH: str = "后处理.位移"
+    DESC: str = "将模型的平动位移和转动位移做后处理"
     INPUT_SLOTS = [
-        PortConf("out", DataType.TENSOR, 1, desc="六个自由度的位移", title="结果")
+        PortConf("out", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
+        PortConf("node_ldof", DataType.MENU, 0, desc="节点的自由度个数", title="自由度长度", default=2, items=[2, 3, 4, 6]),
+        PortConf("type", DataType.MENU, 0, desc="单元的类型", title="单元类型", default="Truss", items=["Truss", "Euler_beam", "Timo_beam"]),
     ]
     OUTPUT_SLOTS = [
-        PortConf("uh", DataType.TENSOR, desc="X,Y,Z三个方向上的位移", title="平动位移"),
-        PortConf("theta_xyz", DataType.TENSOR, desc="X,Y,Z三个方向的弯曲和剪切产生的位移", title="转动位移"),
+        PortConf("uh", DataType.TENSOR,  title="平动位移"),
+        PortConf("theta", DataType.TENSOR, title="转动位移"),
     ]
 
     @staticmethod
-    def run(out):
-        u = out.reshape(-1, 6)
+    def run(out, node_ldof, type):
         
-        uh = u[:, :3]
-        theta_xyz = u[:, 3:]
+        u = out.reshape(-1, node_ldof)
+        if type == "Truss":
+            uh = u
+        elif type == "Euler_beam":
+            uh = u[:, :1]
+            theta = u[:, 1:]
+        elif type == "Timo_beam":
+            uh = u[:, :3]
+            theta = u[:, 3:]
+        else: 
+            raise ValueError(f'post-processing for this type of displacement is not supported yet.')
 
-        return uh, theta_xyz
+        return uh, theta
 
-class StrainStressPostprocess(CNodeType):
-    r"""
-    Compute strain, stress, and reshaped displacement for each bar element.
+class TrussPostprocess(CNodeType):
+    r"""Calculates the displacement of each node and the strain and stress of each rod element 
+    based on the raw displacement vector output by the solver and material parameters.
 
     Inputs:
-        uh (tensor): Raw displacement vector from the solver.
-        mesh (mesh): Computational mesh containing node and edge information.
-        E (float): Young's modulus of the bar material.
-
+        uh (tensor): Raw displacement vector output by the solver.
+        mesh (mesh): Mesh containing node and cell information.
+        E (float): Elastic modulus of the rod.
     Outputs:
-        uh (tensor): Reshaped displacement field.
-        strain (tensor): Strain for each bar element.
-        stress (tensor): Stress for each bar element.
+        strain (tensor): Strain of each rod element.
+        stress (tensor): Stress of each rod element.
+        u (tensor): Reshaped displacement tensor (NN, GD).
     """
-    TITLE: str = "应力应变后处理"
-    PATH: str = "后处理.应力应变"
-    DESC: str = "根据节点位移和材料参数计算每个杆单元的应变和应力, 并输出整形后的位移"
+    TITLE: str = "结果后处理"
+    PATH: str = "后处理.位移应力应变"
+    DESC: str = "根据求解器输出的桁架原始位移向量和材料参数，计算每个节点的位移和每个杆单元的应变应力"
     INPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
         PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
         PortConf("E", DataType.FLOAT, 1, desc="杆的弹性模量", title="弹性模量"),
     ]
     OUTPUT_SLOTS = [
-        PortConf("uh", DataType.TENSOR, desc="整形后的节点位移场", title="节点位移"),
         PortConf("strain", DataType.TENSOR, desc="每个杆单元的应变", title="应变"),
-        PortConf("stress", DataType.TENSOR, desc="每个杆单元的应力", title="应力")
+        PortConf("stress", DataType.TENSOR, desc="每个杆单元的应力", title="应力"),
+        PortConf("u", DataType.TENSOR, desc="重塑后的位移张量 (NN, GD)", title="位移")
     ]
 
     @staticmethod
     def run(uh, mesh, E):
         from fealpy.backend import backend_manager as bm
         
-        uh = uh.reshape(-1, 3) 
+        u = uh.reshape(-1, 3) 
 
         edge = mesh.entity('edge')
         l = mesh.edge_length()
         tan = mesh.edge_tangent()
         unit_tan = tan / l.reshape(-1, 1)
 
-        u_edge = uh[edge]
+        u_edge = u[edge]
         delta_u = u_edge[:, 1, :] - u_edge[:, 0, :]
         delta_l = bm.einsum('ij,ij->i', delta_u, unit_tan)
         strain = delta_l / l
         stress = E * strain
         
-        return uh, strain, stress
+        return strain, stress, u
+
+class AntennaPostprocess(CNodeType):
+    r"""Compute the real-valued electric field at each antenna element 
+    from the complex-valued finite element solution.
+    
+    Inputs:
+        uh (tensor): Complex-valued finite element solution vector (nodal degrees of freedom).
+        space (Space): Finite element space containing mesh and basis function information.
+            
+    Outputs:
+        E (tensor): Real part of the electric field evaluated at the centroid of each element.
+    """
+
+    TITLE: str = "天线单元后处理"
+    PATH: str = "后处理.天线单元"
+    DESC: str = "将天线的自由度平分到各自单元"
+    INPUT_SLOTS = [
+        PortConf("uh", DataType.FUNCTION, 1, desc="求解器输出的复数场自由度", title="有限元解"),
+        PortConf("space", DataType.SPACE, 1, desc="包含节点与单元拓扑的有限元空间", title="有限元空间"),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("E", DataType.TENSOR, desc="各单元重心处的电场强度（实部）", title="单元电场"),
+    ]
+
+    @staticmethod
+    def run(uh, space):
+        from fealpy.backend import backend_manager as bm
+        from fealpy.functionspace import Function
+        mesh = space.mesh
+        bc = bm.array([[1/3, 1/3, 1/3, 1/3]], dtype=bm.float64)
+
+        if isinstance(uh, Function):  
+            uh_real = uh.copy()
+            uh_real[:] = bm.real(uh[:])
+        else:  
+            uh_real = space.function()      
+            uh_real[:] = bm.real(uh)       
+
+        val = space.value(uh_real, bc)
+        E = val.reshape(mesh.number_of_cells(), -1)
+
+        return E

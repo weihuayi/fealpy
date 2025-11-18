@@ -51,4 +51,5 @@ DATA_TABLE = {
     1: ("bar_data_1d", "BarData1D"),
     2: ("truss_data_2d", "TrussData2D"),
     3: ("truss_data_3d", "TrussData3D"),
+    4: ("truss_tower_data_3d", "TrussTowerData3D")
 }
