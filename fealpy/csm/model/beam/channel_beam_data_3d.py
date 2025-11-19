@@ -1,4 +1,4 @@
-from fealpy.typing import Tuple, TensorLike
+from fealpy.typing import Tuple, TensorLike, Index, _S
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import EdgeMesh
 
@@ -23,7 +23,7 @@ class ChannelBeamData3D:
         
         self.L = self.length()
         self.Ax, self.Ay, self.Az = self.cross_section()
-        self.Ix, self.Iy, self.Iz = self.inertia()
+        self.J, self.Iy, self.Iz = self.inertia()
         
         self.e_z = 0.0148  # Shear center offset in z-direction (m)
         self.W_t = 8.64e-7  # Torsional section modulus
@@ -82,10 +82,10 @@ class ChannelBeamData3D:
             - Iy: Weak axis moment of inertia in m⁴
             - Iz: Strong axis moment of inertia in m⁴
         """
-        Ix = 5.18e-9
+        J = 5.18e-9
         Iy = 2.77e-8
         Iz = 1.69e-7
-        return Ix, Iy, Iz
+        return J, Iy, Iz
 
     def get_stress_points(self) -> TensorLike:
         """ Get the stress calculation points at the outermost corners of the 
@@ -123,6 +123,61 @@ class ChannelBeamData3D:
         cell[:, 1] = bm.arange(1, n + 1)
         
         return EdgeMesh(node, cell)
+    
+    def coord_transform(self, index: Index=_S) -> TensorLike:
+        """Construct the coordinate transformation matrix for 3D beam elements."""
+        node= self.mesh.entity('node')
+        cell = self.mesh.entity('cell')[index]
+        bar_nodes = node[cell]
+        
+        x, y, z = bar_nodes[..., 0], bar_nodes[..., 1], bar_nodes[..., 2]
+        bars_length = self.mesh.entity_measure('cell')[index]
+
+        # 第一行（轴向单位向量）
+        T11 = (x[..., 1] - x[..., 0]) / bars_length
+        T12 = (y[..., 1] - y[..., 0]) / bars_length
+        T13 = (z[..., 1] - z[..., 0]) / bars_length
+        
+        # 固定的参考向量 (全局y方向)
+        vy = bm.array([0, 1, 0], dtype=bm.float64)
+        k1, k2, k3 = vy
+
+        # 第二行（局部y方向）
+        A = bm.sqrt((T12 * k3 - T13 * k2)**2 + 
+                    (T13 * k1 - T11 * k3)**2 +
+                    (T11 * k2 - T12 * k1)**2)
+       
+        T21 = -(T12 * k3 - T13 * k2) / A
+        T22 = -(T13 * k1 - T11 * k3) / A
+        T23 = -(T11 * k2 - T12 * k1) / A
+
+         # 第三行（局部z方向 = 第一行 × 第二行）
+        B = bm.sqrt((T12 * T23 - T13 * T22)**2 +
+                    (T13 * T21 - T11 * T23)**2 +
+                    (T11 * T22 - T12 * T21)**2)
+        
+        T31 = (T12 * T23 - T13 * T22) / B
+        T32 = (T13 * T21 - T11 * T23) / B
+        T33 = (T11 * T22 - T12 * T21) / B
+        
+        # 构造3x3基础旋转矩阵 T0
+        T0 = bm.stack([
+                    bm.stack([T11, T12, T13], axis=-1),  # shape: (NC, 3)
+                    bm.stack([T21, T22, T23], axis=-1),
+                    bm.stack([T31, T32, T33], axis=-1)
+                ], axis=1)  # shape: (NC, 3, 3)
+        
+        # 构造12x12旋转变换矩阵 R
+        NC = T0.shape[0]
+        O = bm.zeros((NC, 3, 3))
+        row1 = bm.concatenate([T0   , O,  O,  O], axis=2)
+        row2 = bm.concatenate([O,  T0, O,  O], axis=2)
+        row3 = bm.concatenate([O,  O,  T0, O], axis=2)
+        row4 = bm.concatenate([O,  O,  O,  T0], axis=2)
+
+        R = bm.concatenate([row1, row2, row3, row4], axis=1)  #shape: (NC, 12, 12)
+        return R
+    
     
     def tip_load(self,  load_case: int=1) -> TensorLike:
         """ Get the concentrated load at the tip of the beam.

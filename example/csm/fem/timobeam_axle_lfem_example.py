@@ -56,5 +56,6 @@ from fealpy.csm.fem import TimobeamAxleModel
 model = TimobeamAxleModel(options)
 model.__str__()
 uh = model.solve()
+print("Displacement uh:\n", uh)
 strain, stress = model.compute_strain_and_stress(uh)
 model.show(uh, strain, stress)

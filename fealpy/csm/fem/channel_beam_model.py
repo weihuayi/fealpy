@@ -203,8 +203,7 @@ class ChannelBeamModel(ComputationalModel):
 
                 uh = disp.reshape(-1, self.GD*2)
 
-                timo_integrator = TimoshenkoBeamIntegrator(self.space, self.pde, self.material)
-                R = timo_integrator._coord_transform()  # 获取变换矩阵
+                R = self.pde.coord_transform()  # 获取变换矩阵
                 
                 strain, stress = self.material.compute_strain_and_stress(
                                 self.mesh,

@@ -64,6 +64,6 @@ uh1 = model.solve(load_case=1)
 strain1, stress1 = model.compute_strain_and_stress(uh1)
 model.show(uh1, strain1, stress1)
 
-uh2 = model.solve(load_case=2)
-strain2, stress2 = model.compute_strain_and_stress(uh2)
+# uh2 = model.solve(load_case=2)
+# strain2, stress2 = model.compute_strain_and_stress(uh2)
 # model.show(uh2, strain2, stress2)
