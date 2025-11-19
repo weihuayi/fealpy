@@ -27,9 +27,6 @@ class VPDecoupling(CNodeType):
     OUTPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, title="速度数值解"),
         PortConf("ph", DataType.TENSOR, title="压力数值解"),
-        PortConf("uh_x", DataType.TENSOR, title="速度x分量数值解"),
-        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解"),
-        PortConf("uh_z", DataType.TENSOR, title="速度z分量数值解")
     ]
 
     @staticmethod
@@ -39,16 +36,8 @@ class VPDecoupling(CNodeType):
         NN = mesh.number_of_nodes()
         uh = out[:ugdof]
         uh = uh.reshape(mesh.GD,-1).T
-        uh = uh[:NN,:]
-        uh_x = uh[..., 0]
-        uh_y = uh[..., 1]
-        if mesh.GD == 3:
-            uh_z = uh[..., 2]
-        else:
-            uh_z = bm.zeros_like(uh_x)
         ph = out[ugdof:]
-
-        return uh, ph, uh_x, uh_y, uh_z
+        return uh, ph
 
 
 class UDecoupling(CNodeType):

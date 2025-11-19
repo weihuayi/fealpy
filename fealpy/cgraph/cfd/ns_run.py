@@ -144,9 +144,6 @@ class IncompressibleNSIPCSRun(CNodeType):
     OUTPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, title="速度数值解"),
         PortConf("ph", DataType.TENSOR, title="压力数值解"),
-        PortConf("uh_x", DataType.TENSOR, title="速度x分量数值解"),
-        PortConf("uh_y", DataType.TENSOR, title="速度y分量数值解"),
-        PortConf("uh_z", DataType.TENSOR, title="速度z分量数值解")
     ]
     def run(T0, T1, NL, uspace, pspace, velocity_0, pressure_0, is_pressure_boundary,
             predict_velocity, correct_pressure, correct_velocity, mesh, output_dir):
@@ -154,9 +151,7 @@ class IncompressibleNSIPCSRun(CNodeType):
         from fealpy.decorator import cartesian
         from fealpy.solver import spsolve
         from fealpy.cfd.simulation.time import UniformTimeLine
-        import json
-        import os
-        import gzip
+        from pathlib import Path
         
         nt = NL - 1
         timeline = UniformTimeLine(T0, T1, nt)
@@ -167,14 +162,12 @@ class IncompressibleNSIPCSRun(CNodeType):
         pgdof = pspace.number_of_global_dofs()
         NN = mesh.number_of_nodes()
 
-        n_files = 10
-        n_makeder = 10
-        file_nt = nt // n_files + 1
-        makeder_nt = file_nt // n_makeder + 1
-        node = mesh.interpolation_points(p=1)
-        cell = mesh.entity('cell')
-        data = []
-        j = 0
+        export_dir = Path(output_dir).expanduser().resolve()
+        export_dir.mkdir(parents=True, exist_ok=True)
+        mesh.nodedata["uh"] = u0.reshape(mesh.GD,-1).T
+        mesh.nodedata["ph"] = p0
+        fname = export_dir / f"test_{str(0).zfill(10)}.vtu"
+        mesh.to_vtk(fname=str(fname))
 
         for i in range(nt):
             t  = timeline.current_time()
@@ -213,39 +206,11 @@ class IncompressibleNSIPCSRun(CNodeType):
                 uh_z = bm.zeros_like(uh_x)
             ph = p1
 
-            # mesh.nodedata['ph'] = p1
-            # mesh.nodedata['uh'] = u1.reshape(mesh.GD,-1).T
-            # mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
-
-            if (i+1) % makeder_nt == 0 or i == 0 or (i+1) == nt:
-
-                os.makedirs(output_dir, exist_ok=True)  # 创建目录
-
-                data.append ({
-                "time": round(t+dt, 8),
-                "值":{
-                    "uh" : uh.tolist(),  # ndarray -> list
-                    "uh_x" : uh_x.tolist(),  # ndarray -> list
-                    "uh_y" : uh_y.tolist(),  # ndarray -> list
-                    "uh_z" : uh_z.tolist(),  # ndarray -> list
-                    "ph" : ph.tolist()
-                }, 
-                "几何": {
-                    "cell": cell.tolist(),  # ndarray -> list
-                    "node": node.tolist()   # ndarray -> list
-                }
-                })
-            
-            if len(data) == 10 or i == nt -1:
-                j += 1
-                file_name = f"file_{j:08d}.json.gz"
-                file_path = os.path.join(output_dir, file_name)
-
-                with gzip.open(file_path, "wt", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-                
-                data.clear()
+            mesh.nodedata["uh"] = uh
+            mesh.nodedata["ph"] = ph
+            fname = export_dir / f"test_{str(i+1).zfill(10)}.vtu"
+            mesh.to_vtk(fname=str(fname))
             
             timeline.advance()
 
-        return uh, ph, uh_x, uh_y, uh_z
+        return uh, ph
