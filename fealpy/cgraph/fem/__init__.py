@@ -9,3 +9,4 @@ from .timoaxle import *
 from .truss import *
 from .beam import *
 from .linear_elasticity_eigen import *
+from .gear_box import *

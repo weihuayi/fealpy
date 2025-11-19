@@ -1,6 +1,6 @@
 from .nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["VPDecoupling", "UDecoupling"]
+__all__ = ["VPDecoupling", "UDecoupling","GearboxPostprocess"]
 
 class VPDecoupling(CNodeType):
     r"""Decouple velocity and pressure components from the combined output vector.
@@ -51,7 +51,7 @@ class UDecoupling(CNodeType):
             
     Outputs:
         uh (tensor): Translational displacement field.
-        theta (tensor): Rotational displacement field.
+        theta (tensor): Rotational displacement gfield.
     """
     TITLE: str = "位移后处理"
     PATH: str = "后处理.位移"
@@ -148,7 +148,7 @@ class AntennaPostprocess(CNodeType):
     DESC: str = "将天线的自由度平分到各自单元"
     INPUT_SLOTS = [
         PortConf("uh", DataType.FUNCTION, 1, desc="求解器输出的复数场自由度", title="有限元解"),
-        PortConf("space", DataType.SPACE, 1, desc="包含节点与单元拓扑的有限元空间", title="有限元空间"),
+        PortConf("spa变速箱模态后处理ce", DataType.SPACE, 1, desc="包含节点与单元拓扑的有限元空间", title="有限元空间"),
     ]
     OUTPUT_SLOTS = [
         PortConf("E", DataType.TENSOR, desc="各单元重心处的电场强度（实部）", title="单元电场"),
@@ -174,3 +174,53 @@ class AntennaPostprocess(CNodeType):
         return E
     
 
+class GearboxPostprocess(CNodeType):
+    TITLE: str = "变速箱后处理"
+    PATH: str = "后处理.变速箱"
+    DESC: str = "将模态特征向量映射到网格节点并计算固有频率"
+
+    INPUT_SLOTS = [
+        PortConf("mesh", DataType.SPACE, 1, desc="有限元网格", title="网格"),
+        PortConf("vals", DataType.TENSOR, 1, desc="特征值", title="特征值"),
+        PortConf("vecs", DataType.TENSOR, 1, desc="特征向量", title="特征向量"),
+        PortConf("NS", DataType.TENSOR, 1, desc="自由度划分信息", title="自由度划分"),
+        PortConf("G", DataType.TENSOR, 1, desc="耦合矩阵", title="耦合矩阵"),
+    ]
+
+    OUTPUT_SLOTS = [
+        PortConf("freqs", DataType.TENSOR, desc="固有频率 (Hz)", title="固有频率"),
+        PortConf("eigvecs", DataType.TENSOR, desc="映射后的特征向量", title="特征向量"),
+    ]
+
+    @staticmethod
+    def run(mesh, vals, vecs, NS, G):
+        from ..backend import backend_manager as bm
+
+        freqs = bm.sqrt(vals) / (2 * bm.pi)
+
+        NN = mesh.number_of_nodes()
+        isFreeNode = mesh.data.get_node_data('isFreeNode')
+        isFreeDof = bm.repeat(isFreeNode, 3)
+        isCSNode = mesh.data.get_node_data('isCSNode')
+        isCSDof = bm.repeat(isCSNode, 3)
+
+        mapped_eigvecs = []
+        start = sum(NS[0:-2])
+        end = start + NS[-2]
+
+        for i, val in enumerate(vecs):
+            phi = bm.zeros((NN * 3,), dtype=bm.float64)
+
+            idx, = bm.where(isFreeDof)
+            if (end - start) == idx.shape[0]:
+                phi = bm.set_at(phi, idx, val[start:end])
+
+            idx, = bm.where(isCSDof)
+            phi = bm.set_at(phi, idx, G @ val[end:])
+            phi = phi.reshape((NN, 3))
+            mapped_eigvecs.append(phi)
+     
+            mesh.nodedata[f'eigenvalue-{i}-{vals[i]:0.5e}'] = phi
+
+        eigvecs = bm.array(mapped_eigvecs)
+        return freqs, eigvecs

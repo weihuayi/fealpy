@@ -8,7 +8,7 @@ mesher = cgraph.create("Box3d")
 spacer = cgraph.create("TensorFunctionSpace")        
 isDDof = cgraph.create("BoundaryDof")
 eig_eq = cgraph.create("LinearElasticityEigenEquation")
-eigensolver = cgraph.create("EigenSolver")
+eigensolver = cgraph.create("SLEPcEigenSolver")
 dbc = cgraph.create("DirichletBC")
 
 spacer(mesh=mesher(), p=1,gd=3)
@@ -19,7 +19,6 @@ eigensolver(
     S=eig_eq().stiffness,
     M=eig_eq().mass,
     neigen=6,
-    which='SM'
 )
 
 WORLD_GRAPH.output(eig_eq=eigensolver().val, uh=eigensolver().vec)

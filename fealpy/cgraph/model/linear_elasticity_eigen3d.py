@@ -10,8 +10,8 @@ class LinearElasticityEigen3d(CNodeType):
         PortConf("ny", DataType.INT, title="Y 分段数"),
         PortConf("nz", DataType.INT, title="Z 分段数"),
         PortConf("material", DataType.NONE,title="材料属性"),
-        PortConf("displacement_bc", DataType.FUNCTION),
-        PortConf("is_displacement_boundary", DataType.FUNCTION),
+        PortConf("displacement_bc", DataType.FUNCTION, title="边界条件函数"),
+        PortConf("is_displacement_boundary", DataType.FUNCTION, title="边界标识函数"),
     ]
     
     @staticmethod

@@ -7,14 +7,14 @@ class LinearElasticityEigenEquation(CNodeType):
     PATH: str = "有限元.方程离散"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, "函数空间"),
-        PortConf("q", DataType.INT, title="积分公式", default=3, min_val=1, max_val=17),
+        PortConf("q", DataType.INT, title="积分精度", default=3, min_val=1, max_val=17),
         PortConf("material", DataType.MENU, title="材料属性"),
-        PortConf("displacement_bc", DataType.FUNCTION, title="位移边界条件函数"),
-        PortConf("is_displacement_boundary", DataType.FUNCTION, title="位移边界标识函数"),
+        PortConf("displacement_bc", DataType.FUNCTION, title="边界条件函数"),
+        PortConf("is_displacement_boundary", DataType.FUNCTION, title="边界标识函数"),
     ]
     OUTPUT_SLOTS = [
-        PortConf("stiffness", DataType.LINOPS, title="刚度矩阵（S）"),
-        PortConf("mass", DataType.LINOPS, title="质量矩阵（M）"),
+        PortConf("stiffness", DataType.LINOPS, title="刚度矩阵S"),
+        PortConf("mass", DataType.LINOPS, title="质量矩阵M"),
     ]
 
     @staticmethod
