@@ -41,7 +41,7 @@ class Timoaxle3d(CNodeType):
         PortConf("GD", DataType.INT, title="几何维数"),
         PortConf("beam_para", DataType.TENSOR, title="梁段参数"),
         PortConf("axle_para", DataType.TENSOR, title="轴段参数"),
-        PortConf("R", DataType.TENSOR, title="坐标变换矩阵"),
+        PortConf("coord_transform", DataType.TENSOR, title="坐标变换矩阵"),
         PortConf("external_load", DataType.FUNCTION, title="外部载荷"),
         PortConf("dirichlet_dof", DataType.FUNCTION, title="边界自由度索引")
         
@@ -55,6 +55,7 @@ class Timoaxle3d(CNodeType):
         
         external_load = model.external_load()
         dirichlet_dof = model.dirichlet_dof()
-        
-        return (model.GD, model.beam_para, model.axle_para, model.R,
+        coord_transform = model.coord_transform()
+
+        return (model.GD, model.beam_para, model.axle_para, coord_transform,
                 external_load, dirichlet_dof)

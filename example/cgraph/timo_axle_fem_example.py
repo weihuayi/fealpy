@@ -71,7 +71,6 @@ postprocess(out = solver().out, node_ldof=6, type="Timo_beam")
 strain_stress(
     beam_para = model().beam_para,
     axle_para = model().axle_para,
-    R = model().R,
     beam_E = beam_materialer().E,
     beam_nu = beam_materialer().nu,
     axle_E = axle_materialer().E,
@@ -80,9 +79,10 @@ strain_stress(
     uh = solver().out,
     y = 0.0,
     z = 0.0,
-    beam_num = None,
-    axle_num = None
-       )
+    axial_position = None,
+    beam_num = 22,
+    axle_num = 10
+)
 # report(
 #     path = r"C:\Users\Administrator\Desktop",
 #     beam_para = model().beam_para,
@@ -100,7 +100,7 @@ strain_stress(
 
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(out=solver().out, uh=postprocess().uh, theta=postprocess().theta)
+WORLD_GRAPH.output(out=solver().out, strain=strain_stress().strain, stress=strain_stress().stress)
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

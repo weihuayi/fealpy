@@ -22,7 +22,7 @@ class TimoMaterial(CNodeType):
             mu (FLOAT): Shear modulus, computed as `E / [2(1 + nu)]`.
     """
     TITLE: str = "列车轮轴梁材料属性"
-    PATH: str = "preprocess.material"
+    PATH: str = "material.solid"
     DESC: str = """该节点用于定义列车轮轴中梁段（Beam）部分的材料属性，
         并根据输入的梁几何参数和材料参数计算材料的基本力学常数，
         包括弹性模量、泊松比和剪切模量。节点同时支持铁木辛柯梁模型。"""
@@ -80,7 +80,7 @@ class AxleMaterial(CNodeType):
 
     """
     TITLE: str = "列车轮轴弹簧材料属性"
-    PATH: str = "preprocess.material"
+    PATH: str = "material.solid"
     DESC: str = """该节点计算列车轮轴系统中杆件（Spring / Axle-Rod）部分的材料属性，
         包括弹性模量、泊松比和剪切模量。适用于需要对轴上的弹簧、连接杆等结构进行建模的场景。"""
         
@@ -122,15 +122,16 @@ class TimoAxleStrainStress(CNodeType):
         Inputs:
             beam_para (TENSOR): Beam section parameters, each row represents [Diameter, Length, Count].
             axle_para (TENSOR): Axle section parameters, each row represents [Diameter, Length, Count].
-            R (TENSOR): Transformation matrix between global and local coordinates.
             beam_E (FLOAT): Elastic modulus of the beam material.
             beam_nu (FLOAT): Poisson’s ratio of the beam material.
             axle_E (FLOAT): Elastic modulus of the axle material.
             axle_nu (FLOAT): Poisson’s ratio of the axle material.
             mesh (MESH): Mesh containing node and cell information.
             uh (TENSOR): Post-processed displacement vector.
-            y (FLOAT): Y-coordinate for axial position evaluation. If None, evaluated at midpoint.
-            z (FLOAT): Z-coordinate for axial position evaluation. If None, evaluated at midpoint.
+            y (FLOAT): Local coordinates in the beam cross-section.
+            z (FLOAT): Local coordinates in the beam cross-section.
+            axial_position (FLOAT)): Evaluation position along the beam axis ∈ [0, L].
+                If None, the value is evaluated at the element midpoint L/2
             beam_num (INT): Number of beam elements. If None, uses all cells.
             axle_num (INT): Number of axle elements. If None, uses all cells.
 
@@ -144,7 +145,7 @@ class TimoAxleStrainStress(CNodeType):
 
     """
     TITLE: str = "列车轮轴应变-应力计算"
-    PATH: str = "preprocess.material"
+    PATH: str = "material.solid"
     DESC: str = """该节点基于线弹性理论，对列车轮轴结构的杆件执行应变–应力计算。
             节点通过单元网格、材料参数以及位移场，计算相应的单元应变及应力，用于结构后处理与安全性分析。
             并且用户可选择特定单元进行计算，或对所有单元执行统一的应变–应力分析。"""
@@ -152,21 +153,17 @@ class TimoAxleStrainStress(CNodeType):
     INPUT_SLOTS = [
         PortConf("beam_para", DataType.TENSOR, 1, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
         PortConf("axle_para", DataType.TENSOR, 1, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),
-        PortConf("R", DataType.TENSOR, 1, desc="梁单元全局和局部坐标的变换矩阵", title="坐标变换矩阵"),
         PortConf("beam_E", DataType.FLOAT, 1, desc="梁段的弹性模量", title="梁的弹性模量"),
         PortConf("beam_nu", DataType.FLOAT, 1, desc="梁段的泊松比", title="梁的泊松比"),
         PortConf("axle_E", DataType.FLOAT, 1, desc="轴段的弹性模量", title="弹簧的弹性模量"),
         PortConf("axle_nu", DataType.FLOAT, 1, desc="轴段的泊松比", title="弹簧的泊松比"),
         PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
         PortConf("uh", DataType.TENSOR, 1, desc="未经后处理的位移向量", title="位移向量"),
-        PortConf("y", DataType.FLOAT, 0, desc="轴向评估位置的Y坐标。若为 None，则在单元中点处评估",
-                 title="Y坐标", default=None),
-        PortConf("z", DataType.FLOAT, 0, desc="轴向评估位置的Z坐标。若为 None，则在单元中点处评估",
-                 title="Z坐标", default=None),
-        PortConf("beam_num", DataType.INT, 0, desc="梁单元个数，若为 None，则对全部单元进行计算。",
-                 title="梁单元", default=None),
-        PortConf("axle_num", DataType.INT, 0, desc="弹簧单元个数。若为 None，则对全部单元进行计算。",
-                 title="弹簧单元", default=None),
+        PortConf("y", DataType.FLOAT, 0, desc="截面局部 Y 坐标", title="Y坐标", default=0.0),
+        PortConf("z", DataType.FLOAT, 0, desc="截面局部 Z 坐标", title="Z坐标", default=0.0),
+        PortConf("axial_position", DataType.INT, 0, desc="轴向评估位置", title="轴向位置", default=None),
+        PortConf("beam_num", DataType.INT, 0, desc="梁单元个数", title="梁单元", default=23),
+        PortConf("axle_num", DataType.INT, 0, desc="弹簧单元个数", title="弹簧单元", default=10),
     ]
     
     OUTPUT_SLOTS = [
@@ -189,7 +186,6 @@ class TimoAxleStrainStress(CNodeType):
         NC = mesh.number_of_cells()
         
         uh = options.get("uh").reshape(-1, 6)
-        R = options.get("R")
         
         model = TimobeamAxleData3D(
                 beam_para=options.get("beam_para"),
@@ -200,33 +196,26 @@ class TimoAxleStrainStress(CNodeType):
                                         name="Timo_beam",
                                         elastic_modulus=options.get("beam_E"),
                                         poisson_ratio=options.get("beam_nu"))
-        
+
         beam_num = options.get("beam_num")
-        if beam_num is None:
-            beam_indices = bm.arange(0, NC-10)
-        else:
-            beam_indices = bm.arange(0, beam_num)
-            
+        beam_indices = bm.arange(0, beam_num)
+
+        R = model.coord_transform(index=beam_indices)
         
         y = options.get("y")
         z = options.get("z")
-        if y is not None and z is not None:
-            axial_position = (y, z)
-        else:
-            axial_position = None
+        axial_position = options.get("axial_position")
         
         beam_strain, beam_stress = beam_material.compute_strain_and_stress(
                         mesh,
                         uh,
-                        coord_transform=R,
+                        cross_section_coords=(y, z),
                         axial_position=axial_position,
+                        coord_transform=R,
                         ele_indices=beam_indices)
-        
+
         axle_num = options.get("axle_num")
-        if axle_num is None:
-            axle_indices = bm.arange(NC -10, NC)
-        else:
-            axle_indices = bm.arange(0, axle_num)
+        axle_indices = bm.arange(NC-axle_num, NC)
 
         axle_material = BarMaterial(
             model=model,

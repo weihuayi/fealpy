@@ -59,7 +59,7 @@ class TrussTowerMaterial(CNodeType):
     
     """
     TITLE: str = "桁架塔材料属性"
-    PATH: str = "preprocess.material"
+    PATH: str = "material.solid"
     DESC: str = """该节点定义桁架塔结构中所使用的杆件材料参数，包括材料名称、类型、弹性模量与泊松比等内容，
             通过标准化的材料属性输出，为有限元单元刚度计算与结构分析提供统一的材料基础。"""
             
@@ -122,7 +122,7 @@ class BarStrainStress(CNodeType):
 
     """
     TITLE: str = "桁架塔应变-应力计算"
-    PATH: str = "preprocess.material"
+    PATH: str = "material.solid"
     DESC: str = """该节点基于线弹性理论，对桁架塔结构的杆件执行应变–应力计算。
             节点通过单元网格、材料参数以及位移场，计算相应的单元应变及应力，用于结构后处理与安全性分析。
             并且用户可选择特定单元进行计算，或对所有单元执行统一的应变–应力分析。"""
