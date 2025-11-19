@@ -154,10 +154,8 @@ class TimobeamAxleModel(ComputationalModel):
                 uh = disp.reshape(-1, 6)
                 NC = self.mesh.number_of_cells()
                 beam_indices = bm.arange(0, NC-10)  # 获取前面所有梁单元的索引
-                timo_integrator = TimoshenkoBeamIntegrator(self.space, self.pde, self.Timo, 
-                                        index=beam_indices)
-                R = timo_integrator._coord_transform()  # 获取变换矩阵
-                
+                R = self.pde.coord_transform(index=beam_indices)  # 获取变换矩阵
+
                 beam_strain, beam_stress = self.Timo.compute_strain_and_stress(
                                 self.mesh,
                                 uh,
