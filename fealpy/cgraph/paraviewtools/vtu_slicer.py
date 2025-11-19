@@ -1,9 +1,9 @@
-"""VTU slicing node - extract 2D slices or apply threshold filtering."""
+"""VTU clipping node - retain half a VTU dataset via planar clip."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, Mapping
 
 from fealpy.cgraph.nodetype import CNodeType, PortConf, DataType
 
@@ -11,39 +11,30 @@ __all__ = ["VTUSlicer"]
 
 
 class VTUSlicer(CNodeType):
-    r"""Extract a 2D slice or apply threshold filtering to a VTU dataset.
+    r"""Clip a VTU dataset with a plane, retaining half of the volume.
 
     Inputs:
-        dataset (tensor): VTK dataset from VTUReader.
-        enable_slice (menu): Whether to apply slicing (否/是).
-        slice_type (menu): Type of slice operation (平面/阈值).
-        plane_normal (string): Normal vector of the slicing plane "x,y,z" format.
-        plane_position (string): Position along normal axis (scalar value).
-        array_name (string): Array name for threshold filtering.
-        array_range (string): Range for threshold filtering "min,max" format.
+        dataset (tensor): 上游节点输出的 VTK 数据集。
+        enable_slice (menu): 是否执行裁剪（否/是）。
+        plane_normal (string): 平面法向量 "x,y,z"。
+        plane_ratio (float): 沿法向的裁剪比例（0-100，百分比）。
 
     Outputs:
-        sliced_dataset (tensor): VTK dataset after slicing (or original if slicing disabled).
-        slice_info (string): Information summary about the slice operation.
+        sliced_dataset (tensor): 裁剪后的数据集（或原数据集）。
+        slice_info (string): 裁剪操作的摘要信息。
     """
 
-    TITLE: str = "VTU切片"
+    TITLE: str = "VTU裁剪"
     PATH: str = "后处理.ParaView"
-    DESC: str = "对 VTU 数据进行平面切片或阈值过滤提取，生成 2D 切片或子集。"
+    DESC: str = "对 VTU 数据进行平面裁剪，保留法向一致的一半体积。"
     INPUT_SLOTS = [
         PortConf("dataset", DataType.TENSOR, ttype=1, desc="来自 VTUReader 的数据集", title="数据集"),
-        PortConf("enable_slice", DataType.MENU, 0, desc="是否启用切片", title="启用切片", 
-                 default="否", items=["否", "是"]),
-        PortConf("slice_type", DataType.MENU, 0, desc="切片类型", title="切片类型",
-                 default="平面", items=["平面", "阈值"]),
+           PortConf("enable_slice", DataType.MENU, 0, desc="是否启用裁剪", title="启用裁剪", 
+                  default="否", items=["否", "是"]),
         PortConf("plane_normal", DataType.STRING, 0, desc="平面法向量，格式：x,y,z", 
                  title="法向量", default="0,0,1"),
-        PortConf("plane_position", DataType.STRING, 0, desc="沿法向的位置偏移", 
-                 title="平面位置", default="0"),
-        PortConf("threshold_array", DataType.STRING, 0, desc="用于阈值过滤的数组名称", 
-                 title="阈值数组", default="uh"),
-        PortConf("threshold_range", DataType.STRING, 0, desc="阈值范围，格式：min,max", 
-                 title="阈值范围", default="0,1"),
+        PortConf("plane_ratio", DataType.FLOAT, 0, desc="沿法向裁剪比例(0-100)", 
+             title="裁剪比例(%)", default=50.0, min_val=0, max_val=100),
     ]
     OUTPUT_SLOTS = [
         PortConf("sliced_dataset", DataType.TENSOR, desc="切片后的数据集", title="切片数据集"),
@@ -54,184 +45,174 @@ class VTUSlicer(CNodeType):
     def run(
         dataset: object,
         enable_slice: str = "否",
-        slice_type: str = "平面",
         plane_normal: str = "0,0,1",
-        plane_position: str = "0",
-        threshold_array: str = "uh",
-        threshold_range: str = "0,1",
+        plane_ratio: float = 50.0,
     ) -> tuple[object, str]:
-        try:
-            import paraview.simple as pvs
-            from paraview.servermanager import Fetch
-        except ModuleNotFoundError as exc:  # pragma: no cover
-            raise ModuleNotFoundError("ParaView is required for VTUSlicer.") from exc
+        print(
+            "[VTUSlicer] inputs",
+            {
+                "enable_slice": enable_slice,
+                "plane_normal": plane_normal,
+                "plane_ratio": plane_ratio,
+            },
+        )
+        style_payload: dict[str, object] | None = None
+        dataset_obj = dataset
+        active_array: dict[str, object] | None = None
 
-        # If slicing is disabled, return original dataset
+        if isinstance(dataset, Mapping):
+            if "dataset" not in dataset:
+                raise ValueError(
+                    "VTUSlicer received a mapping input but could not locate the 'dataset' entry."
+                )
+            style_payload = dict(dataset)
+            dataset_obj = style_payload.get("dataset")
+            active_array = style_payload.get("active_array")
+
+        if dataset_obj is None:
+            raise ValueError("VTUSlicer requires a dataset input.")
+
+        if active_array is None:
+            attr = getattr(dataset_obj, "__fealpy_active_array", None)
+            if isinstance(attr, Mapping):
+                active_array = dict(attr)
+
+        # If clipping is disabled, return original dataset
         if enable_slice == "否":
-            return dataset, "Slicing disabled: original dataset returned."
+            slice_info = "Clipping disabled: original dataset returned."
+            print("[VTUSlicer] disabled, returning original dataset")
+            if active_array is not None:
+                try:
+                    setattr(dataset_obj, "__fealpy_active_array", active_array)
+                except AttributeError:
+                    pass
+            if style_payload is not None:
+                style_payload["dataset"] = dataset_obj
+                if active_array is not None:
+                    style_payload.setdefault("active_array", active_array)
+                style_payload["slice_info"] = slice_info
+                return style_payload, slice_info
+            return dataset_obj, slice_info
 
-        slice_info = ""
+        normal_vec = _parse_vector(plane_normal)
 
-        if slice_type == "平面":
-            # Plane slicing
-            sliced_dataset = _apply_plane_slice(
-                dataset, plane_normal, plane_position
-            )
-            slice_info = (
-                f"Plane slice applied: normal=({plane_normal}), "
-                f"position={plane_position}"
-            )
-        elif slice_type == "阈值":
-            # Threshold filtering
-            sliced_dataset = _apply_threshold_slice(
-                dataset, threshold_array, threshold_range
-            )
-            slice_info = (
-                f"Threshold slice applied: array={threshold_array}, "
-                f"range={threshold_range}"
-            )
-        else:
-            raise ValueError(f"Unknown slice_type: {slice_type}")
+        try:
+            ratio = float(plane_ratio)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid plane_ratio value: {plane_ratio}") from exc
+
+        if not 0.0 <= ratio <= 100.0:
+            raise ValueError("plane_ratio must be between 0 and 100")
+
+        position_val = ratio / 100.0
+
+        sliced_dataset = _apply_clip_slice(
+            dataset_obj, normal_vec, position_val
+        )
+        slice_info = (
+            f"Clip applied: normal=({plane_normal}), ratio={ratio:.2f}%, side=正侧"
+        )
+        print("[VTUSlicer] slice_info", slice_info)
+
+        sliced_dataset = _resample_point_arrays(dataset_obj, sliced_dataset)
+
+        if active_array is not None:
+            try:
+                setattr(sliced_dataset, "__fealpy_active_array", active_array)
+            except AttributeError:
+                pass
+
+        sliced_dataset = _ensure_point_arrays(sliced_dataset)
+
+        if style_payload is not None:
+            style_payload["dataset"] = sliced_dataset
+            if active_array is not None:
+                style_payload.setdefault("active_array", active_array)
+            style_payload["slice_info"] = slice_info
+            return style_payload, slice_info
 
         return sliced_dataset, slice_info
-
-
-def _apply_plane_slice(
-    dataset: object, plane_normal: str, plane_position: str
+def _apply_clip_slice(
+    dataset: object, plane_normal: tuple[float, float, float], plane_position: float
 ) -> object:
-    """Apply a plane slice to the dataset.
-    
+    """Apply a plane-based clip to retain half of the dataset.
+
     Args:
         dataset: VTK dataset object
-        plane_normal: Normal vector as "x,y,z" string
-        plane_position: Position along normal as scalar string
-    
+        plane_normal: Normal vector components
+        plane_position: Position fraction along the normal direction (0..1)
+
     Returns:
-        Sliced VTK dataset
+        Clipped VTK dataset
     """
     try:
         import paraview.simple as pvs
         from paraview.servermanager import Fetch
         from vtkmodules.vtkIOXML import vtkXMLUnstructuredGridWriter
     except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError("ParaView is required for plane slicing.") from exc
+        raise ModuleNotFoundError("ParaView is required for clip operations.") from exc
 
-    # Parse inputs
-    normal = _parse_vector(plane_normal)
-    position = float(plane_position)
+    source_path = getattr(dataset, "__fealpy_vtu_path", None)
 
-    # Normalize the normal vector
-    norm_len = sum(x**2 for x in normal) ** 0.5
+    norm_len = sum(component * component for component in plane_normal) ** 0.5
     if norm_len < 1e-10:
         raise ValueError(f"Invalid normal vector (zero length): {plane_normal}")
-    normal = tuple(x / norm_len for x in normal)
+    normal = tuple(component / norm_len for component in plane_normal)
 
-    # Write dataset to temporary VTU file
+    invert_flag = 0
+
+    # Determine bounds along clipping axis to convert fraction to coordinate
+    if hasattr(dataset, "GetBounds"):
+        bounds = dataset.GetBounds()
+    else:
+        bounds = None
+
+    plane_coord = plane_position
+    if bounds is not None and len(bounds) >= 6:
+        # Identify dominant axis of the normal to select min/max pair
+        axis_index = max(range(3), key=lambda idx: abs(normal[idx]))
+        min_val = bounds[axis_index * 2]
+        max_val = bounds[axis_index * 2 + 1]
+        plane_coord = min_val + plane_position * (max_val - min_val)
+
+        origin = [0.0, 0.0, 0.0]
+        origin[axis_index] = plane_coord
+    else:
+        origin = [normal[i] * plane_coord for i in range(3)]
+
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmpdir:
-        temp_vtu = Path(tmpdir) / "temp_dataset.vtu"
+        temp_vtu = Path(tmpdir) / "temp_clip_dataset.vtu"
         writer = vtkXMLUnstructuredGridWriter()
         writer.SetFileName(str(temp_vtu))
-        writer.SetInputData(dataset)
+        prepared_dataset = _augment_dataset_with_cell_arrays(dataset)
+        writer.SetInputData(prepared_dataset)
         writer.Write()
 
         pvs._DisableFirstRenderCameraReset()
 
-        # Read back via ParaView
         reader = pvs.XMLUnstructuredGridReader(FileName=[str(temp_vtu)])
         reader.UpdatePipeline()
 
-        # Apply plane slice
-        sliced = pvs.Slice(
-            Input=reader,
-            SliceOffsetValues=[position],
-            SliceType="Plane",
-        )
+        clip = pvs.Clip(Input=reader, ClipType="Plane")
+        clip.ClipType.Normal = normal
+        clip.ClipType.Origin = origin
+        clip.Invert = invert_flag
 
-        # Set plane normal
-        sliced.SliceType.Normal = normal
+        clip.UpdatePipeline()
 
-        sliced.UpdatePipeline()
+        result = Fetch(clip)
+        if source_path is not None:
+            try:
+                setattr(result, "__fealpy_vtu_path", source_path)
+            except AttributeError:
+                pass
 
-        # Fetch the result as VTK object
-        result = Fetch(sliced)
-
-        # Cleanup
-        pvs.Delete(sliced)
+        pvs.Delete(clip)
         pvs.Delete(reader)
 
-    return result
-
-
-def _apply_threshold_slice(
-    dataset: object, array_name: str, threshold_range: str
-) -> object:
-    """Apply threshold filtering to the dataset.
-    
-    Args:
-        dataset: VTK dataset object
-        array_name: Name of the array to threshold on
-        threshold_range: Range as "min,max" string
-    
-    Returns:
-        Filtered VTK dataset
-    """
-    try:
-        import paraview.simple as pvs
-        from paraview.servermanager import Fetch
-        from vtkmodules.vtkIOXML import vtkXMLUnstructuredGridWriter
-    except ModuleNotFoundError as exc:
-        raise ModuleNotFoundError("ParaView is required for threshold slicing.") from exc
-
-    # Parse threshold range
-    parts = [p.strip() for p in threshold_range.split(",")]
-    if len(parts) != 2:
-        raise ValueError(
-            f"threshold_range must be 'min,max' format, got: {threshold_range}"
-        )
-    try:
-        min_val = float(parts[0])
-        max_val = float(parts[1])
-    except ValueError as exc:
-        raise ValueError(
-            f"Invalid threshold range values: {threshold_range}"
-        ) from exc
-
-    if min_val > max_val:
-        min_val, max_val = max_val, min_val
-
-    # Write dataset to temporary VTU file
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmpdir:
-        temp_vtu = Path(tmpdir) / "temp_dataset.vtu"
-        writer = vtkXMLUnstructuredGridWriter()
-        writer.SetFileName(str(temp_vtu))
-        writer.SetInputData(dataset)
-        writer.Write()
-
-        pvs._DisableFirstRenderCameraReset()
-
-        # Read back via ParaView
-        reader = pvs.XMLUnstructuredGridReader(FileName=[str(temp_vtu)])
-        reader.UpdatePipeline()
-
-        # Apply threshold
-        thresholded = pvs.Threshold(
-            Input=reader,
-            Scalars=[array_name],
-            ThresholdRange=[min_val, max_val],
-        )
-
-        thresholded.UpdatePipeline()
-
-        # Fetch the result as VTK object
-        result = Fetch(thresholded)
-
-        # Cleanup
-        pvs.Delete(thresholded)
-        pvs.Delete(reader)
-
-    return result
+    return _clone_dataset(result, source_path)
 
 
 def _parse_vector(vector_str: str) -> tuple[float, float, float]:
@@ -254,3 +235,165 @@ def _parse_vector(vector_str: str) -> tuple[float, float, float]:
         raise ValueError(
             f"Invalid vector components (must be floats): {vector_str}"
         ) from exc
+
+
+def _clone_dataset(dataset: object, source_path: str | None = None) -> object:
+    if dataset is None or not hasattr(dataset, "NewInstance"):
+        return dataset
+
+    clone = dataset.NewInstance()
+    clone.DeepCopy(dataset)
+
+    if source_path is None:
+        source_path = getattr(dataset, "__fealpy_vtu_path", None)
+
+    if source_path is not None:
+        try:
+            setattr(clone, "__fealpy_vtu_path", source_path)
+        except AttributeError:
+            pass
+
+    active_array = getattr(dataset, "__fealpy_active_array", None)
+    if active_array is not None:
+        try:
+            setattr(clone, "__fealpy_active_array", active_array)
+        except AttributeError:
+            pass
+
+    return clone
+
+
+def _resample_point_arrays(source_dataset: object, sliced_dataset: object) -> object:
+    if source_dataset is None or sliced_dataset is None:
+        return sliced_dataset
+
+    if not hasattr(source_dataset, "GetPointData") or not hasattr(sliced_dataset, "GetPointData"):
+        return sliced_dataset
+
+    source_point_data = source_dataset.GetPointData()
+    if source_point_data is None or source_point_data.GetNumberOfArrays() == 0:
+        return sliced_dataset
+
+    try:
+        from vtkmodules.vtkFiltersGeneral import vtkProbeFilter
+    except (ModuleNotFoundError, ImportError):
+        return sliced_dataset
+
+    probe = vtkProbeFilter()
+    probe.SetSourceData(source_dataset)
+    probe.SetInputData(sliced_dataset)
+
+    if hasattr(probe, "PassPointArraysOn"):
+        probe.PassPointArraysOn()
+    if hasattr(probe, "PassCellArraysOn"):
+        probe.PassCellArraysOn()
+    if hasattr(probe, "PassFieldArraysOn"):
+        probe.PassFieldArraysOn()
+
+    probe.Update()
+    probed_output = probe.GetOutput()
+    if probed_output is None or not hasattr(probed_output, "NewInstance"):
+        return sliced_dataset
+
+    cloned = probed_output.NewInstance()
+    cloned.DeepCopy(probed_output)
+
+    for attr_name in ("__fealpy_vtu_path", "__fealpy_active_array"):
+        attr_value = getattr(sliced_dataset, attr_name, None)
+        if attr_value is None:
+            attr_value = getattr(source_dataset, attr_name, None)
+        if attr_value is not None:
+            try:
+                setattr(cloned, attr_name, attr_value)
+            except AttributeError:
+                pass
+
+    return cloned
+
+
+def _augment_dataset_with_cell_arrays(dataset: object) -> object:
+    if dataset is None or not hasattr(dataset, "GetPointData"):
+        return dataset
+
+    try:
+        from vtkmodules.vtkFiltersCore import vtkPointDataToCellData
+    except ModuleNotFoundError:
+        return dataset
+
+    converter = vtkPointDataToCellData()
+    converter.SetInputData(dataset)
+    if hasattr(converter, "PassPointDataOn"):
+        converter.PassPointDataOn()
+    if hasattr(converter, "ProcessAllArraysOn"):
+        converter.ProcessAllArraysOn()
+
+    converter.Update()
+    converted = converter.GetOutput()
+    if converted is None or not hasattr(converted, "NewInstance"):
+        return dataset
+
+    clone = converted.NewInstance()
+    clone.DeepCopy(converted)
+
+    for attr_name in ("__fealpy_vtu_path", "__fealpy_active_array"):
+        attr_value = getattr(dataset, attr_name, None)
+        if attr_value is not None:
+            try:
+                setattr(clone, attr_name, attr_value)
+            except AttributeError:
+                pass
+
+    return clone
+
+
+def _ensure_point_arrays(dataset: object) -> object:
+    if dataset is None or not hasattr(dataset, "GetCellData"):
+        return dataset
+
+    try:
+        from vtkmodules.vtkFiltersCore import vtkCellDataToPointData
+    except ModuleNotFoundError:
+        return dataset
+
+    cell_data = dataset.GetCellData()
+    if cell_data is None or cell_data.GetNumberOfArrays() == 0:
+        return dataset
+
+    point_data = dataset.GetPointData() if hasattr(dataset, "GetPointData") else None
+    missing_arrays: list[str] = []
+
+    for idx in range(cell_data.GetNumberOfArrays()):
+        array = cell_data.GetArray(idx)
+        name = array.GetName() if array is not None else cell_data.GetArrayName(idx)
+        if not name:
+            continue
+        if point_data is None or point_data.HasArray(name) != 1:
+            missing_arrays.append(name)
+
+    if not missing_arrays:
+        return dataset
+
+    converter = vtkCellDataToPointData()
+    converter.SetInputData(dataset)
+    converter.PassCellDataOn()
+    converter.Update()
+
+    converted = converter.GetOutput()
+    clone = converted.NewInstance()
+    clone.DeepCopy(converted)
+
+    source_path = getattr(dataset, "__fealpy_vtu_path", None)
+    if source_path is not None:
+        try:
+            setattr(clone, "__fealpy_vtu_path", source_path)
+        except AttributeError:
+            pass
+
+    active_array = getattr(dataset, "__fealpy_active_array", None)
+    if active_array is not None:
+        try:
+            setattr(clone, "__fealpy_active_array", active_array)
+        except AttributeError:
+            pass
+
+    return clone
