@@ -149,7 +149,7 @@ class IncompressibleNSIPCSRun(CNodeType):
             predict_velocity, correct_pressure, correct_velocity, mesh, output_dir):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import cartesian
-        from fealpy.solver import spsolve
+        from fealpy.solver import cg
         from fealpy.cfd.simulation.time import UniformTimeLine
         from pathlib import Path
         
@@ -178,16 +178,16 @@ class IncompressibleNSIPCSRun(CNodeType):
             ph1 = p0.space.function()
              
             A0, b0 = predict_velocity(u0, p0, t = timeline.next_time(), dt = dt)
-            uhs[:] = spsolve(A0, b0)
+            uhs[:] = cg(A0, b0)
 
             A1, b1 = correct_pressure(uhs, p0, t = timeline.next_time(), dt = dt)
             if is_pressure_boundary() == 0:
-                ph1[:] = spsolve(A1, b1)[:-1]
+                ph1[:] = cg(A1, b1)[:-1]
             else:
-                ph1[:] = spsolve(A1, b1)
+                ph1[:] = cg(A1, b1)
 
             A2, b2 = correct_velocity(uhs, p0, ph1, t = timeline.next_time(), dt = dt)
-            uh1[:] = spsolve(A2, b2)
+            uh1[:] = cg(A2, b2)
 
             u1 = uh1 
             p1 = ph1

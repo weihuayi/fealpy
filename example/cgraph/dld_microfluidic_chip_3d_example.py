@@ -34,7 +34,7 @@ postprocess(out = solver().out,
             uspace = uspacer(),
             mesh = mesher())
 to_vtk(mesh = mesher(),
-        uh = postprocess().uh,
+        uh = (postprocess().uh, postprocess().ph),
         path = "/home/libz/dld_3d")
 
 # 最终连接到图输出节点上

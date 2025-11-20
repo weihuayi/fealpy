@@ -671,7 +671,7 @@ class TO_VTK(CNodeType):
     DESC: str = "将模拟结果导出为VTK格式文件，便于使用可视化工具进行后续分析与展示。"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, title="网格"),
-        PortConf("uh", DataType.TENSOR, title="数值解"),
+        PortConf("uh", DataType.TENSOR, 2, title="数值解"),
         PortConf("path", DataType.STRING, title="导出路径"),
     ]
     OUTPUT_SLOTS = [
@@ -689,7 +689,10 @@ class TO_VTK(CNodeType):
 
         export_dir = Path(path).expanduser().resolve()
         export_dir.mkdir(parents=True, exist_ok=True)
-        mesh.nodedata["uh"] = uh
+        N = len(uh)
+        for i in range(N):
+            u = uh[i]
+            mesh.nodedata[f"uh{i}"] = u
         fname = export_dir / "test.vtu"
         mesh.to_vtk(fname=str(fname))
         print(f"[TO_VTK] wrote {fname}")

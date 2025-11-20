@@ -343,7 +343,8 @@ class FlowPastFoil(CNodeType):
     INPUT_SLOTS = [
         PortConf("mu", DataType.FLOAT, 0, title="粘度", default=0.001),
         PortConf("rho", DataType.FLOAT, 0, title="密度", default=1.0),
-        PortConf("h", DataType.FLOAT, 0, title="网格尺寸", default=0.05)
+        PortConf("inflow", DataType.FLOAT, 0, title="入口最大速度", default=1.0),
+        PortConf("box", DataType.TENSOR, 1, title="求解域"),
     ]
     OUTPUT_SLOTS = [
         PortConf("mu", DataType.FLOAT, title="粘度"),
@@ -355,68 +356,21 @@ class FlowPastFoil(CNodeType):
         PortConf("velocity_dirichlet", DataType.FUNCTION, title="速度边界条件"),
         PortConf("pressure_dirichlet", DataType.FUNCTION, title="压力边界条件"),
         PortConf("is_velocity_boundary", DataType.FUNCTION, title="速度边界"),
-        PortConf("is_pressure_boundary", DataType.FUNCTION, title="压力边界"),
-        PortConf("mesh", DataType.MESH, title = "网格")
+        PortConf("is_pressure_boundary", DataType.FUNCTION, title="压力边界")
     ]
 
     @staticmethod
-    def run(mu, rho, h) -> Union[object]:
+    def run(mu, rho, inflow, box) -> Union[object]:
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import cartesian, TensorLike
         class PDE():
             def __init__(self, options : dict = None ):
                 self.eps = 1e-10
-                self.box = [-0.5, 2.7, -0.4, 0.4]
                 self.options = options
                 self.rho = options.get('rho', 1.0)
                 self.mu = options.get('mu', 0.001)
-                self.h = options.get('h', 0.05)
-                self.mesh = self.init_mesh()
-
-            def init_mesh(self):
-                from fealpy.mesher import NACA0012Mesher
-                halos = bm.array([
-                [1.0000, 0.00120],
-                [0.9500, 0.01027],
-                [0.9000, 0.01867],
-                [0.8000, 0.03320],
-                [0.7000, 0.04480],
-                [0.6000, 0.05320],
-                [0.5000, 0.05827],
-                [0.4000, 0.06000],
-                [0.3000, 0.05827],
-                [0.2000, 0.05293],
-                [0.1500, 0.04867],
-                [0.1000, 0.04240],
-                [0.0750, 0.03813],
-                [0.0500, 0.03267],
-                [0.0250, 0.02453],
-                [0.0125, 0.01813],
-                [0.0000, 0.00000],
-                [0.0125, -0.01813],
-                [0.0250, -0.02453],
-                [0.0500, -0.03267],
-                [0.0750, -0.03813],
-                [0.1000, -0.04240],
-                [0.1500, -0.04867],
-                [0.2000, -0.05293],
-                [0.3000, -0.05827],
-                [0.4000, -0.06000],
-                [0.5000, -0.05827],
-                [0.6000, -0.05320],
-                [0.7000, -0.04480],
-                [0.8000, -0.03320],
-                [0.9000, -0.01867],
-                [0.9500, -0.01027],
-                [1.0000, -0.00120],
-                [1.00662, 0.0]], dtype=bm.float64)
-                singular_points = bm.array([[0, 0], [1.00662, 0.0]], dtype=bm.float64)
-                box = self.box
-                h = self.h
-                hs = [h/3, h/3]
-                mesher = NACA0012Mesher(halos, box, singular_points)
-                mesh = mesher.init_mesh(h, hs, is_quad=0, thickness=h/10, ratio=2.4, size=h/50)
-                return mesh
+                self.box = options.get('box', [-0.5, 2.7, -0.5, 0.5])
+                self.inflow = options.get('inflow', 1.0)
 
             @cartesian
             def is_outflow_boundary(self,p):
@@ -455,8 +409,9 @@ class FlowPastFoil(CNodeType):
                 x = p[...,0]
                 y = p[...,1]
                 value = bm.zeros_like(p)
-                value[...,0] = 1.5*4*(y-self.box[2])*(self.box[3]-y)/(0.4**2)
-                value[...,1] = 0
+                # value[...,0] = 1.5 * 4 * (y-self.box[2])*(self.box[3]-y)/((0.41)**2)
+                value[...,0] = self.inflow
+                # value[...,1] = 0
                 return value
             
             @cartesian
@@ -471,8 +426,10 @@ class FlowPastFoil(CNodeType):
                 x = p[...,0]
                 y = p[...,1]
                 index = self.is_inflow_boundary(p)
+                # outlet = self.is_outflow_boundary(p)
                 result = bm.zeros_like(p)
                 result[index] = self.u_inflow_dirichlet(p[index])
+                # result[outlet] = self.u_inflow_dirichlet(p[outlet])
                 return result
             
             @cartesian
@@ -484,41 +441,27 @@ class FlowPastFoil(CNodeType):
                 result[..., 1] = 0
                 return result
             
-            def velocity(self, p ,t):
+            def velocity_0(self, p ,t):
                 x = p[...,0]
                 y = p[...,1]
                 value = bm.zeros(p.shape)
                 return value
 
-            def pressure(self, p, t):
+            def pressure_0(self, p, t):
                 x = p[..., 0]
                 val = bm.zeros_like(x)
                 return val
             
-            @cartesian
-            def velocity_0(self, p: TensorLike, t) -> TensorLike:
-                """Compute exact solution of velocity."""
-                x = p[..., 0]
-                y = p[..., 1]
-                result = bm.zeros(p.shape, dtype=bm.float64)
-                return result
-            
-            @cartesian
-            def pressure_0(self, p: TensorLike, t) -> TensorLike:
-                x = p[..., 0]
-                y = p[..., 1]
-                result = bm.zeros(p.shape[0], dtype=p.dtype)
-                return result
-            
         options ={
             'rho': rho,
             'mu': mu,
-            'h': h,
+            'inflow': inflow,
+            'box': box,
         }
         model = PDE(options)
 
         return (model.mu, model.rho, model.box) + tuple(
             getattr(model, name)
             for name in ["source", "velocity_0", "pressure_0", "velocity_dirichlet", "pressure_dirichlet",
-                          "is_velocity_boundary", "is_pressure_boundary", "mesh"]
+                          "is_velocity_boundary", "is_pressure_boundary"]
         )
