@@ -10,7 +10,7 @@ except ImportError:
                       "Please install it via 'pip install gmsh'.")
 
 
-class  NACA4Mesher:
+class NACA4Mesher:
     """
     A mesher for generating mesh of a NACA 0012 airfoil within a rectangular box.
 
@@ -32,15 +32,26 @@ class  NACA4Mesher:
     singular_points : array_like, optional
         Points where mesh refinement is needed, e.g., leading and trailing edges.
     """
-    def __init__(self, m=0.02, p=0.4, t=0.12, c = 1.0, alpha=0, N=50,
-                 box=(-0.5, 1.5, -0.3, 0.3), singular_points:TensorLike=None):
+    def __init__(self, m=0.02, p=0.4, t=0.12, c=1.0, alpha=0, N=50,
+                 box=(-0.5, 1.5, -0.3, 0.3), singular_points: TensorLike = None):
         self.box = box
         self.naca_points = self.get_naca4_points(m, p, t, c, N)
         if alpha != 0:
-            theta = alpha/180.0 * bm.pi
+            theta = alpha / 180.0 * bm.pi
             rotation_matrix = bm.array([[bm.cos(theta), -bm.sin(theta)],
-                                        [bm.sin(theta),  bm.cos(theta)]])
-            self.naca_points = bm.dot(self.naca_points, rotation_matrix.T)
+                                        [bm.sin(theta), bm.cos(theta)]])
+            # self.naca_points = bm.dot(self.naca_points, rotation_matrix.T)
+            # --- Step 1: 计算弦线中点 ---
+            chord_center = bm.array([c / 2, 0.0])
+
+            # --- Step 2: 平移到原点 ---
+            shifted_points = self.naca_points - chord_center
+
+            # --- Step 3: 旋转 ---
+            rotated_points = bm.dot(shifted_points, rotation_matrix.T)
+
+            # --- Step 4: 平移回原位置 ---
+            self.naca_points = rotated_points + chord_center
         if singular_points is not None:
             self.singular_points = bm.array(singular_points, dtype=bm.float64)
         else:
@@ -50,7 +61,7 @@ class  NACA4Mesher:
         gmsh.model.add("naca0012")
 
         # 创建大矩形
-        box_sphere = gmsh.model.occ.addRectangle(box[0], box[2], 0, box[1]-box[0], box[3]-box[2])
+        box_sphere = gmsh.model.occ.addRectangle(box[0], box[2], 0, box[1] - box[0], box[3] - box[2])
         # 创建 NACA 0012翼型
         point_tags = []
         for p in self.naca_points:
@@ -68,7 +79,6 @@ class  NACA4Mesher:
         halo_surface = gmsh.model.occ.addPlaneSurface([halo_curve_loop])
         domain_tag, _ = gmsh.model.occ.cut([(2, box_sphere)], [(2, halo_surface)])
         gmsh.model.occ.synchronize()
-
 
     def geo_dimension(self) -> int:
         return 2
@@ -133,7 +143,7 @@ class  NACA4Mesher:
         return node_airfoil
 
     @variantmethod('tri')
-    def init_mesh(self, h=0.05, singular_h=None, is_quad = 0,
+    def init_mesh(self, h=0.05, singular_h=None, is_quad=0,
                   thickness=None, ratio=None, size=None) -> TriangleMesh:
         """
         Using Gmsh to generate a 2D triangular mesh for a NACA 0012 airfoil within a rectangular box.
@@ -164,7 +174,7 @@ class  NACA4Mesher:
         gmsh.model.mesh.field.setAsBoundaryLayer(f)
         if self.singular_points is not None:
             if singular_h is None:
-                singular_h = [h/10]*len(self.singular_points)
+                singular_h = [h / 10] * len(self.singular_points)
             elif len(singular_h) != len(self.singular_points):
                 raise ValueError("Length of singular_h must match number of singular_points.")
             # 创建奇异点
@@ -176,7 +186,7 @@ class  NACA4Mesher:
             gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
             # 为奇异点设置局部网格加密
             singular_point_tags.extend(self.naca_points_tags)
-            singular_h.extend([h/5]*len(self.naca_points_tags))
+            singular_h.extend([h / 5] * len(self.naca_points_tags))
             fields = []  # 收集所有 Threshold Field
             for i, sp in enumerate(singular_point_tags):
                 f_dist = gmsh.model.mesh.field.add("Distance")
@@ -186,8 +196,8 @@ class  NACA4Mesher:
                 gmsh.model.mesh.field.setNumber(f_thresh, "InField", f_dist)
                 gmsh.model.mesh.field.setNumber(f_thresh, "SizeMin", singular_h[i])
                 gmsh.model.mesh.field.setNumber(f_thresh, "SizeMax", h)
-                gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", (self.box[3]-self.box[2])/100)
-                gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", (self.box[3]-self.box[2])/2)  # 缩小加密范围
+                gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", (self.box[3] - self.box[2]) / 100)
+                gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", (self.box[3] - self.box[2]) / 2)  # 缩小加密范围
 
                 fields.append(f_thresh)
 
@@ -202,10 +212,10 @@ class  NACA4Mesher:
 
         gmsh.model.mesh.generate(2)
         # gmsh.fltk.run()
-        node_tags, node, _ = gmsh.model.mesh.getNodes()
-        node = bm.array(node, dtype=bm.float64).reshape(-1, 3)[:, :2]
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        nodes = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)[:, :2]
         element_types, element_tags, cell = gmsh.model.mesh.getElements(2)
         cell = bm.array(cell[0], dtype=bm.int64).reshape(-1, 3) - 1
 
         gmsh.finalize()
-        return TriangleMesh(node, cell)
+        return TriangleMesh(nodes, cell)
