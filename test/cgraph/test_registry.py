@@ -244,7 +244,7 @@ class TestSearchAllNodes(unittest.TestCase):
 @dataclass
 class MockSlot:
     name: str
-    type: str
+    type: str = ""
 
 
 class TestSearchNode(unittest.TestCase):
@@ -266,9 +266,8 @@ class TestSearchNode(unittest.TestCase):
         # 创建一个模拟的节点类型
         mock_node_type = MagicMock()
         mock_node_type.TITLE = "TestNode"
-        mock_node_type.INPUT_SLOTS = [MockSlot(name="input1", type="int")]
+        mock_node_type.INPUT_SLOTS = [MockSlot(name="input1", type="int"), MockSlot("*")]
         mock_node_type.OUTPUT_SLOTS = [MockSlot(name="output1", type="str")]
-        mock_node_type.VARIABLE = True
 
         # 将模拟节点注册到 REGISTRY 中
         CNodeType.REGISTRY["TestNode"] = mock_node_type
@@ -280,7 +279,8 @@ class TestSearchNode(unittest.TestCase):
         self.assertEqual(result["title"], "TestNode")
         self.assertEqual(result["inputs"], [{"name": "input1", "type": "int"}])
         self.assertEqual(result["outputs"], [{"name": "output1", "type": "str"}])
-        self.assertEqual(result["variable"], True)
+        self.assertEqual(result["var_in"], True)
+        self.assertEqual(result["var_out"], False)
 
     @patch('fealpy.cgraph.registry.register_all_nodes')  # Mock register_all_nodes 函数
     def test_search_node_not_exists(self, mock_register):

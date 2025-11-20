@@ -14,13 +14,15 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
     """
 
     def __init__(self, 
-                 space: _FS, 
+                 space: _FS,
+                 model, 
                  material, 
                  index: Index=_S,
                  method: Optional[str]=None )-> None:
         super().__init__()
 
         self.space = space
+        self.model = model
         self.material = material
         self.index = index
 

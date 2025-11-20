@@ -12,6 +12,7 @@ spacer = cgraph.create("FunctionSpace")
 timoaxle_model = cgraph.create("Timoaxle")
 solver = cgraph.create("DirectSolver")
 postprocess = cgraph.create("UDecoupling")
+report = cgraph.create("SolidReport")
 
 # 连接节点
 node = bm.array([[0.0, 0.0, 0.0], [70.5, 0.0, 0.0], [141.0, 0.0, 0.0], [155.0, 0.0, 0.0],
@@ -34,8 +35,8 @@ cell = bm.array([[0, 1], [1, 2], [2, 3], [3, 4], [4, 5],
 mesher(node = node, cell = cell)
 spacer(type="lagrange", mesh=mesher(), p=1)
 #spacer(type="lagrange", mesh=mesher(), p=1, gd=6)
-beam_materialer(property="Steel", beam_type="Timoshemko beam", beam_E=2.1e11, beam_nu=0.3)
-axle_materialer(property="Steel", axle_type="Bar", axle_E=1.976e6, axle_nu=-0.5)
+beam_materialer(property="Steel", beam_type="Timoshemko", beam_E=2.1e11, beam_nu=0.3)
+axle_materialer(property="Steel", axle_type="Spring", axle_E=1.976e6, axle_nu=-0.5)
 
 timoaxle_model(
     space = spacer(),
@@ -60,10 +61,25 @@ timoaxle_model(
 solver(A = timoaxle_model().K,
        b = timoaxle_model().F)
 
-postprocess(out = solver().out)
+postprocess(out = solver().out, node_ldof=6, type="Timo_beam")
+report(
+    path = r"C:\Users\Administrator\Desktop",
+    beam_para = model().beam_para,
+    axle_para = model().axle_para,
+    section_shapes = "circular",
+    shear_factors = 10/9,
+    mesh=mesher(), 
+    property="Steel",
+    beam_E = beam_materialer().E,
+    beam_mu = beam_materialer().mu,
+    axle_E = axle_materialer().E,
+    axle_mu = axle_materialer().mu,
+    uh = solver().out
+       )
+
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher(), u=solver().out, uh=postprocess().uh, theta_xyz=postprocess().theta_xyz)
+WORLD_GRAPH.output(mesh=mesher(), u=solver().out, uh=postprocess().uh, theta=postprocess().theta, report=report())
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

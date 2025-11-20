@@ -28,12 +28,12 @@ class Beam(CNodeType):
     PATH: str = "有限元.方程离散"
     DESC: str = "组装欧拉梁的刚度矩阵和载荷"
     INPUT_SLOTS = [
-        PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="张量函数空间"),
+        PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),
         PortConf("beam_E", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的弹性模量"),
         PortConf("beam_nu", DataType.FLOAT, 1, desc="梁材料属性",  title="梁的泊松比"),
         PortConf("I", DataType.FLOAT, 1, desc="惯性矩",  title="惯性矩"),
         PortConf("distributed_load", DataType.FLOAT, 1, desc="分布载荷", title="分布载荷"),
-        PortConf("beam_type", DataType.MENU, 0, desc="梁单元选择",title="梁单元类型", default="",
+        PortConf("beam_type", DataType.MENU, 0, desc="梁单元选择",title="梁单元类型", default="euler_bernoulli_2d",
                  items=["euler_bernoulli_2d", "normal_2d", "euler_bernoulli_3d", "normal_3d"]),
     ]
     OUTPUT_SLOTS = [

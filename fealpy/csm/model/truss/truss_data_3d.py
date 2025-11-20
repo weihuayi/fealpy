@@ -4,6 +4,7 @@ from fealpy.backend import backend_manager as bm
 
 from fealpy.mesh import EdgeMesh
 
+
 class TrussData3D:
     """
     A data structure class representing a 3D truss example.
@@ -33,6 +34,8 @@ class TrussData3D:
     def __init__(self):
         super().__init__()
 
+        self.A = self.cross_section_area()
+        self.GD = self.geo_dimension()
         
     def geo_dimension(self) -> int:
         """
@@ -52,6 +55,11 @@ class TrussData3D:
         """
         return [0.0, self.L]
     
+    def cross_section_area(self):
+        """Return bar cross-sectional areas.
+        """
+        return 2000.0
+        
     def init_mesh(self):
         """
         Constructs the 3D EdgeMesh for the truss.

@@ -145,10 +145,12 @@ class TrussTower:
     #     quick_plot_3d(node, cell, "3D z-bar truss")
         
 
-node, cell = TrussTower.build_truss_3d_zbar(n_panel=19, Lz=19, Wx=0.45, Wy=0.40, lc=0.1, ne_per_bar=1)
-mesh = EdgeMesh(node, cell)
+# node, cell = TrussTower.build_truss_3d_zbar(n_panel=19, Lz=19, Wx=0.45, Wy=0.40, lc=0.1, ne_per_bar=1)
+# mesh = EdgeMesh(node, cell)
 
-fig = plt.figure()
-axes = fig.add_subplot(111, projection='3d') 
-mesh.add_plot(axes)
-plt.show()
+# fig = plt.figure()
+# axes = fig.add_subplot(111, projection='3d') 
+# mesh.add_plot(axes)
+# mesh.find_node(axes, showindex=True, color='g', markersize=8, fontsize=8, fontcolor='g')
+# mesh.find_cell(axes, showindex=True, color='b', markersize=16, fontsize=20, fontcolor='b')
+# plt.show()

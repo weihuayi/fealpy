@@ -12,8 +12,8 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default=3, type=int,
-                    help='id of the PDE model, default is 3.')
+                    default=4, type=int,
+                    help='id of the PDE model, default is 4.')
 
 parser.add_argument('--init_mesh',
                     default='edgemesh', type=str,
@@ -24,12 +24,20 @@ parser.add_argument('--space_degree',
         help='Degree of Finite Element Space, default is 1.')
 
 parser.add_argument('--E',
-                    default=2.1e11, type=float,
+                    default=2.0e11, type=float,
                     help='Type of mesh, default is the truss Young modulus.')
 
 parser.add_argument('--nu',
                     default=0.3, type=float,
                     help='Type of mesh, default is the truss Poisson ratio.')
+
+parser.add_argument('--load',
+                    default=84820, type=float,
+                    help='Load applied to the structure, default is 84820.')
+
+parser.add_argument('--neigen',
+                    default=6, type=int,
+                    help='Number of eigenvalues to compute, default is 6.')
 
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
@@ -43,3 +51,11 @@ options = vars(parser.parse_args())
 
 from fealpy.backend import backend_manager as bm
 bm.set_backend(options['backend'])
+
+from fealpy.csm.fem import TrussTowerModel
+model = TrussTowerModel(options)
+model.__str__()
+uh = model.solve()
+strain, stress = model.compute_strain_and_stress(uh)
+model.show(uh, strain, stress)
+# model.buckling_analysis(stress)

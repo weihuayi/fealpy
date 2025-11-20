@@ -1,3 +1,4 @@
+from typing import Union
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
 from fealpy.decorator import variantmethod
@@ -8,10 +9,11 @@ from fealpy.fem import VectorSourceIntegrator
 from fealpy.fem import BilinearForm, DirichletBC, LinearForm
 from fealpy.solver import spsolve
 
-from fealpy.csm.fem.bar_integrator import BarIntegrator
-from fealpy.csm.material import BarMaterial
-from fealpy.csm.model.truss.truss_data_3d import TrussData3D
-from fealpy.csm.model.model_manager import CSMModelManager
+from ..fem.bar_integrator import BarIntegrator
+from ..material import BarMaterial
+from ..model.truss import TrussPDEDataT
+from ..model.model_manager import CSMModelManager
+
 
 class BarLFEMModel(ComputationalModel):
     """
@@ -35,7 +37,7 @@ class BarLFEMModel(ComputationalModel):
         set_pde(pde): Set PDE parameters and update model.
         set_mesh(mesh): Set the mesh.
         set_space(p): Set the finite element space.
-        set_material(E, nu, A): Set material properties.
+        set_material(): Set material properties.
         linear_system(): Assemble and return stiffness matrix and load vector.
         solve(): Solve the linear system and return the solution.
         post_process(uh): Compute displacement, strain, and stress.
@@ -51,14 +53,17 @@ class BarLFEMModel(ComputationalModel):
         self.set_pde(options['pde'])
         mesh = self.pde.init_mesh()
         self.set_mesh(mesh)
-        self.set_space(p=1)
+        self.set_space_degree(options['space_degree'])
+        
+        self.GD = self.pde.geo_dimension()
 
         self.E = options['E']
         self.nu = options['nu']
-        self.A = options['A']
-        self.set_material(E=self.E, nu=self.nu, A=self.A)
         
-    def set_pde(self, pde=3) -> None:
+        self.set_space()
+        self.set_material()
+    
+    def set_pde(self, pde: Union[TrussPDEDataT, int] = 3) -> None:
         """
         Set PDE parameters and update model.
 
@@ -69,7 +74,7 @@ class BarLFEMModel(ComputationalModel):
             self.pde = CSMModelManager('truss').get_example(pde)
         else:
             self.pde = pde
-        self.GD = self.pde.geo_dimension()
+        
         self.logger.info(self.pde)
         
     def set_mesh(self, mesh: Mesh) -> None:
@@ -81,31 +86,30 @@ class BarLFEMModel(ComputationalModel):
         """
         self.mesh = mesh
         
-    def set_space(self, p: int=1) -> None:
-        """
-        Set the finite element space.
+    def set_space_degree(self, p: int) -> None:
+        self.p = p
+        
+    def set_space(self):
+        """Initialize the finite element space."""
+        mesh = self.mesh
+        p = self.p
+        
+        scalar_space = LagrangeFESpace(mesh, p=p, ctype='C')
+        self.space = TensorFunctionSpace(scalar_space, shape=(-1, self.GD))
 
-        Parameters:
-            p (int): Polynomial degree.
-        """
-        scalar_space = LagrangeFESpace(self.mesh, p)
-        self.space = TensorFunctionSpace(scalar_space=scalar_space, shape=(-1, self.GD))
-
-    def set_material(self, E: float, nu: float, A: float) -> None:
+    def set_material(self) -> None:
         """
         Set material properties.
 
         Parameters:
             E (float): Young's modulus.
             nu (float): Poisson's ratio.
-            A (float): Cross-sectional area.
         """
-        self.material = BarMaterial(model=self.pde,
-                                    name='BarMaterial',
-                                    elastic_modulus=E,
-                                    poisson_ratio=nu,
-                                    A=A)
-        
+        self.material = BarMaterial(name='BarMaterial',
+                                    model=self.pde,
+                                    elastic_modulus=self.E,
+                                    poisson_ratio=self.nu)
+
     def linear_system(self):
         """
         Assemble and return stiffness matrix and load vector.
@@ -114,8 +118,12 @@ class BarLFEMModel(ComputationalModel):
             K: Stiffness matrix.
             F_load: Load vector.
         """
+        mesh = self.space.mesh
+        
         bform = BilinearForm(self.space)
-        bform.add_integrator(BarIntegrator(space=self.space, material=self.material))
+        bform.add_integrator(BarIntegrator(space=self.space, 
+                                        model=self.pde, 
+                                        material=self.material))
         K = bform.assembly()
         
         lform = LinearForm(self.space)
@@ -144,7 +152,7 @@ class BarLFEMModel(ComputationalModel):
         K,F= bc.apply(K, F)
         uh[:] = spsolve(K, F, solver='scipy')
         return uh
-
+   
     def post_process(self,uh):
         """
         Compute displacement, strain, and stress.
@@ -190,18 +198,10 @@ class BarLFEMModel(ComputationalModel):
         uh_mat = bm.to_numpy(uh_mat)
         strain = bm.to_numpy(strain)
         stress = bm.to_numpy(stress)
-
-        print("--- Displacement (uh) ---")
-        print(uh_mat)
-        print("------------------------")
-
-        print("\n--- Strain per element ---")
-        print(strain)
-        print("--------------------------")
-
-        print("\n--- Stress per element ---")
-        print(stress)
-        print("--------------------------")
+        
+        self.logger.info(f"Displacement uh:\n{uh_mat}")
+        self.logger.info(f"Strain per element:\n{strain}")
+        self.logger.info(f"Stress per element:\n{stress}")
         return uh_mat, strain, stress
 
     def run(self):

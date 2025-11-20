@@ -34,8 +34,8 @@ class BeamMaterial(CNodeType):
     
     OUTPUT_SLOTS = [
         PortConf("I", DataType.TENSOR, title="惯性矩"),
-        PortConf("E", DataType.FLOAT, title="梁的弹性模量 E"),
-        PortConf("nu", DataType.FLOAT, title="梁的泊松比 nu"),
+        PortConf("E", DataType.FLOAT, title="梁的弹性模量"),
+        PortConf("nu", DataType.FLOAT, title="梁的泊松比"),
     ]
     
     @staticmethod

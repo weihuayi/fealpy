@@ -134,47 +134,68 @@ class IncompressibleCylinder2d(CNodeType):
                 """Return the computational domain [xmin, xmax, ymin, ymax]."""
                 return self.box
             
-            def init_mesh(self):
+            def init_mesh(self): 
+                import gmsh 
+                from fealpy.mesh import TriangleMesh 
                 box = self.box 
                 center = self.center 
                 radius = self.radius 
                 n_circle = self.n_circle 
                 h = self.h 
-
-                from meshpy.triangle import MeshInfo, build
-                from fealpy.mesh import TriangleMesh    
-        
-                points = [
-                    (box[0], box[2]),
-                    (box[1], box[2]),
-                    (box[1], box[3]),
-                    (box[0], box[3])
-                ]
-
-                facets = [[0, 1], [1, 2], [2, 3], [3, 0]]
-
-                cx, cy = center
-                theta = bm.linspace(0, 2*bm.pi, n_circle, endpoint=True)
-                circle_points = [(cx + radius*bm.cos(t), cy + radius*bm.sin(t)) for t in theta]
-                circle_facets = [[i, (i+1) % n_circle] for i in range(n_circle)]
-
-                circle_offset = len(points)
-                all_points = points + circle_points
-                all_facets = facets + [[i[0]+circle_offset, i[1]+circle_offset] for i in circle_facets]
-
-                hole_point = [cx, cy]
-
-                mesh_info = MeshInfo()
-                mesh_info.set_points(all_points)
-                mesh_info.set_facets(all_facets)
-                mesh_info.set_holes([hole_point])  # 空洞位置
-
-                mesh = build(mesh_info, max_volume=h**2)
-
-                node = bm.array(mesh.points)
-                cell = bm.array(mesh.elements)
-
-                return TriangleMesh(node, cell)
+                cx = self.center[0]
+                cy = self.center[1] 
+                gmsh.initialize() 
+                gmsh.model.add("rectangle_with_polygon_hole") 
+                xmin, xmax, ymin, ymax = box 
+                p1 = gmsh.model.geo.addPoint(xmin, ymin, 0) 
+                p2 = gmsh.model.geo.addPoint(xmax, ymin, 0) 
+                p3 = gmsh.model.geo.addPoint(xmax, ymax, 0) 
+                p4 = gmsh.model.geo.addPoint(xmin, ymax, 0) 
+                l1 = gmsh.model.geo.addLine(p1, p2) 
+                l2 = gmsh.model.geo.addLine(p2, p3) 
+                l3 = gmsh.model.geo.addLine(p3, p4) 
+                l4 = gmsh.model.geo.addLine(p4, p1) 
+                outer_loop = gmsh.model.geo.addCurveLoop([l1, l2, l3, l4]) 
+                theta = bm.linspace(0, 2*bm.pi, n_circle, endpoint=False) 
+                circle_pts = [] 
+                for t in theta:
+                    x = cx + radius * bm.cos(t) 
+                    y = cy + radius * bm.sin(t) 
+                    pid = gmsh.model.geo.addPoint(x, y, 0) 
+                    circle_pts.append(pid) 
+                circle_lines = [] 
+                for i in range(n_circle): 
+                    l = gmsh.model.geo.addLine(circle_pts[i], circle_pts[(i + 1) % n_circle]) 
+                    circle_lines.append(l) 
+                circle_loop = gmsh.model.geo.addCurveLoop(circle_lines) 
+                surf = gmsh.model.geo.addPlaneSurface([outer_loop, circle_loop]) 
+                gmsh.model.geo.synchronize() 
+                inlet = gmsh.model.addPhysicalGroup(1, [l4], tag = 1) 
+                gmsh.model.setPhysicalName(1, 1, "inlet") 
+                outlet = gmsh.model.addPhysicalGroup(1, [l2], tag = 2) 
+                gmsh.model.setPhysicalName(1, 2, "outlet") 
+                wall = gmsh.model.addPhysicalGroup(1, [l1, l3], tag = 3) 
+                gmsh.model.setPhysicalName(1, 3, "walls") 
+                cyl = gmsh.model.addPhysicalGroup(1, circle_lines, tag = 4) 
+                gmsh.model.setPhysicalName(1, 4, "cylinder") 
+                domain = gmsh.model.addPhysicalGroup(2, [surf], tag = 5) 
+                gmsh.model.setPhysicalName(2, 5, "fluid") 
+                gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h)
+                gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h) 
+                gmsh.model.mesh.generate(2) 
+                node_tags, node_coords, _ = gmsh.model.mesh.getNodes() 
+                elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(2) 
+                tri_nodes = elem_node_tags[0].reshape(-1, 3) - 1 # 转为从0开始索引 
+                node_coords = bm.array(node_coords).reshape(-1, 3)[:, :2] 
+                tri_nodes = bm.array(tri_nodes, dtype=bm.int32) 
+                boundary = [] 
+                boundary_tags = [1, 2, 3, 4] 
+                for tag in boundary_tags: 
+                    node_tags, _ = gmsh.model.mesh.getNodesForPhysicalGroup(1, tag) # 转换为从 0 开始的索引 
+                    boundary.append(bm.array(node_tags - 1, dtype=bm.int32)) 
+                self.boundary = boundary 
+                gmsh.finalize() 
+                return TriangleMesh(node_coords, tri_nodes)
             
             @cartesian
             def velocity_dirichlet(self, p:TensorLike, t) -> TensorLike:
@@ -313,3 +334,191 @@ class IncompressibleCylinder2d(CNodeType):
                           "is_velocity_boundary", "is_pressure_boundary", "mesh"]
         )
     
+
+class FlowPastFoil(CNodeType):
+    TITLE: str = "二维翼型绕流问题模型"
+    PATH: str = "模型.非稳态 NS"
+    DESC: str = """该节点建立二维非稳态翼型绕流数值模型,自动生成带NACA001翼型障碍物的计算网格, 定义
+                入口抛物线速度、出口压力及各类边界条件, 为Navier-Stokes方程求解提供完整物理场输入。"""
+    INPUT_SLOTS = [
+        PortConf("mu", DataType.FLOAT, 0, title="粘度", default=0.001),
+        PortConf("rho", DataType.FLOAT, 0, title="密度", default=1.0),
+        PortConf("h", DataType.FLOAT, 0, title="网格尺寸", default=0.05)
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mu", DataType.FLOAT, title="粘度"),
+        PortConf("rho", DataType.FLOAT, title = "密度"),
+        PortConf("domain", DataType.DOMAIN, title="求解域"),
+        PortConf("source", DataType.FUNCTION, title="源"),
+        PortConf("velocity_0", DataType.FUNCTION, title="初始速度"),
+        PortConf("pressure_0", DataType.FUNCTION, title="初始压力"),
+        PortConf("velocity_dirichlet", DataType.FUNCTION, title="速度边界条件"),
+        PortConf("pressure_dirichlet", DataType.FUNCTION, title="压力边界条件"),
+        PortConf("is_velocity_boundary", DataType.FUNCTION, title="速度边界"),
+        PortConf("is_pressure_boundary", DataType.FUNCTION, title="压力边界"),
+        PortConf("mesh", DataType.MESH, title = "网格")
+    ]
+
+    @staticmethod
+    def run(mu, rho, h) -> Union[object]:
+        from fealpy.backend import backend_manager as bm
+        from fealpy.decorator import cartesian, TensorLike
+        class PDE():
+            def __init__(self, options : dict = None ):
+                self.eps = 1e-10
+                self.box = [-0.5, 2.7, -0.4, 0.4]
+                self.options = options
+                self.rho = options.get('rho', 1.0)
+                self.mu = options.get('mu', 0.001)
+                self.h = options.get('h', 0.05)
+                self.mesh = self.init_mesh()
+
+            def init_mesh(self):
+                from fealpy.mesher import NACA0012Mesher
+                halos = bm.array([
+                [1.0000, 0.00120],
+                [0.9500, 0.01027],
+                [0.9000, 0.01867],
+                [0.8000, 0.03320],
+                [0.7000, 0.04480],
+                [0.6000, 0.05320],
+                [0.5000, 0.05827],
+                [0.4000, 0.06000],
+                [0.3000, 0.05827],
+                [0.2000, 0.05293],
+                [0.1500, 0.04867],
+                [0.1000, 0.04240],
+                [0.0750, 0.03813],
+                [0.0500, 0.03267],
+                [0.0250, 0.02453],
+                [0.0125, 0.01813],
+                [0.0000, 0.00000],
+                [0.0125, -0.01813],
+                [0.0250, -0.02453],
+                [0.0500, -0.03267],
+                [0.0750, -0.03813],
+                [0.1000, -0.04240],
+                [0.1500, -0.04867],
+                [0.2000, -0.05293],
+                [0.3000, -0.05827],
+                [0.4000, -0.06000],
+                [0.5000, -0.05827],
+                [0.6000, -0.05320],
+                [0.7000, -0.04480],
+                [0.8000, -0.03320],
+                [0.9000, -0.01867],
+                [0.9500, -0.01027],
+                [1.0000, -0.00120],
+                [1.00662, 0.0]], dtype=bm.float64)
+                singular_points = bm.array([[0, 0], [1.00662, 0.0]], dtype=bm.float64)
+                box = self.box
+                h = self.h
+                hs = [h/3, h/3]
+                mesher = NACA0012Mesher(halos, box, singular_points)
+                mesh = mesher.init_mesh(h, hs, is_quad=0, thickness=h/10, ratio=2.4, size=h/50)
+                return mesh
+
+            @cartesian
+            def is_outflow_boundary(self,p):
+                x = p[...,0]
+                y = p[...,1]
+                cond1 = bm.abs(x - self.box[1]) < self.eps
+                cond2 = bm.abs(y-self.box[2])>self.eps
+                cond3 = bm.abs(y-self.box[3])>self.eps
+                return (cond1) & (cond2 & cond3) 
+            
+            @cartesian
+            def is_inflow_boundary(self,p):
+                return bm.abs(p[..., 0]-self.box[0]) < self.eps
+            
+            @cartesian
+            def is_wall_boundary(self,p):
+                return (bm.abs(p[..., 1] -self.box[2]) < self.eps) | \
+                    (bm.abs(p[..., 1] -self.box[3]) < self.eps)
+            
+            @cartesian
+            def is_velocity_boundary(self,p):
+                return ~self.is_outflow_boundary(p)
+                # return None
+            
+            @cartesian
+            def is_pressure_boundary(self,p=None):
+                if p is None:
+                    return 1
+                else:
+                    return self.is_outflow_boundary(p) 
+                    #return bm.zeros_like(p[...,0], dtype=bm.bool)
+                # return 0
+
+            @cartesian
+            def u_inflow_dirichlet(self, p):
+                x = p[...,0]
+                y = p[...,1]
+                value = bm.zeros_like(p)
+                value[...,0] = 1.5*4*(y-self.box[2])*(self.box[3]-y)/(0.4**2)
+                value[...,1] = 0
+                return value
+            
+            @cartesian
+            def pressure_dirichlet(self, p, t):
+                x = p[...,0]
+                y = p[...,1]
+                value = bm.zeros_like(x)
+                return value
+
+            @cartesian
+            def velocity_dirichlet(self, p, t):
+                x = p[...,0]
+                y = p[...,1]
+                index = self.is_inflow_boundary(p)
+                result = bm.zeros_like(p)
+                result[index] = self.u_inflow_dirichlet(p[index])
+                return result
+            
+            @cartesian
+            def source(self, p, t):
+                x = p[..., 0]
+                y = p[..., 1]
+                result = bm.zeros(p.shape, dtype=bm.float64)
+                result[..., 0] = 0
+                result[..., 1] = 0
+                return result
+            
+            def velocity(self, p ,t):
+                x = p[...,0]
+                y = p[...,1]
+                value = bm.zeros(p.shape)
+                return value
+
+            def pressure(self, p, t):
+                x = p[..., 0]
+                val = bm.zeros_like(x)
+                return val
+            
+            @cartesian
+            def velocity_0(self, p: TensorLike, t) -> TensorLike:
+                """Compute exact solution of velocity."""
+                x = p[..., 0]
+                y = p[..., 1]
+                result = bm.zeros(p.shape, dtype=bm.float64)
+                return result
+            
+            @cartesian
+            def pressure_0(self, p: TensorLike, t) -> TensorLike:
+                x = p[..., 0]
+                y = p[..., 1]
+                result = bm.zeros(p.shape[0], dtype=p.dtype)
+                return result
+            
+        options ={
+            'rho': rho,
+            'mu': mu,
+            'h': h,
+        }
+        model = PDE(options)
+
+        return (model.mu, model.rho, model.box) + tuple(
+            getattr(model, name)
+            for name in ["source", "velocity_0", "pressure_0", "velocity_dirichlet", "pressure_dirichlet",
+                          "is_velocity_boundary", "is_pressure_boundary", "mesh"]
+        )

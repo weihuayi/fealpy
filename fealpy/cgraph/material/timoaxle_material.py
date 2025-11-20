@@ -30,15 +30,15 @@ class TimoMaterial(CNodeType):
     DESC: str = "定义列车轮轴系统的梁材料属性"
     INPUT_SLOTS = [
         PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
-        PortConf("beam_type", DataType.MENU, 0, desc="梁模型类型选择", title="梁材料类型",
-                 items=["Timoshenko", "Euler-Bernoulli"]),
+        PortConf("beam_type", DataType.MENU, 0, desc="轮轴材料类型选择", title="梁材料", default="Timo_beam", 
+                 items=["Euler_beam", "Timo_beam"]),
         PortConf("beam_E", DataType.FLOAT, 0, desc="梁的弹性模量", title="梁弹性模量", default=2.1e11),
         PortConf("beam_nu", DataType.FLOAT, 0, desc="梁的泊松比", title="梁泊松比", default=0.3)
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("E", DataType.FLOAT, title="梁的弹性模量 E"),
-        PortConf("mu", DataType.FLOAT, title="梁的剪切模量 mu"),
+        PortConf("E", DataType.FLOAT, title="梁的弹性模量"),
+        PortConf("mu", DataType.FLOAT, title="梁的剪切模量"),
         PortConf("Ax", DataType.TENSOR, title="X 方向横截面积"),
         PortConf("Ay", DataType.TENSOR, title="Y 方向横截面积"),
         PortConf("Az", DataType.TENSOR, title="Z 方向横截面积"),
@@ -48,7 +48,7 @@ class TimoMaterial(CNodeType):
     ]
     
     @staticmethod
-    def run(property="Steel", beam_type="Timoshemko beam", beam_E=2.1e11, beam_nu=0.3):
+    def run(property="Steel", beam_type="Timoshemko beam", beam_E=None, beam_nu=None):
         from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         from fealpy.csm.material import TimoshenkoBeamMaterial
         model = TimobeamAxleData3D()
@@ -69,6 +69,7 @@ class AxleMaterial(CNodeType):
         Inputs:
             property (string): Material name, e.g., "Steel".
             axle_type (menu): Type of axle material.
+            axle_stiffness (float): spring stiffness.
             axle_E (float): Elastic modulus of the axle material.
             axle_nu (float): Poisson’s ratio of the axle material.
  
@@ -79,23 +80,24 @@ class AxleMaterial(CNodeType):
             mu (float): Shear modulus, computed as `E / [2(1 + nu)]`.
     
     """
-    TITLE: str = "列车轮轴杆件材料属性"
+    TITLE: str = "列车轮轴弹簧材料属性"
     PATH: str = "材料.固体"
-    DESC: str = "定义列车轮轴系统中杆件的材料属性"
+    DESC: str = "定义列车轮轴系统中弹簧的材料属性"
     INPUT_SLOTS = [
         PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
-        PortConf("axle_type", DataType.MENU, 0, desc="轮轴材料类型选择", title="轮轴材料类型", items=["Bar", "other"]),
-        PortConf("axle_E", DataType.FLOAT, 0, desc="弹性模量", title="杆的弹性模量", default=1.976e6),
-        PortConf("axle_nu", DataType.FLOAT, 0, desc="泊松比", title="杆的泊松比", default=-0.5)
+        PortConf("axle_type", DataType.STRING, 0, desc="轮轴材料类型", title="弹簧材料", default="Spring"),
+        PortConf("axle_stiffness", DataType.FLOAT, 0, desc="弹簧刚度", title="弹簧的刚度", default=1.976e6),
+        PortConf("axle_E", DataType.FLOAT, 0, desc="弹性模量", title="弹簧的弹性模量", default=1.976e6),
+        PortConf("axle_nu", DataType.FLOAT, 0, desc="泊松比", title="弹簧的泊松比", default=-0.5)
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("E", DataType.FLOAT, title="杆的弹性模量"),
-        PortConf("mu", DataType.FLOAT, title="杆的剪切模量")
+        PortConf("E", DataType.FLOAT, title="弹簧的弹性模量"),
+        PortConf("mu", DataType.FLOAT, title="弹簧的剪切模量")
     ]
         
     @staticmethod
-    def run(property="Steel", axle_type="Bar",axle_E=1.97e6, axle_nu=-0.5):
+    def run(property, axle_type, axle_stiffness, axle_E, axle_nu):
         from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         from fealpy.csm.material import AxleMaterial
         model = TimobeamAxleData3D()

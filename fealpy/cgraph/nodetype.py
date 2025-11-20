@@ -19,6 +19,7 @@ class DataType(IntEnum):
     DOMAIN   = 10
     FUNCTION = 11
     TEXT     = 12
+    CODE     = 13
 
 
 @dataclass(slots=True)
@@ -58,7 +59,6 @@ class CNodeType:
     DESC: str = ""
     INPUT_SLOTS: list[PortConf] = []
     OUTPUT_SLOTS: list[PortConf] = []
-    VARIABLE: bool = False
 
     REGISTRY: dict[str, type["CNodeType"]] = {}
 
@@ -70,10 +70,13 @@ class CNodeType:
             raise ValueError(f"CNodeType {cls.__name__} already exists")
 
     def __new__(cls) -> CNode:
-        node = CNode(getattr(cls, "run"), cls.VARIABLE)
+        node = CNode(getattr(cls, "run"))
         setattr(node, "__node_type__", cls.__name__)
 
         for data in cls.INPUT_SLOTS:
+            if data.name.startswith("*"):
+                node._var_in = True
+                continue
             node.register_input(
                 name=data.name,
                 variable=data.ttype == 2,
@@ -82,6 +85,9 @@ class CNodeType:
             )
 
         for data in cls.OUTPUT_SLOTS:
+            if data.name.startswith("*"):
+                node._var_out = True
+                continue
             node.register_output(name=data.name)
 
         return node
