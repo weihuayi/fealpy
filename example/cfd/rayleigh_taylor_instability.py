@@ -43,22 +43,68 @@ mu2 = phispace.function()
 u0 = ns_fem.uspace.function()
 u1 = ns_fem.uspace.function()
 p1 = ns_fem.pspace.function()
+pde.rho = pde.rho_update(phi1)
 
 mesh.nodedata['phi'] = phi1
 mesh.nodedata['velocity'] = u1.reshape(2,-1).T  
+mesh.nodedata['pressure'] = p1
+mesh.nodedata['rho'] = pde.rho
 fname = './' + 'test_'+ str(1).zfill(10) + '.vtu'
 mesh.to_vtk(fname=fname)
 
-for i in range(1,2000):
-    # 设置参数
-    print("iteration:", i)
-    print("内存占用",psutil.Process().memory_info().rss / 1024 ** 2, "MB")  # RSS内存(MB)  
 
-    phi0, phi1, mu1, u0, u1, p1 = model.run['one_step'](phi0, phi1, mu1, u0, u1, p1)
+# for i in range(1,2000):
+#     # 设置参数
+#     print("iteration:", i)
+#     print("内存占用",psutil.Process().memory_info().rss / 1024 ** 2, "MB")  # RSS内存(MB)  
+
+#     phi0, phi1, mu1, u0, u1, p1 = model.run['one_step'](phi0, phi1, mu1, u0, u1, p1)
        
-    mesh.nodedata['phi'] = phi1
-    mesh.nodedata['velocity'] = u1.reshape(2,-1).T  
-    mesh.nodedata['pressure'] = p1 
-    mesh.nodedata['rho'] = pde.rho
-    fname = './' + 'test_'+ str(i+1).zfill(10) + '.vtu'
-    mesh.to_vtk(fname=fname)
+#     mesh.nodedata['phi'] = phi1
+#     mesh.nodedata['velocity'] = u1.reshape(2,-1).T  
+#     mesh.nodedata['pressure'] = p1 
+#     mesh.nodedata['rho'] = pde.rho
+#     fname = './' + 'test_'+ str(i+1).zfill(10) + '.vtu'
+#     mesh.to_vtk(fname=fname)
+
+
+
+for i in range(3):
+    if i == 0:
+        pde.rho_down = 1
+    if i == 1:
+        pde.rho_down = 2
+    if i == 2:
+        pde.rho_down = 4
+    phi0, phi1, mu1, u0, u1, p1 = model.run['one_step'](phi0, phi1, mu1, u0, u1, p1)
+
+    pgdof = ns_fem.pspace.number_of_global_dofs()
+
+    rho = pde.rho
+    node = mesh.interpolation_points(p=2)
+    y = node[...,1]
+    p = bm.zeros_like(y)
+    mask = y >= 2.0
+    p[mask] = pde.rho_up * (4.0 - y[mask]) 
+    p[~mask] = pde.rho_down * (2.0 - y[~mask]) + pde.rho_up * 2.0
+    print(node.shape)
+    print(p.shape)
+    y_np = bm.to_numpy(y)
+    p_np = bm.to_numpy(p)
+    index = bm.argsort(y)
+
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(8,6))
+    plt.plot(y_np[index], p_np[index], '-o', ms = 3, markerfacecolor='none', label='Numerical Pressure')
+    plt.show()
+
+ 
+
+
+
+mesh.nodedata['phi'] = phi1
+mesh.nodedata['velocity'] = u1.reshape(2,-1).T  
+mesh.nodedata['pressure'] = p 
+mesh.nodedata['rho'] = pde.rho
+fname = './' + 'test_'+ str(2).zfill(10) + '.vtu'
+mesh.to_vtk(fname=fname)

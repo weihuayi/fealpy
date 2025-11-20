@@ -6,7 +6,7 @@ import argparse
 # 解析参数
 options ={
     'backend': 'numpy',
-    'pde': 4,
+    'pde': 2,
     'rho': 1.0,
     'mu': 0.001,
     'T0': 0.0,
@@ -134,8 +134,8 @@ for i in range(model.timeline.NL-1):
     
     u1,p1 = model.run['one_step'](u0, p0, maxstep, tol)
     
-    # cd[i], cl[i], delta_p[i] = benchmark(u1, p1, u0)
-    # print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
+    cd[i], cl[i], delta_p[i] = benchmark(u1, p1, u0)
+    print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
     u0[:] = u1
     p0[:] = p1
 
