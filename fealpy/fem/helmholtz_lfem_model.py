@@ -1,6 +1,4 @@
 
-from .. import logger
-logger.setLevel('WARNING')
 from typing import Union
 from ..backend import bm
 from ..model import PDEModelManager, ComputationalModel

@@ -4,7 +4,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 
 from ...common.Tools import ranges
-from fealpy.mesh.backup.Mesh import Mesh
+from .Mesh import Mesh
 
 class Mesh2d(Mesh):
     def number_of_nodes_of_cells(self):

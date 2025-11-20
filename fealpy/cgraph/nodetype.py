@@ -7,17 +7,19 @@ from fealpy.cgraph.core import CNode
 
 class DataType(IntEnum):
     NONE     = 0
-    MESH     = auto()
-    BOOL     = auto()
-    INT      = auto()
-    FLOAT    = auto()
-    TENSOR   = auto()
-    LINOPS   = auto()
-    STRING   = auto()
-    MENU     = auto()
-    SPACE    = auto()
-    DOMAIN   = auto()
-    FUNCTION = auto()
+    MESH     = 1
+    BOOL     = 2
+    INT      = 3
+    FLOAT    = 4
+    TENSOR   = 5
+    LINOPS   = 6
+    STRING   = 7
+    MENU     = 8
+    SPACE    = 9
+    DOMAIN   = 10
+    FUNCTION = 11
+    TEXT     = 12
+    CODE     = 13
 
 
 @dataclass(slots=True)
@@ -57,7 +59,6 @@ class CNodeType:
     DESC: str = ""
     INPUT_SLOTS: list[PortConf] = []
     OUTPUT_SLOTS: list[PortConf] = []
-    VARIABLE: bool = False
 
     REGISTRY: dict[str, type["CNodeType"]] = {}
 
@@ -69,10 +70,13 @@ class CNodeType:
             raise ValueError(f"CNodeType {cls.__name__} already exists")
 
     def __new__(cls) -> CNode:
-        node = CNode(getattr(cls, "run"), cls.VARIABLE)
+        node = CNode(getattr(cls, "run"))
         setattr(node, "__node_type__", cls.__name__)
 
         for data in cls.INPUT_SLOTS:
+            if data.name.startswith("*"):
+                node._var_in = True
+                continue
             node.register_input(
                 name=data.name,
                 variable=data.ttype == 2,
@@ -81,6 +85,9 @@ class CNodeType:
             )
 
         for data in cls.OUTPUT_SLOTS:
+            if data.name.startswith("*"):
+                node._var_out = True
+                continue
             node.register_output(name=data.name)
 
         return node

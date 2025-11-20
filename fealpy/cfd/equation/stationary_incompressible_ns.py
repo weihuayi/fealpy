@@ -5,7 +5,7 @@ from .base import BaseEquation
 CoefType = Union[int, float, Callable]
 
 class StationaryIncompressibleNS(BaseEquation):
-    def __init__(self, pde):
+    def __init__(self, pde, init_variables = False):
         super().__init__(pde)
         self._coefs = {
             'convection': 1,      # 对流项系数
@@ -13,8 +13,17 @@ class StationaryIncompressibleNS(BaseEquation):
             'viscosity': 1,       # 粘性项系数
             'body_force': 1      # 外力项系数
         }
+        self._variables = { 
+            'velocity': None,     # 速度变量
+            'pressure': None     # 压力变量
+        }
         self.pde = pde
-        self.initialize_from_pde(pde) 
+        self.initialize_from_pde(pde)
+        
+        if pde.is_pressure_boundary() == 0 :
+            self.pressure_neumann = True
+        else:
+            self.pressure_neumann = False 
     
     def initialize_from_pde(self, pde):
         """

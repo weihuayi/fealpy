@@ -3,6 +3,7 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 
 class PoissonEquationDBC(CNodeType):
+    
     TITLE: str = "Poisson 方程 (第一类边界条件)"
     PATH: str = "有限元.方程离散"
     INPUT_SLOTS = [
@@ -13,14 +14,13 @@ class PoissonEquationDBC(CNodeType):
         PortConf("gd", DataType.FUNCTION, title="边界条件")
     ]
     OUTPUT_SLOTS = [
-        PortConf("operator", DataType.LINOPS, title="算子"),
+        PortConf("operator", DataType.TENSOR, title="算子"),
         PortConf("source", DataType.TENSOR, title="源"),
-        PortConf("uh", DataType.TENSOR, title="初始解")
     ]
 
     @staticmethod
     def run(space, q, diffusion, source, gd):
-        from ...fem import (
+        from fealpy.fem import (
             LinearForm,
             BilinearForm,
             ScalarDiffusionIntegrator,
@@ -30,17 +30,14 @@ class PoissonEquationDBC(CNodeType):
         bform = BilinearForm(space)
         DI = ScalarDiffusionIntegrator(diffusion, q=q)
         bform.add_integrator(DI)
-
+        A = bform.assembly()
         lform = LinearForm(space)
         SI = ScalarSourceIntegrator(source, q=q)
         lform.add_integrator(SI)
         F = lform.assembly()
 
-        from ...fem import DirichletBCOperator
+        from fealpy.fem import DirichletBC
+        BC = DirichletBC(space, gd=gd)
+        A,F = BC.apply(A, F)
 
-        isDDof = space.is_boundary_dof()
-        dbc = DirichletBCOperator(form=bform, gd=gd, isDDof=isDDof)
-        uh = dbc.init_solution()
-        F = dbc.apply(F, uh)
-
-        return dbc, F, uh
+        return A, F
