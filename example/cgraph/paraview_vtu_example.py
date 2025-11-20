@@ -19,9 +19,16 @@ report_png_path = export_dir / "report" / f"{source_vtu.stem}.png"
 
 # Create nodes: VTUReader -> VTUSlicer -> VTUStyler -> VTUScreenshot
 reader = cgraph.create("VTUReader")
+
+# uh 渲染节点
 slicer = cgraph.create("VTUSlicer")
 styler = cgraph.create("VTUStyler")
 screenshot = cgraph.create("VTUScreenshot")
+
+# ph 渲染节点
+slicer_ph = cgraph.create("VTUSlicer")
+styler_ph = cgraph.create("VTUStyler")
+screenshot_ph = cgraph.create("VTUScreenshot")
 
 # Reader node loads the VTU dataset
 reader(vtu_path=str(source_vtu))
@@ -47,6 +54,14 @@ slicer(
     plane_ratio=50.0,
 )
 
+# ph 切片（参数与uh一致）
+slicer_ph(
+    dataset=reader().dataset,
+    enable_slice="是",
+    plane_normal="0,0,1",
+    plane_ratio=50.0,
+)
+
 # Apply styling metadata to the sliced dataset
 styler(
     dataset=slicer().sliced_dataset,
@@ -58,36 +73,60 @@ styler(
     show_scalar_bar="是",
 )
 
-# Configure screenshot with camera rotation
+# ph 样式（仅 array_name 改为 ph）
+styler_ph(
+    dataset=slicer_ph().sliced_dataset,
+    array_name="ph",
+    array_location="POINTS",
+    representation="Surface",
+    background="#1e1e1e",
+    transparent="否",
+    show_scalar_bar="是",
+)
+
+
+# 规范图片命名（去掉分量数字0）
+uh_png_name = f"{source_vtu.stem}_uh.png"
+ph_png_name = f"{source_vtu.stem}_ph.png"
+
+
+
+
+# uh 截图（只保留命名规范的调用）
 screenshot(
     styled_dataset=styler().styled_dataset,
     image_width=1920,
     image_height=1080,
-    output_path=str(export_dir),
+    output_path=str(export_dir / uh_png_name),
     camera_rotation=180,
     camera_axis="0,1,0",
 )
 
-WORLD_GRAPH.output(png_dir=screenshot().png_path, vtu_path=str(source_vtu))
+
+# ph 截图（只保留命名规范的调用）
+screenshot_ph(
+    styled_dataset=styler_ph().styled_dataset,
+    image_width=1920,
+    image_height=1080,
+    output_path=str(export_dir / ph_png_name),
+    camera_rotation=180,
+    camera_axis="0,1,0",
+)
+
+WORLD_GRAPH.output(
+    png_dir=screenshot().png_path,
+    png_dir_ph=screenshot_ph().png_path,
+    vtu_path=str(source_vtu)
+)
 WORLD_GRAPH.error_listeners.append(print)
 WORLD_GRAPH.execute()
+
+
 
 result = WORLD_GRAPH.get()
 if not isinstance(result, dict) or "png_dir" not in result:
     raise RuntimeError(f"Graph execution failed: {result}")
 
-# Get the directory where PNG files were generated
-png_dir = Path(result["png_dir"]).expanduser().resolve()
-if not png_dir.exists():
-    raise FileNotFoundError(f"Output directory not found: {png_dir}")
-
-# List all generated PNG files in the directory
-png_files = sorted(png_dir.glob("*.png"))
-
-print(f"\n生成了 {len(png_files)} 张截图:")
-for idx, png_path in enumerate(png_files, 1):
-    print(f"  {idx}. {png_path.name}")
-
-result["png_dir"] = str(png_dir)
-result["png_files"] = [str(p) for p in png_files]
-print("\n" + json.dumps(result, ensure_ascii=False, indent=2))
+uh_png_path = str(export_dir / uh_png_name)
+ph_png_path = str(export_dir / ph_png_name)
+print(f"\n已生成图片: {uh_png_path}, {ph_png_path}")

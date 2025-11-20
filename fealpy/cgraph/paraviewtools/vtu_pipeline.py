@@ -278,43 +278,15 @@ class VTUScreenshot(CNodeType):
         if width <= 0 or height <= 0:
             raise ValueError("Image dimensions must be positive integers.")
 
-        if output_path:
-            target_base = Path(output_path).expanduser()
-            suffix = target_base.suffix.lower()
-            custom_name: str | None = None
 
-            if suffix == ".png":
-                base_dir = target_base.parent
-                custom_name = target_base.name
-                stem_hint = target_base.stem
-            else:
-                base_dir = target_base.parent if suffix else target_base
-                stem_hint = target_base.stem if suffix else None
-
-            base_dir = base_dir.expanduser()
-            report_dir = (base_dir / "report").expanduser()
-            report_dir.mkdir(parents=True, exist_ok=True)
-
-            if not custom_name:
-                stem_candidates = [
-                    stem_hint,
-                    Path(vtu_path_hint).stem if isinstance(vtu_path_hint, str) and vtu_path_hint else None,
-                    base_dir.name or None,
-                ]
-                stem = next((s for s in stem_candidates if s), "vtu_screenshot")
-                custom_name = f"{stem}.png"
-
-            target_path = (report_dir / custom_name).expanduser()
-        else:
-            hinted_vtu = vtu_path_hint or ""
-            if isinstance(hinted_vtu, str) and hinted_vtu:
-                target_path = Path(hinted_vtu).expanduser().with_suffix(".png")
-            else:
-                target_path = Path.cwd() / "vtu_screenshot.png"
-
-        target_path = target_path.resolve()
+        # 自动采用 {vtu名}_{array_name}.png 作为主文件名
+        vtu_stem = Path(vtu_path_hint).stem if vtu_path_hint else "vtu_screenshot"
+        base_dir = Path(output_path).expanduser().parent if output_path else Path.cwd()
+        report_dir = (base_dir / "report").expanduser()
+        report_dir.mkdir(parents=True, exist_ok=True)
+        main_png_name = f"{vtu_stem}_{array_name}.png"
+        target_path = (report_dir / main_png_name).expanduser().resolve()
         print(f"[VTUScreenshot] resolved output_path={target_path}")
-        target_path.parent.mkdir(parents=True, exist_ok=True)
 
         if dataset is None:
             raise ValueError("VTUScreenshot requires a dataset to render.")
@@ -641,7 +613,9 @@ class VTUScreenshot(CNodeType):
             "images": metadata_list,
         }
         
-        json_path = target_path.parent / f"{target_path.stem}_info.json"
+        # 自动采用 vtu名_数据场名_info.json 作为json名
+        vtu_stem = Path(vtu_path_hint).stem if vtu_path_hint else target_path.stem
+        json_path = target_path.parent / f"{vtu_stem}_{array_name}_info.json"
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(json_metadata, f, ensure_ascii=False, indent=2)
         
