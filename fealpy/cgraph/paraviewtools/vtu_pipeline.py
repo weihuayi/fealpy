@@ -7,7 +7,7 @@ from typing import Iterable, Sequence
 
 from fealpy.cgraph.nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["VTUReader", "VTUStyler", "VTUScreenshot", "TO_VTK"]
+__all__ = ["VTUReader", "VTUStyler", "VTUScreenshot", "TO_VTK", "VTUMP4"]
 
 
 class VTUReader(CNodeType):
@@ -768,3 +768,177 @@ def _ensure_point_array(dataset: object, array_name: str, location: str) -> obje
                 pass
 
     return clone
+
+
+class VTUMP4(CNodeType):
+    r"""将一系列VTU文件渲染为视频（mp4）。
+
+    Inputs:
+        vtu_files (list[string]): 一系列VTU文件路径（按帧顺序）。
+        array_name (string): 物理量名称
+        image_width (int): 输出视频宽度，像素
+        image_height (int): 输出视频高度，像素
+        fps (int): 帧率
+        output_path (string): 可选，输出目录
+
+    Outputs:
+        mp4_path (string): 生成的视频文件路径
+    """
+
+    TITLE: str = "VTU转MP4"
+    PATH: str = "后处理.ParaView"
+    DESC: str = "将一系列VTU文件渲染为MP4视频。"
+    INPUT_SLOTS = [
+        PortConf("vtu_files", DataType.STRING, ttype=2, desc="VTU文件路径列表", title="VTU文件列表"),
+        PortConf("array_name", DataType.STRING, 0, desc="物理量名称", title="物理量", default="velocity", items=["velocity", "pressure", "time"]),
+        PortConf("image_width", DataType.INT, 0, desc="视频宽度", title="宽度", default=1920, min_val=1),
+        PortConf("image_height", DataType.INT, 0, desc="视频高度", title="高度", default=1080, min_val=1),
+        PortConf("fps", DataType.INT, 0, desc="帧率", title="帧率", default=20, min_val=1),
+        PortConf("output_path", DataType.STRING, 0, desc="输出目录(可选)", title="输出目录", default=""),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mp4_path", DataType.STRING, desc="生成的视频文件路径", title="MP4路径"),
+    ]
+
+    @staticmethod
+    def run(
+        vtu_files: list[str],
+        array_name: str = "uh",
+        image_width: int = 1920,
+        image_height: int = 1080,
+        fps: int = 20,
+        output_path: str = "",
+    ) -> str:
+
+        print("[VTUMP4] 输入参数:")
+        print(f"  vtu_files: {vtu_files}")
+        print(f"  array_name: {array_name}")
+        print(f"  image_width: {image_width}, image_height: {image_height}")
+        print(f"  fps: {fps}")
+        print(f"  output_path: {output_path}")
+
+        # 修复Path未导入问题
+        from pathlib import Path
+
+        # 新增：如果vtu_files为目录或只包含一个目录，则自动查找该目录下所有vtu/vtk文件
+        expanded_files = []
+        if isinstance(vtu_files, (str, Path)):
+            vtu_files = [vtu_files]
+        for f in vtu_files:
+            p = Path(f).expanduser().resolve()
+            if p.is_dir():
+                print(f"[VTUMP4] {p} 是目录，自动查找vtu/vtk文件")
+                files = list(p.glob("*.vtu")) + list(p.glob("*.vtk"))
+                files = sorted(files, key=lambda x: x.name)
+                expanded_files.extend(files)
+            else:
+                expanded_files.append(p)
+        vtu_files = [str(f) for f in expanded_files]
+        print(f"[VTUMP4] 展开后的vtu_files: {vtu_files}")
+        if not vtu_files:
+            print("[VTUMP4][错误] 未找到任何vtu/vtk文件！")
+            raise ValueError("未找到任何vtu/vtk文件！")
+
+        try:
+            import paraview.simple as pvs
+            from pathlib import Path
+            import imageio.v2 as imageio
+        except ModuleNotFoundError as exc:
+            print("[VTUMP4][错误] ParaView 或 imageio 未安装！")
+            raise ModuleNotFoundError(
+                "ParaView and imageio are required for VTUMP4. Install with: pip install imageio"
+            ) from exc
+
+        # 确定输出目录
+        first_vtu = Path(vtu_files[0]).expanduser().resolve()
+        print(f"[VTUMP4] 第一个vtu文件: {first_vtu}")
+        base_dir = Path(output_path).expanduser().parent if output_path else first_vtu.parent
+        print(f"[VTUMP4] base_dir: {base_dir}")
+        report_dir = (base_dir / "report").expanduser()
+        print(f"[VTUMP4] report_dir: {report_dir}")
+        report_dir.mkdir(parents=True, exist_ok=True)
+
+        # 生成临时图片序列
+        image_paths = []
+        for idx, vtu_path in enumerate(vtu_files):
+            print(f"[VTUMP4] 处理第{idx}个文件: {vtu_path}")
+            vtu_path = Path(vtu_path).expanduser().resolve()
+            print(f"[VTUMP4] 绝对路径: {vtu_path}")
+            if not vtu_path.is_file():
+                print(f"[VTUMP4][错误] 文件不存在: {vtu_path}")
+                raise FileNotFoundError(f"文件不存在: {vtu_path}")
+
+            # 根据后缀选择合适的reader
+            suffix = vtu_path.suffix.lower()
+            print(f"[VTUMP4] 文件后缀: {suffix}")
+            if suffix == ".vtu":
+                reader = pvs.XMLUnstructuredGridReader(FileName=[str(vtu_path)])
+            elif suffix == ".vtk":
+                reader = pvs.LegacyVTKReader(FileNames=[str(vtu_path)])
+            else:
+                print(f"[VTUMP4][错误] 不支持的文件类型: {vtu_path.name}")
+                raise ValueError(f"不支持的文件类型: {vtu_path.name}")
+
+            # 创建渲染视图
+            view = pvs.CreateView("RenderView")
+            view.ViewSize = [image_width, image_height]
+            view.Background = [1.0, 1.0, 1.0]  # 白色背景
+
+            pvs.SetActiveSource(reader)
+            pvs.SetActiveView(view)
+
+            # 显示数据集
+            display = pvs.Show(reader, view)
+            display.Representation = "Surface"
+
+            # 应用着色
+            try:
+                pvs.ColorBy(display, ("POINTS", array_name))
+                color_tf = pvs.GetColorTransferFunction(array_name)
+                color_tf.RescaleTransferFunctionToDataRange()
+            except Exception as e:
+                print(f"[VTUMP4] 警告: 无法按 {array_name} 着色: {str(e)}")
+
+            # 显示标尺
+            display.SetScalarBarVisibility(view, True)
+
+            # 调整相机
+            pvs.ResetCamera(view)
+            pvs.Render()
+
+            # 保存截图
+            img_name = f"frame_{idx:04d}.png"
+            img_path = report_dir / img_name
+            print(f"[VTUMP4] 保存截图: {img_path}")
+            pvs.SaveScreenshot(str(img_path), view, ImageResolution=[image_width, image_height])
+            image_paths.append(str(img_path))
+
+            # 清理资源
+            pvs.Delete(view)
+            pvs.Delete(reader)
+
+        # 合成MP4视频
+        mp4_name = f"{first_vtu.stem}_{array_name}_animation.mp4"
+        mp4_path = report_dir / mp4_name
+
+        print(f"[VTUMP4] 使用imageio合成视频: {mp4_path}")
+        try:
+            with imageio.get_writer(str(mp4_path), fps=fps) as writer:
+                for img in image_paths:
+                    print(f"[VTUMP4] 添加帧到视频: {img}")
+                    image = imageio.imread(img)
+                    writer.append_data(image)
+        except Exception as e:
+            print(f"[VTUMP4][错误] 视频合成失败: {e}")
+            raise RuntimeError(f"视频合成失败: {e}") from e
+
+        # 清理临时图片
+        for img in image_paths:
+            try:
+                Path(img).unlink()
+                print(f"[VTUMP4] 删除临时文件: {img}")
+            except Exception as e:
+                print(f"[VTUMP4] 无法删除临时文件 {img}: {str(e)}")
+
+        print(f"[VTUMP4] 视频生成成功: {mp4_path}")
+        return str(mp4_path)
