@@ -1,5 +1,4 @@
-
-from fealpy.typing import Tuple, TensorLike
+from fealpy.typing import Tuple, TensorLike, Index, _S
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
 from fealpy.mesh import EdgeMesh
@@ -21,36 +20,39 @@ class TimobeamAxleData3D:
         Notes:
             FSY and FSZ: The shear correction factor, 6/5 for rectangular and 10/9 for circular.
     """
-    def __init__(self, para: TensorLike=None, 
-                 kappa: float=10/9):
-        self.beam_para = bm.array([
-            [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
-            [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
-            [120, 141, 2]], dtype=bm.float64)
-        self.axle_para =  bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
+    def __init__(self, beam_para=None, axle_para=None):
+        if beam_para is None:
+            beam_para = bm.array([
+                [120, 141, 2], [150, 28, 2], [184, 177, 4], [160, 268, 2],
+                [184.2, 478, 2], [160, 484, 2], [184, 177, 4], [150, 28, 2],
+                [120, 141, 2]], dtype=bm.float64)
+        if axle_para is None:
+            axle_para = bm.array([[1.976e6, 100, 10]], dtype=bm.float64)
     
-        # self.para = bm.concatenate((self.beam_para, self.axle_para), axis=0)
-        
         # diameter
+        self.beam_para = bm.asarray(beam_para)
+        self.axle_para = bm.asarray(axle_para)
+       
         self.beam_D = bm.repeat(self.beam_para[:, 0], self.beam_para[:, 2].astype(int))
         self.axle_D = bm.repeat(self.axle_para[:, 0], self.axle_para[:, 2].astype(int))
         
-        self.FSY = kappa
-        self.FSZ = kappa
-
-        # === 计算 beam 截面 & 惯性矩 ===
-        self.beam_Ax, self.beam_Ay, self.beam_Az = self.calculate_beam_cross_section()
-        self.beam_Ix, self.beam_Iy, self.beam_Iz = self.calculate_beam_inertia()
+        self.FSY = 10/9
+        self.FSZ = 10/9
         
+        self.GD = self.geo_dimension()
         self.dofs_per_node = 6
         self.mesh = self.init_mesh() 
+
+        # === 计算 beam 截面 & 惯性矩 ===
+        self.Ax, self.Ay, self.Az = self.calculate_beam_cross_section()
+        self.J, self.Iy, self.Iz = self.calculate_beam_inertia()
         
     def __str__(self) -> str:
         """Returns a formatted multi-line string summarizing the configuration of the 3D Timoshenko beam data.
         
         Returns:
             str: A multi-line string showing key beam parameters, geometry, and mesh info.
-    """
+        """
         s = f"{self.__class__.__name__}(\n"
         s += "  === Geometry & Mesh ===\n"
         s += f"  Total Length (L)      : {float(self.L):.3f} mm\n"
@@ -58,10 +60,17 @@ class TimobeamAxleData3D:
         s += f"  Mesh Type             : {self.mesh.__class__.__name__}\n"
         s += f"  Number of Nodes       : {self.mesh.number_of_nodes()}\n"
         s += f"  Number of Elements    : {self.mesh.number_of_cells()}\n"
-        s += f"  Geo Dimension         : {self.geo_dimension()}\n"
-        s += f"  Shear Factors     : {self.FSY}, {self.FSZ}\n"
-        s += f"  beam_Ax, beam_Ay, beam_Az : {self.beam_Ax[:5].tolist()} ...\n"
-        s += f"  beam_Ix, beam_Iy, beam_Iz : {self.beam_Ix[:5].tolist()} ...\n"
+        s += f"  Geo Dimension         : {self.GD}\n"
+        s += "\n  === Cross-Sectional Properties ===\n"
+        s += f"  Area (Ax)              : {self.Ax} m²\n"
+        s += f"  Area (Ay)              : {self.Ay} m²\n"
+        s += f"  Area (Az)              : {self.Az} m²\n"
+        s += f"  Torsional Constant (J): {self.Ix} m⁴\n"
+        s += f"  Moment of Inertia (Iy): {self.Iy} m⁴\n"
+        s += f"  Moment of Inertia (Iz): {self.Iz} m⁴\n"
+        s += "\n  === Shear Factors ===\n"
+        s += f"  mu_y                  : {self.FSY}\n"
+        s += f"  mu_z                  : {self.FSZ}\n"
         s += ")"
         return s
     
@@ -75,17 +84,17 @@ class TimobeamAxleData3D:
     
     def calculate_beam_cross_section(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
         """Beam cross-sectional areas."""
-        beam_Ax = bm.pi * self.beam_D**2 / 4
-        beam_Ay = beam_Ax / self.FSY
-        beam_Az = beam_Ax / self.FSZ
-        return beam_Ax, beam_Ay, beam_Az
+        Ax = bm.pi * self.beam_D**2 / 4
+        Ay = Ax / self.FSY
+        Az = Ax / self.FSZ
+        return Ax, Ay, Az
     
     def calculate_beam_inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
        """Beam moments of inertia."""
-       beam_Iy  = bm.pi * self.beam_D**4 / 64
-       beam_Iz = beam_Iy
-       beam_Ix = beam_Iy + beam_Iz
-       return beam_Ix, beam_Iy, beam_Iz
+       Iy  = bm.pi * self.beam_D**4 / 64
+       Iz = Iy
+       J = Iy +Iz
+       return J, Iy, Iz
     
     def init_mesh(self):
         """Construct a mesh for the beam and axle.
@@ -112,6 +121,60 @@ class TimobeamAxleData3D:
         
         mesh = EdgeMesh(node, cell)
         return mesh
+    
+    def coord_transform(self, index: Index=_S) -> TensorLike:
+        """Construct the coordinate transformation matrix for 3D beam elements."""
+        node= self.mesh.entity('node')
+        cell = self.mesh.entity('cell')[index]
+        bar_nodes = node[cell]
+        
+        x, y, z = bar_nodes[..., 0], bar_nodes[..., 1], bar_nodes[..., 2]
+        bars_length = self.mesh.entity_measure('cell')[index]
+
+        # 第一行（轴向单位向量）
+        T11 = (x[..., 1] - x[..., 0]) / bars_length
+        T12 = (y[..., 1] - y[..., 0]) / bars_length
+        T13 = (z[..., 1] - z[..., 0]) / bars_length
+        
+        # 固定的参考向量 (全局y方向)
+        vy = bm.array([0, 1, 0], dtype=bm.float64)
+        k1, k2, k3 = vy
+
+        # 第二行（局部y方向）
+        A = bm.sqrt((T12 * k3 - T13 * k2)**2 + 
+                    (T13 * k1 - T11 * k3)**2 +
+                    (T11 * k2 - T12 * k1)**2)
+       
+        T21 = -(T12 * k3 - T13 * k2) / A
+        T22 = -(T13 * k1 - T11 * k3) / A
+        T23 = -(T11 * k2 - T12 * k1) / A
+
+         # 第三行（局部z方向 = 第一行 × 第二行）
+        B = bm.sqrt((T12 * T23 - T13 * T22)**2 +
+                    (T13 * T21 - T11 * T23)**2 +
+                    (T11 * T22 - T12 * T21)**2)
+        
+        T31 = (T12 * T23 - T13 * T22) / B
+        T32 = (T13 * T21 - T11 * T23) / B
+        T33 = (T11 * T22 - T12 * T21) / B
+        
+        # 构造3x3基础旋转矩阵 T0
+        T0 = bm.stack([
+                    bm.stack([T11, T12, T13], axis=-1),  # shape: (NC, 3)
+                    bm.stack([T21, T22, T23], axis=-1),
+                    bm.stack([T31, T32, T33], axis=-1)
+                ], axis=1)  # shape: (NC, 3, 3)
+        
+        # 构造12x12旋转变换矩阵 R
+        NC = T0.shape[0]
+        O = bm.zeros((NC, 3, 3))
+        row1 = bm.concatenate([T0   , O,  O,  O], axis=2)
+        row2 = bm.concatenate([O,  T0, O,  O], axis=2)
+        row3 = bm.concatenate([O,  O,  T0, O], axis=2)
+        row4 = bm.concatenate([O,  O,  O,  T0], axis=2)
+
+        R = bm.concatenate([row1, row2, row3, row4], axis=1)  #shape: (NC, 12, 12)
+        return R
     
     @cartesian
     def external_load(self) -> TensorLike:
@@ -145,7 +208,7 @@ class TimobeamAxleData3D:
         return F 
     
     @cartesian
-    def dirichlet_dof_index(self) -> TensorLike:
+    def dirichlet_dof(self) -> TensorLike:
         """Dirichlet boundary conditions are applied.
 
         Returns:

@@ -21,6 +21,8 @@ class StokesEquation(CNodeType):
     """
     TITLE: str = "Stokes 方程 (第一类边界条件)"
     PATH: str = "有限元.方程离散"
+    DESC: str = """该节点构建并组装带Dirichlet边界条件的Stokes方程有限元离散系统, 
+                输出包含系统算子与右端项向量，用于稳态粘性流动求解。"""
     INPUT_SLOTS = [
         PortConf("uspace", DataType.SPACE, title="速度函数空间"),
         PortConf("pspace", DataType.SPACE, title="压力函数空间"),

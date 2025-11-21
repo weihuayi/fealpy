@@ -2,7 +2,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod,cartesian
 from fealpy.model import ComputationalModel
 from fealpy.fem import DirichletBC
-from .equation import IncompressibleNS
+from fealpy.cfd.equation import IncompressibleNS
 from .simulation.time import UniformTimeLine
 
 
@@ -11,8 +11,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         super().__init__(pbar_log = True, log_level = "INFO")
         self.pde = pde
         self.equation = IncompressibleNS(self.pde)
-        self.T0, self.T1, self.nt = 0, 1, 100
-        self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
+        self.timeline = UniformTimeLine(0, 1, 100)
         self.options = options
         
         if mesh is None:
@@ -34,7 +33,6 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             self.maxit = options.get('maxit', 5)
             self.maxstep = options.get('maxstep', 10)
             self.tol = options.get('tol', 1e-10)
-            # self.apply_bc = self.apply_bc[options['apply_bc']]
 
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the computational model configuration."""
@@ -51,6 +49,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             s += f"  maxit          : {self.maxit}\n"
         s += ")"
         self.logger.info(f"\n{s}")
+   
+
+    def set_timeline(self, timeline: UniformTimeLine):
+        self.timeline = timeline
 
     @variantmethod("Newton")
     def method(self):
@@ -106,17 +108,24 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         maxstep = self.maxstep if self.options is not None else maxstep
         tol = self.tol if self.options is not None else tol
 
-        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, t = self.timeline.T0)))
-        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, t = self.timeline.T0)))
+        u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, self.timeline.T0)))
+        p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, self.timeline.T0)))
         
+        mesh.nodedata['ph'] = p0
+        mesh.nodedata['uh'] = u0.reshape(self.mesh.GD,-1).T
+        mesh.to_vtk(f'ns2d_{str(0).zfill(10)}.vtu')
         for i in range(self.timeline.NL-1):
             t  = self.timeline.current_time()
             self.logger.info(f"time={t}")
             
             u1,p1 = self.run['one_step'](u0, p0, maxstep, tol)
-
+            
             u0[:] = u1
             p0[:] = p1
+
+            mesh.nodedata['ph'] = p1
+            mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
+            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
             uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
             self.timeline.advance()
@@ -132,6 +141,8 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         tol = self.tol if self.options is not None else tol
 
         if self.method_str == "IPCS":
+            self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
+            
             BCu = DirichletBC(space=fem.uspace, 
                 gd = cartesian(lambda p : pde.velocity_dirichlet(p, self.timeline.next_time())), 
                 threshold=pde.is_velocity_boundary, 
@@ -145,12 +156,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uh1 = u0.space.function()
             uhs = u0.space.function()
             ph1 = p0.space.function()
-            
-            
-            self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
-            
+             
             A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
             uhs[:] = self.solve(A0, b0)
+            isbd = BCu.boundary_dof_index
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
             if self.equation.pressure_neumann == True:
@@ -158,7 +167,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             else:
                 ph1[:] = self.solve(A1, b1)
 
-            A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, return_form=False)
+            A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, BC=BCu, return_form=False)
             uh1[:] = self.solve(A2, b2)
             return uh1, ph1
         else:
@@ -168,40 +177,39 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             
             uk0 = u0.space.function()
             uk1 = u0.space.function()
-            uk0[:] = u0
-            pk = p0.space.function()
+            
+            pk0 = p0.space.function()
+            pk1 = p0.space.function()
 
             for j in range(maxstep): 
-                # tmr = timer()
-                # next(tmr)
                 self.equation.set_coefficient('body_force', cartesian(lambda p: pde.source(p, self.timeline.next_time())))  
                 fem.update(uk0, u0)
                 
                 A = BForm.assembly()
-                # tmr.send('左端项组装时间')
                 b = LForm.assembly()
-                # tmr.send('右端项组装时间')
                 A, b = self.fem.apply_bc(A, b, self.pde, t=self.timeline.next_time())
-                # tmr.send('边界条件处理时间')
-                A, b = self.fem.lagrange_multiplier(A, b, 0)
-                # tmr.send('拉格朗日乘子处理时间')
+                if self.equation.pressure_neumann == True:
+                    A, b = self.fem.lagrange_multiplier(A, b)
             
                 x = self.solve(A, b, 'mumps')
-                # tmr.send('求解线性方程组时间')
-                # next(tmr)
                 uk1[:] = x[:ugdof]
-                pk[:] = x[ugdof:-1]
+                if self.equation.pressure_neumann == True:
+                    pk1[:] = x[ugdof:-1]
+                else:
+                    pk1[:] = x[ugdof:]
                 
                 res_u = self.mesh.error(uk0, uk1)
-                # print(res_u)
-                if res_u < tol:
-                    break
+                res_p = self.mesh.error(pk0, pk1)
+                if res_u + res_p < tol:
+                    print(f"迭代收敛!迭代步数为{j+1}, 残差为{res_u + res_p}")
+                    return uk1, pk1
                 uk0[:] = uk1
-            return uk1, pk
+                pk0[:] = pk1
+            return uk1, pk1
     
 
     @run.register('uniform_refine')
-    def run(self, maxit=5, maxstep = 10, tol = 1e-12, apply_bc = 'dirichlet', postprocess = 'error'): 
+    def run(self, maxit=5, maxstep = 10, tol = 1e-12): 
         self.run_str = "uniform_refine"       
         maxit = self.maxit if self.options is not None else maxit
         maxstep = self.maxstep if self.options is not None else maxstep
@@ -209,21 +217,21 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         u_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
         for i in range(maxit):
-            self.logger.info(f'mesh: {self.pde.mesh.number_of_cells()}')
-            self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
+            self.logger.info(f'mesh: {self.mesh.number_of_cells()}')
             uh,ph = self.run['main']( maxstep, tol)
             self.nt = self.nt*4
-            self.equation = IncompressibleNS(self.pde)
+            self.timeline = UniformTimeLine(self.T0, self.T1, self.nt)
             uerror, perror = self.error(uh, ph, t= self.T1)
             u_errorMatrix[0, i] = uerror
             p_errorMatrix[0, i] = perror
-            order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
-            order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
-            self.pde.mesh.uniform_refine()
+            self.mesh.uniform_refine()
+        order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
+        order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
         self.logger.info(f"速度最终误差:" + ",".join(f"{uerror:.15e}" for uerror in u_errorMatrix[0,]))
         self.logger.info(f"order_u: " + ", ".join(f"{order_u:.15e}" for order_u in order_u))
         self.logger.info(f"压力最终误差:" + ",".join(f"{perror:.15e}" for perror in p_errorMatrix[0,]))  
         self.logger.info(f"order_p: " + ", ".join(f"{order_p:.15e}" for order_p in order_p))
+        return uh, ph
         
     @variantmethod('L2')
     def error(self, uh, ph, t):
@@ -233,3 +241,4 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         perror = self.mesh.error(cartesian(lambda p : self.pde.pressure(p, t = t)), ph)
         self.logger.info(f"uerror: {uerror}, perror: {perror}")
         return uerror, perror
+    

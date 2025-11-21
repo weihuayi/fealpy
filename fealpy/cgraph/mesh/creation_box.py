@@ -25,6 +25,14 @@ class Box2d(CNodeType):
     """
     TITLE: str = "矩形网格"
     PATH: str = "网格.构造"
+    DESC: str = """在二维矩形区域内按照两个垂直方向上的单元分段数生成均匀网格。
+                该节点通过接受一个矩形区域的横坐标和纵坐标组成的四元数组
+                和 x,y 两个方向的上的分段整数，构造均匀的三角形或四边形网格。
+                使用例子：创建一个四元列表或者数组[x_0 , x_1, y_0,y_1]节点, 
+                其描述了一个矩形边界的四个顶点分布，即 [x_i , y_j] ,i,j = 0,1 这四种组合，
+                将该节点连接到输入上，并输入一个两个整型数 int :  nx 和 ny 其描述了 x,y 两个方向上的单元分段数（注意不是节点数），
+                将该节点连接到输出即可查看网格构造效果。
+                """
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="triangle", items=["triangle", "quadrangle"]),
         PortConf("domain", DataType.NONE, title="区域"),
@@ -59,6 +67,14 @@ class Box3d(CNodeType):
     """
     TITLE: str = "长方体网格"
     PATH: str = "网格.构造"
+    DESC: str = """在三维矩体区域内按照三个垂直方向上的单元分段数生成均匀网格。
+                该节点通过接受一个矩体区域的三个笛卡尔坐标方向组成的六元数组
+                和 x,y,z 三个方向的上的分段整数，构造均匀的四面体或六面体网格。
+                使用例子：创建一个六元列表或者数组[x_0 , x_1, y_0,y_1,z_0,z_1]节点,
+                其描述了一个矩体边界的八个顶点分布，即 [x_i , y_j,z_k] ,i,j,k = 0,1 这八种组合，
+                将该节点连接到输入上，并输入一个两个整型数 int :  nx, ny, nz其描述了 x,y,z 三个方向上的单元分段数（注意不是节点数），
+                将该节点连接到输出即可查看网格构造效果。
+                """
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tetrahedron", items=["tetrahedron", "hexahedron"]),
         PortConf("domain", DataType.NONE, title="区域"),
@@ -95,6 +111,13 @@ class SquareHole(CNodeType):
     """
     TITLE: str = "带空腔的矩形"
     PATH: str = "网格.构造"
+    DESC: str = """在二维矩形区域内挖去一个圆形空腔区域，并按照某个单元尺寸生成三角形网格。
+                该节点通过接受一个矩形区域的横坐标和纵坐标组成的四元数组和描述圆形空腔的圆心和半径以及单元尺寸生成非结构三角形网格。
+                使用例子：创建一个四元列表或者数组[x_0 , x_1, y_0,y_1]节点, 
+                其描述了一个矩形边界的四个顶点分布，即 [x_i , y_j] ,i,j = 0,1 这四种组合，将该节点连接到输入上，
+                并分别输入四个浮点型数 X ，Y ，r ，h 表示空腔圆心的两个坐标分量、圆半径和单元尺寸（注意单元尺寸为区域内单元最长边长或者单元外接圆直径），
+                将该节点连接到输出即可查看网格构造效果。
+                """
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="triangle", items=["triangle"]),
         PortConf("domain", DataType.NONE, title="区域"),
@@ -135,6 +158,13 @@ class CubeSphericalHole(CNodeType):
     """
     TITLE: str = "带空腔的长方体"
     PATH: str = "网格.构造"
+    DESC: str = """在三维矩体区域内挖去一个球形空腔区域，并按照某个单元尺寸生成四面体网格。
+                该节点通过接受一个矩体区域的三个笛卡尔坐标方向组成的六元数组和描述球形空腔的球心和半径以及单元尺寸生成非结构四面体网格。
+                使用例子：创建一个六元列表或者数组[x_0 , x_1, y_0,y_1,z_0,z_1]节点, 其描述了一个矩体边界的八个顶点分布， 
+                即 [x_i , y_j,z_k] ,i,j,k = 0,1 这八种组合，将该节点连接到输入上，
+                并分别输入五个浮点型数 X，Y，Z，r，h 表示空腔球心的三个坐标分量、球半径和单元尺寸（注意单元尺寸为区域内单元最长边长或者单元外接球直径）,
+                将该节点连接到输出即可查看网格构造效果。
+                """
     INPUT_SLOTS = [
     PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tetrahedron", items=["tetrahedron"]),
     PortConf("domain", DataType.NONE, title="区域"),
@@ -180,6 +210,14 @@ class BoxMinusCylinder(CNodeType):
     """
     TITLE: str = "带空圆柱的长方体"
     PATH: str = "网格.构造"
+    DESC: str = """  在三维矩体区域内挖去一个圆柱空腔区域，并按照某个单元尺寸生成四面体网格。
+                该节点通过接受一个矩体区域的三个笛卡尔坐标方向组成的六元数组
+                和描述圆柱空腔的柱心、柱体朝向、半径、高度以及单元尺寸生成非结构四面体网格。
+                使用例子：创建一个六元列表或者数组 [x_0 , x_1, y_0,y_1,z_0,z_1]节点, 其描述了一个矩体边界的八个顶点分布，
+                即 [x_i , y_j,z_k] ,i,j,k = 0,1 这八种组合，将该节点连接到输入上，并分别输入如下三类浮点数：
+                X，Y，Z为柱心坐标分量，ax，ay，az为柱体朝向的三个分量（大小无所谓），cyl_radius，cyl_height，h 为柱体半径、高度和单元尺寸，
+                将该节点连接到输出即可查看网格构造效果。
+                """
     INPUT_SLOTS = [
     PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tetrahedron", items=["tetrahedron"]),
     PortConf("domain", DataType.NONE, title="区域"),

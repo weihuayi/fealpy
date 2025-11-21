@@ -28,6 +28,8 @@ from .optimal_control_integrator import OPCIntegrator
 from .optimal_control_source_integrator import OPCSIntegrator
 from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
 from .jump_penalty_intergrator import JumpPenaltyIntergrator
+from .spacetime_residual_integrator import SpaceTimeResidualIntegrator
+from .spacetime_source_residual_integrator import SpaceTimeSourceResidualIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -48,6 +50,7 @@ from .press_work_integrator import BoundaryPressWorkIntegrator
 from .face_source_integrator import BoundaryFaceSourceIntegrator, InterFaceSourceIntegrator
 ScalarNeumannBCIntegrator = BoundaryFaceSourceIntegrator
 ScalarRobinSourceIntegrator = BoundaryFaceSourceIntegrator
+from .tangent_face_mass_integrator import TangentFaceMassIntegrator
 
 ### Dirichlet BC
 from .dirichlet_bc import DirichletBC
@@ -69,6 +72,7 @@ from .optimal_contron_mixed_fem_model import OPCMixedFEMModel
 from .surface_poisson_lfem_model import SurfacePoissonLFEMModel
 from .helmholtz_lfem_model import HelmholtzLFEMModel
 from .curlcurl_lfem_model import CurlCurlLFEMModel
+from .parabolic_stfem_model import ParabolicSTFEMModel
 from .linear_elasticity_eigen_lfem_model import LinearElasticityEigenLFEMModel
 from .stokes_lfem_model import StokesLFEMModel
 from .dld_microfluidic_chip_lfem_model import DLDMicrofluidicChipLFEMModel
