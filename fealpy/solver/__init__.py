@@ -12,3 +12,9 @@ from .direct_solver_manger import DirectSolverManager
 from .iterative_solver_manger import IterativeSolverManager
 from .bicgstab import bicgstab
 from .bicg import bicg
+
+from .mgstokes import MGStokes
+
+from .transferP1red import transferP1red, indofP1
+from .transferP2red import transferP2red, indofP2
+
