@@ -1,6 +1,6 @@
 from .nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["VPDecoupling", "UDecoupling","GearboxPostprocess"]
+__all__ = ["VPDecoupling", "UDecoupling", "AntennaPostprocess","GearboxPostprocess"]
 
 class VPDecoupling(CNodeType):
     r"""Decouple velocity and pressure components from the combined output vector.
@@ -148,7 +148,7 @@ class AntennaPostprocess(CNodeType):
     DESC: str = "将天线的自由度平分到各自单元"
     INPUT_SLOTS = [
         PortConf("uh", DataType.FUNCTION, 1, desc="求解器输出的复数场自由度", title="有限元解"),
-        PortConf("spa变速箱模态后处理ce", DataType.SPACE, 1, desc="包含节点与单元拓扑的有限元空间", title="有限元空间"),
+        PortConf("space", DataType.SPACE, 1, desc="包含节点与单元拓扑的有限元空间", title="有限元空间"),
     ]
     OUTPUT_SLOTS = [
         PortConf("E", DataType.TENSOR, desc="各单元重心处的电场强度（实部）", title="单元电场"),

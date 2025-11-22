@@ -11,6 +11,7 @@ uher = cgraph.create("FEFunction")
 dipole_antenna_eq = cgraph.create("DipoleAntennaEquation")
 dbc = cgraph.create("DirichletBC")
 solver = cgraph.create("IterativeSolver")
+pross = cgraph.create("AntennaPostprocess")
 
 
 # 连接节点
@@ -39,9 +40,10 @@ solver(
     solver = "minres"
 )
 
+pross(uh = solver().out, space = spacer())
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher().mesh, uh=solver())
+WORLD_GRAPH.output(mesh=mesher().mesh, uh=solver(), E =pross())
 
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
