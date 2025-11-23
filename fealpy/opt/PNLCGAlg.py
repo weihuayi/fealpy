@@ -23,25 +23,29 @@ class PNLCG(Optimizer):
         x0: TensorLike,
         objective,
         Preconditioner: MatrixLike = None,
+        update_Preconditioner = None,
         MaxIters: int = 500,
+        FunValDiff: float = 1e-6,
         StepLengthTol: float = 1e-6,
         NormGradTol: float = 1e-6,
-        NumGrad = 10,
     ):
 
         return opt_alg_options(
             x0=x0,
             objective=objective,
             Preconditioner=Preconditioner,
+            update_Preconditioner=update_Preconditioner,
             MaxIters=MaxIters,
+            FunValDiff=FunValDiff,
             StepLengthTol=StepLengthTol,
             NormGradTol=NormGradTol,
-            NumGrad=NumGrad
         )
     def scalar_coefficient(self,g0,g1,stype='PR'):
         if stype =='PR':
             beta = bm.dot(g1,g1-g0)/bm.dot(g0,g0)
-            beta = max(0.0,beta)
+            #beta = max(0.0,beta)
+            if beta < 0 or bm.isnan(beta):
+                beta = 0.0
         return beta
 
     def run(self,stype='PR'):
@@ -55,7 +59,7 @@ class PNLCG(Optimizer):
         if options["Print"]:
             print(f'initial:  f = {f}, gnorm = {gnorm}')
         alpha = 1
-
+        
         if self.P is None:
             d = -g
         else:
@@ -66,38 +70,38 @@ class PNLCG(Optimizer):
             gtd = bm.dot(g, d)
              
             if gtd >= 0 or bm.isnan(gtd):
-                print(f'Not descent direction quit at iteration {i} witht statt {f}, grad:{gnorm}')
-                break
+                #print(f'Restarting CG direction at iteration {i}')
+                d = -g
+                continue
             
-            alpha, xalpha, falpha, galpha = strongwolfe.search(x, f, gtd, d, self.fun, alpha)
-            gnorm = bm.linalg.norm(g)
+            alpha, xalpha, falpha, galpha = strongwolfe.search(x, f, gtd, d, self.fun, alpha)       
+            diff = bm.abs(falpha - f)
+
+            gnorm = bm.linalg.norm(galpha)
+
             if options["Print"]:
                 print(f'current step {i}, StepLength = {alpha}, ', end='')
                 print(f'nfval = {self.NF}, f = {falpha}, gnorm = {gnorm}')
 
             if bm.abs(falpha - f) < options["FunValDiff"]:
                 print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
-                x = xalpha
-                f = falpha
-                g = galpha
-                break
+                return x, f, g
             
             if gnorm < options["NormGradTol"]:
                 print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {self.problem.NormGradTol}")
-                x = xalpha
-                f = falpha
-                g = galpha
-                break
+                return x, f, g
             
             if alpha < options["StepLengthTol"]:
                 print(f"The step length is smaller than the tolerance {self.problem.StepLengthTol}")
-                x = xalpha
-                f = falpha
-                g = galpha
-                break
-
+                return x, f, g
             x = xalpha
-            f = falpha 
+            f = falpha
+
+            if options["update_Preconditioner"] is None:
+                pass
+            else:
+                options["update_Preconditioner"](x)
+
             if self.P is None:
                 beta = self.scalar_coefficient(g,galpha,stype=stype)
                 g = galpha
@@ -108,5 +112,5 @@ class PNLCG(Optimizer):
                 g = galpha
                 pg0 = pg1
                 d = -pg0 + beta*d
-
+        print(f"Reached the Maximum number of iterations {options['MaxIters']} times")
         return x, f, g

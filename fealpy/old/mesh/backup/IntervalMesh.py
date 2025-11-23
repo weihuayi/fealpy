@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from types import ModuleType
 
-from ..quadrature import GaussLegendreQuadrature
+from ...quadrature import GaussLegendreQuadrature
 from .Mesh1d import Mesh1d
 
 class IntervalMesh(Mesh1d):

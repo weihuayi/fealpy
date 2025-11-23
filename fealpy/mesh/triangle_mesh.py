@@ -8,6 +8,8 @@ from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
 from fealpy.sparse import csr_matrix
 from fealpy.sparse import CSRTensor,COOTensor
+
+
 class TriangleMesh(SimplexMesh, Plotable):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
@@ -68,6 +70,10 @@ class TriangleMesh(SimplexMesh, Plotable):
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
     
     def reference_cell_measure(self):
+        """
+        Calculate the measure of the reference cell.
+        The measure of the reference triangle in 2D is 0.5
+        """
         return 0.5
     
     # quadrature
@@ -1139,7 +1145,20 @@ class TriangleMesh(SimplexMesh, Plotable):
         """
         @brief 找到定点 point 所在的单元，并计算其重心坐标 
         """
-        pass
+        index = self.location(point)
+        node = self.node
+        cell = self.entity('cell')
+        cm = self.cell_area()[index]
+        point = point[:, bm.newaxis, :]
+        v = node[cell[index]] - point
+        a0 = 0.5 * bm.abs(bm.cross(v[:, 1, :], v[:, 2, :]))
+        a1 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 2, :]))
+        a2 = 0.5 * bm.abs(bm.cross(v[:, 0, :], v[:, 1, :]))
+        result = bm.zeros((index.shape[0], 3))
+        result[:, 0] = a0 / cm
+        result[:, 1] = a1 / cm
+        result[:, 2] = a2 / cm
+        return index, result
 
     def mark_interface_cell(self, phi):
         """
@@ -1168,18 +1187,91 @@ class TriangleMesh(SimplexMesh, Plotable):
         pass
 
     @classmethod
-    def show_lattice(cls, p=1, shownltiindex=False):
+    def show_lattice(cls, p=1, showmultiindex=False):
         """
         @berif 展示三角形上的单纯形格点
         """
-        pass
+        import matplotlib.pyplot as plt
+        import matplotlib.tri as mtri
+        if showmultiindex:
+            n = 3
+        else:
+            n = 2
+
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
+        node = mesh.entity('node')
+        ips = mesh.interpolation_points(p)
+        c2p = mesh.cell_to_ipoint(p)
+        ips = ips[c2p].reshape(-1, 2)
+
+        fig = plt.figure()
+        axes = fig.add_subplot(1, n, 1)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True, fontcolor='k')
+
+        axes = fig.add_subplot(1, n, 2)
+        mesh.add_plot(axes)
+        mesh.find_node(axes, node=ips, showindex=True)
+        triangulation = mtri.Triangulation(ips[:, 0], ips[:, 1])
+        axes.triplot(triangulation, color='black', linestyle='dashed')
+        plt.show()
+
 
     @classmethod
     def show_shape_function(cls, p=1, funtype='L'):
         """
         @brief 可视化展示三角形单元上的 p 次基函数
         """
-        pass
+        import matplotlib.pyplot as plt
+
+        mesh = cls.from_one_triangle('equ')  # 返回只有一个单位等边三角形的网格
+        TD = mesh.top_dimension()
+        ldof = mesh.number_of_local_ipoints(p)
+
+        if p % 2 == 0:
+            m = (p + 2) // 2
+            n = p + 1
+        else:
+            m = (p + 1) // 2
+            n = p + 2
+
+        node = mesh.entity('node')
+        ips = mesh.interpolation_points(p)
+        c2p = mesh.cell_to_ipoint(p)
+        ips = ips[c2p].reshape(-1, 2)
+        bcs = mesh.multi_index_matrix(10 * p, TD) / 10 / p
+        ps = mesh.bc_to_point(bcs).reshape(len(bcs), -1)
+        if funtype == 'L':
+            phi = mesh.shape_function(bcs, p)
+        elif funtype == 'B':
+            phi = mesh._bernstein_shape_function(bcs, p)
+        fig = plt.figure()
+        for i in range(ldof):
+            axes = fig.add_subplot(m, n, i + 1, projection='3d')
+            axes.plot_trisurf(node[:, 0], node[:, 1], bm.zeros(3),
+                              color='#99BBF6', alpha=0.5)
+
+            for j in range(3):
+                axes.scatter(node[j, 0], node[j, 1], 0.0, color='k')
+                axes.text(node[j, 0], node[j, 1], 0.0, f'$x_{j}$', color='k')
+
+            axes.scatter(ips[i, 0], ips[i, 1], 1.0, color='r')
+            axes.text(ips[i, 0], ips[i, 1], 1 + 0.02, f'$p_{i}$', color='r')
+
+            axes.plot([ips[i, 0], ips[i, 0]], [ips[i, 1], ips[i, 1]], [0.0,
+                                                                       1.0], 'r--')
+
+            axes.plot_trisurf(ps[:, 0], ps[:, 1], phi[:, i], cmap='viridis',
+                              linewidths=0)
+            if p == 1:
+                axes.set_title(f'$\\phi_{{{i}}}=\\lambda_{{{i}}}$')
+            else:
+                axes.set_title(f'$\\phi_{{{i}}}$')
+            axes.set_xlabel('X')
+            axes.set_ylabel('Y')
+            axes.set_zlabel('Z')
+        plt.show()
+
 
     @classmethod
     def show_global_basis_function(cls, p=3):
@@ -1201,6 +1293,27 @@ class TriangleMesh(SimplexMesh, Plotable):
                 [1.0, 0.0],
                 [0.0, 1.0]], dtype=bm.float64)
         cell = bm.tensor([[0, 1, 2]], dtype=bm.int32)
+        return cls(node, cell)
+
+    @classmethod
+    def from_one_hexagon(cls):
+        t = bm.sqrt(3)/2.0
+        node = bm.array([
+            [ 0.0, 0.0], #0
+            [ 1.0, 0.0], #1
+            [ 0.5,   t], #2
+            [-0.5,   t], #3
+            [-1.0, 0.0], #4
+            [-0.5,  -t], #5
+            [ 0.5,  -t]  #6
+            ], dtype=bm.float64)
+        cell = bm.array([
+            [0, 1, 2],
+            [0, 2, 3],
+            [0, 3, 4], 
+            [0, 4, 5],
+            [0, 5, 6],
+            [0, 6, 1]], dtype=bm.int32)
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
@@ -1375,6 +1488,79 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         return cls(node, cell)
 
+    @classmethod
+    def from_box_with_circular_holes(cls, 
+                                     box=[0, 1, 0, 1], 
+                                     holes=[[0.5, 0.5, 0.1]], h=0.1): 
+        """
+        """
+        import gmsh
+
+        assert len(box) == 4, "box must be [xmin, xmax, ymin, ymax]"
+        xmin, xmax, ymin, ymax = map(float, box)
+        assert h > 0, "h must be positive."
+
+        print("[step] init gmsh")
+        gmsh.initialize()
+        gmsh.option.setNumber("General.Terminal", 1)
+
+        try:
+            print("[step] build geometry")
+            gmsh.model.add("box_with_holes")
+            xmin, xmax, ymin, ymax = map(float, box)
+
+            p1 = gmsh.model.occ.addPoint(xmin, ymin, 0)
+            p2 = gmsh.model.occ.addPoint(xmax, ymin, 0)
+            p3 = gmsh.model.occ.addPoint(xmax, ymax, 0)
+            p4 = gmsh.model.occ.addPoint(xmin, ymax, 0)
+            l1 = gmsh.model.occ.addLine(p1, p2)
+            l2 = gmsh.model.occ.addLine(p2, p3)
+            l3 = gmsh.model.occ.addLine(p3, p4)
+            l4 = gmsh.model.occ.addLine(p4, p1)
+            outer_loop = gmsh.model.occ.addCurveLoop([l1, l2, l3, l4])
+
+            hole_loops = []
+            for cx, cy, r in holes or []:
+                circle = gmsh.model.occ.addCircle(cx, cy, 0, r)
+                loop = gmsh.model.occ.addCurveLoop([circle])
+                hole_loops.append(loop)
+
+            surf = gmsh.model.occ.addPlaneSurface([outer_loop] + hole_loops)
+
+            gmsh.model.occ.synchronize()
+
+            print("[step] mesh options & generate")
+            gmsh.option.setNumber("Mesh.CharacteristicLengthMin", h)
+            gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
+            gmsh.model.mesh.generate(2)
+
+            # --- minimal stats ---
+            node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+            node = bm.from_numpy(node_coords.reshape(-1, 3)[:, 0:2]) # only 2D
+
+            tri_type = gmsh.model.mesh.getElementType("triangle", 1)
+            types, elemTags, elemNodeTags = gmsh.model.mesh.getElements(2)
+            print(f"[step] found {len(elemTags)} elements of type {tri_type} with {len(node_tags)} nodes")
+            cell = None
+            for etype, cell in zip(types, elemNodeTags):
+                if etype == tri_type:
+                    nn = gmsh.model.mesh.getElementProperties(etype)[3]
+                    cell = bm.array(cell, dtype=bm.int32).reshape(-1, nn) - 1
+                    break
+
+        finally:
+            print("[step] finalize gmsh")
+            gmsh.finalize()
+            NN = len(node)
+            isValidNode = bm.zeros(NN, dtype=bm.bool)
+            isValidNode = bm.set_at(isValidNode, cell, True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=cell.dtype)
+            idxMap = bm.set_at(idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=bm.int64))
+            cell = idxMap[cell]
+
+            return cls(node, cell)
+
     ## @ingroup MeshGenerators
     @classmethod
     def from_polygon_gmsh(cls, vertices, h):
@@ -1522,6 +1708,65 @@ class TriangleMesh(SimplexMesh, Plotable):
             return cls(node, cell), U.flatten(), V.flatten()
         else:
             return cls(node, cell)
+        
+    @classmethod        
+    def from_square_hole(cls, box = [0,1,0,1], scenter = [0.5,0.5], r=0.2 , h = 0.05):
+        import gmsh
+        gmsh.initialize()
+        lc = h
+
+        # 外框为矩形区域
+        t0,t1,t2,t3 = box
+        gmsh.model.geo.addPoint(t0, t2, 0, lc, 1)
+        gmsh.model.geo.addPoint(t1, t2, 0, lc, 2)
+        gmsh.model.geo.addPoint(t1, t3, 0, lc, 3)
+        gmsh.model.geo.addPoint(t0, t3, 0, lc, 4)
+
+        gmsh.model.geo.addLine(1, 2, 1)
+        gmsh.model.geo.addLine(3, 2, 2)
+        gmsh.model.geo.addLine(3, 4, 3)
+        gmsh.model.geo.addLine(4, 1, 4)
+
+        gmsh.model.geo.addCurveLoop([4, 1, -2, 3], 1)
+
+        # 圆的圆心和水平方向上的两个端点
+        c0,c1 = scenter
+        a0,a1 = c0-r, c1
+        b0,b1 = c0+r, c1
+        gmsh.model.geo.addPoint(c0,c1,0,lc,5)
+        gmsh.model.geo.addPoint(a0,a1,0,lc,6)
+        gmsh.model.geo.addPoint(b0,b1,0,lc,7)
+
+        gmsh.model.geo.addCircleArc(6,5,7,tag=5)
+        gmsh.model.geo.addCircleArc(7,5,6,tag=6)
+
+        gmsh.model.geo.addCurveLoop([5,6],2)
+
+        gmsh.model.geo.addPlaneSurface([1,2], 1)
+
+        gmsh.model.geo.synchronize() 
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),lc)
+
+        gmsh.model.mesh.generate(2)
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_tags = bm.from_numpy(node_tags)
+        node_coords = bm.from_numpy(node_coords)
+        node = node_coords.reshape((-1, 3))[:, :2]
+
+        # 节点编号映射
+        nodetags_map = dict({int(j): i for i, j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        # 节点编号映射到单元
+        evid = bm.array([nodetags_map[int(j)] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1], -1))
+
+        gmsh.finalize()
+        return cls(node, cell)
 
     ### 界面网格 ###
     # NOTE: 均匀网格改成作为一个参数传入，避免循环内调用本函数时反复实例化。
@@ -1591,7 +1836,16 @@ class TriangleMesh(SimplexMesh, Plotable):
 
     def to_vtk(self, fname=None, etype='cell', index: Index=_S):
         """
-        @brief 把网格转化为 vtk 的数据格式
+        Export the mesh to VTK format. 
+
+        Parameters:
+            fname (str): File name to save the mesh in VTK format. If None, returns the data instead.
+            etype (str): Type of entity to export ('cell' or 'face').
+            index (Index): Index of the entities to export. Default is all entities.
+
+        Returns:
+            If fname is None, returns the node coordinates, cell connectivity, cell type, and number of cells.
+            Otherwise, writes the mesh to a VTK file.
         """
         from .vtk_extent import  write_to_vtu
 
@@ -1664,6 +1918,58 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.array(mesh.entity('cell'), dtype=itype, device=device)
 
         return cls(node, cell)
+    
+    def location(self, points):
+        """
+        Notes
+        -----
+        给定一组点 p , 找到这些点所在的单元
+
+        这里假设：
+
+        1. 所有点在网格内部，
+        2. 网格中没有洞
+        3. 区域还要是凸的
+        """
+        from scipy.spatial import KDTree
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NP = points.shape[0]
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.cell_to_cell()
+
+        start = bm.zeros(NN, dtype=self.itype)
+        start[cell[:, 0]] = range(NC)
+        start[cell[:, 1]] = range(NC)
+        start[cell[:, 2]] = range(NC)
+        tree = KDTree(node)
+        _, loc = tree.query(points)
+        start = start[loc]  # 设置一个初始单元位置
+
+        isNotOK = bm.ones(NP, dtype=bm.bool)
+        while bm.any(isNotOK):
+            idx = start[isNotOK]
+            pp = points[isNotOK]
+
+            v0 = node[cell[idx, 0]] - pp  # 所在单元的三个顶点
+            v1 = node[cell[idx, 1]] - pp
+            v2 = node[cell[idx, 2]] - pp
+
+            a = bm.zeros((len(idx), 3), dtype=self.ftype)
+            a[:, 0] = bm.cross(v1, v2)
+            a[:, 1] = bm.cross(v2, v0)
+            a[:, 2] = bm.cross(v0, v1)
+            lidx = bm.argmin(a, axis=-1)
+
+            # 最小面积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0
+
+            idx0, = bm.nonzero(isNotOK)
+            start[idx0[isOutCell]] = cell2cell[idx[isOutCell], lidx[isOutCell]]
+            isNotOK[idx0[~isOutCell]] = False
+
+        return start
 
 TriangleMesh.set_ploter('2d')
 

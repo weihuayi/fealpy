@@ -1,5 +1,7 @@
-from .base import BaseEquation
 from typing import Union, Callable, Dict
+
+from .base import BaseEquation
+
 CoefType = Union[int, float, Callable]
 
 class IncompressibleNS(BaseEquation):
@@ -18,8 +20,14 @@ class IncompressibleNS(BaseEquation):
         }
         self.pde = pde
         if init_variables:
-            self.initialize_from_pde(pde) 
-    
+            self.initialize_from_pde(pde)
+        
+        if pde.is_pressure_boundary() == 0 :
+            self.pressure_neumann = True
+        else:
+            self.pressure_neumann = False
+
+
     def initialize_from_pde(self, pde):
         """
         根据 pde 对象初始化系数和变量。
@@ -50,7 +58,7 @@ class IncompressibleNS(BaseEquation):
         self._coefs['convection'] = rho
         self._coefs['pressure'] = 1
         self._coefs['viscosity'] = mu
-        self._coefs['body_force'] = getattr(pde, 'body_force', 0)
+        self._coefs['body_force'] = getattr(pde, 'source', 0)
 
         # 设置变量
         self._variables['velocity'] = getattr(pde, 'init_velocity', None)

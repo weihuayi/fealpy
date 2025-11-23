@@ -6,7 +6,7 @@ bm.set_backend('numpy')
 from ..sparse import spdiags
 from ..solver import spsolve
 
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ..mesh import UniformMesh     
 from . import DirichletBC, ConvectionOperator
 
@@ -86,7 +86,7 @@ class HyperbolicFDMModel:
                 Time-stepping scheme: forward Euler, backward Euler,
                 or Crank–Nicolson.
         """
-        self.pde = PDEDataManager('hyperbolic').get_example(example) 
+        self.pde = PDEModelManager('hyperbolic').get_example(example) 
         self.maxit = maxit
         self.ns = ns
         self.solver = spsolve

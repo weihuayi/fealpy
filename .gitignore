@@ -12,6 +12,7 @@ doc/project
 *.inp
 *.mtx
 *.mexa64
+*.mphtxt
 
 meviewer
 
@@ -74,3 +75,4 @@ tags
 .DS_Store
 *env
 tmp
+*.msh

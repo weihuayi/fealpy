@@ -1,6 +1,8 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import cartesian
+
 from fealpy.mesh import TriangleMesh
+
 class Channel: 
     def __init__(self, eps=1e-10, rho=1, mu=1, R=None):
         self.eps = eps

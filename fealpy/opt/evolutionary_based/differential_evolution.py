@@ -218,12 +218,18 @@ class DifferentialEvolution(Optimizer):
             # Mutation: Generate a mutant vector based on random individuals
             v = strategy.mutate()
 
+            # Boundary handling: Ensure the new solutions stay within the bounds
+            v = bm.clip(v, self.lb, self.ub)
+
             # Crossover: Combine the mutant vector with the current population
-            mask = bm.random.rand(self.N, self.dim) < cr
-            x_new = bm.where(mask, v, self.x)
+            r_zeros = bm.zeros((self.N, self.dim), dtype=bm.float64)
+            r_zeros[bm.arange(self.N), bm.random.randint(0, self.dim, (self.N,))] = 1
+            mask = (bm.random.rand(self.N, self.dim) < cr) + r_zeros
+            mask = bm.clip(mask, 0, 1)
+            x_new = mask * v + (1 - mask) * self.x
 
             # Boundary handling: Ensure the new solutions stay within the bounds
-            x_new = x_new + (self.lb - x_new) * (x_new < self.lb) + (self.ub - x_new) * (x_new > self.ub)
+            x_new = bm.clip(x_new, self.lb, self.ub)
 
             # Evaluation: Calculate the fitness of the new solutions
             fit_new = self.fun(x_new)

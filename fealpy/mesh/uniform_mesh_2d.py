@@ -443,7 +443,11 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     def edgex_barycenter(self) -> TensorLike:
         """
-        @brief Calculate the coordinates range for the edge centers in the x-direction.
+        Calculate the coordinates range for the edge centers in the x-direction.
+        Note that the tangent of the edge is towards the x-axis direction.
+
+        Returns
+            TensorLike: Barycentric coordinates of the edge centers in the x-direction.
         """
         nx = self.nx
         ny = self.ny
@@ -460,12 +464,16 @@ class UniformMesh2d(StructuredMesh, TensorMesh, Plotable):
 
     def edgey_barycenter(self) -> TensorLike:
         """
-        @brief Calculate the coordinates range for the edge centers in the x-direction.
+        Calculate the coordinates range for the edge centers in the y-direction.
+        Note that the tangent of the edge is towards the y-axis direction.
+
+        Returns
+            TensorLike: Barycentric coordinates of the edge centers in the y-direction.
         """
         nx = self.nx
         ny = self.ny
-        box = [self.origin[0] + self.h[0] / 2, self.origin[0] + self.h[0] / 2 + (nx - 1) * self.h[0],
-               self.origin[1], self.origin[1] + ny * self.h[1]]
+        box = [self.origin[0], self.origin[0] + nx * self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1]]
         x = bm.linspace(box[0], box[1], nx + 1)
         y = bm.linspace(box[2], box[3], ny)
         X, Y = bm.meshgrid(x, y, indexing='ij') 

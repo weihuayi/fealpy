@@ -54,7 +54,6 @@ DATA_TABLE is a registry, when adding new PDE models,
 follow the existing examples to register them in the registry.                  
 """                                                                             
 DATA_TABLE = {     # example name: (file_name, class_name)                                     
-    "single": ("single_charge_3d", "SingleCharge3D"),                              
-    # "exp":("exp_data_2d", "ExpDate2D")                                        
+                                         
 }                                                                               
                                             

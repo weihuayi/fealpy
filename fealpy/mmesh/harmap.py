@@ -1,4 +1,6 @@
-from .base import *
+from . import Monitor
+from . import Interpolater
+from .config import *
 from .tool import (quad_equ_solver,
                    cubic_equ_solver,
                    _compute_coef_2d,
@@ -6,10 +8,9 @@ from .tool import (quad_equ_solver,
                    segmenter)
 
 
-class Harmap(MM_monitor,MM_Interpolater):
-    def __init__(self,mesh,beta,space,config:Config):
-        MM_monitor.__init__(self,mesh,beta,space,config)
-        MM_Interpolater.__init__(self,mesh,space,config)
+class Harmap(Monitor, Interpolater):
+    def __init__(self, mesh, beta, space, config: Config):
+        super().__init__(mesh=mesh, beta=beta, space=space, config=config)
         self.alpha = config.alpha
         self.tol = config.tol
         self.maxit = config.maxit

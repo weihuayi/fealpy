@@ -143,7 +143,7 @@ class FlowPastCylinder:
             node,cell = self._fealpy_mesh(h)
             node = bm.device_put(node, device)
             cell = bm.device_put(cell, device) 
-        elif mesh == 'gmesh':
+        elif method == 'gmesh':
             node,cell = self._gmesh_mesh(h)
         else:
             raise ValueError(f"Unknown method:{method}")
@@ -175,12 +175,16 @@ class FlowPastCylinder:
                (bm.abs(p[..., 1] ) < self.eps)
     
     @cartesian
-    def is_u_boundary(self,p):
+    def is_velocity_boundary(self,p):
         return ~self.is_outflow_boundary(p)
     
     @cartesian
-    def is_p_boundary(self,p):
-        return self.is_outflow_boundary(p) 
+    def is_pressure_boundary(self,p=None):
+        if p is None:
+            return 1
+        else:
+            return self.is_outflow_boundary(p) 
+            #return bm.zeros_like(p[...,0], dtype=bm.bool)
 
     @cartesian
     def u_inflow_dirichlet(self, p):
@@ -192,17 +196,37 @@ class FlowPastCylinder:
         return value
     
     @cartesian
-    def p_dirichlet(self, p):
+    def pressure_dirichlet(self, p, t):
         x = p[...,0]
         y = p[...,1]
         value = bm.zeros_like(x)
         return value
 
     @cartesian
-    def u_dirichlet(self, p):
+    def velocity_dirichlet(self, p, t):
         x = p[...,0]
         y = p[...,1]
         index = self.is_inflow_boundary(p)
         result = bm.zeros_like(p)
         result[index] = self.u_inflow_dirichlet(p[index])
         return result
+    
+    @cartesian
+    def source(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        result = bm.zeros(p.shape, dtype=bm.float64)
+        result[..., 0] = 0
+        result[..., 1] = 0
+        return result
+    
+    def velocity(self, p ,t):
+        x = p[...,0]
+        y = p[...,1]
+        value = bm.zeros(p.shape)
+        return value
+
+    def pressure(self, p, t):
+        x = p[..., 0]
+        val = bm.zeros_like(x)
+        return val

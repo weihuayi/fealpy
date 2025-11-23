@@ -75,6 +75,48 @@ class RecoveryAlg:
 
             bm.index_add(deg, cell2dof, d)
             bm.index_add(gval, cell2dof, guh)
+        elif method == 'angle_average':
+            angle = space.mesh.angle() # (NC, ldof)
+            guh = bm.einsum('ij...,ij->ij...', guh, angle) # (NC, ldof, TD)
+            bm.index_add(deg, cell2dof, angle)
+            bm.index_add(gval, cell2dof, guh)   
+        elif method == 'SPR':
+            # Recover gradients at nodes whose associated element patches (stars) have at most two elements.
+            # A "star" is the set of elements sharing a given node.
+            bd_cell = space.mesh.boundary_cell_flag()
+            bm.index_add(deg, cell2dof[bd_cell], 1)
+            bm.index_add(gval, cell2dof[bd_cell], guh[bd_cell])
+            flag = (deg > 0.5)
+            gval = bm.add_at(gval, flag, gval[flag] / deg[flag, None])
+            # Then recover the gradients at the remaining nodes by performing local least-squares fitting
+            # over their element patches (stars), using the gradients at element centers.
+            n2c = space.mesh.node_to_cell('array') # (NN, NC)
+            num = bm.sum(n2c, axis=-1)
+            rflag = bm.where(num > 2)             
+            bp = space.mesh.entity_barycenter('cell') # (NC, GD)
+            bp = bm.where(n2c[..., None], bp[None, :, :], 0) # (NN, NC, TD)
+            x = bp[:, :, 0]; y = bp[:, :, 1]
+            # Construct the least-squares matrix A with shape (gdof, 3, 3)
+            A = bm.stack([
+                num, bm.sum(x, axis=1),   bm.sum(y, axis=1),
+                bm.sum(x, axis=1), bm.sum(x*x, axis=1), bm.sum(x*y, axis=1),
+                bm.sum(y, axis=1), bm.sum(x*y, axis=1), bm.sum(y*y, axis=1),
+            ], axis=-1).reshape(-1, 3, 3)
+            gu = bm.permute_dims(guh, (2, 0, 1))
+            # gu = guh.transpose(2, 0, 1) 
+            vec = bm.einsum('nij,kji->kni', bm.stack([n2c, x, y], axis=0), gu)
+            vec = bm.permute_dims(vec, (2, 1, 0))
+            # Construct the linear basis functions {1, x, y} for least-squares recovery
+            points = space.interpolation_points()
+            basis = bm.concat([bm.ones((gdof, 1)), points], axis=-1)[rflag]
+            invA = bm.linalg.inv(A[rflag])
+            r_gval = bm.einsum('ni,nij,njd->nd', basis, invA, vec[rflag])  # (N, 2)
+            gval = bm.set_at(gval, rflag, r_gval) 
+            deg = bm.set_at(deg, slice(gdof), 1)
+        elif method == 'PPR':
+            pass
+        elif method == 'SCR':
+            pass        
         else:
             raise ValueError('Unsupported method: %s' % method)
 

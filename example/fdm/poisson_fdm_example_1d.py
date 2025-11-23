@@ -1,7 +1,7 @@
 from fealpy.backend import backend_manager as bm
 bm.set_backend('numpy')
 
-from fealpy.model import PDEDataManager
+from fealpy.model import PDEModelManager
 
 from fealpy.mesh import UniformMesh
 from fealpy.fdm import LaplaceOperator
@@ -9,7 +9,7 @@ from fealpy.fdm import DirichletBC
 from fealpy.solver import spsolve
 import matplotlib.pyplot as plt
 
-pde = PDEDataManager('poisson').get_example('sin')
+pde = PDEModelManager('poisson').get_example('sin')
 # print(pde.__doc__)
 domain = pde.domain()
 

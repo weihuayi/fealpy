@@ -10,34 +10,44 @@ class PoissonPDEDataProtocol(Protocol):
         1. Domain specification methods (geometry,computational domain)
         2. Equation terms methods (exact solution, grdient and source terms)
         3. Boundary condition methods (Dirichlet, Neumann, Robin types)
-
+        4. scaling_function is a function that satisfies the boundary conditions.
+        
     Notes:  
         This protocol serves as a development guideline - implementing classes are encouraged to:
         - Provide implementations for the declared methods
         - Maintain consistent method signatures and return types
         - Implement methods relevant to their use case
     """
-    def geo_dimension(self) -> int: ...
+    def get_dimension(self) -> int: ...
     def domain(self) -> Sequence[float]: ...
-    def init_mesh(self): ...
     def solution(self, p: TensorLike) -> TensorLike: ...
     def gradient(self, p: TensorLike) -> TensorLike: ...
     def source(self, p: TensorLike) -> TensorLike: ...
     def dirichlet(self, p: TensorLike) -> TensorLike: ...
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike: ...
+    def neumann(self, p: TensorLike) -> TensorLike: ...
+    def is_neumann_boundary(self, p: TensorLike) -> TensorLike: ...
+    def robin(self, p: TensorLike) -> TensorLike: ...
+    def is_robin_boundary(self, p: TensorLike) -> TensorLike: ...
+    def scaling_function(p: TensorLike) -> TensorLike: ...
 
 PoissonPDEDataT = TypeVar('PoissonPDEDataT', bound=PoissonPDEDataProtocol)
-
 """
 DATA_TABLE is a registry, when adding new PDE models, 
 follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    "coscos": ("cos_cos_data_2d", "CosCosData2D"),
-    "coscoscos": ("cos_cos_cos_data_3d", "CosCosCosData3D"),
-    "sin": ("sin_data_1d", "SinData1D"),
-    "sinsin": ("sin_sin_data_2d", "SinSinData2D"),
-    "sinsinsin": ("sin_sin_sin_data_3d", "SinSinSinData3D"),
-
+    1: ("exp0001", "Exp0001"),
+    2: ("exp0002", "Exp0002"),
+    3: ("exp0003", "Exp0003"),
+    4: ("exp0004", "Exp0004"),
+    5: ("exp0005", "Exp0005"),
+    6: ("exp0006", "Exp0006"),
+    7: ("exp0007", "Exp0007"),
+    8: ("exp0008", "Exp0008"),
+    9: ("exp0009", "Exp0009"),
+    10: ("exp0010", "Exp0010"),
+    11: ("exp0011", "Exp0011"),
+    12: ("exp0012", "Exp0012"),
 }

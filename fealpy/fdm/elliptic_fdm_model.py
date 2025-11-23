@@ -2,7 +2,7 @@ from ..backend import backend_manager as bm
 import matplotlib.pyplot as plt
 from ..mesh import UniformMesh
 from ..model import ComputationalModel
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ..solver import spsolve
 from . import  DirichletBC
 from . import DiffusionOperator, ConvectionOperator, ReactionOperator
@@ -31,7 +31,7 @@ class EllipticFDMModel(ComputationalModel):
 
     Attributes
     ----------
-    pde : PDEDataManager
+    pde : PDEModelManager
         Manages PDE problem data (domain, solution, source term, etc.).
     maxit : int
         Maximum refinement iterations.
@@ -51,7 +51,7 @@ class EllipticFDMModel(ComputationalModel):
     def __init__(self, example: str = 'coscos', maxit: int = 4, ns: int = 20, 
                  solver=spsolve, method: str ='upwind_const_1'):
    
-        self.pde = PDEDataManager('elliptic').get_example(example)
+        self.pde = PDEModelManager('elliptic').get_example(example)
         self.maxit = maxit
         self.ns = ns
         self.solver = solver

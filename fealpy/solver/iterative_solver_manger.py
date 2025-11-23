@@ -141,9 +141,9 @@ class IterativeSolverManager:
                         
                     def solve(self, A, b):
                         M = (lambda x: self.pc.apply(x)) if self.pc else None
-                        args = dict(atol=self.atol, rtol=self.rtol, maxit=self.maxit, M=M, returninfo=True)
-                        x, info = self.func(A, b, **args)
-                        return x, info
+                        args = dict(atol=self.atol, rtol=self.rtol, maxit=self.maxit, M=M)
+                        x = self.func(A, b, **args)
+                        return x
                     
                 solver = FuncSolver(solver)
             solver.setup(self.A, pc=self.get_preconditioner(), rtol=self.rtol,

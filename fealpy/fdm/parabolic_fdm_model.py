@@ -7,7 +7,7 @@ bm.set_backend('numpy')
 from ..sparse import spdiags
 from ..solver import spsolve
 
-from ..model import PDEDataManager
+from ..model import PDEModelManager
 from ..mesh import UniformMesh  
 from . import LaplaceOperator, DirichletBC
 from . import DiffusionOperator, ConvectionOperator, ReactionOperator
@@ -47,7 +47,7 @@ class ParabolicFDMModel:
         
     Attributes
     ----------
-        pde : PDEDataManager
+        pde : PDEModelManager
             Manages PDE problem data (domain, ICs, BCs, exact solution)
         mesh : UniformMesh
             Current computational mesh
@@ -70,7 +70,7 @@ class ParabolicFDMModel:
                  ns: int = 20, solver=spsolve, nt: int = 400, 
                  scheme: str='backward', method: str ='upwind_const_1'):
     
-        self.pde = PDEDataManager('parabolic').get_example(example) 
+        self.pde = PDEModelManager('parabolic').get_example(example) 
         self.maxit = maxit
         self.ns = ns
         self.solver = spsolve
