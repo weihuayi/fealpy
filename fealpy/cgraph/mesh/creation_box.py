@@ -3,12 +3,51 @@ from ..nodetype import CNodeType, PortConf, DataType
 from .utils import get_mesh_class
 
 __all__ = [
+    "Int1d",
     "Box2d",
     "Box3d",
     "SquareHole",
     "CubeSphericalHole",
     "BoxMinusCylinder"
 ]
+
+
+class Int1d(CNodeType):
+    r"""Create a mesh in a box-shaped 2D area.
+
+    Inputs:
+        mesh_type (str): Type of mesh to granerate.
+        domain (tuple[float, float, float, float], optional): Domain.
+        n (int, optional): Segments on x direction.
+
+    Outputs:
+        mesh (MeshType): The mesh object created.
+    """
+    TITLE: str = "区间网格"
+    PATH: str = "网格.构造"
+    DESC: str = """在区间区网格内按照水平方向上的单元分段数生成均匀网格。
+                该节点通过接受一个区间区域的横坐标，和 x 方向的上的分段整数，构造均匀的三角形或四边形网格。
+                使用例子：创建一个二元列表或者数组[x_0 , x_1]节点, 
+                其描述了一个区间边界的两个顶点分布，
+                将该节点连接到输入上，并输入一个两个整型数 int :  nx 描述了 x 方向上的单元分段数（注意不是节点数），
+                将该节点连接到输出即可查看网格构造效果。
+                """
+    INPUT_SLOTS = [
+        PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="interval", items=["interval"]),
+        PortConf("interval", DataType.NONE, title="区域"),
+        PortConf("nx", DataType.INT, title="分段数", default=10, min_val=1),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("mesh", DataType.MESH, title="网格")
+    ]
+
+    @staticmethod
+    def run(mesh_type, interval, nx):
+        MeshClass = get_mesh_class(mesh_type)
+        kwds = {"nx": nx}
+        if interval is not None:
+            kwds["interval"] = interval
+        return MeshClass.from_interval_domain(**kwds)
 
 
 class Box2d(CNodeType):

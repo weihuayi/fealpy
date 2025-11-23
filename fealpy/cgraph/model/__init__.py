@@ -14,4 +14,4 @@ from .couette_flow import CouetteFlow
 from .rayleightaylor import RayleighTaylor
 from .linear_elasticity_eigen3d import LinearElasticityEigen3d
 from .microstrip_antenna3d import *
-from .rasing_bubble2d import RasingBubble2D
+from .water_purification_reactor import *

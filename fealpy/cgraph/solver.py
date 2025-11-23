@@ -94,16 +94,16 @@ class IterativeSolver(CNodeType):
 
 from .nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["ScipyEigenSolver"]
+__all__ = ["EigenSolver"]
 
-class ScipyEigenSolver(CNodeType):
-    TITLE: str = "Scipy特征值求解器"
+class EigenSolver(CNodeType):
+    TITLE: str = "特征值求解器"
     PATH: str = "解法器.特征值"
     INPUT_SLOTS = [
         PortConf("S", DataType.TENSOR, title="刚度矩阵 S"),
         PortConf("M", DataType.TENSOR, title="质量矩阵 M"),
-        PortConf("neigen", DataType.INT, title="求取特征值个数", default=6, min_val=1),
-        PortConf("which", DataType.STRING, title="求解特征值类型", default='SM'),
+        PortConf("neigen", DataType.INT, title="求取的特征值个数", default=6, min_val=1),
+        PortConf("which", DataType.STRING, title="eigsh which", default='SM'),
     ]
     OUTPUT_SLOTS = [
         PortConf("val", DataType.TENSOR, title="特征值"),
@@ -119,90 +119,54 @@ class ScipyEigenSolver(CNodeType):
         val, vec = eigsh(S, k=neigen, M=M, which=kwargs.get('which', 'SM'), tol=1e-6, maxiter=1000)
         return val, vec
     
-
-from .nodetype import CNodeType, PortConf, DataType
-
-__all__ = ["SLEPcEigenSolver"]
-
-class SLEPcEigenSolver(CNodeType):
-    TITLE: str = "SLEPc特征值求解器"
-    PATH: str = "解法器.特征值"
+class MGStokesSolver(CNodeType):
+    TITLE: str = "Stokes离散系统的多重网格求解器"
+    PATH: str = "simulation.solver"
+    
     INPUT_SLOTS = [
-        PortConf("S", DataType.TENSOR, title="刚度矩阵 S"),
-        PortConf("M", DataType.TENSOR, title="质量矩阵 M"),
-        PortConf("neigen", DataType.INT, title="求取特征值个数", default=6, min_val=1),
-        PortConf("sigma", DataType.FLOAT, title="目标值", default=0.0),
+        PortConf("op", DataType.LINOPS, title="初始系数矩阵"),
+        PortConf("F", DataType.TENSOR, title="右端向量"),
+        PortConf("Ai", DataType.LINOPS, title="每层的动量方程刚度矩阵"),
+        PortConf("Bi", DataType.LINOPS, title="每层的散度矩阵"),
+        PortConf("Bti", DataType.LINOPS, title="每层的梯度矩阵"),
+        PortConf("bigAi", DataType.TENSOR, title="最粗网格的整体矩阵"),
+        PortConf("P_u", DataType.LINOPS, title="速度插值矩阵"),
+        PortConf("R_u", DataType.LINOPS, title="速度限制矩阵"),
+        PortConf("P_p", DataType.LINOPS, title="压力插值矩阵"),
+        PortConf("R_p", DataType.LINOPS, title="压力限制矩阵"),
+        PortConf("Nu", DataType.INT, title="每层速度自由度"),
+        PortConf("Np", DataType.INT, title="每层压力自由度"),
+        PortConf("level", DataType.INT, title="多重网格层数"),
+        PortConf("auxMat", DataType.MENU, title="每层LSC-DGS平滑所需若干参数"),
+        PortConf("options", DataType.MENU, title="多重网格所需若干参数"),
     ]
     OUTPUT_SLOTS = [
-        PortConf("val", DataType.TENSOR, title="特征值"),
-        PortConf("vec", DataType.TENSOR, title="特征向量"),
+        PortConf("bigu", DataType.TENSOR, title="方程解"),
     ]
     
     @staticmethod    
-    def run(S, M, neigen, sigma):
-        
-        from petsc4py import PETSc
-        from slepc4py import SLEPc
-        from ..backend import backend_manager as bm
-        PS = PETSc.Mat().createAIJ(
-                size=S.shape, 
-                csr=(S.indptr, S.indices, S.data))
-        PS.assemble()
-        PM = PETSc.Mat().createAIJ(
-                size=M.shape, 
-                csr=(M.indptr, M.indices, M.data))
-        PS.assemble()
-        
+    def run(**kwargs):
+        from ..solver import MGStokes
+        op = kwargs.get('op')
+        F = kwargs.get('F')
+        Ai = kwargs.get('Ai')
+        Bi = kwargs.get('Bi')
+        Bti = kwargs.get('Bti')
+        bigAi = kwargs.get('bigAi')
+        P_u = kwargs.get('P_u')
+        R_u = kwargs.get('R_u')
+        P_p = kwargs.get('P_p')
+        R_p = kwargs.get('R_p')
+        Nu = kwargs.get('Nu')
+        Np = kwargs.get('Np')
+        level = kwargs.get('level')
+        auxMat = kwargs.get('auxMat')
+        options = kwargs.get('options')
 
-        eps = SLEPc.EPS().create()
-        eps.setOperators(PS, PM)
-        eps.setProblemType(SLEPc.EPS.ProblemType.GHEP)
-        #eps.setType(SLEPc.EPS.Type.KRYLOVSCHUR)
-        eps.setType(SLEPc.EPS.Type.LANCZOS)
-
-        opts = PETSc.Options()
-        opts['eps_lanczos_reorthog'] = 'local'
-        eps.setFromOptions()
-
-        eps.setWhichEigenpairs(SLEPc.EPS.Which.TARGET_REAL)
-        eps.setTarget(sigma)  # ← 显式设置目标
-
-        st = eps.getST()
-        st.setType(SLEPc.ST.Type.SINVERT)
-        st.setShift(sigma)
-
-        ksp = st.getKSP()
-        ksp.setType('preonly')
-        pc = ksp.getPC()
-        pc.setType('lu')
-        try:
-            pc.setFactorSolverType('mumps')
-        except Exception:
-            pc.setFactorSolverType('superlu')
-        vec = PS.getVecRight()
-        vec.setRandom()
-        eps.setInitialSpace([vec])
-        eps.setDimensions(nev=neigen, ncv=min(8*neigen, 200))
-        eps.setTolerances(tol=1e-6, max_it=10000)
-        
-        nn = S.shape[0]
-        v0 = bm.random.rand(nn) + 10000
-        v0 = PETSc.Vec().createWithArray(v0)
-        eps.setInitialSpace([v0])       
-        
-        eps.solve()
-        
-        eigvals = []
-        eigvecs = []
-
-        vr, vi = eps.getOperators()[0].getVecs()
-        print(f"Number of eigenvalues converged: {eps.getConverged()}")
-        for i in range(min(neigen, eps.getConverged())):
-            val = eps.getEigenpair(i, vr, vi)
-            eigvals.append(val.real)
-            eigvecs.append(vr.getArray().copy())
-        val = bm.array(eigvals)
-        vec = bm.array(eigvecs)
-
-
-        return val, vec
+        Solver = MGStokes(Ai, Bi, Bti, bigAi,
+                P_u, R_u, P_p, R_p,
+                Nu, Np, level, 
+                auxMat, options)
+        bigu = Solver.solve(op, F)
+        return bigu
+ 
