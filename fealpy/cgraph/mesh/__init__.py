@@ -13,4 +13,3 @@ from .inp_mesh_reader import InpMeshReader
 from .boundary_mesh_extractor import BoundaryMeshExtractor
 from .dipole_mesh import Dipole3d
 from .microstrip_patch_mesh import *
-from .water_purification_reactor_mesh import *
