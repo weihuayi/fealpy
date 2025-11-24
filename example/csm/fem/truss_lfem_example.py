@@ -1,6 +1,4 @@
 import argparse
-from fealpy.backend import backend_manager as bm
-from fealpy.csm.fem.bar_lfem_model import BarLFEMModel
 
 
 parser = argparse.ArgumentParser(description="""
@@ -47,17 +45,17 @@ parser.add_argument('--log_level',
                     help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
 options = vars(parser.parse_args())
+
+from fealpy.backend import backend_manager as bm
+from fealpy.csm.fem.truss_model import TrussModel
 bm.set_backend(options['backend'])
 
 
-model = BarLFEMModel(options)
-uh = model.solve()
+model = TrussModel(options)
+K, F = model.linear_system()
+K_bc, F_bc = model.apply_bc(K, F)
+uh = model.solve(K_bc, F_bc)
+strain, stress = model.compute_strain_and_stress(uh)
+mstress = model.calculate_von_mises_stress(stress)
 
-uh, strain, stress = model.print_results(uh=uh)
-model.show(uh=uh)
-
-model.show.set("strain")
-model.show(strain=strain)
-
-model.show.set("stress")
-model.show(stress=stress)
+model.show(uh, strain, stress, mstress)

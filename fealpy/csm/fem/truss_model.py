@@ -15,7 +15,7 @@ from ..model.truss import TrussPDEDataT
 from ..model.model_manager import CSMModelManager
 
 
-class BarLFEMModel(ComputationalModel):
+class TrussModel(ComputationalModel):
     """
     3D linear FEM model for truss structures with blocked DOF layout.
 
@@ -64,8 +64,7 @@ class BarLFEMModel(ComputationalModel):
         self.set_material()
     
     def set_pde(self, pde: Union[TrussPDEDataT, int] = 3) -> None:
-        """
-        Set PDE parameters and update model.
+        """Set PDE parameters and update model.
 
         Parameters:
             pde: PDE data manager or int.
@@ -78,8 +77,7 @@ class BarLFEMModel(ComputationalModel):
         self.logger.info(self.pde)
         
     def set_mesh(self, mesh: Mesh) -> None:
-        """
-        Set the mesh.
+        """Set the mesh.
 
         Parameters:
             mesh (Mesh): The mesh object.
@@ -98,8 +96,7 @@ class BarLFEMModel(ComputationalModel):
         self.space = TensorFunctionSpace(scalar_space, shape=(-1, self.GD))
 
     def set_material(self) -> None:
-        """
-        Set material properties.
+        """Set material properties.
 
         Parameters:
             E (float): Young's modulus.
@@ -111,8 +108,7 @@ class BarLFEMModel(ComputationalModel):
                                     poisson_ratio=self.nu)
 
     def linear_system(self):
-        """
-        Assemble and return stiffness matrix and load vector.
+        """Assemble and return stiffness matrix and load vector.
 
         Returns:
             K: Stiffness matrix.
@@ -125,123 +121,81 @@ class BarLFEMModel(ComputationalModel):
                                         model=self.pde, 
                                         material=self.material))
         K = bform.assembly()
-        
-        lform = LinearForm(self.space)
-        lform.add_integrator(VectorSourceIntegrator(source=self.pde.source))
-        F = lform.assembly()
-        F_load = F.reshape(-1, self.GD)
-        node = self.mesh.entity('node')
-        F_load[node[...,2]==5080] = bm.array([0.0, 900, 0])
-        F_load = F_load.reshape(-1)
-        return K, F_load
+        F = self.pde.load()
+        return K, F
+    
+    def apply_bc(self, K, F):
+        """Apply boundary conditions using DirichletBC.
 
-    def solve(self):
+        Parameters:
+            K: Stiffness matrix.
+            F: Load vector.
+
+        Returns:
+            K_bc: Modified stiffness matrix.
+            F_bc: Modified load vector.
+        """
+        gdof = self.space.number_of_global_dofs()
+        threshold = bm.zeros(gdof, dtype=bool)
+        threshold[self.pde.is_dirichlet_boundary()] = True
+        bc = DirichletBC(self.space, gd=self.pde.dirichlet_bc, 
+                         threshold=threshold)
+        K, F = bc.apply(K, F)
+        return K, F
+
+    def solve(self, K, F):
         """
         Solve the linear system and return the solution.
 
         Returns:
             uh: Solution vector.
         """
-        K, F = self.linear_system()
-        uh = self.space.function()
-        gdof = self.space.number_of_global_dofs()
-        threshold = bm.zeros(gdof, dtype=bool)
-        threshold[self.pde.is_displacement_boundary()] = True
-        bc = DirichletBC(self.space, gd=self.pde.displacement_bc, 
-                         threshold=threshold)
-        K,F= bc.apply(K, F)
-        uh[:] = spsolve(K, F, solver='scipy')
-        return uh
-   
-    def post_process(self,uh):
-        """
-        Compute displacement, strain, and stress.
-
-        Parameters:
-            uh: Solution vector.
-
-        Returns:
-            uh_mat: Displacement matrix.
-            strain: Strain per element.
-            stress: Stress per element.
-        """
-        NN = self.mesh.number_of_nodes()
-        uh_mat = uh[:].reshape(-1,self.GD)
-
-        mesh = self.mesh
-        E = self.E
-        edge = mesh.entity('edge')
-        l = mesh.edge_length()
-        tan = mesh.edge_tangent()
-        unit_tan = tan / l.reshape(-1, 1)
-
-        u_edge = uh_mat[edge]
-        delta_u = u_edge[:, 1, :] - u_edge[:, 0, :]
-        delta_l = bm.einsum('ij,ij->i', delta_u, unit_tan)
-        strain = delta_l / l
-        stress = E * strain
-        return uh_mat, strain, stress
-
-    def print_results(self,uh):
-        """
-        Print displacement, strain, and stress.
-
-        Parameters:
-            uh: Solution vector.
-
-        Returns:
-            uh_mat: Displacement matrix.
-            strain: Strain per element.
-            stress: Stress per element.
-        """
-        uh_mat, strain, stress = self.post_process(uh=uh)
-        uh_mat = bm.to_numpy(uh_mat)
-        strain = bm.to_numpy(strain)
-        stress = bm.to_numpy(stress)
+        uh = spsolve(K, F, solver='scipy')
         
-        self.logger.info(f"Displacement uh:\n{uh_mat}")
-        self.logger.info(f"Strain per element:\n{strain}")
-        self.logger.info(f"Stress per element:\n{stress}")
-        return uh_mat, strain, stress
-
-    def run(self):
-        """
-        Solve and show results.
-
-        Returns:
-            uh_mat: Displacement matrix.
-            strain: Strain per element.
-            stress: Stress per element.
-        """
-        self.solve()
-        return self.show()
+        # self.logger.info(f"Solution : {uh.reshape(-1, 3)}")
+        
+        return uh
     
-    @variantmethod("displacement")
-    def show(self, uh):
+    def compute_strain_and_stress(self, disp):
+                """Compute axial strain and stress for truss elements."""
 
-        mesh = self.mesh
-        uh = uh.reshape(-1, self.GD)
-        mesh.nodedata['displacement']=uh
-        save_path = "../bar_result"
-        import os
-        os.makedirs(save_path, exist_ok=True)
-        mesh.to_vtk(f"{save_path}/bar_displacement.vtu")
+                uh = disp.reshape(-1, self.GD)
+                
+                strain, stress = self.material.compute_strain_and_stress(
+                                self.mesh,
+                                uh,
+                                ele_indices=None)
 
-    @show.register("strain")
-    def show(self, strain):
-        mesh = self.mesh
-        mesh.edgedata['strain'] = strain
-        save_path = "../bar_result"
-        import os
-        os.makedirs(save_path, exist_ok=True)
-        mesh.to_vtk(f"{save_path}/bars_strain.vtu")
+                # self.logger.info(f"strain: {strain}")
+                # self.logger.info(f"stress: {stress}")
 
-    @show.register("stress")
-    def show(self, stress):
-        mesh = self.mesh
+                return strain, stress
 
-        mesh.edgedata['stress'] = stress
-        save_path = "../bar_result"
-        import os
-        os.makedirs(save_path, exist_ok=True)
-        mesh.to_vtk(f"{save_path}/bar_stress.vtu")
+    def calculate_von_mises_stress(self, stress):
+        """Calculate von Mises stress for truss elements."""
+        mstress = self.material.calculate_mises_stress(stress)
+        self.logger.info(f"mstress: {mstress}")
+        return mstress
+
+    def show(self, uh, strain, stress, mstress):
+                """Visualize displacement field, strain field, and stress field by saving to VTU files."""
+                
+                mesh = self.space.mesh
+                save_path = "../truss_result"
+                
+                disp = uh.reshape(-1, self.GD)
+        
+                import os
+                os.makedirs(save_path, exist_ok=True)
+                
+                mesh.nodedata['displacement'] = disp
+                mesh.to_vtk(f"{save_path}/disp.vtu")
+                
+                mesh.edgedata['strain'] = strain
+                mesh.to_vtk(f"{save_path}/strain.vtu")
+
+                mesh.edgedata['stress'] = stress
+                mesh.to_vtk(f"{save_path}/stress.vtu")
+
+                mesh.edgedata['von_mises_stress'] = mstress
+                mesh.to_vtk(f"{save_path}/von_mises_stress.vtu")

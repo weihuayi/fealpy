@@ -124,5 +124,17 @@ class BarMaterial(LinearElasticMaterial):
             stress[idx, 0] = self.E * axial_strain
             stress[idx, 1] = 0.0
             stress[idx, 2] = 0.0
-
+        # stress = strain @ self.stress_matrix()
         return strain, stress
+
+    def calculate_mises_stress(self, stress: TensorLike) -> TensorLike:
+        """Calculate von Mises stress from the stress tensor.
+
+        Parameters:
+            stress (TensorLike): The stress tensor of shape (num_elements, 3).
+
+        Returns:
+            TensorLike: The von Mises stress of shape (num_elements,).
+        """
+        mstress = stress[:, 0]
+        return bm.abs(mstress)

@@ -15,7 +15,7 @@ from fealpy.solver import spsolve
 
 from ..model.truss import TrussPDEDataT
 from ..model import CSMModelManager
-from ..material.bar_meterial import BarMaterial
+from ..material.bar_material import BarMaterial
 from ..fem.bar_integrator import BarIntegrator
 
 

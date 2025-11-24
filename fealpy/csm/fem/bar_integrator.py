@@ -78,7 +78,7 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
             A_selected = A  
         else:
             A_selected = A[index]  # (NC_selected,)
-    
+
         l = mesh.edge_length()[index].reshape(-1, 1)  # (NC_selected, 1)
         tan = mesh.edge_tangent()[index]  # (NC_selected, 3)
         unit_tan = tan / l  # (NC_selected, 3)
@@ -99,7 +99,6 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
             k *= EA
             
         k /= l[:, None] 
-         
         return k
     
     @assembly.register('geometric')
@@ -133,7 +132,7 @@ class BarIntegrator(LinearInt, OpInt, CellInt):
             A_selected = A
         else:
             A_selected = A[index]  # (NC_selected,)
-            
+
         #  Axial force in each element: N = sigma * A
         N = bm.einsum('ci, c -> c', sigma_selected, A_selected)  # (NC_selected,)
         l = mesh.edge_length()[index].reshape(-1, 1) 

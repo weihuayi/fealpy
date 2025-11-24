@@ -21,6 +21,7 @@ from ..model.beam import BeamPDEDataT
 from ..model import CSMModelManager
 from ..material import TimoshenkoBeamMaterial
 from ..fem.timoshenko_beam_integrator import TimoshenkoBeamIntegrator
+from ..utils import coord_transform
 
 
 class ChannelBeamModel(ComputationalModel):
@@ -202,8 +203,7 @@ class ChannelBeamModel(ComputationalModel):
                 """Compute axial strain and stress for beam elements."""
 
                 uh = disp.reshape(-1, self.GD*2)
-
-                R = self.pde.coord_transform()  # 获取变换矩阵
+                R = coord_transform(self.mesh, vref=[0, 1, 0])
                 
                 strain, stress = self.material.compute_strain_and_stress(
                                 self.mesh,

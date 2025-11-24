@@ -2,7 +2,6 @@ from typing import Union
 from fealpy.sparse import COOTensor
 
 from fealpy.backend import bm
-from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
 
 from fealpy.mesh import Mesh
@@ -10,15 +9,14 @@ from fealpy.functionspace import (
         LagrangeFESpace, 
         TensorFunctionSpace
         )
-from fealpy.fem import BilinearForm
-from fealpy.solver import spsolve, cg
+from fealpy.solver import spsolve
 
 from ..model.beam import BeamPDEDataT
 from ..model import CSMModelManager
 from ..material import TimoshenkoBeamMaterial,  BarMaterial
 from ..fem.timoshenko_beam_integrator import TimoshenkoBeamIntegrator
 from ..fem.axle_integrator import AxleIntegrator
-
+from ..utils import coord_transform
 
 class TimobeamAxleModel(ComputationalModel):
         """
@@ -154,7 +152,7 @@ class TimobeamAxleModel(ComputationalModel):
                 uh = disp.reshape(-1, 6)
                 NC = self.mesh.number_of_cells()
                 beam_indices = bm.arange(0, NC-10)  # 获取前面所有梁单元的索引
-                R = self.pde.coord_transform(index=beam_indices)  # 获取变换矩阵
+                R = coord_transform(self.mesh, vref=[0, 1, 0], index=beam_indices)
 
                 beam_strain, beam_stress = self.Timo.compute_strain_and_stress(
                                 self.mesh,
