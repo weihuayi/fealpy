@@ -114,12 +114,11 @@ class TrussModel(ComputationalModel):
             K: Stiffness matrix.
             F_load: Load vector.
         """
-        mesh = self.space.mesh
-        
         bform = BilinearForm(self.space)
-        bform.add_integrator(BarIntegrator(space=self.space, 
+        integrator = BarIntegrator(space=self.space, 
                                         model=self.pde, 
-                                        material=self.material))
+                                        material=self.material)
+        bform.add_integrator(integrator)
         K = bform.assembly()
         F = self.pde.load()
         return K, F
@@ -137,8 +136,12 @@ class TrussModel(ComputationalModel):
         """
         gdof = self.space.number_of_global_dofs()
         threshold = bm.zeros(gdof, dtype=bool)
-        threshold[self.pde.is_dirichlet_boundary()] = True
-        bc = DirichletBC(self.space, gd=self.pde.dirichlet_bc, 
+         
+        is_bd_dof = self.pde.is_dirichlet_boundary()
+        threshold[is_bd_dof] = True
+       
+        gd_value = self.pde.dirichlet_bc()
+        bc = DirichletBC(self.space, gd=gd_value, 
                          threshold=threshold)
         K, F = bc.apply(K, F)
         return K, F
@@ -188,14 +191,14 @@ class TrussModel(ComputationalModel):
                 import os
                 os.makedirs(save_path, exist_ok=True)
                 
-                mesh.nodedata['displacement'] = disp
-                mesh.to_vtk(f"{save_path}/disp.vtu")
+                # mesh.nodedata['displacement'] = disp
+                # mesh.to_vtk(f"{save_path}/disp.vtu")
                 
-                mesh.edgedata['strain'] = strain
-                mesh.to_vtk(f"{save_path}/strain.vtu")
+                # mesh.edgedata['strain'] = strain
+                # mesh.to_vtk(f"{save_path}/strain.vtu")
 
-                mesh.edgedata['stress'] = stress
-                mesh.to_vtk(f"{save_path}/stress.vtu")
+                # mesh.edgedata['stress'] = stress
+                # mesh.to_vtk(f"{save_path}/stress.vtu")
 
                 mesh.edgedata['von_mises_stress'] = mstress
                 mesh.to_vtk(f"{save_path}/von_mises_stress.vtu")

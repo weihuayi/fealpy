@@ -87,24 +87,29 @@ class TrussData3D:
 
     @cartesian
     def is_dirichlet_boundary(self) -> TensorLike:
-        """
-        Returns the indices of nodes with Dirichlet boundary conditions.
+        """Returns a boolean array indicating which DOFs have Dirichlet BCs.
 
         Returns:
-            TensorLike: Indices of boundary nodes.
+            TensorLike: Boolean array of shape (NN*GD,).
         """
-        return bm.array([18, 19, 20, 21, 22, 23, 24, 
-                         25, 26, 27, 28, 29], dtype=bm.int32)
+        node = self.mesh.entity('node')
+        GD = self.GD
+        
+        # 底部节点 (z < 1e-12)
+        is_bd_node = node[..., 2] < 1e-12
+        is_bd_dof = bm.repeat(is_bd_node, GD)
+    
+        return is_bd_dof
 
     @cartesian
-    def dirichlet_bc(self, p: TensorLike) -> TensorLike:
-        """
-        Returns the prescribed displacement values for boundary nodes.
+    def dirichlet_bc(self) -> TensorLike:
+        """Returns the prescribed displacement values for ALL DOFs.
 
-        Parameters:
-            p (TensorLike): The coordinates of boundary nodes.
 
         Returns:
-            TensorLike: Zero displacement.
+            TensorLike: Zero displacement vector of shape (NN*GD,).
         """
-        return bm.zeros_like(p)
+        NN = self.mesh.number_of_nodes()
+        GD = self.GD
+        
+        return bm.zeros(NN * GD, dtype=bm.float64)

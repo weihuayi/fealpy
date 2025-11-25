@@ -67,9 +67,9 @@ class BarMaterial(LinearElasticMaterial):
         return D
     
     def compute_strain_and_stress(self, 
-                                   mesh,
-                                   disp,
-                                   ele_indices=None) -> Tuple[TensorLike, TensorLike]:
+                               mesh,
+                               disp,
+                               ele_indices=None) -> Tuple[TensorLike, TensorLike]:
         """Calculate the strain and stress for bar elements.
             Compute axial strain: ε = (u1 - u0) / L
             Compute axial stress: σ = E * ε
@@ -83,48 +83,41 @@ class BarMaterial(LinearElasticMaterial):
             Tuple[TensorLike, TensorLike]: Strain and stress vectors.
         """
         NC = mesh.number_of_cells()
-        if ele_indices is None:
-            ele_indices = range(NC)
-            num_elements = NC
-        else:
+        GD = mesh.geo_dimension()
+        
+        # Reshape displacement vector to (NN, GD)
+        uh_mat = disp.reshape(-1, GD)
+        
+        # Get edge information
+        edge = mesh.entity('edge')
+        l = mesh.entity_measure('cell')
+        tan = mesh.edge_tangent()
+        unit_tan = tan / l.reshape(-1, 1)
+        
+        # Process specific elements or all
+        if ele_indices is not None:
+            edge = edge[ele_indices]
+            l = l[ele_indices]
+            unit_tan = unit_tan[ele_indices]
             num_elements = len(ele_indices)
-            
+        else:
+            num_elements = NC
+        
+        u_edge = uh_mat[edge]  # Shape: (num_elements, 2, GD)
+        u0 = bm.einsum('ij, ij -> i', u_edge[:, 0, :], unit_tan)   # u0 · t̂
+        u1 = bm.einsum('ij, ij -> i', u_edge[:, 1, :], unit_tan)  # u1 · t̂
+        
+        # ε = [-1/L, 1/L] · [u0, u1] = (u1 - u0) / L
+        axial_strain = (-u0 + u1) / l
+        axial_stress = self.E * axial_strain
+        
+        # Construct strain and stress
         strain = bm.zeros((num_elements, 3), dtype=bm.float64)
         stress = bm.zeros((num_elements, 3), dtype=bm.float64)
+        
+        strain[:, 0] = axial_strain
+        stress[:, 0] = axial_stress
 
-        edge_lengths = mesh.edge_length()
-        edge_tangents = mesh.edge_tangent()
-
-        for idx, i in enumerate(ele_indices):
-            cell = mesh.entity('cell', i)
-            node0_idx, node1_idx = cell[0], cell[1]
-            
-            # Get element-specific tangent vector and length
-            l = edge_lengths[i]
-            tan = edge_tangents[i]
-            unit_tan = tan / l
-
-            u_node0 = disp[node0_idx]
-            u_node1 = disp[node1_idx]
-            
-            # translational displacement 
-            u0_trans = u_node0[:3]
-            u1_trans = u_node1[:3]
-            
-            u0 = bm.dot(unit_tan, u0_trans)
-            u1 = bm.dot(unit_tan, u1_trans)
-            
-            # Axial strain: (u1 - u0) / L
-            axial_strain = (u1 - u0) / l
-
-            strain[idx, 0] = axial_strain
-            strain[idx, 1] = 0.0
-            strain[idx, 2] = 0.0
-
-            stress[idx, 0] = self.E * axial_strain
-            stress[idx, 1] = 0.0
-            stress[idx, 2] = 0.0
-        # stress = strain @ self.stress_matrix()
         return strain, stress
 
     def calculate_mises_stress(self, stress: TensorLike) -> TensorLike:
