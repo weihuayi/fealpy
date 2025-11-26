@@ -13,10 +13,11 @@ from fealpy.solver import spsolve
 
 from ..model.beam import BeamPDEDataT
 from ..model import CSMModelManager
-from ..material import TimoshenkoBeamMaterial,  BarMaterial
+from ..material import TimoshenkoBeamMaterial,  AxleMaterial
 from ..fem.timoshenko_beam_integrator import TimoshenkoBeamIntegrator
 from ..fem.axle_integrator import AxleIntegrator
-from ..utils import coord_transform
+from ..utils import CoordTransform
+
 
 class TimobeamAxleModel(ComputationalModel):
         """
@@ -87,7 +88,7 @@ class TimobeamAxleModel(ComputationalModel):
                                         elastic_modulus=self.beam_E,
                                         poisson_ratio=self.beam_nu)
                 
-                Axle = BarMaterial(name="axle",
+                Axle = AxleMaterial(name="axle",
                                 model=self.pde,
                                 elastic_modulus=self.axle_E,
                                 poisson_ratio=self.axle_nu)
@@ -152,7 +153,8 @@ class TimobeamAxleModel(ComputationalModel):
                 uh = disp.reshape(-1, 6)
                 NC = self.mesh.number_of_cells()
                 beam_indices = bm.arange(0, NC-10)  # 获取前面所有梁单元的索引
-                R = coord_transform(self.mesh, vref=[0, 1, 0], index=beam_indices)
+                coord_trans = CoordTransform(method='beam3d')
+                R = coord_trans.coord_transform_beam3d(self.mesh, vref=[0, 1, 0], index=beam_indices)
 
                 beam_strain, beam_stress = self.Timo.compute_strain_and_stress(
                                 self.mesh,
@@ -171,10 +173,13 @@ class TimobeamAxleModel(ComputationalModel):
                 uh = disp.reshape(-1, 6)
                 NC = self.mesh.number_of_cells()
                 axle_indices = bm.arange(NC-10, NC)  # 获取最后10个单元的索引
-                
+                coord_trans = CoordTransform(method='beam3d')
+                R = coord_trans.coord_transform_beam3d(self.mesh, vref=[0, 1, 0], index=axle_indices)
+
                 axle_strain, axle_stress = self.Axle.compute_strain_and_stress(
                                 self.mesh,
                                 uh,
+                                coord_transform=R,
                                 ele_indices=axle_indices)
                 
                 # self.logger.info(f"strain: {axle_strain}")

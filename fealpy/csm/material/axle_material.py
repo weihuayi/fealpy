@@ -5,11 +5,11 @@ from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
 
 
-class BarMaterial(LinearElasticMaterial):
-    """Material properties for 3D bars.
+class AxleMaterial(LinearElasticMaterial):
+    """Material properties for 3D axles.
     Parameters:
         name (str): The name of the material.
-        model (object): The model containing the bar's geometric and material properties.
+        model (object): The model containing the axle's geometric and material properties.
         E (float): The elastic modulus of the material.
         mu (float): The shear modulus of the material.
     """
@@ -35,17 +35,17 @@ class BarMaterial(LinearElasticMaterial):
         s = f"{self.__class__.__name__}(\n"
         s += "  === Material Parameters ===\n"
         s += f"  Name              : {self.get_property('name')}\n"
-        s += f"  [bar]  E           : {self.E}\n"
-        s += f"  [bar]  nu          : {self.nu}\n"
-        s += f"  [bar]  mu          : {self.mu}\n"
+        s += f"  [axle]  E           : {self.E}\n"
+        s += f"  [axle]  nu          : {self.nu}\n"
+        s += f"  [axle]  mu          : {self.mu}\n"
         s += ")"
         return s
     
     def linear_basis(self, x: float, l: float) -> TensorLike:
-        """Linear shape functions for a bar material.
+        """Linear shape functions for a axle material.
         Parameters:
-            x (float): Local coordinate along the bar axis.
-            l (float): Length of the bar element.
+            x (float): Local coordinate along the axle axis.
+            l (float): Length of the axle element.
         Returns:
             b (TensorLike): Linear shape functions evaluated at xi.
         """
@@ -100,35 +100,24 @@ class BarMaterial(LinearElasticMaterial):
         strain = bm.zeros((num_elements, 3), dtype=bm.float64)
         stress = bm.zeros((num_elements, 3), dtype=bm.float64)
         
-        u_edge = disp[edge]  # Shape: (num_elements, 2, GD)
+        u_edge = disp[edge]  # Shape: (num_elements, 2, 2*GD)
         
-        # [u1_x, u1_y, u1_z, u2_x, u2_y, u2_z]
-        u_global = u_edge.reshape(num_elements, 2 * GD)
-        
+        # [u1_x, u1_y, u1_z, u1_thetax, u1_thetay, u1_thetaz, u2_x, u2_y, u2_z,  u2_thetax, u2_thetay, u2_thetaz]
+        u_global = u_edge.reshape(num_elements, 12)
+
         if coord_transform is not None:
-            u_local = bm.einsum('cij, cj -> ci', coord_transform,  u_global) # Shape: (num_elements, 2)
+            u_local = bm.einsum('cij, cj -> ci', coord_transform,  u_global) # Shape: (num_elements, 12)
+            u_local_axial = u_local[:, [0, 6]]  # Shape: (num_elements, 2)
         else:
-            u_local = u_edge
+            u_local_axial = u_global[:, [0, 6]]  # Shape: (num_elements, 2)
 
         # u_local[:, 0] is axial displacement of node 1 (local x-direction)
         # u_local[:, 1] is axial displacement of node 2 (local x-direction)
         # ε = [-1/L, 1/L] · [u0, u1] = (u1 - u0) / L
-        axial_strain = (u_local[:, 1] - u_local[:, 0]) / l
+        axial_strain = (u_local_axial[:, 1] - u_local_axial[:, 0]) / l
         axial_stress = self.E * axial_strain
         
         strain[:, 0] = axial_strain
         stress[:, 0] = axial_stress
 
         return strain, stress
-
-    def calculate_mises_stress(self, stress: TensorLike) -> TensorLike:
-        """Calculate von Mises stress from the stress tensor.
-
-        Parameters:
-            stress (TensorLike): The stress tensor of shape (num_elements, 3).
-
-        Returns:
-            TensorLike: The von Mises stress of shape (num_elements,).
-        """
-        mstress = stress[:, 0]
-        return bm.abs(mstress)

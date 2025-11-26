@@ -1,7 +1,7 @@
 from typing import Union
+from fealpy.sparse import CSRTensor
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
-from fealpy.decorator import variantmethod
 
 from fealpy.mesh import Mesh
 from fealpy.functionspace import LagrangeFESpace, TensorFunctionSpace
@@ -13,9 +13,10 @@ from ..fem.bar_integrator import BarIntegrator
 from ..material import BarMaterial
 from ..model.truss import TrussPDEDataT
 from ..model.model_manager import CSMModelManager
+from ..utils import CoordTransform
 
 
-class TrussModel(ComputationalModel):
+class BarModel(ComputationalModel):
     """
     3D linear FEM model for truss structures with blocked DOF layout.
 
@@ -70,11 +71,14 @@ class TrussModel(ComputationalModel):
             pde: PDE data manager or int.
         """
         if isinstance(pde, int):
+            if pde not in [3, 4]:
+                raise ValueError(f"Invalid PDE ID: {pde}. Must be 3, 4.")
             self.pde = CSMModelManager('truss').get_example(pde)
         else:
             self.pde = pde
         
-        self.logger.info(self.pde)
+        # self.logger.info(self.pde.is_dirichlet_boundary())
+        # self.logger.info(self.pde.load())
         
     def set_mesh(self, mesh: Mesh) -> None:
         """Set the mesh.
@@ -121,6 +125,8 @@ class TrussModel(ComputationalModel):
         bform.add_integrator(integrator)
         K = bform.assembly()
         F = self.pde.load()
+        # self.logger.info(f"strain: {K}")
+        # self.logger.info(f"stress: {F}")
         return K, F
     
     def apply_bc(self, K, F):
@@ -143,7 +149,33 @@ class TrussModel(ComputationalModel):
         gd_value = self.pde.dirichlet_bc()
         bc = DirichletBC(self.space, gd=gd_value, 
                          threshold=threshold)
+        F = F.flatten()
         K, F = bc.apply(K, F)
+        
+        return K, F
+    
+    def apply_bc_penalty(self, K, F, penalty=1e12):
+        """Apply Dirichlet boundary conditions using Penalty Method."""
+        
+        is_bd_dof = self.pde.is_dirichlet_boundary()
+        fixed_dofs = bm.where(is_bd_dof)[0]
+        
+        F = F.flatten()
+        F[fixed_dofs] *= penalty
+        
+        K = K.toarray()
+        for dof in fixed_dofs:
+                K[dof, dof] *= penalty
+                
+        rows, cols = bm.nonzero(K)
+        values = K[rows, cols]
+        crow = bm.zeros(K.shape[0] + 1, dtype=bm.int64)
+        for i in range(len(rows)):
+            crow[rows[i] + 1] += 1
+        crow = bm.cumsum(crow)
+        
+        K = CSRTensor(crow, cols, values, spshape=K.shape)
+        
         return K, F
 
     def solve(self, K, F):
@@ -155,7 +187,7 @@ class TrussModel(ComputationalModel):
         """
         uh = spsolve(K, F, solver='scipy')
         
-        # self.logger.info(f"Solution : {uh.reshape(-1, 3)}")
+        # self.logger.info(f"Solution : {uh}")
         
         return uh
     
@@ -163,21 +195,24 @@ class TrussModel(ComputationalModel):
                 """Compute axial strain and stress for truss elements."""
 
                 uh = disp.reshape(-1, self.GD)
+                coord_trans = CoordTransform(method='bar3d')
+                R = coord_trans.coord_transform_bar3d(self.mesh)
                 
                 strain, stress = self.material.compute_strain_and_stress(
                                 self.mesh,
                                 uh,
+                                coord_transform=R,
                                 ele_indices=None)
 
-                # self.logger.info(f"strain: {strain}")
-                # self.logger.info(f"stress: {stress}")
+                #self.logger.info(f"strain: {strain}")
+                #self.logger.info(f"stress: {stress}")
 
                 return strain, stress
 
     def calculate_von_mises_stress(self, stress):
         """Calculate von Mises stress for truss elements."""
         mstress = self.material.calculate_mises_stress(stress)
-        self.logger.info(f"mstress: {mstress}")
+        # self.logger.info(f"mstress: {mstress}")
         return mstress
 
     def show(self, uh, strain, stress, mstress):
@@ -191,14 +226,14 @@ class TrussModel(ComputationalModel):
                 import os
                 os.makedirs(save_path, exist_ok=True)
                 
-                # mesh.nodedata['displacement'] = disp
-                # mesh.to_vtk(f"{save_path}/disp.vtu")
+                mesh.nodedata['displacement'] = disp
+                mesh.to_vtk(f"{save_path}/disp.vtu")
                 
-                # mesh.edgedata['strain'] = strain
-                # mesh.to_vtk(f"{save_path}/strain.vtu")
+                mesh.edgedata['strain'] = strain
+                mesh.to_vtk(f"{save_path}/strain.vtu")
 
-                # mesh.edgedata['stress'] = stress
-                # mesh.to_vtk(f"{save_path}/stress.vtu")
+                mesh.edgedata['stress'] = stress
+                mesh.to_vtk(f"{save_path}/stress.vtu")
 
-                mesh.edgedata['von_mises_stress'] = mstress
-                mesh.to_vtk(f"{save_path}/von_mises_stress.vtu")
+                mesh.edgedata['mises_stress'] = mstress
+                mesh.to_vtk(f"{save_path}/mises_stress.vtu")

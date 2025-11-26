@@ -5,13 +5,13 @@ from fealpy.backend import backend_manager as bm
 from fealpy.mesh import EdgeMesh
 
 
-class TrussData3D:
+class BarData25:
     """
-    A data structure class representing a 3D truss example.
+    A data structure class representing a 3D bar example.
 
-    This class specifically handles 3D truss structures, initializing with predefined node coordinates and edge connectivity.
-    It sets up the mesh, source term, distributed load, and boundary conditions tailored for truss geometries. Upon instantiation,
-    it provides methods to construct the mesh and define problem-specific data for the truss model.
+    This class specifically handles 3D bar structures, initializing with predefined node coordinates and edge connectivity.
+    It sets up the mesh, source term, distributed load, and boundary conditions tailored for bar geometries. Upon instantiation,
+    it provides methods to construct the mesh and define problem-specific data for the bar model.
 
     Parameters:
         None
@@ -25,10 +25,9 @@ class TrussData3D:
         geo_dimension(): Return the geometric dimension of the domain.
         domain(): Return the computational domain for API compatibility.
         init_mesh(): Construct and return the EdgeMesh for the truss structure.
-        source(x): Return the source term for the truss problem.
-        load(x): Return the distributed load for the truss problem.
-        is_displacement_boundary(): Return indices of nodes with displacement boundary conditions.
-        displacement_bc(p): Return prescribed displacement values for boundary nodes.
+        load(): Return the nodal loads for the truss problem.
+        is_dirichlet_boundary(): Return indices of nodes with displacement boundary conditions.
+        dirichlet_bc(): Return prescribed displacement values for boundary nodes.
     """
 
     def __init__(self):
@@ -83,7 +82,7 @@ class TrussData3D:
         
         node = self.mesh.entity('node')
         F[node[..., 2] == 5080] = bm.array([0, 900, 0])
-        return F.flatten()
+        return F
 
     @cartesian
     def is_dirichlet_boundary(self) -> TensorLike:

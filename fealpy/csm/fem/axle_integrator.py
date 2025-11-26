@@ -7,7 +7,7 @@ from fealpy.fem.integrator import (
     enable_cache)
 from fealpy.functionspace.space import FunctionSpace as _FS
 
-from ..utils import coord_transform
+from ..utils import CoordTransform
 
 
 class AxleIntegrator(LinearInt, OpInt, CellInt):
@@ -61,7 +61,8 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
         Ke = bm.concatenate((row1, row2, row3, row4), axis=0) # (12,12)
         
         # 刚度矩阵
-        R = coord_transform(mesh, vref=[0, 1, 0], index=cells)
+        coord_trans = CoordTransform(method='beam3d')
+        R = coord_trans.coord_transform_beam3d(mesh, vref=[0, 1, 0], index=cells)
         KE = bm.einsum('cji, ...jk, ckl -> cil', R, Ke, R)
        
         return KE
