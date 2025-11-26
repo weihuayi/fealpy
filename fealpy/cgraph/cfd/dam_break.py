@@ -98,8 +98,6 @@ class DamBreakParticleIterativeUpdate(CNodeType):
     def run(maxstep, dx, dy, rhomin, dt, c0, gamma, alpha, rho0, pp, bpp,output_dir):
         from fealpy.cfd.simulation.sph.particle_solver_new import BamBreakSolver,ParticleSystem
         from pathlib import Path
-        from fealpy.backend import backend_manager as bm
-        bm.set_backend("pytorch")
         from fealpy.cfd.simulation.utils_non_pyvista import VTKWriter2
         writer = VTKWriter2()
         

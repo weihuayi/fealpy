@@ -3,7 +3,7 @@ from scipy.spatial import cKDTree
 import matplotlib.pyplot as plt
 from fealpy.backend import TensorLike
 from typing import Dict
-import pyvista
+# import pyvista  #这里注释掉是为了保证研究院电脑上可以跑通,将来可以取消
 
 import numpy as np #画图
 
