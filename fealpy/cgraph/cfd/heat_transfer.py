@@ -23,8 +23,8 @@ class HeatTransferParticleGeneration(CNodeType):
         通过指定两个方向粒子间距dx和dy，可以生成相应的粒子分布。"""
     )
     INPUT_SLOTS = [
-        PortConf("dx", dtype=DataType.FLOAT, ttype=1, title="水平粒子间隔"),
-        PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔"),
+        PortConf("dx", dtype=DataType.FLOAT, ttype=1, title="水平粒子间隔", default=0.02),
+        PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔", default=0.02),
     ]
     OUTPUT_SLOTS = [
         PortConf("mesh", dtype=DataType.MESH, title="粒子分布"),
@@ -32,6 +32,8 @@ class HeatTransferParticleGeneration(CNodeType):
 
     @staticmethod
     def run(dx, dy):
+        from fealpy.backend import backend_manager as bm
+        bm.set_backend("pytorch")
         from fealpy.mesh.node_mesh import NodeMesh
         mesh = NodeMesh.from_heat_transfer_domain(dx=dx,dy=dy)
         return mesh
@@ -70,10 +72,10 @@ class HeatTransferParticleIterativeUpdate(CNodeType):
     """
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, 1, title="粒子分布"),
-        PortConf("maxstep", DataType.INT, 0, title="最大迭代步数"),
+        PortConf("maxstep", DataType.INT, 0, title="最大迭代步数",default=1000),
         PortConf("kernel", DataType.STRING, 0, title="选取核函数",default="quintic", items=["quintic", "cubic", "wendlandc2","quintic_wendland"]),
-        PortConf("dx", DataType.FLOAT, 0, title="核函数的平滑长度"),
-        PortConf("dt", DataType.FLOAT, 0, title="时间步长"),
+        PortConf("dx", DataType.FLOAT, 0, title="核函数的平滑长度",default=0.02),
+        PortConf("dt", DataType.FLOAT, 0, title="时间步长",default=0.00045454545454545455),
         PortConf("output_dir", DataType.STRING, title="输出目录")
     ]
     OUTPUT_SLOTS = [
@@ -86,7 +88,6 @@ class HeatTransferParticleIterativeUpdate(CNodeType):
     @staticmethod
     def run(mesh, maxstep,kernel, dx, dt,output_dir):
         from fealpy.backend import backend_manager as bm
-        bm.set_backend("pytorch")
         from fealpy.cfd.simulation.sph.sph_base import SPHQueryKernel, Kernel
         from fealpy.mesh.node_mesh import Space
         from fealpy.cfd.simulation.sph.equation_solver import EquationSolver

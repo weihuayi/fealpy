@@ -24,12 +24,10 @@ class DamBreakParticleGeneration(CNodeType):
         通过指定两个方向粒子间距dx和dy，可以生成相应的粒子分布。"""
     )
     INPUT_SLOTS = [
-        PortConf("dx", dtype=DataType.FLOAT, ttype=1, title="水平粒子间隔"),
-        PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔"),
+        PortConf("dx", dtype=DataType.FLOAT, ttype=1, title="水平粒子间隔",default=0.03),
+        PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔",default=0.03),
     ]
     OUTPUT_SLOTS = [
-        PortConf("dx", dtype=DataType.FLOAT, title="水平粒子间隔"),
-        PortConf("dy", dtype=DataType.FLOAT, title="垂直粒子间隔"),
         PortConf("pp", dtype=DataType.TENSOR, title="流体粒子坐标"),
         PortConf("bpp", dtype=DataType.TENSOR, title="边界粒子坐标"),
     ]
@@ -41,7 +39,7 @@ class DamBreakParticleGeneration(CNodeType):
         domain = BamBreak.from_bam_break_domain(dx, dy)
         pp = domain.node
         bpp = domain.nodedata
-        return dx, dy, pp, bpp
+        return pp, bpp
 
 
 class DamBreakParticleIterativeUpdate(CNodeType):
@@ -75,15 +73,15 @@ class DamBreakParticleIterativeUpdate(CNodeType):
     DESC: str = """该节点实现了基于光滑粒子流体动力学(SPH)的溃坝问题数值模拟求解器，
     包含完整的SPH算法流程：邻居搜索、密度更新、压力计算、速度更新、位置更新等。"""
     INPUT_SLOTS = [
-        PortConf("maxstep", DataType.INT, ttype=0, title="最大迭代步数"),
-        PortConf("dx", dtype=DataType.FLOAT, ttype=1, title="水平粒子间隔"),
-        PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔"),
-        PortConf("rhomin", dtype=DataType.FLOAT, ttype=0, title="最小参考密度"),
-        PortConf("dt", dtype=DataType.FLOAT, ttype=0, title="时间步长"),
-        PortConf("c0", dtype=DataType.FLOAT, ttype=0, title="初始声速"),
-        PortConf("gamma", dtype=DataType.FLOAT, ttype=0, title="比热容比"),
-        PortConf("alpha", dtype=DataType.FLOAT, ttype=0, title="人工粘性系数"),
-        PortConf("rho0", dtype=DataType.FLOAT, ttype=0, title="初始粒子密度"),
+        PortConf("maxstep", DataType.INT, ttype=0, title="最大迭代步数", default=2000),
+        # PortConf("dx", dtype=DataType.FLOAT, ttype=1, title="水平粒子间隔"),
+        # PortConf("dy", dtype=DataType.FLOAT, ttype=1, title="垂直粒子间隔"),
+        # PortConf("rhomin", dtype=DataType.FLOAT, ttype=0, title="最小参考密度"),
+        PortConf("dt", dtype=DataType.FLOAT, ttype=0, title="时间步长", default=0.001),
+        # PortConf("c0", dtype=DataType.FLOAT, ttype=0, title="初始声速", default=10),
+        # PortConf("gamma", dtype=DataType.FLOAT, ttype=0, title="比热容比", default=7),
+        # PortConf("alpha", dtype=DataType.FLOAT, ttype=0, title="人工粘性系数", default=0.01),
+        PortConf("rho0", dtype=DataType.FLOAT, ttype=0, title="初始粒子密度", default=1000),
         PortConf("pp", dtype=DataType.TENSOR, ttype=1, title="流体粒子坐标"),
         PortConf("bpp", dtype=DataType.TENSOR, ttype=1, title="边界粒子坐标"),
         PortConf("output_dir", DataType.STRING, title="输出目录")
@@ -95,7 +93,8 @@ class DamBreakParticleIterativeUpdate(CNodeType):
     
 
     @staticmethod
-    def run(maxstep, dx, dy, rhomin, dt, c0, gamma, alpha, rho0, pp, bpp,output_dir):
+    def run(maxstep, dt, rho0, pp, bpp,output_dir):
+        #dx, dy, rhomin, c0, gamma, alpha, 
         from fealpy.cfd.simulation.sph.particle_solver_new import BamBreakSolver,ParticleSystem
         from pathlib import Path
         from fealpy.cfd.simulation.utils_non_pyvista import VTKWriter2
