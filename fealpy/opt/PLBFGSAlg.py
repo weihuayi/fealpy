@@ -106,19 +106,17 @@ class PLBFGS(Optimizer):
                 print(f'nfval = {self.NF}, f = {f}, gnorm = {gnorm}')
 
             if diff < options["FunValDiff"]:
-                print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
-                flag = 1
-                return x, f, g, flag
+                print(f"Convergence achieved after {i} iterations, the function value difference is less than tolerance {options['FunValDiff']}")
+                return x, f, g
 
             if gnorm < options["NormGradTol"]:
-                print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {options['NormGradTol']}")
-                flag = 1
-                return x, f, g, flag
+                print(f"Convergence achieved after {i} iterations, the norm of current gradient is smaller than tolerance {options['NormGradTol']}")
+                return x, f, g
 
             if alpha <= options["StepLengthTol"]:
                 if j == 0:
-                    flag = 2
-                    return x, f, g, flag
+                    print(f"Quit at {i} iterations, Step length {alpha} is smaller than the tolerance {options['StepLengthTol']}")
+                    return x, f, g
                 else:
                     alpha = 1
                     ND = x.shape[0]
@@ -144,7 +142,5 @@ class PLBFGS(Optimizer):
                     self.Y.popleft()
                     self.Y.append(y)
 
-        if flag == 0:
-            flag = 3
         print(f"Reached the Maximum number of iterations {options['MaxIters']} times")
-        return x, f, g, flag
+        return x, f, g
