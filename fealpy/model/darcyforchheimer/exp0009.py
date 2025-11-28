@@ -1,9 +1,11 @@
-from typing import Sequence
-from ...decorator import cartesian
-from ...backend import TensorLike
+from typing import Optional, Sequence
 from ...backend import backend_manager as bm
+from ...decorator import cartesian
+from ...typing import TensorLike
+from ...mesher import BoxMesher2d
 
-class PostData5:
+
+class Exp0009(BoxMesher2d):
     """
     2D exponential-vortex Darcy-Forchheimer problem on Ω = [-1,1]×[-1,1]:
 
@@ -13,25 +15,27 @@ class PostData5:
 
     Exact solution:
         u(x,y) = (e^x sin(y), e^x cos(y))^T
-        p(x,y) = (x + y)/(x^2 + y^2 + 0.02)
+        p(x,y) = (x-x^2)(y-y^2)
         g(x,y) = 0
 
     Forcing term:
         f(x,y) = μ u + β |u| u + ∇p
 
     Parameters:
-        μ = 2.0
-        k = 4.0
+        μ = 1.0
+        k = 1.0
         ρ = 1.0
         β = 5.0
         tol = 1e-12
     """
     def __init__(self):
         # physical parameters
-        self.mu = 2.0
-        self.k = 4.0
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
+        self.mu = 1.0
+        self.k = 1.0
         self.rho = 1.0
-        self.beta = 5.0
+        self.beta = 1.0
         self.tol = 1e-12
 
     def geo_dimension(self) -> int:
@@ -40,7 +44,7 @@ class PostData5:
 
     def domain(self) -> Sequence[float]:
         """Return computational domain [xmin, xmax, ymin, ymax]."""
-        return [-1.0, 1.0, -1.0, 1.0]
+        return [0, 1.0, 0, 1.0]
 
     @cartesian
     def g(self, p: TensorLike) -> TensorLike:
@@ -58,18 +62,16 @@ class PostData5:
     def pressure(self, p: TensorLike) -> TensorLike:
         """Pressure p = (x+y)/(x^2+y^2+0.02)."""
         x, y = p[...,0], p[...,1]
-        denom = x**2 + y**2 + 0.02
-        return (x + y) / denom
+        return (x-x**2)*(y-y**2)
 
     @cartesian
     def grad_pressure(self, p: TensorLike) -> TensorLike:
         """Gradient of pressure ∇p."""
         x, y = p[...,0], p[...,1]
-        denom = x**2 + y**2 + 0.02
-        factor = 1/(denom**2)
-        dpdx = (denom - 2*x*(x+y)) * factor
-        dpdy = (denom - 2*y*(x+y)) * factor
+        dpdx = (1 - 2*x) * (y - y**2)
+        dpdy = (1 - 2*y) * (x - x**2)
         return bm.stack((dpdx, dpdy), axis=-1)
+
 
     @cartesian
     def f(self, p: TensorLike) -> TensorLike:

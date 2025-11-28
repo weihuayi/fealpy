@@ -75,7 +75,7 @@ class DarcyForchheimerTPDv:
         self.update_frequency = int(update_frequency)
 
         # free pressure indices 
-        self.freep = bm.arange(self.Np - 1)
+        self.freep = bm.arange(self.Np)
         self.Bff = self.B[self.freep, :]
         self.Bfft = self.Bff.T
 
@@ -172,7 +172,7 @@ class DarcyForchheimerTPDv:
         # initial global arrays
         poldAll = self.p0.copy()
         # enforce pressure reference
-        poldAll[-1] = 0.0
+        # poldAll[-1] = 0.0
         uoldAll = self.u0.copy()
 
         resu = bm.zeros(self.maxIt)

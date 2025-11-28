@@ -3,9 +3,9 @@ from typing import Union
 
 from ..backend import bm
 from ..mesh import Mesh, TriangleMesh
-from ..functionspace import TensorFunctionSpace, LagrangeFESpace
+from ..functionspace import TensorFunctionSpace, LagrangeFESpace,RaviartThomasFESpace
 from ..fem import BilinearForm, LinearForm, BlockForm
-from ..fem import ScalarSourceIntegrator, ScalarNeumannBCIntegrator, ScalarMassIntegrator, GradPressureIntegrator
+from ..fem import ScalarSourceIntegrator, ScalarNeumannBCIntegrator, ScalarMassIntegrator, GradPressureIntegrator, DivIntegrator
 from ..model import PDEModelManager, ComputationalModel
 from ..decorator import variantmethod
 from ..solver import  DarcyForchheimerTPDv
@@ -20,7 +20,7 @@ class DarcyForchheimerFEMModel(ComputationalModel):
                          log_level=options.get('log_level', 'INFO'))
         self.set_pde(options.get('pde', 3))
         self.set_init_mesh(options.get('init_mesh', "uniform_tri"),
-                           nx=options.get('nx',16), ny=options.get('ny', 16))
+                           nx=options.get('nx',10), ny=options.get('ny', 10))
         self.set_space_degree(options.get('pdegree', 1), options.get('udegree', 0))
 
     def set_pde(self, pde: Union[int, object] = 1):
@@ -48,12 +48,13 @@ class DarcyForchheimerFEMModel(ComputationalModel):
 
     def set_space_degree(self, pdegree: int = 1, udegree: int = 0):
         """Set FE spaces: pressure P^pdegree (continuous), velocity P^{udegree} (discontinuous)"""
-        self.pdegree = 2
+        self.pdegree = 1
         self.udegree = 1
 
-        self.pspace = LagrangeFESpace(self.mesh, p=self.pdegree)
-        space = LagrangeFESpace(self.mesh, p=self.udegree, ctype='D')
-        self.uspace = TensorFunctionSpace(space, (-1,2))
+        self.pspace = LagrangeFESpace(self.mesh, p=self.pdegree, ctype='D')
+        self.uspace = RaviartThomasFESpace(self.mesh, p=self.udegree)
+        # space = LagrangeFESpace(self.mesh, p=self.udegree, ctype='D')
+        # self.uspace = TensorFunctionSpace(space, (-1,2))
 
         # FE functions
 
@@ -70,24 +71,35 @@ class DarcyForchheimerFEMModel(ComputationalModel):
 
         # pressure-velocity coupling
         self.p_bform = BilinearForm(self.pspace, self.uspace)
-        self.p_bform.add_integrator(GradPressureIntegrator(q=4))
+        self.p_bform.add_integrator(DivIntegrator(coef=-1, q=3))
 
         # RHS forms (dont assemble here)
         self.ulform = LinearForm(self.uspace)
         self.ulform.add_integrator(ScalarSourceIntegrator(self.pde.f, q=4))
         self.plform = LinearForm(self.pspace)
         self.plform.add_integrator(ScalarSourceIntegrator(self.pde.g, q=4))
-        # try to add neumann if exists
-        try:
-            self.plform.add_integrator(ScalarNeumannBCIntegrator(source=self.pde.neumann, q=4))
-        except Exception:
-            pass
+         
+        # uspace, pspace = self.space()
+        # ugdof = uspace.number_of_global_dofs()
+        # G_apply = pspace.set_neumann_bc(gd)
+        # F = bm.zeros(ugdof, dtype=bm.float64)
+        # b_apply = bm.concatenate([G_apply,F],axis=0)
+        # b = b - b_apply
+        # # try to add neumann if exists
+        # try:
+        #     self.plform.add_integrator(ScalarNeumannBCIntegrator(source=self.pde.neumann, q=4))
+        # except Exception:
+        #     pass
 
     def linear_system(self):
 
         B = self.p_bform.assembly().T
         f = self.ulform.assembly()
         g = self.plform.assembly()
+        uspace = self.uspace
+        G = uspace.set_neumann_bc(self.pde.pressure)
+        f = f - G
+        
         return B, f, g
 
     def apply_bc(self, A, F):
@@ -96,7 +108,7 @@ class DarcyForchheimerFEMModel(ComputationalModel):
 
 
     @variantmethod("TPDv")
-    def solve(self, maxIt: int = 100, tol: float = 1e-8,
+    def solve(self, maxIt: int = 1000, tol: float = 1e-6,
               gamma0: float = 10, stepsize: float = 0.4, scaleu: float = 0.8):
 
 
@@ -115,7 +127,7 @@ class DarcyForchheimerFEMModel(ComputationalModel):
                                   stepsize=stepsize, scaleu=scaleu).TPDv()
         ip1 = self.mesh.integral(ph)/(sum(self.mesh.entity_measure('cell')))
         #ph[:] = ph[:] - ip1 + pspace.integralalg.integral(pde.pressure)/(sum(mesh.entity_measure('cell')))
-        ph[:] = ph[:] -  ip1 
+        # ph[:] = ph[:] -  ip1 
         eu = self.mesh.error(self.pde.velocity, uh)
         ep = self.mesh.error(self.pde.pressure, ph)
         
