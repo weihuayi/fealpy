@@ -10,7 +10,8 @@ materialer = cgraph.create("TrussTowerMaterial")
 truss_tower = cgraph.create("TrussTower")
 solver = cgraph.create("DirectSolver")
 postprocess = cgraph.create("UDecoupling")
-strain_stress = cgraph.create("BarStrainStress")
+coord = cgraph.create("Rbar3d")
+strain_stress = cgraph.create("TrussTowerStrainStress")
 
 model(
     dov=0.015,
@@ -29,12 +30,7 @@ mesher(
     face_diag = True
 )
 spacer(type="lagrange", mesh=mesher(), p=1)
-materialer(property="Steel", type="bar", 
-    dov=model().dov,
-    div=model().div,
-    doo=model().doo,
-    dio=model().dio,
-    E=2.0e11, nu=0.3)
+materialer(property="Steel", type="bar", E=2.0e11, nu=0.3)
 truss_tower(
     dov=model().dov,
     div=model().div,
@@ -53,20 +49,18 @@ solver(A = truss_tower().K,
        b = truss_tower().F)
 
 postprocess(out = solver().out, node_ldof=3, type="Truss")
+coord(mesh=mesher(), vref=None, index=None)
 strain_stress(
-    dov=model().dov,
-    div=model().div,
-    doo=model().doo,
-    dio=model().dio,
     E = materialer().E,
     nu = materialer().nu,
     mesh = mesher(),
-    uh = postprocess().uh,
-    ele_num = None
+    uh = solver().out,
+    coord_transform = coord().R
 )
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(uh=postprocess().uh, strain=strain_stress().strain, stress=strain_stress().stress)
+WORLD_GRAPH.output(uh=postprocess().uh, strain=strain_stress().strain, stress=strain_stress().stress
+                )
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

@@ -6,7 +6,7 @@ from .helmholtz import *
 from .stokes import *
 from .dipole_antenna import *
 from .timoaxle import *
-from .truss import *
+from .bar3d_model import *
 from .beam2d_model import *
 from .linear_elasticity_eigen import *
 from .beam3d_model import *

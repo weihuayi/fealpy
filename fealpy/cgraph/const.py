@@ -21,12 +21,12 @@ class ConstDomain(CNodeType):
         PortConf("value", DataType.STRING, 0, title="值", default="[0, 1]")
     ]
     OUTPUT_SLOTS = [
-        PortConf("value", DataType.DOMAIN, title="区域")
+        PortConf("value", DataType.LIST, title="区域")
     ]
     @staticmethod
     def run(value):
         domain = eval(value)
-        if isinstance(domain, (list, tuple)) and all(isinstance(x, int) for x in domain):
+        if isinstance(domain, (list, tuple)):
             return domain
         else:
             raise ValueError("Invalid domain value.")

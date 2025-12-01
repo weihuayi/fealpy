@@ -40,12 +40,12 @@ class PointSourceMaxwell(CNodeType):
                 和最多三个物体区域，为FDTD仿真提供物理问题定义。"""
     
     INPUT_SLOTS = [
-        PortConf("domain", DataType.DOMAIN, 0, title="计算域", default=[0, 5e-6, 0, 5e-6],),
+        PortConf("domain", DataType.LIST, 0, title="计算域", default=[0, 5e-6, 0, 5e-6],),
         PortConf("eps", DataType.FLOAT, 0, title="相对介电常数", default=1.0),
         PortConf("mu", DataType.FLOAT, 0, title="相对磁导率", default=1.0),
         
         # Single source configuration
-        PortConf("source1_position", DataType.DOMAIN, 0, title="第一源位置", default=[3e-6,2e-6],
+        PortConf("source1_position", DataType.LIST, 0, title="第一源位置", default=[3e-6,2e-6],
                 desc="源位置坐标，格式为(x,y)或(x,y,z)"),
         PortConf("source1_component", DataType.MENU, 0, title="第一源场分量", default="Ez",
                 items=["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"],
@@ -62,7 +62,7 @@ class PointSourceMaxwell(CNodeType):
         PortConf("source1_injection", DataType.MENU, 0, title="第一源注入方式", default="soft",
                 items=["soft", "hard"],
                 desc="源的注入方式：soft(叠加)或hard(覆盖)"),
-        PortConf("source2_position", DataType.DOMAIN, 0, title="第二源位置", default=None,
+        PortConf("source2_position", DataType.LIST, 0, title="第二源位置", default=None,
                 desc="源位置坐标，格式为(x,y)或(x,y,z)，None表示无第二个源"),
         PortConf("source2_component", DataType.MENU, 0, title="第二源场分量", default="Ez",
                 items=["Ex", "Ey", "Ez", "Hx", "Hy", "Hz"],
@@ -81,7 +81,7 @@ class PointSourceMaxwell(CNodeType):
                 desc="源的注入方式：soft(叠加)或hard(覆盖)"),
         
         # First object configuration
-        PortConf("object1_box", DataType.DOMAIN, 0, title="物体1边界框", default=None,
+        PortConf("object1_box", DataType.LIST, 0, title="物体1边界框", default=None,
                 desc="第一个物体的边界框，格式为[xmin, xmax, ymin, ymax]或[xmin, xmax, ymin, ymax, zmin, zmax]"),
         PortConf("object1_eps", DataType.FLOAT, 0, title="物体1介电常数", default=None,
                 desc="第一个物体的相对介电常数，None表示使用背景值"),
@@ -89,7 +89,7 @@ class PointSourceMaxwell(CNodeType):
                 desc="第一个物体的相对磁导率，None表示使用背景值"),
         
         # Second object configuration
-        PortConf("object2_box", DataType.DOMAIN, 0, title="物体2边界框", default=None,
+        PortConf("object2_box", DataType.LIST, 0, title="物体2边界框", default=None,
                 desc="第二个物体的边界框，格式为[xmin, xmax, ymin, ymax]或[xmin, xmax, ymin, ymax, zmin, zmax]"),
         PortConf("object2_eps", DataType.FLOAT, 0, title="物体2介电常数", default=None,
                 desc="第二个物体的相对介电常数，None表示使用背景值"),
@@ -97,7 +97,7 @@ class PointSourceMaxwell(CNodeType):
                 desc="第二个物体的相对磁导率，None表示使用背景值"),
 
         # third object configuration
-        PortConf("object3_box", DataType.DOMAIN, 0, title="物体3边界框", default=None,
+        PortConf("object3_box", DataType.LIST, 0, title="物体3边界框", default=None,
                 desc="第三个物体的边界框，格式为[xmin, xmax, ymin, ymax]或[xmin, xmax, ymin, ymax, zmin, zmax]"),
         PortConf("object3_eps", DataType.FLOAT, 0, title="物体3介电常数", default=None,
                 desc="第三个物体的相对介电常数，None表示使用背景值"),
@@ -108,7 +108,7 @@ class PointSourceMaxwell(CNodeType):
     OUTPUT_SLOTS = [
         PortConf("eps", DataType.FLOAT, title="相对介电常数"),
         PortConf("mu", DataType.FLOAT, title="相对磁导率"),
-        PortConf("domain", DataType.DOMAIN, title="计算域"),
+        PortConf("domain", DataType.LIST, title="计算域"),
         PortConf("source_config", DataType.TEXT, title="源配置"),
         PortConf("object_configs", DataType.TEXT, title="物体配置列表"),
     ]

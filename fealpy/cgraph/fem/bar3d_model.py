@@ -1,94 +1,178 @@
 from ..nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["Truss", "TrussTower"]
+__all__ = ["Bar25Model", "Bar942Model", "TrussTower"]
 
 
-class Truss(CNodeType):
+class Bar25Model(CNodeType):
     r"""
-    Assembles the global stiffness matrix and load vector for a 3D truss (bar) finite element model.
-
-    This node takes a function space, mesh, material properties (E, A), load parameters, 
-    and fixed node indices. It constructs the stiffness matrix, generates the load vector, 
-    applies Dirichlet boundary conditions, and returns the final system matrix `K` and vector `F`.
+    Assembles the global stiffness matrix and load vector for a 3D bar finite element model.
 
     Inputs:
+        GD (INT): Geometric dimension of the model.
         space (Space): A scalar Lagrange function space.
         mesh (Mesh): The mesh object representing the truss structure.
-        bar_E (float): Elastic modulus of the bar material.
-        A (float): Cross-sectional area of the bars.
-        p (float): The magnitude of the concentrated force.
-        top_z (float): The Z-coordinate of the nodes where the load is applied.
-        fixed_nodes (tensor): A tensor containing the indices of nodes with fixed (zero displacement) boundary conditions.
-
+        E (float): Elastic modulus of the bar material.
+        nu (float): Poisson's ratio of the bar material.
+        external_load (float): The global load vector applied to the structure.
+        dirichlet_dof (tensor): Boolean flags indicating Dirichlet boundary DOFs.
+        dirichlet_bc (tensor): Prescribed displacement values for all DOFs.
+        
     Outputs:
-        K (tensor): The global stiffness matrix with boundary conditions applied.
+        K (linops): The global stiffness matrix with boundary conditions applied.
         F (tensor): The global load vector with boundary conditions applied.
     """
-    TITLE: str = "桁架有限元模型"
+    TITLE: str = "25杆有限元模型"
     PATH: str = "simulation.discretization"
     DESC: str = "组装全局刚度矩阵K并应用边界条件, 输出K与F"
 
     INPUT_SLOTS = [
+        PortConf("GD", DataType.INT, 1, desc="模型的几何维数", title="几何维数"),
         PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),
-        PortConf("bar_E", DataType.FLOAT, 1, desc="弹性模量", title="杆的弹性模量"),
-        PortConf("A", DataType.FLOAT, 1, desc="横截面积", title="杆的横截面积"),
-        PortConf("mesh", DataType.MESH, 1, title="网格"),
-        PortConf("p", DataType.FLOAT, 0, desc="沿y轴的集中力", title="载荷", default=900.0),
-        PortConf("top_z", DataType.FLOAT, 0, desc="受力层Z坐标", title="受力层Z", default=5080.0),
-        PortConf("fixed_nodes", DataType.TENSOR, 1, desc="固定约束的节点", title="固定节点", default=[6, 7, 8, 9]),
+        PortConf("E", DataType.FLOAT, 1, desc="杆的弹性模量", title="弹性模量"),
+        PortConf("nu", DataType.FLOAT, 1, desc="杆的泊松比", title="泊松比"),
+        PortConf("external_load", DataType.FLOAT, 1, desc="集中载荷", title="载荷"),
+        PortConf("dirichlet_dof", DataType.TENSOR, 1, desc="Dirichlet边界条件的自由度索引", title="边界自由度"),
+        PortConf("dirichlet_bc", DataType.TENSOR, 1, desc="边界节点的位移约束值", title="边界位移的值")
+
     ]
     OUTPUT_SLOTS = [
-        PortConf("K", DataType.LINOPS, desc="处理边界后的刚度矩阵", title="全局刚度矩阵"),
-        PortConf("F", DataType.TENSOR, desc="处理边界后的载荷向量", title="全局载荷向量"),
+        PortConf("K", DataType.LINOPS, desc="处理边界后的刚度矩阵", title="算子"),
+        PortConf("F", DataType.TENSOR, desc="处理边界后的载荷向量", title="载荷"),
     ]
-
+    
     @staticmethod
     def run(**options):
         from fealpy.backend import bm
         from fealpy.functionspace import TensorFunctionSpace
-        from fealpy.csm.fem.bar_integrator import BarIntegrator
         from fealpy.fem import BilinearForm, DirichletBC
-
-        class material:
-            def __init__(self, options: dict):
-                self.E = options.get("bar_E")
-                self.A = options.get("A")
-
-        bar_material = material(options=options)
+        from fealpy.csm.model.truss.bar_data25_3d import BarData25
+        from fealpy.csm.material import BarMaterial
+        from fealpy.csm.fem.bar_integrator import BarIntegrator
+        
+        
+        pde = BarData25()
         space = options.get("space")
-        mesh = options.get("mesh")
-        top_z = options.get("top_z")
-        p = options.get("p")
-        fixed_nodes = options.get("fixed_nodes")
+        GD = options.get("GD")
+        tspace = TensorFunctionSpace(space, shape=(-1, GD))
         
-        node_coords = mesh.entity("node")
-        GD, NN = 3, mesh.number_of_nodes()
-        F = bm.zeros((NN, GD), dtype=bm.float64)
-        idx = bm.where(node_coords[..., 2] == top_z)[0]
-        if idx.size > 0:
-            F[idx] = bm.array([0.0, p, 0.0], dtype=bm.float64)
-        F = F.reshape(-1)
+        materil = BarMaterial(
+            model=pde,
+            name="bar",
+            elastic_modulus=options.get("E"),
+            poisson_ratio=options.get("nu"),
+        )
 
-        fn = bm.asarray(fixed_nodes, dtype=bm.int32)
-        dof_list = []
-        for k in range(3):
-            dof_list.append(3*fn + k)
-        fixed_dofs = bm.concatenate(dof_list).astype(bm.int32)
-        
-        tspace = TensorFunctionSpace(space, shape=(-1, 3))
         bform = BilinearForm(tspace)
-        bform.add_integrator(BarIntegrator(space=tspace, material=bar_material))
+        integrator = BarIntegrator(space=tspace, 
+                                        model=pde, 
+                                        material=materil)
+        bform.add_integrator(integrator)
         K = bform.assembly()
-
-        def zero_bc(p):
-            return bm.zeros_like(p)
-
-        threshold = bm.zeros(tspace.number_of_global_dofs(), dtype=bool)
-        threshold[fixed_dofs] = True
-        bc = DirichletBC(space=tspace, gd=zero_bc, threshold=threshold)
+        F = options.get("external_load")
+        
+        gdof = tspace.number_of_global_dofs()
+        threshold = bm.zeros(gdof, dtype=bool)
+         
+        is_bd_dof = options.get("dirichlet_dof")
+        threshold[is_bd_dof] = True
+       
+        gd_value = options.get("dirichlet_bc")
+        bc = DirichletBC(space=tspace, gd=gd_value, 
+                         threshold=threshold)
+        F = F.flatten()
         K, F = bc.apply(K, F)
+        
         return K, F
     
+
+class Bar942Model(CNodeType):
+    r"""
+    Assembles the global stiffness matrix and load vector for a 3D bar finite element model.
+
+    Inputs:
+        GD (INT): Geometric dimension of the model.
+        space (Space): A scalar Lagrange function space.
+        mesh (Mesh): The mesh object representing the truss structure.
+        E (float): Elastic modulus of the bar material.
+        nu (float): Poisson's ratio of the bar material.
+        external_load (float): The global load vector applied to the structure.
+        dirichlet_dof (tensor): Boolean flags indicating Dirichlet boundary DOFs.
+        dirichlet_bc (tensor): Prescribed displacement values for all DOFs.
+
+    Outputs:
+        K (linops): The global stiffness matrix with boundary conditions applied.
+        F (tensor): The global load vector with boundary conditions applied.
+    """
+    TITLE: str = "942杆有限元模型"
+    PATH: str = "simulation.discretization"
+    DESC: str = "组装全局刚度矩阵K并应用边界条件, 输出K与F"
+
+    INPUT_SLOTS = [
+        PortConf("GD", DataType.INT, 1, desc="模型的几何维数", title="几何维数"),
+        PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),
+        PortConf("E", DataType.FLOAT, 1, desc="杆的弹性模量", title="弹性模量"),
+        PortConf("nu", DataType.FLOAT, 1, desc="杆的泊松比", title="泊松比"),
+        PortConf("external_load", DataType.FLOAT, 1, desc="集中载荷", title="载荷"),
+        PortConf("dirichlet_dof", DataType.TENSOR, 1, desc="Dirichlet边界条件的自由度索引", title="边界自由度"),
+        PortConf("dirichlet_bc", DataType.TENSOR, 1, desc="边界节点的位移约束值", title="边界位移的值"),
+        PortConf("penalty", DataType.FLOAT, 0, desc="乘大数法系数", title="乘大数法系数", default=1e12)
+
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("K", DataType.LINOPS, desc="处理边界后的刚度矩阵", title="算子"),
+        PortConf("F", DataType.TENSOR, desc="处理边界后的载荷向量", title="载荷"),
+    ]
+    
+    @staticmethod
+    def run(**options):
+        from fealpy.backend import bm
+        from fealpy.sparse import CSRTensor
+        from fealpy.functionspace import TensorFunctionSpace
+        from fealpy.fem import BilinearForm, DirichletBC
+        from fealpy.csm.model.truss.bar_data942_3d import BarData942
+        from fealpy.csm.material import BarMaterial
+        from fealpy.csm.fem.bar_integrator import BarIntegrator
+       
+        pde = BarData942()
+        space = options.get("space")
+        GD = options.get("GD")
+        tspace = TensorFunctionSpace(space, shape=(-1, GD))
+        
+        materil = BarMaterial(
+            model=pde,
+            name="bar",
+            elastic_modulus=options.get("E"),
+            poisson_ratio=options.get("nu"),
+        )
+
+        bform = BilinearForm(tspace)
+        integrator = BarIntegrator(space=tspace, 
+                                        model=pde, 
+                                        material=materil)
+        bform.add_integrator(integrator)
+        K = bform.assembly()
+        F = options.get("external_load")
+        
+        is_bd_dof = options.get("dirichlet_dof")
+        fixed_dofs = bm.where(is_bd_dof)[0]
+        
+        F = F.flatten()
+        F[fixed_dofs] *= options.get("penalty")
+
+        K = K.toarray()
+        for dof in fixed_dofs:
+                K[dof, dof] *= options.get("penalty")
+
+        rows, cols = bm.nonzero(K)
+        values = K[rows, cols]
+        crow = bm.zeros(K.shape[0] + 1, dtype=bm.int64)
+        for i in range(len(rows)):
+            crow[rows[i] + 1] += 1
+        crow = bm.cumsum(crow)
+        
+        K = CSRTensor(crow, cols, values, spshape=K.shape)
+        
+        return K, F
 
 class TrussTower(CNodeType):
     r"""Truss Tower Finite Element Model Node.

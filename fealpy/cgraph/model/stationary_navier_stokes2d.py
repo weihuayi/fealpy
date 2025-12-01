@@ -31,7 +31,7 @@ class StationaryNS2d(CNodeType):
     OUTPUT_SLOTS = [
         PortConf("mu", DataType.FLOAT, title="粘度系数"),
         PortConf("rho", DataType.FLOAT, title = "密度"),
-        PortConf("domain", DataType.DOMAIN, title="求解域"),
+        PortConf("domain", DataType.LIST, title="求解域"),
         PortConf("velocity", DataType.FUNCTION, title="速度真解"),
         PortConf("pressure", DataType.FUNCTION, title="压力真解"),
         PortConf("source", DataType.FUNCTION, title="源"),

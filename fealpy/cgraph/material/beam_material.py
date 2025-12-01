@@ -1,7 +1,9 @@
 from typing import Union
 from ..nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["BeamMaterial", "ChannelBeamMaterial"]
+__all__ = ["BeamMaterial", 
+           "ChannelBeamMaterial",
+           "TimoMaterial"]
 
 
 class BeamMaterial(CNodeType):
@@ -20,11 +22,11 @@ class BeamMaterial(CNodeType):
             nu (float): Poisson's ratio of the beam.
     """
     TITLE: str = "欧拉梁材料属性"
-    PATH: str = "材料.固体"
+    PATH: str = "material.solid"
     DESC: str = "欧拉梁材料属性"
     INPUT_SLOTS = [
         PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
-        PortConf("beam_type", DataType.MENU, 0, desc="梁模型类型选择", title="梁材料类型",
+        PortConf("beam_type", DataType.MENU, 0, desc="梁模型类型选择", title="梁材料类型", default="Euler-Bernoulli",
                  items=["Euler-Bernoulli", "Timoshenko"]),
         PortConf("beam_E", DataType.FLOAT, 0, desc="梁的弹性模量", title="梁弹性模量", default=200e9),
         PortConf("beam_nu", DataType.FLOAT, 0, desc="梁的泊松比", title="梁泊松比", default=0.3),
@@ -63,8 +65,9 @@ class ChannelBeamMaterial(CNodeType):
         beam_type (MENU): Beam model type selection.
         mu_y (FLOAT): Ratio of maximum to average shear stress for y-direction shear.
         mu_z (FLOAT): Ratio of maximum to average shear stress for z-direction shear.
-        beam_E (FLOAT): Elastic modulus of the beam material.
-        beam_nu (FLOAT): Poisson’s ratio of the beam material.
+        E (FLOAT): Elastic modulus of the beam material.
+        nu (FLOAT): Poisson's ratio of the beam material.
+        density (FLOAT): Density of the beam material.
 
     Outputs:
         property (STRING): Material type.
@@ -74,20 +77,18 @@ class ChannelBeamMaterial(CNodeType):
     """
     TITLE: str = "槽形梁材料属性"
     PATH: str = "material.solid"
-    DESC: str = """该节点用于定义槽形梁的材料属性，并根据输入的梁几何参数和材料参数计算材料的基本力学常数，
-        包括弹性模量、泊松比和剪切模量。"""
+    DESC: str = """该节点用于定义槽形梁的材料参数。"""
         
     INPUT_SLOTS = [
-        PortConf("property", DataType.STRING, 0, desc="材料名称（如钢、铝等）", title="材料材质", default="Steel"),
-        PortConf("beam_type", DataType.MENU, 0, desc="轮轴材料类型选择", title="梁材料", default="Timo_beam", 
-                items=["Euler_beam", "Timo_beam"]),
-        PortConf("mu_y", DataType.FLOAT, 0, desc="y方向剪切应力的最大值与平均值比例因子", 
-                 title="y向剪切因子", default=2.44),
-        PortConf("mu_z", DataType.FLOAT, 0, desc="z方向剪切应力的最大值与平均值比例因子", 
-                 title="z向剪切因子", default=2.38),
-        PortConf("beam_E", DataType.FLOAT, 0, desc="梁的弹性模量", title="梁的弹性模量", default=2.1e11),
-        PortConf("beam_nu", DataType.FLOAT, 0, desc="梁的泊松比", title="梁的泊松比", default=0.25),
-        PortConf("beam_density", DataType.FLOAT, 0, desc="梁的密度", title="梁的密度", default=7800)
+        PortConf("property", DataType.MENU, 0, desc="材料名称", title="材料材质", default="structural-steel", 
+                 items=["structural-steel", "aluminum", "concrete", "plastic", "wood", "alloy"]),
+        PortConf("type", DataType.MENU, 0, desc="材料类型选择", title="梁类型", default="Timoshenko", 
+                items=["Euler-Bernoulli", "Timoshenko"]),
+        PortConf("mu_y", DataType.FLOAT, 1, desc="y方向剪切应力比", title="y方向剪切应力比", default=2.44),
+        PortConf("mu_z", DataType.FLOAT, 1, desc="z方向剪切应力比", title="z方向剪切应力比", default=2.38),
+        PortConf("E", DataType.FLOAT, 0, desc="梁的弹性模量", title="弹性模量", default=2.1e11),
+        PortConf("nu", DataType.FLOAT, 0, desc="梁的泊松比", title="泊松比", default=0.25),
+        PortConf("density", DataType.FLOAT, 0, desc="梁的密度", title="密度", default=7800)
     ]
     
     OUTPUT_SLOTS = [
@@ -98,19 +99,19 @@ class ChannelBeamMaterial(CNodeType):
     ]
     
     @staticmethod
-    def run(property="Steel", beam_type="Timoshemko_beam", 
-            mu_y=2.44, mu_z=2.38,
-            beam_E=2.1e11, beam_nu=0.3, beam_density=7800):
+    def run(**options):
         from fealpy.csm.model.beam.channel_beam_data_3d import ChannelBeamData3D
         from fealpy.csm.material import TimoshenkoBeamMaterial
         
+        mu_y = options.get("mu_y")
+        mu_z = options.get("mu_z")
         model = ChannelBeamData3D(mu_y=mu_y, mu_z=mu_z)
-        
-        beam_material = TimoshenkoBeamMaterial(model=model, 
-                                        name=beam_type,
-                                        elastic_modulus=beam_E,
-                                        poisson_ratio=beam_nu,
-                                        density=beam_density)
+
+        beam_material = TimoshenkoBeamMaterial(model=model,
+                                        name=options.get("type"),
+                                        elastic_modulus=options.get("E"),
+                                        poisson_ratio=options.get("nu"),
+                                        density=options.get("density"))
 
         return tuple(
             getattr(beam_material, name)
@@ -118,73 +119,60 @@ class ChannelBeamMaterial(CNodeType):
         )
         
 
-class ChannelStrainStress(CNodeType):
-    r"""Compute Strain and Stress for Channel Beam.
+class TimoMaterial(CNodeType):
+    r"""Timoshenko Beam Material Definition Node.
     
         Inputs:
-            mu_y (FLOAT): Ratio of maximum to average shear stress for y-direction shear.
-            mu_z (FLOAT): Ratio of maximum to average shear stress for z-direction shear.
-            beam_E (FLOAT): Elastic modulus of the beam material.
-            beam_nu (FLOAT): Poisson’s ratio of the beam material.
-            mesh (MESH): Mesh containing node and cell information.
-            uh (TENSOR): Post-processed displacement vector.
-            y (FLOAT): Local coordinates in the beam cross-section.
-            z (FLOAT): Local coordinates in the beam cross-section.
+            property (STRING): Material type, e.g., "Steel".
+            beam_type (MENU): Beam model type selection.
+            beam_para (TENSOR): Beam section parameters, each row represents [Diameter, Length, Count].
+            axle_para (TENSOR): Axle section parameters, each row represents [Diameter, Length, Count].
+            E (FLOAT): Elastic modulus of the beam material.
+            nu (FLOAT): Poisson's ratio of the beam material.
 
         Outputs:
-            strain (TENSOR): Computed strain at specified locations.
-            stress (TENSOR): Computed stress at specified locations.
+            E (FLOAT): Elastic modulus of the beam material.
+            nu (FLOAT): Poisson's ratio of the beam material.
+            mu (FLOAT): Shear modulus, computed as `E / [2(1 + nu)]`.
     """
-    TITLE: str = "槽形梁应变应力计算"
+    TITLE: str = "列车轮轴梁段部分材料属性"
     PATH: str = "material.solid"
-    DESC: str = """该节点用于计算槽形梁在给定载荷和边界条件下的应变和应力分布。"""
+    DESC: str = """该节点用于定义列车轮轴中梁段部分的材料属性。"""
+        
     INPUT_SLOTS = [
-        PortConf("mu_y", DataType.FLOAT, 1, desc="y方向剪切应力的最大值与平均值比例因子", 
-                 title="y向剪切因子"),        
-        PortConf("mu_z", DataType.FLOAT, 1, desc="z方向剪切应力的最大值与平均值比例因子", 
-                 title="z向剪切因子"),
-        PortConf("beam_E", DataType.FLOAT, 1, desc="梁的弹性模量", title="梁的弹性模量"),
-        PortConf("beam_nu", DataType.FLOAT, 1, desc="梁的泊松比", title="梁的泊松比"),
-        PortConf("mesh", DataType.MESH, 1, desc="槽形梁的三维网格", title="梁网格"),
-        PortConf("uh", DataType.TENSOR, 1, desc="有限元分析得到的位移解向量", title="位移解"),
-        PortConf("y", DataType.FLOAT, 0, desc="应变/应力评估的y坐标", title="y坐标", default=0.0),
-        PortConf("z", DataType.FLOAT, 0, desc="应变/应力评估的z坐标", title="z坐标", default=0.0),
+        PortConf("property", DataType.MENU, 0, desc="材料名称", title="材料材质", default="structural-steel", 
+                 items=["structural-steel", "aluminum", "concrete", "plastic", "wood", "alloy"]),
+        PortConf("type", DataType.MENU, 0, desc="轮轴材料类型选择", title="梁类型", default="Timoshenko", 
+                 items=["Euler-Bernoulli", "Timoshenko"]),
+        PortConf("beam_para", DataType.TENSOR, 1, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
+        PortConf("axle_para", DataType.TENSOR, 1, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),
+        PortConf("E", DataType.FLOAT, 0, desc="梁的弹性模量", title="梁的弹性模量", default=2.1e11),
+        PortConf("nu", DataType.FLOAT, 0, desc="梁的泊松比", title="梁的泊松比", default=0.3)
     ]
+    
     OUTPUT_SLOTS = [
-        PortConf("strain", DataType.TENSOR, title="应变"),
-        PortConf("stress", DataType.TENSOR, title="应力")
+        PortConf("E", DataType.FLOAT, title="梁的弹性模量"),
+        PortConf("nu", DataType.FLOAT, title="梁的泊松比"),
+        PortConf("mu", DataType.FLOAT, title="梁的剪切模量")
     ]
     
     @staticmethod
     def run(**options):
-        
-        from fealpy.csm.model.beam.channel_beam_data_3d import ChannelBeamData3D
+        from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         from fealpy.csm.material import TimoshenkoBeamMaterial
-        
-        mu_y = options.get("mu_y")
-        mu_z = options.get("mu_z")
 
-        model = ChannelBeamData3D(mu_y=mu_y, mu_z=mu_z)
-        
-        beam_E = options.get("beam_E")
-        beam_nu = options.get("beam_nu")
-        material = TimoshenkoBeamMaterial(model=model, 
-                                        name="Timoshenko_beam",
-                                        elastic_modulus=beam_E,
-                                        poisson_ratio=beam_nu)
-        
-        mesh = options.get("mesh")
-        disp = options.get("uh")
-        uh = disp.reshape(-1, 6)
-        y = options.get("y", 0.0)
-        z = options.get("z", 0.0)
-        strain, stress = material.compute_strain_and_stress(
-            mesh=mesh,
-            disp=uh,
-            cross_section_coords=(y, z),
-            axial_position=None,
-            coord_transform=model.coord_transform(),
-            ele_indices=None
+        model = TimobeamAxleData3D(
+            beam_para=options.get("beam_para"),
+            axle_para=options.get("axle_para")
+        )
+
+        beam_material = TimoshenkoBeamMaterial(model=model, 
+                                        name=options.get("type"),
+                                        elastic_modulus=options.get("E"),
+                                        poisson_ratio=options.get("nu"))
+
+        return tuple(
+            getattr(beam_material, name)
+            for name in ["E", "nu", "mu"]
         )
         
-        return strain, stress

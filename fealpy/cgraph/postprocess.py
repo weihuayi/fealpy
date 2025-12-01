@@ -85,51 +85,6 @@ class UDecoupling(CNodeType):
 
         return uh, theta
 
-class TrussPostprocess(CNodeType):
-    r"""Calculates the displacement of each node and the strain and stress of each rod element 
-    based on the raw displacement vector output by the solver and material parameters.
-
-    Inputs:
-        uh (tensor): Raw displacement vector output by the solver.
-        mesh (mesh): Mesh containing node and cell information.
-        E (float): Elastic modulus of the rod.
-    Outputs:
-        strain (tensor): Strain of each rod element.
-        stress (tensor): Stress of each rod element.
-        u (tensor): Reshaped displacement tensor (NN, GD).
-    """
-    TITLE: str = "结果后处理"
-    PATH: str = "postprocess"
-    DESC: str = "根据求解器输出的桁架原始位移向量和材料参数，计算每个节点的位移和每个杆单元的应变应力"
-    INPUT_SLOTS = [
-        PortConf("uh", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
-        PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
-        PortConf("E", DataType.FLOAT, 1, desc="杆的弹性模量", title="弹性模量"),
-    ]
-    OUTPUT_SLOTS = [
-        PortConf("strain", DataType.TENSOR, desc="每个杆单元的应变", title="应变"),
-        PortConf("stress", DataType.TENSOR, desc="每个杆单元的应力", title="应力"),
-        PortConf("u", DataType.TENSOR, desc="重塑后的位移张量 (NN, GD)", title="位移")
-    ]
-
-    @staticmethod
-    def run(uh, mesh, E):
-        from fealpy.backend import backend_manager as bm
-        
-        u = uh.reshape(-1, 3) 
-
-        edge = mesh.entity('edge')
-        l = mesh.edge_length()
-        tan = mesh.edge_tangent()
-        unit_tan = tan / l.reshape(-1, 1)
-
-        u_edge = u[edge]
-        delta_u = u_edge[:, 1, :] - u_edge[:, 0, :]
-        delta_l = bm.einsum('ij,ij->i', delta_u, unit_tan)
-        strain = delta_l / l
-        stress = E * strain
-        
-        return strain, stress, u
 
 class AntennaPostprocess(CNodeType):
     r"""Compute the real-valued electric field at each antenna element 

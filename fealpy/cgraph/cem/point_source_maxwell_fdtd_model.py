@@ -30,7 +30,7 @@ class PointSourceMaxwellFDTDModel(CNodeType):
         # 物理参数
         PortConf("eps", DataType.FLOAT, 1, title="相对介电常数"),
         PortConf("mu", DataType.FLOAT, 1, title="相对磁导率"),
-        PortConf("domain", DataType.DOMAIN, 1, title="计算域"),
+        PortConf("domain", DataType.LIST, 1, title="计算域"),
         PortConf("mesh", DataType.MESH, 1, title="Yee网格"),
         
         # 配置参数

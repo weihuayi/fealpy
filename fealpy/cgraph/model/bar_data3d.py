@@ -1,49 +1,94 @@
 from ..nodetype import CNodeType, PortConf, DataType
 
-__all__ = ["Truss3dData", "TrussTower3d"]
+__all__ = ["Bar25Data", 
+           "Bar942Data",
+           "TrussTower3d"]
 
 
-class Truss3dData(CNodeType):
+class Bar25Data(CNodeType):
     r"""A 25-bar truss structure model.
 
     This node generates the node coordinates and cell connectivity for a 
     classic 25-bar space truss.
 
     Outputs:
-        node (tensor): The node coordinates of the truss.
-        cell (tensor): The cell connectivity of the truss (edges).
+        GD (int): Geometric dimension of the model (3D).
+        A (float): Cross-sectional area of all bars (mm²).
+        external_load (tensor): Global load vector applied at top nodes.
+        dirichlet_dof (tensor): Boolean array indicating Dirichlet boundary DOFs.
+        dirichlet_bc (tensor): Prescribed displacement values for all DOFs.
+        
     """
-    TITLE: str = "25杆桁架几何"
-    PATH: str = "模型.几何"
-    DESC: str = "生成一个经典的25杆空间桁架的节点坐标和单元连接关系。"
+    TITLE: str = "25杆模型"
+    PATH: str = "preprocess.modeling"
+    DESC: str = """该节点用于建立经典25杆空间桁架结构的几何模型。"""
 
     INPUT_SLOTS = []
 
     OUTPUT_SLOTS = [
-        PortConf("node", DataType.TENSOR, desc="桁架的节点坐标", title="节点坐标"),
-        PortConf("cell", DataType.TENSOR, desc="桁架的单元连接关系", title="单元"),
+        PortConf("GD", DataType.INT, desc="模型的几何维数", title="几何维数"),
+        PortConf("A", DataType.FLOAT, desc="所有杆件的横截面积", title="横截面积"),
+        PortConf("external_load", DataType.TENSOR, desc="施加在顶部节点的全局载荷向量", title="外部载荷"),
+        PortConf("dirichlet_dof", DataType.TENSOR, desc="Dirichlet边界条件的自由度索引", title="边界自由度"),
+        PortConf("dirichlet_bc", DataType.TENSOR, desc="边界节点的位移约束值", title="边界位移的值")
     ]
 
     @staticmethod
     def run():
-        from fealpy.backend import backend_manager as bm
-
-        node = bm.array([
-            [-950, 0, 5080], [950, 0, 5080], [-950, 950, 2540],
-            [950, 950, 2540], [950, -950, 2540], [-950, -950, 2540],
-            [-2540, 2540, 0], [2540, 2540, 0], [2540, -2540, 0],
-            [-2540, -2540, 0]], dtype=bm.float64)
-        edge = bm.array([
-            [0, 1], [3, 0], [1, 2], [1, 5], [0, 4],
-            [1, 3], [1, 4], [0, 2], [0, 5], [2, 5],
-            [4, 3], [2, 3], [4, 5], [2, 9], [6, 5],
-            [8, 3], [7, 4], [6, 3], [2, 7], [9, 4],
-            [8, 5], [9, 5], [2, 6], [7, 3], [8, 4]], dtype=bm.int32)
+        from fealpy.csm.model.truss.bar_data25_3d import BarData25
         
-        cell = edge
+        model = BarData25()
+        GD = model.GD
+        A = model.A
+        
+        external_load = model.load()
+        dirichlet_dof = model.is_dirichlet_boundary()
+        dirichlet_bc = model.dirichlet_bc()
 
-        return node, cell
+        return (GD, A, external_load,
+                dirichlet_dof, dirichlet_bc)
 
+
+class Bar942Data(CNodeType):
+    r"""A 942-bar truss structure model.
+
+    This node generates the node coordinates and cell connectivity for a 
+    classic 942-bar space truss.
+
+    Outputs:
+        GD (int): Geometric dimension of the model (3D).
+        A (float): Cross-sectional area of all bars (mm²).
+        external_load (tensor): Global load vector applied at top nodes.
+        dirichlet_dof (tensor): Boolean array indicating Dirichlet boundary DOFs.
+        dirichlet_bc (tensor): Prescribed displacement values for all DOFs.
+
+    """
+    TITLE: str = "942杆模型"
+    PATH: str = "preprocess.modeling"
+    DESC: str = """该节点用于建立942杆空间桁架结构的几何模型。"""
+
+    INPUT_SLOTS = []
+
+    OUTPUT_SLOTS = [
+        PortConf("GD", DataType.INT, desc="模型的几何维数", title="几何维数"),
+        PortConf("A", DataType.FLOAT, desc="所有杆件的横截面积", title="横截面积"),
+        PortConf("external_load", DataType.TENSOR, desc="施加在顶部节点的全局载荷向量", title="外部载荷"),
+        PortConf("dirichlet_dof", DataType.TENSOR, desc="Dirichlet边界条件的自由度索引", title="边界自由度"),
+        PortConf("dirichlet_bc", DataType.TENSOR, desc="边界节点的位移约束值", title="边界位移的值")
+    ]
+
+    @staticmethod
+    def run():
+        from fealpy.csm.model.truss.bar_data942_3d import BarData942
+
+        model = BarData942()
+        
+        external_load = model.load()
+        dirichlet_dof = model.is_dirichlet_boundary()
+        dirichlet_bc = model.dirichlet_bc()
+
+        return (model.GD, model.A, external_load,
+                dirichlet_dof, dirichlet_bc)
 
 class TrussTower3d(CNodeType):
     r"""3D Truss Tower Model.

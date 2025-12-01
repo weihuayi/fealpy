@@ -48,7 +48,7 @@ class MicrostripAntenna3D(CNodeType):
             s=options['s'],
             p=options['pp'],
         ) # PML is in the air
-        k = 2*bm.pi*options['f']*1e1 / 3
+        k = 2*bm.pi*options['f']*1e1 / 3 / 1000 # unit for length is mm
         mesh = options['mesh']
         p = options['p']
         space = FirstNedelecFESpace(mesh, p)
@@ -106,7 +106,7 @@ class MicrostripAntenna3D(CNodeType):
 
             FTF    = bm.einsum("...ij, ...ik -> ...jk", F, F)
             invFTF = bm.linalg.inv(FTF)
-            val[isInPML] = - k**2 * eps_air * detF[:, None, None] * invFTF
+            val[isInPML] = - k**2 * eps_air * detF[..., None, None] * invFTF
 
             return val
 

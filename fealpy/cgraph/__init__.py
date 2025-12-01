@@ -21,10 +21,10 @@ __nodes__ = [
     "pathplanning",
     "sampling",
     "material",
-    "postreport",
     "reports",
     "paraviewtools",
-    "cem"
+    "cem",
+    "coordtransform"
 ]
 
 register_all_nodes()

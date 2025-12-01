@@ -7,6 +7,8 @@ from fealpy.fem.integrator import (
     enable_cache)
 from fealpy.functionspace.space import FunctionSpace as _FS
 
+from ..utils import CoordTransform
+
 
 class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
     """
@@ -55,8 +57,9 @@ class TimoshenkoBeamIntegrator(LinearInt, OpInt, CellInt):
         E, mu = self.material.E, self.material.mu
         Ax, Ay, Az = self.model.Ax, self.model.Ay, self.model.Az
         J, Iy, Iz = self.model.J, self.model.Iy, self.model.Iz
-        R = self.model.coord_transform(index=self.index)
-        
+        coord_trans = CoordTransform(method='beam3d')
+        R = coord_trans.coord_transform_beam3d(mesh, vref=[0, 1, 0], index=self.index)
+
         return E, mu, l, Ax, Ay, Az, J, Iy, Iz, R, NC
 
     @variantmethod

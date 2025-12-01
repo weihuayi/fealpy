@@ -147,10 +147,13 @@ def load(data: dict, /, return_graph=True) -> CNode | NodeGroup | Graph:
 
     # STEP 4: Set all inputs and their defaults
     for slot_item in slots_table:
-        if is_output_slot(slot_item):
-            continue
         cnode_id = slot_item["cnode"]
         cnode = cnode_list[cnode_id]
+        if is_output_slot(slot_item):
+            cnode_item = cnode_table[cnode_id]
+            if not (is_group_input(cnode_item) or is_group(cnode_item)):
+                cnode.register_output(slot_item["name"])
+            continue
         try:
             cnode(**{slot_item["name"]: slot_item["val"]})
         except TypeError:

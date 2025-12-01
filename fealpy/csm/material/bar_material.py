@@ -67,9 +67,10 @@ class BarMaterial(LinearElasticMaterial):
         return D
     
     def compute_strain_and_stress(self, 
-                                   mesh,
-                                   disp,
-                                   ele_indices=None) -> Tuple[TensorLike, TensorLike]:
+                               mesh,
+                               disp,
+                               coord_transform=None,
+                               ele_indices=None) -> Tuple[TensorLike, TensorLike]:
         """Calculate the strain and stress for bar elements.
             Compute axial strain: ε = (u1 - u0) / L
             Compute axial stress: σ = E * ε
@@ -77,52 +78,57 @@ class BarMaterial(LinearElasticMaterial):
         Parameters:
             mesh: The mesh containing element information.
             disp: The global displacement vector.
+            coord_transform: Coordinate transformation matrix for each element.
             ele_indices (Optional[int]): Indices of elements to process. If None, process all elements.
 
         Returns:
             Tuple[TensorLike, TensorLike]: Strain and stress vectors.
         """
         NC = mesh.number_of_cells()
-        if ele_indices is None:
-            ele_indices = range(NC)
-            num_elements = NC
-        else:
+        GD = mesh.geo_dimension()
+        edge = mesh.entity('edge')
+        l = mesh.entity_measure('cell')
+        
+        # Process specific elements or all
+        if ele_indices is not None:
+            edge = edge[ele_indices]
+            l = l[ele_indices]
             num_elements = len(ele_indices)
+        else:
+            num_elements = NC
             
         strain = bm.zeros((num_elements, 3), dtype=bm.float64)
         stress = bm.zeros((num_elements, 3), dtype=bm.float64)
+        
+        u_edge = disp[edge]  # Shape: (num_elements, 2, GD)
+        
+        # [u1_x, u1_y, u1_z, u2_x, u2_y, u2_z]
+        u_global = u_edge.reshape(num_elements, 2 * GD)
+        
+        if coord_transform is not None:
+            u_local = bm.einsum('cij, cj -> ci', coord_transform,  u_global) # Shape: (num_elements, 2)
+        else:
+            u_local = u_edge
 
-        edge_lengths = mesh.edge_length()
-        edge_tangents = mesh.edge_tangent()
-
-        for idx, i in enumerate(ele_indices):
-            cell = mesh.entity('cell', i)
-            node0_idx, node1_idx = cell[0], cell[1]
-            
-            # Get element-specific tangent vector and length
-            l = edge_lengths[i]
-            tan = edge_tangents[i]
-            unit_tan = tan / l
-
-            u_node0 = disp[node0_idx]
-            u_node1 = disp[node1_idx]
-            
-            # translational displacement 
-            u0_trans = u_node0[:3]
-            u1_trans = u_node1[:3]
-            
-            u0 = bm.dot(unit_tan, u0_trans)
-            u1 = bm.dot(unit_tan, u1_trans)
-            
-            # Axial strain: (u1 - u0) / L
-            axial_strain = (u1 - u0) / l
-
-            strain[idx, 0] = axial_strain
-            strain[idx, 1] = 0.0
-            strain[idx, 2] = 0.0
-
-            stress[idx, 0] = self.E * axial_strain
-            stress[idx, 1] = 0.0
-            stress[idx, 2] = 0.0
+        # u_local[:, 0] is axial displacement of node 1 (local x-direction)
+        # u_local[:, 1] is axial displacement of node 2 (local x-direction)
+        # ε = [-1/L, 1/L] · [u0, u1] = (u1 - u0) / L
+        axial_strain = (u_local[:, 1] - u_local[:, 0]) / l
+        axial_stress = self.E * axial_strain
+        
+        strain[:, 0] = axial_strain
+        stress[:, 0] = axial_stress
 
         return strain, stress
+
+    def calculate_mises_stress(self, stress: TensorLike) -> TensorLike:
+        """Calculate von Mises stress from the stress tensor.
+
+        Parameters:
+            stress (TensorLike): The stress tensor of shape (num_elements, 3).
+
+        Returns:
+            TensorLike: The von Mises stress of shape (num_elements,).
+        """
+        mstress = stress[:, 0]
+        return bm.abs(mstress)

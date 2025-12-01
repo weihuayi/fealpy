@@ -87,8 +87,8 @@ class GraphCtxOps:
             results = (results,)
 
         if len(results) >= 2 and len(results) != len(send_slots):
-            raise NodeIOError("The number of results does not match "
-                              f"the number of output slots in the node '{node_msg}'.")
+            raise NodeIOError(f"The number of results ({len(results)}) does not match "
+                              f"the number of output slots ({len(send_slots)}) in the node '{node_msg}'.")
 
         for output_slot, result in zip(send_slots.values(), results):
             context_key = id(output_slot)

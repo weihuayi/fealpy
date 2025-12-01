@@ -26,8 +26,8 @@ class Lshape2d(CNodeType):
                 """
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tri_threshold", items=["triangle", "quadrangle"]),
-        PortConf("big_box", DataType.DOMAIN, title="大矩形区域"),
-        PortConf("small_box", DataType.DOMAIN, title="挖去小矩形区域"),
+        PortConf("big_box", DataType.LIST, title="大矩形区域"),
+        PortConf("small_box", DataType.LIST, title="挖去小矩形区域"),
         PortConf("nx", DataType.INT, title="X 分段数", default=10, min_val=1),
         PortConf("ny", DataType.INT, title="Y 分段数", default=10, min_val=1)
     ]

@@ -27,7 +27,7 @@ class YeeUniformMesh(CNodeType):
     DESC: str = """该节点创建Yee网格并初始化电磁场分量，考虑电场和磁场在Yee网格上的交错分布特性。"""
     
     INPUT_SLOTS = [
-        PortConf("domain", DataType.DOMAIN, 1, title="计算域"),
+        PortConf("domain", DataType.LIST, 1, title="计算域"),
         PortConf("n", DataType.INT, 0, title="剖分数", default=50),
     ]
     

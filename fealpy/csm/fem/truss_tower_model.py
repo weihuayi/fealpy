@@ -15,8 +15,9 @@ from fealpy.solver import spsolve
 
 from ..model.truss import TrussPDEDataT
 from ..model import CSMModelManager
-from ..material.bar_meterial import BarMaterial
+from ..material.bar_material import BarMaterial
 from ..fem.bar_integrator import BarIntegrator
+from ..utils import CoordTransform
 
 
 class TrussTowerModel(ComputationalModel):
@@ -67,7 +68,7 @@ class TrussTowerModel(ComputationalModel):
         self.logger.info(f"\n{s}")
         return s
                
-    def set_pde(self, pde: Union[TrussPDEDataT, int] = 4) -> None:
+    def set_pde(self, pde: Union[TrussPDEDataT, int] = 5) -> None:
         if isinstance(pde, int):
             self.pde = CSMModelManager("truss_tower").get_example(pde)
         else:
@@ -251,17 +252,27 @@ class TrussTowerModel(ComputationalModel):
         """Compute axial strain and stress for axle elements."""
                 
         uh = disp.reshape(-1, 3)
+        coord_trans = CoordTransform(method='bar3d')
+        R = coord_trans.coord_transform_bar3d(self.mesh)
+                
         strain, stress = self.material.compute_strain_and_stress(
                         self.mesh,
                         uh,
+                        coord_transform=R,
                         ele_indices=None)
         
         # self.logger.info(f"strain: {strain}")
         # self.logger.info(f"stress: {stress}")
 
         return strain, stress
+    
+    def calculate_von_mises_stress(self, stress):
+        """Calculate von Mises stress for truss elements."""
+        mstress = self.material.calculate_mises_stress(stress)
+        # self.logger.info(f"mstress: {mstress}")
+        return mstress
 
-    def show(self, uh, strain, stress):
+    def show(self, uh, strain, stress, mstress):
         """Visualize displacement field, strain field, and stress field by saving to VTU files."""
         
         mesh = self.space.mesh
@@ -280,6 +291,9 @@ class TrussTowerModel(ComputationalModel):
 
         mesh.edgedata['stress'] = stress
         mesh.to_vtk(f"{save_path}/stress.vtu")
+        
+        mesh.edgedata['mises_stress'] = mstress
+        mesh.to_vtk(f"{save_path}/mises_stress.vtu")
 
     def geometric_stiffness_matrix(self, stress):
         """Assemble the global geometric stiffness matrix for buckling analysis.

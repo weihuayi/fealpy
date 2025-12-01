@@ -16,7 +16,7 @@ class DataType(IntEnum):
     STRING   = 7
     MENU     = 8
     SPACE    = 9
-    DOMAIN   = 10
+    LIST     = 10
     FUNCTION = 11
     TEXT     = 12
     CODE     = 13
