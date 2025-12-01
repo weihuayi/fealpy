@@ -47,7 +47,7 @@ class StationaryNSRun(CNodeType):
         ph (tensor): Final numerical pressure field.
     """
     TITLE: str = "稳态 NS 方程有限元迭代求解"
-    PATH: str = "流体.NS 方程有限元迭代求解"
+    PATH: str = "simulation.solvers"
     DESC: str = """该节点实现稳态不可压 Navier-Stokes 方程的有限元迭代求解器，通过系数更新与边界
                 条件施加，逐步组装并求解线性系统，输出速度场与压力场的稳态数值解。"""
     INPUT_SLOTS = [
@@ -123,7 +123,7 @@ class IncompressibleNSIPCSRun(CNodeType):
         uh_y (tensor): y-component of the velocity field.
     """
     TITLE: str = "IPCS 求解非稳态 NS 方程"
-    PATH: str = "流体.NS 方程有限元迭代求解"
+    PATH: str = "simulation.solvers"
     DESC: str  = """该节点实现非稳态不可压 Navier-Stokes 方程的 IPCS 分步算法求解器，按时间步推进依次完成速度预测、
                 压力修正与速度校正，并输出速度与压力场的时序数值结果。"""
     INPUT_SLOTS = [

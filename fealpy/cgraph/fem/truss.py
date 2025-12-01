@@ -25,7 +25,7 @@ class Truss(CNodeType):
         F (tensor): The global load vector with boundary conditions applied.
     """
     TITLE: str = "桁架有限元模型"
-    PATH: str = "有限元.方程离散"
+    PATH: str = "simulation.discretization"
     DESC: str = "组装全局刚度矩阵K并应用边界条件, 输出K与F"
 
     INPUT_SLOTS = [

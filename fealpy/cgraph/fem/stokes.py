@@ -20,7 +20,7 @@ class StokesEquation(CNodeType):
         lform (tensor): Assembled right-hand side vector.
     """
     TITLE: str = "Stokes 方程 (第一类边界条件)"
-    PATH: str = "有限元.方程离散"
+    PATH: str = "simulation.discretization"
     DESC: str = """该节点构建并组装带Dirichlet边界条件的Stokes方程有限元离散系统, 
                 输出包含系统算子与右端项向量，用于稳态粘性流动求解。"""
     INPUT_SLOTS = [

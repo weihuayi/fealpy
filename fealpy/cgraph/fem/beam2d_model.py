@@ -25,7 +25,7 @@ class Beam(CNodeType):
         to assemble the stiffness matrix and load vector. Inputs are obtained from the provided options dictionary.
     """
     TITLE: str = "欧拉梁有限元模型"
-    PATH: str = "有限元.方程离散"
+    PATH: str = "simulation.discretization"
     DESC: str = "组装欧拉梁的刚度矩阵和载荷"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, 1, desc="拉格朗日函数空间", title="标量函数空间"),

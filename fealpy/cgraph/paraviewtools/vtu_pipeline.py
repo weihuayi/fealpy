@@ -21,7 +21,7 @@ class VTUReader(CNodeType):
     """
 
     TITLE: str = "VTU读取"
-    PATH: str = "后处理.ParaView"
+    PATH: str = "postprocess"
     DESC: str = "读取 VTU 文件并返回数据集。"
     INPUT_SLOTS = [
         PortConf("vtu_path", DataType.NONE, 0, desc="VTU 文件路径", title="文件路径", default=""),
@@ -81,7 +81,7 @@ class VTUStyler(CNodeType):
     """
 
     TITLE: str = "VTU样式化"
-    PATH: str = "后处理.ParaView"
+    PATH: str = "postprocess"
     DESC: str = "对 VTU 数据应用样式设置（颜色、表现形式、背景等）。"
     INPUT_SLOTS = [
         PortConf("dataset", DataType.TENSOR, ttype=1, desc="来自 VTUReader 的数据集", title="数据集"),
@@ -199,7 +199,7 @@ class VTUScreenshot(CNodeType):
     """
 
     TITLE: str = "VTU截图"
-    PATH: str = "后处理.ParaView"
+    PATH: str = "postprocess"
     DESC: str = "渲染样式化的 VTU 数据并导出 PNG 图像。对于多分量数组，自动生成模和各分量图片。"
     INPUT_SLOTS = [
         PortConf("styled_dataset", DataType.TENSOR, ttype=1, desc="来自 VTUStyler 的样式数据集", title="样式数据集"),
@@ -641,7 +641,7 @@ class TO_VTK(CNodeType):
     """
 
     TITLE: str = "导出VTK文件"
-    PATH: str = "后处理.导出VTK"
+    PATH: str = "postprocess"
     DESC: str = "将模拟结果导出为VTK格式文件，便于使用可视化工具进行后续分析与展示。"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, title="网格"),
@@ -786,7 +786,7 @@ class VTUMP4(CNodeType):
     """
 
     TITLE: str = "VTU转MP4"
-    PATH: str = "后处理.ParaView"
+    PATH: str = "postprocess"
     DESC: str = "将一系列VTU文件渲染为MP4视频。"
     INPUT_SLOTS = [
         PortConf("vtu_files", DataType.STRING, ttype=2, desc="VTU文件路径列表", title="VTU文件列表"),

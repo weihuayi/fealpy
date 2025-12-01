@@ -27,7 +27,7 @@ def get_space_class(space_type: str) -> Type:
 
 class FunctionSpace(CNodeType):
     TITLE: str = "标量函数空间"
-    PATH: str = "函数空间.构造"
+    PATH: str = "simulation.function-space"
     INPUT_SLOTS = [
         PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein", "first_nedelec"]),
         PortConf("mesh", DataType.MESH, 1, title="网格"),
@@ -44,7 +44,7 @@ class FunctionSpace(CNodeType):
 
 class P0FunctionSpace(CNodeType):
     TITLE: str = "P0元标量函数空间"
-    PATH: str = "函数空间.构造"
+    PATH: str = "simulation.function-space"
     INPUT_SLOTS = [
         PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein", "first_nedelec"]),
         PortConf("mesh", DataType.MESH, 1, title="网格"),
@@ -61,7 +61,7 @@ class P0FunctionSpace(CNodeType):
 
 class TensorFunctionSpace(CNodeType):
     TITLE: str = "张量函数空间"
-    PATH: str = "函数空间.构造"
+    PATH: str = "simulation.function-space"
     INPUT_SLOTS = [
         PortConf("type", DataType.MENU, 0, title="空间类型", param="space_type", default="lagrange", items=["lagrange", "bernstein", "first_nedelec"]),
         PortConf("mesh", DataType.MESH, 1, title="网格"),
@@ -83,7 +83,7 @@ class TensorFunctionSpace(CNodeType):
 
 class BoundaryDof(CNodeType):
     TITLE: str = "边界自由度"
-    PATH: str = "函数空间.操作"
+    PATH: str = "simulation.function-space"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, title="函数空间"),
     ]
@@ -98,7 +98,7 @@ class BoundaryDof(CNodeType):
 
 class FEFunction(CNodeType):
     TITLE: str = "有限元函数"
-    PATH: str = "函数空间.函数"
+    PATH: str = "simulation.function-space"
     INPUT_SLOTS = [
         PortConf("tensor", DataType.TENSOR, title="自由度"),
         PortConf("space", DataType.SPACE, title="函数空间"),

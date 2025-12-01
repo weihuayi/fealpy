@@ -2,7 +2,7 @@ from ..nodetype import CNodeType, PortConf, DataType
 
 class CEC2022(CNodeType):
     TITLE: str = "CEC2022"
-    PATH: str = "优化.cec_2022"
+    PATH: str = "simulation.optimization"
     INPUT_SLOTS = [
         PortConf("func_num", DataType.INT),
         PortConf("dim", DataType.MENU, default=2, items=[2, 10, 20]),

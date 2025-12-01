@@ -16,7 +16,7 @@ class ReportOutput(CNodeType):
     r"""Collect textual snippets from multiple sources and emit a report file."""
 
     TITLE: str = "报告输出"
-    PATH: str = "后处理.报告生成"
+    PATH: str = "postprocess"
     DESC: str = "汇总多个节点的报告内容并生成文本报告文件。"
     INPUT_SLOTS = [
         PortConf(

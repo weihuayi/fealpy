@@ -14,7 +14,7 @@ class CFDTimeline(CNodeType):
         NL (int): Number of time levels.
     """
     TITLE: str = "均匀时间剖分"
-    PATH: str = "流体.时间剖分"
+    PATH: str = "preprocess"
     DESC: str = """该节点实现流体力学计算中的均匀时间剖分, 依据起止时间与时间步数生成时间
                 层信息, 为瞬态CFD模拟提供时间推进基础。"""
     INPUT_SLOTS = [

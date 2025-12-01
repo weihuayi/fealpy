@@ -5,7 +5,7 @@ __all__ = ["DipoleAntennaEquation"]
 
 class DipoleAntennaEquation(CNodeType):
     TITLE: str = "麦克斯韦 方程"
-    PATH: str = "有限元.方程离散"
+    PATH: str = "simulation.discretization"
     DESC: str = "麦克斯韦方程的离散形式"
     INPUT_SLOTS = [
         PortConf("space", DataType.SPACE, title="函数空间"),

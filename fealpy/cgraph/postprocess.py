@@ -16,7 +16,7 @@ class VPDecoupling(CNodeType):
         ph (tensor): Numerical pressure field.
     """
     TITLE: str = "速度-压力解耦"
-    PATH: str = "后处理.解耦"
+    PATH: str = "postprocess"
     DESC: str = """该节点用于将包含速度和压力分量的联合输出向量进行解耦，提取速度场及其各分量与压力场，
                 便于后续的流体力学结果分析与可视化处理。"""
     INPUT_SLOTS = [
@@ -54,7 +54,7 @@ class UDecoupling(CNodeType):
         theta (tensor): Rotational displacement gfield.
     """
     TITLE: str = "位移后处理"
-    PATH: str = "后处理.位移"
+    PATH: str = "postprocess"
     DESC: str = "将模型的平动位移和转动位移做后处理"
     INPUT_SLOTS = [
         PortConf("out", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
@@ -99,7 +99,7 @@ class TrussPostprocess(CNodeType):
         u (tensor): Reshaped displacement tensor (NN, GD).
     """
     TITLE: str = "结果后处理"
-    PATH: str = "后处理.位移应力应变"
+    PATH: str = "postprocess"
     DESC: str = "根据求解器输出的桁架原始位移向量和材料参数，计算每个节点的位移和每个杆单元的应变应力"
     INPUT_SLOTS = [
         PortConf("uh", DataType.TENSOR, 1, desc="求解器输出的原始位移向量", title="位移向量"),
@@ -144,7 +144,7 @@ class AntennaPostprocess(CNodeType):
     """
 
     TITLE: str = "天线单元后处理"
-    PATH: str = "后处理.天线单元"
+    PATH: str = "postprocess"
     DESC: str = "将天线的自由度平分到各自单元"
     INPUT_SLOTS = [
         PortConf("uh", DataType.FUNCTION, 1, desc="求解器输出的复数场自由度", title="有限元解"),

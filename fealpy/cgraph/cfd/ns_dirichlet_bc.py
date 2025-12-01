@@ -24,7 +24,7 @@ class StationaryNSDBC(CNodeType):
             to the assembled system matrices and right-hand side vectors.
     """
     TITLE: str = "稳态 NS 方程边界处理"
-    PATH: str = "流体.边界处理"
+    PATH: str = "preprocessing.discretization"
     DESC: str = """该节点用于稳态 Navier-Stokes 方程的边界条件处理，构建统一的 Dirichlet 边界约束应用函数，
                     实现速度与压力场的边界识别与施加，供后续求解节点调用。"""
     INPUT_SLOTS = [
@@ -72,7 +72,7 @@ class IterativeDBC(CNodeType):
             conditions to system matrices and right-hand side vectors.
     """
     TITLE: str = "非稳态 NS 方程迭代法边界处理"
-    PATH: str = "流体.边界处理"
+    PATH: str = "simulation.discretization"
     DESC: str = """该节点用于非稳态不可压 Navier-Stokes 方程迭代算法的边界处理，动态生成时间相关的 Dirichlet 边界约束函数，
                 对速度与压力场施加相应边界条件，确保每步迭代物理一致性。"""
     INPUT_SLOTS = [
@@ -128,7 +128,7 @@ class ProjectDBC(CNodeType):
             conditions to system matrices and right-hand side vectors.
     """
     TITLE: str = "非稳态 NS 方程投影法边界处理"
-    PATH: str = "流体.边界处理"
+    PATH: str = "simulation.discretization"
     DESC: str = """该节点用于非稳态 Navier-Stokes 方程投影法的边界条件处理，生成时间相关的 Dirichlet 约束应用函数，
                 对速度场在指定边界上施加边界条件，保证时间步推进过程的物理正确性。"""
     INPUT_SLOTS = [

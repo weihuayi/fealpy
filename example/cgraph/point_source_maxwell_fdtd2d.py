@@ -21,22 +21,22 @@ pde(
     source1_amplitude=1.0,            # 源幅度
     source1_spread=0,                 # 点源
     source1_injection="soft",         # 软注入
-    # source2_position=[3e-6,2e-6],      # 第二个源位置  
-    # source2_component='Ez',
-    # source2_waveform='sinusoid',
-    # source2_waveform_params=3e14,
-    # source2_amplitude=2.0,
-    # source2_spread=0,
-    # source2_injection="soft",
-    object1_box=[0,2.10e-6,2.5e-6,2.6e-6],  # 第一个物体区域
-    object1_eps=10000,                 # 高介电常数物体
-    object1_mu=1.0,
-    object2_box=[2.35e-6,2.65e-6,2.5e-6,2.6e-6], # 无第二个物体
-    object2_eps=10000,
-    object2_mu=1.0,
-    object3_box=[2.9e-6,5e-6,2.5e-6,2.6e-6],
-    object3_eps=10000,
-    object3_mu=1.0
+    source2_position=[3e-6,2e-6],      # 第二个源位置  
+    source2_component='Ez',
+    source2_waveform='sinusoid',
+    source2_waveform_params=3e14,
+    source2_amplitude=2.0,
+    source2_spread=0,
+    source2_injection="soft",
+    # object1_box=[0,2.10e-6,2.5e-6,2.6e-6],  # 第一个物体区域
+    # object1_eps=10000,                 # 高介电常数物体
+    # object1_mu=1.0,
+    # object2_box=[2.35e-6,2.65e-6,2.5e-6,2.6e-6], # 无第二个物体
+    # object2_eps=10000,
+    # object2_mu=1.0,
+    # object3_box=[2.9e-6,5e-6,2.5e-6,2.6e-6],
+    # object3_eps=10000,
+    # object3_mu=1.0
 )
 
 # 配置网格

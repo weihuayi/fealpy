@@ -25,7 +25,7 @@ class VTUSlicer(CNodeType):
     """
 
     TITLE: str = "VTU裁剪"
-    PATH: str = "后处理.ParaView"
+    PATH: str = "postprocess"
     DESC: str = "对 VTU 数据进行平面裁剪，保留法向一致的一半体积。"
     INPUT_SLOTS = [
         PortConf("dataset", DataType.TENSOR, ttype=1, desc="来自 VTUReader 的数据集", title="数据集"),

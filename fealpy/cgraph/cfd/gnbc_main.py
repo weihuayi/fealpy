@@ -60,7 +60,7 @@ class GNBCSimulation(CNodeType):
     - Verification of GNBC boundary models in diffuse-interface formulations.
     """
     TITLE: str = "两相Couette流动问题模型"
-    PATH: str = "simulation.discretization"
+    PATH: str = "simulation.solvers"
     DESC: str = """
     该节点基于广义Navier边界条件(GNBC)实现两相Couette流动的有限元数值求解。
     模型将Cahn-Hilliard方程与Navier-Stokes方程进行耦合求解，

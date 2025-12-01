@@ -33,7 +33,7 @@ postprocess(out = solver().out,
             mesh = mesher())
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(uh = postprocess().uh,u_x = postprocess().u_x, u_y = postprocess().u_y, ph = postprocess().ph)
+WORLD_GRAPH.output(uh = postprocess().uh, ph = postprocess().ph)
 WORLD_GRAPH.error_listeners.append(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

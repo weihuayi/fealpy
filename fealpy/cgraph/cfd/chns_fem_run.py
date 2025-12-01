@@ -39,7 +39,7 @@ class CHNSFEMRun(CNodeType):
         phi (Function): Phase-field function.
     """
     TITLE: str = "有限元求解 CHNS 方程"
-    PATH: str = "流体.CHNS 方程有限元求解"
+    PATH: str = "simulation.solvers"
     DESC: str = """该节点实现了两相不可压流体的 Cahn–Hilliard–Navier–Stokes (CHNS) 方程组有限元求解
                 器。CHNS 模型结合了相场法与流体力学方程，用以描述两种不可混溶流体的界面演化与流动耦合过程。
                 通过时间步推进（dt, nt），程序在每个时间步内依次执行：

@@ -29,7 +29,7 @@ class SolidReport(CNodeType):
     
     """
     TITLE: str = "固体力学计算报告"
-    PATH: str = "后处理.报告生成"
+    PATH: str = "postprocess"
     DESC: str = "生成包含几何、网格、材料与计算结果信息的固体力学分析报告"
     INPUT_SLOTS = [
         PortConf("path", DataType.STRING, 1, desc="仿真报告的存储路径", title="存储路径"),

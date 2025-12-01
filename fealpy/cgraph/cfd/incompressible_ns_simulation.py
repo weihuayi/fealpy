@@ -42,7 +42,7 @@ class IncompressibleNSIPCS(CNodeType):
         correct_velocity (function): Function that assembles the velocity correction system.
     """
     TITLE: str = "非稳态 NS 方程 IPCS 算法"
-    PATH: str = "流体.有限元算法"
+    PATH: str = "simulation.discretization"
     DESC: str = """该节点实现了用于求解非稳态不可压缩 Navier–Stokes 方程的 **IPCS（增量压力修正算法）**。
 
                 算法思想是将速度与压力的耦合系统拆分为三个子问题：
@@ -274,7 +274,7 @@ class IncompressibleNSBDF2(CNodeType):
         update (function): Function that assembles the system for each time step.
     """
     TITLE: str = "非稳态 NS 方程 BDF2 算法"
-    PATH: str = "流体.有限元算法"
+    PATH: str = "simulation.discretization"
     DESC: str = """
                 该节点基于有限元法实现不可压 Navier-Stokes 方程的非稳态求解，采用 BDF2（二阶
                 向后差分格式）进行时间离散。在每个时间步中，该算法构建速度与压力场的耦合离散系统，

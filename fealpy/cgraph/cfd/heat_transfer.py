@@ -65,7 +65,7 @@ class HeatTransferParticleIterativeUpdate(CNodeType):
     """
 
     TITLE: str = "平板传热场景粒子迭代更新"
-    PATH: str = "simulation.discretization"
+    PATH: str = "simulation.solvers"
     DESC: str = """该节点实现了基于光滑粒子流体动力学(SPH)的平板传热场景数值模拟求解器，
     """
     INPUT_SLOTS = [

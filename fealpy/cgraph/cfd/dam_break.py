@@ -71,7 +71,7 @@ class DamBreakParticleIterativeUpdate(CNodeType):
     """
 
     TITLE: str = "溃坝问题粒子迭代更新"
-    PATH: str = "simulation.discretization"
+    PATH: str = "simulation.solvers"
     DESC: str = """该节点实现了基于光滑粒子流体动力学(SPH)的溃坝问题数值模拟求解器，
     包含完整的SPH算法流程：邻居搜索、密度更新、压力计算、速度更新、位置更新等。"""
     INPUT_SLOTS = [

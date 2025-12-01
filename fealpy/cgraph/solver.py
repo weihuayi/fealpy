@@ -29,7 +29,7 @@ __all__ = ["DirectSolver"]
 
 class DirectSolver(CNodeType):
     TITLE: str = "直接解法器"
-    PATH: str = "解法器.直接"
+    PATH: str = "simulation.solvers"
 
     INPUT_SLOTS = [
         PortConf("A", DataType.LINOPS, title="矩阵"),
@@ -62,7 +62,7 @@ from .nodetype import CNodeType, PortConf, DataType
 __all__ = ["IterativeSolver"]
 class IterativeSolver(CNodeType):
     TITLE: str = "迭代解法器"
-    PATH: str = "解法器.迭代"
+    PATH: str = "simulation.solvers"
     INPUT_SLOTS = [
         PortConf("A", DataType.LINOPS, title="算子"),
         PortConf("b", DataType.TENSOR, title="向量"),
@@ -98,7 +98,7 @@ __all__ = ["ScipyEigenSolver"]
 
 class ScipyEigenSolver(CNodeType):
     TITLE: str = "Scipy特征值求解器"
-    PATH: str = "simulation.solver"
+    PATH: str = "simulation.solvers"
     INPUT_SLOTS = [
         PortConf("S", DataType.TENSOR, title="刚度矩阵 S"),
         PortConf("M", DataType.TENSOR, title="质量矩阵 M"),
@@ -127,7 +127,7 @@ __all__ = ["SLEPcEigenSolver"]
 
 class SLEPcEigenSolver(CNodeType):
     TITLE: str = "SLEPc特征值求解器"
-    PATH: str = "simulation.solver"
+    PATH: str = "simulation.solvers"
     INPUT_SLOTS = [
         PortConf("S", DataType.TENSOR, title="刚度矩阵 S"),
         PortConf("M", DataType.TENSOR, title="质量矩阵 M"),
@@ -211,7 +211,7 @@ class SLEPcEigenSolver(CNodeType):
 
 class MGStokesSolver(CNodeType):
     TITLE: str = "Stokes离散系统的多重网格求解器"
-    PATH: str = "simulation.solver"
+    PATH: str = "simulation.solvers"
     
     INPUT_SLOTS = [
         PortConf("op", DataType.LINOPS, title="初始系数矩阵"),
