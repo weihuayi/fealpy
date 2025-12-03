@@ -6,41 +6,34 @@ WORLD_GRAPH = cgraph.WORLD_GRAPH
 
 pde = cgraph.create("DipoleAntenna3D")
 mesher = cgraph.create("Dipole3d")
-spacer = cgraph.create("FunctionSpace")
-uher = cgraph.create("FEFunction")
 dipole_antenna_eq = cgraph.create("DipoleAntennaEquation")
-dbc = cgraph.create("DirichletBC")
 solver = cgraph.create("IterativeSolver")
 pross = cgraph.create("AntennaPostprocess")
 
 
 # 连接节点
 mesher(cr = 0.05, sr0 = 1.9, sr1 = 2.4, L = 2.01, G = 0.01)
-spacer(type = "first_nedelec", mesh=mesher().mesh, p=1)
 dipole_antenna_eq(
-    space=spacer(),
+    mesh=mesher().mesh,
     q=3,
     diffusion = pde().diffusion,
     reaction = pde().reaction,
     source = pde().source,
     Y = pde().Y,
-    ID = mesher().ID1
+    ID = mesher().ID1,
+    gd=pde().dirichlet,
+    isDDof=mesher().ID2
+
 )
 
-dbc(
-    gd=pde().dirichlet,
-    isDDof=mesher().ID2,
-    form=dipole_antenna_eq().operator,
-    F=dipole_antenna_eq().source
-)
 
 solver(
-    A=dbc().A,
-    b=dbc().F,
+    A = dipole_antenna_eq().A,
+    b = dipole_antenna_eq().F,
     solver = "minres"
 )
 
-pross(uh = solver().out, space = spacer())
+pross(uh = solver().out, mesh=mesher().mesh)
 
 # 最终连接到图输出节点上
 WORLD_GRAPH.output(mesh=mesher().mesh, uh=solver(), E =pross())

@@ -103,17 +103,18 @@ class AntennaPostprocess(CNodeType):
     DESC: str = "将天线的自由度平分到各自单元"
     INPUT_SLOTS = [
         PortConf("uh", DataType.FUNCTION, 1, desc="求解器输出的复数场自由度", title="有限元解"),
-        PortConf("space", DataType.SPACE, 1, desc="包含节点与单元拓扑的有限元空间", title="有限元空间"),
+        PortConf("mesh", DataType.MESH, 1, title="网格"),
     ]
     OUTPUT_SLOTS = [
         PortConf("E", DataType.TENSOR, desc="各单元重心处的电场强度（实部）", title="单元电场"),
     ]
 
     @staticmethod
-    def run(uh, space):
+    def run(uh, mesh):
         from fealpy.backend import backend_manager as bm
         from fealpy.functionspace import Function
-        mesh = space.mesh
+        from fealpy.functionspace import FirstNedelecFESpace
+        space = FirstNedelecFESpace(mesh = mesh, p=1)
         bc = bm.array([[1/3, 1/3, 1/3, 1/3]], dtype=bm.float64)
         gdof = space.number_of_global_dofs()
 
