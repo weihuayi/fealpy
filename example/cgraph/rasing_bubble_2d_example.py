@@ -39,13 +39,11 @@ phispacer(mesh = mesher(), p=2)
 uspacer(mesh = mesher(), p=2)
 pspacer(mesh = mesher(), p=1)
 
-allencahn_eq(mesh = mesher(),
-            epsilon = pde().epsilon,gamma = gamma, 
-            init_phase = pde().init_phase,phispace = phispacer(),
-            q = q)
+allencahn_eq(epsilon = pde().epsilon,gamma = gamma, 
+             init_phase = pde().init_phase,phispace = phispacer(),
+             q = q)
 
-guns_eq(mesh = mesher(),
-        rho0 = pde().rho0,rho1 = pde().rho1,
+guns_eq(rho0 = pde().rho0,rho1 = pde().rho1,
         mu0 = pde().mu0,mu1 = pde().mu1,
         lam = lam,gamma = gamma,
         uspace = uspacer(),pspace = pspacer(),phispace = phispacer(),
@@ -53,8 +51,7 @@ guns_eq(mesh = mesher(),
 
 output_dir = "./"
 
-solver(mesh = mesher(),
-       domain = pde().box,
+solver(domain = pde().box,
        dt = 0.001 , nt = 5000,
        uspace = uspacer(),pspace = pspacer(),phispace = phispacer(),
        update_ac = allencahn_eq().update_ac,

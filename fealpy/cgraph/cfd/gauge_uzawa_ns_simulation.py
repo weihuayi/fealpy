@@ -10,7 +10,6 @@ class GaugeUzawaNSSimulation(CNodeType):
     the Navier-Stokes equations using the provided function spaces.
     
     Inputs:
-        mesh (MeshType): Computational mesh.
         rho0 (float): Density of the fluid 0.
         rho1 (float): Density of the fluid 1.
         mu0 (float): Viscosity of the fluid 0.
@@ -36,7 +35,6 @@ class GaugeUzawaNSSimulation(CNodeType):
                 在每个时间步调用时返回当前的离散矩阵 A 与右端项 b。
                 """
     INPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH, title="网格"),
         PortConf("rho0", DataType.FLOAT, title="第一液相密度"),
         PortConf("rho1", DataType.FLOAT, title="第二液相密度"),
         PortConf("mu0", DataType.FLOAT, title="第一液相粘度"),
@@ -56,13 +54,14 @@ class GaugeUzawaNSSimulation(CNodeType):
         PortConf("update_pressure", DataType.FUNCTION, title="压力更新函数")
     ]
     @staticmethod
-    def run(mesh, rho0, rho1, mu0, mu1, lam, gamma,
+    def run(rho0, rho1, mu0, mu1, lam, gamma,
             uspace, pspace,phispace, q):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import barycentric
         from fealpy.fem import (ScalarMassIntegrator, ScalarDiffusionIntegrator,
                                 SourceIntegrator,ViscousWorkIntegrator, ScalarConvectionIntegrator)
         from fealpy.fem import (BilinearForm, LinearForm ,DirichletBC)
+        mesh = uspace.mesh
         bar_mu = min(mu0, mu1)
         us_bform = BilinearForm(uspace)
         ps_bform = BilinearForm(pspace)

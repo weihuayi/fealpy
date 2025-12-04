@@ -9,7 +9,6 @@ class AllenCahnFEMSimulation(CNodeType):
     required for the discretization of the Allen-Cahn equation using the provided function space.
 
     Inputs:
-        mesh (MeshType): Computational mesh.
         epsilon (float): Interface thickness parameter.
         gamma (float): Mobility parameter.
         phispace (SpaceType): Finite element space for the phase field φ.
@@ -27,7 +26,6 @@ class AllenCahnFEMSimulation(CNodeType):
                 在每个时间步调用时返回当前的离散矩阵 A 与右端项 b。
                 """
     INPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH, title="网格"),
         PortConf("epsilon", DataType.FLOAT, title="界面厚度参数"),
         PortConf("gamma", DataType.FLOAT, title="迁移率参数"),
         PortConf("init_phase", DataType.FUNCTION, title="初始相场函数"),
@@ -38,7 +36,7 @@ class AllenCahnFEMSimulation(CNodeType):
         PortConf("update_ac", DataType.FUNCTION, title="更新函数")
     ]
     @staticmethod
-    def run(mesh, epsilon, gamma, init_phase, phispace, q):
+    def run(epsilon, gamma, init_phase, phispace, q):
         from fealpy.backend import backend_manager as bm
         from fealpy.decorator import barycentric
         from fealpy.fem import (ScalarMassIntegrator, ScalarConvectionIntegrator,
@@ -46,6 +44,7 @@ class AllenCahnFEMSimulation(CNodeType):
         from fealpy.fem import (BilinearForm, LinearForm, BlockForm)
         from fealpy.sparse import COOTensor
         
+        mesh = phispace.mesh
         init_mass = mesh.integral(init_phase)
         
         def update_ac(u_n, phi_n, dt,phase_force, mv: None):

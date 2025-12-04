@@ -10,7 +10,6 @@ class MMGUACNSFEMSolver(CNodeType):
     the ACNS equations using the provided function spaces.
     
     Inputs:
-        mesh (MeshType): Computational mesh.
         dt (float): Time step size.
         nt (int): Number of time steps.
         uspace (SpaceType): Finite element space for the velocity field.
@@ -30,7 +29,7 @@ class MMGUACNSFEMSolver(CNodeType):
         p (Function): Pressure field.
         phi (Function): Phase-field function.
     """
-    TITLE: str = "有限元求解 ACNS 方程"
+    TITLE: str = "移动网格有限元求解 ACNS 方程"
     PATH: str = "simulation.solvers"
     DESC: str = """该节点实现了两相不可压流体的 Allen-Cahn-Navier-Stokes (ACNS) 方程组有限元求解
                 器。ACNS 模型结合了相场法与流体力学方程，用以描述两种不可混溶流体的界面演化与流动耦合过程。
@@ -39,7 +38,6 @@ class MMGUACNSFEMSolver(CNodeType):
                 2. Navier-Stokes 方程：根据当前相场计算密度场 ρ(φ)，更新速度场 u 与压力场 p。
 
                 输入参数：
-                - mesh (MeshType)：计算区域网格；
                 - dt (float)：时间步长；
                 - nt (int)：总时间步数；
                 - uspace (SpaceType)：速度场有限元空间；
@@ -65,7 +63,6 @@ class MMGUACNSFEMSolver(CNodeType):
                 设置好初始界面与网格信息后，即可在多时间步迭代中自动完成流体界面的演化与速度场的时序求解。
                 """
     INPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH, title="网格"),
         PortConf("domain", DataType.NONE, title="计算域"),
         PortConf("dt", DataType.FLOAT, 0, title="时间步长", default=0.001),
         PortConf("nt", DataType.INT, 0, title="时间步数", default=2000),
@@ -95,7 +92,7 @@ class MMGUACNSFEMSolver(CNodeType):
     ]
     
     @staticmethod
-    def run(mesh,domain, dt, nt,
+    def run(domain, dt, nt,
             uspace, pspace, phispace,
             update_ac, update_us, update_ps,
             update_velocity, update_gauge, update_pressure,
@@ -108,7 +105,7 @@ class MMGUACNSFEMSolver(CNodeType):
         from fealpy.solver import spsolve
         from fealpy.functionspace import TensorFunctionSpace
         from pathlib import Path
-        
+        mesh = uspace.mesh
         export_dir = Path(output_dir).expanduser().resolve()
         export_dir.mkdir(parents=True, exist_ok=True)
         
