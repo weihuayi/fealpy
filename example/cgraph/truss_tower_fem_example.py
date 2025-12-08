@@ -6,12 +6,12 @@ WORLD_GRAPH = cgraph.WORLD_GRAPH
 model = cgraph.create("TrussTower3d")
 mesher = cgraph.create("TrussTowerMesh")
 spacer = cgraph.create("FunctionSpace")
-materialer = cgraph.create("TrussTowerMaterial")
+materialer = cgraph.create("BarMaterial")
 truss_tower = cgraph.create("TrussTower")
 solver = cgraph.create("DirectSolver")
 postprocess = cgraph.create("UDecoupling")
 coord = cgraph.create("Rbar3d")
-strain_stress = cgraph.create("TrussTowerStrainStress")
+strain_stress = cgraph.create("BarStrainStress")
 
 model(
     dov=0.015,
@@ -30,7 +30,7 @@ mesher(
     face_diag = True
 )
 spacer(type="lagrange", mesh=mesher(), p=1)
-materialer(property="Steel", type="bar", E=2.0e11, nu=0.3)
+materialer(property="Steel", bar_type="truss_tower", E=2.0e11, nu=0.3)
 truss_tower(
     dov=model().dov,
     div=model().div,
@@ -52,6 +52,7 @@ solver(A = truss_tower().K,
 postprocess(out = solver().out, node_ldof=3, type="Truss")
 coord(mesh=mesher(), vref=None, index=None)
 strain_stress(
+    bar_type="truss_tower",
     E = materialer().E,
     nu = materialer().nu,
     mesh = mesher(),

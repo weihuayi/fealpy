@@ -12,19 +12,12 @@ class Bar25Mesh(CNodeType):
         
     Outputs:
         mesh (Mesh): The generated 25-bar truss mesh.
-        NN (int): Number of nodes in the truss. 
-        NC (int): Number of elements in the truss.
     """
     TITLE: str = "25杆桁架网格"
     PATH: str = "preprocess.mesher"
-    DESC: str = "生成一个经典的25杆空间桁架的网格。"
-
     INPUT_SLOTS = []
-
     OUTPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH, desc="25杆桁架网格", title="网格"),
-        PortConf("NN", DataType.INT, desc="桁架的节点数量", title="节点数量"),
-        PortConf("NC", DataType.INT, desc="桁架的单元数量", title="单元数量")
+        PortConf("mesh", DataType.MESH, desc="25杆桁架网格", title="网格")
     ]
 
     @staticmethod
@@ -45,10 +38,8 @@ class Bar25Mesh(CNodeType):
             [8, 5], [9, 5], [2, 6], [7, 3], [8, 4]], dtype=bm.int32)
         
         mesh = EdgeMesh(node, cell)
-        NN = mesh.number_of_nodes()
-        NC = mesh.number_of_cells()
 
-        return mesh, NN, NC
+        return mesh
     
 class Bar942Mesh(CNodeType):
     r"""Generate a 3D mesh for a 942-bar truss structure.
@@ -69,14 +60,10 @@ class Bar942Mesh(CNodeType):
         l1 (float): Height of the first segment.
 
     Outputs:
-        mesh (Mesh): The generated 924-bar truss mesh.
-        NN (int): Number of nodes in the truss. 
-        NC (int): Number of elements in the truss.
+        mesh (Mesh): The generated 942-bar truss mesh.
     """
     TITLE: str = "942杆桁架网格"
     PATH: str = "preprocess.mesher"
-    DESC: str = "生成一个大型942杆空间桁架的网格结构。"
-
     INPUT_SLOTS = [
         PortConf("d1", DataType.FLOAT, 1, desc="第一层半宽(正方形顶部)", title="第一层半宽", default=2135.0),
         PortConf("d2", DataType.FLOAT, 1, desc="第二层宽度(八边形段)", title="第二层宽度", default=5335.0),
@@ -89,11 +76,8 @@ class Bar942Mesh(CNodeType):
         PortConf("l2", DataType.FLOAT, 0, desc="第二段高度(八边形段顶部高度，默认l3+29260)", title="第二段高度", default=None),
         PortConf("l1", DataType.FLOAT, 0, desc="第一段高度(正方形段顶部高度，默认l2+21950)", title="第一段高度", default=None)
     ]
-
     OUTPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH, desc="924杆桁架网格", title="网格"),
-        PortConf("NN", DataType.INT, desc="桁架的节点数量", title="节点数量"),
-        PortConf("NC", DataType.INT, desc="桁架的单元数量", title="单元数量")
+        PortConf("mesh", DataType.MESH, desc="924杆桁架网格", title="网格")
     ]
 
     @staticmethod
@@ -113,12 +97,8 @@ class Bar942Mesh(CNodeType):
             l2=options.get("l2"),
             l1=options.get("l1")
         )
-        
         mesh = EdgeMesh(nodes, cells)
-        NN = mesh.number_of_nodes()
-        NC = mesh.number_of_cells()
-        
-        return mesh, NN, NC
+        return mesh
 
 class TrussTowerMesh(CNodeType):
     r"""Generate a 3D mesh for a truss tower structure.
@@ -134,16 +114,9 @@ class TrussTowerMesh(CNodeType):
         
     Outputs:
         mesh (Mesh): The generated 3D truss tower mesh.
-        NN (int): Number of nodes in the truss tower.
-        NC (int): Total number of elements in the truss tower.
     """
     TITLE: str = "桁架塔网格"
-    PATH: str = "preprocess.mesher"
-    DESC: str = """该节点生成三维桁架塔结构的网格，沿 z 方向构建长条状桁架结构。
-            用户可通过设置面板数量、塔身长度以及截面尺寸来控制塔体的整体几何特征，
-            并可指定每根杆件的单元划分密度，从而得到具有精细结构的三维桁架网格。
-            节点同时支持面内对角加劲杆的自动生成，用于增强塔体的结构稳定性。"""
-                
+    PATH: str = "preprocess.mesher"       
     INPUT_SLOTS = [
         PortConf("n_panel", DataType.INT, 1, desc="沿 z 方向的面板数量（≥1）", title="面板数量", default=19),
         PortConf("Lz", DataType.FLOAT, 1, desc="桁架塔沿 z 方向的总长度", title="总长度", default=19.0),
@@ -176,6 +149,4 @@ class TrussTowerMesh(CNodeType):
         
         from fealpy.mesh import EdgeMesh
         mesh = EdgeMesh(node, cell)
-        NN = mesh.number_of_nodes()
-        NC = mesh.number_of_cells()
-        return mesh, NN, NC
+        return mesh

@@ -42,7 +42,6 @@ timoaxle_model(
     beam_nu = beam_materialer().nu,
     axle_E = axle_materialer().E,
     axle_nu = axle_materialer().nu,
-    NC = mesher().NC,
     external_load = model().external_load,
     dirichlet_dof = model().dirichlet_dof,
     penalty = 1e20

@@ -14,24 +14,18 @@ class ChannelBeamMesh(CNodeType):
         
     Outputs:
         mesh (MESH): Generated 1D mesh along the beam length.
-        NN (INT): Number of nodes in the mesh.
-        NC (INT): Number of cells in the mesh.
     """
     
     TITLE: str = "槽形梁网格生成"
     PATH: str = "preprocess.mesher"
-    DESC: str = """该节点用于生成三维槽形梁的一维网格。"""
-    
     INPUT_SLOTS = [
         PortConf("L", DataType.FLOAT, 0, desc="梁的长度", title="梁长度", default=1.0),
         PortConf("n_ele", DataType.INT, 0, desc="沿梁长度方向的单元数量", 
-                 title="单元数量", default=10),
+                 title="网格剖分数目", default=10),
     ]
         
     OUTPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH, desc="槽形梁网格", title="网格"),
-        PortConf("NN", DataType.INT, desc="槽形梁的节点数量", title="节点数量"),
-        PortConf("NC", DataType.INT, desc="槽形梁的单元数量", title="单元数量")
+        PortConf("mesh", DataType.MESH, desc="槽形梁网格", title="网格")
     ]
     
     @staticmethod
@@ -50,10 +44,8 @@ class ChannelBeamMesh(CNodeType):
         cell[:, 1] = bm.arange(1, n + 1)
         
         mesh = EdgeMesh(node, cell)
-        NN = mesh.number_of_nodes()
-        NC = mesh.number_of_cells()
         
-        return mesh, NN, NC
+        return mesh
     
 
 class TimobeamAxleMesh(CNodeType):
@@ -72,8 +64,6 @@ class TimobeamAxleMesh(CNodeType):
     
     TITLE: str = "列车车轴网格生成"
     PATH: str = "preprocess.mesher"
-    DESC: str = """该节点用于生成列车车轴的一维网格。"""
-
     INPUT_SLOTS = []
 
     OUTPUT_SLOTS = [

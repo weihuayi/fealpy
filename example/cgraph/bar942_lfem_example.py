@@ -3,17 +3,17 @@ from fealpy.backend import backend_manager as bm
 
 WORLD_GRAPH = cgraph.WORLD_GRAPH
 
-model942 = cgraph.create("Bar942Data")
+model942 = cgraph.create("BarData")
 mesher942 = cgraph.create("Bar942Mesh")
 spacer = cgraph.create("FunctionSpace")
-materialer942 = cgraph.create("Bar942Material")
-bar942_model = cgraph.create("Bar942Model")
+materialer942 = cgraph.create("BarMaterial")
+bar942_model = cgraph.create("BarModel")
 solver = cgraph.create("DirectSolver")
 postprocess = cgraph.create("UDecoupling")
 coord = cgraph.create("Rbar3d")
-strain_stress = cgraph.create("Bar942StrainStress")
+strain_stress = cgraph.create("BarStrainStress")
 
-model942()
+model942(bar_type="bar942")
 mesher942(d1 = 2135,
         d2 = 5335,
         d3 = 7470,
@@ -26,9 +26,10 @@ mesher942(d1 = 2135,
         l1 = None
         )
 spacer(type="lagrange", mesh=mesher942(), p=1)
-materialer942(property="structural-steel", type="bar", E=2.1e5, nu=0.3)
+materialer942(property="structural-steel", bar_type="bar942", E=2.1e5, nu=0.3)
 
 bar942_model(
+    bar_type="bar942",
     space_type="lagrangespace",
     GD = model942().GD,
     mesh = mesher942(),
@@ -47,6 +48,7 @@ postprocess(out = solver().out, node_ldof=3, type="Truss")
 coord(mesh=mesher942(), vref=None, index=None)
 
 strain_stress(
+    bar_type="bar942",
     E = materialer942().E,
     nu = materialer942().nu,
     mesh = mesher942(),

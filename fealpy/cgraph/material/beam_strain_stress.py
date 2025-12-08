@@ -24,7 +24,6 @@ class ChannelStrainStress(CNodeType):
     """
     TITLE: str = "槽形梁应变-应力计算"
     PATH: str = "material.solid"
-    DESC: str = """该节点用于计算槽形梁在给定载荷和边界条件下的应变和应力。"""
     INPUT_SLOTS = [
         PortConf("mu_y", DataType.FLOAT, 1, desc="y方向剪切应力的最大值与平均值比例因子", 
                  title="y向剪切因子"),        
@@ -95,7 +94,6 @@ class BeamAxleIndices(CNodeType):
     """
     TITLE: str = "获取列车车轴梁和轴单元索引"
     PATH: str = "material.solid"
-    DESC: str = "获取列车车轴梁和轴单元的索引信息。"
     INPUT_SLOTS = [
         PortConf("beam_num", DataType.INT, 0, desc="梁单元个数", title="梁单元数目", default=22),
         PortConf("axle_num", DataType.INT, 0, desc="弹簧单元个数", title="弹簧单元数目", default=10),

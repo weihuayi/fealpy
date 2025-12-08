@@ -27,11 +27,7 @@ class Timoaxle(CNodeType):
     
     """
     TITLE: str = "列车车轴有限元模型"
-    PATH: str = "simulation.discretization"
-    DESC: str = """"该节点基于前处理阶段给定的几何参数与材料参数，构建列车车轴的梁-杆耦合有限元模型。
-           将所有单元刚度汇总组装为全局刚度矩阵，并通过罚函数法施加 Dirichlet 边界条件,
-           输出包含边界约束后的全局刚度矩阵与全局载荷向量。"""
-            
+    PATH: str = "simulation.discretization" 
     INPUT_SLOTS = [
         PortConf("beam_para", DataType.TENSOR, 1, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
         PortConf("axle_para", DataType.TENSOR, 1, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),
@@ -44,7 +40,6 @@ class Timoaxle(CNodeType):
         PortConf("axle_nu", DataType.FLOAT, 1, desc="弹簧材料属性",  title="弹簧的泊松比"),
         PortConf("external_load", DataType.FUNCTION, 1, desc="返回全局载荷向量", title="外部载荷"),
         PortConf("dirichlet_dof", DataType.FUNCTION, 1, desc="返回 Dirichlet 自由度", title="边界自由度"),
-        PortConf("NC", DataType.INT, 1, desc="车轴模型的单元总数", title="单元总数"),
         PortConf("penalty", DataType.FLOAT, 0, desc="乘大数法处理边界", title="系数", default=1e20),
     ]
     OUTPUT_SLOTS = [
@@ -86,7 +81,7 @@ class Timoaxle(CNodeType):
         GD = options.get("GD")
         mesh = options.get("mesh")
         space = LagrangeFESpace(mesh, p=1)
-        NC = options.get("NC")
+        NC = mesh.number_of_cells()
         external_load = options.get("external_load")
         dirichlet_dof = options.get("dirichlet_dof")
         penalty = options.get("penalty")

@@ -23,8 +23,6 @@ class ChannelBeam3d(CNodeType):
     """
     TITLE: str = "槽形梁几何参数模型"
     PATH: str = "preprocess.modeling"
-    DESC: str = """该节点用于建立三维槽形梁的几何参数模型。"""
-            
     INPUT_SLOTS = [
         PortConf("mu_y", DataType.FLOAT, 0, desc="y方向剪切应力的最大值与平均值比例因子", 
                  title="y向剪切因子", default=2.44),
@@ -78,9 +76,6 @@ class Timoaxle3d(CNodeType):
     """
     TITLE: str = "列车车轴几何参数模型"
     PATH: str = "preprocess.modeling"
-    DESC: str = """该节点用于建立列车车轴的三维几何参数模型，通过梁段与轴段的结构参数、截面形状及剪切修正因子，
-            定义 Timoshenko 梁模型所需的关键几何特性。"""
-            
     INPUT_SLOTS = [
         PortConf("beam_para", DataType.TENSOR, 0, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
         PortConf("axle_para", DataType.TENSOR, 0, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),

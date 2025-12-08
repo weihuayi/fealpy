@@ -77,8 +77,6 @@ class ChannelBeamMaterial(CNodeType):
     """
     TITLE: str = "槽形梁材料属性"
     PATH: str = "material.solid"
-    DESC: str = """该节点用于定义槽形梁的材料参数。"""
-        
     INPUT_SLOTS = [
         PortConf("property", DataType.MENU, 0, desc="材料名称", title="材料材质", default="structural-steel", 
                  items=["structural-steel", "aluminum", "concrete", "plastic", "wood", "alloy"]),
@@ -137,8 +135,6 @@ class TimoMaterial(CNodeType):
     """
     TITLE: str = "列车车轴梁段部分材料属性"
     PATH: str = "material.solid"
-    DESC: str = """该节点用于定义列车车轴中梁段部分的材料属性。"""
-        
     INPUT_SLOTS = [
         PortConf("property", DataType.MENU, 0, desc="材料名称", title="材料材质", default="structural-steel", 
                  items=["structural-steel", "aluminum", "concrete", "plastic", "wood", "alloy"]),

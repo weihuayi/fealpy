@@ -25,10 +25,6 @@ class ChannelBeam(CNodeType):
     """
     TITLE: str = "槽形梁有限元模型"
     PATH: str = "simulation.discretization"
-    DESC: str = """"该节点基于前处理阶段给定的几何参数与材料参数，构建槽形梁的有限元模型。
-            调用对应材料模型计算单元刚度矩阵。随后，将所有单元刚度汇总组装为全局刚度矩阵，
-            并施加 Dirichlet 边界条件，输出包含边界约束后的全局刚度矩阵与全局载荷向量。"""
-    
     INPUT_SLOTS = [
         PortConf("mu_y", DataType.FLOAT, 1, desc="y方向剪切应力的最大值与平均值比例因子", 
                  title="y向剪切因子"),
