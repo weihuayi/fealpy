@@ -107,7 +107,7 @@ class BarModel(ComputationalModel):
             nu (float): Poisson's ratio.
         """
         self.material = BarMaterial(name='BarMaterial',
-                                    model=self.pde,
+                                    model=None,
                                     elastic_modulus=self.E,
                                     poisson_ratio=self.nu)
 
