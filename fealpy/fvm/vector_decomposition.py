@@ -4,14 +4,14 @@ from fealpy.typing import TensorLike
 class VectorDecomposition():
     def __init__(self, mesh):
         self.mesh = mesh  
-        self.Sf = mesh.edge_normal()  # (NE, 2)
+        self.Sf = mesh.edge_normal()  # (NE, self.mesh.GD)
 
     def centroid_vector_calculation(self) -> TensorLike:
         cell_centers = self.mesh.entity_barycenter('cell')  # (NC, 2)
         edge_middle_point = self.mesh.entity_barycenter('face')
         e2c = self.mesh.edge_to_cell()
         NE = self.mesh.number_of_edges()
-        e = bm.zeros((NE, 2))
+        e = bm.zeros((NE, self.mesh.GD))
         is_interior = e2c[:, 0] != e2c[:, 1]
         e[is_interior] = cell_centers[e2c[:, 1][is_interior]] - cell_centers[e2c[:, 0][is_interior]]
         is_boundary = ~is_interior 

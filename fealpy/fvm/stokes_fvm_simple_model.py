@@ -102,7 +102,8 @@ class StokesFVMSimpleModel(ComputationalModel):
         bform2.add_integrator(ScalarDiffusionIntegrator(q=2))
         A = bform2.assembly()
         LagA = self.mesh.entity_measure('cell')
-        div_u = ap[:len(LagA)]*div_u
+        # div_u = ap[:len(LagA)]*div_u
+        div_u = bm.einsum('i,i,i->i', ap[:len(LagA)], div_u, 1/LagA)
         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                              bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
         A = BlockForm([[A, A1.T], [A1, None]])
@@ -127,7 +128,7 @@ class StokesFVMSimpleModel(ComputationalModel):
             if L2_p_corr < tol:
                 self.logger.info("Converged.")
                 break
-            p += 0.8*p_corr
+            p += 0.01*p_corr
             _, u = self.temporary_velocity(p)
 
         self.uh = u[:self.NC]

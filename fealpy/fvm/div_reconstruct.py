@@ -10,6 +10,7 @@ class DivergenceReconstruct:
         self.mesh = mesh
 
     def StagReconstruct(self, edge_velocity):
+        # print("edge_velocity:",edge_velocity)
         pem = self.mesh.entity_measure('edge')
         veloin = edge_velocity*pem
         PNC = self.mesh.number_of_cells()
@@ -19,6 +20,7 @@ class DivergenceReconstruct:
         mask = pe2c[:, 1] != pe2c[:, 0]  # 非边界边
         bm.add.at(div_u, pe2c[mask, 0], veloin[mask])   # 左侧/下侧单元正贡献
         bm.add.at(div_u, pe2c[mask, 1], -veloin[mask])
+        # print("div_u:",div_u)
         # bd_u = edge_velocity[bd_idx]
         # bd_n = self.mesh.edge_normal()[[bd_idx]]
         # bd_n = bm.sum(bd_n, axis=2, keepdims=True)

@@ -61,7 +61,8 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         uspace = ScaledMonomialSpace2d(self.umesh, 0)
         A = BilinearForm(uspace).add_integrator(ScalarDiffusionIntegrator(q=2)).assembly()
         f = LinearForm(uspace).add_integrator(ScalarSourceIntegrator(self.pde.source_u, q=2)).assembly()
-        grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
+        grad_p = GradientReconstruct(self.umesh).test(p_u)
+        # grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
         # grad_p = GradientReconstruct(self.umesh).AverageGradientreDirichlet(p_u, self.pde.dirichlet_pressure)
         f -= bm.einsum('i,i->i', grad_p[:, 0], self.ucm)
         dbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
@@ -76,7 +77,8 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         vspace = ScaledMonomialSpace2d(self.vmesh, 0)
         A = BilinearForm(vspace).add_integrator(ScalarDiffusionIntegrator(q=2)).assembly()
         f = LinearForm(vspace).add_integrator(ScalarSourceIntegrator(self.pde.source_v, q=2)).assembly()
-        grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
+        grad_p = GradientReconstruct(self.vmesh).test(p_v)
+        # grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
         # grad_p = GradientReconstruct(self.vmesh).AverageGradientreDirichlet(p_v,self.pde.dirichlet_pressure)
         f -= bm.einsum('i,i->i', grad_p[:, 1], self.vcm)
         dbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
@@ -90,18 +92,21 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         """
         Solve for pressure correction p' to enforce continuity.
         """
-        pspace = ScaledMonomialSpace2d(self.pmesh, 0)
-        A = BilinearForm(pspace).add_integrator(
-            ScalarDiffusionIntegrator(q=2,coef=1 / a_p_edge)
-        ).assembly()  
         LagA = self.pmesh.entity_measure('cell')
+        pspace = ScaledMonomialSpace2d(self.pmesh, 0)
+        p_edge = self.pmesh.entity_measure('edge')
+        p_edge2 = bm.einsum('i,i->i', p_edge,p_edge)
+        A = BilinearForm(pspace).add_integrator(
+            ScalarDiffusionIntegrator(q=2,coef=p_edge2 / a_p_edge)
+        ).assembly()
+        # LagA = self.pmesh.entity_measure('cell')
         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                              bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
         A = BlockForm([[A, A1.T], [A1, None]])
         A = A.assembly_sparse_matrix(format='csr')
         b0 = bm.array([0])
         b = bm.concatenate([f, b0], axis=0)
-        sol = spsolve(A, b)
+        sol = spsolve(A, b,"mumps")
         p_correct = sol[:-1]   
         return p_correct
 
@@ -110,7 +115,23 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         Solve the Stokes equation using the SIMPLE algorithm.
         """
         p = bm.zeros(self.ppoints.shape[0])
+        # p = self.pde.pressure(self.ppoints)
         self.residuals = []
+        # for i in range(50):
+            
+        #     p_u, p_v = self.staggered_mesh.map_pressure_pcell_to_uvedge(p)
+        #     uh, a_p_u = self.compute_velocity_u(p_u)
+        #     vh, a_p_v = self.compute_velocity_v(p_v)
+        #     edge_vel, a_p_edge = self.staggered_mesh.map_velocity_uvcell_to_pedge(uh, vh, a_p_u, a_p_v)
+        #     self.div_rhs = self.div.StagReconstruct(edge_vel)
+        #     p_corr = self.correct_pressure_compute(-self.div_rhs, a_p_edge)
+        #     L2_p_corr = bm.sqrt(bm.sum(self.pcm * (p_corr)**2))
+        #     self.residuals.append(float(L2_p_corr))
+        #     self.logger.info(f"[Iter {i+1}] L2 norm of the pressure correction : {L2_p_corr:.6e}")
+        #     if L2_p_corr < tol:
+        #         self.logger.info("Converged.")
+        #         break
+        #     p += 0.001 * p_corr
         for i in range(max_iter):
             
             p_u, p_v = self.staggered_mesh.map_pressure_pcell_to_uvedge(p)
@@ -125,7 +146,7 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
             if L2_p_corr < tol:
                 self.logger.info("Converged.")
                 break
-            p += 0.8*p_corr
+            p += 0.01 * p_corr
         self.uh, self.vh, self.ph = uh, vh, p
         return uh, vh, p
 
@@ -137,12 +158,12 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
         self.vI = self.pde.velocity_v(self.vpoints)
         self.pI = self.pde.pressure(self.ppoints)
         
-        uerror = bm.sqrt(bm.sum(self.ucm * (self.uh - self.uI)**2))
-        verror = bm.sqrt(bm.sum(self.vcm * (self.vh - self.vI)**2))
-        perror = bm.sqrt(bm.sum(self.pcm * (self.ph - self.pI)**2))
-        # uerror = bm.max(bm.abs(self.uh - self.uI))
-        # verror = bm.max(bm.abs(self.vh - self.vI))
-        # perror = bm.max(bm.abs(self.ph - self.pI))
+        # uerror = bm.sqrt(bm.sum(self.ucm * (self.uh - self.uI)**2))
+        # verror = bm.sqrt(bm.sum(self.vcm * (self.vh - self.vI)**2))
+        # perror = bm.sqrt(bm.sum(self.pcm * (self.ph - self.pI)**2))
+        uerror = bm.max(bm.abs(self.uh - self.uI))
+        verror = bm.max(bm.abs(self.vh - self.vI))
+        perror = bm.max(bm.abs(self.ph - self.pI))
         return uerror, verror, perror
 
     def plot(self) -> None:

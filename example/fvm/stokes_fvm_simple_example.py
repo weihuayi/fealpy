@@ -9,10 +9,10 @@ def main():
     parser.add_argument('--pde', default=1, type=int, 
                         help='Stokes PDE example ID')
     
-    parser.add_argument('--nx', default=20, type=int, 
+    parser.add_argument('--nx', default=32, type=int, 
                         help='Number of cells in x-direction')
     
-    parser.add_argument('--ny', default=20, type=int, 
+    parser.add_argument('--ny', default=32, type=int, 
                         help='Number of cells in y-direction')
     
     parser.add_argument('--space_degree', default=0, type=int, 
@@ -28,7 +28,7 @@ def main():
                         default='INFO', type=str,
                         help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
-    parser.add_argument('--max_iter', default=1000, type=int)
+    parser.add_argument('--max_iter', default=200, type=int)
     
     parser.add_argument('--tol', default=1e-5, type=float)
     
