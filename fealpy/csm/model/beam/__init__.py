@@ -51,5 +51,5 @@ DATA_TABLE = {
     # Add beam PDE models here (file_name, class_name)
     1: ("euler_bernoulli_beam_data_2d", "EulerBernoulliBeamData2D"),
     2: ("timobeam_axle_data_3d", "TimobeamAxleData3D"),
-    3: ("channel_beam_data_3d", "channelBeamData3D")
+    3: ("channel_beam_data_3d", "ChannelBeamData3D")
 }

@@ -43,8 +43,29 @@ class IncompressibleNSIPCS(CNodeType):
     """
     TITLE: str = "非稳态 NS 方程 IPCS 算法"
     PATH: str = "流体.有限元算法"
-    DESC: str = """该节点基于有限元法实现不可压 Navier-Stokes 方程的非稳态求解，采用 IPCS 分步算法
-                构建预测速度、压力修正和速度修正三个离散系统，支持多种本构模型与边界条件设置。"""
+    DESC: str = """该节点实现了用于求解非稳态不可压缩 Navier–Stokes 方程的 **IPCS（增量压力修正算法）**。
+
+                算法思想是将速度与压力的耦合系统拆分为三个子问题：
+                1. **速度预测方程**：忽略不可压条件，先预测一个中间速度场；
+                2. **压力修正方程**：利用预测速度修正压力，使流场满足散度为零；
+                3. **速度修正方程**：根据修正后的压力场，更新最终速度。
+
+                输入参数包括：
+                - constitutive ：控制流体类型（1 表示牛顿流体，2 表示广义黏性流体）；
+                - mu 和 rho ：分别为动力黏度与密度；
+                - source ：体力源项（如重力、外部驱动） ；
+                - uspace 与 pspace ：速度与压力的有限元空间；
+                - apply_bcu 和 apply_bcp ：分别为速度与压力边界条件处理函数；
+                - q ：积分精度控制。
+
+                输出为三个离散组装函数：
+                - predict_velocity ：构造预测速度方程；
+                - correct_pressure ：构造压力修正方程；
+                - correct_velocity ：构造速度修正方程。
+
+                使用示例：将“速度空间”、“压力空间”和“边界条件”节点连接至相应输入槽，
+                设定物性参数与源项后，依次调用三个输出函数即可完成一个时间步的 IPCS 求解过程。
+                """
     INPUT_SLOTS = [
         PortConf("constitutive", DataType.MENU, 0, title="本构方程", default=1, items=[i for i in range(1, 2)]),
         PortConf("mu", DataType.FLOAT, title="粘度系数"),
@@ -239,3 +260,110 @@ class IncompressibleNSIPCS(CNodeType):
             return A, b
             
         return predict_velocity, correct_pressure, correct_velocity
+    
+
+class IncompressibleNSBDF2(CNodeType):
+    r"""Unsteady Incompressible Navier-Stokes solver using the BDF2 algorithm.
+
+    Inputs:
+        Re (float): Reynolds number.
+        uspace(space): Function space for the velocity field.
+        pspace(space): Function space for the pressure field.
+        q (int): Quadrature order for numerical integration (default: 3).   
+    Outputs:
+        update (function): Function that assembles the system for each time step.
+    """
+    TITLE: str = "非稳态 NS 方程 BDF2 算法"
+    PATH: str = "流体.有限元算法"
+    DESC: str = """
+                该节点基于有限元法实现不可压 Navier-Stokes 方程的非稳态求解，采用 BDF2（二阶
+                向后差分格式）进行时间离散。在每个时间步中，该算法构建速度与压力场的耦合离散系统，
+                通过定义双线性型与线性型实现刚度矩阵与载荷项的组装，同时可支持不同雷诺数、积分精
+                度与源项输入。输出为一个时间步进函数，用于每步更新系统矩阵 A 与右端项 L。
+                
+                使用示例：用户可在输入槽中传入速度与压力的有限元空间 (uspace, pspace)、雷诺数
+                (Re) 并设置积分精度 (q)，输出的 update 函数可被上层时间推进框架调用，以在每个
+                时间步组装系统方程。
+                """
+    INPUT_SLOTS = [
+        PortConf("Re", DataType.FLOAT, title="雷诺数"),
+        PortConf("uspace", DataType.SPACE, title="速度函数空间"),
+        PortConf("pspace", DataType.SPACE, title="压力函数空间"),
+        PortConf("q", DataType.INT, 0, default = 3, min_val=3, title="积分精度")
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("update", DataType.FUNCTION, title="时间步进更新函数")
+    ]
+
+    @staticmethod
+    def run(Re, uspace, pspace, q):
+        from fealpy.fem import (BilinearForm, BlockForm, ScalarMassIntegrator, 
+                                ScalarConvectionIntegrator, ViscousWorkIntegrator,
+                                PressWorkIntegrator, LinearBlockForm, LinearForm, 
+                                SourceIntegrator)
+        from fealpy.backend import backend_manager as bm
+        from fealpy.decorator import barycentric
+        def update(u_0, u_1, dt, rho, source):
+            
+            ctd = rho
+            cv = 1/Re
+            cc = rho
+            pc = 1
+            cbf = source
+            
+            ## BilinearForm
+            
+            A00 = BilinearForm(uspace)
+            BM = ScalarMassIntegrator(q=q)
+            BM.coef = 3*ctd/(2*dt)
+            BC = ScalarConvectionIntegrator(q=q)
+            def BC_coef(bcs, index): 
+                ccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
+                result = 2* ccoef * u_1(bcs, index)
+                return result
+            BC.coef = BC_coef
+            BD = ViscousWorkIntegrator(q=q)
+            BD.coef = 2*cv 
+            
+
+            A00.add_integrator(BM)
+            A00.add_integrator(BC)
+            A00.add_integrator(BD)
+
+            A01 = BilinearForm((pspace, uspace))
+            BPW0 = PressWorkIntegrator(q=q)
+            BPW0.coef = -pc
+            A01.add_integrator(BPW0) 
+
+            A10 = BilinearForm((pspace, uspace))
+            BPW1 = PressWorkIntegrator(q=q)
+            BPW1.coef = -1
+            A10.add_integrator(BPW1)
+            
+            A = BlockForm([[A00, A01], [A10.T, None]])
+
+            ## LinearForm
+            L0 = LinearForm(uspace) 
+            LSI_U = SourceIntegrator(q=q)
+            @barycentric
+            def LSI_U_coef(bcs, index):
+                masscoef = ctd(bcs, index)[..., bm.newaxis] if callable(ctd) else ctd
+                result0 =  masscoef * (4*u_1(bcs, index) - u_0(bcs, index)) / (2*dt)
+                
+                ccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
+                result1 = ccoef*bm.einsum('cqij, cqj->cqi', u_1.grad_value(bcs, index), u_0(bcs, index))
+                cbfcoef = cbf(bcs, index) if callable(cbf) else cbf
+                
+                result = result0 + result1 + cbfcoef
+                return result
+            LSI_U.source = LSI_U_coef
+            L0.add_integrator(LSI_U)
+
+            L1 = LinearForm(pspace)
+            L = LinearBlockForm([L0, L1])
+
+            return A, L
+        return update
+
+
+        

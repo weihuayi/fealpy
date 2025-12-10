@@ -16,3 +16,4 @@ from .ellipse_mesher import EllipseMesher
 from .torus_mesher import TorusMesher
 from .ellipsoid_mesher import EllipsoidMesher
 from .patch_antenna_mesher import PatchAntennaMesher
+from .wpr_mesher import WPRMesher

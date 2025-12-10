@@ -1,3 +1,4 @@
 
 from .generator import EITDataGenerator
-from .em_fdtd_sim import EMFDTDSim
+from .model.source import Source
+from .point_source_maxwell_fdtd_model import PointSourceMaxwellFDTDModel

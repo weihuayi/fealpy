@@ -91,3 +91,30 @@ class IterativeSolver(CNodeType):
         mgr.set_tolerances(rtol=rtol, atol=atol, maxit=maxit)
         x = mgr.solve(b)
         return x
+
+from .nodetype import CNodeType, PortConf, DataType
+
+__all__ = ["EigenSolver"]
+
+class EigenSolver(CNodeType):
+    TITLE: str = "特征值求解器"
+    PATH: str = "解法器.特征值"
+    INPUT_SLOTS = [
+        PortConf("S", DataType.TENSOR, title="刚度矩阵 S"),
+        PortConf("M", DataType.TENSOR, title="质量矩阵 M"),
+        PortConf("neigen", DataType.INT, title="求取的特征值个数", default=6, min_val=1),
+        PortConf("which", DataType.STRING, title="eigsh which", default='SM'),
+    ]
+    OUTPUT_SLOTS = [
+        PortConf("val", DataType.TENSOR, title="特征值"),
+        PortConf("vec", DataType.TENSOR, title="特征向量"),
+    ]
+    
+    @staticmethod    
+    def run(*args, **kwargs):
+        from scipy.sparse.linalg import eigsh
+        S = kwargs.get('S')
+        M = kwargs.get('M')
+        neigen = kwargs.get('neigen')
+        val, vec = eigsh(S, k=neigen, M=M, which=kwargs.get('which', 'SM'), tol=1e-6, maxiter=1000)
+        return val, vec

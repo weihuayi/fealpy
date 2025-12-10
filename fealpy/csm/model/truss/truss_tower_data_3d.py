@@ -6,36 +6,123 @@ from ...mesh import TrussTower
 
 
 class TrussTowerData3D:
-    """
-    """
-    def __init__(self):
+    """3D Truss Tower data structure."""
+    
+    def __init__(self,
+                 dov=0.015, div=0.010,    # Vertical rod outer / inner diameter (m)
+                 doo=0.010, dio=0.007     # Other rods outer / inner diameter (m)
+                 ):
         
         self.dofs_per_node = 3
+        self.GD = self.geo_dimension()
         self.mesh = self.init_mesh() 
+        
+        # Tube section geometry (in meters)
+        self.dov, self.div = dov, div
+        self.doo, self.dio = doo, dio
+        
+        self.Av, self.Ao = self.cross_section_area() # Vertical/Other area
+        self.Iv, self.Io = self.inertia() # Vertical/Other I
+        self.A, self.I, self.is_vertical = self.bar_sections()
+        self.I1, self.I2 = self.structural_inertia()
     
     def __str__(self) -> str:
-        """Returns a formatted multi-line string summarizing the configuration of the 3D truss tower data.
+        """Returns a formatted multi-line string summarizing geometry & mesh information."""
         
-        Returns:
-            str: A multi-line string showing key truss parameters, geometry, and mesh info.
-    """
         s = f"{self.__class__.__name__}(\n"
         s += "  === Geometry & Mesh ===\n"
         s += f"  Mesh Type             : {self.mesh.__class__.__name__}\n"
         s += f"  Number of Nodes       : {self.mesh.number_of_nodes()}\n"
         s += f"  Number of Elements    : {self.mesh.number_of_cells()}\n"
         s += f"  Geo Dimension         : {self.geo_dimension()}\n"
+        s += "  === Section Properties ===\n"
+        s += f"  Vertical  rods: A = {self.Av:.6e}, I = {self.Iv:.6e}\n"
+        s += f"  Other     rods: A = {self.Ao:.6e}, I = {self.Io:.6e}\n"
+        s += "  === Structural Inertia ===\n"
+        s += f"  I1 (depth dir) = {self.I1:.6e} m⁴\n"
+        s += f"  I2 (width dir) = {self.I2:.6e} m⁴\n"
         s += ")"
         return s
     
     def geo_dimension(self) -> int:
-        """the geometric dimension."""
+        """Return the geometric dimension of the model."""
         return 3
     
-    def inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
-        """moments of inertia."""
-        pass 
+    def cross_section_area(self) -> Tuple[float, float]:
+        """Compute the cross-sectional area (A) of tube sections.
+            
+        Note:
+             A = π(do² - di²) / 4
+        """
+        A_vertical = bm.pi * (self.dov**2 - self.div**2) / 4
+        A_other = bm.pi * (self.doo**2 - self.dio**2) / 4
+        return A_vertical, A_other
     
+    def inertia(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        """Compute area moment of inertia.
+        
+        Note: 
+            I = π(do⁴ - di⁴) / 64 
+        """
+        I_vertical = bm.pi * (self.dov**4 - self.div**4) / 64
+        I_other = bm.pi * (self.doo**4 - self.dio**4) / 64
+        return I_vertical, I_other
+    
+    def bar_sections(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        """Assign cross-sectional area and moment of inertia to each bar element.
+        
+        Returns:
+            A(ndarray): Cross-sectional area for each bar element.
+            I(ndarray): Area moment of inertia for each bar element.
+            is_vertical(ndarray): Boolean array indicating if each bar is vertical.
+        """
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        
+        # Calculate bar vectors
+        bar_vectors = node[cell[:, 1]] - node[cell[:, 0]] #(NC, 3)
+        
+        # Calculate bar lengths and unit vectors
+        bar_length = bm.linalg.norm(bar_vectors, axis=1, keepdims=True) # (NC, 1)
+        unit_vectors = bar_vectors / (bar_length + 1e-12) #(NC, 3)
+        
+        z_component = bm.abs(unit_vectors[:, 2]) # (NC,)
+        xy_component = bm.sqrt(unit_vectors[:, 0]**2 + unit_vectors[:, 1]**2) # (NC,)
+        
+        # A bar is vertical: (|cos(0)| > 0.95) & (|sin(0)| < 0.3)
+        is_vertical = (z_component > 0.95) & (xy_component<0.3)
+        
+        A = bm.zeros(NC, dtype=bm.float64)
+        I = bm.zeros(NC, dtype=bm.float64)
+        
+        A[is_vertical] = self.Av # Vertical columns area
+        A[~is_vertical] = self.Ao # Diagonal braces and horizontal bars area
+        
+        I[is_vertical] = self.Iv
+        I[~is_vertical] = self.Io # Other bars inertia
+        
+        return A, I, is_vertical
+    
+    def structural_inertia(self) -> Tuple[float, float]:
+        """Compute structural area moment of inertia for buckling analysis.
+        
+        Returns:
+            (I1, I2) - Area moments of inertia about different axes
+            I1 = 4*A1*(depth/2)**2, where A1 = 4*A_vertical
+            I2 = 4*A1*(width/2)**2  where A1 = 4*A_vertical
+        """
+        A1 = 4*self.Av  # Total area of all 4 vertical columns
+        
+        # From init_mesh parameters: Wy=0.40 (depth), Wx=0.45 (width)
+        depth = 0.40  # Y direction
+        width = 0.45  # X direction
+        
+        I1 = 4 * A1 * (depth/2)**2 
+        I2 = 4 * A1 * (width/2)**2 
+        
+        return I1, I2
     
     def init_mesh(self):
         """Generate a 3D slender truss tower along the z-axis using line (1D) elements.
@@ -58,8 +145,66 @@ class TrussTowerData3D:
         mesh = EdgeMesh(node, cell)
         return mesh
     
-    def load(self):
-        pass
+    def external_load(self, load_total: float=1.0):
+        """Generate the external load vector for the 3D truss tower.
+        
+        Note:
+            - Total load = 1 N (load = 1).
+            - Applied vertically downward on top nodes.
+            - Each top node gets an equal fraction of the total load.
+        """
+        node = self.mesh.entity('node')
+        num_nodes = self.mesh.number_of_nodes()
+        
+        F = bm.zeros((num_nodes*self.dofs_per_node,), dtype=bm.float64)
+        
+        # 找到塔顶节点
+        top_nodes = bm.where(node[:, 2] > 18.999)[0]
+    
+        # 每个顶节点施加总载荷的等分
+        load_per_node = load_total / len(top_nodes)  # 总载荷: load_total 
+        for i in top_nodes:
+             F[3*i + 2] = -load_per_node  # Z方向,向下
+        
+        return F
     
     def dirichlet_dof(self):
-        pass
+        """Return Dirichlet boundary fixed DOFs for the 3D truss tower.
+        
+        Note:
+            All degrees of freedom (ux, uy, uz) at the bottom nodes are fixed.
+        """
+        node = self.mesh.entity('node')
+        
+        node_dofs = []
+        
+        # 找到底部节点（z = 0）
+        bottom_nodes = bm.where(node[:, 2] < 1e-6)[0]
+        
+        # 构造固定自由度：按节点顺序，每个节点依次排列ux, uy, uz
+        for node_idx in bottom_nodes:
+            dof_x = node_idx * 3       
+            dof_y = node_idx * 3 + 1   
+            dof_z = node_idx * 3 + 2 
+            node_dofs.append(bm.array([dof_x, dof_y, dof_z]))
+        
+        fixed_dofs = bm.concatenate(node_dofs)
+        
+        return fixed_dofs
+    
+    def is_dirichlet_boundary(self):
+        """Return boolean array indicating which DOFs are on the boundary.
+        
+        Returns:
+            Array of shape (gdof,) with True for boundary DOFs
+        """
+        return self.dirichlet_dof()
+
+    def dirichlet_bc(self):
+        """Return dirichlet boundary conditions.
+        
+        Returns:
+            Dirichlet values at boundary DOFs (all zeros for fixed boundary)
+        """
+        fixed_dofs = self.dirichlet_dof()
+        return bm.zeros(len(fixed_dofs), dtype=bm.float64)
