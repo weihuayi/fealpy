@@ -5,6 +5,10 @@ from .tool import _compute_coef_2d, quad_equ_solver , linear_surfploter
 from ..sparse import spdiags
 from scipy.sparse import bmat,diags , block_diag,coo_matrix
 from scipy.integrate import solve_ivp
+from fealpy.utils import timer
+time = timer()
+next(time)
+
 
 class EAGAdaptiveHuang(Monitor, Interpolater):
     def __init__(self, mesh, beta, space, config:Config):
@@ -402,6 +406,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                         shape=(2*NN, 2*NN)).tocsr()
         return JAC
     
+    
     def linear_interpolate(self, Xi, Xi_new , X):
         """
         linear interpolation method
@@ -506,50 +511,6 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         A = bm.permute_dims((node[scell[:,1:]] - node[scell[:,0,None]]),axes=(0,2,1))
         C = bm.permute_dims((delta_x[scell[:,1:]] - delta_x[scell[:,0,None]]),axes=(0,2,1))
         return A, C
-    
-    # 这段代码被注释掉了，因为并不适合当前算法
-    # def get_physical_node(self,Xinew,X,vector_field):
-    #     """
-    #     计算物理网格的新节点位置
-    #     x_{n+1} = x_n + eta * J * vector_field
-    #     J = E_K E_hat_K^{-1} 为局部雅可比矩阵将逻辑网格的位移场拉回物理网格
-    #     注意上述得到的位移需要在边界处进行修正,以保持边界形状
-    #     eta 步长控制,其为了了防止网格翻转,一般取 eta in (0,1]
-         
-    #     Parameters:
-    #         vector_field(Tensor): 逻辑网格节点的速度场 (NN, GD)
-    #     Return:
-    #         x_new(Tensor): 物理网格的新节点位置 (NN, GD)
-    #     """
-    #     cell = self.cell
-    #     alpha = self.alpha
-    #     E = self.edge_matrix(X) # (NC, GD, GD)
-    #     Xinew_0 = Xinew[cell[:,0],:] # (NC, GD)
-    #     E_map = Xinew[cell[:,1:],:] - Xinew_0[:, None , :] # (NC, GD, GD)
-    #     E_map = bm.permute_dims(E_map, (0,2,1))  # (NC, GD, GD)
-    #     J = E @ bm.linalg.inv(E_map) # (NC, GD, GD)
-    #     vf_cell = bm.mean(vector_field[self.mesh.cell], axis=1) # (NC, GD)
-    #     vf_physical_cell = bm.einsum('ijk,ik->ij', J , vf_cell) # (NC, GD)
-        
-    #     sm = self.sm
-    #     cm = self.cm
-    #     vf_physical = bm.zeros_like(vector_field , **self.kwargs0) # (NN, GD)
-    #     vf_physical = bm.index_add(vf_physical , self.mesh.cell , (vf_physical_cell*cm[:, None])[:, None , :])
-    #     vf_physical /= sm[:, None]
-        
-    #     Bdinnernode_idx = self.Bdinnernode_idx
-    #     dot = bm.sum(self.Bi_Pnode_normal * vf_physical[Bdinnernode_idx],axis=1)
-    #     vf_physical = bm.set_at(vf_physical , Bdinnernode_idx ,
-    #                             vf_physical[Bdinnernode_idx] - dot[:,None] * self.Bi_Pnode_normal)
-    #     vf_physical = bm.set_at(vf_physical , self.Vertices_idx , 0)
-        
-    #     coef = _compute_coef_2d(vf_physical,self.AC_generator)
-    #     k = quad_equ_solver(coef)
-    #     positive_k = bm.where(k>0, k, 1)
-    #     eta = bm.min(positive_k)
-    #     Xnew = self.mesh.node + alpha * eta * vf_physical
-
-    #     return Xnew
 
     def _caculate_tol(self):
         """
@@ -626,12 +587,16 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                 y = (s_vec * y)
                 Xi_current = y.reshape(self.GD, self.NN).T
                 v = self.vector_construction(Xi_current , M_inv)
+                time.send("ODE vector field")
                 return s_inv *v.ravel(order = 'F')
             
             def jac(t, y):
                 y = (s_vec * y)
                 Xi_current = y.reshape(self.GD, self.NN).T
                 J_y = self.JAC_functional(Xi_current, M_inv)
+                # J_y = self.JAC_functional_simple(Xi_current, M_inv)
+                
+                time.send("ODE Jacobian matrix computation complete")
                 J_z = J_y.multiply(s_inv[:, None])             # 行缩放
                 J_z = J_z.multiply(s_vec[None, :])
                 return J_z
@@ -649,6 +614,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             self.uh = self.interpolate(Xnew)
             self._construct(Xnew)
             print(f"EAGAdaptiveHuang: step {it+1}/{self.total_steps} completed.")
-
+        time.send("Mesh redistribution complete")
+        next(time)
         return Xnew
         

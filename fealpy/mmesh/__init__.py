@@ -11,4 +11,8 @@ from .gfmmpde_lagrange_2d import GFMMPDELagrange2d
 from .lmeagadaptive import LMEAGAdaptive
 from .lmeagadaptivex import LMEAGAdaptiveX
 from .eagadaptivehuang import EAGAdaptiveHuang
+from .metrictensoradaptive import MetricTensorAdaptive
+
+from .mesh_quality import MeshQuality
+
 from .mmesher import MMesher

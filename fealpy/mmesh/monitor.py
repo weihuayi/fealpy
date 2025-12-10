@@ -246,7 +246,8 @@ class Monitor(PREProcessor):
         """
         M = self.M
         GD = self.GD
-        # M = bm.mean(M,axis=1)  # NC,GD,GD
+        if M.ndim != 3:
+            M = bm.mean(M,axis=1)  # NC,GD,GD
         cell = self.cell
         counts = bm.zeros((self.NN,), **self.kwargs0)
         ones = bm.ones((self.NC,self.GD+1), **self.kwargs0)

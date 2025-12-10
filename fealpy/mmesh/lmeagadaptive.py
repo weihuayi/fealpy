@@ -89,7 +89,7 @@ class LMEAGAdaptive(Monitor, Interpolater):
         det_M = bm.linalg.det(M)
         rho_K = bm.sqrt(det_M)
         sigma = bm.sum(cm * rho_K , axis=0)
-        area = bm.sum(cm)
+        area = bm.sum(cm , axis=0)
         theta = (sigma/area)**(-2/d)
         return theta
         
@@ -157,45 +157,173 @@ class LMEAGAdaptive(Monitor, Interpolater):
         pT_pg = - gamma * H**(gamma-1) * theta * det_A**(1/d - 1)
         return pT_pg
     
-    def TdA_2(self,theta,A):
+    def TdA_3(self,theta,A):
         """
-        (|A|_F)^gamma + (...)tr(A)^gamma 型
-        基于几何离散的 T 泛函关于算子 A 的导数
-        T = 1/2*|A|^2_F + theta^{gamma}*(tr(A) - d * det(A)^{1/d})tr(A))^(gamma-1)
-        A = E_hat E_K^{-1}M^{-1} E_K^{-T} E_hat^T
-        
-        pT/pA = gamma * |A|_F^{2(gamma-1)}* A + 
-                gamma * theta^{gamma} * (gamma*tr(A)^{gamma-1} - 
-                d*(gamma-1)tr(A)^{gamma-2}*g^{1/d}) * I
+        测试去掉 tr(A)
         """
         gamma = self.gamma
-        A_F = bm.sum(A**2 , axis=(-2,-1))
-        trace_A = bm.trace(A,axis1=-2,axis2=-1)
-        det_A = bm.linalg.det(A)
         d = self.GD
+        det_A = bm.linalg.det(A)
+        A_Fnorm = bm.sum(A**2 , axis=(-2,-1))
+        H = 0.5 * A_Fnorm + theta * ( - d * det_A**(1/d)) + 1/2 * d * theta**2
+        d = A.shape[-1]
         I_base = bm.eye(d, **self.kwargs0)
         I = bm.zeros_like(A , **self.kwargs0)
         I += I_base
-        term0 = gamma * (A_F**(gamma-1))[...,None,None] * A
-        term1 = gamma * theta**gamma * (trace_A**(gamma-1) - 
-                 d*(gamma-1)*trace_A**(gamma-2)*det_A**(1/d))[...,None,None] * I
-        pT_pA = term0 + term1
+        pT_pA = (gamma * H**(gamma-1))[...,None,None] * A
         return pT_pA
     
-    def Tdg_2(self, theta,A ,det_A):
+    def Tdg_3(self,theta,A , det_A):
         """
-        (|A|_F)^gamma + (...)tr(A)^gamma 型
-        基于几何离散的 T 泛函关于标量 g 的导数
-        g = det(A)
-
-        pT/pg = - d*theta^gamma*gamma*tr(A)^{gamma-1} * g^{1/d - 1}
+        测试去掉 tr(A)
         """
         gamma = self.gamma
-        trace_A = bm.trace(A,axis1=-2,axis2=-1)
         d = self.GD
-        pT_pg = - d * theta**gamma * gamma * trace_A**(gamma-1) * det_A**(1/d - 1)
+        A_Fnorm = bm.sum(A**2 , axis=(-2,-1))
+        H = 0.5 * A_Fnorm + theta * ( - d * det_A**(1/d)) + 1/2 * d * theta**2
+        pT_pg = - gamma * H**(gamma-1) * theta * det_A**(1/d - 1)
         return pT_pg
     
+    def TdA_2(self,theta ,A):
+        """
+        缩放指数
+        基于几何离散的 T 泛函关于标量 A 的导数
+        T = 1/2 * |A|_F^{d*gamma/2} + (theta*tr(A))^{d*gamma/4} - (d*theta*det(A)^{1/d})^{d*gamma/4}
+        pT/pA = d*gamma/4 *(|A|_F^{d*gamma/2 - 2} * A + theta^{d*gamma/4} * tr(A)^{d*gamma/4 - 1} * I)
+        """
+        gamma = self.gamma
+        d = self.GD
+        A_Fnorm = bm.sum(A**2 , axis=(-2,-1))
+        trace_A = bm.trace(A,axis1=-2,axis2=-1)
+        I_base = bm.eye(d, **self.kwargs0)
+        I = bm.zeros_like(A , **self.kwargs0)
+        I += I_base
+        term1 = (d*gamma/4) * (A_Fnorm**(d*gamma/4 - 1))[...,None,None] * A
+        term2 = (d*gamma/4) * theta**(d*gamma/4) * (trace_A**(d*gamma/4 - 1))[...,None,None] * I
+        pT_pA = term1 + term2
+        return pT_pA
+
+    def Tdg_2(self, theta , det_A):
+        """
+        缩放指数
+        基于几何离散的 T 泛函关于标量 g 的导数
+        g = det(A)
+        pT/pg = - gamma/4 * (d*theta)^{d*gamma/4} * det(A)^{gamma/4 - 1}
+        """
+        gamma = self.gamma
+        d = self.GD
+        pT_pg = - gamma/4 * (d*theta)**(d*gamma/4) * det_A**(gamma/4 - 1)
+        return pT_pg
+    
+    def TdA_4(self,theta ,A):
+        """
+        缩放指数
+        基于几何离散的 T 泛函关于标量 A 的导数
+        T = (H)^gamma
+        H = 1/2 * |A|_F^{d/2} + (theta*tr(A))^{d/4} - (d*theta*det(A)^{1/d})^{d/4}
+        pT/pA = gamma * H^{gamma-1} * [ d/4 * |A|_F^{d/2 - 2} * A + d/4 * theta^{d/4} * tr(A)^{d/4 - 1} * I ]
+        """
+        gamma = self.gamma
+        d = self.GD
+        A_Fnorm = bm.sqrt(bm.sum(A**2 , axis=(-2,-1)))
+        trace_A = bm.trace(A,axis1=-2,axis2=-1)
+        det_A = bm.linalg.det(A)
+        H = 0.5 * A_Fnorm**(d/2) + (theta*trace_A)**(d/4) - (d*theta*det_A**(1/d))**(d/4)
+        I_base = bm.eye(d, **self.kwargs0)
+        I = bm.zeros_like(A , **self.kwargs0)
+        I += I_base
+        term1 = (d/4) * (A_Fnorm**(d/2 - 2))[...,None,None] * A
+        term2 = (d/4) * theta**(d/4) * (trace_A**(d/4 - 1))[...,None,None] * I
+        pT_pA = (gamma * H**(gamma-1))[...,None,None] * (term1 + term2)
+        return pT_pA
+    
+    def Tdg_4(self, theta ,A, det_A):
+        """
+        缩放指数
+        基于几何离散的 T 泛函关于标量 g 的导数
+        g = det(A)
+        pT/pg = - gamma * H^{gamma-1} * 1/4 * (d*theta)^{d/4} * det(A)^{1/4 - 1}
+        """
+        gamma = self.gamma
+        d = self.GD
+        det_A = bm.linalg.det(A)
+        A_Fnorm = bm.sqrt(bm.sum(A**2 , axis=(-2,-1)))
+        trace_A = bm.trace(A,axis1=-2,axis2=-1)
+        H = 0.5 * A_Fnorm**(d/2) + (theta*trace_A)**(d/4) - (d*theta*det_A**(1/d))**(d/4)
+        pT_pg = - gamma * H**(gamma-1) * 1/4 * (d*theta)**(d/4) * det_A**(1/4 - 1)
+        return pT_pg
+    
+    def TdA_5(self,theta ,A):
+        """
+        T = (H)^gamma
+        H = d^{1/2} * |A|_F + theta*(tr(A) -2 * d * det(A)^{1/d})
+        pT/pA = gamma * H^{gamma-1} * [ d^{1/2} * A / |A|_F + theta * I ]
+        """
+        gamma = self.gamma
+        d = self.GD
+        A_Fnorm = bm.sqrt(bm.sum(A**2 , axis=(-2,-1)))
+        trace_A = bm.trace(A,axis1=-2,axis2=-1)
+        det_A = bm.linalg.det(A)
+        H = d**(1/2) * A_Fnorm + theta * (trace_A - 2 * d * det_A**(1/d))
+        I_base = bm.eye(d, **self.kwargs0)
+        I = bm.zeros_like(A , **self.kwargs0)
+        I += I_base
+        term1 = d**(1/2) * (A_Fnorm**(-1))[...,None,None] * A
+        term2 = theta * I
+        pT_pA = (gamma * H**(gamma-1))[...,None,None] * (term1 + term2)
+        return pT_pA
+    
+    def Tdg_5(self, theta ,A, det_A):
+        """
+        T = (H)^gamma
+        H = d^{1/2} * |A|_F + theta*(tr(A) -2 * d * det(A)^{1/d})
+        pT/pg = - gamma * H^{gamma-1} * theta * 2 * det(A)^{1/d - 1}
+        """
+        gamma = self.gamma
+        d = self.GD
+        A_Fnorm = bm.sqrt(bm.sum(A**2 , axis=(-2,-1)))
+        trace_A = bm.trace(A,axis1=-2,axis2=-1)
+        det_A = bm.linalg.det(A)
+        H = d**(1/2) * A_Fnorm + theta * (trace_A - 2 * d * det_A**(1/d))
+        pT_pg = - gamma * H**(gamma-1) * theta * 2 * det_A**(1/d - 1)
+        return pT_pg
+    
+    def TdA_6(self,theta,A):
+        """
+        T = lambda *(tr(A)^{d*gamma/2} -d^{d*gamma/2}* gamma/2 * theta^(d*gamma/2) * ln (det(A)))
+        TdA = lambda * d*gamma/2 * tr(A)^{d*gamma/2 - 1} * I 
+        """
+        lam = self.lam(theta)
+        gamma = self.gamma
+        d = self.GD
+        trace_A = bm.trace(A,axis1=-2,axis2=-1)
+        I_base = bm.eye(d, **self.kwargs0)
+        I = bm.zeros_like(A , **self.kwargs0)
+        I += I_base
+        pT_pA = 1/lam * (d*gamma/2) * (trace_A**(d*gamma/2 - 1))[...,None,None] * I
+        return pT_pA
+    
+    def Tdg_6(self, theta ,det_A):
+        """
+        T = lambda *(tr(A)^{d*gamma/2} -d^{d*gamma/2}* gamma/2 * theta^(d*gamma/2) * ln (det(A)))
+        Tdg = -lambda * d^{d*gamma/2} * gamma/2* theta^{d*gamma/2} * 1/det(A)
+        """
+        lam = self.lam(theta)
+        gamma = self.gamma
+        d = self.GD
+        pT_pg = - 1/lam * d**(d*gamma/2) * gamma/2 * theta**(d*gamma/2) * det_A**(-1)
+        return pT_pg
+
+    def lam(self , theta):
+        """
+        拉伸因子 lambda
+        """
+        d = self.GD
+        gamma = self.gamma
+        power = d * gamma / 2
+        lam = d**(power) * theta**(power)*(1- power * bm.log(theta))
+        return lam
+
     def balance(self,M_node):
         """
         (...)^gamma 型
@@ -209,8 +337,50 @@ class LMEAGAdaptive(Monitor, Interpolater):
         d = self.GD
         gamma = self.gamma
         det_M_node = bm.linalg.det(M_node)
-        n = 1/d * (2 * gamma - d/2)
+        n = 1/d * (gamma - d/2)
         P_diag = det_M_node**n # (NN,)
+        return P_diag
+    
+    def balance_2(self,M_node):
+        """
+        缩放指数
+        平衡函数 P 为 (NN,NN) 的对角矩阵,实际组装时只需对角元
+        P = diag( det(M)^{m})
+        m = 1/2 * (gamma - 1)
+        Parameters:
+            M_node(Tensor): 目标单元度量张量 (NN, GD, GD)
+            theta(float): 积分全局乘子
+        """
+        d = self.GD
+        gamma = self.gamma
+        det_M_node = bm.linalg.det(M_node)
+        m = 1/2 * (gamma - 1)
+        P_diag = det_M_node**m # (NN,)
+        return P_diag
+    
+    def balance_3(self,M_node):
+        """
+        T = (H)^gamma
+        H = d^{1/2} * |A|_F + theta*(tr(A) -2 * det(A)^{1/d})
+        平衡函数 P 为 (NN,NN) 的对角矩阵,实际组装时只需对角元
+        P = diag( det(M)^{k})
+        k = 1/d * ( gamma -d/2)
+        Parameters:
+            M_node(Tensor): 目标单元度量张量 (NN, GD, GD)
+            theta(float): 积分全局乘子
+        """
+        d = self.GD
+        gamma = self.gamma
+        det_M_node = bm.linalg.det(M_node)
+        k = 1/d * ( gamma - d/2)
+        P_diag = det_M_node**k # (NN,)
+        return P_diag
+    
+    def balance_4(self,M_node):
+        d = self.GD
+        det_M_node = bm.linalg.det(M_node)
+        k = -1/2
+        P_diag = det_M_node**k # (NN,)
         return P_diag
     
     def R_matrix(self):
@@ -241,15 +411,15 @@ class LMEAGAdaptive(Monitor, Interpolater):
         E_hat_inv = bm.linalg.inv(E_hat)
         A = self.A(E_K , E_hat , M_inv)
         g = bm.linalg.det(A)
-        TdA = self.TdA(theta , A)
-        Tdg = self.Tdg(theta , A , g)
+        TdA = self.TdA(theta, A)
+        Tdg = self.Tdg(theta,A,g)
         
         term0 = E_hat_inv @ A @ TdA
         term1 = (Tdg * g)[..., None, None] * E_hat_inv
-        Idxi_grad_part = 2 * rho[..., None, None] * (term0 + term1)
+        Idxi_grad_part = rho[..., None, None] * (term0 + term1) # (NC, GD, GD)
         Idxi = self.R[None,...] @ Idxi_grad_part # (NC, GD+1, GD)
         return Idxi
-
+    
     def BD_projector(self):
         """
         构造按“变量列”右乘的边界投影矩阵系数（2D）
@@ -402,10 +572,7 @@ class LMEAGAdaptive(Monitor, Interpolater):
         E_K     = cache['E_K']
         E_K_inv = cache['E_K_inv']
         rho     = cache['rho']
-        cm      = cache['cm']
-        P_diag  = cache['P_diag']
         theta   = cache['theta']
-        rxx, ryy, rxy, ryx = cache['rxx'], cache['ryy'], cache['rxy'], cache['ryx']
 
         # 基本量
         E_hat    = self.edge_matrix(Xi)                     # (NC,d,d)
@@ -421,7 +588,7 @@ class LMEAGAdaptive(Monitor, Interpolater):
         # 数值稳健性
         eps = 1e-14
         g_pos    = bm.maximum(g, eps)
-        H        = 0.5*A_F2 + theta*(trA - d * g_pos**(1.0/d))    # (NC,)
+        H        = 0.5*A_F2 + theta*(trA - d * g_pos**(1.0/d))   # (NC,)
         H_pos    = bm.maximum(H, eps)
 
         gamma = self.gamma
@@ -485,9 +652,635 @@ class LMEAGAdaptive(Monitor, Interpolater):
         # 局部二阶块（对 j'=1..d 的“梯度部分”），形状 (NC,c,k,d,matrix_cols=j')
         D2_all = P1_all + P2_all                                                # (NC,c,k,d,d)
 
+        JAC = self.JAC_assembly(D2_all)
+        return JAC
+    
+    def JAC_functional_3(self,Xi,M_inv):
+        """
+        (...)^gamma 型
+        构造算法：
+        d E_hat = e_k x e_c^T
+        d E_hat_inv = - E_hat_inv dE_hat E_hat_inv
+        d A =  2*M_inv (dE_hat E_K^{-1})^T
+        d g =  g * tr(A^{-1} dA)
+        d H = (A) : dA - theta * g^{1/d-1} * dg
+        d (TdA) = gamma *(gamma-1)* H^{gamma-2} dH * (A) + gamma * H^{gamma-1} * dA
+        d (Tdg) = - gamma *(gamma-1)* H^{gamma-2} dH * theta * g^{1/d-1} - 
+                    gamma * H^{gamma-1} * theta * (1/d - 1) * g^{1/d-2} * dg
+        P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        J = R @ (P1 + P2)
+        """
+        d   = self.GD
+        NN  = self.NN
+        NC  = self.NC
+        assert d == 2, "当前实现针对 2D；3D 可按相同张量结构扩展"
+
+        # 缓存（在 solve_ivp 步内不变）
+        cache = getattr(self, '_ivp_cache', None)
+        if cache is None:
+            raise RuntimeError("ivp 缓存未准备，请先调用 _prepare_ivp_cache")
+        E_K     = cache['E_K']
+        E_K_inv = cache['E_K_inv']
+        rho     = cache['rho']
+        theta   = cache['theta']
+
+        # 基本量
+        E_hat    = self.edge_matrix(Xi)                     # (NC,d,d)
+        Einv     = bm.linalg.inv(E_hat)                     # (NC,d,d)
+        Ehat_T   = bm.swapaxes(E_hat, -1, -2)               # (NC,d,d)
+        C        = E_K_inv @ M_inv @ bm.swapaxes(E_K_inv, -1, -2)  # (NC,d,d) = E_K^{-1} M^{-1} E_K^{-T}
+        A        = E_hat @ C @ Ehat_T                       # (NC,d,d)
+        I_d      = bm.eye(d, **self.kwargs0)
+        I_mat    = bm.zeros_like(A, **self.kwargs0); I_mat += I_d
+  
+        A_F2     = bm.sum(A*A, axis=(-2,-1))                # (NC,)
+        g        = bm.linalg.det(A)                          # (NC,)
+        # 数值稳健性
+        eps = 1e-14
+        g_pos    = bm.maximum(g, eps)
+        H        = 0.5*A_F2 + theta*( - d * g_pos**(1.0/d)) + 1/2 * d * theta**2   # (NC,)
+        H_pos    = bm.maximum(H, eps)
+
+        gamma = self.gamma
+        S     = A 
+        H_gm1 = H_pos**(gamma-1.0)
+        TdA   = (gamma * H_gm1)[..., None, None] * S          # (NC,d,d)
+        Tdg   = -gamma * H_gm1 * theta * (g_pos**(1.0/d - 1.0))   # (NC,)
+
+        # 预备构件（用于 δA ）
+        U = E_hat @ C                        # (NC,d,d)
+        W = C @ Ehat_T                       # (NC,d,d)
+        # δE_hat^{-1} = −(b_k ⊗ row_c(Einv))，一次性生成 (NC,c,k,d,d)
+        b_all        = bm.swapaxes(Einv, -1, -2)              # (NC,d,d) 列向量转行表示：b_all[:,k,:] = Einv[:, :, k]^T
+        row_c_Einv   = Einv                                   # (NC,c,d)
+        dEinv_all = -( b_all[:, None, :, :, None] * row_c_Einv[:, :, None, None, :] )  # (NC,c,k,d,d)
+
+        # δA_all = (e_k ⊗ row_c(W)) + (col_c(U) ⊗ e_k^T)，全向量化
+        eye = bm.eye(d, **self.kwargs0)                       # (d,d)
+        row_sel = eye[None, None, :, :, None]                 # (1,1,k,d,1) 选定“行 k”
+        col_sel = eye[None, None, :, None, :]                 # (1,1,k,1,d) 选定“列 k”
+        # row_c(W): (NC,c,d), col_c(U): (NC,c,d)
+        drow_all = W                                          # (NC,c,d) 使用 W 的第 c 行
+        ucol_all = bm.permute_dims(U, (0, 2, 1))              # (NC,c,d) 使用 U 的第 c 列
+        dA_row   = row_sel * drow_all[:, :, None, None, :]    # (NC,c,k,d,d)，仅第 k 行非零
+        dA_col   = ucol_all[:, :, None, :, None] * col_sel    # (NC,c,k,d,d)，仅第 k 列非零
+        dA_all   = dA_row + dA_col                            # (NC,c,k,d,d)
+    
+        # δg_all = g * tr(A^{-1} δA)
+        Ainv    = bm.linalg.inv(A)                                           # (NC,d,d)
+        tr_term = bm.sum(Ainv[:, None, None, :, :] * dA_all, axis=(3,4))   # (NC,c,k)
+        dg_all  = (g_pos[:, None, None]) * tr_term                           # (NC,c,k)
+
+        # δH_all = S:δA − theta*g^{1/d-1}*δg
+        S_dot_dA = bm.sum(S[:, None, None, :, :] * dA_all, axis=(3,4))        # (NC,c,k)
+        g_pow    = g_pos**(1.0/d - 1.0)                                       # (NC,)
+        dH_all   = S_dot_dA - theta * g_pow[:, None, None] * dg_all            # (NC,c,k)
+
+        # d(TdA)_all
+        f1 = gamma*(gamma-1.0) * (H_pos**(gamma-2.0))                          # (NC,)
+        term1 = (f1[:, None, None] * dH_all)[..., None, None] * S[:, None, None, :, :]   # (NC,c,k,d,d)
+        term2 = (gamma * H_gm1)[..., None, None, None, None] * dA_all                      # (NC,c,k,d,d)
+        dTdA_all = term1 + term2
+
+        # d(Tdg)_all（标量）
+        coef1 = -f1 * theta * g_pow      # (NC,)
+        coef2 = -gamma * H_gm1 * theta * (1.0/d - 1.0) * (g_pos**(1.0/d - 2.0))# (NC,)
+        dTdg_all = coef1[:, None, None] * dH_all + coef2[:, None, None] * dg_all   # (NC,c,k)
+
+        # P1 = 2ρ·δÊ^{-1}·(A TdA + Tdg g I)
+        M0 = A @ TdA + (Tdg * g_pos)[..., None, None] * I_mat                   # (NC,d,d)
+        P1_all = 2.0 * rho[:, None, None, None, None] * bm.einsum('nckij,njl->nckil', dEinv_all, M0)
+
+        # P2 = 2ρ·Ê^{-1}·(δA TdA + A d(TdA) + d(Tdg) g I + Tdg δg I)
+        part_a = bm.einsum('nckij,njl->nckil', dA_all, TdA)                     # δA TdA
+        part_b = bm.einsum('nij,nckjl->nckil', A, dTdA_all)                     # A d(TdA)
+        part_c = (dTdg_all * g_pos[:, None, None])[..., None, None] * I_mat[:, None, None, :, :]   # d(Tdg) g I
+        part_d = (Tdg[:, None, None] * dg_all)[..., None, None] * I_mat[:, None, None, :, :]       # Tdg δg I
+        bracket = part_a + part_b + part_c + part_d                              # (NC,c,k,d,d)
+        P2_all  = 2.0 * rho[:, None, None, None, None] * bm.einsum('nij,nckjl->nckil', Einv, bracket)
+
+        # 局部二阶块（对 j'=1..d 的“梯度部分”），形状 (NC,c,k,d,matrix_cols=j')
+        D2_all = P1_all + P2_all                                                # (NC,c,k,d,d)
+        JAC = self.JAC_assembly(D2_all)
+        return JAC
+    
+    def JAC_functional_2(self,Xi,M_inv):
+        """
+        T = 1/2 * |A|_F^{d*gamma/2} + (theta*tr(A))^{d*gamma/4} - (d*theta*det(A)^{1/d})^{d*gamma/4}
+        TdA = d*gamma/4 *(|A|_F^{d*gamma/2 - 2} * A + theta^{d*gamma/4} * tr(A)^{d*gamma/4 - 1} * I)
+        Tdg = - gamma/4 * (d*theta)^{d*gamma/4} * det(A)^{gamma/4 - 1}
+        d E_hat = e_k x e_c^T
+        d E_hat_inv = - E_hat_inv dE_hat E_hat_inv
+        d A =  2*M_inv (dE_hat E_K^{-1})^T
+        d g =  g * tr(A^{-1} dA)
+        d (TdA) = d*gamma/4 * ( (d*gamma/2 - 2) * |A|_F^{d*gamma/2 - 4} * (A : dA) * A + 
+                    |A|_F^{d*gamma/2 - 2} * dA + 
+                    theta^{d*gamma/4} * (d*gamma/4 - 1) * tr(A)^{d*gamma/4 - 2} * tr(dA) * I )
+        d (Tdg) = - gamma/4 * (gamma/4 - 1) * (d*theta)^{d*gamma/4} * det(A)^{gamma/4 - 2} * dg
+        P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        J = R @ (P1 + P2)
+        """
+        d   = self.GD
+        NN  = self.NN
+        NC  = self.NC
+        assert d == 2, "当前实现针对 2D；3D 可按相同结构扩展"
+        print("使用 JAC_functional_2")
+        # 缓存
+        cache = getattr(self, '_ivp_cache', None)
+        if cache is None:
+            raise RuntimeError("ivp 缓存未准备，请先调用 _prepare_ivp_cache")
+        E_K     = cache['E_K']
+        E_K_inv = cache['E_K_inv']
+        rho     = cache['rho']
+        theta   = cache['theta']
+
+        # 基本量
+        E_hat    = self.edge_matrix(Xi)                     # (NC,d,d)
+        Einv     = bm.linalg.inv(E_hat)                     # (NC,d,d)
+        Ehat_T   = bm.swapaxes(E_hat, -1, -2)               # (NC,d,d)
+        C        = E_K_inv @ M_inv @ bm.swapaxes(E_K_inv, -1, -2)  # (NC,d,d)
+        A        = E_hat @ C @ Ehat_T                       # (NC,d,d)
+        I_d      = bm.eye(d, **self.kwargs0)
+        I_mat    = bm.zeros_like(A, **self.kwargs0); I_mat += I_d
+        trA      = bm.trace(A, axis1=-2, axis2=-1)          # (NC,)
+        A_F2     = bm.sqrt(bm.sum(A*A, axis=(-2,-1)))                # (NC,)
+        g        = bm.linalg.det(A)                         # (NC,)
+        eps = 1e-14
+        g_pos    = bm.maximum(g, eps)
+
+        # 目标泛函及导数
+        gamma = self.gamma
+        # T = 1/2 * |A|_F^{d*gamma/2} + (theta*tr(A))^{d*gamma/4} - (d*theta*det(A)^{1/d})^{d*gamma/4}
+
+        # TdA = d*gamma/4 *(|A|_F^{d*gamma/2 - 2} * A + theta^{d*gamma/4} * tr(A)^{d*gamma/4 - 1} * I)
+        A_Fnorm_pow2 = (A_F2) ** (d*gamma/2 - 2)
+        trA_pow2 = (theta * trA) ** (d*gamma/4 - 1)
+        TdA = (d*gamma/4)* (A_Fnorm_pow2[...,None,None] * A + (theta**(d*gamma/4)) * trA_pow2[...,None,None] * I_mat)
+
+        # Tdg = - gamma/4 * (d*theta)^{d*gamma/4} * det(A)^{gamma/4 - 1}
+        Tdg = - gamma/4 * (d*theta)**(d*gamma/4) * g_pos**(gamma/4 - 1)
+
+        # 预备构件（用于 δA ）
+        U = E_hat @ C                        # (NC,d,d)
+        W = C @ Ehat_T                       # (NC,d,d)
+        # δE_hat^{-1} = −(b_k ⊗ row_c(Einv))，一次性生成 (NC,c,k,d,d)
+        b_all        = bm.swapaxes(Einv, -1, -2)              # (NC,d,d)
+        row_c_Einv   = Einv                                   # (NC,c,d)
+        dEinv_all = -( b_all[:, None, :, :, None] * row_c_Einv[:, :, None, None, :] )  # (NC,c,k,d,d)
+
+        # δA_all = (e_k ⊗ row_c(W)) + (col_c(U) ⊗ e_k^T)，全向量化
+        eye = bm.eye(d, **self.kwargs0)                       # (d,d)
+        row_sel = eye[None, None, :, :, None]                 # (1,1,k,d,1)
+        col_sel = eye[None, None, :, None, :]                 # (1,1,k,1,d)
+        drow_all = W                                          # (NC,c,d)
+        ucol_all = bm.permute_dims(U, (0, 2, 1))              # (NC,c,d)
+        dA_row   = row_sel * drow_all[:, :, None, None, :]    # (NC,c,k,d,d)
+        dA_col   = ucol_all[:, :, None, :, None] * col_sel    # (NC,c,k,d,d)
+        dA_all   = dA_row + dA_col                            # (NC,c,k,d,d)
+
+        # δg_all = g * tr(A^{-1} δA)
+        Ainv    = bm.linalg.inv(A)                                           # (NC,d,d)
+        tr_term = bm.sum(Ainv[:, None, None, :, :] * dA_all, axis=(3,4))   # (NC,c,k)
+        dg_all  = (g_pos[:, None, None]) * tr_term                           # (NC,c,k)
+
+        # d (TdA)_all
+        # 先准备常用项
+        A_Fnorm_pow3 = (A_F2) ** (d*gamma/2 - 4)
+        trA_pow3 = (theta * trA) ** (d*gamma/4 - 2)
+        A_dot_dA = bm.sum(A[:, None, None, :, :] * dA_all, axis=(3,4))  # (NC,c,k)
+        tr_dA = bm.trace(dA_all, axis1=3, axis2=4)                      # (NC,c,k)
+        # d (TdA) = d*gamma/4 * [ (d*gamma/2 - 2) * |A|_F^{d*gamma/2 - 4} * (A : dA) * A
+        #                        + |A|_F^{d*gamma/2 - 2} * dA
+        #                        + theta^{d*gamma/4} * (d*gamma/4 - 1) * tr(A)^{d*gamma/4 - 2} * tr(dA) * I ]
+        term1 = (d*gamma/4) * (d*gamma/2 - 2) * \
+                A_Fnorm_pow3[..., None, None, None, None] * \
+                A_dot_dA[..., None, None] * \
+                A[:, None, None, ...]
+        term2 = (d*gamma/4) * A_Fnorm_pow2[...,None, None,None, None] * dA_all
+        term3 = (d*gamma/4) * (d*gamma/4 - 1) *\
+                trA_pow3[...,None,None,None, None] * \
+                tr_dA[...,None,None] * I_mat[:, None, None, :, :]
+        dTdA_all = term1 + term2 + term3  # (NC,c,k,d,d)
+
+        # d (Tdg)_all
+        # d (Tdg) = - gamma/4 * (gamma/4 - 1) * (d*theta)^{d*gamma/4} * det(A)^{gamma/4 - 2} * dg
+        dTdg_all = - gamma/4 * (gamma/4 - 1) * (d*theta)**(d*gamma/4) *\
+                    (g_pos**(gamma/4 - 2))[...,None,None] * dg_all  # (NC,c,k)
+
+        # P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        M0 = A @ TdA + (Tdg * g_pos)[..., None, None] * I_mat                   # (NC,d,d)
+        P1_all = 2.0 * rho[:, None, None, None, None] * bm.einsum('nckij,njl->nckil', dEinv_all, M0)
+
+        # P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        part_a = bm.einsum('nckij,njl->nckil', dA_all, TdA)                     # dA TdA
+        part_b = bm.einsum('nij,nckjl->nckil', A, dTdA_all)                     # A d(TdA)
+        part_c = (dTdg_all * g_pos[:, None, None])[..., None, None] * I_mat[:, None, None, :, :]   # d(Tdg) g I
+        part_d = (Tdg[:, None, None] * dg_all)[..., None, None] * I_mat[:, None, None, :, :]       # Tdg dg I
+        bracket = part_a + part_b + part_c + part_d                              # (NC,c,k,d,d)
+        P2_all  = 2.0 * rho[:, None, None, None, None] * bm.einsum('nij,nckjl->nckil', Einv, bracket)
+
+        # 局部二阶块（对 j'=1..d 的“梯度部分”），形状 (NC,c,k,d,matrix_cols=j')
+        D2_all = P1_all + P2_all                                                # (NC,c,k,d,d)
+
+        JAC = self.JAC_assembly(D2_all) 
+        return JAC
+     
+    def JAC_functional_4(self,Xi,M_inv):
+        """
+        T = (H)^gamma
+        H = 1/2 * |A|_F^{d/2} + (theta*tr(A))^{d/4} - (d*theta*det(A)^{1/d})^{d/4}
+        TdA = gamma * H^{gamma-1} * [ d/4 * |A|_F^{d/2 - 2} * A + d/4 * theta^{d/4} * tr(A)^{d/4 - 1} * I ]
+        Tdg = - gamma * H^{gamma-1} * 1/4 * (d*theta)^{d/4} * det(A)^{1/4 - 1}
+        d E_hat = e_k x e_c^T
+        d E_hat_inv = - E_hat_inv dE_hat E_hat_inv
+        d A =  2*M_inv (dE_hat E_K^{-1})^T
+        d g =  g * tr(A^{-1} dA)
+        d H = S : dA -  (d * theta)^{d/4} * 1/4 * g^{1/4 - 1} * dg
+        S = 1/2 * d/2 * |A|_F^{d/2 - 2} * A + 1/4 * d * theta^{d/4} * tr(A)^{d/4 - 1} * I
+        d (TdA) = gamma*(gamma-1) * (H)^{gamma-2} * (dH) * 
+                [ d/4 * |A|_F^{d/2 - 2} * A + d/4 * theta^{d/4} * tr(A)^{d/4 - 1} * I ] +
+                 gamma * H^{gamma-1} * [ d/4 * (d/2 - 2) * |A|_F^{d/2 - 4} * (A : dA) * A + d/4 * |A|_F^{d/2 - 2} * dA +
+                 d/4 * theta^{d/4} * (d/4 - 1) * tr(A)^{d/4 - 2} * tr(dA) * I ]
+        d (Tdg) = - gamma*(gamma-1) * (H)^{gamma-2} * (dH) * 1/4 * (d*theta)^{d/4} * det(A)^{1/4 - 1} 
+                 - gamma * H^{gamma-1} * 1/4 * (d*theta)^{d/4} * (1/4 - 1) * det(A)^{1/4 - 2} * dg
+        P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        J = R @ (P1 + P2)
+        """
+        d   = self.GD
+        NN  = self.NN
+        NC  = self.NC
+        assert d == 2, "当前实现针对 2D；3D 可按相同结构扩展"
+        print("使用 JAC_functional_4")
+        # 缓存
+        cache = getattr(self, '_ivp_cache', None)
+        if cache is None:
+            raise RuntimeError("ivp 缓存未准备，请先调用 _prepare_ivp_cache")
+        E_K     = cache['E_K']
+        E_K_inv = cache['E_K_inv']
+        rho     = cache['rho']
+        theta   = cache['theta']
+
+        # 基本量
+        E_hat    = self.edge_matrix(Xi)                     # (NC,d,d)
+        Einv     = bm.linalg.inv(E_hat)                     # (NC,d,d)
+        Ehat_T   = bm.swapaxes(E_hat, -1, -2)               # (NC,d,d)
+        C        = E_K_inv @ M_inv @ bm.swapaxes(E_K_inv, -1, -2)  # (NC,d,d)
+        A        = E_hat @ C @ Ehat_T                       # (NC,d,d)
+        I_d      = bm.eye(d, **self.kwargs0)
+        I_mat    = bm.zeros_like(A, **self.kwargs0); I_mat += I_d
+        trA      = bm.trace(A, axis1=-2, axis2=-1)          # (NC,)
+        A_Fnorm  = bm.sqrt(bm.sum(A*A, axis=(-2,-1)))       # (NC,)
+        g        = bm.linalg.det(A)                         # (NC,)
+        eps = 1e-14
+        g_pos    = bm.maximum(g, eps)
+
+        # 目标泛函及导数
+        gamma = self.gamma
+        # H = 1/2 * |A|_F^{d/2} + (theta*tr(A))^{d/4} - (d*theta*det(A)^{1/d})^{d/4}
+        H = 0.5 * (A_Fnorm**(d/2)) + (theta*trA)**(d/4) - (d*theta*g_pos**(1/d))**(d/4)
+        H_pos = bm.maximum(H, eps)
+
+        # TdA = gamma * H^{gamma-1} * [ d/4 * |A|_F^{d/2 - 2} * A + d/4 * theta^{d/4} * tr(A)^{d/4 - 1} * I ]
+        A_Fnorm_pow = (A_Fnorm**(d/2 - 2))
+        trA_pow = (theta*trA)**(d/4 - 1)
+        TdA = (gamma * H_pos**(gamma-1))[...,None,None] * (
+            (d/4) * A_Fnorm_pow[...,None,None] * A +
+            (d/4) * theta**(d/4) * trA_pow[...,None,None] * I_mat
+        )  # (NC,d,d)
+
+        # Tdg = - gamma * H^{gamma-1} * 1/4 * (d*theta)^{d/4} * det(A)^{1/4 - 1}
+        Tdg = - (gamma * H_pos**(gamma-1)) * 0.25 * (d*theta)**(d/4) * g_pos**(0.25 - 1)
+
+        # S = 1/2 * d/2 * |A|_F^{d/2 - 2} * A + 1/4 * d * theta^{d/4} * tr(A)^{d/4 - 1} * I
+        S = 0.5 * d/2 * A_Fnorm_pow[...,None,None] * A + 0.25 * d * theta**(d/4) * trA_pow[...,None,None] * I_mat
+
+        # 预备构件（用于 δA ）
+        U = E_hat @ C                        # (NC,d,d)
+        W = C @ Ehat_T                       # (NC,d,d)
+        # δE_hat^{-1} = −(b_k ⊗ row_c(Einv))，一次性生成 (NC,c,k,d,d)
+        b_all        = bm.swapaxes(Einv, -1, -2)              # (NC,d,d)
+        row_c_Einv   = Einv                                   # (NC,c,d)
+        dEinv_all = -( b_all[:, None, :, :, None] * row_c_Einv[:, :, None, None, :] )  # (NC,c,k,d,d)
+
+        # δA_all = (e_k ⊗ row_c(W)) + (col_c(U) ⊗ e_k^T)，全向量化
+        eye = bm.eye(d, **self.kwargs0)                       # (d,d)
+        row_sel = eye[None, None, :, :, None]                 # (1,1,k,d,1)
+        col_sel = eye[None, None, :, None, :]                 # (1,1,k,1,d)
+        drow_all = W                                          # (NC,c,d)
+        ucol_all = bm.permute_dims(U, (0, 2, 1))              # (NC,c,d)
+        dA_row   = row_sel * drow_all[:, :, None, None, :]    # (NC,c,k,d,d)
+        dA_col   = ucol_all[:, :, None, :, None] * col_sel    # (NC,c,k,d,d)
+        dA_all   = dA_row + dA_col                            # (NC,c,k,d,d)
+
+        # δg_all = g * tr(A^{-1} δA)
+        Ainv    = bm.linalg.inv(A)                                           # (NC,d,d)
+        tr_term = bm.sum(Ainv[:, None, None, :, :] * dA_all, axis=(3,4))   # (NC,c,k)
+        dg_all  = (g_pos[:, None, None]) * tr_term                           # (NC,c,k)
+
+        # dH_all = S : dA - (d*theta)^{d/4} * 1/4 * g^{1/4 - 1} * dg
+        g_pow = g_pos**(0.25 - 1)
+        dH_all = bm.sum(S[:, None, None, :, :] * dA_all, axis=(3,4)) - (d*theta)**(d/4) * 0.25 * g_pow[:, None, None] * dg_all  # (NC,c,k)
+
+        # d (TdA)_all
+        # 第一项
+        f1 = gamma*(gamma-1) * H_pos**(gamma-2)
+        TdA_bracket = (d/4) * A_Fnorm_pow[...,None,None] * A + (d/4) * theta**(d/4) * trA_pow[...,None,None] * I_mat
+        term1 = (f1[:, None, None] * dH_all)[..., None, None] * TdA_bracket[:, None, None, :, :]
+        # 第二项
+        A_Fnorm_pow3 = (A_Fnorm**(d/2 - 4))
+        A_dot_dA = bm.sum(A[:, None, None, :, :] * dA_all, axis=(3,4))  # (NC,c,k)
+        trA_pow3 = (theta * trA) ** (d/4 - 2)
+        tr_dA = bm.trace(dA_all, axis1=3, axis2=4)                      # (NC,c,k)
+        term2 = (gamma * H_pos**(gamma-1))[...,None,None,None,None] * (
+            (d/4)*(d/2-2) * A_Fnorm_pow3[...,None,None,None,None] * A_dot_dA[...,None,None] * A[:, None, None, ...] +
+            (d/4) * A_Fnorm_pow[...,None,None,None,None] * dA_all +
+            (d/4) * theta**(d/4) * (d/4-1) * trA_pow3[...,None,None,None,None] * tr_dA[...,None,None] * I_mat[:, None, None, :, :]
+        )
+        dTdA_all = term1 + term2  # (NC,c,k,d,d)
+
+        # d (Tdg)_all
+        # d (Tdg) = - gamma*(gamma-1) * (H)^{gamma-2} * (dH) * 1/4 * (d*theta)^{d/4} * det(A)^{1/4 - 1} 
+        #         - gamma * H^{gamma-1} * 1/4 * (d*theta)^{d/4} * (1/4 - 1) * det(A)^{1/4 - 2} * dg
+        coef1 = -gamma*(gamma-1) * H_pos**(gamma-2) * 0.25 * (d*theta)**(d/4) * g_pos**(0.25 - 1)
+        coef2 = -gamma * H_pos**(gamma-1) * 0.25 * (d*theta)**(d/4) * (0.25 - 1) * g_pos**(0.25 - 2)
+        dTdg_all = coef1[:, None, None] * dH_all + coef2[:, None, None] * dg_all   # (NC,c,k)
+
+        # P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        M0 = A @ TdA + (Tdg * g_pos)[..., None, None] * I_mat                   # (NC,d,d)
+        P1_all = 2.0 * rho[:, None, None, None, None] * bm.einsum('nckij,njl->nckil', dEinv_all, M0)
+
+        # P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        part_a = bm.einsum('nckij,njl->nckil', dA_all, TdA)                     # dA TdA
+        part_b = bm.einsum('nij,nckjl->nckil', A, dTdA_all)                     # A d(TdA)
+        part_c = (dTdg_all * g_pos[:, None, None])[..., None, None] * I_mat[:, None, None, :, :]   # d(Tdg) g I
+        part_d = (Tdg[:, None, None] * dg_all)[..., None, None] * I_mat[:, None, None, :, :]       # Tdg dg I
+        bracket = part_a + part_b + part_c + part_d                              # (NC,c,k,d,d)
+        P2_all  = 2.0 * rho[:, None, None, None, None] * bm.einsum('nij,nckjl->nckil', Einv, bracket)
+
+        # 局部二阶块（对 j'=1..d 的“梯度部分”），形状 (NC,c,k,d,matrix_cols=j')
+        D2_all = P1_all + P2_all                                                # (NC,c,k,d,d)
+        JAC = self.JAC_assembly(D2_all)
+        return JAC
+    
+    def JAC_functional_5(self,Xi,M_inv):
+        """
+        T = (H)^gamma
+        H = d^{1/2} * |A|_F + theta*(tr(A) -2 *d * det(A)^{1/d})
+        TdA = gamma * H^{gamma-1} * [ d^{1/2} * |A|_F^{-1} * A + theta *I ]
+        Tdg = -  2 * gamma * H^{gamma-1} * theta * det(A)^{1/d - 1}
+        d E_hat = e_k x e_c^T
+        d E_hat_inv = - E_hat_inv dE_hat E_hat_inv
+        d A =  2*M_inv (dE_hat E_K^{-1})^T
+        d g =  g * tr(A^{-1} dA)
+        d H = S : dA -  theta  * g^{1/d - 1} * dg
+        S = d^{1/2} * |A|_F^{-1} * A + theta * I
+        d (TdA) = gamma*(gamma-1) * (H)^{gamma-2} * (dH) * 
+                [ d^{1/2} * |A|_F^{-1} * A + theta * I ] +
+                 gamma * H^{gamma-1} * [- d^{1/2} * |A|_F^{-3} * (A : dA) * A + d^{1/2} * |A|_F^{-1} * dA ]
+        d (Tdg) = - gamma*(gamma-1) * (H)^{gamma-2} * (dH) * 2 * theta * det(A)^{1/d - 1}
+                 - gamma * H^{gamma-1} * 2 * theta * (1/d - 1) * det(A)^{1/d - 2} * dg
+        P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        J = R @ (P1 + P2)
+        """
+        d   = self.GD
+        NN  = self.NN
+        NC  = self.NC
+        assert d == 2, "当前实现针对 2D；3D 可按相同张量结构扩展"
+
+        cache = getattr(self, '_ivp_cache', None)
+        if cache is None:
+            raise RuntimeError("ivp 缓存未准备，请先调用 _prepare_ivp_cache")
+        E_K     = cache['E_K']
+        E_K_inv = cache['E_K_inv']
+        rho     = cache['rho']
+        theta   = cache['theta']
+
+        # 基本量
+        E_hat    = self.edge_matrix(Xi)                     # (NC,d,d)
+        Einv     = bm.linalg.inv(E_hat)                     # (NC,d,d)
+        Ehat_T   = bm.swapaxes(E_hat, -1, -2)               # (NC,d,d)
+        C        = E_K_inv @ M_inv @ bm.swapaxes(E_K_inv, -1, -2)  # (NC,d,d)
+        A        = E_hat @ C @ Ehat_T                       # (NC,d,d)
+
+        I_d      = bm.eye(d, **self.kwargs0)
+        I_mat    = bm.zeros_like(A, **self.kwargs0); I_mat += I_d
+
+        trA      = bm.trace(A, axis1=-2, axis2=-1)          # (NC,)
+        A_Fnorm  = bm.sqrt(bm.sum(A * A, axis=(-2, -1)))    # (NC,)
+        g        = bm.linalg.det(A)                         # (NC,)
+
+        # 数值稳健性
+        eps = 1e-14
+        g_pos    = bm.maximum(g, eps)
+        A_Fnorm_safe = bm.maximum(A_Fnorm, eps)
+        # H 与其幂
+        gamma = self.gamma
+        H = (d**0.5) * A_Fnorm + theta * (trA - 2.0 *d * g_pos**(1.0 / d))   # (NC,)
+        H_pos = bm.maximum(H, eps)
+        H_gm1 = H_pos**(gamma - 1.0)
+
+        # TdA 与 Tdg（直接复用已实现的 TdA_5 / Tdg_5）
+        TdA = self.TdA_5(theta, A)    # (NC,d,d)
+        Tdg = self.Tdg_5(theta, A, g_pos)  # (NC,)
+
+        # 预备构件（用于 δA）
+        U = E_hat @ C                        # (NC,d,d)
+        W = C @ Ehat_T                       # (NC,d,d)
+
+        # δE_hat^{-1} 结构：-(b_k ⊗ row_c(Einv))
+        b_all        = bm.swapaxes(Einv, -1, -2)              # (NC,d,d)
+        row_c_Einv   = Einv                                   # (NC,c,d)
+        dEinv_all = -( b_all[:, None, :, :, None] * row_c_Einv[:, :, None, None, :] )  # (NC,c,k,d,d)
+
+        # δA_all = (e_k ⊗ row_c(W)) + (col_c(U) ⊗ e_k^T)，全向量化
+        eye = bm.eye(d, **self.kwargs0)                       # (d,d)
+        row_sel = eye[None, None, :, :, None]                 # (1,1,k,d,1)
+        col_sel = eye[None, None, :, None, :]                 # (1,1,k,1,d)
+        drow_all = W                                          # (NC,c,d)
+        ucol_all = bm.permute_dims(U, (0, 2, 1))              # (NC,c,d)
+        dA_row   = row_sel * drow_all[:, :, None, None, :]    # (NC,c,k,d,d)
+        dA_col   = ucol_all[:, :, None, :, None] * col_sel    # (NC,c,k,d,d)
+        dA_all   = dA_row + dA_col                            # (NC,c,k,d,d)
+
+        # δg_all = g * tr(A^{-1} δA)
+        Ainv    = bm.linalg.inv(A)                                           # (NC,d,d)
+        tr_term = bm.sum(Ainv[:, None, None, :, :] * dA_all, axis=(3,4))   # (NC,c,k)
+        dg_all  = (g_pos[:, None, None]) * tr_term                           # (NC,c,k)
+
+        # S 矩阵与 δH（注释中 S = d^{1/2} * |A|_F^{-1} * A + theta * I）
+        A_Fnorm_inv = (1.0 / A_Fnorm_safe)
+        S_mat = (d**0.5) * A_Fnorm_inv[..., None, None] * A + theta * I_mat  # (NC,d,d)
+
+        # dH_all = S : dA - theta  * g^{1/d - 1} * dg
+        S_dot_dA = bm.sum(S_mat[:, None, None, :, :] * dA_all, axis=(3,4))    # (NC,c,k)
+        g_pow = g_pos**(1.0 / d - 1.0)
+        dH_all = S_dot_dA - theta * g_pow[:, None, None] * dg_all  # (NC,c,k)
+
+        # d(TdA)_all：
+        # 第一项: gamma*(gamma-1) * H^{gamma-2} * dH * S_mat
+        f1 = gamma * (gamma - 1.0) * (H_pos**(gamma - 2.0))    # (NC,)
+        term1 = (f1[:, None, None] * dH_all)[..., None, None] * S_mat[:, None, None, :, :]  # (NC,c,k,d,d)
+
+        # 第二项: gamma * H^{gamma-1} * [ - d^{1/2} * |A|_F^{-3} * (A : dA) * A + d^{1/2} * |A|_F^{-1} * dA ]
+        A_dot_dA = bm.sum(A[:, None, None, :, :] * dA_all, axis=(3,4))  # (NC,c,k)
+        A_Fnorm_inv3 = A_Fnorm_inv**3
+        part_neg = - (d**0.5) * A_Fnorm_inv3[..., None, None, None, None] * A_dot_dA[..., None, None] * A[:, None, None, :, :]  # (NC,c,k,d,d)
+        part_pos = (d**0.5) * A_Fnorm_inv[..., None, None, None, None] * dA_all  # (NC,c,k,d,d)
+        term2 = (gamma * H_gm1)[..., None, None, None, None] * (part_neg + part_pos)
+
+        dTdA_all = term1 + term2  # (NC,c,k,d,d)
+
+        # d(Tdg)_all：
+        # - gamma*(gamma-1) * H^{gamma-2} * dH * 2 * theta * det(A)^{1/d - 1}
+        # - gamma * H^{gamma-1} * 2 * theta * (1/d - 1) * det(A)^{1/d - 2} * dg
+        det_pow1 = g_pos**(1.0 / d - 1.0)
+        det_pow2 = g_pos**(1.0 / d - 2.0)
+        coef_a = - gamma * (gamma - 1.0) * (H_pos**(gamma - 2.0)) * (2.0 * theta) * det_pow1  # (NC,)
+        coef_b = - gamma * H_gm1 * (2.0 * theta) * (1.0 / d - 1.0) * det_pow2  # (NC,)
+        dTdg_all = coef_a[:, None, None] * dH_all + coef_b[:, None, None] * dg_all  # (NC,c,k)
+
+        # P1 = 2ρ·δÊ^{-1}·(A TdA + Tdg * g * I)
+        M0 = A @ TdA + (Tdg * g_pos)[..., None, None] * I_mat                   # (NC,d,d)
+        P1_all = 2.0 * rho[:, None, None, None, None] * bm.einsum('nckij,njl->nckil', dEinv_all, M0)
+
+        # P2 = 2ρ·Ê^{-1}·(δA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        part_a = bm.einsum('nckij,njl->nckil', dA_all, TdA)                     # δA TdA
+        part_b = bm.einsum('nij,nckjl->nckil', A, dTdA_all)                     # A d(TdA)
+        part_c = (dTdg_all * g_pos[:, None, None])[..., None, None] * I_mat[:, None, None, :, :]   # d(Tdg) g I
+        part_d = (Tdg[:, None, None] * dg_all)[..., None, None] * I_mat[:, None, None, :, :]       # Tdg δg I
+        bracket = part_a + part_b + part_c + part_d                              # (NC,c,k,d,d)
+        P2_all  = 2.0 * rho[:, None, None, None, None] * bm.einsum('nij,nckjl->nckil', Einv, bracket)
+
+        # 局部二阶块（对 j'=1..d 的“梯度部分”），形状 (NC,c,k,d,matrix_cols=j')
+        D2_all = P1_all + P2_all                                                # (NC,c,k,d,d)
+
+        # 使用统一装配函数把 D2_all 装配为全局 JAC
+        JAC = self.JAC_assembly(D2_all)
+        return JAC
+    
+    def JAC_functional_6(self,Xi,M_inv):
+        """
+        T = tr(A)^{d*gamma/2} - d*gamma/2 * theta^(d*gamma/2) * ln (det(A))
+        TdA = (d*gamma/2) * tr(A)^{d*gamma/2 - 1} * I
+        Tdg = - d*gamma/2 * theta^(d*gamma/2) * det(A)^{-1}
+        d E_hat = e_k x e_c^T
+        d E_hat_inv = - E_hat_inv dE_hat E_hat_inv
+        d A =  2*M_inv (dE_hat E_K^{-1})^T
+        d g =  g * tr(A^{-1} dA)
+        d(TdA) = (d*gamma/2) * (d*gamma/2 - 1) * tr(A)^{d*gamma/2 - 2} * tr(dA) * I
+        d(Tdg) = d*gamma/2 * theta^(d*gamma/2) * det(A)^{-2} * dg
+        P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        J = R @ (P1 + P2)
+        """
+        d   = self.GD
+        NN  = self.NN
+        NC  = self.NC
+        assert d == 2, "当前实现针对 2D；3D 可按相同张量结构扩展"
+
+        cache = getattr(self, '_ivp_cache', None)
+        if cache is None:
+            raise RuntimeError("ivp 缓存未准备，请先调用 _prepare_ivp_cache")
+        E_K     = cache['E_K']
+        E_K_inv = cache['E_K_inv']
+        rho     = cache['rho']
+        theta   = cache['theta']
+
+        # 基本量
+        E_hat    = self.edge_matrix(Xi)                     # (NC,d,d)
+        Einv     = bm.linalg.inv(E_hat)                     # (NC,d,d)
+        Ehat_T   = bm.swapaxes(E_hat, -1, -2)               # (NC,d,d)
+        C        = E_K_inv @ M_inv @ bm.swapaxes(E_K_inv, -1, -2)  # (NC,d,d)
+        A        = E_hat @ C @ Ehat_T                       # (NC,d,d)
+
+        I_d      = bm.eye(d, **self.kwargs0)
+        I_mat    = bm.zeros_like(A, **self.kwargs0); I_mat += I_d
+
+        trA      = bm.trace(A, axis1=-2, axis2=-1)          # (NC,)
+        g        = bm.linalg.det(A)                         # (NC,)
+        lam      = self.lam(theta)
+        # 数值稳健性
+        eps = 1e-14
+        g_pos    = bm.maximum(g, eps)
+        trA_safe = bm.maximum(trA, eps)
+
+        # 目标泛函及导数（无 H）
+        gamma = self.gamma
+        power = (d * gamma / 2.0)
+        # TdA = (d*gamma/2) * tr(A)^{d*gamma/2 - 1} * I
+        TdA = self.TdA_6(theta,A)  # (NC,d,d)
+        Tdg = self.Tdg_6(theta, g_pos)  # (NC,)
+
+        # 预备构件（用于 δA）
+        U = E_hat @ C                        # (NC,d,d)
+        W = C @ Ehat_T                       # (NC,d,d)
+
+        # δE_hat^{-1} 结构：-(b_k ⊗ row_c(Einv))
+        b_all        = bm.swapaxes(Einv, -1, -2)              # (NC,d,d)
+        row_c_Einv   = Einv                                   # (NC,c,d)
+        dEinv_all = -( b_all[:, None, :, :, None] * row_c_Einv[:, :, None, None, :] )  # (NC,c,k,d,d)
+
+        # δA_all = (e_k ⊗ row_c(W)) + (col_c(U) ⊗ e_k^T)，全向量化
+        eye = bm.eye(d, **self.kwargs0)                       # (d,d)
+        row_sel = eye[None, None, :, :, None]                 # (1,1,k,d,1)
+        col_sel = eye[None, None, :, None, :]                 # (1,1,k,1,d)
+        drow_all = W                                          # (NC,c,d)
+        ucol_all = bm.permute_dims(U, (0, 2, 1))              # (NC,c,d)
+        dA_row   = row_sel * drow_all[:, :, None, None, :]    # (NC,c,k,d,d)
+        dA_col   = ucol_all[:, :, None, :, None] * col_sel    # (NC,c,k,d,d)
+        dA_all   = dA_row + dA_col                            # (NC,c,k,d,d)
+
+        # δg_all = g * tr(A^{-1} δA)
+        Ainv    = bm.linalg.inv(A)                                           # (NC,d,d)
+        tr_term = bm.sum(Ainv[:, None, None, :, :] * dA_all, axis=(3,4))     # (NC,c,k)
+        dg_all  = (g_pos[:, None, None]) * tr_term                           # (NC,c,k)
+
+        # d(TdA)_all = (d*gamma/2) * (d*gamma/2 - 1) * tr(A)^{d*gamma/2 - 2} * tr(dA) * I
+        tr_dA = bm.trace(dA_all, axis1=3, axis2=4)                            # (NC,c,k)
+        coef_td = d**(-d*gamma/2) * (power) * (power - 1.0) * (trA_safe ** (power - 2.0))        # (NC,)
+        dTdA_all = 1/lam * coef_td[:, None, None, None, None] * tr_dA[..., None, None] * I_mat[:, None, None, :, :]  # (NC,c,k,d,d)
+
+        # d(Tdg)_all = d*gamma/2 * theta^(d*gamma/2) * det(A)^{-2} * dg
+        coef_tdg = gamma/2  * (theta ** power) * (g_pos ** (-2.0))             # (NC,)
+        dTdg_all =  1/lam * coef_tdg[:, None, None] * dg_all                           # (NC,c,k)
+
+        # P1 = 2 * rho * d E_hat_inv (A TdA + Tdg * g * I)
+        M0 = A @ TdA + (Tdg * g_pos)[..., None, None] * I_mat                 # (NC,d,d)
+        P1_all = 2.0 * rho[:,None,None,None,None] * bm.einsum('nckij,njl->nckil', dEinv_all, M0)
+
+        # P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
+        part_a = bm.einsum('nckij,njl->nckil', dA_all, TdA)                     # dA TdA
+        part_b = bm.einsum('nij,nckjl->nckil', A, dTdA_all)                     # A d(TdA)
+        part_c = (dTdg_all * g_pos[:, None, None])[..., None, None] * I_mat[:, None, None, :, :]   # d(Tdg) g I
+        part_d = (Tdg[:, None, None] * dg_all)[..., None, None] * I_mat[:, None, None, :, :]       # Tdg dg I
+        bracket = part_a + part_b + part_c + part_d                              # (NC,c,k,d,d)
+        P2_all  = 2.0 * rho[:,None,None,None,None] * bm.einsum('nij,nckjl->nckil', Einv, bracket)
+
+        # 局部二阶块（对 j'=1..d 的“梯度部分”），形状 (NC,c,k,d,matrix_cols=j')
+        D2_all = P1_all + P2_all                                                # (NC,c,k,d,d)
+
+        # 使用统一装配函数把 D2_all 装配为全局 JAC
+        JAC = self.JAC_assembly(D2_all)
+        return JAC
+        
+    
+    def JAC_assembly(self,D2_all):
+        """
+        依据局部二阶块 D2_all 装配全局雅可比
+        """
+        d   = self.GD
+        NN  = self.NN
+        NC  = self.NC
+        assert d == 2, "当前实现针对 2D；3D 可按相同结构扩展"
+        cm = self.cm
+        rxx, ryy, rxy, ryx = self.rxx, self.ryy, self.rxy, self.ryx
+        P_diag = self._ivp_cache['P_diag']
         # 打包：把 (NC,c,d) 压成按 c 分段的 (c*NC*(d+1),)，并在最前加 j=0 列（负和）
         def pack_all(D2_comp_all):
-            # D2_comp_all: (NC,c,d)
             D1 = -bm.sum(D2_comp_all, axis=2, keepdims=True)                    # (NC,c,1)
             V  = bm.concat([D1, D2_comp_all], axis=2)                           # (NC,c,d+1)
             V  = bm.permute_dims(V, (1, 0, 2)).reshape(-1)                      # (c*NC*(d+1),)
@@ -552,207 +1345,11 @@ class LMEAGAdaptive(Monitor, Interpolater):
             data01_tile, data11_tile, data01_0, data11_0
         ], axis=0)
 
+        from scipy.sparse import coo_matrix
         JAC = coo_matrix((V.astype(float), (I.astype(int), J.astype(int))),
-                         shape=(2*NN, 2*NN)).tocsr()
+                        shape=(2*NN, 2*NN)).tocsr()
         return JAC
     
-    def JAC_functional_2(self,Xi,M_inv):
-        """
-        (|A|_F)^gamma + theta^gamma * [ tr(A)^gamma - d*(gamma-1)*tr(A)^{gamma-2}*g^{1/d} * tr(A) ]
-        的雅可比构造（按与 JAC_functional 相同的稀疏装配套路）
-        """
-        d   = self.GD
-        NN  = self.NN
-        NC  = self.NC
-        assert d == 2, "当前实现针对 2D；3D 可按相同张量结构扩展"
-
-        cache = getattr(self, '_ivp_cache', None)
-        if cache is None:
-            raise RuntimeError("ivp 缓存未准备，请先调用 _prepare_ivp_cache")
-        E_K     = cache['E_K']
-        E_K_inv = cache['E_K_inv']
-        rho     = cache['rho']
-        cm      = cache['cm']
-        P_diag  = cache['P_diag']
-        theta   = cache['theta']
-        rxx, ryy, rxy, ryx = cache['rxx'], cache['ryy'], cache['rxy'], cache['ryx']
-
-        # 基本量
-        E_hat    = self.edge_matrix(Xi)                             # (NC,d,d)
-        Einv     = bm.linalg.inv(E_hat)                             # (NC,d,d)
-        Ehat_T   = bm.swapaxes(E_hat, -1, -2)                       # (NC,d,d)
-        C        = E_K_inv @ M_inv @ bm.swapaxes(E_K_inv, -1, -2)   # (NC,d,d)
-        A        = E_hat @ C @ Ehat_T                               # (NC,d,d)
-        I_d      = bm.eye(d, **self.kwargs0)
-        I_mat    = bm.zeros_like(A, **self.kwargs0); I_mat += I_d
-
-        trA      = bm.trace(A, axis1=-2, axis2=-1)                  # (NC,)
-        A_F2     = bm.sum(A*A, axis=(-2,-1))                        # (NC,)
-        g        = bm.linalg.det(A)                                 # (NC,)
-
-        # 稳健性裁剪
-        eps      = 1e-14
-        trA_pos  = bm.maximum(trA, eps)
-        A_F2_pos = bm.maximum(A_F2, eps)
-        g_pos    = bm.maximum(g, eps)
-
-        gamma = self.gamma
-        thg   = theta**gamma
-
-        # 一阶导：TdA, Tdg（对应该能量型）
-        # TdA = gamma * |A|_F^{2(gamma-1)} * A
-        TdA1 = (gamma * A_F2_pos**(gamma-1))[..., None, None] * A
-
-        # + gamma * theta^gamma * ( tr(A)^{gamma-1} - d*(gamma-1) tr(A)^{gamma-2} * g^{1/d} ) * I
-        g_1d = g_pos**(1.0/d)
-        coef_tr = (trA_pos**(gamma-1)) - d*(gamma-1)*(trA_pos**(gamma-2))*g_1d
-        TdA2 = (gamma * thg * coef_tr)[..., None, None] * I_mat
-
-        TdA = TdA1 + TdA2                                             # (NC,d,d)
-
-        # Tdg = - d * theta^gamma * gamma * tr(A)^{gamma-1} * g^{1/d - 1}
-        Tdg = - d * thg * gamma * (trA_pos**(gamma-1)) * (g_pos**(1.0/d - 1.0))  # (NC,)
-
-        # 预备构件（用于 δA ）
-        U = E_hat @ C
-        W = C @ Ehat_T
-
-        b_all      = bm.swapaxes(Einv, -1, -2)                        # (NC,d,d)
-        row_c_Einv = Einv                                             # (NC,c,d)
-        dEinv_all = -( b_all[:, None, :, :, None] * row_c_Einv[:, :, None, None, :] )  # (NC,c,k,d,d)
-
-        eye = bm.eye(d, **self.kwargs0)
-        row_sel = eye[None, None, :, :, None]                         # (1,1,k,d,1)
-        col_sel = eye[None, None, :, None, :]                         # (1,1,k,1,d)
-        drow_all = W                                                  # (NC,c,d)
-        ucol_all = bm.permute_dims(U, (0, 2, 1))                      # (NC,c,d)
-        dA_row   = row_sel * drow_all[:, :, None, None, :]            # (NC,c,k,d,d)
-        dA_col   = ucol_all[:, :, None, :, None] * col_sel            # (NC,c,k,d,d)
-        dA_all   = dA_row + dA_col                                    # (NC,c,k,d,d)
-
-        # 标量变分项
-        Ainv      = bm.linalg.inv(A)                                   # (NC,d,d)
-        tr_term   = bm.sum(Ainv[:, None, None, :, :] * dA_all, axis=(3,4))    # (NC,c,k)  -> tr(A^{-1} δA)
-        dg_all    = (g_pos[:, None, None]) * tr_term                   # (NC,c,k)
-
-        ds1_all   = bm.sum(I_mat[:, None, None, :, :] * dA_all, axis=(3,4))   # δ tr(A)  (NC,c,k)
-        dAF_all   = 2.0 * bm.sum(A[:, None, None, :, :] * dA_all, axis=(3,4)) # δ |A|_F^2 (NC,c,k)
-
-        g_pow1    = g_pos**(1.0/d - 1.0)                               # (NC,)
-        g_pow2    = g_pos**(1.0/d - 2.0)                               # (NC,)
-
-        # 二阶块：d(TdA)
-        # dTdA1 = γ(γ-1) |A|_F^{2(γ-2)} (δ|A|_F^2) A + γ |A|_F^{2(γ-1)} δA
-        coef2 = (gamma*(gamma-1) * A_F2_pos**(gamma-2))[:, None, None, None, None]   # (NC,1,1,1,1)
-        term1a = coef2 * dAF_all[..., None, None] * A[:, None, None, :, :]           # (NC,c,k,d,d)
-
-        coef1 = (gamma * A_F2_pos**(gamma-1))[:, None, None, None, None]             # (NC,1,1,1,1)
-        term1b = coef1 * dA_all
-        dTdA1_all = term1a + term1b
-
-        # dTdA2 = c * [ (γ-1) tr^{γ-2} δtr
-        #            - d(γ-1)( (γ-2) tr^{γ-3} g^{1/d} δtr + tr^{γ-2} (1/d) g^{1/d-1} δg ) ] * I
-        c = gamma * thg
-        tr_pow_m2 = (trA_pos**(gamma-2))[:, None, None]      # (NC,1,1)
-        tr_pow_m3 = (trA_pos**(gamma-3))[:, None, None]      # (NC,1,1)
-        g_1d_ck   = g_1d[:, None, None]                      # (NC,1,1)
-        g_pow1_ck = g_pow1[:, None, None]                    # (NC,1,1)
-
-        t1 = c * (gamma-1) * tr_pow_m2 * ds1_all
-        t2 = - c * d * (gamma-1) * (
-              (gamma-2) * tr_pow_m3 * g_1d_ck * ds1_all
-            + tr_pow_m2 * (1.0/d) * g_pow1_ck * dg_all
-        )
-        dTdA2_all = (t1 + t2)[..., None, None] * I_mat[:, None, None, :, :]
-
-        dTdA_all = dTdA1_all + dTdA2_all
-
-        # d(Tdg) = C0[ (γ-1) tr^{γ-2} g^{1/d-1} δtr + tr^{γ-1} (1/d-1) g^{1/d-2} δg ]
-        C0 = - d * thg * gamma
-        tr_pow_m1 = (trA_pos**(gamma-1))[:, None, None]      # (NC,1,1)
-        g_pow2_ck = g_pow2[:, None, None]                    # (NC,1,1)
-        dTdg_all = C0 * ( (gamma-1) * tr_pow_m2 * g_pow1_ck * ds1_all
-                        + tr_pow_m1 * (1.0/d - 1.0) * g_pow2_ck * dg_all )
-
-        # P1 = 2ρ·δÊ^{-1}·(A TdA + Tdg g I)
-        M0 = A @ TdA + (Tdg * g_pos)[..., None, None] * I_mat
-        P1_all = 2.0 * rho[:, None, None, None, None] * bm.einsum('nckij,njl->nckil', dEinv_all, M0)
-
-        # P2 = 2ρ·Ê^{-1}·(δA TdA + A d(TdA) + d(Tdg) g I + Tdg δg I)
-        part_a = bm.einsum('nckij,njl->nckil', dA_all, TdA)
-        part_b = bm.einsum('nij,nckjl->nckil', A, dTdA_all)
-        part_c = (dTdg_all * g_pos[:, None, None])[..., None, None] * I_mat[:, None, None, :, :]
-        part_d = (Tdg[:, None, None] * dg_all)[..., None, None] * I_mat[:, None, None, :, :]
-        bracket = part_a + part_b + part_c + part_d
-        P2_all  = 2.0 * rho[:, None, None, None, None] * bm.einsum('nij,nckjl->nckil', Einv, bracket)
-
-        # 局部二阶块
-        D2_all = P1_all + P2_all                                        # (NC,c,k,d,d)
-
-        # 打包与装配（与 JAC_functional 一致）
-        def pack_all(D2_comp_all):
-            D1 = -bm.sum(D2_comp_all, axis=2, keepdims=True)            # (NC,c,1)
-            V  = bm.concat([D1, D2_comp_all], axis=2)                   # (NC,c,d+1)
-            V  = bm.permute_dims(V, (1, 0, 2)).reshape(-1)              # (c*NC*(d+1),)
-            return V
-
-        vx_seg_x_all = pack_all(D2_all[:, :, 0, :, 0])
-        vy_seg_x_all = pack_all(D2_all[:, :, 0, :, 1])
-        vx_seg_y_all = pack_all(D2_all[:, :, 1, :, 0])
-        vy_seg_y_all = pack_all(D2_all[:, :, 1, :, 1])
-
-        rr_x_all  = self._row_off_x_tile_d % NN
-        rr_y_all  = self._row_off_y_tile_d % NN
-        rc_x_tile = (-1.0 / self.tau) * P_diag[rr_x_all]
-        rc_y_tile = (-1.0 / self.tau) * P_diag[rr_y_all]
-        cm_rep    = bm.repeat(cm, d+1)
-        cm_rep_all = bm.tile(cm_rep, d)
-
-        data00_tile = rc_x_tile * cm_rep_all * ( rxx[rr_x_all] * vx_seg_x_all + rxy[rr_x_all] * vy_seg_x_all )
-        data10_tile = rc_y_tile * cm_rep_all * ( ryx[rr_y_all] * vx_seg_x_all + ryy[rr_y_all] * vy_seg_x_all )
-        data01_tile = rc_x_tile * cm_rep_all * ( rxx[rr_x_all] * vx_seg_y_all + rxy[rr_x_all] * vy_seg_y_all )
-        data11_tile = rc_y_tile * cm_rep_all * ( ryx[rr_y_all] * vx_seg_y_all + ryy[rr_y_all] * vy_seg_y_all )
-
-        def pack0(D2_0_comp):
-            D1 = -bm.sum(D2_0_comp, axis=1, keepdims=True)              # (NC,1)
-            V  = bm.concat([D1, D2_0_comp], axis=1)                     # (NC,d+1)
-            return V.reshape(-1)                                        # (NC*(d+1),)
-
-        D2_0_x = -bm.sum(D2_all[:, :, 0, :, :], axis=1)                 # (NC,d,d)
-        D2_0_y = -bm.sum(D2_all[:, :, 1, :, :], axis=1)
-        vx_0_x = pack0(D2_0_x[:, :, 0]); vy_0_x = pack0(D2_0_x[:, :, 1])
-        vx_0_y = pack0(D2_0_y[:, :, 0]); vy_0_y = pack0(D2_0_y[:, :, 1])
-
-        rr_x0  = self._row_off_x_0 % NN
-        rr_y0  = self._row_off_y_0 % NN
-        coef_x0 = (-1.0 / self.tau) * P_diag[rr_x0]
-        coef_y0 = (-1.0 / self.tau) * P_diag[rr_y0]
-
-        data00_0 = coef_x0 * cm_rep * ( rxx[rr_x0] * vx_0_x + rxy[rr_x0] * vy_0_x )
-        data10_0 = coef_y0 * cm_rep * ( ryx[rr_y0] * vx_0_x + ryy[rr_y0] * vy_0_x )
-        data01_0 = coef_x0 * cm_rep * ( rxx[rr_x0] * vx_0_y + rxy[rr_x0] * vy_0_y )
-        data11_0 = coef_y0 * cm_rep * ( ryx[rr_y0] * vx_0_y + ryy[rr_y0] * vy_0_y )
-
-        I = bm.concat([
-            self._row_off_x_tile_d, self._row_off_y_tile_d,
-            self._row_off_x_0,      self._row_off_y_0,
-            self._row_off_x_tile_d, self._row_off_y_tile_d,
-            self._row_off_x_0,      self._row_off_y_0,
-        ], axis=0)
-        J = bm.concat([
-            self._cols_x_tile_d, self._cols_x_tile_d,
-            self._cols_x_0,      self._cols_x_0,
-            self._cols_y_tile_d, self._cols_y_tile_d,
-            self._cols_y_0,      self._cols_y_0,
-        ], axis=0)
-        V = bm.concat([
-            data00_tile, data10_tile, data00_0, data10_0,
-            data01_tile, data11_tile, data01_0, data11_0
-        ], axis=0)
-
-        JAC = coo_matrix((V.astype(float), (I.astype(int), J.astype(int))),
-                         shape=(2*NN, 2*NN)).tocsr()
-        return JAC
     
     def linear_interpolate(self, Xi, Xi_new , X):
         """
@@ -846,49 +1443,6 @@ class LMEAGAdaptive(Monitor, Interpolater):
         C = bm.permute_dims((delta_x[scell[:,1:]] - delta_x[scell[:,0,None]]),axes=(0,2,1))
         return A,C
     
-    def get_physical_node(self,Xinew,X,vector_field):
-        """
-        计算物理网格的新节点位置
-        x_{n+1} = x_n + eta * J * vector_field
-        J = E_K E_hat_K^{-1} 为局部雅可比矩阵将逻辑网格的位移场拉回物理网格
-        注意上述得到的位移需要在边界处进行修正,以保持边界形状
-        eta 步长控制,其为了了防止网格翻转,一般取 eta in (0,1]
-         
-        Parameters:
-            vector_field(Tensor): 逻辑网格节点的速度场 (NN, GD)
-        Return:
-            x_new(Tensor): 物理网格的新节点位置 (NN, GD)
-        """
-        cell = self.cell
-        alpha = self.alpha
-        E = self.edge_matrix(X) # (NC, GD, GD)
-        Xinew_0 = Xinew[cell[:,0],:] # (NC, GD)
-        E_map = Xinew[cell[:,1:],:] - Xinew_0[:, None , :] # (NC, GD, GD)
-        E_map = bm.permute_dims(E_map, (0,2,1))  # (NC, GD, GD)
-        J = E @ bm.linalg.inv(E_map) # (NC, GD, GD)
-        vf_cell = bm.mean(vector_field[self.mesh.cell], axis=1) # (NC, GD)
-        vf_physical_cell = bm.einsum('ijk,ik->ij', J , vf_cell) # (NC, GD)
-        
-        sm = self.sm
-        cm = self.cm
-        vf_physical = bm.zeros_like(vector_field , **self.kwargs0) # (NN, GD)
-        vf_physical = bm.index_add(vf_physical , self.mesh.cell , (vf_physical_cell*cm[:, None])[:, None , :])
-        vf_physical /= sm[:, None]
-        
-        Bdinnernode_idx = self.Bdinnernode_idx
-        dot = bm.sum(self.Bi_Pnode_normal * vf_physical[Bdinnernode_idx],axis=1)
-        vf_physical = bm.set_at(vf_physical , Bdinnernode_idx ,
-                                vf_physical[Bdinnernode_idx] - dot[:,None] * self.Bi_Pnode_normal)
-        vf_physical = bm.set_at(vf_physical , self.Vertices_idx , 0)
-        
-        coef = _compute_coef_2d(vf_physical,self.AC_generator)
-        k = quad_equ_solver(coef)
-        positive_k = bm.where(k>0, k, 1)
-        eta = bm.min(positive_k)
-        Xnew = self.mesh.node + alpha * eta * vf_physical
-
-        return Xnew
-    
     def _construct(self,moved_node:TensorLike):
         """
         @brief construct information for the harmap method before the next iteration
@@ -925,7 +1479,7 @@ class LMEAGAdaptive(Monitor, Interpolater):
             theta = self.theta(M)
             # s = it / self.total_steps
             # theta = s * theta
-
+            print(theta)
             self._prepare_ivp_cache(X, M, M_inv,theta)
             P_diag = self._ivp_cache['P_diag']
             eps = 1e-12
