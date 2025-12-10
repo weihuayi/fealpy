@@ -53,23 +53,23 @@ class GNBCSimulation(CNodeType):
         PortConf("pspace", DataType.SPACE, 1, title="压力函数空间"),
         PortConf("uspace", DataType.SPACE, 1, title="速度函数空间"),
         PortConf("output_dir", DataType.STRING, title="输出目录"),
+        PortConf("NS_BC", DataType.FUNCTION, title="边界处理函数"),
         PortConf("q", DataType.INT, title="积分次数", default=5),
     ]
     OUTPUT_SLOTS = [
-        PortConf("max_u_up", DataType.TENSOR, title="上边界最大值"),
-        PortConf("min_u_up", DataType.TENSOR, title="上边界最小值"),
-        PortConf("max_u_down", DataType.TENSOR, title="下边界最大值"),
-        PortConf("min_u_down", DataType.TENSOR, title="下边界最小值")
+        PortConf("u", DataType.TENSOR, title="速度"),
+        PortConf("p", DataType.TENSOR, title="压力"),
+        PortConf("phi", DataType.TENSOR, title="序参量"),
+        PortConf("mu", DataType.TENSOR, title="化学势")
     ]
     
     @staticmethod
     def run(param_list, init_phi, is_uy_Dirichlet,is_up_boundary,
             is_down_boundary,is_wall_boundary,u_w,nt,
-            phispace,space,pspace,uspace,output_dir,q=5) -> Union[object]:
+            phispace,space,pspace,uspace,output_dir,NS_BC,q=5) -> Union[object]:
         from fealpy.backend import backend_manager as bm
         from fealpy.old.timeintegratoralg import UniformTimeLine
         from fealpy.solver import spsolve, cg, gmres 
-        from fealpy.fem import DirichletBC
         from fealpy.utils import timer
         from pathlib import Path
         from fealpy.cfd.example.GNBC.solver import Solver
@@ -115,7 +115,6 @@ class GNBCSimulation(CNodeType):
         p2 = pspace.function()
 
         ugdof = uspace.number_of_global_dofs()
-        pgdof = pspace.number_of_global_dofs()
         phigdof = phispace.number_of_global_dofs()
         export_dir = Path(output_dir).expanduser().resolve()
         export_dir.mkdir(parents=True, exist_ok=True)
@@ -130,14 +129,6 @@ class GNBCSimulation(CNodeType):
         CH_LForm = solver.CH_LForm()
         NS_BForm = solver.NS_BForm()
         NS_LForm = solver.NS_LForm()
-        is_up = space.is_boundary_dof(pde.is_up_boundary)
-        is_down = space.is_boundary_dof(pde.is_down_boundary)
-        is_uy_bd = space.is_boundary_dof(pde.is_uy_Dirichlet)
-        ux_gdof = space.number_of_global_dofs()
-        is_bd = bm.concatenate((bm.zeros(ux_gdof, dtype=bool), is_uy_bd, bm.zeros(pgdof, dtype=bool)))
-        NS_BC = DirichletBC(space=(uspace,pspace), \
-                gd=bm.zeros(ugdof+pgdof, dtype=bm.float64), \
-                threshold=is_bd, method='interp')
         time.send("初始化用时")
         for i in range(nt):
             t = timeline.next_time_level()
@@ -149,7 +140,6 @@ class GNBCSimulation(CNodeType):
             
             time.send(f"第{i+1}次CH组装用时")
             CH_x = spsolve(CH_A, CH_b, 'mumps')
-            # CH_x = spsolve(CH_A, CH_b, 'scipy')
             time.send(f"第{i+1}次CH求解用时")
             
             phi2[:] = CH_x[:phigdof]
@@ -157,10 +147,9 @@ class GNBCSimulation(CNodeType):
             solver.NS_update(u0, u1, mu2, phi2, phi1)
             NS_A = NS_BForm.assembly()
             NS_b = NS_LForm.assembly()
-            NS_A,NS_b = NS_BC.apply(NS_A,NS_b)
+            NS_A,NS_b = NS_BC(NS_A,NS_b)
             time.send(f"第{i+1}次NS组装用时")
             NS_x = spsolve(NS_A, NS_b, 'mumps')  
-            # NS_x = spsolve(NS_A, NS_b, 'scipy') 
             time.send(f"第{i+1}次NS求解用时")
             u2[:] = NS_x[:ugdof]
             p2[:] = NS_x[ugdof:]
@@ -179,14 +168,5 @@ class GNBCSimulation(CNodeType):
             mesh.nodedata['mu'] = mu2
             mesh.to_vtk(fname=fname)
             timeline.advance()
-            time.send(f"第{i+1}次画图用时")
-            uuu = u2.reshape(2,-1).T
-            print("上边界最大值",bm.max(uuu[is_up,0]))
-            print("上边界最小值",bm.min(uuu[is_up,0]))
-            print("下边界最大值",bm.max(uuu[is_down,0]))
-            print("下边界最小值",bm.min(uuu[is_down,0]))
-        max_u_up = bm.max(uuu[is_up,0])
-        min_u_up = bm.min(uuu[is_up,0])
-        max_u_down = bm.max(uuu[is_down,0])
-        min_u_down = bm.min(uuu[is_down,0])
-        return max_u_up, min_u_up, max_u_down, min_u_down
+            
+        return u2.reshape(2,-1).T,p2,phi2,mu2

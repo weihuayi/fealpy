@@ -10,6 +10,7 @@ pspace = cgraph.create("P0FunctionSpace")
 space = cgraph.create("FunctionSpace")
 uspace = cgraph.create("TensorFunctionSpace")
 simulation = cgraph.create("GNBCSimulation")
+GNBC = cgraph.create("GNBC")
 
 pde(
     eps = 1e-10,
@@ -26,8 +27,14 @@ phispace(mesh = mesher(), p=1)
 pspace(mesh = mesher(), ctype='D')
 space(mesh = mesher(), p=2)
 uspace(mesh = mesher(), p=2, gd = 2)
-
+GNBC(Dirichlet = pde().is_uy_Dirichlet,
+    space = space(),
+    pspace = pspace(),
+    uspace = uspace()
+    )
 simulation(
+    # dt = 0.0001,
+    # i = 0,
     param_list = pde().param_list,
     init_phi = pde().init_phi,
     is_uy_Dirichlet = pde().is_uy_Dirichlet,
@@ -40,13 +47,15 @@ simulation(
     space = space(),
     pspace = pspace(),
     uspace = uspace(),
-    output_dir = "/home/edwin/output", 
+    output_dir = "/home/edwin/output",
+    NS_BC = GNBC().apply_bc, 
     q = 5)
 
 WORLD_GRAPH.output(max_u_up=simulation().max_u_up, 
-                   min_u_up=simulation().min_u_up,
-                   max_u_down=simulation().max_u_down,
-                   min_u_down=simulation().min_u_down)
+                #    min_u_up=simulation().min_u_up,
+                #    max_u_down=simulation().max_u_down,
+                #    min_u_down=simulation().min_u_down)
+)
 
 # 最终连接到图输出节点上
 WORLD_GRAPH.register_error_hook(print)
