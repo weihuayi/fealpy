@@ -45,7 +45,7 @@ solver(A = bar942_model().K,
        b = bar942_model().F)
 
 postprocess(out = solver().out, node_ldof=3, type="Truss")
-coord(mesh=mesher942(), vref=None, index=None)
+coord(mesh=mesher942(), index=None)
 
 strain_stress(
     bar_type="bar942",

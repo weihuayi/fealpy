@@ -44,7 +44,7 @@ class Timoaxle(CNodeType):
     ]
     OUTPUT_SLOTS = [
         PortConf("K", DataType.LINOPS, desc="含边界条件处理后的刚度矩阵", title="全局刚度矩阵",),
-        PortConf("F", DataType.TENSOR, desc="含边界条件作用的全局载荷向量",  title="全局载荷向量"),
+        PortConf("F", DataType.TENSOR, desc="含边界条件作用的全局载荷向量",  title="载荷向量"),
     ]
 
     @staticmethod

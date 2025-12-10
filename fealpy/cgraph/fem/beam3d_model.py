@@ -33,9 +33,9 @@ class ChannelBeam(CNodeType):
         PortConf("space_type", DataType.MENU, 0, title="函数空间类型", default="lagrangespace", items=["lagrangespace"]),
         PortConf("GD", DataType.INT, 1, desc="模型的几何维数", title="几何维数"),
         PortConf("mesh", DataType.MESH, 1, desc="槽形梁网格", title="网格"),
-        PortConf("beam_E", DataType.FLOAT, 1, desc="梁的弹性模量", title="梁的弹性模量"),
-        PortConf("beam_nu", DataType.FLOAT, 1, desc="梁的泊松比", title="梁的泊松比"),
-        PortConf("beam_density", DataType.FLOAT, 1, desc="梁的密度", title="梁的密度"),
+        PortConf("beam_E", DataType.FLOAT, 1, desc="梁的弹性模量", title="弹性模量"),
+        PortConf("beam_nu", DataType.FLOAT, 1, desc="梁的泊松比", title="泊松比"),
+        PortConf("beam_density", DataType.FLOAT, 1, desc="梁的密度", title="密度"),
         PortConf("load_case", DataType.MENU, 1, desc="载荷工况选择", title="载荷工况"),
         PortConf("dirichlet_dof", DataType.FUNCTION, 1, desc="返回 Dirichlet 自由度", title="边界自由度"),
         PortConf("gravity", DataType.FLOAT, 0, desc="重力加速度", title="重力加速度", default=9.81),
@@ -44,7 +44,7 @@ class ChannelBeam(CNodeType):
     
     OUTPUT_SLOTS = [
         PortConf("K", DataType.LINOPS, desc="含边界条件处理后的刚度矩阵", title="全局刚度矩阵",),
-        PortConf("F", DataType.TENSOR, desc="含边界条件作用的全局载荷向量",  title="全局载荷向量"),
+        PortConf("F", DataType.TENSOR, desc="含边界条件作用的全局载荷向量",  title="载荷向量"),
     ]
     
     @staticmethod

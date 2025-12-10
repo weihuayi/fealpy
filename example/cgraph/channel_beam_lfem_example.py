@@ -40,7 +40,7 @@ solver(A = ChannelBeam_model().K,
 
 postprocess(out = solver().out, node_ldof=6, type="Timo_beam")
 
-coord(mesh=mesher(), vref=None, index=None)
+coord(mesh=mesher(), vref=[0, 1, 0], index=None)
 
 strain_stress(
     mu_y = model().mu_y,

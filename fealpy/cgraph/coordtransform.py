@@ -25,10 +25,8 @@ class Rbar2d(CNodeType):
     """
     TITLE: str = "2D杆件坐标变换"
     PATH: str = "utils.coordtransform"
-    DESC: str = "计算2D杆件单元的坐标变换矩阵。"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
-        PortConf("vref", DataType.TENSOR, 0, desc="参考向量，用于定义局部坐标系", title="参考向量", default=None),
         PortConf("index", DataType.TENSOR, 1, desc="单元索引，默认为所有单元", title="单元索引", default=None)
     ]
     OUTPUT_SLOTS = [
@@ -39,12 +37,11 @@ class Rbar2d(CNodeType):
     def run(**options):
         from fealpy.csm.utils import CoordTransform
         mesh = options.get("mesh")
-        vref = options.get("vref")
         index = options.get("index")
         indices = index if index is not None else slice(index)
         
         coord_transform = CoordTransform(method="bar2d")
-        R = coord_transform.coord_transform_bar2d(mesh, vref, indices)
+        R = coord_transform.coord_transform_bar2d(mesh, indices)
         return R
     
     
@@ -56,7 +53,6 @@ class Rbar3d(CNodeType):
 
     Inputs:
         mesh (MESH): The mesh object containing node and element information.
-        vref (MENU): Reference vector for defining local coordinate system.
         index (TENSOR): Indices of elements to compute. Defaults to all elements.
 
     Outputs:
@@ -65,11 +61,8 @@ class Rbar3d(CNodeType):
     """
     TITLE: str = "3D杆件坐标变换"
     PATH: str = "utils.coordtransform"
-    DESC: str = "计算3D杆件单元的坐标变换矩阵。"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
-        PortConf("vref", DataType.MENU, 0, desc="参考向量，用于定义局部坐标系", title="参考向量", default=None,
-                 items=[[0, 1, 0], [1, 0, 0], [0, 0, 1]]),
         PortConf("index", DataType.INT, 1, desc="单元索引，默认为所有单元", title="单元索引", default=None)
     ]
     OUTPUT_SLOTS = [
@@ -81,12 +74,11 @@ class Rbar3d(CNodeType):
         from fealpy.backend import bm
         from fealpy.csm.utils import CoordTransform
         mesh = options.get("mesh")
-        vref = options.get("vref")
         index = options.get("index")
         indices = index if index is not None else slice(index)
         
         coord_transform = CoordTransform(method="bar3d")
-        R = coord_transform.coord_transform_bar3d(mesh, vref, indices)
+        R = coord_transform.coord_transform_bar3d(mesh, indices)
         return R
 
 
@@ -107,11 +99,10 @@ class Rbeam3d(CNodeType):
     """
     TITLE: str = "3D梁单元坐标变换" 
     PATH: str = "utils.coordtransform"
-    DESC: str = "计算3D梁单元的坐标变换矩阵。"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, 1, desc="包含节点和单元信息的网格", title="网格"),
-        PortConf("vref", DataType.MENU, 0, desc="参考向量，用于定义局部坐标系", title="参考向量", default=None,
-                 items=[[0, 1, 0], [1, 0, 0], [0, 0, 1]]),
+        PortConf("vref", DataType.MENU, 0, desc="参考向量，用于定义局部坐标系", title="参考向量", default=[0, 1, 0],
+                 items=[[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
         PortConf("index", DataType.TENSOR, 1, desc="单元索引，默认为所有单元", title="单元索引", default=None)
     ]
     OUTPUT_SLOTS = [

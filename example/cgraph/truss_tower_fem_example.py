@@ -50,7 +50,7 @@ solver(A = truss_tower().K,
        b = truss_tower().F)
 
 postprocess(out = solver().out, node_ldof=3, type="Truss")
-coord(mesh=mesher(), vref=None, index=None)
+coord(mesh=mesher(), index=None)
 strain_stress(
     bar_type="truss_tower",
     E = materialer().E,
