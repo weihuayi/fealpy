@@ -40,42 +40,43 @@ class GNBCSimulation(CNodeType):
     适用于两相不可压流体的层流模拟、界面滑移研究及润湿动力学分析。
 """
     INPUT_SLOTS = [
+        PortConf("dt", DataType.FLOAT, title="时间步长"),
+        PortConf("i", DataType.INT, title="当前时间步"),
         PortConf("param_list", DataType.LIST, title="参数列表"),
         PortConf("init_phi", DataType.FUNCTION, 1, title="定义初始相场分布"),
-        PortConf("is_uy_Dirichlet", DataType.FUNCTION, 1, title="判断是否为速度Dirichlet边界"),
-        PortConf("is_up_boundary", DataType.FUNCTION, 1, title="判断是否为上边界"),
-        PortConf("is_down_boundary", DataType.FUNCTION, 1, title="判断是否为下边界"),
         PortConf("is_wall_boundary", DataType.FUNCTION, 1, title="判断是否为壁面边界"),
         PortConf("u_w", DataType.FUNCTION, 1, title="定义壁面速度边界条件"),
-        PortConf("nt", DataType.INT, title="总迭代步数"),
         PortConf("phispace", DataType.SPACE, 1, title="相场函数空间"),
         PortConf("space", DataType.SPACE, 1, title="函数空间"),
         PortConf("pspace", DataType.SPACE, 1, title="压力函数空间"),
         PortConf("uspace", DataType.SPACE, 1, title="速度函数空间"),
-        PortConf("output_dir", DataType.STRING, title="输出目录"),
         PortConf("NS_BC", DataType.FUNCTION, title="边界处理函数"),
+        PortConf("u0", DataType.FUNCTION, title="第0步速度"),
+        PortConf("u1", DataType.FUNCTION, title="第1步速度"),
+        PortConf("phi0", DataType.FUNCTION, title="第0步序参量"),
+        PortConf("phi1", DataType.FUNCTION, title="第1步序参量"),
+        PortConf("mu1", DataType.FUNCTION, title="第1步化学势"),
+        PortConf("p1", DataType.FUNCTION, title="第1步压力"),
         PortConf("q", DataType.INT, title="积分次数", default=5),
     ]
     OUTPUT_SLOTS = [
-        PortConf("u", DataType.TENSOR, title="速度"),
-        PortConf("p", DataType.TENSOR, title="压力"),
-        PortConf("phi", DataType.TENSOR, title="序参量"),
-        PortConf("mu", DataType.TENSOR, title="化学势")
+        PortConf("u0", DataType.FUNCTION, title="第0步速度"),
+        PortConf("u1", DataType.FUNCTION, title="第1步速度"),
+        PortConf("phi0", DataType.FUNCTION, title="第0步序参量"),
+        PortConf("phi1", DataType.FUNCTION, title="第1步序参量"),
+        PortConf("mu1", DataType.FUNCTION, title="第1步化学势"),
+        PortConf("p1", DataType.FUNCTION, title="第1步压力")
     ]
     
     @staticmethod
-    def run(param_list, init_phi, is_uy_Dirichlet,is_up_boundary,
-            is_down_boundary,is_wall_boundary,u_w,nt,
-            phispace,space,pspace,uspace,output_dir,NS_BC,q=5) -> Union[object]:
-        from fealpy.backend import backend_manager as bm
-        from fealpy.old.timeintegratoralg import UniformTimeLine
-        from fealpy.solver import spsolve, cg, gmres 
-        from fealpy.utils import timer
-        from pathlib import Path
+    def run(dt, i, param_list, init_phi,is_wall_boundary,u_w,
+            phispace,space,pspace,uspace,NS_BC,
+            u0=None,u1=None,phi0=None,phi1=None,mu1=None,p1=None,q=5) -> Union[object]:
+        from fealpy.solver import spsolve
         from fealpy.cfd.example.GNBC.solver import Solver
         class PDE:
-            def __init__(self, param_list, is_wall_boundary,is_up_boundary,
-                        is_down_boundary,is_uy_Dirichlet, u_w, init_phi):
+            def __init__(self, param_list, is_wall_boundary,
+                        u_w, init_phi):
                 self.R = param_list[0]
                 self.L_s = param_list[1]
                 self.epsilon = param_list[2]
@@ -85,62 +86,35 @@ class GNBCSimulation(CNodeType):
                 self.s = param_list[6]
                 self.theta_s = param_list[7]
                 self.is_wall_boundary = is_wall_boundary
-                self.is_up_boundary = is_up_boundary
-                self.is_down_boundary = is_down_boundary
-                self.is_uy_Dirichlet = is_uy_Dirichlet
                 self.u_w = u_w
                 self.init_phi = init_phi
-        T = param_list[8]
-        pde = PDE(param_list, is_wall_boundary,is_up_boundary,
-            is_down_boundary,is_uy_Dirichlet,u_w,init_phi)
-        
-        timeline = UniformTimeLine(0, T, nt)
-        dt = timeline.dt
-        time = timer()
-        next(time)
+        pde = PDE(param_list, is_wall_boundary,u_w,init_phi) 
         mesh = getattr(space, 'mesh', None)
         solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q)
-        
-        u0 = uspace.function()
-        u1 = uspace.function()
-        u2 = uspace.function()
-        phi0 = phispace.interpolate(pde.init_phi)
-        phi1 = phispace.function()
-        # TODO:第一步求解
-        phi1[:] = phi0[:]
-        phi2 = phispace.function()
-        mu1 = phispace.function()
-        mu2 = phispace.function()
-        p1 = pspace.function()
-        p2 = pspace.function()
-
         ugdof = uspace.number_of_global_dofs()
         phigdof = phispace.number_of_global_dofs()
-        export_dir = Path(output_dir).expanduser().resolve()
-        export_dir.mkdir(parents=True, exist_ok=True)
-        
-        fname = export_dir / f"test_{str(0).zfill(10)}.vtu"
-        mesh.nodedata['phi'] = phi0
-        mesh.nodedata['u'] = u0.reshape(2,-1).T
-        mesh.nodedata['mu'] = mu1
-        mesh.to_vtk(fname=fname)
-
-        CH_BForm = solver.CH_BForm()
-        CH_LForm = solver.CH_LForm()
-        NS_BForm = solver.NS_BForm()
-        NS_LForm = solver.NS_LForm()
-        time.send("初始化用时")
-        for i in range(nt):
-            t = timeline.next_time_level()
-            print(f"第{i+1}步")
-            print("time=", t)
+        if i == 0:  
+            u0 = uspace.function()
+            u1 = uspace.function()
+            u2 = uspace.function()
+            phi0 = phispace.interpolate(pde.init_phi)
+            phi1 = phispace.function()
+            # TODO:第一步求解
+            phi1[:] = phi0[:]
+            phi2 = phispace.function()
+            mu1 = phispace.function()
+            mu2 = phispace.function()
+            p1 = pspace.function()
+            p2 = pspace.function() 
+        else:
+            CH_BForm = solver.CH_BForm()
+            CH_LForm = solver.CH_LForm()
+            NS_BForm = solver.NS_BForm()
+            NS_LForm = solver.NS_LForm()
             solver.CH_update(u0, u1, phi0, phi1)
             CH_A = CH_BForm.assembly()
             CH_b = CH_LForm.assembly()
-            
-            time.send(f"第{i+1}次CH组装用时")
             CH_x = spsolve(CH_A, CH_b, 'mumps')
-            time.send(f"第{i+1}次CH求解用时")
             
             phi2[:] = CH_x[:phigdof]
             mu2[:] = CH_x[phigdof:] 
@@ -148,9 +122,8 @@ class GNBCSimulation(CNodeType):
             NS_A = NS_BForm.assembly()
             NS_b = NS_LForm.assembly()
             NS_A,NS_b = NS_BC(NS_A,NS_b)
-            time.send(f"第{i+1}次NS组装用时")
-            NS_x = spsolve(NS_A, NS_b, 'mumps')  
-            time.send(f"第{i+1}次NS求解用时")
+            NS_x = spsolve(NS_A, NS_b, 'mumps')
+
             u2[:] = NS_x[:ugdof]
             p2[:] = NS_x[ugdof:]
             
@@ -161,12 +134,4 @@ class GNBCSimulation(CNodeType):
             mu1[:] = mu2[:]
             p1[:] = p2[:]
             
-            fname = export_dir / f"test_{str(i+1).zfill(10)}.vtu"
-            mesh.nodedata['phi'] = phi2
-            mesh.nodedata['u'] = u2.reshape(2,-1).T
-            mesh.celldata['p'] = p2
-            mesh.nodedata['mu'] = mu2
-            mesh.to_vtk(fname=fname)
-            timeline.advance()
-            
-        return u2.reshape(2,-1).T,p2,phi2,mu2
+        return u0,u1,phi0,phi1,mu1,p1

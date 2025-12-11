@@ -11,7 +11,7 @@ space = cgraph.create("FunctionSpace")
 uspace = cgraph.create("TensorFunctionSpace")
 simulation = cgraph.create("GNBCSimulation")
 GNBC = cgraph.create("GNBC")
-
+to_vtk = cgraph.create("TO_VTK")
 pde(
     eps = 1e-10,
     T = 2,
@@ -33,29 +33,26 @@ GNBC(Dirichlet = pde().is_uy_Dirichlet,
     uspace = uspace()
     )
 simulation(
-    # dt = 0.0001,
-    # i = 0,
+    dt = pde().dt,
+    i = 0,
     param_list = pde().param_list,
     init_phi = pde().init_phi,
-    is_uy_Dirichlet = pde().is_uy_Dirichlet,
-    is_up_boundary = pde().is_up_boundary,
-    is_down_boundary = pde().is_down_boundary,
     is_wall_boundary = pde().is_wall_boundary,
     u_w = pde().u_w,
-    nt = pde().nt,
     phispace = phispace(),
     space = space(),
     pspace = pspace(),
     uspace = uspace(),
-    output_dir = "/home/edwin/output",
     NS_BC = GNBC().apply_bc, 
     q = 5)
+to_vtk(mesh = mesher(),
+        uh = (simulation().u1, simulation().p1, simulation().phi1, simulation().mu1),
+        path = "/home/edwin/output",
+        i = None)
 
-WORLD_GRAPH.output(max_u_up=simulation().max_u_up, 
-                #    min_u_up=simulation().min_u_up,
-                #    max_u_down=simulation().max_u_down,
-                #    min_u_down=simulation().min_u_down)
-)
+
+WORLD_GRAPH.output(path = to_vtk().path)
+                
 
 # 最终连接到图输出节点上
 WORLD_GRAPH.register_error_hook(print)

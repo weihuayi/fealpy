@@ -53,7 +53,8 @@ class CouetteFlow(CNodeType):
         PortConf("is_wall_boundary", DataType.FUNCTION, title="判断是否为壁面边界"),
         PortConf("u_w", DataType.FUNCTION, title="定义壁面速度边界条件"),
         PortConf("domain", DataType.NONE, title = "求解区域"),
-        PortConf("nt", DataType.INT, title="总迭代步数"),
+        PortConf("dt", DataType.FLOAT, title="时间步长"),
+        PortConf("nt", DataType.INT, title="最大迭代次数"),
         PortConf("h", DataType.FLOAT, 0, title="网格尺寸", default=1/256),
         PortConf("nx", DataType.INT, title="x方向单元数"),
         PortConf("ny", DataType.INT, title="y方向单元数"),
@@ -81,9 +82,11 @@ class CouetteFlow(CNodeType):
                 self.theta_s = bm.array(theta/180 * bm.pi)
                 self.T = T
                 self.nt = int(T/(0.1*h))
+                self.dt = T/self.nt
                 self.h = h
-                self.nx=int(1/self.h)
-                self.ny=int(0.25/self.h)
+                self.nx = int(1/self.h)
+                self.ny = int(0.25/self.h)
+                
                 
             @cartesian
             def is_wall_boundary(self,p):
@@ -148,10 +151,9 @@ class CouetteFlow(CNodeType):
         model.V_s,     
         model.s,       
         model.theta_s,
-        model.T
         ]
         return (param_list,model.init_phi, model.is_uy_Dirichlet,
                 model.is_up_boundary, model.is_down_boundary,
                 model.is_wall_boundary, model.u_w, model.domain,
-                model.nt,model.h,model.nx,model.ny
+                model.dt,model.nt,model.h,model.nx,model.ny
                 )
