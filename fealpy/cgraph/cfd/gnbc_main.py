@@ -55,8 +55,6 @@ class GNBCSimulation(CNodeType):
         PortConf("u1", DataType.FUNCTION, title="第1步速度"),
         PortConf("phi0", DataType.FUNCTION, title="第0步序参量"),
         PortConf("phi1", DataType.FUNCTION, title="第1步序参量"),
-        PortConf("mu1", DataType.FUNCTION, title="第1步化学势"),
-        PortConf("p1", DataType.FUNCTION, title="第1步压力"),
         PortConf("q", DataType.INT, title="积分次数", default=5),
     ]
     OUTPUT_SLOTS = [
@@ -71,7 +69,7 @@ class GNBCSimulation(CNodeType):
     @staticmethod
     def run(dt, i, param_list, init_phi,is_wall_boundary,u_w,
             phispace,space,pspace,uspace,NS_BC,
-            u0=None,u1=None,phi0=None,phi1=None,mu1=None,p1=None,q=5) -> Union[object]:
+            u0 = None,u1=None,phi0=None,phi1=None,q=5) -> Union[object]:
         from fealpy.solver import spsolve
         from fealpy.cfd.example.GNBC.solver import Solver
         class PDE:
@@ -93,10 +91,16 @@ class GNBCSimulation(CNodeType):
         solver = Solver(pde, mesh, pspace, phispace, uspace, dt, q)
         ugdof = uspace.number_of_global_dofs()
         phigdof = phispace.number_of_global_dofs()
+        u2 = uspace.function()
+        mu1 = phispace.function()
+        mu2 = phispace.function()
+        p1 = pspace.function()
+        p2 = pspace.function()
+        phi2 = phispace.function() 
         if i == 0:  
             u0 = uspace.function()
             u1 = uspace.function()
-            u2 = uspace.function()
+            # u2 = uspace.function()
             phi0 = phispace.interpolate(pde.init_phi)
             phi1 = phispace.function()
             # TODO:第一步求解
