@@ -16,7 +16,7 @@ from ..model.model_manager import CSMModelManager
 from ..utils import CoordTransform
 
 
-class BarModel(ComputationalModel):
+class TrussModel(ComputationalModel):
     """
     3D linear FEM model for truss structures with blocked DOF layout.
 
@@ -125,8 +125,8 @@ class BarModel(ComputationalModel):
         bform.add_integrator(integrator)
         K = bform.assembly()
         F = self.pde.load()
-        # self.logger.info(f"strain: {K}")
-        # self.logger.info(f"stress: {F}")
+        # self.logger.info(f"K: {K}")
+        # self.logger.info(f"F: {F}")
         return K, F
     
     def apply_bc(self, K, F):
@@ -161,12 +161,13 @@ class BarModel(ComputationalModel):
         fixed_dofs = bm.where(is_bd_dof)[0]
         
         F = F.flatten()
-        F[fixed_dofs] *= penalty
-        
+        bc_values = self.pde.dirichlet_bc()
+       
         K = K.toarray()
         for dof in fixed_dofs:
-                K[dof, dof] *= penalty
-                
+            K[dof, dof] *= penalty
+            F[dof] = bc_values[dof] * K[dof, dof]
+                    
         rows, cols = bm.nonzero(K)
         values = K[rows, cols]
         crow = bm.zeros(K.shape[0] + 1, dtype=bm.int64)
@@ -186,8 +187,7 @@ class BarModel(ComputationalModel):
             uh: Solution vector.
         """
         uh = spsolve(K, F, solver='scipy')
-        
-        # self.logger.info(f"Solution : {uh}")
+        self.logger.info(f"Solution : {uh}")
         
         return uh
     

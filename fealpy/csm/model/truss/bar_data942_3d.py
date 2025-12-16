@@ -54,15 +54,14 @@ class BarData942:
         """Return the nodal loads for the truss problem.
         
         Note:
-            Concentrated forces are applied at nodes 1 and 2:
+            Concentrated forces are applied at nodes 0 and 1:
+            - Node 0: [0, 400, -100] (y=400, z=-100)
             - Node 1: [0, 400, -100] (y=400, z=-100)
-            - Node 2: [0, 400, -100] (y=400, z=-100)
         """
         GD = self.GD
         NN = self.mesh.number_of_nodes()
         F = bm.zeros((NN, GD), dtype=bm.float64)
         
-        # 在节点1和节点2施加载荷 [0, 400, -100]
         F[0] = bm.array([0, 400, -100])
         F[1] = bm.array([0, 400, -100])
         
@@ -82,9 +81,8 @@ class BarData942:
         
         # 约束节点232-243的所有自由度
         for i in range(12):
-                node_idx = i + 232  # 对应节点233-244
+                node_idx = i + 232  
                 is_bd_dof[node_idx * GD : (node_idx + 1) * GD] = True
-    
         return is_bd_dof
 
     @cartesian
@@ -96,6 +94,5 @@ class BarData942:
             TensorLike: Zero displacement vector of shape (NN*GD,).
         """
         NN = self.mesh.number_of_nodes()
-        GD = self.GD
-        
+        GD = self.GD 
         return bm.zeros(NN * GD, dtype=bm.float64)
