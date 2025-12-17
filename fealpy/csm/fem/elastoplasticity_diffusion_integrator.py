@@ -6,6 +6,7 @@ from fealpy.mesh import TensorMesh
 from fealpy.functionspace.space import FunctionSpace as _FS
 
 from fealpy.fem import LinearElasticityIntegrator
+from fealpy.decorator import variantmethod
 
 
 class ElastoplasticDiffusionIntegrator(LinearElasticityIntegrator):
@@ -48,8 +49,10 @@ class ElastoplasticDiffusionIntegrator(LinearElasticityIntegrator):
     '''
     def __init__(self, D_ep, material, q, method=None):
         super().__init__(material, q, method=method)
+        self.assembly.set(method)
         self.D_ep = D_ep  # 弹塑性材料矩阵
 
+    @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
         """
         Assemble the global tangent stiffness matrix for the elastoplastic material.
@@ -71,5 +74,4 @@ class ElastoplasticDiffusionIntegrator(LinearElasticityIntegrator):
         else:
             KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij',
                             ws, cm, B, D_ep, B)
-        
         return KK # (NC, tdof, tdof)
