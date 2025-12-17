@@ -206,5 +206,5 @@ class CurlCurlSpherePML():
 
             FTF    = bm.einsum("...ij, ...ik->...jk", F, F)
             invFTF = bm.linalg.inv(FTF)
-            val[isInPML] = k**2 * epsilon * detF[:, None, None] * invFTF
+            val[isInPML] = - k**2 * epsilon * detF[:, None, None] * invFTF
         return val

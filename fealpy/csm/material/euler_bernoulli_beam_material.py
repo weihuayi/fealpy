@@ -5,8 +5,6 @@ from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.material.elastic_material import LinearElasticMaterial
 
-from ..model.beam.euler_bernoulli_beam_data_2d import EulerBernoulliBeamData2D
-
 
 class EulerBernoulliBeamMaterial(LinearElasticMaterial):
     """Material properties for 3D Timoshenko beams.
@@ -25,10 +23,6 @@ class EulerBernoulliBeamMaterial(LinearElasticMaterial):
                 poisson_ratio: Optional[float] = None,
                 shear_modulus: Optional[float] = None,
                 I: Optional[float] = None,
-                Iy: Optional[float] = None,
-                Iz: Optional[float] = None,
-                G: Optional[float] = None,
-                J: Optional[float] = None
                 ) -> None:
         super().__init__(name=name, 
                         elastic_modulus= elastic_modulus, 
@@ -39,18 +33,12 @@ class EulerBernoulliBeamMaterial(LinearElasticMaterial):
         self.nu = self.get_property('poisson_ratio')
         self.mu = self.get_property('shear_modulus')
         self.I = I
-        self.Iy = Iy
-        self.Iz = Iz
-        self.G = G
-        self.J = J
 
-        pdemodel = model
-
-        self.L = pdemodel.L
-        self.A = pdemodel.A
-        self.f = pdemodel.f
-        self.h = pdemodel.h
-        self.l = pdemodel.l
+        self.L = model.L
+        self.A = model.A
+        self.f = model.f
+        self.h = model.h
+        self.l = model.l
         
         
     def __str__(self) -> str:

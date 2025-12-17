@@ -26,6 +26,10 @@ class CircleMesh(CNodeType):
 
     TITLE: str = "二维圆形网格"
     PATH: str = "网格.构造"
+    DESC: str = """在二维圆形区域生成非结构的三角形网格。
+                该节点通过接受圆心坐标(X,Y)、半径以及网格尺寸四个参数，生成非结构的三角形网格。
+                使用例子：通过输入四类浮点数:圆心坐标X,Y, 半径radius, 网格尺寸h, 连接到节点上，
+                创建网格点坐标张量和单元数据张量，再将该节点连接到输出，即可查看网格构建效果。"""
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="triangle", items=["triangle"]),
         PortConf("X", DataType.FLOAT, title="圆心X坐标", default=0.0),
@@ -67,6 +71,15 @@ class Ellipse2d(CNodeType):
     """
     TITLE: str = "椭圆网格"
     PATH: str = "网格.构造"
+    DESC: str = """
+                在二维椭圆形区域生成三角形或四边形网格。
+
+                该节点通过接受两个轴长: 长轴a和短轴b, 两个中心坐标x,y, 网格尺寸以及旋转角度（弧度）六个参数，
+                依次建模、网格剖分，生成三角形或四边形非结构网格。
+
+                使用例子: 通过输入长轴a和短轴b,中心坐标x,y, 网格尺寸h, 旋转角度theta, 连接到节点上，创建网
+                格点坐标张量和单元数据张量，再将该节点连接到输出，即可查看网格构建效果。
+                """
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tri", items=["tri", "quad"]),
         PortConf("a", DataType.FLOAT, 1, default=1.0, title="长轴"),
@@ -106,6 +119,14 @@ class Ellipse2d(CNodeType):
         """
         TITLE: str = "椭球面网格"
         PATH: str = "网格.构造"
+        DESC: str = """
+                    在三维椭球面上生成三角形或四边形网格。
+
+                    该节点通过接受三个椭球中心参数: 坐标x、坐标y、坐标z, 三个椭球各方向主
+                    轴长度$$rx,ry,rz$$，网格尺寸，依次建模、网格剖分，生成三角形或四边形非结构网格。
+
+                    使用例子: 通过输入三个椭球中心参数: 坐标x、坐标y、坐标z, 三个椭球各方向主轴长度rx,ry,rz, 
+                    网格尺寸h, 连接到节点上，创建网格点坐标张量和单元数据张量，再将该节点连接到输出，即可查看网格构建效果。"""
         INPUT_SLOTS = [
             PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tri", items=["tri", "quad"]),
             PortConf("x", DataType.FLOAT, 1, default=0.0, title="椭球中心的 x 坐标"),
@@ -150,6 +171,16 @@ class Ellipse2d(CNodeType):
         """
         TITLE: str = "椭球体网格"
         PATH: str = "网格.构造"
+        DESC: str = """
+                    创建三维空间中，椭球体区域对应的四面体网格。
+
+                    该节点创建椭球体区域对应的四面体网格, 椭球心坐标由输入参数 (x, y, z) 控制，三个
+                    主轴由输入参数(rx, ry, rz)确定，使用 gmsh 生成网格, 并根据输入的网格尺寸(h)
+                    控制网格密度。
+
+                    使用例子: 向该节点的相应输入槽输入表示椭圆心坐标(x, y, z)、三主轴长度(rx, ry, rz)、
+                    网格尺寸 (h) 的七个浮点数, 再将该节点Q连接到输出, 即可查看网格构造效果。
+                    """
         INPUT_SLOTS = [
             PortConf("x", DataType.FLOAT, 1, default=0.0, title="椭球中心的 x 坐标"),
             PortConf("y", DataType.FLOAT, 1, default=0.0, title="椭球中心的 y 坐标"),
@@ -184,7 +215,14 @@ class SphereSurface(CNodeType):
     """
     TITLE: str = "球面网格"
     PATH: str = "网格.构造"
-    DESC: str = "生成单位球面上的网格，输出网格类型与网格加密次数，加密次数越大，网格越密。"
+    DESC: str = """
+                    在单位球面上生成网格生成三角形或四边形网格，加密次数越多，网格越密。
+                    
+                    该节点通过接受整型网格加密次数refine, 生成三角形或四边形非结构网格。
+                    
+                    使用例子: 通过输入一个代表网格加密次数refine的整数, 比如2, 代表加密两次, 连接
+                    到节点上，创建网格点坐标张量和单元数据张量，再将该节点连接到输出，即可查看一个被三角形
+                    或者四边形剖分的单元球面网格。"""
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="triangle", items=["triangle", "quadrangle"]),
         PortConf("refine", DataType.INT, 1, title="加密", default=2, min_val=1),
@@ -212,7 +250,13 @@ class Sphere(CNodeType):
     """
     TITLE: str = "球体网格"
     PATH: str = "网格.构造"
-    DESC: str = "生成单位球体的网格，输入网格类型和网格密度h。h一般为大于0小于1的浮点数，h越小，网格越密。"
+    DESC: str = """
+                    生成单位球体的四面体网格，网格尺寸越小，网格越密。
+
+                    该节点通过接受浮点型网格尺寸h, 一般0<h<1, 生成单位球体的四面体网格。
+
+                    使用例子: 通过输入一个代表网格尺寸h, 例如0.5, 连接到节点上，创建网格点坐标张量和
+                    单元数据张量，再将该节点连接到输出，即可查看一个被四面体网格剖分的单位球体网格。"""
     INPUT_SLOTS = [
         PortConf("mesh_type", DataType.MENU, 0, title="网格类型", default="tetrahedron", items=["tetrahedron"]),
         PortConf("h", DataType.FLOAT, 1, title="网格尺寸", default=0.5, min_val=0.1),
@@ -238,6 +282,15 @@ class SphericalShell3d(CNodeType):
     """
     TITLE: str = "带空腔的球体网格"
     PATH: str = "网格.构造"
+    DESC: str = """
+                创建三维空间中，内部包含球形空腔的球体区域对应的四面体网格。
+                
+                该节点创建一个包含球形空腔的球体网格, 主球体与内部球体空腔圆心都为原点, 由输入的外圆半径(r2)
+                与内圆半径(r1)确定半径，使用 gmsh 生成网格, 并根据输入的网格尺寸(h)控制网格密度。
+                
+                使用例子：向该节点的相应输入槽输入表示内半径、外半径、网格尺寸的三个浮点数，再将该节点连接到
+                输出，即可查看网格构造效果。
+                """
     INPUT_SLOTS = [
         PortConf("r1", DataType.FLOAT, title="内半径", default=0.05, min_val=0.0),
         PortConf("r2", DataType.FLOAT, title="外半径", default=0.5, min_val=0.0),

@@ -45,10 +45,10 @@ class HexahedronMesh(TensorMesh, Plotable):
         self.celldata = {}
         self.meshdata = {}
 
-    def ref_cell_measure(self):
+    def reference_cell_measure(self):
         return 1.0
 
-    def ref_face_meausre(self):
+    def reference_face_measure(self):
         return 1.0
 
     def quadrature_formula(self, q, etype='cell'):
@@ -122,7 +122,17 @@ class HexahedronMesh(TensorMesh, Plotable):
             J = bm.einsum( 'cim, qin -> cqmn', node[entity[:, [0, 3, 1, 2]]], gphi)
         return J
 
+    def face_unit_normal(self, index=_S):
+        # 暂时的处理，没有考虑翘曲，需要修改为高斯点上的法向量即 (NF,NQ,3)
+        face = self.face
+        node = self.node
 
+        v01 = node[face[index, 1], :] - node[face[index, 0], :]
+        v02 = node[face[index, 2], :] - node[face[index, 0], :]
+        nv = bm.cross(v01, v02)
+        length = bm.sqrt(bm.square(nv).sum(axis=1))
+        return nv/length.reshape(-1, 1)
+    
     def first_fundamental_form(self, J):
         """
         @brief 由 Jacobi 矩阵计算第一基本形式。

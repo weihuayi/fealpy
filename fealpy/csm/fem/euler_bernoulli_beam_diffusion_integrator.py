@@ -90,11 +90,6 @@ class EulerBernoulliBeamDiffusionIntegrator(LinearInt, OpInt, CellInt):
         self.type = beam_type.lower()
         self.E = material.E
         self.I = material.I
-        self.A = material.A
-        self.Iy = material.Iy
-        self.Iz = material.Iz
-        self.G = material.G
-        self.J = material.J
         self.l = space.mesh.cell_length()
         method = 'assembly' if (method is None) else method
         super().__init__(method=method)

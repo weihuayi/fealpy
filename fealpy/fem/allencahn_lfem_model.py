@@ -45,14 +45,37 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.lagrange_multiplier.set(options['lagrange_multiplier'])
         self.set_lagrange_multiplier()
 
-    def set_pde(self,pde: Union[AllenCahnPDEDataProtocol,str] = 'circle_interface'):
+    def get_default_options(self) -> dict:
+        """
+        Returns the default options for the Allen-Cahn LFEM model.
+        
+        Returns:
+            dict: Default options for the model.
+        """
+        return {
+            'pde': 1,
+            'init_mesh': 'uniform_tri',
+            'space_degree': 1,
+            'quadrature': 4,
+            'assemble_method': None,
+            'time_step': 0.01,
+            'up': 2,
+            'pbar_log': True,
+            'log_level': 'INFO',
+            'time_strategy': 'implicit',
+            'solve': 'direct',
+            'lagrange_multiplier': 'implicit',
+            'mm_param': None
+        }
+    
+    def set_pde(self,pde: Union[AllenCahnPDEDataProtocol,int] = 1):
         """
         Set the PDE data for the model.
         
         Parameters:
             pde (str or AcCircleData2D): The name of the PDE or an instance of AcCircleData2D.
         """
-        if isinstance(pde, str):
+        if isinstance(pde, int):
             self.pde = self.pdm.get_example(pde)
         else:
             self.pde = pde
@@ -118,7 +141,18 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.phi = self.space.function()
         self.phi0 = self.space.function()
         self.theta = 0.0
-
+        
+    def set_laplace_space(self):
+        """
+        Set the function space for the Laplacian operator.
+        
+        This method initializes the Lagrange finite element space for the Laplacian operator.
+        """
+        self.laplace_space = LagrangeFESpace(self.mesh, p=1)
+        self.laplace_phi = self.laplace_space.function()
+        self.logger.info(f"Laplacian function space initialized with \
+                         {self.laplace_space.number_of_global_dofs()} degrees of freedom.")
+    
     def set_velocity_function_space(self,up: int = 2):
         """
         Set the vector function space for the model.
@@ -153,7 +187,7 @@ class AllenCahnLFEMModel(ComputationalModel):
         """
         from ..sparse import COOTensor
         LagLinearForm = LinearForm(self.space)
-        Lag_SSI = ScalarSourceIntegrator(source=1, q=self.q)
+        Lag_SSI = ScalarSourceIntegrator(source=1, q=self.q , method=self.assemble_method)
         LagLinearForm.add_integrator(Lag_SSI)
         LagA = LagLinearForm.assembly()
         A0 = -self.dt * self.pde.gamma() * bm.ones(self.space.number_of_global_dofs())
@@ -174,6 +208,17 @@ class AllenCahnLFEMModel(ComputationalModel):
         """
         self.LagLinearForm = LinearForm(self.space)
         self.Lag_SSI = ScalarSourceIntegrator(q=self.q)
+        self.LagLinearForm.add_integrator(self.Lag_SSI)
+    
+    @set_lagrange_multiplier.register('explicit_conv')
+    def set_lagrange_multiplier(self):
+        """
+        Set the Lagrange multiplier for the weak formulation of the Allen-Cahn equation.
+        This method differs from the implicit scheme as it requires explicitly 
+        solving the Lagrange multiplier before assembling the right-hand side
+        """
+        self.LagLinearForm = LinearForm(self.space)
+        self.Lag_SSI = ScalarSourceIntegrator(q=self.q, method=self.assemble_method)
         self.LagLinearForm.add_integrator(self.Lag_SSI)
           
     @variantmethod('implicit')
@@ -224,7 +269,7 @@ class AllenCahnLFEMModel(ComputationalModel):
             phi_val = phi0(bcs)
             fphi = self.pde.nonlinear_source(phi_val)
     
-            result = gamma * fphi
+            result = -gamma * fphi
             result += phi_force(bcs)
             result += gamma* self.laplace_phi(bcs)
             
@@ -239,7 +284,53 @@ class AllenCahnLFEMModel(ComputationalModel):
         b0 = self.LagLinearForm.assembly()
         b += b0
         return A,b
+    
+    @lagrange_multiplier.register('explicit_conv')
+    def lagrange_multiplier(self, A , b, uh0=None, phi_force=None):
+        """
+        Explicitly add the Lagrange multiplier terms to right-hand side vector.
+        This method computes with (1- Φ^2) as coefficient for the Lagrange multiplier terms. 
         
+        Parameters:
+            A (CSRTensor): The original matrix from the bilinear form.
+            b (TensorLike): The original right-hand side vector from the linear form.
+            uh0 (Function): The previous velocity field variable.
+            phi_force (Function): The force term for the phase field variable.
+        Returns:
+            A (CSRTensor): Without changing the matrix, only the right-hand side vector is extended.
+            b (TensorLike): The extended right-hand side vector with Lagrange multiplier terms.
+        """
+        space = self.space
+        bcs = self.bcs
+        pde = self.pde
+        gamma = pde.gamma()
+        dt = self.dt
+        eta = pde.eta
+        phi0 = self.phi0
+        rm = space.mesh.reference_cell_measure()
+        @barycentric
+        def G(bcs):
+            phi_val = phi0(bcs)
+            fphi = self.pde.nonlinear_source(phi_val)
+    
+            result = -gamma * fphi
+            result += phi_force(bcs)
+            result += gamma* self.laplace_phi(bcs)
+            mesh_result = self.move_vector(bcs) - uh0(bcs)
+            result += bm.einsum('cqi, cqi->cq', mesh_result, phi0.grad_value(bcs))
+            return result
+        node0 = self.mspace.function(self.node0.T.flatten())
+        J = node0.grad_value(bcs)
+        value = (1/dt + gamma/eta**2)*(bm.abs(bm.linalg.det(J))-1)*phi0(bcs) - G(bcs)
+        phi_val_sq = 1- phi0(bcs)**2
+        t0 = bm.einsum('cq ,q ,cq ->',value,self.ws*rm,self.d)
+        t1 = bm.einsum('cq ,q ,cq ->',phi_val_sq,self.ws*rm,self.d)
+        theta = t0/(gamma*t1)
+        self.Lag_SSI.source = dt*gamma*theta*phi_val_sq
+        b0 = self.LagLinearForm.assembly()
+        b += b0
+        return A, b
+    
     def set_time_step(self, dt: float = 0.01):
         """
         Set the time step for the simulation.
@@ -371,13 +462,14 @@ class AllenCahnLFEMModel(ComputationalModel):
         q = self.q
         method = self.assemble_method
         self.bform = BilinearForm(space)
-        self.bform_exp = BilinearForm(space)
         self.SMI = ScalarMassIntegrator(coef=1.0+dt*(gamma/eta**2), q=q, method=method)
-        self.SMI_exp = ScalarMassIntegrator(coef=1.0, q=q, method=method)
         self.SDI = ScalarDiffusionIntegrator(coef=dt*gamma, q=q, method=method)
         self.bform.add_integrator(self.SMI,self.SDI)
-        self.bform_exp.add_integrator(self.SMI_exp)
         self.set_linear_form()
+        self.set_laplace_space()
+        self.laplace_bform = BilinearForm(self.laplace_space)
+        self.laplace_SMI = ScalarMassIntegrator(q=q, method=method)
+        self.laplace_bform.add_integrator(self.laplace_SMI)
         
         self.logger.info("Linear system set with bilinear and linear forms.")
         self.logger.info("Bilinear form moving_mesh set with diffusion and mass terms.")
@@ -431,19 +523,20 @@ class AllenCahnLFEMModel(ComputationalModel):
         Returns:
             Function: The recovered Laplacian of the phase field variable.
         """
-        space = self.space
+        laplace_space = self.laplace_space
         bcs = self.bcs
         grad_phi0 = phi0.grad_value(bcs)
-        grad_basis = space.grad_basis(bcs)
-        rm = space.mesh.reference_cell_measure()
+        grad_basis = laplace_space.grad_basis(bcs)
+        rm = laplace_space.mesh.reference_cell_measure()
         J = self._Jacobi(bcs)
         G = bm.permute_dims(J, (0, 1, 3,2))@ J
         self.d = bm.sqrt(bm.linalg.det(G))
         b_local = bm.einsum('q,cq,cqid, cqd->ci',self.ws*rm,self.d ,grad_basis,-grad_phi0)
-        F = bm.zeros(space.number_of_global_dofs(), dtype=bm.float64)
-        F = bm.index_add(F, space.cell_to_dof(), b_local)
-        M = self.bform_exp.assembly()
-        laplace_phi = space.function(self.solve(M, F))
+        F = bm.zeros(laplace_space.number_of_global_dofs(), dtype=bm.float64)
+        F = bm.index_add(F, laplace_space.cell_to_dof(), b_local)
+
+        M = self.laplace_bform.assembly()
+        laplace_phi = laplace_space.function(self.solve(M, F))
         return laplace_phi
        
     def set_linear_form(self):
@@ -573,8 +666,8 @@ class AllenCahnLFEMModel(ComputationalModel):
         def source(bcs, index):
             phi_val = phi0(bcs, index)
             fphi = pde.nonlinear_source(phi_val)
-            result = -gamma * dt * fphi
-            result += gamma * dt * self.laplace_phi(bcs, index)
+            result = (1+ dt*gamma/eta**2) * phi_val
+            result -= gamma * dt * fphi
             result += dt * self.phi_force(bcs, index)
             
             mesh_result = move_vector(bcs,index) - uh0(bcs, index)
@@ -662,9 +755,8 @@ class AllenCahnLFEMModel(ComputationalModel):
         self.laplace_phi = self.laplace_recovery(self.phi0)
         A,b = self.assembly(t1 = self.t,uh0 = self.uh0,phi0=self.phi0,move_vector = self.move_vector)
         A,b = self.lagrange_multiplier(A, b, uh0=self.uh0, phi_force=self.phi_force)
-
-        phi_e = self.solve(A,b)
-        phi_new = self.phi0 + phi_e
+        
+        phi_new = self.solve(A,b)
 
         self.phi[:] = phi_new
         self.phi0[:] = self.phi[:]

@@ -35,7 +35,6 @@ class Exp0001(BoxMesher2d):
         self.eta = bm.tensor(option.get('eta', 0.0078))
         self.area = bm.tensor(option.get('area', 4))
         
-
     def geo_dimension(self) -> int:
         """Return the geometric dimension of the domain."""
         return 2

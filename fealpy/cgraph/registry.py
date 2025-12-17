@@ -4,7 +4,7 @@ from types import ModuleType
 from typing import Any
 from collections.abc import Iterator
 
-from .core import Graph, CNode
+from .core import Graph, CNode, NodeGroup
 from .nodetype import CNodeType
 
 __all__ = ["register_all_nodes", "search_all_nodes", "search_node", "load", "dump"]
@@ -52,75 +52,111 @@ def search_node(name: str):
 
     if name in CNodeType.REGISTRY:
         nodetype = CNodeType.REGISTRY[name]
+        inputs, outputs = [], []
+        var_in, var_out = False, False
+
+        for slot in nodetype.INPUT_SLOTS:
+            if slot.name.startswith("*"):
+                var_in = True
+                continue
+            inputs.append(asdict(slot))
+
+        for slot in nodetype.OUTPUT_SLOTS:
+            if slot.name.startswith("*"):
+                var_out = True
+                continue
+            outputs.append(asdict(slot))
 
         return {
             "title": nodetype.TITLE,
-            "inputs": [asdict(d) for d in nodetype.INPUT_SLOTS],
-            "outputs": [asdict(d) for d in nodetype.OUTPUT_SLOTS],
-            "variable": nodetype.VARIABLE,
+            "inputs": inputs,
+            "outputs": outputs,
+            "var_in": var_in,
+            "var_out": var_out,
         }
 
     raise ValueError(f"Node {name} not found")
 
 
-def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
+def is_group_input(cnode_item: dict[str, Any]):
+    return cnode_item.get("gin", None) is not None
+
+def is_group_output(cnode_item: dict[str, Any]):
+    return cnode_item.get("gout", None) is not None
+
+def is_group(cnode_item: dict[str, Any]):
+    return cnode_item.get("ref", None) is not None
+
+def is_output_slot(slot_item: dict[str, Any]):
+    return bool(slot_item["src"])
+
+
+def load(data: dict, /, return_graph=True) -> CNode | NodeGroup | Graph:
     from .nodetype import create
     from .core.edge import connect_from_address, AddrHandler
 
     cnode_table, slots_table, conns_table = data["cnodes"], data["slots"], data["conns"]
     del data
-
     # Same order as the data
-    cnode_list = []
-    graph_dict = {}
+    cnode_list: list[CNode | NodeGroup | None] = []
+    graph_dict: dict[int, Graph] = {}
 
-    # Create cnodes and graphs
+    # STEP 1: Create cnode_list and graph_dict
     for cnode_item in cnode_table:
         # Skip graph IO nodes
-        if cnode_item["gin"] is not None or cnode_item["gout"] is not None:
+        if is_group_input(cnode_item) or is_group_output(cnode_item):
             # use a placeholder to keep index, as the graph may not be created yet
             cnode_list.append(None)
             continue
+        if is_group(cnode_item):
+            graph_id = cnode_item["ref"]
+            if graph_id not in graph_dict:
+                graph_dict[graph_id] = Graph(cnode_item["name"])
+            cnode_list.append(None)
+            continue
 
-        if cnode_item["ref"] is None:
-            cnode = create(cnode_item["name"])
-        else:
-            cnode = Graph(cnode_item["name"])
-            graph_dict[cnode_item["ref"]] = cnode
+        cnode_list.append(create(cnode_item["name"]))
 
-        cnode_list.append(cnode)
+    # STEP 2: Find graph IO slots to register source and drain for graphs.
+    for slot_item in slots_table:
+        cnode_id = slot_item["cnode"]
+        cnode_item = cnode_table[cnode_id]
 
-    # Loop again to replace placeholders with actual graph IO nodes
+        if is_group_input(cnode_item):
+            graph = graph_dict[cnode_item["gin"]]
+            graph.register_source(slot_item["name"])
+
+        elif is_group_output(cnode_item): # input slot of the output node of a graph
+            graph = graph_dict[cnode_item["gout"]]
+            graph.register_drain(slot_item["name"], default=slot_item["val"])
+
+    # STEP 3: Generate actual graph IO nodes from graphs, and groups from graphs.
     for idx, cnode_item in enumerate(cnode_table):
-        if cnode_item["gin"] is not None:
+        if is_group_input(cnode_item):
             graph = graph_dict[cnode_item["gin"]]
             assert cnode_list[idx] is None
-            cnode_list[idx] = graph._input_node
-        elif cnode_item["gout"] is not None:
+            cnode_list[idx] = graph._source_node
+        elif is_group_output(cnode_item):
             graph = graph_dict[cnode_item["gout"]]
             assert cnode_list[idx] is None
-            cnode_list[idx] = graph._output_node
+            cnode_list[idx] = graph._drain_node
+        elif is_group(cnode_item):
+            graph = graph_dict[cnode_item["ref"]]
+            assert cnode_list[idx] is None
+            cnode_list[idx] = NodeGroup(graph)
 
-    # Set inputs and their defaults
+    # STEP 4: Set all inputs and their defaults
     for slot_item in slots_table:
-        if not slot_item["src"]:
-            cnode_id = slot_item["cnode"]
-            cnode_item = cnode_table[cnode_id]
+        if is_output_slot(slot_item):
+            continue
+        cnode_id = slot_item["cnode"]
+        cnode = cnode_list[cnode_id]
+        try:
+            cnode(**{slot_item["name"]: slot_item["val"]})
+        except TypeError:
+            pass
 
-            # Register IO slots got subgraphs:
-            # Operations are done through the graph, but not their IO nodes which
-            # are only wrappers.
-            if cnode_item["gout"] is not None: # input slot of the output node of a graph
-                graph = graph_dict[cnode_item["gout"]]
-                graph.register_output(slot_item["name"], default=slot_item["val"])
-                graph.output_slots[slot_item["name"]].default = slot_item["val"]
-            else:
-                cnode = cnode_list[cnode_id]
-                if cnode_item["ref"] is not None: # input slot of a subgraph
-                    cnode.register_input(slot_item["name"], default=slot_item["val"])
-                cnode.input_slots[slot_item["name"]].default = slot_item["val"]
-
-    # Recover connections
+    # STEP 5: Recover connections
     for src_id, dst_id in ((item["src"], item["dst"]) for item in conns_table):
         src_item = slots_table[src_id]
         dst_item = slots_table[dst_id]
@@ -129,12 +165,23 @@ def load(data: dict[str, list[dict[str, Any]]], /) -> Graph | CNode:
         src_node = cnode_list[src_node_id]
         dst_node = cnode_list[dst_node_id]
         # print(src_node, src_name, "->", dst_node, dst_name)
-        connect_from_address(dst_node.input_slots, {dst_name: AddrHandler(src_node, src_name)})
+        try:
+            addr = getattr(src_node(), src_name)
+        except TypeError:
+            addr = AddrHandler(src_node, src_name)
+
+        try:
+            dst_node(**{dst_name: addr})
+        except TypeError:
+            connect_from_address(dst_node.input_slots, {dst_name: addr})
+
+    if return_graph and isinstance(cnode_list[0], NodeGroup):
+        return cnode_list[0].graph
 
     return cnode_list[0]
 
 
-def relation_table(graph: Graph, /):
+def relation_table(group: NodeGroup, /):
     from queue import Queue
     from .core._types import CNode
 
@@ -145,7 +192,7 @@ def relation_table(graph: Graph, /):
     graph_map: dict[Graph, None] = {}
 
     node_queue = Queue()
-    node_queue.put(graph)
+    node_queue.put(group)
 
     while not node_queue.empty():
         current_node = node_queue.get()
@@ -154,11 +201,11 @@ def relation_table(graph: Graph, /):
             continue
 
         # branch into the graph
-        if isinstance(current_node, Graph):
-            graph_map[current_node] = None
+        if isinstance(current_node, NodeGroup):
+            graph_map[current_node.graph] = None
             # The graph input node is also need to be included manually
-            node_queue.put(current_node._input_node)
-            node_queue.put(current_node._output_node)
+            # node_queue.put(current_node._input_node)
+            node_queue.put(current_node.graph._drain_node)
 
         cnode_map[current_node] = None
         # collect all inputs
@@ -182,8 +229,11 @@ def relation_table(graph: Graph, /):
     return conn_list, output_map, input_map, cnode_map, graph_map
 
 
-def dump(global_graph: Graph, /) -> dict[str, list[dict[str, Any]]]:
-    cl, om, im, nm, gm = relation_table(global_graph)
+def dump(global_group: NodeGroup | Graph, /) -> dict[str, list[dict[str, Any]]]:
+    if isinstance(global_group, Graph):
+        global_group = NodeGroup(global_group)
+
+    cl, om, im, nm, gm = relation_table(global_group)
     # make index
     output_idx = {key: idx for idx, key in enumerate(om.keys())}
     input_idx = {key: idx for idx, key in enumerate(im.keys())}
@@ -196,22 +246,22 @@ def dump(global_graph: Graph, /) -> dict[str, list[dict[str, Any]]]:
 
     for node, _ in nm.items():
         from .core.graph import GraphInputNode, GraphOutputNode
-        if isinstance(node, Graph):
-            gi, go = -1, -1
-            if node.name is None:
-                name = "Graph " + graph_idx[node]
+        if isinstance(node, NodeGroup):
+            gi, go = None, None
+            if node.graph.name is None:
+                name = "Graph_" + str(graph_idx[node.graph])
             else:
-                name = node.name
+                name = node.graph.name
 
         elif isinstance(node, GraphInputNode):
-            gi, go = graph_idx[node.graph], -1
+            gi, go = graph_idx[node.graph], None
             if node.graph.name is None:
                 name = "GroupInput({})".format("Graph " + graph_idx[node.graph])
             else:
                 name = "GroupInput({})".format(node.graph.name)
 
         elif isinstance(node, GraphOutputNode):
-            gi, go = -1, graph_idx[node.graph]
+            gi, go = None, graph_idx[node.graph]
             if node.graph.name is None:
                 name = "GroupOutput({})".format("Graph " + graph_idx[node.graph])
             else:
@@ -219,10 +269,10 @@ def dump(global_graph: Graph, /) -> dict[str, list[dict[str, Any]]]:
 
         else:
             assert hasattr(node, "__node_type__")
-            gi, go = -1, -1
+            gi, go = None, None
             name = node.__node_type__
 
-        ref = graph_idx[node] if isinstance(node, Graph) else -1
+        ref = graph_idx[node.graph] if isinstance(node, NodeGroup) else None
         cnode_table.append(
             {"name": name, "ref": ref, "gin": gi, "gout": go}
         )
