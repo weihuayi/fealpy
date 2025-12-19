@@ -6,5 +6,6 @@ from .ns_dirichlet_bc import StationaryNSDBC, ProjectDBC
 from .incompressible_ns_simulation import IncompressibleNSIPCS, IncompressibleNSBDF2
 from .cahn_hilliard_fem_simulation import CahnHilliardFEMSimulation
 from .timeline import CFDTimeline
-from .particle_generation_sph import ParticleGenerationSPH
-from .particle_iterative_update_sph import ParticleIterativeUpdateSPH
+from .gnbc_main import GNBCSolver
+from .dam_break import DamBreakParticleGeneration,DamBreakParticleIterativeUpdate
+from .heat_transfer import HeatTransferParticleGeneration,HeatTransferParticleIterativeUpdate

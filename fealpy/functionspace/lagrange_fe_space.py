@@ -190,11 +190,26 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         else :
             c_index  = face2cell[:,1]
             e_local_index = face2cell[:,3]
+        
+        Xf = self.mesh.bc_to_point(bc[[0, -1]], index=eindex)   # (NF, 2, GD)
 
         for i in range(NLF):
-            gphi = self.grad_basis(cbcs[i], c_index)
-            tag = bm.where(e_local_index==i)
-            result[tag] = gphi[tag]
+            gphi = self.grad_basis(cbcs[i], c_index)        # (NF, NQ, ldof, TD)
+            tag = bm.where(e_local_index == i)
+            if tag[0].size == 0:
+                continue
+            gi = gphi[tag]                                  # (nF, NQ, ldof, TD)
+            
+            Xc = self.mesh.bc_to_point(cbcs[i][[0, -1]], index=c_index[tag])  # (nF, 2, GD)
+            Xf_tag = Xf[tag]                                                  # (nF, 2, GD)
+            # 选择与面参数顺序更接近的方向
+            d0 = bm.linalg.norm(Xc - Xf_tag, axis=-1).sum(axis=1)          # (nF,)
+            d1 = bm.linalg.norm(Xc[:, ::-1, :] - Xf_tag, axis=-1).sum(axis=1)
+            flip = d1 < d0
+            if bm.any(flip):
+                gi = bm.where(flip[:, None, None, None], gi[:, ::-1, ...], gi)
+            result[tag] = gi
+        
         return result
     
     @barycentric

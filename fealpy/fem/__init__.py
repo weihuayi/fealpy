@@ -30,6 +30,7 @@ from .curl_jump_penalty_intergrator import CurlJumpPenaltyIntergrator
 from .jump_penalty_intergrator import JumpPenaltyIntergrator
 from .spacetime_residual_integrator import SpaceTimeResidualIntegrator
 from .spacetime_source_residual_integrator import SpaceTimeSourceResidualIntegrator
+from .coupling_mass_integrator import CouplingMassIntegrator
 
 ### Cell Source
 from .cell_source_integrator import CellSourceIntegrator
@@ -79,3 +80,4 @@ from .dld_microfluidic_chip_lfem_model import DLDMicrofluidicChipLFEMModel
 from .dld_microfluidic_chip_lfem_model_3d import DLDMicrofluidicChipLFEMModel3D
 from .curlcurl_upml_model import CurlCurlUPMLModel
 from .mgtensor_possion_lfem_model import MGTensorPossionLFEMModel
+from .wpr_lfem_model import WPRLFEMModel
