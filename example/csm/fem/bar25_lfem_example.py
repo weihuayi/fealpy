@@ -48,10 +48,10 @@ options = vars(parser.parse_args())
 
 import numpy as np
 from fealpy.backend import backend_manager as bm
-from fealpy.csm.fem.bar_model import BarModel
+from fealpy.csm.fem.truss_model import TrussModel
 bm.set_backend(options['backend'])
 
-model = BarModel(options)
+model = TrussModel(options)
 K, F = model.linear_system()
 K_bc, F_bc = model.apply_bc(K, F)
 uh = model.solve(K_bc, F_bc)
