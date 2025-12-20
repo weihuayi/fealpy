@@ -84,6 +84,7 @@ class Monitor(PREProcessor):
         huh_node = bm.zeros((self.NN, self.GD, self.GD), **self.kwargs0)
         huh_node = bm.index_add(huh_node, self.cell2dof, c_hess[:, None, ...])  # (NN, GD, GD)
         huh_node /= sm[:, None, None]
+        huh_node = 0.5*(huh_node + bm.permute_dims(huh_node, axes=(0,2,1)))
         BdNodeidx = self.BdNodeidx
         huh_node = bm.set_at(huh_node, BdNodeidx, 0)
         return huh_node
@@ -163,8 +164,15 @@ class Monitor(PREProcessor):
         area = bm.sum(cm)
         
         H = bm.mean(huh_node[self.cell],axis=1)  # NC,GD,GD
-        H_K = bm.trace(H,axis1= -2,axis2 = -1)**(2*d/(d+4))  # NC
-        b = (bm.sum(cm*H_K)/(2*area))**((d+4)/(2*d))
+        trH = bm.trace(H, axis1=-2, axis2=-1)
+        trH = bm.maximum(trH, 1e-14)
+        H_K = trH ** (2 * d / (d + 4))  # (NC,)
+        
+        S = bm.sum(cm * H_K)
+        denom = bm.maximum(2 * area, 1e-14)
+        target = bm.maximum(S / denom, 1e-14)
+        pwr = (d + 4) / (2 * d)
+        b = target ** pwr
         
         a = 0.001
         alpha = 0.5*(a+b)
@@ -179,6 +187,7 @@ class Monitor(PREProcessor):
                 a = alpha
             else:
                 b = alpha
+        alpha = 0.5 * (a + b)
         I_nv = bm.eye(d,**self.kwargs0)[None,...]
         II_nv = bm.repeat(I_nv, self.NN, axis=0)
         Hessian = II_nv + 1/alpha * huh_node  # NN,GD,GD

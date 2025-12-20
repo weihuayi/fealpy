@@ -441,7 +441,7 @@ class GFMMPDE2d(Monitor, Interpolater):
                     t = (i+1)/steps
                     self.uh = t * self.uh
                     self.mesh_redistributor()
-                    self.uh = pde.init_solution(self.mesh.node)
+                    self.uh = pde.moving_init_solution(self.mesh.node)
         else:
             for i in range(steps):
                 t = (i+1)/steps

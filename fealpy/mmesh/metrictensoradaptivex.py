@@ -2,13 +2,15 @@ from . import Monitor
 from . import Interpolater
 from .config import *
 from scipy.integrate import solve_ivp
+from scipy.sparse import coo_matrix
 from fealpy.utils import timer
 from scipy.sparse.linalg import LinearOperator,cg
 from scipy.sparse.linalg import spsolve as sv
 import scipy.sparse as sp
+time = timer()
+next(time)
 
-
-class MetricTensorAdaptive(Monitor, Interpolater):
+class MetricTensorAdaptiveX(Monitor, Interpolater):
     def __init__(self, mesh, beta, space, config:Config):
         super().__init__(mesh, beta, space, config)
         self.config = config
@@ -29,18 +31,14 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         self.BD_projector()
         self._build_jac_pattern()
     
-    def _prepare_ivp_cache(self, X, M,theta):
+    def _prepare_ivp_cache(self, xi):
         """
         预计算在一个 solve_ivp 步进内不变的量，减少 jac/ode 回调重复开销。
         """
-        E_K     = self.edge_matrix(X)           # (NC,d,d)
-        E_K_inv = bm.linalg.inv(E_K)            # (NC,d,d)
-        det_E_K = bm.linalg.det(E_K)            # (NC,)
-        rho     = self.rho(M)                   # (NC,)
-        P_diag  = self.balance(self.M_node)     # (NN,)
+        E_hat = self.edge_matrix(xi)  # (NC, GD, GD)
+        E_hat_inv = bm.linalg.inv(E_hat)  # (NC, GD, GD)
         cache = {
-            'E_K': E_K, 'E_K_inv': E_K_inv, 'det_E_K': det_E_K,
-            'rho': rho, 'cm': self.cm, 'P_diag': P_diag,'theta': theta,
+            'E_hat': E_hat, 'E_hat_inv': E_hat_inv,
         }
         self._ivp_cache = cache
     
@@ -104,12 +102,20 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         Return:
             I(float): I 函数值
         """
-        d = self.GD
-        gamma = self.gamma
-        p = d * gamma / 2
-        I  = rho/lam * ( trA**p - d**p * gamma/2 * theta**p * bm.log(detA) )
+        T = self.T( theta , trA , detA)
+        I  = rho/lam * T
         I = bm.sum(self.cm * I)
         return I
+    
+    def T(self, theta , trA , det_A):
+        """
+        T = (tr(A)^{d*gamma/2} -d^{d*gamma/2}* gamma/2 * theta^(d*gamma/2) * ln (det(A)))
+        """
+        gamma = self.gamma
+        d = self.GD
+        p = d * gamma / 2
+        T = trA**p - d**p * gamma/2 * theta**p * bm.log(det_A)
+        return T
     
     def TdA(self,trA):
         """
@@ -119,8 +125,8 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         gamma = self.gamma
         d = self.GD
         p = d * gamma / 2
-        pT_pA = (p) * (trA**(p - 1))[...,None,None] * self.I_p
-        return pT_pA
+        TdA = (p) * (trA**(p - 1))[...,None,None] * self.I_p
+        return TdA
     
     def Tdg(self,theta ,det_A):
         """
@@ -132,6 +138,25 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         p = d * gamma / 2
         Tdg = - d**(p) * gamma/2 * theta**(p) * det_A**(-1)
         return Tdg
+    
+    def U_matrix(self,T , TdA , Tdg , A , g , E_K):
+        """
+        U = J (- 1/2 *T I + A TdA + (Tdg * g) I ) J^{-1}
+        """
+        E_hat_inv = self._ivp_cache['E_hat_inv']
+        J_K = E_K @ E_hat_inv
+        J_K_inv = bm.linalg.inv(J_K)
+        H = A @ TdA + (Tdg * g - 0.5 * T)[..., None, None] * self.I_p
+        U = J_K @ H @ J_K_inv
+        return U
+    
+    def GdM(self,U , M , rho , lam):
+        """
+        GdM = -1/lambda * rho * U M^{-1}
+        """
+        M_inv = bm.linalg.inv(M)
+        GdM = -1/lam * rho[..., None, None] * (U @ M_inv )
+        return GdM
     
     def lam(self , theta):
         """
@@ -150,7 +175,7 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         d = self.GD
         M_dim = (1/theta * det_M_node**(1/d))**0.5
 
-        k = -d/2
+        k = -d
         P_diag = M_dim**k # (NN,)
         return P_diag
     
@@ -169,29 +194,40 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         R[1:, :] = bm.eye(dim-1, **self.kwargs0)
         return R
 
-    def Idxi_from_Ehat(self,A ,g, trA, E_hat, rho, theta):
+    def Idx_from_E_K(self,A ,g, trA, E_K, rho, theta):
         """
         泛函局部导数 Idxi 的计算
-        Idxi = 2 * rho * R @ [ E_hat^{-1} A TdA + (Tdg * g) E_hat^{-1} ]
+        Idx = rho/lambda * J (-0.5 * T I +  A TdA + (Tdg * g) I ) J^{-1} - 
+             1/(d+1) * e ( sum_i trace( GdM M_node_i ) * V_i )
         Parameters:
             A (Tensor): 雅可比算子 J^{-1}M^{-1}J^-T (NC, GD, GD)
             g (Tensor): 算子 A 行列式 (NC,)
             trA (Tensor): A 的迹 (NC,)
-            E_hat (Tensor): 参考单元边矩阵 (NC, GD, GD)
+            E_K (Tensor): 单元边矩阵 (NC, GD, GD)
             rho (Tensor): 权重函数 rho (NC,)
             theta (float): 积分全局乘子
         """
-        E_hat_inv = bm.linalg.inv(E_hat)
-
+        GD = self.GD
+        E_K_inv = bm.linalg.inv(E_K)
+        V = self.R @ E_K_inv  # (NC, GD+1, GD)
+        T = self.T(theta , trA , g)
         TdA = self.TdA(trA)
-        Tdg = self.Tdg(theta ,g)
+        Tdg = self.Tdg(theta , g)
+        U = self.U_matrix(T , TdA , Tdg , A , g , E_K)
         
-        term0 = E_hat_inv @ A @ TdA
-        term1 = (Tdg * g)[..., None, None] * E_hat_inv
+        rho = self.rho(self.M)
         lam = self.lam(theta)
-        Idxi_grad_part = 2/lam * rho[..., None, None] * (term0 + term1) # (NC, GD, GD)
-        Idxi = self.R[None,...] @ Idxi_grad_part # (NC, GD+1, GD)
-        return Idxi
+        part0 = 2*rho[...,None,None]/lam * V @ U  # (NC, GD+1, GD)
+        
+        cell = self.cell
+        GdM = self.GdM(U , self.M , rho , lam)  # (NC, GD, GD)
+        M_cell = self.M_node[cell[:,1:]] - self.M_node[cell[:,0]][:,None,...]  # (NC, GD , GD , GD)
+        u = bm.einsum('cij,clij->cl', GdM, M_cell)  # (NC, GD)
+        u_Einv = bm.einsum('clj,cl->cj', E_K_inv, u)/(GD+1)  # (NC, GD)
+        part1 = u_Einv[:, None, :]  # (NC, 1, GD)
+        
+        loacl_vector = -part0 + part1  # (NC, GD+1, GD)
+        return loacl_vector
     
     def BD_projector(self):
         """
@@ -270,145 +306,115 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         self._row_off_x_0      = self._rows_base
         self._row_off_y_0      = self._rows_base + NN
 
+        self.I = bm.concat([
+            self._row_off_x_tile_d, self._row_off_y_tile_d,
+            self._row_off_x_0,      self._row_off_y_0,
+            self._row_off_x_tile_d, self._row_off_y_tile_d,
+            self._row_off_x_0,      self._row_off_y_0,
+        ], axis=0)
+        self.J = bm.concat([
+            self._cols_x_tile_d, self._cols_x_tile_d,
+            self._cols_x_0,      self._cols_x_0,
+            self._cols_y_tile_d, self._cols_y_tile_d,
+            self._cols_y_0,      self._cols_y_0,
+        ], axis=0)
         # 完成
         self._jac_pat_ready = True
+        ones = bm.ones(self.I.shape[0], dtype=bm.bool)
+        S = coo_matrix((ones, (self.I.astype(int), self.J.astype(int))), shape=(2*NN, 2*NN)).tocsr()
+        self._jac_sparsity = S
     
-    def vector_construction(self, A , g ,trA , E_hat):
+    def vector_construction(self, A , g ,trA , E_K, theta):
         """
         构造全局移动向量场
+        v = rho/lambda * J (-1/2 *T I + A TdA + (Tdg * g) I )J^{-1}\
+            - 1/(d+1) * e ( sum_i trace( GdM M_node_i ) * V_i )
         Parameters:
             A (Tensor): 雅可比算子 J^{-1}M^{-1}J^-T (NC, GD, GD)
             g (Tensor): 算子 A 行列式 (NC,)
             trA (Tensor): A 的迹 (NC,)
-            E_hat (Tensor): 参考单元边矩阵 (NC, GD, GD)
+            E_K (Tensor): 单元边矩阵 (NC, GD, GD)
         Returns:
             v: (NN, GD) 参考网格上的全局移动向量场
         """
-        cache = self._ivp_cache
-        if cache is not None:
-            rho     = cache['rho']     
-            cm      = cache['cm']      
-            P_diag  = cache['P_diag']
-            theta   = cache['theta']
-
-        Idxi = self.Idxi_from_Ehat(A , g , trA , E_hat, rho, theta)  # (NC, GD+1, GD)
+        local_vector = self.Idx_from_E_K(A , g , trA , E_K , 
+                                         self.rho(self.M) , theta)
         cell = self.cell
         cm = self.cm
         global_vector = bm.zeros((self.NN, self.GD), dtype=bm.float64)
-        global_vector = bm.index_add(global_vector , cell , cm[:,None,None] * Idxi)
+        global_vector = bm.index_add(global_vector , cell , cm[:,None,None] * local_vector)
         
+        P_diag = self.balance(self.M_node)
         tau = self.tau
         v = -1/tau * global_vector * P_diag[:, None]  # (NN, GD)
         
         # 边界投影和角点固定
-        Bi_Lnode_normal = self.Bi_Lnode_normal
+        Bi_Pnode_normal = self.Bi_Pnode_normal
         Bdinnernode_idx = self.Bdinnernode_idx
-        dot = bm.sum(Bi_Lnode_normal * v[Bdinnernode_idx],axis=1)
+        dot = bm.sum(Bi_Pnode_normal * v[Bdinnernode_idx],axis=1)
         v = bm.set_at(v , Bdinnernode_idx ,
-                        v[Bdinnernode_idx] - dot[:,None] * Bi_Lnode_normal)
+                        v[Bdinnernode_idx] - dot[:,None] * Bi_Pnode_normal)
         vertice_idx = self.Vertices_idx
         v = bm.set_at(v , vertice_idx , 0.0)
         return v
     
-    def JAC_functional(self,A,trA , g ,E_hat,M_inv):
+    def JAC_functional(self,A, g, trA , E_K,M_inv, theta):
         """
         I = 1/lambda *(tr(A)^{d*gamma/2} -d^{d*gamma/2}* gamma/2 * theta^(d*gamma/2) * ln (det(A)))
         IdA = 1/lambda * d*gamma/2 * tr(A)^{d*gamma/2 - 1} * I 
         Idg = -1/lambda * d^{d*gamma/2} * gamma/2* theta^{d*gamma/2} * 1/det(A)
-        d E_hat = e_k x e_c^T
-        d E_hat_inv = - E_hat_inv dE_hat E_hat_inv
-        d A =  2*M_inv (dE_hat E_K^{-1})^T
-        d g =  g * tr(A^{-1} dA)
         
-        d(IdA) = 1/lambda *(d*gamma/2) * (d*gamma/2 - 1) * tr(A)^{d*gamma/2 - 2} * tr(dA) * I
-        d(Idg) = 1/lambda * d^{d*gamma/2}* gamma/2 * theta^(d*gamma/2) * det(A)^{-2} * dg
-        
-        P1 = 2 * rho * d E_hat_inv (A IdA + Idg * g * I)
-        P2 = 2 * rho * E_hat_inv (dA IdA + A d(IdA) + d(Idg) * g * I + Idg * dg * I)
-        J = R @ (P1 + P2)
+        v = rho/lambda * J (-0.5 * T I +  A TdA + (Tdg * g) I ) J^{-1} - 
+            1/(d+1) * e ( sum_i trace( GdM M_node_i ) * V_i )
         """
-        d   = self.GD
-        NN  = self.NN
-        NC  = self.NC
+        d = self.GD
+        NC = self.NC
         assert d == 2, "当前实现针对 2D；3D 可按相同张量结构扩展"
+        E_hat = self._ivp_cache['E_hat']
+        rho = self.rho(self.M)
+        # 差分步长（相对尺度 + 绝对下限，数值稳健）
+        cm = self.cm
+        local = self.Idx_from_E_K(A , g , trA , E_K , rho , theta)   # (NC, d+1, d)
+        local = local * cm[:, None, None]  # 去权重后的局部向量
+        
+        B = d * d
+        k_idx, c_idx = bm.meshgrid(bm.arange(d), bm.arange(d), indexing='ij')
+        k_idx = k_idx.reshape(-1)   # (B,)
+        c_idx = c_idx.reshape(-1)   # (B,)
+        K =bm.permute_dims(E_K, axes=(2,1,0))  # (NC, d, d)
+        K_all = K.reshape((B,NC))  # (B, NC)
+        
+        eps = bm.finfo(E_K.dtype).eps
+        h_mag = (K_all + bm.maximum(bm.abs(K_all), 1.0) * bm.sqrt(eps)) - K_all   # (B, NC)
+        sgn   = bm.where(K_all >= 0, 1.0, -1.0)
+        h_entry = sgn * bm.abs(h_mag)                 # (B, NC)
+        
+        basis = bm.zeros((B, d, d), **self.kwargs0)   # (B, d, d) one-hot
+        basis = bm.set_at(basis, (bm.arange(B), k_idx, c_idx), 1.0)
+        dE_all = h_entry[:, :, None, None] * basis[:, None, :, :]
+        
+        E_pos_all     = E_K[None, ...] + dE_all                         # (B, NC, d, d)
+        cm_pos_all    = 0.5 * bm.abs(bm.linalg.det(E_pos_all))          # (B, NC)
 
-        cache = getattr(self, '_ivp_cache', None)
-        if cache is None:
-            raise RuntimeError("ivp 缓存未准备，请先调用 _prepare_ivp_cache")
-        E_K     = cache['E_K']
-        E_K_inv = cache['E_K_inv']
-        rho     = cache['rho']
-        theta   = cache['theta']
+        local_pos_list = []
+        for b in range(B):
+            A_pos_b = self.A(E_pos_all[b], E_hat, M_inv)
+            g_pos_b = bm.linalg.det(A_pos_b)
+            trA_pos_b = bm.trace(A_pos_b, axis1=1, axis2=2)
+            local_pos_b = self.Idx_from_E_K(A_pos_b, g_pos_b, trA_pos_b, E_pos_all[b], rho, theta)  
+            local_pos_list.append(local_pos_b)
+        local_pos_all = bm.stack(local_pos_list, axis=0)
+        local_pos_all = cm_pos_all[:, :, None, None] * local_pos_all 
+        d_local_all = (local_pos_all - local) / h_entry[:, :, None, None]
+        
+        D2_all = bm.zeros((NC, d, d, d, d), **self.kwargs0)
+        diff_jm = d_local_all[:, :, 1:, :]   # (B, NC, d, d) -> (B, NC, j, m)
 
-        # 基本量
-        Einv     = bm.linalg.inv(E_hat)                     # (NC,d,d)
-        Ehat_T   = bm.swapaxes(E_hat, -1, -2)               # (NC,d,d)
-        C        = E_K_inv @ M_inv @ bm.swapaxes(E_K_inv, -1, -2)  # (NC,d,d)
-
-        I_mat = self.I_p
-
-        lam      = self.lam(theta)
-        # 数值稳健性
-        eps = 1e-14
-        g_pos    = bm.maximum(g, eps)
-        trA_safe = bm.maximum(trA, eps)
-
-        # 目标泛函及导数（无 H）
-        gamma = self.gamma
-        power = (d * gamma / 2.0)
-        # IdA = (d*gamma/2) * tr(A)^{d*gamma/2 - 1} * I
-        TdA = self.TdA(trA_safe)  # (NC,d,d)
-        Tdg = self.Tdg(theta, g_pos)  # (NC,)
-
-        # 预备构件（用于 δA）
-        U = E_hat @ C                        # (NC,d,d)
-        W = C @ Ehat_T                       # (NC,d,d)
-
-        # δE_hat^{-1} 结构：-(b_k ⊗ row_c(Einv))
-        b_all        = bm.swapaxes(Einv, -1, -2)              # (NC,d,d)
-        row_c_Einv   = Einv                                   # (NC,c,d)
-        dEinv_all = -( b_all[:, None, :, :, None] * row_c_Einv[:, :, None, None, :] )  # (NC,c,k,d,d)
-
-        # δA_all = (e_k ⊗ row_c(W)) + (col_c(U) ⊗ e_k^T)，全向量化
-        eye = bm.eye(d, **self.kwargs0)                       # (d,d)
-        row_sel = eye[None, None, :, :, None]                 # (1,1,k,d,1)
-        col_sel = eye[None, None, :, None, :]                 # (1,1,k,1,d)
-        drow_all = W                                          # (NC,c,d)
-        ucol_all = bm.permute_dims(U, (0, 2, 1))              # (NC,c,d)
-        dA_row   = row_sel * drow_all[:, :, None, None, :]    # (NC,c,k,d,d)
-        dA_col   = ucol_all[:, :, None, :, None] * col_sel    # (NC,c,k,d,d)
-        dA_all   = dA_row + dA_col                            # (NC,c,k,d,d)
-
-        # δg_all = g * tr(A^{-1} δA)
-        Ainv    = bm.linalg.inv(A)                                           # (NC,d,d)
-        tr_term = bm.sum(Ainv[:, None, None, :, :] * dA_all, axis=(3,4))     # (NC,c,k)
-        dg_all  = (g_pos[:, None, None]) * tr_term                           # (NC,c,k)
-
-        # d(TdA)_all = 1/lambda *(d*gamma/2) * (d*gamma/2 - 1) * tr(A)^{d*gamma/2 - 2} * tr(dA) * I
-        tr_dA = bm.trace(dA_all, axis1=3, axis2=4)                            # (NC,c,k)
-        coef_td = (power) * (power - 1.0) * (trA_safe ** (power - 2.0))        # (NC,)
-        dTdA_all = coef_td[:, None, None, None, None] * tr_dA[..., None, None] * I_mat[:, None, None, :, :]  # (NC,c,k,d,d)
- 
-        # d(Tdg)_all = 1/lambda * d^{d*gamma/2}* gamma/2 * theta^(d*gamma/2) * det(A)^{-2} * dg
-        coef_tdg = d**(power) * gamma/2  * (theta ** power) * (g_pos ** (-2.0))             # (NC,)
-        dTdg_all = coef_tdg[:, None, None] * dg_all                           # (NC,c,k)
-
-        # P1 = 2 * rho * d E_hat_inv (A IdA + Idg * g * I)
-        M0 = A @ TdA + (Tdg * g_pos)[..., None, None] * I_mat                 # (NC,d,d)
-        P1_all = 2.0/lam * rho[:,None,None,None,None] * bm.einsum('nckij,njl->nckil', dEinv_all, M0)
-
-        # P2 = 2 * rho * E_hat_inv (dA TdA + A d(TdA) + d(Tdg) * g * I + Tdg * dg * I)
-        part_a = bm.einsum('nckij,njl->nckil', dA_all, TdA)                     # dA TdA
-        part_b = bm.einsum('nij,nckjl->nckil', A, dTdA_all)                     # A d(TdA)
-        part_c = (dTdg_all * g_pos[:, None, None])[..., None, None] * I_mat[:, None, None, :, :]   # d(Tdg) g I
-        part_d = (Tdg[:, None, None] * dg_all)[..., None, None] * I_mat[:, None, None, :, :]      # Tdg dg I
-        bracket = part_a + part_b + part_c + part_d                                                 # (NC,c,k,d,d)
-
-        P2_all  = 2.0/lam * rho[:,None,None,None,None] * bm.einsum('nij,nckjl->nckil', Einv, bracket)
-        # 局部二阶块（对 j'=1..d 的“梯度部分”），形状 (NC,c,k,d,matrix_cols=j')
-        D2_all = (P1_all + P2_all)                                                # (NC,c,k,d,d)
-
-        # D2_all 装配为全局 JAC
+        for b in range(B):
+            c = c_idx[b]
+            k = k_idx[b]
+            D2_all = bm.set_at(D2_all, (slice(None), c, k, slice(None), slice(None)), diff_jm[b])
+        # 交给装配器；它会根据 D2_all 自动补全 j=0 列（负和）并乘以权与投影
         JAC = self.JAC_assembly(D2_all)
         return JAC
         
@@ -420,10 +426,9 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         NN  = self.NN
         NC  = self.NC
         assert d == 2, "当前实现针对 2D；3D 可按相同结构扩展"
-        cm = self.cm
         rxx, ryy, rxy, ryx = self.rxx, self.ryy, self.rxy, self.ryx
-        P_diag = self._ivp_cache['P_diag']
-
+        P_diag = self.balance(self.M_node)
+        
         # 打包：把 (NC,c,d) 压成按 c 分段的 (c*NC*(d+1),)，并在最前加 j=0 列（负和）
         def pack_all(D2_comp_all):
             D1 = -bm.sum(D2_comp_all, axis=2, keepdims=True)                    # (NC,c,1)
@@ -442,14 +447,12 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         rr_y_all  = self._row_off_y_tile_d % NN
         rc_x_tile = (-1.0 / self.tau) * P_diag[rr_x_all]                    # (d*NC*(d+1),)
         rc_y_tile = (-1.0 / self.tau) * P_diag[rr_y_all]
-        cm_rep    = bm.repeat(cm, d+1)                                          # (NC*(d+1),)
-        cm_rep_all = bm.tile(cm_rep, d)                                         # (d*NC*(d+1),)
 
         # 四个 tile 段（投影右乘 + 行缩放 + 单元权）
-        data00_tile = rc_x_tile * cm_rep_all * ( rxx[rr_x_all] * vx_seg_x_all + rxy[rr_x_all] * vy_seg_x_all )
-        data10_tile = rc_y_tile * cm_rep_all * ( ryx[rr_y_all] * vx_seg_x_all + ryy[rr_y_all] * vy_seg_x_all )
-        data01_tile = rc_x_tile * cm_rep_all * ( rxx[rr_x_all] * vx_seg_y_all + rxy[rr_x_all] * vy_seg_y_all )
-        data11_tile = rc_y_tile * cm_rep_all * ( ryx[rr_y_all] * vx_seg_y_all + ryy[rr_y_all] * vy_seg_y_all )
+        data00_tile = rc_x_tile * ( rxx[rr_x_all] * vx_seg_x_all + rxy[rr_x_all] * vy_seg_x_all )
+        data10_tile = rc_y_tile * ( ryx[rr_y_all] * vx_seg_x_all + ryy[rr_y_all] * vy_seg_x_all )
+        data01_tile = rc_x_tile * ( rxx[rr_x_all] * vx_seg_y_all + rxy[rr_x_all] * vy_seg_y_all )
+        data11_tile = rc_y_tile * ( ryx[rr_y_all] * vx_seg_y_all + ryy[rr_y_all] * vy_seg_y_all )
 
         # j=0 列（为 −sum_c），与 pack_all 逻辑等价（此处直接从 D2_all 聚合）
         def pack0(D2_0_comp):
@@ -467,113 +470,21 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         coef_x0 = (-1.0 / self.tau) * P_diag[rr_x0]
         coef_y0 = (-1.0 / self.tau) * P_diag[rr_y0]
 
-        data00_0 = coef_x0 * cm_rep * ( rxx[rr_x0] * vx_0_x + rxy[rr_x0] * vy_0_x )
-        data10_0 = coef_y0 * cm_rep * ( ryx[rr_y0] * vx_0_x + ryy[rr_y0] * vy_0_x )
-        data01_0 = coef_x0 * cm_rep * ( rxx[rr_x0] * vx_0_y + rxy[rr_x0] * vy_0_y )
-        data11_0 = coef_y0 * cm_rep * ( ryx[rr_y0] * vx_0_y + ryy[rr_y0] * vy_0_y )
+        data00_0 = coef_x0 * ( rxx[rr_x0] * vx_0_x + rxy[rr_x0] * vy_0_x )
+        data10_0 = coef_y0 * ( ryx[rr_y0] * vx_0_x + ryy[rr_y0] * vy_0_x )
+        data01_0 = coef_x0 * ( rxx[rr_x0] * vx_0_y + rxy[rr_x0] * vy_0_y )
+        data11_0 = coef_y0 * ( ryx[rr_y0] * vx_0_y + ryy[rr_y0] * vy_0_y )
 
         # 一次性装配（COO -> CSR）
-        I = bm.concat([
-            self._row_off_x_tile_d, self._row_off_y_tile_d,
-            self._row_off_x_0,      self._row_off_y_0,
-            self._row_off_x_tile_d, self._row_off_y_tile_d,
-            self._row_off_x_0,      self._row_off_y_0,
-        ], axis=0)
-        J = bm.concat([
-            self._cols_x_tile_d, self._cols_x_tile_d,
-            self._cols_x_0,      self._cols_x_0,
-            self._cols_y_tile_d, self._cols_y_tile_d,
-            self._cols_y_0,      self._cols_y_0,
-        ], axis=0)
         V = bm.concat([
             data00_tile, data10_tile, data00_0, data10_0,
             data01_tile, data11_tile, data01_0, data11_0
         ], axis=0)
 
         from scipy.sparse import coo_matrix
-        JAC = coo_matrix((V.astype(float), (I.astype(int), J.astype(int))),
+        JAC = coo_matrix((V.astype(float), (self.I, self.J)),
                         shape=(2*NN, 2*NN)).tocsr()
         return JAC
-        
-    def linear_interpolate(self, Xi, Xi_new , X):
-        """
-        linear interpolation method
-        
-        Parameters
-            moved_node: TensorLike, new node positions
-        """
-        node2cell = self.node2cell
-        i, j = node2cell.row, node2cell.col
-        p = self.pspace.p # physical space polynomial degree
-        Xnew = bm.zeros_like(X, **self.kwargs0) # 初始化新的解向量,对节点优先进行赋值
-        interpolated = bm.zeros(self.NN, dtype=bool, device=self.device)
-
-        current_i, current_j = self.tri_interpolate_batch(i, j, Xnew,X, 
-                                                      interpolated,Xi,Xi_new) 
-        # 迭代扩展 - 添加循环上限
-        max_iterations = min(30, int(bm.log(self.NC)) + 20)
-        iteration_count = 0
-        # 迭代扩展
-        while len(current_i) > 0 and iteration_count < max_iterations:
-            iteration_count += 1
-            # 扩展邻居
-            neighbors = self.cell2cell[current_j].flatten()
-            expanded_i = bm.repeat(current_i, self.cell2cell.shape[1])
-            valid_mask = neighbors >= 0
-
-            if not bm.any(valid_mask):
-                break
-
-            combined = expanded_i[valid_mask] * self.NC + neighbors[valid_mask]
-            unique_combined = bm.unique(combined)
-            
-            unique_i = unique_combined // self.NC
-            unique_j = unique_combined % self.NC
-            current_i, current_j = self.tri_interpolate_batch(unique_i, unique_j,
-                                                    Xnew,X, interpolated,Xi,Xi_new)
-        if iteration_count >= max_iterations:
-            print(f"Warning: Maximum iterations reached ({max_iterations}) without full interpolation.")
-
-        return Xnew
-
-    def tri_interpolate_batch(self,nodes, cells,Xnew,X, interpolated,Xi,Xi_new):
-        """
-        triangle mesh interpolation batch processing
-        
-        Parameters
-            nodes: TensorLike, nodes to be interpolated
-            cells: TensorLike, cells corresponding to the nodes
-            new_uh: TensorLike, new solution vector
-            interpolated: TensorLike, boolean mask indicating if nodes are already interpolated
-            moved_node: TensorLike, moved node positions
-        Returns
-            nodes: TensorLike, nodes that still need interpolation
-            cells: TensorLike, cells corresponding to the nodes that still need interpolation
-        """
-        if len(nodes) == 0:
-            return bm.array([], **self.kwargs1), bm.array([], **self.kwargs1)
-            
-        # 计算重心坐标
-        v_matrix = bm.permute_dims(
-            Xi_new[self.cell[cells, 1:]] - Xi_new[self.cell[cells, 0:1]], 
-            axes=(0, 2, 1)
-        )
-        v_b = Xi[nodes] - Xi_new[self.cell[cells, 0]]
-        
-        inv_matrix = bm.linalg.inv(v_matrix)
-        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
-        lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
-        valid = bm.all(lam > -1e-10, axis=-1) & ~interpolated[nodes]
-        
-        if bm.any(valid):
-            valid_nodes = nodes[valid]
-            phi = self.mesh.shape_function(lam[valid], self.pspace.p)
-            valid_value = bm.sum(phi[...,None] * X[self.pcell2dof[cells[valid]]], axis=1)
-
-            Xnew = bm.set_at(Xnew, valid_nodes, valid_value)
-            interpolated = bm.set_at(interpolated, valid_nodes, True)
-        
-        return nodes[~interpolated[nodes]], cells[~interpolated[nodes]]
     
     def _construct(self,moved_node:TensorLike):
         """
@@ -582,13 +493,14 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         self.mesh.node = moved_node
         self.node = moved_node
         self.cm = self.mesh.entity_measure('cell')
+        self.cm = bm.maximum(self.cm , 1e-14)
         self.sm = bm.zeros(self.NN, **self.kwargs0)
         self.sm = bm.index_add(self.sm , self.mesh.cell , self.cm[:, None])
     
     def mesh_redistributor(self , total_steps=None, h = None,
-                           method='scipy',return_info = False, return_timemesh = False):
+                           method='scipy',return_info = False):
         """
-        逆变拉格朗日乘子法自适应网格算法
+        协变拉格朗日乘子法自适应网格算法
         1. 初始化 E, E_hat, M_inv (边矩阵, 目标度量张量的逆)
         2. 计算初始的梯度信息
         3. 构造梯度流
@@ -606,77 +518,72 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         
         I_h = []
         cm_min = []
-        time_mesh = [self.mesh.node]
         
         for it in range(total_steps):
-            self.monitor()
-            self.mol_method()
-            M = self.M
-            M_inv = bm.linalg.inv(M)
             X = self.mesh.node
             Xi = self.logic_mesh.node
             
-            theta = self.theta(M)
-            print(theta)
-            self._prepare_ivp_cache(X, M,theta)
-            E_K = self._ivp_cache['E_K']
+            self._prepare_ivp_cache(Xi)
+            E_hat = self._ivp_cache['E_hat']
 
             I_base = bm.eye(self.GD, **self.kwargs0)
-            self.I_p = bm.zeros_like(E_K, **self.kwargs0)
+            self.I_p = bm.zeros_like(E_hat, **self.kwargs0)
             self.I_p += I_base
             
-            def info_generator(xi):
-                E_hat = self.edge_matrix(xi)
+            def info_generator(x):
+                E_K = self.edge_matrix(x)
+                self.uh = self.interpolate(x)
+                self._construct(x)
+                self.monitor()
+                self.mol_method()
+                M = self.M
+                theta = self.theta(M)
+                M_inv = bm.linalg.inv(M)
                 A = self.A(E_K , E_hat , M_inv)
                 g = bm.linalg.det(A)
+                g = bm.maximum(g , 1e-14)
                 trA = bm.trace(A, axis1=1, axis2=2)
-                return E_hat , A , g , trA
+                trA = bm.maximum(trA , 1e-14)
+                return E_K , A , g , trA, theta,M_inv
             
             if method == 'scipy':
                 def ode_system(t, y):
-                    Xi_current = y.reshape(self.GD, self.NN).T
-                    E_hat, A , g , trA = info_generator(Xi_current)
-                    v = self.vector_construction(A , g ,trA , E_hat)
+                    X_current = y.reshape(self.GD, self.NN).T
+                    E_K, A , g , trA, theta,_ = info_generator(X_current)
+                    v = self.vector_construction(A , g ,trA , E_K , theta)
+                    time.send("ODE vector field")
                     return v.ravel(order = 'F')
                 
                 def jac(t, y):
-                    Xi_current = y.reshape(self.GD, self.NN).T
-                    E_hat, A , g , trA = info_generator(Xi_current)
-                    J_y = self.JAC_functional(A , trA , g , E_hat, M_inv)
+                    X_current = y.reshape(self.GD, self.NN).T
+                    E_K, A , g , trA, theta, M_inv = info_generator(X_current)
+                    J_y = self.JAC_functional(A , g , trA , E_K, M_inv, theta)
                     return J_y
                 
                 t_span = [0,self.t_span]
-                y0 = Xi.ravel(order = 'F')
-                sol = solve_ivp(ode_system, t_span, y0, jac=jac, method='BDF',
-                                            first_step=h,
+                y0 = X.ravel(order = 'F')
+                sol = solve_ivp(ode_system, t_span, y0,jac = jac, method='BDF',
+                                            jac_sparsity=self._jac_sparsity,
+                                            first_step=self.t_span/self.step,
                                             atol=atol, rtol=rtol)
                 y_last = sol.y[:, -1]
-                Xinew = y_last.reshape(self.GD, self.NN).T
+                Xnew = y_last.reshape(self.GD, self.NN).T
             else:
-                Xinew = self.integrater(Xi, M_inv, h, atol=atol, rtol=rtol,
-                                        newton_tol=1e-6, newton_maxit=20,)
-            
-            Xnew = self.linear_interpolate(Xi, Xinew , X)
+                Xnew = self.integrater(X, h, atol=atol, rtol=rtol,
+                                        newton_tol=1e-6, newton_maxit=40,)
             
             if return_info:
-                E_hat , A , g , trA = info_generator(Xinew)
+                E_hat , A , g , trA, theta, _ = info_generator(Xnew)
                 lam = self.lam(theta)
-                I = self.I_func(theta, lam , trA , g, self._ivp_cache['rho'])
+                rho = self.rho(self.M)
+                I = self.I_func(theta, lam , trA , g, rho)
                 I_h.append(I)
                 cm_min.append(bm.min(self.cm).item())
-            if return_timemesh:
-                time_mesh.append(Xnew)
-                
-            self.uh = self.interpolate(Xnew)
-            self._construct(Xnew)
+        
             print(f"MTAdaptive: step {it+1}/{self.total_steps} completed.")
-
-        ret = {"X": Xnew}
-        if return_info:
-            ret["info"] = (I_h, cm_min)
-        if return_timemesh:
-            ret["time_mesh"] = time_mesh
-        return ret
+        time.send("Mesh redistribution complete")
+        next(time)
+        return Xnew , (I_h , cm_min) if return_info else Xnew
 
     def two_level_mesh_redistributor(self,coarsen_mesh ,
                                           prolong,
@@ -732,52 +639,8 @@ class MetricTensorAdaptive(Monitor, Interpolater):
 
         self.tau = 0.005
         X_refine = self.mesh_redistributor(total_steps=5, h=h )
-        
-    def mulit_preconditioner(self ,A_c,A_r, v , omega=0.8):
-        """
-        多重网格预条件器构造
-        1.初始猜测 z = 0
-        2.平滑处理 z = S_pre(z)
-        3.计算残差 r = v - A z
-        4.计算粗网格残差 r_c = R r
-        5.粗网格上求解 A_c e_c = r_c
-        6.细网格上插值 e_r = P e_c
-        7.修正 z = z + e_r
-        8.平滑处理 z = S_post(z)
-        
-        Parameters:
-            dt: 时间步长
-            coarsen_jac: 粗网格雅可比矩阵
-            refine_jac: 细网格雅可比矩阵
-            v: 待预条件向量
-        """
-        def smoother(Aop, x, b, iterations):
-            if iterations <= 0:
-                return x
-            D = bm.array(Aop.diagonal())
-            for _ in range(iterations):
-                r = b - Aop.dot(x)
-                x = x + omega * (r / D)
-            return x
-        z = bm.zeros_like(v , **self.kwargs0)
-        # 预平滑
-        z = smoother(A_r ,z , v ,  iterations = 7)
-        # 计算残差
-        r = v - A_r @ z
-        # 计算粗网格残差
-        r_c = self.R_block @ r
-        
-        # 粗网格上求解
-        e_c = sv(A_c , r_c)
-        # 细网格上插值
-        e_r = self.P_block @ e_c
-        # 修正
-        z = z + e_r
-        # 后平滑
-        z = smoother(A_r ,z , v , iterations = 7)
-        return z
     
-    def integrater(self, Xi, M_inv, h, atol=1e-6, rtol=1e-4,
+    def integrater(self, X, h, atol=1e-5, rtol=1e-3,
                                       newton_tol=1e-6, newton_maxit=20, 
                                       cg_tol=1e-8,
                                       h_min=None, h_max=None):
@@ -787,34 +650,46 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         NN = self.NN
         GD = self.GD
         Nvar = NN * GD
-        y = Xi.ravel(order='F')
-        last_delta = None  # GMRES 的初始猜测
+        y = X.ravel(order='F')
+        last_delta = None  
         h_max = h_max or h * 10
         h_min = h_min or h * 0.1
-        
+        E_hat = self._ivp_cache['E_hat']
         def info_update(y_new):
-            Yi = y_new.reshape(GD, NN).T
-            E_hat = self.edge_matrix(Yi)
-            A = self.A(self._ivp_cache['E_K'], E_hat, M_inv)
+            x = y_new.reshape(GD, NN).T
+            E_K = self.edge_matrix(x)
+            self.uh = self.interpolate(x)
+            self._construct(x)
+            self.monitor()
+            self.mol_method()
+            M = self.M
+            theta = self.theta(M)
+            M_inv = bm.linalg.inv(M)
+            A = self.A(E_K , E_hat , M_inv)
             g = bm.linalg.det(A)
-            trA = bm.trace(A, axis1=-2, axis2=-1)
-            return A, g, trA, E_hat
+            g = bm.maximum(g , 1e-14)
+            trA = bm.trace(A, axis1=1, axis2=2)
+            trA = bm.maximum(trA , 1e-14)
+            return E_K , A , g , trA, theta,M_inv
         
         def single_step(y_new,y , h , last_delta):
             r_pre = None
             for nit in range(newton_maxit):
                 # 计算 f 和残差 r = F(y_new)
-                A, g, trA, E_hat = info_update(y_new)
-                f = self.vector_construction(A, g, trA, E_hat).ravel(order='F')
- 
+                time.send("Starting single time step")
+                print(f"  Newton iteration {nit+1}/{newton_maxit}")
+                E_K , A , g , trA, theta, M_inv = info_update(y_new)
+                f = self.vector_construction(A, g, trA, E_K , theta).ravel(order='F')
+
                 r = y_new - y - h * f
                 res_norm = (r**2).sum()**0.5
+                print(f"    Residual norm: {res_norm:.6e}")
                 if res_norm < newton_tol:
                     break
                 lin_tol = min(0.5, bm.sqrt(res_norm)) * min(1.0, cg_tol)
                 # J = d f / d y 
                 if nit == 0:
-                    J = self.JAC_functional(A, trA, g, E_hat, M_inv)
+                    J = self.JAC_functional(A , g , trA , E_K, M_inv, theta)
                     def Aop_mv(v):
                         Av = v - h * (J @ v)
                         return Av
@@ -844,7 +719,6 @@ class MetricTensorAdaptive(Monitor, Interpolater):
                 # 线性系统: (I - h * J) delta = -r
                 rhs = -r
                 x0 = last_delta if last_delta is not None else None
-
                 delta, info = cg(A_op, rhs, x0=x0, atol=lin_tol,maxiter=200,)
     
                 last_delta =  delta
@@ -862,16 +736,15 @@ class MetricTensorAdaptive(Monitor, Interpolater):
             y_new = y.copy()
             
             y_new , last_delta, res = single_step( y_new , y , h , last_delta)
-            
             tol_vector = atol + rtol * bm.abs(y)
             scaled_error = bm.max(bm.abs(res) / tol_vector)
 
-            # 5. 步长自适应 (理论正确)
+            # 5. 步长自适应
             if scaled_error <= 1.0:
                 # 接受步长
                 total_time += h
                 y = y_new
             h = bm.clip((1.0 / scaled_error)**0.5 * h, h_min, h_max)
 
-        Xi_new = y.reshape(GD, NN).T
-        return Xi_new
+        X_new = y.reshape(GD, NN).T
+        return X_new

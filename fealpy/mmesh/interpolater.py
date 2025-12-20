@@ -632,7 +632,7 @@ class Interpolater(PREProcessor):
         """
         pde = self.pde
         space = self.pspace
-        uh = space.interpolate(pde.init_solution)
+        uh = space.interpolate(pde.moving_init_solution)
         return uh
 
     @interpolate.register('poisson')

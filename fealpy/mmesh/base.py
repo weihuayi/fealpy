@@ -60,7 +60,8 @@ class PREProcessor:
 
         elif self.method in ['LMEAGAdaptive', 'LMEAGAdaptiveX',
                              'EAGAdaptiveHuang',"TargetAdaptive",
-                             "MetricTensorAdaptive"]:
+                             'EAGAdaptiveXHuang',
+                             "MetricTensorAdaptive","MetricTensorAdaptiveX"]:
             self._data_and_device()
             self._isinstance_mesh_type()
             self._meshtop_preparation()

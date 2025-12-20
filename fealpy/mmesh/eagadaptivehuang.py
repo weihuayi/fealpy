@@ -1,7 +1,6 @@
 from . import Monitor
 from . import Interpolater
 from .config import *
-from .tool import _compute_coef_2d, quad_equ_solver , linear_surfploter
 from ..sparse import spdiags
 from scipy.sparse import bmat,diags , block_diag,coo_matrix
 from scipy.integrate import solve_ivp
@@ -32,7 +31,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self.BD_projector()
         self._last_loc_cells = None
         self._build_jac_pattern()
-        
+                
     def edge_matrix(self,X):
         """
         边矩阵 E
@@ -48,12 +47,12 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         E = bm.permute_dims(E, (0,2,1))  # (NC, GD, GD)
         return E
         
-    def Jacobian_matrix(self,E_k,  E_hat):
+    def Jacobian_matrix(self,E_K,  E_hat):
         """
         雅可比矩阵 J = (F')^{-1} = E_hat * E_k^{-1}
         """
-        E_k_inv = bm.linalg.inv(E_k)  # (NC, GD, GD)
-        J = E_hat @ E_k_inv  # (NC, GD, GD)
+        E_K_inv = bm.linalg.inv(E_K)  # (NC, GD, GD)
+        J = E_hat @ E_K_inv  # (NC, GD, GD)
         return J
     
     def rho(self,M):
@@ -65,6 +64,23 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         det_M = bm.linalg.det(M)
         rho = det_M ** (0.5)
         return rho
+    
+    def I_func(self,rho,J , M_inv):
+        """
+        计算 I = theta * rho trace(JM^{-1}J^T)^{dp/2} + 
+                (1-2*theta) * d^{dp/2} * rho^{1-p} * det(J)^{-p}
+        Parameters
+           rho: (NC, )
+        """
+        d = self.GD
+        p = self.gamma
+        theta = self.theta
+        trace_term = bm.trace(J @ M_inv @ bm.swapaxes(J , -1,-2), axis1=-2, axis2=-1)
+        det_J = bm.linalg.det(J)     # (NC, )
+        I = theta * rho * trace_term**(d * p / 2) +\
+            (1 - 2*theta) * d**(d * p / 2) * rho**(1 - p) * det_J**(-p)
+        I = bm.sum(self.cm * I)
+        return I
     
     def GdJ(self,rho, J , M_inv):
         """
@@ -88,7 +104,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
     def Gdr(self,rho , J):
         """
         计算 Gdr = dG/drho
-        Huang's paper Eq : p*(1-theta) * d^{dp/2} * rho^{(1-p)} * det(J)^{p-1}
+        Huang's paper Eq : p*(1-2 *theta) * d^{dp/2} * rho^{(1-p)} * det(J)^{p-1}
         Parameters
            rho: (NC, )
            J: (NC, GD, GD)
@@ -158,7 +174,6 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                                 v[Bdinnernode_idx] - dot[:,None] * Bi_Lnode_normal)
         vertice_idx = self.Vertices_idx
         v = bm.set_at(v , vertice_idx , 0)
-        
         return v
     
     def _prepare_ivp_cache(self, X, M, M_inv):
@@ -174,7 +189,6 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         cache = {
             'E_K': E_K, 'E_K_inv': E_K_inv, 'det_E_K': det_E_K,
             'B': B, 'rho': rho, 'cm': self.cm, 'P_diag': P_diag,
-            'rxx': self.rxx, 'ryy': self.ryy, 'rxy': self.rxy, 'ryx': self.ryx
         }
         self._ivp_cache = cache
     
@@ -258,9 +272,24 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self._row_off_x_0      = self._rows_base
         self._row_off_y_0      = self._rows_base + NN
 
+        self.I = bm.concat([
+            self._row_off_x_tile_d, self._row_off_y_tile_d,
+            self._row_off_x_0,      self._row_off_y_0,
+            self._row_off_x_tile_d, self._row_off_y_tile_d,
+            self._row_off_x_0,      self._row_off_y_0,
+        ], axis=0)
+        self.J = bm.concat([
+            self._cols_x_tile_d, self._cols_x_tile_d,
+            self._cols_x_0,      self._cols_x_0,
+            self._cols_y_tile_d, self._cols_y_tile_d,
+            self._cols_y_0,      self._cols_y_0,
+        ], axis=0)
         # 完成
         self._jac_pat_ready = True
-    
+        ones = bm.ones(self.I.shape[0], dtype=bm.bool)
+        S = coo_matrix((ones, (self.I.astype(int), self.J.astype(int))), shape=(2*NN, 2*NN)).tocsr()
+        self._jac_sparsity = S
+        
     def JAC_functional(self,Xi,M_inv):
         """
         完全向量化的解析雅可比：无 d/c 循环，按图样一次装配 2NN×2NN。
@@ -273,8 +302,6 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             E_K     = cache['E_K'];     E_K_inv = cache['E_K_inv']
             det_E_K = cache['det_E_K']; B       = cache['B']
             rho     = cache['rho'];     cm      = cache['cm']
-            P_diag  = cache['P_diag']
-            rxx, ryy, rxy, ryx = cache['rxx'], cache['ryy'], cache['rxy'], cache['ryx']
 
         E_hat   = self.edge_matrix(Xi)               # (NC,d,d)
         Einv    = bm.linalg.inv(E_hat)               # (NC,d,d)
@@ -286,7 +313,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         a      = d * p / 2.0
         c0     = d * p * theta
         detJ   = det_Eh / bm.maximum(det_E_K, 1e-14)                     # (NC,)
-        C3     = p * (1.0 - 2.0*theta) * (d**(d*p/2)) \
+        C3     = p * (1.0 - 2.0*theta) * (d**(a)) \
                 * (bm.maximum(rho,1e-14)**(1-p)) * (bm.maximum(detJ,1e-14)**p)  # (NC,)
 
         J_T    = bm.swapaxes(J, -1, -2)             # (NC,d,d)
@@ -300,18 +327,6 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
 
         # 列空间辅助：B @ r；以及 Einv 的列/行视图
         b_all  = bm.swapaxes(Einv, -1, -2)          # (NC,d,k)  第 k 列（E_hat^{-1} e_k）
-
-        # 预备装配常量
-        cm_rep   = bm.repeat(cm, d+1)               # (NC*(d+1),)
-
-        rc_x_tile = (-1.0 / self.tau) * P_diag[self._row_off_x_tile_d % NN]
-        rc_y_tile = (-1.0 / self.tau) * P_diag[self._row_off_y_tile_d % NN]
-
-        def pack(D2_comp):
-            D1 = -bm.sum(D2_comp, axis=1, keepdims=True)
-            V  = bm.concat([D1, D2_comp], axis=1)
-            return V.reshape(-1)
-        
         eye = bm.eye(d, **self.kwargs0) 
 
         # r_all: (NC,c,d)，c 轴就是 E_K_inv 的“行”（对应列扰动索引）
@@ -334,19 +349,33 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         P1_all = dC3_all[:, :, :, None, None] * Einv[:, None, None, :, :]      # (NC,c,k,d,d)
 
         # 4 P2：d(E^-1) 的秩一外积
-        row_c_Einv_all = Einv                               # (NC,c,d)
+        row_c_Einv_all = Einv                         # (NC,c,d)
         P2_all = -(C3[:, None, None, None, None]) * (
             b_all[:, None, :, :, None] * row_c_Einv_all[:, :, None, None, :]
         )  # (NC,c,k,d,d)
 
         D2_all = part1_all + part2_all + P1_all + P2_all    # (NC,c,k,d,d)
 
-        # 打包函数：把 (NC,c,d) 压成按 c 分段的 (c*NC*(d+1),)
+        JAC = self.JAC_assembly(D2_all)
+        return JAC
+    
+    def JAC_assembly(self,D2_all):
+        """
+        依据局部二阶块 D2_all 装配全局雅可比
+        """
+        d   = self.GD
+        NN  = self.NN
+        NC  = self.NC
+        assert d == 2, "当前实现针对 2D；3D 可按相同结构扩展"
+        cm = self.cm
+        rxx, ryy, rxy, ryx = self.rxx, self.ryy, self.rxy, self.ryx
+        P_diag = self._ivp_cache['P_diag']
+
+        # 打包：把 (NC,c,d) 压成按 c 分段的 (c*NC*(d+1),)，并在最前加 j=0 列（负和）
         def pack_all(D2_comp_all):
-            # D2_comp_all: (NC,c,d)
-            D1 = -bm.sum(D2_comp_all, axis=2, keepdims=True)          # (NC,c,1)
-            V  = bm.concat([D1, D2_comp_all], axis=2)                  # (NC,c,d+1)
-            V  = bm.permute_dims(V, (1, 0, 2)).reshape(-1)             # (c*NC*(d+1),)
+            D1 = -bm.sum(D2_comp_all, axis=2, keepdims=True)                    # (NC,c,1)
+            V  = bm.concat([D1, D2_comp_all], axis=2)                           # (NC,c,d+1)
+            V  = bm.permute_dims(V, (1, 0, 2)).reshape(-1)                      # (c*NC*(d+1),)
             return V
 
         # k=0 对 δx，k=1 对 δy；m=0/1 取 vx/vy 分量
@@ -355,28 +384,33 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         vx_seg_y_all = pack_all(D2_all[:, :, 1, :, 0])
         vy_seg_y_all = pack_all(D2_all[:, :, 1, :, 1])
 
-        # 与稀疏图样对齐的行系数/投影系数（整段向量，无需切片）
-        rr_x_all = self._row_off_x_tile_d % NN
-        rr_y_all = self._row_off_y_tile_d % NN
-        coef_x_all = rc_x_tile                              # (-1/tau)*P_diag[...]，形状已对齐 (d*NC*(d+1),)
-        coef_y_all = rc_y_tile
-        cm_rep_all = bm.tile(cm_rep, d)                     # (d*NC*(d+1),)
+        # 行索引与系数（与稀疏图样对齐）
+        rr_x_all  = self._row_off_x_tile_d % NN
+        rr_y_all  = self._row_off_y_tile_d % NN
+        rc_x_tile = (-1.0 / self.tau) * P_diag[rr_x_all]                    # (d*NC*(d+1),)
+        rc_y_tile = (-1.0 / self.tau) * P_diag[rr_y_all]
+        cm_rep    = bm.repeat(cm, d+1)                                          # (NC*(d+1),)
+        cm_rep_all = bm.tile(cm_rep, d)                                         # (d*NC*(d+1),)
 
-        # 直接生成四个 tile 段（替代 data**_list 拼接）
-        data00_tile = coef_x_all * cm_rep_all * ( rxx[rr_x_all] * vx_seg_x_all + rxy[rr_x_all] * vy_seg_x_all )
-        data10_tile = coef_y_all * cm_rep_all * ( ryx[rr_y_all] * vx_seg_x_all + ryy[rr_y_all] * vy_seg_x_all )
-        data01_tile = coef_x_all * cm_rep_all * ( rxx[rr_x_all] * vx_seg_y_all + rxy[rr_x_all] * vy_seg_y_all )
-        data11_tile = coef_y_all * cm_rep_all * ( ryx[rr_y_all] * vx_seg_y_all + ryy[rr_y_all] * vy_seg_y_all )
+        # 四个 tile 段（投影右乘 + 行缩放 + 单元权）
+        data00_tile = rc_x_tile * cm_rep_all * ( rxx[rr_x_all] * vx_seg_x_all + rxy[rr_x_all] * vy_seg_x_all )
+        data10_tile = rc_y_tile * cm_rep_all * ( ryx[rr_y_all] * vx_seg_x_all + ryy[rr_y_all] * vy_seg_x_all )
+        data01_tile = rc_x_tile * cm_rep_all * ( rxx[rr_x_all] * vx_seg_y_all + rxy[rr_x_all] * vy_seg_y_all )
+        data11_tile = rc_y_tile * cm_rep_all * ( ryx[rr_y_all] * vx_seg_y_all + ryy[rr_y_all] * vy_seg_y_all )
 
-        # 处理 j=0 列（为 −sum_c）
-        D2_0_x = -bm.sum(D2_all[:, :, 0, :, :], axis=1)     # (NC,d,d)
+        # j=0 列（为 −sum_c），与 pack_all 逻辑等价（此处直接从 D2_all 聚合）
+        def pack0(D2_0_comp):
+            D1 = -bm.sum(D2_0_comp, axis=1, keepdims=True)                      # (NC,1)
+            V  = bm.concat([D1, D2_0_comp], axis=1)                             # (NC,d+1)
+            return V.reshape(-1)                                                # (NC*(d+1),)
+
+        D2_0_x = -bm.sum(D2_all[:, :, 0, :, :], axis=1)                         # (NC,d,d)
         D2_0_y = -bm.sum(D2_all[:, :, 1, :, :], axis=1)
+        vx_0_x = pack0(D2_0_x[:, :, 0]); vy_0_x = pack0(D2_0_x[:, :, 1])
+        vx_0_y = pack0(D2_0_y[:, :, 0]); vy_0_y = pack0(D2_0_y[:, :, 1])
 
-        vx_0_x = pack(D2_0_x[:, :, 0]); vy_0_x = pack(D2_0_x[:, :, 1])
-        vx_0_y = pack(D2_0_y[:, :, 0]); vy_0_y = pack(D2_0_y[:, :, 1])
-
-        rr_x0 = self._row_off_x_0 % NN
-        rr_y0 = self._row_off_y_0 % NN
+        rr_x0  = self._row_off_x_0 % NN
+        rr_y0  = self._row_off_y_0 % NN
         coef_x0 = (-1.0 / self.tau) * P_diag[rr_x0]
         coef_y0 = (-1.0 / self.tau) * P_diag[rr_y0]
 
@@ -385,27 +419,15 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         data01_0 = coef_x0 * cm_rep * ( rxx[rr_x0] * vx_0_y + rxy[rr_x0] * vy_0_y )
         data11_0 = coef_y0 * cm_rep * ( ryx[rr_y0] * vx_0_y + ryy[rr_y0] * vy_0_y )
 
-        # 拼装稀疏矩阵（一次性 COO -> CSR）
-        I = bm.concat([
-            self._row_off_x_tile_d, self._row_off_y_tile_d,
-            self._row_off_x_0,      self._row_off_y_0,
-            self._row_off_x_tile_d, self._row_off_y_tile_d,
-            self._row_off_x_0,      self._row_off_y_0,
-        ], axis=0)
-        J = bm.concat([
-            self._cols_x_tile_d, self._cols_x_tile_d,
-            self._cols_x_0,      self._cols_x_0,
-            self._cols_y_tile_d, self._cols_y_tile_d,
-            self._cols_y_0,      self._cols_y_0,
-        ], axis=0)
+        # 一次性装配（COO -> CSR）
         V = bm.concat([
             data00_tile, data10_tile, data00_0, data10_0,
             data01_tile, data11_tile, data01_0, data11_0
         ], axis=0)
-        JAC = coo_matrix((V.astype(float), (I.astype(int), J.astype(int))),
+
+        JAC = coo_matrix((V.astype(float), (self.I , self.J)),
                         shape=(2*NN, 2*NN)).tocsr()
         return JAC
-    
     
     def linear_interpolate(self, Xi, Xi_new , X):
         """
@@ -562,15 +584,26 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self.sm = bm.zeros(self.NN, **self.kwargs0)
         self.sm = bm.index_add(self.sm , self.mesh.cell , self.cm[:, None])
     
-    def mesh_redistributor(self):
+    def mesh_redistributor(self,total_steps=None, h = None,
+                          return_info = False , return_timemesh = False):
         """
         Huang 等人的等分布与对齐自适应网格算法
         """
-        for it in range(self.total_steps):
+        if total_steps is None:
+            total_steps = self.total_steps
+        if h is None:
+            h = self.t_span/self.step
+            
+        atol = 1e-5
+        rtol = atol * 100
+        I_h = []
+        cm_min = []
+        time_mesh = [self.mesh.node]
+        
+        for it in range(total_steps):
             self.monitor()
             self.mol_method()
-            atol = 1e-6
-            rtol = atol * 100
+            
             M = self.M
             M_inv = bm.linalg.inv(M)
             X = self.mesh.node
@@ -588,13 +621,12 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                 Xi_current = y.reshape(self.GD, self.NN).T
                 v = self.vector_construction(Xi_current , M_inv)
                 time.send("ODE vector field")
-                return s_inv *v.ravel(order = 'F')
+                return 1/s_vec * v.ravel(order = 'F')
             
             def jac(t, y):
                 y = (s_vec * y)
                 Xi_current = y.reshape(self.GD, self.NN).T
                 J_y = self.JAC_functional(Xi_current, M_inv)
-                # J_y = self.JAC_functional_simple(Xi_current, M_inv)
                 
                 time.send("ODE Jacobian matrix computation complete")
                 J_z = J_y.multiply(s_inv[:, None])             # 行缩放
@@ -606,15 +638,32 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             y0 = Xi.ravel(order = 'F')
             z0 = (s_inv * y0)
             sol = solve_ivp(ode_system, t_span, z0, jac=jac, method='BDF',
-                                        first_step=self.t_span/self.step,
+                                        jac_sparsity=self._jac_sparsity,
+                                        first_step=h,
                                         atol=atol, rtol=rtol)
             y_last = (s_vec * sol.y[:, -1])
             Xinew = y_last.reshape(self.GD, self.NN).T
             Xnew = self.linear_interpolate(Xi , Xinew , X)
+            
+            if return_info:
+                J = self.Jacobian_matrix(E_K = self.edge_matrix(Xinew),
+                                           E_hat = self.edge_matrix(X))
+                I = self.I_func(self._ivp_cache['rho'],J , M_inv)
+                I_h.append(I)
+                cm_min.append(bm.min(self.cm).item())
+            if return_timemesh:
+                time_mesh.append(Xnew)
+            
             self.uh = self.interpolate(Xnew)
             self._construct(Xnew)
             print(f"EAGAdaptiveHuang: step {it+1}/{self.total_steps} completed.")
         time.send("Mesh redistribution complete")
         next(time)
-        return Xnew
+        
+        ret = {"X": Xnew}
+        if return_info:
+            ret["info"] = (I_h, cm_min)
+        if return_timemesh:
+            ret["time_mesh"] = time_mesh
+        return ret
         
