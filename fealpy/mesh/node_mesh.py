@@ -354,6 +354,218 @@ class NodeMesh(MeshDS):
         }
         return cls(r, nodedata=nodedata)
 
+    @classmethod
+    def from_dam_break_domain_2d(cls, dx, dy):
+        rho0 = 1000
+        rhomin = 995
+        H = 0.92 * bm.sqrt(dx**2 + dy**2)
+        dt = 0.001
+        c0 = 10
+        g = bm.array([0.0, -9.8])
+        gamma = 7
+        alpha = 0.1
+        maxstep = 2000
+
+        # 流体粒子pp生成
+        x_pp = bm.arange(2 * dx, 1 + dx, dx)
+        y_pp = bm.arange(2 * dy, 2 + dy, dy)
+        X_pp, Y_pp = bm.meshgrid(x_pp, y_pp)
+        X_flat = X_pp.flatten()
+        Y_flat = Y_pp.flatten()
+        pp = bm.stack((X_flat, Y_flat), axis=1)
+
+        # 边界粒子bpp生成
+        x0 = bm.arange(0, 4, dx / 2)
+        x1 = bm.arange(-dx / 4, 4 + dx / 4, dx / 2)
+        y = bm.arange(dy, 4, dy / 2)
+
+        bp0 = bm.stack((x0, bm.zeros_like(x0)), axis=1)
+        bp1 = bm.stack((x1, bm.full_like(x1, dy / 2)), axis=1)
+        bp = bm.concatenate((bp0, bp1), axis=0)
+
+        lp0 = bm.stack((bm.zeros_like(y), y + dy / 2), axis=1)
+        lp1 = bm.stack((bm.full_like(y, dx / 2), y), axis=1)
+        lp = bm.concatenate((lp0, lp1), axis=0)
+
+        rp0 = bm.stack((bm.full_like(y, 4), y + dy / 2), axis=1)
+        rp1 = bm.stack((bm.full_like(y, 4 - dx / 2), y), axis=1)
+        rp = bm.concatenate((rp0, rp1), axis=0)
+
+        bpp = bm.concatenate((bp, lp, rp), axis=0)
+        tag_f = bm.full((pp.shape[0],), 0, dtype=bm.int32)
+        tag_w = bm.full((bpp.shape[0],), 1, dtype=bm.int32)
+        r = bm.concatenate((pp, bpp), axis=0)
+        tag = bm.concatenate([tag_f, tag_w])
+        NN = r.shape[0]  # 总粒子数
+
+        # 初始化粒子属性
+
+        u = bm.zeros((NN, 2), dtype=bm.float64)  # 速度初始化为0
+        rho = bm.full(NN, rho0, dtype=bm.float64)  # 密度初始化为参考密度
+        mass = bm.full(
+            NN, dx * dy * rho0, dtype=bm.float64
+        )  # 质量=体积*密度（简化计算）
+        pressure = bm.zeros(NN, dtype=bm.float64)  # 压力初始化为0
+        sound = bm.full(NN, c0, dtype=bm.float64)  # 声速初始化为参考声速
+        drhodt = bm.zeros(NN, dtype=bm.float64)
+        dxdt = bm.zeros(NN, dtype=bm.float64)
+        dudt = bm.zeros(NN, dtype=bm.float64)
+        nodedata = {
+            "position": r,
+            "u": u,
+            "tag": tag,
+            "rho": rho,
+            "mass": mass,
+            "pressure": pressure,
+            "sound": sound,
+            "drhodt": drhodt,
+            "dxdt": dxdt,
+            "dudt": dudt,
+            "H": H,
+            "dt": dt,
+            "g": g,
+            "gamma": gamma,
+            "alpha": alpha,
+            "c0": c0,
+            "rho0": rho0,
+            "rhomin": rhomin,
+            "maxstep": maxstep,
+            "dx": dx,
+            "dy": dy,
+        }
+
+        return cls(r, nodedata=nodedata)
+
+    @classmethod
+    def from_dam_break_domain_3d(cls, dx, dy, dz):
+        rho0 = 1000
+        rhomin = 995
+        H = 0.92 * bm.sqrt(dx**2 + dy**2 + dz**2)
+        dt = 0.001
+        c0 = 10
+        g = bm.array([0.0, 0.0, -9.8])  # 重力方向调整为z轴负方向
+        gamma = 7
+        alpha = 0.1
+        maxstep = 2000
+
+        # 流体粒子pp生成 (水体: 长0.40m, 宽0.61m, 高0.30m)
+        x_pp = bm.arange(dx, 0.60 - dx / 2, dx)
+        y_pp = bm.arange(dy, 0.61 - dy / 2, dy)  # 宽度对应y轴
+        z_pp = bm.arange(2 * dz, 0.50 - dz / 2, dz)  # 高度对应z轴
+        X_pp, Y_pp, Z_pp = bm.meshgrid(x_pp, y_pp, z_pp)
+        X_flat = X_pp.flatten()
+        Y_flat = Y_pp.flatten()
+        Z_flat = Z_pp.flatten()
+        pp = bm.stack((X_flat, Y_flat, Z_flat), axis=1)
+        pp = bm.unique(pp, axis=0)
+        
+        # 水箱边界粒子生成
+        # 底面边界 (z=0平面)
+        x_b0 = bm.arange(0, 1.6, dx / 2)
+        y_b0 = bm.arange(0, 0.61, dy / 2)
+        X_b0, Y_b0 = bm.meshgrid(x_b0, y_b0)
+        X_b0_flat = X_b0.flatten()
+        Y_b0_flat = Y_b0.flatten()
+        bp_bottom = bm.stack((X_b0_flat, Y_b0_flat, bm.zeros_like(X_b0_flat)), axis=1)
+        
+        # 顶面边界 (z=0.6平面)
+        X1, Y1 = bm.meshgrid(x_b0, y_b0)
+        X1_flat = X1.flatten()
+        Y1_flat = Y1.flatten()
+        bp_top = bm.stack((X1_flat, Y1_flat, bm.full_like(X1_flat, 0.6)), axis=1)
+        
+        bp = bm.concatenate((bp_bottom, bp_top), axis=0)
+
+        # 左侧边界 (x=0平面)
+        y_left = bm.arange(0, 0.61, dy / 2)
+        z_left = bm.arange(0, 0.6, dz / 2)
+        Y_l, Z_l = bm.meshgrid(y_left, z_left)
+        Y_l_flat = Y_l.flatten()
+        Z_l_flat = Z_l.flatten()
+        lp = bm.stack((bm.zeros_like(Y_l_flat), Y_l_flat, Z_l_flat), axis=1)
+        
+        # 右侧边界 (x=1.6平面)
+        Y_r, Z_r = bm.meshgrid(y_left, z_left)
+        Y_r_flat = Y_r.flatten()
+        Z_r_flat = Z_r.flatten()
+        rp = bm.stack((bm.full_like(Y_r_flat, 1.6), Y_r_flat, Z_r_flat), axis=1)
+        
+        # 前侧边界 (y=0平面)
+        x_front = bm.arange(0, 1.6, dx / 2)
+        z_front = bm.arange(0, 0.6, dz / 2)
+        X_f, Z_f = bm.meshgrid(x_front, z_front)
+        X_f_flat = X_f.flatten()
+        Z_f_flat = Z_f.flatten()
+        fp = bm.stack((X_f_flat, bm.zeros_like(X_f_flat), Z_f_flat), axis=1)
+        
+        # 后侧边界 (y=0.61平面)
+        X_b, Z_b = bm.meshgrid(x_front, z_front)
+        X_b_flat = X_b.flatten()
+        Z_b_flat = Z_b.flatten()
+        bp_side = bm.stack((X_b_flat, bm.full_like(X_b_flat, 0.61), Z_b_flat), axis=1)    
+
+        # 添加障碍物: 0.12m宽的方柱, 位置在水体下游0.5m处, 距侧壁0.25m
+        obstacle_width = 0.12
+        obstacle_height = 0.6  # 从底部到顶部
+        obstacle_x_start = 0.9  
+        obstacle_x_end = obstacle_x_start + obstacle_width
+        obstacle_y_start = 0.25  # 距一侧壁0.25m
+        obstacle_y_end = obstacle_y_start + obstacle_width
+        
+        x_obs = bm.arange(obstacle_x_start, obstacle_x_end, dx / 2)
+        y_obs = bm.arange(obstacle_y_start, obstacle_y_end, dy / 2)
+        z_obs = bm.arange(0.0, obstacle_height, dz / 2)
+        X_obs, Y_obs, Z_obs = bm.meshgrid(x_obs, y_obs, z_obs)
+        X_obs_flat = X_obs.flatten()
+        Y_obs_flat = Y_obs.flatten()
+        Z_obs_flat = Z_obs.flatten()
+        obstacle_particles = bm.stack((X_obs_flat, Y_obs_flat, Z_obs_flat), axis=1)
+
+        # 合并所有边界粒子
+        bpp = bm.concatenate((bp, lp, rp, fp, bp_side, obstacle_particles), axis=0)
+        bpp = bm.unique(bpp, axis=0)
+        
+        tag_f = bm.full((pp.shape[0],), 0, dtype=bm.int32)
+        tag_w = bm.full((bpp.shape[0],), 1, dtype=bm.int32)
+        r = bm.concatenate((pp, bpp), axis=0)
+        tag = bm.concatenate([tag_f, tag_w])
+        NN = r.shape[0]  # 总粒子数
+
+        # 初始化粒子属性
+        u = bm.zeros((NN, 3), dtype=bm.float64)  # 速度初始化为0
+        rho = bm.full(NN, rho0, dtype=bm.float64)  # 密度初始化为参考密度
+        mass = bm.full(NN, dx * dy * dz * rho0, dtype=bm.float64)  # 质量=体积*密度（简化计算）
+        pressure = bm.zeros(NN, dtype=bm.float64)  # 压力初始化为0
+        sound = bm.full(NN, c0, dtype=bm.float64)  # 声速初始化为参考声速
+        drhodt = bm.zeros(NN, dtype=bm.float64)
+        dxdt = bm.zeros(NN, dtype=bm.float64)
+        dudt = bm.zeros(NN, dtype=bm.float64)
+        nodedata = {
+            "position": r,
+            "u": u,
+            "tag": tag,
+            "rho": rho,
+            "mass": mass,
+            "pressure": pressure,
+            "sound": sound,
+            "drhodt": drhodt,
+            "dxdt": dxdt,
+            "dudt": dudt,
+            "H": H,
+            "dt": dt,
+            "g": g,
+            "gamma": gamma,
+            "alpha": alpha,
+            "c0": c0,
+            "rho0": rho0,
+            "rhomin": rhomin,
+            "maxstep": maxstep,
+            "dx": dx,
+            "dy": dy,
+            "dz": dz,
+        }
+        return cls(r, nodedata=nodedata)
+    
 class Space:
     def raw_transform(self, box:Box, R:TensorLike):
         if box.ndim == 0 or box.size == 1:
