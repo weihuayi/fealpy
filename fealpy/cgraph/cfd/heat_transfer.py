@@ -138,7 +138,7 @@ class HeatTransferParticleIterativeUpdate(CNodeType):
     """
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, 1, title="粒子分布"),
-        PortConf("i", DataType.INT, 0, title="迭代步",default=1000),
+        PortConf("i", DataType.INT, title="当前时间步"),
         PortConf("box_size", dtype=DataType.TENSOR, title="模拟区域"),
         PortConf("dx", DataType.FLOAT, 0, title="核函数的平滑长度",default=0.02),
         PortConf("dt", DataType.FLOAT, 0, title="时间步长",default=0.00045454545454545455),
@@ -178,9 +178,6 @@ class HeatTransferParticleIterativeUpdate(CNodeType):
             mesh.nodedata["p"] = solver.state_equation("tait_eos", mesh.nodedata, X=5.0)
             mesh.nodedata = tech.boundary_conditions(mesh.nodedata, box_size, dx=dx)
         
-        
-        
-            
         mesh.nodedata['mv'] += 1.0*dt*mesh.nodedata["dmvdt"]
         mesh.nodedata['tv'] = mesh.nodedata['mv']
         mesh.nodedata["position"] = shift(mesh.nodedata["position"], 1.0 * dt * mesh.nodedata["tv"])
