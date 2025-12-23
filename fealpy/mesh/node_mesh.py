@@ -449,10 +449,10 @@ class NodeMesh(MeshDS):
         maxstep = 2000
 
         # 流体粒子pp生成 (水体: 长0.40m, 宽0.61m, 高0.30m)
-        x_pp = bm.arange(dx, 0.60 - dx / 2, dx)
+        x_pp = bm.arange(dx, 0.40 - dx / 2, dx)
         y_pp = bm.arange(dy, 0.61 - dy / 2, dy)  # 宽度对应y轴
-        z_pp = bm.arange(2 * dz, 0.50 - dz / 2, dz)  # 高度对应z轴
-        X_pp, Y_pp, Z_pp = bm.meshgrid(x_pp, y_pp, z_pp)
+        z_pp = bm.arange(2 * dz, 0.30 - dz / 2, dz)  # 高度对应z轴
+        X_pp, Y_pp, Z_pp = bm.meshgrid(x_pp, y_pp, z_pp) 
         X_flat = X_pp.flatten()
         Y_flat = Y_pp.flatten()
         Z_flat = Z_pp.flatten()
@@ -460,49 +460,33 @@ class NodeMesh(MeshDS):
         pp = bm.unique(pp, axis=0)
         
         # 水箱边界粒子生成
-        # 底面边界 (z=0平面)
-        x_b0 = bm.arange(0, 1.6, dx / 2)
-        y_b0 = bm.arange(0, 0.61, dy / 2)
-        X_b0, Y_b0 = bm.meshgrid(x_b0, y_b0)
-        X_b0_flat = X_b0.flatten()
-        Y_b0_flat = Y_b0.flatten()
-        bp_bottom = bm.stack((X_b0_flat, Y_b0_flat, bm.zeros_like(X_b0_flat)), axis=1)
-        
-        # 顶面边界 (z=0.6平面)
-        X1, Y1 = bm.meshgrid(x_b0, y_b0)
-        X1_flat = X1.flatten()
-        Y1_flat = Y1.flatten()
-        bp_top = bm.stack((X1_flat, Y1_flat, bm.full_like(X1_flat, 0.6)), axis=1)
-        
-        bp = bm.concatenate((bp_bottom, bp_top), axis=0)
-
-        # 左侧边界 (x=0平面)
-        y_left = bm.arange(0, 0.61, dy / 2)
-        z_left = bm.arange(0, 0.6, dz / 2)
-        Y_l, Z_l = bm.meshgrid(y_left, z_left)
-        Y_l_flat = Y_l.flatten()
-        Z_l_flat = Z_l.flatten()
-        lp = bm.stack((bm.zeros_like(Y_l_flat), Y_l_flat, Z_l_flat), axis=1)
-        
-        # 右侧边界 (x=1.6平面)
-        Y_r, Z_r = bm.meshgrid(y_left, z_left)
-        Y_r_flat = Y_r.flatten()
-        Z_r_flat = Z_r.flatten()
-        rp = bm.stack((bm.full_like(Y_r_flat, 1.6), Y_r_flat, Z_r_flat), axis=1)
-        
-        # 前侧边界 (y=0平面)
-        x_front = bm.arange(0, 1.6, dx / 2)
-        z_front = bm.arange(0, 0.6, dz / 2)
-        X_f, Z_f = bm.meshgrid(x_front, z_front)
-        X_f_flat = X_f.flatten()
-        Z_f_flat = Z_f.flatten()
-        fp = bm.stack((X_f_flat, bm.zeros_like(X_f_flat), Z_f_flat), axis=1)
-        
-        # 后侧边界 (y=0.61平面)
-        X_b, Z_b = bm.meshgrid(x_front, z_front)
+        # 上下侧边界 (z=0，z=0.6平面)
+        x_b = bm.arange(0, 1.6 + dx / 4, dx / 2)
+        y_b = bm.arange(0, 0.61 + dy / 4, dy / 2)
+        X_b, Y_b = bm.meshgrid(x_b, y_b)
         X_b_flat = X_b.flatten()
-        Z_b_flat = Z_b.flatten()
-        bp_side = bm.stack((X_b_flat, bm.full_like(X_b_flat, 0.61), Z_b_flat), axis=1)    
+        Y_b_flat = Y_b.flatten()
+        bp = bm.stack((X_b_flat, Y_b_flat, bm.zeros_like(X_b_flat)), axis=1)
+        tp = bm.stack((X_b_flat, Y_b_flat, bm.full_like(X_b_flat, 0.6)), axis=1)
+
+        # 前后侧边界 (x=0，x=1.6平面)
+        y_front = bm.arange(0, 0.61 + dy / 4, dy / 2)
+        z_front = bm.arange(0, 0.6 + dz / 4, dz / 2)
+        Y_f, Z_f = bm.meshgrid(y_front, z_front)
+        Y_f_flat = Y_f.flatten()
+        Z_f_flat = Z_f.flatten()
+        fp = bm.stack((bm.zeros_like(Y_f_flat), Y_f_flat, Z_f_flat), axis=1)
+        bp_side = bm.stack((bm.full_like(Y_f_flat, 1.6), Y_f_flat, Z_f_flat), axis=1)
+        
+    
+        # 左右侧边界 (y=0，y=0.61平面)
+        x_left = bm.arange(0, 1.6 + dx / 4, dx / 2)
+        z_left = bm.arange(0, 0.6 + dz / 4, dz / 2)
+        X_l, Z_l = bm.meshgrid(x_left, z_left)
+        X_l_flat = X_l.flatten()
+        Z_l_flat = Z_l.flatten()
+        lp = bm.stack((X_l_flat, bm.zeros_like(X_l_flat), Z_l_flat), axis=1)
+        rp = bm.stack((X_l_flat, bm.full_like(X_l_flat, 0.61), Z_l_flat), axis=1)    
 
         # 添加障碍物: 0.12m宽的方柱, 位置在水体下游0.5m处, 距侧壁0.25m
         obstacle_width = 0.12
@@ -512,17 +496,24 @@ class NodeMesh(MeshDS):
         obstacle_y_start = 0.25  # 距一侧壁0.25m
         obstacle_y_end = obstacle_y_start + obstacle_width
         
-        x_obs = bm.arange(obstacle_x_start, obstacle_x_end, dx / 2)
-        y_obs = bm.arange(obstacle_y_start, obstacle_y_end, dy / 2)
+        x_obs = bm.arange(obstacle_x_start, obstacle_x_end + dx / 4 , dx / 2)
         z_obs = bm.arange(0.0, obstacle_height, dz / 2)
-        X_obs, Y_obs, Z_obs = bm.meshgrid(x_obs, y_obs, z_obs)
-        X_obs_flat = X_obs.flatten()
-        Y_obs_flat = Y_obs.flatten()
-        Z_obs_flat = Z_obs.flatten()
-        obstacle_particles = bm.stack((X_obs_flat, Y_obs_flat, Z_obs_flat), axis=1)
-
+        X_obs_front, Z_obs_front = bm.meshgrid(x_obs, z_obs)
+        X_obs_flat = X_obs_front.flatten()
+        Z_obs_flat = Z_obs_front.flatten()
+        op_left = bm.stack((X_obs_flat, bm.full_like(X_obs_flat, obstacle_y_start), Z_obs_flat), axis=1)
+        op_right = bm.stack((X_obs_flat, bm.full_like(X_obs_flat, obstacle_y_end), Z_obs_flat), axis=1)
+        
+        y_obs = bm.arange(obstacle_y_start, obstacle_y_end + dy / 4, dy / 2)
+        Y_obs_front, Z_obs_front = bm.meshgrid(y_obs, z_obs)
+        Y_obs_flat = Y_obs_front.flatten()
+        Z_obs_flat = Z_obs_front.flatten()
+        op_front = bm.stack((bm.full_like(Y_obs_flat, obstacle_x_start), Y_obs_flat, Z_obs_flat), axis=1)
+        op_behind = bm.stack((bm.full_like(Y_obs_flat, obstacle_x_end), Y_obs_flat, Z_obs_flat), axis=1)
+        
+        
         # 合并所有边界粒子
-        bpp = bm.concatenate((bp, lp, rp, fp, bp_side, obstacle_particles), axis=0)
+        bpp = bm.concatenate((bp, tp, lp, rp, fp, bp_side,op_left, op_right, op_front, op_behind), axis=0)
         bpp = bm.unique(bpp, axis=0)
         
         tag_f = bm.full((pp.shape[0],), 0, dtype=bm.int32)
