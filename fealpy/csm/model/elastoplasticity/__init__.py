@@ -41,4 +41,5 @@ DATA_TABLE = {
     1: ("elastoplasticity_data_2d", "ElastoplasticityData2D"),
     2: ("elastoplasticity_data_3d", "ElastoplasticityData3D"),
     3: ("thick_walled_cylinder_data", "ThickWalledCylinderData"),
+    4: ("perforated_square_plate_data", "PerforatedSquarePlateData"),
 }

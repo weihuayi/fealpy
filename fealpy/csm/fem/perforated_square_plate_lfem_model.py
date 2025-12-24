@@ -5,7 +5,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
 
 from fealpy.mesh import Mesh
-from fealpy.mesher import AnnulusMesher
+from fealpy.mesher import BlockWithHoleMesher
 from fealpy.functionspace import functionspace
 from fealpy.material import LinearElasticMaterial
 
@@ -21,9 +21,9 @@ from . import ElastoplasticitySourceIntIntegrator
 from . import ElastoplasticDiffusionIntegrator
 
 
-class ThickWalledCylinderFEMModel(ComputationalModel):
+class PerforatedSquarePlateFEMModel(ComputationalModel):
     """
-    ThickWalledCylinderFEMModel is a finite element model for solving elastoplasticity problems.
+    PerforatedSquarePlateFEMModel is a finite element model for solving elastoplasticity problems.
 
     This class implements a finite element method (FEM) solver for elastoplasticity problems, 
     suitable for analyzing materials that exhibit both elastic and plastic behavior under loading. 
@@ -77,14 +77,14 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
         self.set_init_mesh()
         self.set_space_degree(options['space_degree'])
         self.set_space()
-        self.set_material_parameters(E=21000, nu=0.3)  # Set material parameters
+        self.set_material_parameters(E=10000, nu=0.25)  # Set material parameters
         self.E = self.pde.E
         self.nu = self.pde.nu
         self.f = self.pde.Ft_max
         self.N = 20  # Number of load steps
 
 
-    def set_pde(self, pde=3) -> None:
+    def set_pde(self, pde=4) -> None:
         '''
         Set the PDE parameters for the elastoplasticity problem.
         '''
@@ -130,7 +130,8 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
         Returns:
             Mesh: The initialized mesh object.
         '''
-        self.mesh = AnnulusMesher.init_mesh(self, R = 200, r = 100, theta0_deg=0, theta1_deg=90, center=(0,0), h =8)
+        mesher = BlockWithHoleMesher()
+        self.mesh = mesher.mesh
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
@@ -156,7 +157,7 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
             nu (float): Poisson's ratio.
         """
         self.cm = LinearElasticMaterial("elastic", elastic_modulus=E, poisson_ratio=nu, 
-                                              hypo='plane_strain', device=bm.get_device(self.mesh))
+                                              hypo='3D', device=bm.get_device(self.mesh))
         qf = self.mesh.quadrature_formula(q=self.space.scalar_space.p+3)
         bcs, ws = qf.get_quadrature_points_and_weights()
         self.NQ = bcs.shape[0]
@@ -167,7 +168,7 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
                                 elastic_modulus=E, poisson_ratio=nu,
                                 yield_stress=self.pde.yield_stress, 
                                 hardening_modulus=self.pde.hardening_modulus, 
-                                hypo='plane_strain', device=bm.get_device(self.mesh))
+                                hypo='3D', device=bm.get_device(self.mesh))
 
     def cell2dof(self, stress):
         """
@@ -235,14 +236,14 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
 
         tmr = timer()
         next(tmr)
-        
-        u = self.space.function()  # 总位移
-        strain_pl = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
-        stress = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
-        strain_e = bm.zeros((self.NC, self.NQ), dtype=bm.float64)
-        strain_total = bm.zeros((self.NC, self.NQ, 3), dtype=bm.float64)
 
-        tol = 1e-8
+        u = self.space.function()  # 总位移
+        strain_pl = bm.zeros((self.NC, self.NQ, 6), dtype=bm.float64)
+        stress = bm.zeros((self.NC, self.NQ, 6), dtype=bm.float64)
+        strain_e = bm.zeros((self.NC, self.NQ), dtype=bm.float64)
+        strain_total = bm.zeros((self.NC, self.NQ, 6), dtype=bm.float64)
+
+        tol = 1e-6
         N = self.N
 
         for n in range(N):
@@ -266,13 +267,13 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
             while not converged:
                 # 计算当前试应变
                 delta_strain = self.compute_strain(delta_u)
+                print(strain_total.shape, delta_strain.shape)
                 strain_total_trial = strain_total + delta_strain
-                tmr.send(f'第{n}次计算试应变时间')
-
+                tmr.send(f'第{n}次迭代：试应变计算时间')
 
                 stress_trial, strain_pl_trial, strain_e_trial, Ctang_trial, is_plastic = \
                     self.pfcm.material_point_update(strain_total_trial, strain_pl_old, strain_e_old)
-                tmr.send(f'第{n}次积分点更新时间')
+                tmr.send(f'第{n}次迭代：材料点更新计算时间')
                     
                 #num_plastic = is_plastic.astype(bm.uint8).sum()
                 num_plastic = bm.sum(bm.astype(is_plastic, bm.uint8))
@@ -286,25 +287,24 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
                 K, F_int, F_ext = self.linear_system(loading_neumann=loading_neumann,
                                                     D_ep=Ctang_trial,
                                                     stress=stress_trial)  
-                tmr.send(f'第{n}次线性系统组装时间')
+                tmr.send(f'第{n}次迭代：线性系统组装时间')
                 R = F_int - F_ext
                 from fealpy.fem import DirichletBC
                 gd_uh = self.pde.dirichlet_bc
                 threshold = self.pde.is_dirichlet_boundary()
                 K, R = DirichletBC(self.space, gd=gd_uh,
                                 threshold=threshold).apply(K, R)
-                tmr.send(f'第{n}次边界条件处理时间')
+                tmr.send(f'第{n}次迭代：边界条件应用时间')
                 if bm.linalg.norm(R) > 1e6:
                     print("Residual too large. Exiting.")
                 from fealpy.solver import spsolve
                 delta_du = spsolve(K, -R, 'scipy')
-                tmr.send(f'第{n}次线性系统求解时间')
+                tmr.send(f'第{n}次迭代：线性系统求解时间')
                 delta_u += delta_du  # 累加位移增量
                 
 
                 norm_R = bm.linalg.norm(R)
                 norm_du = bm.linalg.norm(delta_du)
-                tmr.send(f'第{n}次残差和位移增量计算时间')
                 print(f"  Iter {iter_count:02d}: ||R|| = {norm_R:.3e}, ||du|| = {norm_du:.3e}")
 
                 if norm_R < tol and norm_du < tol:
@@ -322,7 +322,6 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
             print(f"  u.max = {u.max():.4e}, u.min = {u.min():.4e}")
             self.show(displacement=u, n=n)
             tmr.send(f'第{n}次后处理时间')
-
             next(tmr)
 
 
@@ -330,13 +329,21 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
     
     def show(self, displacement, n):
         """
-        Visualize the mesh and the displacement field.
+        Visualize the mesh and the displacement field (3D version).
         """
         save_path = "../elastoplastic_result"
-        gdof = self.space.scalar_space.number_of_global_dofs()   
-        u1 = displacement[:gdof]
-        u2 = displacement[gdof:]
-        u = bm.stack([u1, u2], axis=-1)
+        gdof = self.space.scalar_space.number_of_global_dofs()  # 节点数
+
+        num_nodes = gdof 
+        u1 = displacement[:num_nodes]
+        u2 = displacement[num_nodes:2*num_nodes]
+        u3 = displacement[2*num_nodes:]
+
+        u = bm.zeros((num_nodes, 3), dtype=bm.float64)
+        u[:, 0] = u1
+        u[:, 1] = u2
+        u[:, 2] = u3
+
         self.mesh.nodedata['displacement_vector'] = u
         self.mesh.to_vtk(f"{save_path}/incremental_iter_{n:03d}.vtu")
 
