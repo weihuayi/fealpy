@@ -15,7 +15,7 @@ class BarMaterial(LinearElasticMaterial):
     """
     def __init__(self, 
                 name: str,
-                model,
+                model: Optional[object] = None,
                 elastic_modulus: Optional[float] = None,
                 poisson_ratio: Optional[float] = None,
                 shear_modulus: Optional[float] = None) -> None:

@@ -30,7 +30,9 @@ class CoordTransform:
         
         Parameters:
             mesh: The mesh object.
-            vref: Reference vector for defining local coordinate system(only for 3D elements).
+            vref: Reference vector for defining local coordinate system (only for 3D beam elements).
+                  Can be a list, tuple, or TensorLike of shape (3,).
+                  Example: [0, 1, 0], [1, 0, 0], etc.
             index (Index): The indices of elements. Defaults to all elements.
             
         Returns:
@@ -39,13 +41,13 @@ class CoordTransform:
         if self.method == 'beam3d':
             return self.coord_transform_beam3d(mesh, vref, index)
         elif self.method == 'beam2d':
-            return self.coord_transform_beam2d(mesh, vref, index)
+            return self.coord_transform_beam2d(mesh, index)
         elif self.method == 'bar3d':
-            return self.coord_transform_bar3d(mesh, vref, index)
+            return self.coord_transform_bar3d(mesh, index)
         else:
             raise ValueError(f"Unknown method: {self.method}")
 
-    def coord_transform_bar2d(self, mesh, vref=None, index: Index=_S) -> TensorLike:
+    def coord_transform_bar2d(self, mesh, index: Index=_S) -> TensorLike:
         """Construct the coordinate transformation matrix for 2D bar elements.
         
         Returns:
@@ -84,7 +86,7 @@ class CoordTransform:
         
         return R
     
-    def coord_transform_bar3d(self, mesh, vref=None, index: Index=_S)-> TensorLike:
+    def coord_transform_bar3d(self, mesh, index: Index=_S)-> TensorLike:
         """Construct the coordinate transformation matrix for 3D bar elements.
         
         Returns:
@@ -124,7 +126,7 @@ class CoordTransform:
 
         return R
     
-    def coord_transform_beam2d(self, mesh, vref=None, index: Index=_S)-> TensorLike:
+    def coord_transform_beam2d(self, mesh, index: Index=_S)-> TensorLike:
         """Construct the coordinate transformation matrix for 2D beam elements.
         
         Returns:
@@ -149,6 +151,10 @@ class CoordTransform:
         """
         if vref is None:
             vref = [0, 1, 0]  # 默认参考向量
+        
+        vref = bm.array(vref, dtype=bm.float64)
+        if vref.shape != (3,):
+            raise ValueError(f"vref must have shape (3,), got {vref.shape}")
             
         node= mesh.entity('node')
         cell = mesh.entity('cell')[index]
