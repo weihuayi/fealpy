@@ -204,7 +204,7 @@ class SLEPcEigenSolver(CNodeType):
     
 
 class MGStokesSolver(CNodeType):
-    TITLE: str = "Stokes离散系统的多重网格求解器"
+    TITLE: str = "Stokes多重网格求解器"
     PATH: str = "simulation.solvers"
     
     INPUT_SLOTS = [

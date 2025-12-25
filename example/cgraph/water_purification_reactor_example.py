@@ -3,19 +3,15 @@ import fealpy.cgraph as cgraph
 
 
 WORLD_GRAPH = cgraph.WORLD_GRAPH
-domain = cgraph.create("ConstDomain")
 mesher = cgraph.create("WaterPurificationReactorMesher")
-imesher = cgraph.create("Int1d")
 wpr = cgraph.create("MGTensorWPR")
 solver = cgraph.create("MGStokesSolver")
 to_vtk = cgraph.create("TO_VTK")
 
-domain(value="[0, 0.4]")
-mesher(lc = 0.4)
-imesher(interval=domain().value, nx=8)
+mesher(lc = 0.4, nx=8)
 wpr(
-    mesh=mesher().mesh,
-    imesh=imesher().mesh,
+    tmesh=mesher().tmesh,
+    imesh=mesher().imesh,
     thickness=0.4
 )
 solver(

@@ -6,11 +6,11 @@ __all__ = ["MGTensorWPR"]
 class MGTensorWPR(CNodeType):
     r"""张量网格上通过多重网格方法求解Stokes方程.
     """
-    TITLE: str = "三维水净化反应器"
+    TITLE: str = "水净化反应器方程离散 (集总端口)"
     PATH: str = "simulation.discretization"
     DESC: str = "三维水净化反应器节点"
     INPUT_SLOTS = [
-        PortConf("mesh", DataType.MESH, 1, title="底面网格"),
+        PortConf("tmesh", DataType.MESH, 1, title="底面网格"),
         PortConf("imesh", DataType.MESH, 1, title="区间网格"),
         PortConf("inlet_length", DataType.FLOAT, 1, title="入口长度", default=0.5),
         PortConf("inlet_width", DataType.FLOAT, 1, title="入口宽度", default=0.8),
@@ -49,10 +49,10 @@ class MGTensorWPR(CNodeType):
         from fealpy.fem import WPRLFEMModel
         import gc
 
-        mesh = options['mesh']
+        tmesh = options['tmesh']
         imesh = options['imesh']
         model = WPRLFEMModel(options)
-        model.set_init_mesher(mesh, imesh)
+        model.set_init_mesher(tmesh, imesh)
         model.set_inlet_condition()
         op0, A, F = model.linear_system()
 
