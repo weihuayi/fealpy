@@ -202,7 +202,9 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
             index(Index): the index of the mesh entities.
         """
-        pass
+        bc = bm.array([1/3, 1/3, 1/3], dtype=bm.float64)
+        return self.bc_to_point(bc, index=index)
+        
 
     def uniform_refine(self, n: int = 1):
         """
@@ -393,6 +395,8 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             cell2edge = bm.set_at(cell2edge, (edge2cell[:, 1], edge2cell[:, 3]), range(len(edge)))
 
             self.node = node
+            if self.surface is not None:
+                self.node, _ = self.surface.project(self.node)
             self.face = edge
             self.edge = edge 
             self.edge2cell = edge2cell
@@ -484,12 +488,13 @@ class LagrangeTriangleMesh(HomogeneousMesh):
 
         return quad
 
-    def bc_to_point(self, bc: TensorLike, index: Index=_S):
+    def bc_to_point(self, bc: TensorLike, index: Index=_S, map_mode: str='all'):
         """
 
         Parameters:
             bc(TensorLike): the barycentric coordinates of the integration points.
             index(Index): the index of the mesh entities.
+            map_mode(str): 'all' for all entities, 'pair' for one bc with one entity.
 
         Returns:
             TensorLike: the coordinates of the integration points in the
@@ -498,10 +503,17 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         node = self.node
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index=index) # 
-        phi = self.shape_function(bc) # (NC, NQ, NVC)
-        p = bm.einsum('c...n, cni -> c...i', phi, node[entity])
+        if map_mode == 'all':
+            phi = self.shape_function(bc, variables='x') # (NC, NQ, NVC)
+            p = bm.einsum('c...n, cni -> c...i', phi, node[entity])
+        elif map_mode == 'pair':
+            assert bc.shape[0] == index.shape[0]
+            phi = self.shape_function(bc, variables='u')
+            p = bm.einsum('cn, cni -> ci', phi, node[entity])
+        else:
+            raise ValueError(f"Unsupported map_mode: {map_mode}. Should be 'all' or 'pair'.")
         return p
-    
+
     def shape_function(self, bc: TensorLike, p: int=None, variables='x', index: Index=_S):
         """
         Parameters:
@@ -525,9 +537,19 @@ class LagrangeTriangleMesh(HomogeneousMesh):
         elif variables == 'x':
             return phi[None, ...]
 
-    def grad_shape_function(self, bc: TensorLike, p: int=None, 
-                            index: Index=_S, variables='x'):
+    def grad_shape_function(self, 
+                            bc: TensorLike, 
+                            p: int=None, 
+                            index: Index=_S, 
+                            variables: str ='x',
+                            map_mode: str = 'all'):
         """
+        Compute the gradient of the shape function at the integration points.
+
+        Note that there are two computation modes:
+        1. map_mode = 'all': compute the gradient for all entities at once at
+        all barycentric points.
+        2. map_mode = 'pair': compute the gradient for entity index[i] at bc[i].
 
         Parameters:
             bc(TensorLike): the barycentric coordinates of the integration
@@ -539,6 +561,7 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             physical variables (x, y).
 
             index(Index): the index of the mesh entities.
+            map_mode(str): 'all' for all entities, 'pair' for one bc with one entity.
 
         Returns:
             TensorLike: the gradient of the shape function at the integration
@@ -561,15 +584,31 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             Dlambda = bm.array([[-1], [1]], dtype=bm.float64)
         R = bm.simplex_grad_shape_function(bc, p=p) # (NQ, ldof, TD+1)
         gphi = bm.einsum('qij, jn -> qin', R, Dlambda) # (NQ, ldof, TD)
-        
-        if variables == 'u':
-            return gphi[None, :, :, :] #(1, ..., ldof, TD)
-        elif variables == 'x':
-            J = self.jacobi_matrix(bc, index=index)
-            G = self.first_fundamental_form(J)
-            d = bm.linalg.inv(G)
-            gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, d, gphi) 
-            return gphi
+
+        if map_mode == 'all':
+            if variables == 'u':
+                return gphi[None, :, :, :] #(1, ..., ldof, TD)
+            elif variables == 'x':
+                J = self.jacobi_matrix(bc, index=index, map_mode='all', gphi=gphi)
+                G = self.first_fundamental_form(J)
+                d = bm.linalg.inv(G)
+                gphi = bm.einsum('cqkm, cqmn, qln -> cqlk', J, d, gphi) 
+                return gphi
+            else:
+                raise ValueError(f"Unsupported variables: {variables}. Should be 'u' or 'x'.")
+        elif map_mode == 'pair':
+            if variables == 'u':
+                return gphi
+            elif variables == 'x':
+                J = self.jacobi_matrix(bc, index=index, map_mode='pair', gphi=gphi)
+                G = self.first_fundamental_form(J)
+                d = bm.linalg.inv(G)
+                gphi = bm.einsum('ckm, cmn, cln -> cqlk', J, d, gphi) 
+                return gphi
+            else:
+                raise ValueError(f"Unsupported variables: {variables}. Should be 'u' or 'x'.")
+        else:
+            raise ValueError(f"Unsupported map_mode: {map_mode}. Should be 'all' or 'pair'.")
 
     def number_of_local_ipoints(self, p:int, iptype:Union[int, str]='cell'):
         """
@@ -718,22 +757,49 @@ class LagrangeTriangleMesh(HomogeneousMesh):
             n /= l
         return n
 
-    def jacobi_matrix(self, bc: TensorLike, index: Index=_S, return_grad=False):
+    def jacobi_matrix(self, 
+                      bc: TensorLike, 
+                      index: Index=_S, 
+                      return_grad=False,
+                      gphi: Optional[TensorLike]=None,
+                      map_mode: str='all'):
         """
-        @berif 计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
+        Compute the Jacobi matrix of the mapping from reference Lagrange
+        triangle
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        Parameters:
+            bc(TensorLike): the barycentric coordinates of the integration points.
+            index(Index): the index of the mesh entities.
+            return_grad(bool): whether to return the gradient of the shape function.
+            map_mode(str): 'all' for all entities, 'pair' for one bc with one entity.
+        Returns:
+            TensorLike: the Jacobi matrix at the integration points.
         """
+
         TD = bc.shape[-1] - 1
         entity = self.entity(TD, index)
-        gphi = self.grad_shape_function(bc, variables='u')
-        J = bm.einsum(
-                'cin, cqim -> cqnm',
-                self.node[entity[index], :], gphi) #(NC,ldof,GD),(NC,NQ,ldof,TD)
+        if gphi is None:
+            gphi = self.grad_shape_function(bc, variables='u', map_mode='pair')
+        else:
+            assert gphi.shape[0] == bc.shape[0] 
+
+        if map_mode == 'all':
+            J = bm.einsum(
+                    'cin, qim -> cqnm',
+                    self.node[entity, :], gphi)
+        elif map_mode == 'pair':
+            J = bm.einsum(
+                    'cin, cim -> cnm',
+                    self.node[entity, :], gphi)
+        else:
+            raise ValueError(f"Unsupported map_mode: {map_mode}. Should be 'all' or 'pair'.")
+
         if return_grad is False:
-            return J #(NC,NQ,GD,TD)
+            return J
         else:
             return J, gphi
+          
 
     # fundamental form
     def first_fundamental_form(self, J: TensorLike, index: Index=_S):

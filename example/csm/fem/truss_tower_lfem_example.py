@@ -12,7 +12,7 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default=4, type=int,
+                    default=5, type=int,
                     help='id of the PDE model, default is 4.')
 
 parser.add_argument('--init_mesh',
@@ -57,5 +57,7 @@ model = TrussTowerModel(options)
 model.__str__()
 uh = model.solve()
 strain, stress = model.compute_strain_and_stress(uh)
-model.show(uh, strain, stress)
+mstress = model.calculate_von_mises_stress(stress)
+
+model.show(uh, strain, stress, mstress)
 # model.buckling_analysis(stress)
