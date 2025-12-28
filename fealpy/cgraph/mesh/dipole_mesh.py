@@ -30,8 +30,6 @@ class Dipole3d(CNodeType):
     ]
     OUTPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, title="网格"),
-        PortConf("ID1", DataType.BOOL, title="Robin边界"),
-        PortConf("ID2", DataType.BOOL, title="Dirichlet边界")
     ]   
    
     @staticmethod
@@ -170,13 +168,15 @@ class Dipole3d(CNodeType):
         NF = mesh.number_of_faces()
         ID1 = bm.zeros(NF, dtype=bool)
         ID1[robinBC] = True
+        mesh.facedata['RobinID'] = ID1
 
         NE = mesh.number_of_edges()
         NF = mesh.number_of_faces()
         gdof = NE * 2 + NF * 2
         ID2 = bm.zeros(gdof, dtype=bool)
         ID2[dirichletBC] = True
+        mesh.facedata['DirichletID'] = ID2
 
-        return mesh, ID1, ID2
+        return mesh
 
     

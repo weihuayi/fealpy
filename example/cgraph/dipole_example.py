@@ -14,16 +14,13 @@ pross = cgraph.create("AntennaPostprocess")
 # 连接节点
 mesher(cr = 0.05, sr0 = 1.9, sr1 = 2.4, L = 2.01, G = 0.01)
 dipole_antenna_eq(
-    mesh=mesher().mesh,
+    mesh=mesher(),
     q=3,
     diffusion = pde().diffusion,
     reaction = pde().reaction,
     source = pde().source,
     Y = pde().Y,
-    ID = mesher().ID1,
     gd=pde().dirichlet,
-    isDDof=mesher().ID2
-
 )
 
 
