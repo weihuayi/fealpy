@@ -1,4 +1,3 @@
-
 from typing import Literal
 from fealpy.typing import TensorLike, Index, _S
 from fealpy.backend import backend_manager as bm
