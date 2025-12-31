@@ -1,5 +1,3 @@
-from typing import Type
-
 from .nodetype import CNodeType, PortConf, DataType
 
 __all__ = ["Rbar2d", "Rbar3d", "Rbeam3d", "RbeamAxle3d"]
@@ -117,9 +115,7 @@ class RbeamAxle3d(CNodeType):
 
     Outputs:
         R_beam (TENSOR): Coordinate transformation matrix for beam elements (NC_beam, 12, 12).
-        R_axle (TENSOR): Coordinate transformation matrix for axle elements (NC_axle, 2, 6).
-        beam_indices (TENSOR): Indices of beam elements.
-        axle_indices (TENSOR): Indices of axle elements.
+        R_axle (TENSOR): Coordinate transformation matrix for axle elements (NC_axle, 12, 12).
     """
     TITLE: str = "梁-轴耦合单元坐标变换"
     PATH: str = "utils.coordtransform"

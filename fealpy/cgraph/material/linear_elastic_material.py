@@ -19,7 +19,7 @@ class LinearElasticMaterial(CNodeType):
         rho (FLOAT): Density [kg/m³] (only effective when property='custom-input').
 
     Outputs:
-        mp (LIST): Material properties list containing E, nu, rho, mu, and lambda_. 
+        mp (DICT): Material properties, containing E, nu, rho, mu, and lambda_. 
     """
     TITLE: str = "线弹性材料"
     PATH: str = "material.solid"

@@ -10,8 +10,8 @@ class YeeUniformMesh(CNodeType):
         domain: Computational domain [xmin, xmax, ymin, ymax] or 3D.
         n: Number of grid points in each direction.
         mp: Material properties (eps, mu).
-        source_configs: List of source configurations.
-        object_configs: List of object configurations.
+        source_configs: source configurations.
+        object_configs: object configurations.
     
     Outputs:
         mesh: YeeUniformMesher instance with attached properties.
@@ -25,11 +25,11 @@ class YeeUniformMesh(CNodeType):
         PortConf("n", DataType.INT, 0, 
                 desc="每个方向的网格剖分数",
                 title="剖分数", default=50),
-        PortConf("mp", DataType.LIST, 1, 
+        PortConf("mp", DataType.DICT, 1, 
                 desc="材料属性字典, 包含eps(介电常数)和mu(磁导率)",
-                title="材料属性", default=[{"eps": 1.0, "mu": 1.0}]),
-        PortConf("source_configs", DataType.LIST, 1, desc="点源配置列表", title="点源配置"),
-        PortConf("object_configs", DataType.LIST, 1, desc="物体配置列表", title="物体配置")
+                title="材料属性", default={"eps": 1.0, "mu": 1.0}),
+        PortConf("source_configs", DataType.DICT, 1, desc="点源配置", title="点源配置"),
+        PortConf("object_configs", DataType.DICT, 1, desc="物体配置", title="物体配置")
     ]
     
     OUTPUT_SLOTS = [

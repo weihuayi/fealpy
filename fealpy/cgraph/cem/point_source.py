@@ -18,7 +18,7 @@ class PointSource(CNodeType):
         ... (similar for source2)
     
     Outputs:
-        source_configs: List of source configuration dictionaries.
+        source_configs: source configuration dictionaries.
     """
     
     TITLE: str = "点源配置"
@@ -77,7 +77,7 @@ class PointSource(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("source_configs", DataType.LIST, title="点源配置"),
+        PortConf("source_configs", DataType.DICT, title="点源配置"),
     ]
     @staticmethod
     def run(**options):
@@ -164,7 +164,7 @@ class ObjectSource(CNodeType):
         ... (similar for object2 and object3)
     
     Outputs:
-        object_configs: List of object configuration dictionaries.
+        object_configs: object configuration dictionaries.
     """
     TITLE: str = "物体配置"
     PATH : str = "examples.CEM"
@@ -204,7 +204,7 @@ class ObjectSource(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
-        PortConf("object_config", DataType.LIST, title="物体配置")
+        PortConf("object_config", DataType.DICT, title="物体配置")
     ]
     
     @staticmethod

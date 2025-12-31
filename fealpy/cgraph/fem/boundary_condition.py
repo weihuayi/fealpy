@@ -27,7 +27,7 @@ class BoundaryCondition(CNodeType):
         - Constrained DOF displacements are set to 0 (can be extended for non-zero prescribed values).
     """
     TITLE: str = "杆单元边界条件处理"
-    PATH: str = "simulation.boundary"
+    PATH: str = "simulation.discretization"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, 1, 
                  desc="包含杆单元的网格对象",  
@@ -129,7 +129,7 @@ class BeamBoundaryCondition(CNodeType):
         F_bc (TENSOR): Modified load vector with boundary conditions applied.
     """
     TITLE: str = "梁单元边界条件处理"
-    PATH: str = "simulation.boundary"
+    PATH: str = "simulation.discretization"
     INPUT_SLOTS = [
         PortConf("mesh", DataType.MESH, 1, 
                  desc="包含梁单元的网格对象",  

@@ -44,7 +44,7 @@ class PointSourceMaxwellFDTDModel(CNodeType):
             title="PML宽度", default=8),
         PortConf("pml_m", DataType.FLOAT, 0,
             desc="UPML grading参数",
-            title="PML参数m", default=5.0),
+            title="PML参数", default=5.0),
         PortConf("output_dir", DataType.STRING, 0,
             desc="输出文件保存目录",
             title="输出目录",default="~/fdtd_output"),
