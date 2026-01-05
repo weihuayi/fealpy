@@ -205,8 +205,7 @@ class DamBreak3DParticleIterativeUpdate(CNodeType):
             "pressure": mesh.nodedata["pressure"].tolist(),  # ndarray -> list
             }     
         writer = VTKWriter2()
-        path = "/home/peter/"
-        zfname = path + 'test_'+ str(i+1).zfill(10) + '.vtk'    
+        zfname = output_dir + '/' + 'test_'+ str(i+1).zfill(10) + '.vtk'    
         writer.write_vtk(current_data, zfname)           
 
         velocity = mesh.nodedata["u"]
