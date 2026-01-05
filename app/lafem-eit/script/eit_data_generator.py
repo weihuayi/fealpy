@@ -16,6 +16,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.backend import TensorLike as Tensor
 from fealpy.mesh import TriangleMesh, UniformMesh2d
 from fealpy.cem import EITDataGenerator
+from fealpy.decorator import cartesian
 
 
 parser = argparse.ArgumentParser()
@@ -81,7 +82,8 @@ if LABEL_FOLDER:
     os.makedirs(os.path.join(output_folder, LABEL_FOLDER), exist_ok=True)
 
 
-def neumann(points: Tensor, *args):
+@cartesian
+def neumann(points: Tensor, *args, **kwargs):
     x = points[..., 0]
     y = points[..., 1]
     kwargs = {'dtype': points.dtype, 'device': bm.get_device(points)}

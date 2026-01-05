@@ -107,7 +107,7 @@ class EITDataGenerator():
         # node is the integral of the current density function.
         if callable(gn_source):
             lform = LinearForm(self.space, batch_size=batch_size)
-            self._bsi.gn = gn_source
+            self._bsi.source = gn_source
             self._bsi.batched = (batch_size > 0)
             self._bsi.clear()
             lform.add_integrator(self._bsi)
