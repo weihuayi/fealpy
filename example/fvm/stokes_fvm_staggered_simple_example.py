@@ -10,10 +10,10 @@ def main():
     parser.add_argument('--pde', default=1, type=int,
                         help='Stokes PDE example ID')
     
-    parser.add_argument('--nx', default=32, type=int,
+    parser.add_argument('--nx', default=20, type=int,
                         help='Grid divisions in x-direction')
 
-    parser.add_argument('--ny', default=32, type=int,
+    parser.add_argument('--ny', default=20, type=int,
                         help='Grid divisions in y-direction')
     
     parser.add_argument('--backend',default='numpy', type=str,

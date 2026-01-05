@@ -146,7 +146,7 @@ class StokesFVMStaggeredSimpleModel(ComputationalModel):
             if L2_p_corr < tol:
                 self.logger.info("Converged.")
                 break
-            p += 0.01 * p_corr
+            p += 0.02 * p_corr
         self.uh, self.vh, self.ph = uh, vh, p
         return uh, vh, p
 

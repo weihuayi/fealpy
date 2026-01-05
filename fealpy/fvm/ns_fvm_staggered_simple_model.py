@@ -170,7 +170,7 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
             #     p += 0.05*p_corr
             # else:
             #     p += 0.05*p_corr
-            p += 0.24*p_corr
+            p += 0.25*p_corr
             uh += u_corr
             vh += v_corr
             uf1 = (uh[ue2c[:,0]] + uh[ue2c[:,1]])/2
@@ -182,6 +182,9 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
 
         
         self.uh, self.vh, self.ph = uh, vh, p
+        self.edge_vel, _ = self.staggered_mesh.map_velocity_uvcell_to_pedge(uh, vh, a_p_u, a_p_v)
+        # print(self.edge_vel.shape)
+        # print(self.pmesh.number_of_edges())
         self.p_correct = p_corr
         return uh, vh, p
 
@@ -234,4 +237,52 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         plt.ylabel("Residual (log scale)")
         plt.grid(True, which="both", ls="--")
         plt.tight_layout()
+        plt.show()
+
+    def plot_streamline(self) -> None:
+        """Plot the streamlines of the velocity field."""
+        import matplotlib.pyplot as plt
+
+        nx, ny = 32, 32 # u.shape = (ny, nx) 通常
+        
+        c2e = self.pmesh.cell2edge
+        u = (self.edge_vel[c2e[:,1]]+self.edge_vel[c2e[:,3]])/2
+        v = (self.edge_vel[c2e[:,0]]+self.edge_vel[c2e[:,2]])/2
+        print("u shape:",u.shape)
+        print("v shape:",v.shape)
+        u2d = u.reshape((ny, nx),order="F")
+        v2d = v.reshape((ny, nx),order="F")
+        p2d = self.ph.reshape((ny, nx),order="F")
+
+        import numpy as np
+
+        dx = 1.0 / nx
+        dy = 1.0 / ny
+
+        x = (np.arange(nx) + 0.5) * dx
+        y = (np.arange(ny) + 0.5) * dy
+        X, Y = np.meshgrid(x, y)
+
+
+        import matplotlib.pyplot as plt
+
+        speed = np.sqrt(u2d**2 + v2d**2)
+
+        plt.figure(figsize=(6, 6))
+        plt.streamplot(
+            X, Y, u2d, v2d,
+            color=speed,
+            cmap="viridis",
+            density=1.5
+        )
+        plt.colorbar(label="|u|")
+        plt.axis("equal")
+        plt.title("Lid-driven cavity streamlines")
+        plt.show()
+
+        plt.figure(figsize=(6, 6))
+        plt.contourf(X, Y, p2d, levels=50, cmap="coolwarm")
+        plt.colorbar(label="p")
+        plt.axis("equal")
+        plt.title("Pressure contour")
         plt.show()

@@ -36,4 +36,5 @@ class DivergenceReconstruct:
         mask = e2c[:, 1] != e2c[:, 0]
         bm.add.at(div_u, e2c[:, 0], integrator)
         bm.add.at(div_u, e2c[mask, 1], -integrator[mask])
+        # bm.add.at(div_u, e2c[:, 1], -integrator)
         return div_u

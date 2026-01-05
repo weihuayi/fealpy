@@ -16,6 +16,7 @@ from fealpy.fvm import (
     GradientReconstruct,
     DivergenceReconstruct,
     DirichletBC,
+    RhieChowInterpolation
 )
 
 
@@ -55,15 +56,31 @@ class NSFVMSimpleModel(ComputationalModel):
         self.space = ScaledMonomialSpace2d(self.mesh, self.p)
         self.velocity_space = TensorFunctionSpace(self.space, shape=(2, -1))
 
-    # --- SIMPLE components ----------------------------------------------------
+    def sum_duplicates_csr_manual(self,csr):
+        from fealpy.sparse import csr_matrix
+        indptr = csr.indptr       # shape (nrow+1,)
+        indices = csr.indices     # shape (nnz,)
+        data = csr.data           # shape (nnz,)
+        nrow, ncol = csr.shape
+        counts = indptr[1:] - indptr[:-1]
+        row = bm.repeat(bm.arange(nrow), counts)
+        flat_idx = row * ncol + indices
+        summed = bm.bincount(flat_idx, weights=data, minlength=nrow*ncol)
+        nnz_idx = bm.nonzero(summed)[0]
+        new_data = summed[nnz_idx]
+        new_row, new_col = divmod(nnz_idx, ncol)
+        return csr_matrix((new_data, (new_row, new_col)), shape=csr.shape)
+
+# --- SIMPLE components ----------------------------------------------------
 
     def temporary_velocity(self, p, uf) -> Tuple[TensorLike, TensorLike]:
         """Solve momentum eqn for intermediate velocity u*."""
         # Diffusion
         bform = BilinearForm(self.velocity_space)
         bform.add_integrator(ScalarDiffusionIntegrator(q=self.p + 2))
+        # Convection
+        bform.add_integrator(ConvectionIntegrator(q=self.p + 2, coef=uf))
         B = bform.assembly()
-
         # Source
         lform = LinearForm(self.velocity_space)
         lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p + 2))
@@ -71,14 +88,9 @@ class NSFVMSimpleModel(ComputationalModel):
 
         dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
         B, f = dbc.DiffusionApply(B, f)
-
-        C = BilinearForm(self.velocity_space).add_integrator(
-            ConvectionIntegrator(q=self.p + 2, coef=uf)).assembly()
-        B = B + C
-        # f = dbc.ConvectionApplyX(f)
-
+        #fealpy中的稀疏矩阵是有问题的,需要手动合并重复的行列项
+        B = self.sum_duplicates_csr_manual(B)
         ap = B.diags().values
-
         grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(
             p, self.pde.neumann_pressure
         )  # (NC, 2)
@@ -89,58 +101,38 @@ class NSFVMSimpleModel(ComputationalModel):
         u = spsolve(B, f, "mumps")
         return ap, u
 
-    def Ucell2edge(self, u, gd):
-        """Interpolate cell-centered u to face velocities uf."""
-        u = bm.stack([u[:self.NC], u[self.NC:]], axis=-1)
-        bd_edge = self.mesh.boundary_face_index()
-        edge_middle_point = self.mesh.entity_barycenter("edge")
-        e2c = self.mesh.edge_to_cell()
-
-        bdedgepoint = edge_middle_point[bd_edge]
-        bdedgeu = gd(bdedgepoint)
-
-        uf = bm.zeros((self.mesh.number_of_faces(), 2), dtype=u.dtype)
-        uf += (u[e2c[:, 0]] + u[e2c[:, 1]]) / 2
-        uf[bd_edge, :] = bdedgeu
-        uf = bm.reshape(uf, (-1, 2))
-        return uf
-
-    def rhie_chow(self, uf, ph0, ap_edge):
-        """Rhie-Chow interpolation to face velocity."""
-        avargrad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(
-            ph0, self.pde.neumann_pressure
-        )  # (NC, 2)
-        avargrad_f = GradientReconstruct(self.mesh).reconstruct(avargrad_p)
-        x = self.mesh.boundary_face_index()
-        e2c = self.mesh.edge_to_cell()
-        dp = self.cm / ap_edge[:len(self.cm)]
-        df = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
-        mask = bm.ones(avargrad_f.shape[0], dtype=bool)
-        mask[x] = False
-        uf[mask] += bm.einsum("i,ij->ij", df[mask], avargrad_f[mask])
-        return uf,df
-
-
     def pressure_correct(self, ap: TensorLike, uf: TensorLike,p) -> TensorLike:
-        """Solve pressure correction equation."""
+        """Solve pressure correction equation.
+        在这里实际上是有问题的,理论上计算dp_edge的程序应该是:
+        dp = cm/ap[:len(cm)]
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        但是随着网格加密,使用此dp_edge会导致求出的压力修正过大,必须使用非常小的松弛因子比如0.001才能使迭代收敛.
+        所以进行了改动,使用dp = 1/ap[:len(cm)],然后计算
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        dp_edge = dp_edge*em
+        最终不需要过大的收敛因子,而且迭代次数也相对会减少一些.
+        但这样做,在算法原理上是矛盾的,而且随着网格的加密,松弛因子仍然要不断减小,大概是网格加密一倍,松弛因子就要减小到原来的一半.
+        这个问题需要进一步研究.
+        """
+        cm = self.mesh.entity_measure('cell')
+        em = self.mesh.entity_measure('edge')
+        dp = 1/ap[:len(cm)]
+        e2c = self.mesh.edge_to_cell()
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        dp_edge = dp_edge*em
         div_u = DivergenceReconstruct(self.mesh).Reconstruct(uf)  # (NC,)
-        
         bform2 = BilinearForm(self.space)
-        bform2.add_integrator(ScalarDiffusionIntegrator(q=2))
+        bform2.add_integrator(ScalarDiffusionIntegrator(q=2,coef=dp_edge))
         A = bform2.assembly()
-
         LagA = self.mesh.entity_measure("cell")
-        div_u = ap[:len(LagA)]*div_u
         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                  bm.arange(len(LagA), dtype=bm.int32)]),LagA,
             spshape=(1, len(LagA)),
         )
         A = BlockForm([[A, A1.T], [A1, None]])
         A = A.assembly_sparse_matrix(format="csr")
-
         b0 = bm.array([0])
         b = bm.concatenate([-div_u, b0], axis=0)
-
         sol = spsolve(A, b, "mumps")
         p_c = sol[:-1]
         return p_c
@@ -149,22 +141,27 @@ class NSFVMSimpleModel(ComputationalModel):
         """Main SIMPLE loop."""
         p = bm.zeros(self.NC)
         uf = bm.zeros((self.mesh.number_of_faces(), 2))
-
         ap, u = self.temporary_velocity(p, uf)
         self.residuals = []
-
+        # dp = self.cm/ap[:self.NC]
+        bd_edge = self.mesh.boundary_face_index()
+        edge_middle_point = self.mesh.entity_barycenter('edge')
+        bdedgepoint = edge_middle_point[bd_edge]
+        bdedgeu = self.pde.dirichlet_velocity(bdedgepoint)
         for i in range(max_iter):
-            uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
+            uf = RhieChowInterpolation(self.mesh).Interpolation(u,ap,p)
+            uf[bd_edge, :] = bdedgeu
             p_c = self.pressure_correct(ap, uf,p)
             L2p_c = bm.sqrt(bm.sum(self.cm * (p_c) ** 2))
             self.residuals.append(float(L2p_c))
-            self.logger.info(f"[Iter {i+1}] pressure_correct = {L2p_c:.4e}")
+            self.logger.info(f"[Iter {i+1}] pressure_correct = {L2p_c}")
 
             if L2p_c < tol:
                 self.logger.info("Converged.")
                 break
 
-            p += 0.8*p_c
+            p += 0.4*p_c
+
             _, u = self.temporary_velocity(p, uf)
 
         self.uh = u[:self.NC]

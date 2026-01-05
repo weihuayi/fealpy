@@ -16,6 +16,7 @@ from . import (
     GradientReconstruct,
     DivergenceReconstruct,
     DirichletBC,
+    RhieChowInterpolation
 )
 
 class StokesFVMSimpleModel(ComputationalModel):
@@ -94,18 +95,20 @@ class StokesFVMSimpleModel(ComputationalModel):
     
     def pressure_correct(self, ap: TensorLike, uf: TensorLike) -> TensorLike:
         """Solve for pressure correction p' to enforce continuity."""
-
-        
+        cm = self.mesh.entity_measure('cell')
+        em = self.mesh.entity_measure('edge')
+        dp = 1/ap[:len(cm)]
+        e2c = self.mesh.edge_to_cell()
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        dp_edge = em*dp_edge
         div_u = DivergenceReconstruct(self.mesh).Reconstruct(uf)  # (NE,)
         
         bform2 = BilinearForm(self.space)
-        bform2.add_integrator(ScalarDiffusionIntegrator(q=2))
+        bform2.add_integrator(ScalarDiffusionIntegrator(q=2,coef=dp_edge))
         A = bform2.assembly()
-        LagA = self.mesh.entity_measure('cell')
-        # div_u = ap[:len(LagA)]*div_u
-        div_u = bm.einsum('i,i,i->i', ap[:len(LagA)], div_u, 1/LagA)
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                             bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
+        
+        A1 = COOTensor(bm.array([bm.zeros(len(cm), dtype=bm.int32),
+                             bm.arange(len(cm), dtype=bm.int32)]), cm, spshape=(1, len(cm)))
         A = BlockForm([[A, A1.T], [A1, None]])
         A = A.assembly_sparse_matrix(format='csr')
         b0 = bm.array([0])
@@ -114,13 +117,24 @@ class StokesFVMSimpleModel(ComputationalModel):
         p_c = sol[:-1]
         return p_c
 
-    def solve(self, max_iter: int = 10, tol: float = 1e-5) -> Tuple[TensorLike, TensorLike]:
+    def solve(self, max_iter: int = 100, tol: float = 1e-5) -> Tuple[TensorLike, TensorLike]:
         """Solve the Stokes equation using the SIMPLE algorithm."""
         p = bm.zeros(self.NC)
         ap, u = self.temporary_velocity(p)
+        cm = self.mesh.entity_measure('cell')
+        # em = self.mesh.entity_measure('edge')
+        dp = cm/ap[:len(cm)]
+        e2c = self.mesh.edge_to_cell()
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
         self.residuals = []
+        bd_edge = self.mesh.boundary_face_index()
+        edge_middle_point = self.mesh.entity_barycenter('edge')
+        bdedgepoint = edge_middle_point[bd_edge]
+        bdedgeu = self.pde.dirichlet_velocity(bdedgepoint)
         for i in range(max_iter):
-            uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
+            uf = RhieChowInterpolation(self.mesh).Interpolation(u,ap,p)
+            uf[bd_edge, :] = bdedgeu
+            # uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
             p_corr = self.pressure_correct(ap, uf)
             L2_p_corr = bm.sqrt(bm.sum(self.cm * (p_corr)**2))
             self.residuals.append(float(L2_p_corr))
@@ -128,7 +142,7 @@ class StokesFVMSimpleModel(ComputationalModel):
             if L2_p_corr < tol:
                 self.logger.info("Converged.")
                 break
-            p += 0.01*p_corr
+            p += 0.36*p_corr
             _, u = self.temporary_velocity(p)
 
         self.uh = u[:self.NC]

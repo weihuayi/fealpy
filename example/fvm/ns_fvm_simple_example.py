@@ -8,10 +8,10 @@ def main():
     parser.add_argument('--pde', default=1, type=int,
                          help='Navier–Stokes PDE example ID')
     
-    parser.add_argument('--nx', default=20, type=int, 
+    parser.add_argument('--nx', default=16, type=int, 
                         help='Grid divisions in x')
 
-    parser.add_argument('--ny', default=20, type=int, 
+    parser.add_argument('--ny', default=16, type=int, 
                         help='Grid divisions in y')
     
     parser.add_argument('--space_degree', default=0, type=int, 
@@ -27,9 +27,9 @@ def main():
                         default='INFO', type=str,
                         help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
     
-    parser.add_argument('--max_iter', default=1000, type=int)
+    parser.add_argument('--max_iter', default=500, type=int)
     
-    parser.add_argument('--tol', default=1e-5, type=float)
+    parser.add_argument('--tol', default=8e-4, type=float)
     
     parser.add_argument('--plot', action='store_true')
 
@@ -46,6 +46,7 @@ def main():
     print(f"L2 error (v) = {verror}")
     print(f"L2 error (p) = {perror}")
     model.plot()
+    # model.plot_streamline()
     if options["plot"]:
         model.plot()
         model.plot_residual()

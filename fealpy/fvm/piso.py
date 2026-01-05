@@ -14,8 +14,9 @@ from fealpy.fvm import (
     GradientReconstruct,
     DivergenceReconstruct,
     DirichletBC,
-    NeumannBC)
-
+    VectorDecomposition,
+    NeumannBC,
+    RhieChowInterpolation)
 
 
 
@@ -24,22 +25,79 @@ nt = 20
 tau = (duration[1] -duration[0]) / nt
 
 
-pde = PDEModelManager("navier_stokes").get_example(3)
-nx = 10
-ny = 10
+pde = PDEModelManager("navier_stokes").get_example(1)
+nx = 3
+ny = 3
 staggered_mesh = StaggeredMeshManager(pde.domain(), nx=nx, ny=ny)
 umesh = staggered_mesh.umesh
 vmesh = staggered_mesh.vmesh
 pmesh = staggered_mesh.pmesh
 ucell2pedge = staggered_mesh.get_dof_mapping_ucell2pedge()
 
+ppoints = pmesh.entity_barycenter("cell")
+p = pde.pressure(ppoints)
+# e, d = VectorDecomposition(pmesh).centroid_vector_calculation()
+# partial_p = (p[pmesh.edge_to_cell()[:,1]] - p[pmesh.edge_to_cell()[:,0]])/d
+# e_cf = e / d[:, None]
+# # print(e_cf)
+# grad_p = GradientReconstruct(pmesh).AverageGradientreNeumann(
+#             p, pde.neumann_pressure)
+grad_p = GradientReconstruct(pmesh).test(p)
+grad_p_I = pde.grad_pressure(ppoints)
+pcm = pmesh.entity_measure("cell")
+L2error = bm.sqrt(bm.sum(pcm * (grad_p[:,0] - grad_p_I[:,0]) ** 2))
+print("error of grad p at cell:",L2error)
+# print("error of grad p at face:",grad_p[3,0] - grad_p_I[3,0])
+exit()
+# overline_grad_p_f = GradientReconstruct(pmesh).reconstruct(grad_p)
+# GradientDifference = (partial_p - bm.einsum('ij,ij->i', overline_grad_p_f, e_cf))[:, None]*e_cf
+# # print("GradientDifference:",GradientDifference)
+# gradp_f = overline_grad_p_f + GradientDifference
+# pem = pmesh.entity_measure("edge")
+# pepoints = pmesh.entity_barycenter("edge")
+# grad_p_f_I = pde.grad_pressure(pepoints)
+# error = grad_p_f_I - gradp_f
+# # L2error = bm.sqrt(bm.sum(pem * (GradientDifference[:,0]) ** 2))
+# L2error1 = bm.sqrt(bm.sum(pem * (grad_p_f_I[:,0] - overline_grad_p_f[:,0]) ** 2))
+# L2error2 = bm.sqrt(bm.sum(pem * (grad_p_f_I[:,0] - gradp_f[:,0]) ** 2))
+# error = bm.max(bm.abs(GradientDifference[:,0]))
+# # error = bm.max(bm.abs(grad_p_f_I[:,0] - gradp_f[:,0]))
+# print("error of grad p at face:",L2error1)
+# print("error of grad p at face:",L2error2)
+# exit()
 
-# from matplotlib import pyplot as plt
-# fig = plt.figure()
-# axes = fig.add_subplot(111)
-# pmesh.add_plot(axes) # 画出网格背景
-# pmesh.find_edge(axes, showindex=True) # 找到单元重心
-# plt.show()
+from matplotlib import pyplot as plt
+fig = plt.figure()
+axes = fig.add_subplot(111)
+pmesh.add_plot(axes) # 画出网格背景
+pmesh.find_edge(axes, showindex=True) # 找到单元重心
+plt.show()
+exit()
+
+
+
+rhie_chow = RhieChowInterpolation(pmesh)
+space = ScaledMonomialSpace2d(pmesh,p=0) 
+bform = BilinearForm(space)
+bform.add_integrator(ScalarDiffusionIntegrator(q=2))
+A = bform.assembly()
+uap = A.diags().values
+cm = pmesh.entity_measure("cell")
+em = pmesh.entity_measure("edge")
+dp = cm/uap
+# print("a_p:",dp)
+cellpoints = pmesh.entity_barycenter("cell")
+facepoints = pmesh.entity_barycenter("face")
+uf = pde.velocity(facepoints)
+u = pde.velocity(cellpoints)
+uf_rhie,df = rhie_chow.Ucell2edge(u,dp)
+u_difference = uf - uf_rhie 
+print(u_difference[0,0])
+p = pde.pressure(cellpoints)
+p_defference = rhie_chow.GradientDifference(p)
+print(p_defference[80,:])
+exit()
+
 # print(pmesh.cell_to_edge())
 # print("ucell2pedge:",ucell2pedge)
 

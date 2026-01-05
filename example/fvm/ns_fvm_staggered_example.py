@@ -6,13 +6,13 @@ from fealpy.fvm import NSFVMStaggeredModel
 def main():
     parser = argparse.ArgumentParser(description="FVM Stokes solver on staggered mesh")
 
-    parser.add_argument('--pde', default=1, type=int,
+    parser.add_argument('--pde', default=2, type=int,
                         help='PDE example ID from Stokes PDE manager.')
     
-    parser.add_argument('--nx', default=20, type=int,
+    parser.add_argument('--nx', default=16, type=int,
                         help='Number of cells in x-direction.')
     
-    parser.add_argument('--ny', default=20, type=int,
+    parser.add_argument('--ny', default=16, type=int,
                         help='Number of cells in y-direction.')
     
     parser.add_argument('--backend', default='numpy', type=str,

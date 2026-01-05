@@ -28,9 +28,9 @@ def main():
                         default='INFO', type=str,
                         help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
-    parser.add_argument('--max_iter', default=200, type=int)
+    parser.add_argument('--max_iter', default=100, type=int)
     
-    parser.add_argument('--tol', default=1e-5, type=float)
+    parser.add_argument('--tol', default=4e-5, type=float)
     
     parser.add_argument('--plot', action='store_true')
 
