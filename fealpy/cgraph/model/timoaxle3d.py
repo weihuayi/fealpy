@@ -14,8 +14,7 @@ class Timoaxle3d(CNodeType):
         shear_factors (FLOAT): Shear correction factor. Default 10/9.
 
     Outputs:
-        FSY (float): Shear correction factor along the Y direction.
-        FSZ (float): Shear correction factor along the Z direction.
+        init_mesh(mesh): Create a mesh object.
         external_load (function): Function that returns the global load vector.
         dirichlet_dof_index (function): Function that returns Dirichlet boundary condition indices.
     """
@@ -32,16 +31,18 @@ class Timoaxle3d(CNodeType):
     ]
     
     OUTPUT_SLOTS = [
+        PortConf("beam_para", DataType.TENSOR, desc="梁结构参数数组，每行为 [直径, 长度, 数量]", title="梁段参数"),
+        PortConf("axle_para", DataType.TENSOR, desc="轴结构参数数组，每行为 [直径, 长度, 数量]", title="轴段参数"),
         PortConf("external_load", DataType.FUNCTION, desc="全局载荷向量的函数", title="外部载荷"),
         PortConf("dirichlet_dof_index", DataType.FUNCTION, desc="Dirichlet 自由度索引的函数", title="边界自由度索引")
         
     ]
 
     @staticmethod
-    def run(beam_para=None, axle_para=None, section_shapes="circular", kappa=10/9):
+    def run(beam_para=None, axle_para=None, section_shapes="circular", kappa=None):
         from fealpy.csm.model.beam.timobeam_axle_data_3d import TimobeamAxleData3D
         model = TimobeamAxleData3D( beam_para, axle_para, kappa)
         return tuple(
             getattr(model, name)
-            for name in ["external_load", "dirichlet_dof_index"]
+            for name in ["beam_para", "axle_para", "external_load", "dirichlet_dof_index"]
         )

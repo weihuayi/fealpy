@@ -84,13 +84,20 @@ class ScalarMassIntegrator(LinearInt, OpInt, CellInt):
         J = mesh.jacobi_matrix(bcs, index=index)
         G = mesh.first_fundamental_form(J) 
         d = bm.sqrt(bm.linalg.det(G))
+        coef = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         phi = space.basis(bcs)
+        phi = phi.reshape(*phi.shape[:3], -1) # (C, Q, I, dof_numel)
+        
         if coef is None:
-            M = bm.einsum(f'q, cqi, cqj,cq -> cij', ws*rm, phi, phi, d)
+            M = bm.einsum(f'q, cqid, cqjd, cq -> cij', ws*rm, phi, phi, d)
         if isinstance(coef, (int, float)):
-            M = bm.einsum('q, cqi, cqj, cq -> cij', ws*rm, phi, phi, d) * coef
+            M = bm.einsum('q, cqid, cqjd, cq -> cij', ws*rm, phi, phi, d) * coef
         elif isinstance(coef, TensorLike):
-            M = bm.einsum('q, cqi, cqj, cq, cq -> cij', ws*rm, phi, phi, d, coef)
+            ndim = coef.ndim
+            if ndim == 4:
+                M = bm.einsum(f'q,  cqid, cqjn,cq, cqdn -> cij', ws*rm, phi, phi ,d, coef)
+            elif ndim == 2:
+                M = bm.einsum('q, cqid, cqjd , cq, cq -> cij', ws*rm, phi, phi, d, coef)
         return M
 
 

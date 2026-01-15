@@ -37,6 +37,10 @@ class TensorPrismMesh(HomogeneousMesh, Plotable):
         self.ccw = bm.array([0, 1, 2, 3], **kwargs)
         self.construct()
 
+        self.nodedata = {}
+        self.celldata = {}
+        self.meshdata = {}
+        
     def construct(self):
         tmesh = self.tmesh
         imesh = self.imesh
@@ -62,17 +66,6 @@ class TensorPrismMesh(HomogeneousMesh, Plotable):
         qface = bm.concat([all_edge[:-tNE], all_edge[tNE:][:,::-1]], axis=1)
         self.node = node
         self.cell = cell
-        # from .prism_mesh import PrismMesh
-        # import matplotlib.pyplot as plt
-        # pm = PrismMesh(node, cell)
-        # ipoints = self.interpolation_points(p=2)
-        # fig = plt.figure()
-        # axes = fig.add_subplot(111, projection='3d')
-        # pm.add_plot(axes, cellcolor="#80e673")
-        # pm.find_node(axes, node=ipoints,
-        #                showindex=True, color='r', fontsize='20')
-        # pm.find_cell(axes=axes, showindex=True, fontsize='20')
-        # plt.show()
 
         self.tface = all_cell
         self.qface = qface
@@ -331,4 +324,31 @@ class TensorPrismMesh(HomogeneousMesh, Plotable):
         elif etype in {'edge', 1}:
             return qf1 
     
+    # vtk
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 3}:
+            VTK_WEDGE = 13
+            return VTK_WEDGE
+    
+    def to_vtk(self, fname=None, etype='cell', index=_S):
+        """把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import  write_to_vtu
 
+        node = self.node
+        cell = self.cell[index]
+        
+        NC = len(cell)
+        NV = cell.shape[-1]
+
+        cellType = self.vtk_cell_type(etype)
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell = bm.set_at(cell, (slice(NC), 0), NV)
+
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)

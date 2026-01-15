@@ -16,9 +16,9 @@ IncompressibleNSRun = cgraph.create("IncompressibleNSIPCSRun")
 pde(
     mu = 0.001,
     rho = 1.0,
-    cx = 0.5,
+    cx = 0.2,
     cy = 0.2,
-    radius = 0.07,
+    radius = 0.05,
     n_circle = 100,
     h = 0.06)
 uspacer(mesh = pde().mesh, p=2, gd = 2)
@@ -43,7 +43,7 @@ simulation(
     is_pressure_boundary = pde().is_pressure_boundary,
     apply_bcu = dbc_u().apply_bc,
     apply_bcp = dbc_p().apply_bc,
-    q = 2
+    q = 3
 ) 
 timeline(
     T0 = 0.0,

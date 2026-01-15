@@ -8,3 +8,4 @@ from .dipole_antenna import *
 from .timoaxle import *
 from .truss import *
 from .beam import *
+from .linear_elasticity_eigen import *

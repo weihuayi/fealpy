@@ -41,9 +41,11 @@ dbc(
 solver(A = dbc().K,
        b = dbc().F)
 
+postprocess(out = solver().out, node_ldof=2, type="Euler_beam")
+
 
 # 最终连接到图输出节点上
-WORLD_GRAPH.output(mesh=mesher(), u=solver())
+WORLD_GRAPH.output(mesh=mesher(), u=solver().out, uh=postprocess().uh, theta=postprocess().theta)
 WORLD_GRAPH.register_error_hook(print)
 WORLD_GRAPH.execute()
 print(WORLD_GRAPH.get())

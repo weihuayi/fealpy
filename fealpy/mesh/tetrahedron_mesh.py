@@ -174,7 +174,12 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         volume = bm.sum(v03*bm.cross(v01, v02), axis=1)/6.0
         return volume
 
-
+    def reference_cell_measure(self):
+        """
+        Calculate the measure of the reference cell (tetrahedron).
+        """
+        return 1.0/6.0
+        
     def face_area(self, index=_S):
         """
         @brief 计算所有网格面的面积
@@ -983,7 +988,28 @@ class TetrahedronMesh(SimplexMesh, Plotable):
                 ret["nodedata"].append(fval)
         return ret
 
+    def jacobi_matrix(self,bcs = None, index=_S):
+        """
+        Compute the Jacobi matrix for the tetrahedral element.
 
+        Parameters
+            index : Index, optional
+                The index of the element to compute the Jacobian for.
+        Returns
+            J : array
+                The Jacobi matrix for the tetrahedral element.
+        """
+        GD = self.geo_dimension()
+        node = self.entity('node')
+        cell = self.entity('cell',index=index)
+        NC = len(cell)
+        
+        J = bm.zeros((NC, GD, 3), dtype=self.ftype, device=self.device)
+        J = bm.set_at(J , (..., 0), node[cell[:, 1]] - node[cell[:, 0]])
+        J = bm.set_at(J , (..., 1), node[cell[:, 2]] - node[cell[:, 0]])
+        J = bm.set_at(J , (..., 2), node[cell[:, 3]] - node[cell[:, 0]])
+        
+        return J
    
     ## @ingroup MeshGenerators
     @classmethod
