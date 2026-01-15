@@ -68,7 +68,8 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         A = bform.assembly()
 
         f = LinearForm(uspace).add_integrator(ScalarSourceIntegrator(self.pde.source_u, q=2)).assembly()
-        grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
+        grad_p = GradientReconstruct(self.umesh).LSQ(p_u)
+        # grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
         f -= bm.einsum('i,i->i', grad_p[:, 0], self.ucm)
         dbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
                           threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
@@ -88,7 +89,8 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         A = bform.assembly()
 
         f = LinearForm(vspace).add_integrator(ScalarSourceIntegrator(self.pde.source_v, q=2)).assembly()
-        grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
+        # grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
+        grad_p = GradientReconstruct(self.vmesh).LSQ(p_v)
         f -= bm.einsum('i,i->i', grad_p[:, 1], self.vcm)
         dbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
                           threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
@@ -170,7 +172,7 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
             #     p += 0.05*p_corr
             # else:
             #     p += 0.05*p_corr
-            p += 0.25*p_corr
+            p += 0.2*p_corr
             uh += u_corr
             vh += v_corr
             uf1 = (uh[ue2c[:,0]] + uh[ue2c[:,1]])/2

@@ -11,12 +11,13 @@ from fealpy.solver import spsolve
 
 from fealpy.fvm import (
     ScalarDiffusionIntegrator,
+    ScalarCrossDiffusionIntegrator,
     ScalarSourceIntegrator,
     ConvectionIntegrator,
     GradientReconstruct,
     DivergenceReconstruct,
     DirichletBC,
-    RhieChowInterpolation
+    RhieChowInterpolation    
 )
 
 
@@ -46,7 +47,7 @@ class NSFVMSimpleModel(ComputationalModel):
 
     def set_mesh(self, nx: int, ny: int) -> None:
         """Initialize computational mesh."""
-        self.mesh = self.pde.init_mesh['uniform_qrad'](nx=nx, ny=ny)
+        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)
         self.cm = self.mesh.entity_measure('cell')
         self.NC = self.mesh.number_of_cells()
 
@@ -73,7 +74,7 @@ class NSFVMSimpleModel(ComputationalModel):
 
 # --- SIMPLE components ----------------------------------------------------
 
-    def temporary_velocity(self, p, uf) -> Tuple[TensorLike, TensorLike]:
+    def temporary_velocity(self, p, uf, u0) -> Tuple[TensorLike, TensorLike]:
         """Solve momentum eqn for intermediate velocity u*."""
         # Diffusion
         bform = BilinearForm(self.velocity_space)
@@ -85,22 +86,42 @@ class NSFVMSimpleModel(ComputationalModel):
         lform = LinearForm(self.velocity_space)
         lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p + 2))
         f = lform.assembly()
-
         dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
         B, f = dbc.DiffusionApply(B, f)
         #fealpy中的稀疏矩阵是有问题的,需要手动合并重复的行列项
         B = self.sum_duplicates_csr_manual(B)
         ap = B.diags().values
-        grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(
-            p, self.pde.neumann_pressure
-        )  # (NC, 2)
+        grad_p = GradientReconstruct(self.mesh).LSQ(p)  # (NC, 2)
         p1 = bm.einsum('i,i->i', grad_p[:,0], self.cm)
         p2 = bm.einsum('i,i->i', grad_p[:,1], self.cm)
         p_grad_integrator = bm.concatenate((p1,p2))
         f = f - p_grad_integrator
         u = spsolve(B, f, "mumps")
-        return ap, u
 
+        cross = self.compute_cross_diffusion(u0)
+        for i in range(10):
+            rhs = f + cross
+            uh_new = spsolve(B, rhs)
+            err = bm.max(bm.abs(uh_new - u))
+            print(f"[Iter {i+1}] residual = {err}")
+            if err < 10e-5:
+                # print("Converged.")
+                break
+            u = uh_new
+            cross = self.compute_cross_diffusion(u)
+        
+        return ap, u
+    
+    def compute_cross_diffusion(self, uh: TensorLike) -> TensorLike:
+        """Compute cross-diffusion term based on current velocity uh."""
+        lform = LinearForm(self.velocity_space)
+        U = bm.stack((uh[:self.NC], uh[self.NC:]), axis=1)
+        grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(U,self.pde.dirichlet_velocity)
+        # grad_u = GradientReconstruct(self.mesh).LSQ(uh)
+        grad_f = GradientReconstruct(self.mesh).reconstruct(grad_u)  # (NE, 2)
+        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f))
+        return lform.assembly()
+    
     def pressure_correct(self, ap: TensorLike, uf: TensorLike,p) -> TensorLike:
         """Solve pressure correction equation.
         在这里实际上是有问题的,理论上计算dp_edge的程序应该是:
@@ -137,32 +158,40 @@ class NSFVMSimpleModel(ComputationalModel):
         p_c = sol[:-1]
         return p_c
 
-    def solve(self, max_iter: int = 100, tol: float = 1e-5) -> Tuple[TensorLike, TensorLike]:
+    def solve(self, max_iter: int = 100, tol: float = 1e-5, relax: float = 0.32) -> Tuple[TensorLike, TensorLike]:
         """Main SIMPLE loop."""
         p = bm.zeros(self.NC)
         uf = bm.zeros((self.mesh.number_of_faces(), 2))
-        ap, u = self.temporary_velocity(p, uf)
+        u = bm.zeros(2 * self.NC)
+        ap, u = self.temporary_velocity(p, uf, u)
         self.residuals = []
-        # dp = self.cm/ap[:self.NC]
         bd_edge = self.mesh.boundary_face_index()
         edge_middle_point = self.mesh.entity_barycenter('edge')
         bdedgepoint = edge_middle_point[bd_edge]
         bdedgeu = self.pde.dirichlet_velocity(bdedgepoint)
+        L2_p_corr0 = 100
         for i in range(max_iter):
             uf = RhieChowInterpolation(self.mesh).Interpolation(u,ap,p)
             uf[bd_edge, :] = bdedgeu
-            p_c = self.pressure_correct(ap, uf,p)
-            L2p_c = bm.sqrt(bm.sum(self.cm * (p_c) ** 2))
-            self.residuals.append(float(L2p_c))
-            self.logger.info(f"[Iter {i+1}] pressure_correct = {L2p_c}")
-
-            if L2p_c < tol:
+            p_corr = self.pressure_correct(ap, uf, p)
+            L2_p_corr = bm.sqrt(bm.sum(self.cm * (p_corr)**2))
+            delta_L2_p_corr0 = L2_p_corr - L2_p_corr0
+            self.residuals.append(float(L2_p_corr))
+            self.logger.info(f"[Iter {i+1}] L2 norm of the delta pressure correction : {delta_L2_p_corr0}")
+            # if delta_L2_p_corr0 > 0:
+            #     print("L2_p_corr:",L2_p_corr)
+            #     self.logger.info("Converged.")
+            #     break
+            # elif bm.abs(delta_L2_p_corr0) < tol:
+            #     self.logger.info("Converged.")
+            #     break
+            if bm.abs(delta_L2_p_corr0) < tol:
                 self.logger.info("Converged.")
                 break
+            p += relax*p_corr
+            L2_p_corr0 = L2_p_corr
 
-            p += 0.4*p_c
-
-            _, u = self.temporary_velocity(p, uf)
+            _, u = self.temporary_velocity(p,uf,u)
 
         self.uh = u[:self.NC]
         self.vh = u[self.NC:]

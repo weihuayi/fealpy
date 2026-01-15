@@ -68,6 +68,10 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         return cell2dof
 
     def edge_to_dof(self, p=None):
+        """
+        这里的edge_to_dof返回的是每条边对应的两个单元的编号,而不是边上的自由度编号
+        这是为了适配有限体积法程序而设置的,因为fvm程序在使用TensorFunctionSpace时会用到scalar_space.face_to_dof(),所以设置了这个函数.
+        """
         mesh = self.mesh
         return mesh.face_to_cell()[:,:2]
 

@@ -9,10 +9,10 @@ def main():
     parser.add_argument('--pde', default=1, type=int,
                         help='PDE example ID from Stokes PDE manager.')
     
-    parser.add_argument('--nx', default=20, type=int,
+    parser.add_argument('--nx', default=40, type=int,
                         help='Number of cells in x-direction.')
     
-    parser.add_argument('--ny', default=20, type=int,
+    parser.add_argument('--ny', default=40, type=int,
                         help='Number of cells in y-direction.')
     
     parser.add_argument('--backend', default='numpy', type=str,
@@ -30,10 +30,11 @@ def main():
     print(model)
 
     model.solve_rhie_chow()
-    uerror, verror, perror = model.compute_error()
+    uerror, verror, perror, perror0 = model.compute_error()
     print(f"L2 error (u) = {uerror}")
     print(f"L2 error (v) = {verror}")
     print(f"L2 error (p) = {perror}")
+    print(f"L2 error (p0) = {perror0}")
     model.plot()
     if options["plot"]:
         model.plot()

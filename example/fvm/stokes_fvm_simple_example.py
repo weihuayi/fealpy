@@ -28,10 +28,12 @@ def main():
                         default='INFO', type=str,
                         help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
-    parser.add_argument('--max_iter', default=100, type=int)
+    parser.add_argument('--max_iter', default=10, type=int)
     
-    parser.add_argument('--tol', default=4e-5, type=float)
+    parser.add_argument('--tol', default=1e-3, type=float)
     
+    parser.add_argument('--relax', default=0.32, type=float)
+
     parser.add_argument('--plot', action='store_true')
 
     options = vars(parser.parse_args())
@@ -40,13 +42,12 @@ def main():
 
     model = StokesFVMSimpleModel(options)
     print(model)
-    
-    model.solve(max_iter=options["max_iter"], tol=options["tol"])
+
+    model.solve(max_iter=options["max_iter"], tol=options["tol"], relax=options["relax"])
     uerror, verror, perror = model.compute_error()
     print(f"L2 error (u) = {uerror}")
     print(f"L2 error (v) = {verror}")
     print(f"L2 error (p) = {perror}")
-    model.plot()
     if options["plot"]:
         model.plot()
         model.plot_residual()

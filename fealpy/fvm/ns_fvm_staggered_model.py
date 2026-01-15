@@ -185,7 +185,7 @@ class NSFVMStaggeredModel(ComputationalModel):
         S = BlockForm([[ABC, A1.T], [A1, None]]).assembly_sparse_matrix(format="csr")
         return S,b
 
-    def solve(self, max_iter: int = 100, tol: float = 1e-5) -> Tuple:
+    def solve(self, max_iter: int = 100, tol: float = 1e-6) -> Tuple:
         UNE = self.umesh.number_of_edges()
         uf = bm.ones(UNE)
         vf = bm.ones(UNE)
@@ -213,13 +213,16 @@ class NSFVMStaggeredModel(ComputationalModel):
         self.vI = self.pde.velocity_v(self.vmesh.entity_barycenter("cell"))
         self.pI = self.pde.pressure(self.pmesh.entity_barycenter("cell"))
 
-        uerror = bm.sqrt(bm.sum(self.umesh.entity_measure("cell") * (self.uh - self.uI)**2))
-        verror = bm.sqrt(bm.sum(self.vmesh.entity_measure("cell") * (self.vh - self.vI)**2))
-        perror = bm.sqrt(bm.sum(self.pmesh.entity_measure("cell") * (self.ph - self.pI)**2))
-        # uerr = bm.max(bm.abs(self.uh - self.uI))
-        # verr = bm.max(bm.abs(self.vh - self.vI))
-        # perr = bm.max(bm.abs(self.ph - self.pI))
-        return uerror, verror, perror
+        # uerror = bm.sqrt(bm.sum(self.umesh.entity_measure("cell") * (self.uh - self.uI)**2))
+        # verror = bm.sqrt(bm.sum(self.vmesh.entity_measure("cell") * (self.vh - self.vI)**2))
+        # perror = bm.sqrt(bm.sum(self.pmesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        # err = self.ph - self.pI
+        # print("err[210]:",err[210])
+        uerr = bm.max(bm.abs(self.uh - self.uI))
+        verr = bm.max(bm.abs(self.vh - self.vI))
+        perr = bm.max(bm.abs(self.ph - self.pI))
+        # return uerror, verror, perror
+        return uerr, verr, perr
 
     def plot(self) -> None:
         import matplotlib.pyplot as plt
