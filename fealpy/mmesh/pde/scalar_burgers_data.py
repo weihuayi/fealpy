@@ -50,6 +50,8 @@ class ScalarBurgersData:
             self.mesh = TriangleMesh.from_box(self.D, nx=nx, ny=ny)
         elif meshtype == 'quad':
             self.mesh = QuadrangleMesh.from_box(self.D, nx=nx, ny=ny)
+        elif meshtype == 'cross_tri':
+            self.mesh = TriangleMesh.from_box_cross_mesh(self.D, nx=nx, ny=ny)
         else:
             raise ValueError('meshtype error')
         self.mesh.meshdata['vertices'] = vertices
@@ -66,6 +68,10 @@ class ScalarBurgersData:
     
     @cartesian
     def init_solution(self, p):
+        return self.solution(p, self.T[0])
+    
+    @cartesian
+    def moving_init_solution(self, p):
         return self.solution(p, self.T[0])
     
     @cartesian

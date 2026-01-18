@@ -12,6 +12,8 @@ from .lmeagadaptive import LMEAGAdaptive
 from .lmeagadaptivex import LMEAGAdaptiveX
 from .eagadaptivehuang import EAGAdaptiveHuang
 from .eagadaptivexhuang import EAGAdaptiveXHuang
+from .eagadaptivefb import EAGAdaptiveFB
+from .eagadaptivexfb import EAGAdaptiveXFB
 from .metrictensoradaptive import MetricTensorAdaptive
 from .metrictensoradaptivex import MetricTensorAdaptiveX
 

@@ -58,9 +58,7 @@ class PREProcessor:
                 self.b_val0 = bcollection[0]
             self._space_preparation()
 
-        elif self.method in ['LMEAGAdaptive', 'LMEAGAdaptiveX',
-                             'EAGAdaptiveHuang',"TargetAdaptive",
-                             'EAGAdaptiveXHuang',
+        elif self.method in ['EAGAdaptiveHuang', 'EAGAdaptiveXHuang',"EAGAdaptiveFB","EAGAdaptiveXFB",
                              "MetricTensorAdaptive","MetricTensorAdaptiveX"]:
             self._data_and_device()
             self._isinstance_mesh_type()

@@ -160,35 +160,82 @@ class MeshQuality:
             stats[name] = st
 
         # 绘图
-        fig, axs = plt.subplots(1, 3, figsize=(15, 4))
-        for ax, (name, arr) in zip(axs, metrics.items()):
+        plt.style.use('seaborn-v0_8-whitegrid')
+        plt.rcParams.update({
+            'font.family': 'sans-serif',
+            'font.sans-serif': ['Helvetica', 'Arial', 'DejaVu Sans'],
+            'axes.titlesize': 12,
+            'axes.labelsize': 11,
+            'xtick.labelsize': 9,
+            'ytick.labelsize': 9,
+            'legend.fontsize': 9
+        })
+        fig, axs = plt.subplots(1, 3, figsize=(15, 4),dpi = 200, constrained_layout=True)
+        colors = ['#4C72B0', '#55A868', '#C44E52']
+
+        for ax, (name, arr), color in zip(axs, metrics.items(), colors):
             data = arr.ravel()
             data = data[~_np.isnan(data)]
             if data.size == 0:
-                ax.text(0.5, 0.5, 'no data', ha='center', va='center')
-                ax.set_title(name)
+                ax.text(0.5, 0.5, 'no data', ha='center', va='center', fontsize=10)
+                ax.set_title(name, fontweight='bold')
+                ax.set_xticks([]); ax.set_yticks([])
+                for spine in ax.spines.values():
+                    spine.set_visible(False)
                 continue
+
+            # 直方图
             if logscale:
-                # 只保留正值
                 data_pos = data[data > 0]
                 if data_pos.size == 0:
-                    ax.text(0.5, 0.5, 'no positive data for logscale', ha='center', va='center')
-                else:
-                    ax.hist(data_pos, bins=bins, log=False)
-                    ax.set_xscale('log')
+                    ax.text(0.5, 0.5, 'no positive data for logscale', ha='center', va='center', fontsize=10)
+                    ax.set_title(name, fontweight='bold')
+                    ax.set_xticks([]); ax.set_yticks([])
+                    for spine in ax.spines.values():
+                        spine.set_visible(False)
+                    continue
+                hist_data = data_pos
+                ax.set_xscale('log')
+                ax.set_xlabel('log-scale value')
             else:
-                ax.hist(data, bins=bins)
-            ax.set_title(name)
-            # 在图上添加少量统计摘要
+                hist_data = data
+                ax.set_xlabel('value')
+
+            ax.hist(hist_data, bins=bins, color=color, edgecolor='#333333', linewidth=0.6, alpha=0.7)
+            ax.set_title(name, fontweight='bold')
+            ax.grid(True, linestyle='--', linewidth=0.6, alpha=0.6)
+            ax.set_ylabel('count')
+
+            # 统计线（均值/中位数/5%、95%分位）
             st = stats[name]
             if st['count'] > 0:
+                mean_v = st['mean']; med_v = st['median']
+                p5 = st.get('p5'); p95 = st.get('p95')
+                for v, ls, lw, lbl, col in [
+                    (mean_v, '-', 1.4, 'mean', '#2E86AB'),
+                    (med_v, '--', 1.1, 'median', '#D95F02'),
+                ]:
+                    ax.axvline(v, color=col, linestyle=ls, linewidth=lw, alpha=0.9, label=lbl)
+                if p5 is not None and p95 is not None:
+                    ax.axvline(p5, color='#555555', linestyle=':', linewidth=1.0, alpha=0.9, label='p5/p95')
+                    ax.axvline(p95, color='#555555', linestyle=':', linewidth=1.0, alpha=0.9)
+
+                # 角标摘要
                 txt = (f"n={st['count']}\nmax={st['max']:.3f}\nmin={st['min']:.3f}\n"
                        f"std={st['std']:.3g}\nglobal={st['global']:.3f}")
                 ax.annotate(txt, xy=(0.97, 0.95), xycoords='axes fraction', ha='right', va='top',
-                            fontsize=9, bbox=dict(boxstyle='round', fc='white', alpha=0.7))
-        fig.tight_layout()
+                            fontsize=9, bbox=dict(boxstyle='round,pad=0.35', fc='white', ec='#666666', alpha=0.9))
+
+            # 去掉顶部和右侧脊柱
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.legend(frameon=False, loc='best')
+
+        # 可选总标题（留空以便嵌入论文排版时自定义）
+        # fig.suptitle('Mesh Quality Metrics', fontsize=14, fontweight='bold', y=1.02)
+
         if savefig:
-            fig.savefig(savefig, dpi=200)
+            fig.savefig(savefig, dpi=400, bbox_inches='tight', transparent=True)
         plt.show()
 
         return stats

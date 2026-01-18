@@ -7,7 +7,7 @@ from .metric_shared import GeometricDiscreteCore
 from scipy.sparse.linalg import LinearOperator,cg
 from scipy.sparse import coo_matrix
 
-class EAGAdaptiveHuang(Monitor, Interpolater):
+class EAGAdaptiveFB(Monitor, Interpolater):
     def __init__(self, mesh, beta, space, config:Config):
         super().__init__(mesh, beta, space, config)
         self.config = config
@@ -40,7 +40,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         rho     = self.rho(M)                   # (NC,)
         gamma = self.gamma
         d = self.GD
-        P_diag  = self.balance(self.M_node, theta,power=d*(gamma-1)/2 ,mixed=False )    # (NN,)
+        P_diag  = self.balance(self.M_node, theta,power = -gamma/4 ,mixed = False )    # (NN,)
         cache = {
             'E_K': E_K, 'E_K_inv': E_K_inv, 'det_E_K': det_E_K,
             'rho': rho, 'cm': self.cm, 'P_diag': P_diag,'theta': theta,
@@ -61,45 +61,50 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
     
     def balance(self,M_node, theta, power=None , mixed=True):
         return self.geo_core.balance(M_node, theta, power, mixed)
-    
-    def I_func(self,trA , rho , g):
+        
+    def I_func(self, theta ,A , rho):
         """
-        I = rho * (mu * trA^{d*gamma/2} + d^{d*gamma/2}* (1-2 * mu) * g^{gamma/2} )
+        I = rho * |A - theta * I|^{2 * gamma}
+        Parameters:
+            theta(float): 积分全局乘子
+            A(Tensor): 雅可比算子 J^{-1}M^{-1}J^-T (NC, GD, GD)
+            rho(Tensor): 权重函数 rho
+        Return:
+            I(float): I 函数值
         """
-        d = self.GD
         gamma = self.gamma
-        mu = 1/3
-        I  = rho * ( mu * trA**(d*gamma/2) + d**(d*gamma/2) * (1 - 2 * mu) * g**(gamma/2) )
+        I  = rho * (bm.sum((A - theta * self.I_p)**2, axis=(-2, -1))) ** (gamma)
         I = bm.sum(self.cm * I)
         return I
     
-    def TdA(self, trA):
+    def TdA(self, A  , theta):
         """
-        TdA =  mu * (d*gamma/2) * trA^{d*gamma/2 - 1}
+        T = |A - theta * I|^{2 * gamma}
+        TdA = 2 * gamma * |A - theta * I|^{2 * gamma - 2} * (A - theta * I)
         """
-        d = self.GD
         gamma = self.gamma
-        mu = 1/3
-        TdA = ( mu * (d * gamma / 2) * trA**(d * gamma / 2 - 1))[..., None, None] *self.I_p
+        p = 2 * gamma
+        tildeA = A - theta * self.I_p
+        FN = bm.sum(tildeA**2, axis=(-2, -1))
+        eps = 1e-15
+        TdA = p * ((FN+eps)**(gamma-1))[..., None, None] * tildeA
         return TdA
     
-    def Tdg(self , g):
+    def Tdg(self,det_A):
         """
-        Tdg = rho * d^{d*gamma/2} * (1-2 * mu) * (gamma/2) * g^{gamma/2 - 1}
+        T = |A - theta * I|^{2 * gamma}
+        Tdg = 0
         """
-        d = self.GD
-        gamma = self.gamma
-        mu = 1/3
-        Tdg = d**(d * gamma / 2) * (1 - 2 * mu) * (gamma / 2) * g**(gamma / 2 - 1)
+        Tdg = bm.zeros_like(det_A, dtype=bm.float64)
         return Tdg
-    
+
     def lam(self , theta):
         """
         拉伸因子 lambda
         """
         return 1.0
 
-    def Idxi_from_Ehat(self,A ,g,trA, E_hat, rho, theta):
+    def Idxi_from_Ehat(self,A ,g,E_hat, rho, theta):
         """
         泛函局部导数 Idxi 的计算
         Idxi = 2 * rho * R @ [ E_hat^{-1} A TdA + (Tdg * g) E_hat^{-1} ]
@@ -112,7 +117,8 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             theta (float): 积分全局乘子
         """
         E_hat_inv = bm.linalg.inv(E_hat)
-        TdA = self.TdA(trA )
+
+        TdA = self.TdA(A , theta)
         Tdg = self.Tdg(g)
         
         term0 = E_hat_inv @ A @ TdA
@@ -148,7 +154,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self.I = geo.I
         self.J = geo.J
     
-    def vector_construction(self, A , g ,trA , E_hat):
+    def vector_construction(self, A , g , E_hat):
         """
         构造全局移动向量场
         Parameters:
@@ -166,7 +172,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             P_diag  = cache['P_diag']
             theta   = cache['theta']
 
-        Idxi = self.Idxi_from_Ehat(A , g ,trA , E_hat, rho, theta)  # (NC, GD+1, GD)
+        Idxi = self.Idxi_from_Ehat(A , g ,E_hat, rho, theta)  # (NC, GD+1, GD)
         cell = self.cell
         cm = self.cm
         global_vector = bm.zeros((self.NN, self.GD), dtype=bm.float64)
@@ -185,14 +191,14 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         v = bm.set_at(v , vertice_idx , 0.0)
         return v
     
-    def JAC_functional(self,A, g, trA, E_hat,M_inv, theta):
+    def JAC_functional(self,A, g, E_hat,M_inv, theta):
         d = self.GD
         NC = self.NC
         assert d == 2, "当前实现针对 2D；3D 可按相同张量结构扩展"
         E_K = self._ivp_cache['E_K']
         rho = self.rho(self.M)
         # 差分步长（相对尺度 + 绝对下限，数值稳健）
-        local = self.Idxi_from_Ehat(A , g ,trA, E_hat , rho , theta)   # (NC, d+1, d)
+        local = self.Idxi_from_Ehat(A , g , E_hat , rho , theta)   # (NC, d+1, d)
         local = local   # 去权重后的局部向量
         
         B = d * d
@@ -217,8 +223,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         for b in range(B):
             A_pos_b = self.A(E_K, E_pos_all[b],  M_inv)
             g_pos_b = bm.linalg.det(A_pos_b)
-            trA_pos_b = bm.trace(A_pos_b, axis1=-2, axis2=-1)
-            local_pos_b = self.Idxi_from_Ehat(A_pos_b, g_pos_b, trA_pos_b, E_pos_all[b], rho, theta) 
+            local_pos_b = self.Idxi_from_Ehat(A_pos_b, g_pos_b, E_pos_all[b], rho, theta) 
             local_pos_list.append(local_pos_b)
         local_pos_all = bm.stack(local_pos_list, axis=0)
         d_local_all = (local_pos_all - local) / h_entry[:, :, None, None]
@@ -394,7 +399,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self.sm = bm.index_add(self.sm , self.mesh.cell , self.cm[:, None])
     
     def mesh_redistributor(self , total_steps=None, h = None,
-                           method='BDF_LBFGS',return_info = False, return_timemesh = False):
+                           method='scipy',return_info = False, return_timemesh = False):
         """
         逆变拉格朗日乘子法自适应网格算法
         1. 初始化 E, E_hat, M_inv (边矩阵, 目标度量张量的逆)
@@ -444,13 +449,13 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                 def ode_system(t, y):
                     Xi_current = y.reshape(self.GD, self.NN).T
                     E_hat, A , g , trA = info_generator(Xi_current)
-                    v = self.vector_construction(A , g ,trA , E_hat)
+                    v = self.vector_construction(A , g , E_hat)
                     return v.ravel(order = 'F')
                 
                 def jac(t, y):
                     Xi_current = y.reshape(self.GD, self.NN).T
                     E_hat, A , g , trA = info_generator(Xi_current)
-                    J_y = self.JAC_functional(A ,  g ,trA, E_hat, M_inv,theta)
+                    J_y = self.JAC_functional(A ,  g , E_hat, M_inv,theta)
                     return J_y
                 
                 t_span = [0,self.t_span]
@@ -469,7 +474,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             if return_info:
                 E_hat , A , g , trA = info_generator(Xinew)
                 lam = self.lam(theta)
-                I = self.I_func(trA, self._ivp_cache['rho'],g)
+                I = self.I_func(theta, A, self._ivp_cache['rho'])
                 I_h.append(I)
                 cm_min.append(bm.min(self.cm).item())
             if return_timemesh:
@@ -480,9 +485,9 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             
             self.uh = self.interpolate(Xnew)
             self._construct(Xnew)
-            if error < self.tol:
-                print(f"Converged at step {it+1} with error {error}")
-                break
+            # if error < self.tol:
+            #     print(f"Converged at step {it+1} with error {error}")
+            #     break
 
         ret = {"X": Xnew}
         if return_info:
@@ -561,7 +566,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             for nit in range(newton_maxit):
                 # 计算 f 和残差 r = F(y_new)
                 A, g, trA, E_hat = info_update(y_new)
-                f = self.vector_construction(A, g, trA, E_hat).ravel(order='F')
+                f = self.vector_construction(A, g,E_hat).ravel(order='F')
  
                 r = y_new - y - h * f
                 res_norm = (r**2).sum()**0.5
@@ -571,7 +576,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                 # J = d f / d y 
                 if nit == 0:
                     theta = self._ivp_cache['theta']
-                    J = self.JAC_functional(A,  g, trA, E_hat, M_inv, theta)
+                    J = self.JAC_functional(A,  g,E_hat, M_inv, theta)
                     def Aop_mv(v):
                         Av = v - h * (J @ v)
                         return Av
@@ -632,4 +637,3 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
 
         Xi_new = y.reshape(GD, NN).T
         return Xi_new
-        

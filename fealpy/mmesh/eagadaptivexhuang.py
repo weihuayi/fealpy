@@ -144,7 +144,7 @@ class EAGAdaptiveXHuang(Monitor, Interpolater):
             E_hat     = cache['E_hat']
         Idx = self.Idx_from_EK(E_hat, E_K, rho, M_inv, E_K_inv)  # (NC, GD+1, GD)
         cell = self.cell
-        cm = self.cm
+        cm = self.cm # 此处的面积可能是逻辑网格的固定面积？
         global_vector = bm.zeros((self.NN, self.GD), dtype=bm.float64)
         global_vector = bm.index_add(global_vector , cell , cm[:,None,None] * Idx)
         

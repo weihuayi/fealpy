@@ -141,7 +141,10 @@ class GFMMPDE2d(Monitor, Interpolater):
             a = JJ * M_inv_cell[:, None, None]
             b = -bm.einsum('cmk,cm->ck', JJ, G_xi)
         else:  # 矩阵情况
-            M_cell_avg = bm.mean(M, axis=1)  # NC,TD,TD
+            if M.ndim == 3:
+                M_cell_avg = M
+            else:
+                M_cell_avg = bm.mean(M, axis=1)  # NC,TD,TD
             M_inv_cell = bm.linalg.inv(M_cell_avg)
             M_inv_cell2dof = bm.linalg.inv(M_node)[cell2dof]
             G_xi = bm.einsum('cid,cimn->cmnd',lgphi[:, 0, ...], M_inv_cell2dof)
@@ -422,6 +425,7 @@ class GFMMPDE2d(Monitor, Interpolater):
             self.construct(node)
             if error < self.tol:
                 break
+        return self.mesh , self.uh
               
     def preprocessor(self,fun_solver =None):
         """

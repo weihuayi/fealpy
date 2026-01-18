@@ -9,8 +9,8 @@ from ..fem_base import FEM
 
 class BDF2(FEM):
     
-    def __init__(self, equation):
-        super().__init__(equation)
+    def __init__(self, equation,mesh):
+        super().__init__(equation,mesh)
      
     def BForm(self):
         pspace = self.pspace
@@ -52,7 +52,9 @@ class BDF2(FEM):
         L = LinearBlockForm([L0, L1])
         return L
 
-    def update(self, u_0, u_1):
+    def update(self, u_0, u_1 , mv = None):
+        if mv is None:
+            mv = self.uspace.function()
         dt = self.dt
         equation = self.equation
         ctd = equation.coef_time_derivative 
@@ -65,7 +67,7 @@ class BDF2(FEM):
         self.BM.coef = 3*ctd/(2*dt)
         def BC_coef(bcs, index): 
             ccoef = cc(bcs, index)[..., bm.newaxis] if callable(cc) else cc
-            result = 2* ccoef * u_1(bcs, index)
+            result = 2* ccoef * u_1(bcs, index) - mv(bcs, index)
             return result
         self.BC.coef = BC_coef
 

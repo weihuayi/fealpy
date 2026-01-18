@@ -87,6 +87,9 @@ class Poissondata():
             return self.u(x,y,z)
         return self.u(x,y)
     
+    def moving_init_solution(self, p):
+        return self.solution(p)
+    
     def init_solution(self, p):
         return self.solution(p)
     

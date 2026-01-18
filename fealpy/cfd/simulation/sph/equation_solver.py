@@ -73,7 +73,7 @@ class EquationSolver():
         rho0 = self.rho0 if rho0 is None else rho0
         gamma = self.gamma if gamma is None else gamma
         X = self.X if X is None else X
-        return gamma * c0**2 * ((rho / rho0)**gamma - 1) / rho0 + X
+        return rho0 * c0**2 * ((rho / rho0)**gamma - 1) /gamma  + X
 
     def fuild_p(self, state, rho0=None, B=None, c1=None):
         """Updates the pressure of fluid particles"""

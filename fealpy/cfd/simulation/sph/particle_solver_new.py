@@ -666,6 +666,198 @@ class SPHSolver:
                 v = np.hstack([v, np.zeros((N, 1))])
             data_pv[k] = np.asarray(v)
         return data_pv
+    @staticmethod
+    def change_rho_dam(state, self_node, neighbors, grad_w):
+        m_j = state["mass"][neighbors]
+        u_ij = state["u"][self_node] - state["u"][neighbors]
+        dot_product = bm.einsum("ij,ij->i", u_ij, grad_w)
+        term = m_j * dot_product
+        result = bm.zeros_like(state["drhodt"], dtype=bm.float64)
+
+        return bm.index_add(result, self_node, term)
+    
+    @staticmethod
+    def change_u_dam(state, self_node, neighbors, dr, dist, grad_w):
+        rho = state["rho"]
+        pressure = state["pressure"]
+        sound = state["sound"]
+        mass = state["mass"]
+        alpha = state["alpha"]
+        H = state["H"]  # 平滑长度
+        g = state["g"]  # 重力加速度
+        m_j = mass[neighbors]
+
+        eta_val = 0.1 * H
+
+        u_ij = state["u"][self_node] - state["u"][neighbors]
+
+        dot_vr = bm.einsum("ij,ij->i", u_ij, dr)  # (n,)
+
+        mu_ij = (H * dot_vr) / (dist**2 + eta_val**2)
+
+        c_ij = (sound[self_node] + sound[neighbors]) / 2.0  # (c_a + c_b)/2
+        rho_ij = (rho[self_node] + rho[neighbors]) / 2.0  # (ρ_a + ρ_b)/2
+        pi_ij = bm.where(dot_vr < 0, -alpha * c_ij * mu_ij / rho_ij, 0.0)
+
+        p_term = pressure[neighbors] / (rho[neighbors] ** 2) + pressure[self_node] / (
+            rho[self_node] ** 2
+        )
+
+        total_factor = m_j * (p_term + pi_ij)
+        term = total_factor[:, None] * grad_w
+
+        dudt = bm.zeros_like(state["u"], dtype=bm.float64)
+        dudt = bm.index_add(dudt, self_node, -term)
+
+        dudt += g
+        return dudt
+    
+    @staticmethod
+    def change_r_dam(state, self_node, neighbors, w):
+        u = state["u"].copy()
+        rho_i = state["rho"][self_node]
+        rho_j = state["rho"][neighbors]
+        m_j = state["mass"][neighbors]
+        
+        u_ij = u[self_node] - u[neighbors]
+        rho_ij = (rho_i + rho_j) / 2
+        mass_coeff = m_j * w / rho_ij
+        correction_term = 0.5 * mass_coeff[:, None] * u_ij
+
+        result = bm.index_add(u, self_node, 0.5 * correction_term)
+
+        return result
+    
+    @staticmethod
+    def sound_dam(state, c0, rho0, gamma):
+        B = c0**2 * rho0 / gamma
+        rho = state["rho"]
+        return (B * gamma * (rho / rho0) ** (gamma - 1) / rho0) ** 0.5
+    
+    @staticmethod
+    def rein_rho_2d(state, self_node, neighbors, w):
+        r_ij = state["position"][self_node] - state["position"][neighbors]
+        m_j = state["mass"][neighbors]
+        x_ij, y_ij = r_ij[:, 0], r_ij[:, 1]
+        V_j = bm.full_like(x_ij, state["dx"] * state["dy"])
+        dot = w * V_j
+        rho_new = state["rho"].copy
+
+        A_bar = bm.zeros((len(self_node), 3, 3))
+        A_bar[:, 0, 0] = 1
+        A_bar[:, 1, 1] = x_ij**2
+        A_bar[:, 2, 2] = y_ij**2
+        A_bar[:, 0, 1] = A_bar[:, 1, 0] = x_ij
+        A_bar[:, 0, 2] = A_bar[:, 2, 0] = y_ij
+        A_bar[:, 1, 2] = A_bar[:, 2, 1] = x_ij * y_ij
+        dot_product = dot[:, None, None] * A_bar
+
+        unique_nodes = bm.unique(self_node)
+        n_groups = len(unique_nodes)
+        A = bm.zeros((n_groups, 3, 3))
+        bm.add_at(A, self_node, dot_product)
+
+        conds = bm.array([bm.linalg.cond(A[i]) for i in range(n_groups)])
+        is_singular = (conds > 1e15) | (conds < 1e-15)
+        non_singular_mask = ~is_singular
+        b = bm.array([1, 0, 0])
+
+        # 将T分发回原来的位置
+        beta_distributed = bm.zeros((len(self_node), 3))
+        for idx in bm.where(non_singular_mask)[0]:
+            A_single = A[idx]
+            T = bm.linalg.solve(A_single, b)
+            # 更新对应self_node中的粒子
+            particle_mask = self_node == unique_nodes[idx]
+            beta_distributed[particle_mask] = T
+
+        W_MLS = w * (
+            beta_distributed[:, 0]
+            + beta_distributed[:, 1] * x_ij
+            + beta_distributed[:, 2] * y_ij
+        )
+        term = W_MLS * m_j
+        result = bm.zeros_like(state["rho"])
+        rho_new = bm.index_add(result, self_node, term)
+
+        for idx in bm.where(is_singular)[0]:
+            particle_mask = self_node == unique_nodes[idx]
+            W_ab = w[particle_mask]
+            m_b = m_j[particle_mask]
+            rho_b = state["rho"][neighbors][particle_mask]  
+
+            numerator = bm.sum(m_b * W_ab)
+            denominator = bm.sum(m_b / rho_b * W_ab)
+            rho_a = numerator / denominator
+
+            rho_new[self_node[particle_mask]] = rho_a
+
+        state["rho"] = rho_new
+     
+    @staticmethod  
+    def rein_rho_3d(state, self_node, neighbors, w):
+        r_ij = state["position"][self_node] - state["position"][neighbors]
+        m_j = state["mass"][neighbors]
+        x_ij, y_ij, z_ij = r_ij[:, 0], r_ij[:, 1], r_ij[:, 2]
+        V_j = bm.full_like(x_ij, state["dx"] * state["dy"] * state["dz"])
+        dot = w * V_j
+        rho_new = state["rho"].copy
+        
+        # 构建4x4矩阵用于3D MLS
+        A_bar = bm.zeros((len(self_node), 4, 4))
+        A_bar[:, 0, 0] = 1
+        A_bar[:, 1, 1] = x_ij**2
+        A_bar[:, 2, 2] = y_ij**2
+        A_bar[:, 3, 3] = z_ij**2
+        A_bar[:, 0, 1] = A_bar[:, 1, 0] = x_ij
+        A_bar[:, 0, 2] = A_bar[:, 2, 0] = y_ij
+        A_bar[:, 0, 3] = A_bar[:, 3, 0] = z_ij
+        A_bar[:, 1, 2] = A_bar[:, 2, 1] = x_ij * y_ij
+        A_bar[:, 1, 3] = A_bar[:, 3, 1] = x_ij * z_ij
+        A_bar[:, 2, 3] = A_bar[:, 3, 2] = y_ij * z_ij
+        dot_product = dot[:, None, None] * A_bar
+        
+        unique_nodes = bm.unique(self_node)
+        n_groups = len(unique_nodes)
+        A = bm.zeros((n_groups, 4, 4))
+        bm.add_at(A, self_node, dot_product)
+        
+        conds = bm.array([bm.linalg.cond(A[i]) for i in range(n_groups)])
+        is_singular = (conds > 1e15) | (conds < 1e-15)  
+        non_singular_mask = ~is_singular
+        b = bm.array([1, 0, 0, 0])
+        
+        beta_distributed = bm.zeros((len(self_node), 4))
+        for idx in bm.where(non_singular_mask)[0]:
+            A_single = A[idx]
+            T = bm.linalg.solve(A_single, b)
+            # 更新对应self_node中的粒子
+            particle_mask = (self_node == unique_nodes[idx])
+            beta_distributed[particle_mask] = T 
+
+        W_MLS = w * (beta_distributed[:, 0] + 
+                    beta_distributed[:, 1] * x_ij + 
+                    beta_distributed[:, 2] * y_ij + 
+                    beta_distributed[:, 3] * z_ij)
+        term = W_MLS * m_j 
+        result = bm.zeros_like(state["rho"])
+        rho_new = bm.index_add(result, self_node, term)
+
+        # 处理奇异矩阵情况
+        for idx in bm.where(is_singular)[0]:
+            particle_mask = (self_node == unique_nodes[idx])
+            W_ab = w[particle_mask]
+            m_b = m_j[particle_mask]
+            rho_b = state["rho"][neighbors][particle_mask]  # 使用邻居的密度
+            
+            numerator = bm.sum(m_b * W_ab)
+            denominator = bm.sum(m_b / rho_b * W_ab)
+            rho_a = numerator / denominator
+
+            rho_new[self_node[particle_mask]] = rho_a
+
+        state["rho"] = rho_new   
+
 
 class ParticleSystem:
     def __init__(self, particles):

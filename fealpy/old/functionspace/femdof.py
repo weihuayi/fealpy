@@ -216,47 +216,47 @@ class CPLFEMDof2d():
         return edge2dof
 
     def cell_to_dof(self):
-        p = self.p
-        mesh = self.mesh
+        # p = self.p
+        # mesh = self.mesh
 
-        cell = mesh.entity('cell')
-        N = mesh.number_of_nodes()
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
+        # cell = mesh.entity('cell')
+        # N = mesh.number_of_nodes()
+        # NE = mesh.number_of_edges()
+        # NC = mesh.number_of_cells()
 
-        ldof = self.number_of_local_dofs()
+        # ldof = self.number_of_local_dofs()
 
-        if p == 1:
-            cell2dof = cell
+        # if p == 1:
+        #     cell2dof = cell
 
-        if p > 1:
-            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
+        # if p > 1:
+        #     cell2dof = np.zeros((NC, ldof), dtype=np.int_)
 
-            isEdgeDof = self.is_on_edge_local_dof()
-            edge2dof = self.edge_to_dof()
-            cell2edgeSign = mesh.cell_to_face_sign()
-            cell2edge = mesh.cell_to_edge()
+        #     isEdgeDof = self.is_on_edge_local_dof()
+        #     edge2dof = self.edge_to_dof()
+        #     cell2edgeSign = mesh.cell_to_face_sign()
+        #     cell2edge = mesh.cell_to_edge()
 
-            cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
+        #     cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
+        #             edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
+        #     cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
+        #             edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
 
-            cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
-            cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
+        #     cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
+        #             edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
+        #     cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
+        #             edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
 
-            cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
-        if p > 2:
-            base = N + (p-1)*NE
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            idof = ldof - 3*p
-            cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
-
+        #     cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
+        #             edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
+        #     cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
+        #             edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
+        # if p > 2:
+        #     base = N + (p-1)*NE
+        #     isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
+        #     idof = ldof - 3*p
+        #     cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
+        cell2dof = self.mesh.cell_to_ipoint(self.p)
         return cell2dof
 
     def interpolation_points(self):
@@ -274,7 +274,7 @@ class CPLFEMDof2d():
             ipoint = np.zeros((gdof, dim), dtype=np.float64)
             ipoint[:N, :] = node
             NE = mesh.number_of_edges()
-            edge = mesh.edge
+            edge = mesh.entity('edge')
             w = np.zeros((p-1,2), dtype=np.float64)
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
