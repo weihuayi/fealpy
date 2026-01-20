@@ -22,6 +22,7 @@ from .particle_swarm_opt import ParticleSwarmOpt
 from .remora_opt_alg import RemoraOptAlg
 from .sand_cat_swarm_opt import SandCatSwarmOpt
 from .seagull_opt_alg import SeagullOptAlg
+from .secretary_bird_opt import SecretaryBirdOpt
 from .sparrow_search_alg import SparrowSearchAlg
 from .squirrel_search_alg import SquirrelSearchAlg
 from .starfish_opt_alg import StarFishOptAlg
