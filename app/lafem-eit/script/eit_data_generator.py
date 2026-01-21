@@ -17,19 +17,12 @@ from fealpy.backend import TensorLike as Tensor
 from fealpy.mesh import TriangleMesh, UniformMesh2d
 from fealpy.cem import EITDataGenerator
 from fealpy.decorator import cartesian
+from lafemeit.data import *
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config", help="path of the .yaml file")
 
-
-def levelset(p: Tensor, centers: Tensor, radius: Tensor):
-    """Calculate level set function value."""
-    struct = p.shape[:-1]
-    p = p.reshape(-1, p.shape[-1])
-    dis = bm.linalg.norm(p[:, None, :] - centers[None, :, :], axis=-1) # (N, NCir)
-    ret = bm.min(dis - radius[None, :], axis=-1) # (N, )
-    return ret.reshape(struct)
 
 def transition_sine(levelset_val: Tensor, /, width: float) -> Tensor:
     PI = bm.pi
@@ -48,6 +41,7 @@ GD_FOLDER = config['data'].get('gd_folder', 'gd')
 GN_FILE = config['data'].get('gn_file', 'gn')
 EXT = config['data']['ext']
 H = 2./EXT
+DATA_MODEL = config['data']['model']
 SIGMA = config['data']['sigma']
 NUM_CIR = config['data'].get('num_cir', 3)
 FREQ = config['data']['freq']
@@ -102,22 +96,45 @@ def main(sigma_iterable: Sequence[int], seed: int = 0, index: int = 0):
                           dynamic_ncols=True,
                           unit='sample',
                           position=index):
+        while True:
+            if DATA_MODEL == "circle":
+                data_model = random_unioned_circles_model(NUM_CIR, values=SIGMA)
+            elif DATA_MODEL == "triangle":
+                data_model = random_unioned_triangles_model(
+                    NUM_CIR,
+                    box=[-0.9, 0.9, -0.9, 0.9],
+                    kind=config['data'].get("kind", ""),
+                    rlim=config['data'].get("rlim", [0.2, 0.5]),
+                    values=SIGMA
+                )
+            elif DATA_MODEL == "gaussian":
+                data_model = random_gaussian2d_model(
+                    NUM_CIR,
+                    [-1, 1, -1, 1],
+                    major_lim=config['data'].get("major_lim"),
+                    ecc_lim=config['data'].get("ecc_lim")
+                )
+            else:
+                raise ValueError()
 
-        ctrs_ = np.random.rand(NUM_CIR, 2) * 1.6 - 0.8 # (NCir, GD)
-        b = np.min(0.9-np.abs(ctrs_), axis=-1) # (NCir, )
-        rads_ = np.random.rand(NUM_CIR) * (b-0.1) + 0.1 # (NCir, )
-        ctrs = bm.astype(ctrs_, bm.float64)
-        rads = bm.astype(rads_, bm.float64)
+            if data_model.levelset is None: # continuous
+                mesh = TriangleMesh.from_box([-1, 1, -1, 1], nx=EXT, ny=EXT, itype=bm.int32, ftype=bm.float64)
+            else: # piece-wise constant
+                try:
+                    mesh = TriangleMesh.interfacemesh_generator(umesh, phi=data_model.levelset)
+                except ValueError:
+                    continue
+            break
 
-        ls_fn = lambda p: levelset(p, ctrs, rads)
-
-        interface_mesh = TriangleMesh.interfacemesh_generator(umesh, phi=ls_fn)
-        generator = EITDataGenerator(mesh=interface_mesh, p=P, q=Q)
+        generator = EITDataGenerator(mesh=mesh, p=P, q=Q)
         gn = generator.set_boundary(neumann, batch_size=len(FREQ))
-        generator.set_levelset(SIGMA, ls_fn)
+        generator.set_sigma(data_model.coef)
         gd = generator.run()
 
-        label = bm.astype(trans(ls_fn(pixel)), LABEL_DTYPE)
+        if data_model.levelset is None: # continuous
+            label = bm.astype(data_model.coef(pixel), LABEL_DTYPE)
+        else: # piece-wise constant
+            label = bm.astype(trans(data_model.levelset(pixel)), LABEL_DTYPE)
 
         if GD_FOLDER:
             np.save(
@@ -125,12 +142,18 @@ def main(sigma_iterable: Sequence[int], seed: int = 0, index: int = 0):
                 bm.to_numpy(gd)
             )
         if LABEL_FOLDER:
-            np.savez(
-                os.path.join(output_folder, f'{LABEL_FOLDER}/{sigma_idx}.npz'),
-                label=bm.to_numpy(label),
-                ctrs=bm.to_numpy(ctrs),
-                rads=bm.to_numpy(rads)
-            )
+            if hasattr(data_model.shape, "_asdict"):
+                np.savez(
+                    os.path.join(output_folder, f'{LABEL_FOLDER}/{sigma_idx}.npz'),
+                    label=bm.to_numpy(label),
+                    **data_model.shape._asdict()
+                )
+            else:
+                np.savez(
+                    os.path.join(output_folder, f'{LABEL_FOLDER}/{sigma_idx}.npz'),
+                    label=bm.to_numpy(label),
+                    shape=data_model.shape
+                )
 
     if index == 0 and GN_FILE: # Save gn only on the first task
         np.save(os.path.join(output_folder, f'{GN_FILE}.npy'), bm.to_numpy(gn))
@@ -198,15 +221,19 @@ if __name__ == "__main__":
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
+    NUM = tuple(range(config['head'], config['tail']))
+
     from multiprocessing import Pool
     from fealpy.utils import timer
+
+    # main(NUM, 26710+621)
+    # exit()
 
     pool = Pool(NUM_PROCESS)
     tmr = timer()
     next(tmr)
 
     SEED = config.get('seed', int(time()))
-    NUM = tuple(range(config['head'], config['tail']))
 
     for idx, offset in enumerate(SEED_OFFSETS):
         pool.apply_async(main, (NUM[idx::NUM_CHUNK], offset + SEED, idx))
