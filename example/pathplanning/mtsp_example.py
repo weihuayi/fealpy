@@ -1,6 +1,6 @@
 from fealpy.backend import backend_manager as bm
 from fealpy.pathplanning.model import PathPlanningModelManager
-from fealpy.opt import QuantumParticleSwarmOpt, SnowAblationOpt
+from fealpy.opt import QuantumParticleSwarmOpt
 
 # TSP
 pos = bm.random.rand(15, 2) * 100 # 城市坐标
@@ -47,27 +47,21 @@ pos = bm.array([
     [1260, 1910],
     [360, 1980],
     [420, 1930]
-])
+], dtype=bm.float64)
 
 warehouse_pos = bm.mean(pos, axis=0)[None, :]
 
 up_opt_dict = {
     'opt_alg': QuantumParticleSwarmOpt,
     'NP': 50,
-    'MaxIT': 500
-}
-down_opt_dict = {
-    'opt_alg': SnowAblationOpt,
-    'NP': 50,
-    'MaxIT': 500
+    'MaxIT': 300
 }
 
 options = {
-    'uav_num': 4,
+    'uav_num': 6,
     'pos': pos,
     'warehouse': warehouse_pos,
     'up_opt_dict': up_opt_dict,
-    'down_opt_dict': down_opt_dict,
 }
 
 manager = PathPlanningModelManager('travelling_salesman_prob')
