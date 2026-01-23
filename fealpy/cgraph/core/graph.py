@@ -7,7 +7,12 @@ import threading
 import traceback
 
 from . import edge as _E
-from ._types import CNode, NodeExceptionData, Slot, TransSlot, InputSlot, NodeIOError
+from ._types import (
+    CNode,
+    NodeExceptionData,
+    Slot, OutputSlot, TransSlot, InputSlot,
+    NodeIOError
+)
 
 __all__ = ["Graph", "WORLD_GRAPH"]
 
@@ -98,8 +103,8 @@ class Graph:
     KEY_OF_EDGE = "conn"
 
     status : GraphStatus
-    _input_slots : OrderedDict[str, InputSlot]
-    _output_slots : OrderedDict[str, TransSlot]
+    _source_slots : OrderedDict[str, OutputSlot]
+    _drain_slots : OrderedDict[str, InputSlot]
     context : dict[int, Any]
     error_listeners : list[Callable[[NodeExceptionData], Any]]
     status_listeners : list[Callable[[GraphStatus], Any]]
@@ -107,14 +112,14 @@ class Graph:
     def __init__(self, name: str | None = None, /):
         self.name = name
         self.status = GraphStatus.READY
-        self._input_slots = OrderedDict()
-        self._output_slots = OrderedDict()
         self.context = {}
         self.controller = threading.Condition()
         self.error_listeners = []
         self.status_listeners = []
-        self._input_node = GraphInputNode(self)
-        self._output_node = GraphOutputNode(self)
+        self._source_slots = OrderedDict()
+        self._drain_slots = OrderedDict()
+        self._source_node = GraphInputNode(self, self._source_slots)
+        self._drain_node = GraphOutputNode(self, self._drain_slots)
         self._log_message = []
 
     def __repr__(self):
@@ -125,90 +130,26 @@ class Graph:
     def __bool__(self) -> bool:
         return True
 
-    def register_input(
-            self,
-            name: str,
-            variable: bool = False,
-            parameter: str | None = None,
-            **kwargs
-    ):
-        """Add an input slot to the node."""
-        if "_input_slots" not in self.__dict__:
-            raise AttributeError(
-                "cannot assign inputs before Node.__init__() call"
-            )
-        elif not isinstance(name, str):
-            raise TypeError(
-                f"input name should be a string, but got {name.__class__.__name__}"
-            )
-        elif "." in name:
-            raise KeyError('input name can\'t contain "."')
-        elif name == "":
-            raise KeyError('input name can\'t be empty string ""')
-        elif hasattr(self, name) and name not in self._input_slots:
-            raise KeyError(f"attribute '{name}' already exists")
-        else:
-            if parameter is None:
-                parameter = name
+    def register_source(self, name: str, /):
+        self._source_slots[name] = OutputSlot()
 
-            self._input_slots[name] = InputSlot(
-                has_default="default" in kwargs,
-                default=kwargs.get("default", None),
-                param_name=parameter,
-                variable=variable
-            )
-
-    def register_output(self, name: str, **kwargs):
-        """Add an output slot to the node."""
-        if "_output_slots" not in self.__dict__:
-            raise AttributeError(
-                "cannot assign outputs before Node.__init__() call"
-            )
-        elif not isinstance(name, str):
-            raise TypeError(
-                f"output name should be a string, but got {name.__class__.__name__}"
-            )
-        elif "." in name:
-            raise KeyError('output name can\'t contain "."')
-        elif name == "":
-            raise KeyError('output name can\'t be empty string ""')
-        elif hasattr(self, name) and name not in self._output_slots:
-            raise KeyError(f"attribute '{name}' already exists")
-        else:
-            self._output_slots[name] = TransSlot(
-                has_default="default" in kwargs,
-                default=kwargs.get("default", None)
-            )
-
-    @property
-    def input_slots(self):
-        return self._input_slots
-
-    @property
-    def output_slots(self):
-        return self._output_slots
-
-    def run(self, **kwargs):
-        self._input_node.data.update(kwargs)
-        self.execute()
-        result = tuple(self.get().values())
-        self.reset()
-        return result[0] if len(result) == 1 else result
-
-    def __call__(self, **kwargs: _E.AddrHandler):
-        _E.connect_from_address(self.input_slots, kwargs)
-        return _E.AddrHandler(self, None)
+    def register_drain(self, name: str, /, **kwargs):
+        self._drain_slots[name] = InputSlot(
+            has_default="default" in kwargs,
+            default=kwargs.get("default", None),
+            param_name=name
+        )
 
     def input(self, slot: str, /):
-        if slot not in self.input_slots:
-            self.register_input(slot)
-        return _E.AddrHandler(self._input_node, slot)
+        if slot not in self._source_slots:
+            self.register_source(slot)
+        return _E.AddrHandler(self._source_node, slot)
 
     def output(self, **kwargs: _E.AddrHandler):
         for name in kwargs.keys():
-            if name not in self.output_slots:
-                self.register_output(name)
-        _E.connect_from_address(self.output_slots, kwargs)
+            if name not in self._drain_slots:
+                self.register_drain(name)
+        _E.connect_from_address(self._drain_slots, kwargs)
 
     # def requests(self):
     #     request_set: set[CNode] = set()
@@ -242,11 +183,16 @@ class Graph:
                 keyword_inputs=kwargs
             )
 
-    def execute(self) -> None:
+    def execute(self, source: dict[str, Any] = {}, capture_err=True) -> None:
         if self.status != GraphStatus.READY:
             raise GraphStatusError("Can not execute a graph with status %s".format(self.status))
 
-        for node in self._topological_sort([self._output_node]):
+        for key in self._source_slots:
+            if key not in source:
+                raise NodeIOError(f"The input {key!r} is not provided.")
+            self._source_node.data[key] = source[key]
+
+        for node in self._topological_sort([self._drain_node]):
             with self.controller:
                 if self.status in (GraphStatus.STOP, GraphStatus.DEBUG):
                     break
@@ -259,14 +205,13 @@ class Graph:
                 results = node.run(**input_values)
                 GraphCtxOps.send_data(self.context, node.output_slots, results, repr(node))
             except Exception as error:
+                if not capture_err:
+                    raise NodeIOError(f"node {node!r} execution failed") from error
                 with self.controller:
                     self._set_status(GraphStatus.DEBUG)
                 error_info = self._capture_error(node, error, (), input_values)
                 self._send_exception(error_info)
                 break
-        else:
-            with self.controller:
-                self._set_status(GraphStatus.STOP)
 
     def pause(self):
         """Pause or resume the graph execution."""
@@ -289,10 +234,12 @@ class Graph:
         with self.controller:
             if self.status == GraphStatus.STOP:
                 self.context.clear()
+                self._source_node.data.clear()
+                self._drain_node.data.clear()
                 self._set_status(GraphStatus.READY)
 
     def get(self) -> dict[str, Any]:
-        return self._output_node.data.copy()
+        return self._drain_node.data.copy()
 
     @staticmethod
     def _collect_relevant_nodes(nodes: Iterable[CNode]):
@@ -364,9 +311,10 @@ class Graph:
 
 
 class GraphInputNode:
-    def __init__(self, graph: Graph, /):
+    def __init__(self, graph: Graph, outputs, /):
         self.graph = graph
         self.data = OrderedDict()
+        self._slots = outputs
 
     def __repr__(self):
         if self.graph.name is None:
@@ -375,26 +323,21 @@ class GraphInputNode:
             return "$input node (" + self.graph.name + ")$"
 
     @property
-    def input_slots(self):
-        return {}
-
+    def input_slots(self): return {}
     @property
-    def output_slots(self):
-        return self.graph.input_slots
+    def output_slots(self): return self._slots
 
     def run(self):
         result = tuple(self.data.values())
         self.data.clear()
         return result
 
-    def __call__(self, **kwargs: _E.AddrHandler | Any):
-        return _E.AddrHandler(self, None)
-
 
 class GraphOutputNode:
-    def __init__(self, graph: Graph, /):
+    def __init__(self, graph: Graph, inputs, /):
         self.graph = graph
         self.data = OrderedDict()
+        self._slots = inputs
 
     def __repr__(self):
         if self.graph.name is None:
@@ -403,20 +346,13 @@ class GraphOutputNode:
             return "$output node (" + self.graph.name + ")$"
 
     @property
-    def input_slots(self):
-        return self.graph.output_slots
-
+    def input_slots(self): return self._slots
     @property
-    def output_slots(self):
-        return {}
+    def output_slots(self): return {}
 
     def run(self, **kwargs):
         self.data.clear()
         self.data.update(kwargs)
-
-    def __call__(self, **kwargs: _E.AddrHandler | Any):
-        _E.connect_from_address(self.input_slots, kwargs)
-        return _E.AddrHandler(self, None)
 
 
 WORLD_GRAPH = Graph("WORLD_GRAPH")

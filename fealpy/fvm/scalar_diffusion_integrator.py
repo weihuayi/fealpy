@@ -19,7 +19,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
                  method: Optional[str]=None) -> None:
         super().__init__()
         self.coef = coef
-        self.q = q
+        self.q = 2 if q is None else q
         self.index = index
         self.batched = batched
         self.assembly.set(method)
@@ -48,7 +48,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
     
     @variantmethod
     def assembly(self, space: _FS) -> TensorLike:
-        coef = self.coef
+        # coef = self.coef
         mesh = getattr(space, 'mesh', None)
         Sf, e, d, index, bcs,phi = self.fetch(space)
         D = phi.shape[-1]
@@ -58,9 +58,11 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         e_norm = bm.einsum('ij,ij->i', e, e)**0.5               
         # Ef_abs = (|Sf|^2 / (e·Sf)) * |e|
         Ef_abs = bm.einsum('i,i->i', Sf_dot_Sf / e_dot_Sf, e_norm)
-        if coef is None:
-            coef = bm.ones_like(Ef_abs, dtype=space.ftype)
-        integrator  = bm.einsum('i,i->i', Ef_abs / d, coef)
+        if self.coef is None:
+            self.coef = bm.ones_like(Ef_abs, dtype=space.ftype)
+        elif type(self.coef) in [int, float]:
+            self.coef = bm.full_like(Ef_abs, fill_value=self.coef, dtype=space.ftype)
+        integrator  = bm.einsum('i,i->i', Ef_abs / d, self.coef)
         direction_matrix = bm.array([[1.0, -1.0], [-1.0, 1.0]], dtype=space.ftype)
         eye_D = bm.eye(D, dtype=space.ftype, device=bm.get_device(space))
         base_matrix = bm.einsum('ij,pq->ipjq', eye_D, direction_matrix).reshape(2*D, 2*D)

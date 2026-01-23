@@ -61,7 +61,9 @@ class  NACA0012Mesher:
 
     @variantmethod('tri')
     def init_mesh(self, h=0.05, singular_h=None, is_quad = 0,
-                  thickness=0.005, ratio=2.4, size=0.001) -> TriangleMesh:
+                  thickness=0.005, ratio=2.4, size=0.001,
+              convert_quads_to_tris=True,
+              area_tol=1e-8, merge_tol=1e-10) -> TriangleMesh:
         """
         Using Gmsh to generate a 2D triangular mesh for a NACA 0012 airfoil within a rectangular box.
 
@@ -77,9 +79,9 @@ class  NACA0012Mesher:
         f = gmsh.model.mesh.field.add('BoundaryLayer')
         gmsh.model.mesh.field.setNumbers(f, 'CurvesList', self.naca_line_tags)
         gmsh.model.mesh.field.setNumber(f, 'Size', h / 50)
-        gmsh.model.mesh.field.setNumber(f, 'Ratio', 2.4)
+        gmsh.model.mesh.field.setNumber(f, 'Ratio', ratio)
         gmsh.model.mesh.field.setNumber(f, 'Quads', is_quad)
-        gmsh.model.mesh.field.setNumber(f, 'Thickness', h / 10)
+        gmsh.model.mesh.field.setNumber(f, 'Thickness', thickness)
         gmsh.option.setNumber('Mesh.BoundaryLayerFanElements', 7)
         gmsh.model.mesh.field.setNumbers(f, 'FanPointsList', [self.naca_points_tags[-1]])
         gmsh.model.mesh.field.setAsBoundaryLayer(f)
@@ -89,9 +91,10 @@ class  NACA0012Mesher:
             elif len(singular_h) != len(self.singular_points):
                 raise ValueError("Length of singular_h must match number of singular_points.")
             # 创建奇异点
-            singular_point_tags = []
-            for i, p in enumerate(self.singular_points):
-                singular_point_tags.append(gmsh.model.occ.addPoint(p[0], p[1], 0, singular_h[i]))
+            singular_point_tags = [
+                gmsh.model.occ.addPoint(p[0], p[1], 0, singular_h[i])
+                for i, p in enumerate(self.singular_points)
+            ]
             gmsh.model.occ.synchronize()
             # 设置背景网格
             gmsh.option.setNumber("Mesh.CharacteristicLengthMax", h)
@@ -121,11 +124,48 @@ class  NACA0012Mesher:
 
         gmsh.model.mesh.generate(2)
         # gmsh.fltk.run()
-        node_tags, node, _ = gmsh.model.mesh.getNodes()
-        node = bm.array(node, dtype=bm.float64).reshape(-1, 3)[:, :2]
-        element_types, element_tags, cell = gmsh.model.mesh.getElements(2)
-        cell = bm.array(cell[0], dtype=bm.int64).reshape(-1, 3) - 1
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        nodes = bm.array(node_coords, dtype=bm.float64).reshape(-1, 3)[:, :2]
+
+        element_types, element_tags, element_node_lists = gmsh.model.mesh.getElements(2)
+
+        tri_cells = []
+        for etype, nodelist in zip(element_types, element_node_lists):
+            nodelist = bm.array(nodelist, dtype=bm.int64)
+            if etype == 2:  # Triangle
+                tri_cells.append(nodelist.reshape(-1, 3) - 1)
+            elif etype == 3 and convert_quads_to_tris:  # Quadrangle -> 2 triangles
+                arr = nodelist.reshape(-1, 4) - 1
+                t1 = arr[:, [0, 1, 2]]
+                t2 = arr[:, [0, 2, 3]]
+                tri_cells.extend([t1, t2])
+            elif etype == 3 and not convert_quads_to_tris:
+                print("[Warning] Quad elements found but not converted!")
+            else:
+                # Fallback for other element types (only first 3 nodes)
+                tri_cells.append(nodelist.reshape(-1, 3) - 1)
+
+        cells = bm.concatenate(tri_cells, axis=0)
+
+        # ---------- Remove zero/small area triangles ----------
+        def tri_area(p0, p1, p2):
+            return 0.5 * abs((p1[0]-p0[0])*(p2[1]-p0[1]) - (p2[0]-p0[0])*(p1[1]-p0[1]))
+
+        areas = bm.array([tri_area(nodes[i0], nodes[i1], nodes[i2]) for i0, i1, i2 in cells])
+        valid_mask = areas > area_tol
+        if bm.sum(valid_mask) != cells.shape[0]:
+            print(f"[Mesh Cleanup] Removed {cells.shape[0] - bm.sum(valid_mask)} zero/small area triangles.")
+            cells = cells[valid_mask]
+
+        # ---------- Merge nearly duplicate nodes ----------
+        coords = bm.asarray(nodes)
+        scale = 1.0 / max(1e-12, merge_tol)
+        keys = bm.round(coords * scale).astype('int64')
+        unique_keys, inv = bm.unique(keys, axis=0, return_inverse=True)
+        new_coords = unique_keys.astype('float64') / scale
+        cells = inv[cells]
+        nodes = bm.array(new_coords, dtype=bm.float64)
 
         gmsh.finalize()
-        return TriangleMesh(node, cell)
+        return TriangleMesh(nodes, cells)
 

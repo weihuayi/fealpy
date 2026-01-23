@@ -666,20 +666,15 @@ class SPHSolver:
                 v = np.hstack([v, np.zeros((N, 1))])
             data_pv[k] = np.asarray(v)
         return data_pv
+
 class ParticleSystem:
-    def __init__(self, dx, dy, rho0=1000, rhomin=995, dt=0.001, c0=10, gamma=7, alpha=0.1):
-        self.dx = dx
-        self.dy = dy
-        self.rho0 = rho0
-        self.rhomin = rhomin
-        self.dt = dt
-        self.c0 = c0
-        self.gamma = gamma
-        self.alpha = alpha
-        self.g = bm.array([0.0, -9.8])
-        self.H = 0.92 * bm.sqrt(dx**2 + dy**2)
-        
-        self.dtype = [
+    def __init__(self, particles):
+
+        self.particles = particles
+
+    @classmethod
+    def initialize_particles(cls, pp, bpp, rho0=1000):
+        dtype = [
             ("position", "float64", (2,)),
             ("velocity", "float64", (2,)),
             ("rho", "float64"),
@@ -688,21 +683,30 @@ class ParticleSystem:
             ("sound", "float64"),
             ("tag", "bool"),
         ]
-        
-        self.particles = None
-        
-    def initialize_particles(self, pp, bpp):
         num_particles = pp.shape[0] + bpp.shape[0]
-        self.particles = bm.zeros(num_particles, dtype=self.dtype)
-        self.particles["rho"] = self.rho0
-        self.particles["position"] = bm.concatenate((pp, bpp), axis=0)
-        self.particles["tag"][pp.shape[0]:] = True
-        self.particles["tag"][:pp.shape[0]] = False
+        particles = bm.zeros(num_particles, dtype=dtype)
+        particles["rho"] = rho0
+        particles["position"] = bm.concatenate((pp, bpp), axis=0)
+        particles["tag"][pp.shape[0] :] = True
+        particles["tag"][: pp.shape[0]] = False
+    
+        return cls(particles)
+
 
 class BamBreakSolver:
-    def __init__(self, particle_system):
-        self.ps = particle_system
-        
+    def __init__(self, particles, dx=0.03, dy=0.03, dt=0.001, c0=10, rho0=1000, rhomin=995, gamma=7, alpha=0.01):
+        self.dx = dx
+        self.dy = dy
+        self.dt = dt
+        self.c0 = c0
+        self.rho0 = rho0
+        self.rhomin = rhomin
+        self.gamma = gamma
+        self.alpha = alpha
+        self.g = bm.array([0, -9.8])
+        self.ps = particles
+        self.H = 0.92 * bm.sqrt(dx ** 2 + dy ** 2)
+
     # 使用 cKDTree 进行临近搜索
     def find_neighbors_within_distance(self, points, h):
         tree = cKDTree(points)
@@ -732,19 +736,19 @@ class BamBreakSolver:
         num = particles["rho"].shape[0]
         position = particles["position"]
         velocity = particles["velocity"]
-        mass = self.ps.dx * self.ps.dy * particles["rho"]
+        mass = self.dx * self.dy * particles["rho"]
         result = bm.zeros(num)
-        
+
         for i in range(num):
             for j in idx[i]:
                 if i != j:  # 排除自己
                     rij = position[i] - position[j]
-                    gk = self.gradkernel(rij, self.ps.H) * rij
+                    gk = self.gradkernel(rij, self.H) * rij
                     vij = velocity[i] - velocity[j]
                     result[i] += mass[j] * bm.dot(gk, vij)
-            particles["rho"][i] += self.ps.dt * result[i]
-            if self.ps.rhomin > 0 and particles["rho"][i] < self.ps.rhomin:
-                particles["rho"][i] = self.ps.rhomin
+            particles["rho"][i] += self.dt * result[i]
+            if self.rhomin > 0 and particles["rho"][i] < self.rhomin:
+                particles["rho"][i] = self.rhomin
 
     # 计算粒子位置的变化
     def change_position(self, idx):
@@ -753,75 +757,73 @@ class BamBreakSolver:
         position = particles["position"]
         velocity = particles["velocity"]
         rho = particles["rho"]
-        mass = self.ps.dx * self.ps.dy * rho
+        mass = self.dx * self.dy * rho
         result = bm.zeros((num, 2))
-        
+
         for i in range(num):
             for j in idx[i]:
                 rhoij = (rho[i] + rho[j]) / 2
                 vij = velocity[i] - velocity[j]
                 rij = position[i] - position[j]
-                ke = self.kernel(rij, self.ps.H)
+                ke = self.kernel(rij, self.H)
                 result[i] += 0.5 * mass[j] * vij * ke / rhoij
             result[i] = velocity[i] + 0.5 * result[i]
-        
+
         # 边界粒子位置固定不动，只更新内部粒子的位置
         tag = particles["tag"]
-        particles["position"][~tag] += self.ps.dt * result[~tag]
+        particles["position"][~tag] += self.dt * result[~tag]
 
     # 计算粒子压强
     def change_p(self, step):
         particles = self.ps.particles
-        B = self.ps.c0**2 * self.ps.rho0 / self.ps.gamma
-        particles["pressure"] = B * ((particles["rho"] / self.ps.rho0) ** self.ps.gamma - 1)
-        particles["sound"] = (
-            B * self.ps.gamma / self.ps.rho0 * (particles["rho"] / self.ps.rho0) ** (self.ps.gamma - 1)
-        ) ** 0.5
+        B = self.c0**2 * self.rho0 / self.gamma
+        particles["pressure"] = B * ((particles["rho"] / self.rho0) ** self.gamma - 1)
+        particles["sound"] = (B * self.gamma / self.rho0 * (particles["rho"] / self.rho0) ** (self.gamma - 1)) ** 0.5
 
     # 计算粒子加速度
     def change_v(self, idx):
         particles = self.ps.particles
         num = particles["rho"].shape[0]
         rho = particles["rho"]
-        mass = self.ps.dx * self.ps.dy * rho
+        mass = self.dx * self.dy * rho
         position = particles["position"]
         velocity = particles["velocity"]
         sound = particles["sound"]
         pressure = particles["pressure"]
         result = bm.zeros((num, 2))
-        
+
         for i in range(num):
             for j in idx[i]:
                 if i != j:  # 排除自己
                     val = pressure[i] / rho[i] ** 2 + pressure[j] / rho[j] ** 2
                     rij = position[i] - position[j]
-                    gk = self.gradkernel(rij, self.ps.H) * rij
+                    gk = self.gradkernel(rij, self.H) * rij
                     vij = velocity[i] - velocity[j]
                     pij = 0
                     if bm.dot(rij, vij) < 0:
-                        pij = -self.ps.alpha * (sound[i] + sound[j]) / 2
-                        pij *= self.ps.H * bm.dot(rij, vij) / (bm.dot(rij, rij) + 0.01 * self.ps.H * self.ps.H)
+                        pij = -self.alpha * (sound[i] + sound[j]) / 2
+                        pij *= (self.H * bm.dot(rij, vij) / (bm.dot(rij, rij) + 0.01 * self.H * self.H))
                         pij /= (rho[i] + rho[j]) / 2
                     result[i] += mass[j] * (val + pij) * gk
-                    
-        result = -result + self.ps.g
+
+        result = -result + self.g
         tag = particles["tag"]
-        particles["velocity"][~tag] += self.ps.dt * result[~tag]
+        particles["velocity"][~tag] += self.dt * result[~tag]
 
     # 重置密度
     def rein_rho(self, idx):
         particles = self.ps.particles
         num = particles["rho"].shape[0]
         rho = particles["rho"]
-        mass = self.ps.dx * self.ps.dy * rho
+        mass = self.dx * self.dy * rho
         position = particles["position"]
         vol = mass / rho
         A = bm.zeros((num, 3, 3))
-        
+
         for i in range(num):
             for j in idx[i]:
                 rij = position[i] - position[j]
-                wij = self.kernel(rij, self.ps.H)
+                wij = self.kernel(rij, self.H)
                 Abar = bm.zeros((3, 3))
                 Abar[0, 1] = rij[0]
                 Abar[0, 2] = rij[1]
@@ -831,7 +833,7 @@ class BamBreakSolver:
                 Abar[1, 1] = rij[0] ** 2
                 Abar[2, 2] = rij[1] ** 2
                 A[i] += Abar * wij * vol[j]
-                
+
         for i in range(num):
             particles["rho"][i] = 0
             condA = bm.linalg.cond(A[i])
@@ -839,7 +841,7 @@ class BamBreakSolver:
                 invA = bm.linalg.inv(A[i])
                 for j in idx[i]:
                     rij = position[i] - position[j]
-                    wij = self.kernel(rij, self.ps.H)
+                    wij = self.kernel(rij, self.H)
                     wmls = invA[0, 0] + invA[1, 0] * rij[0] + invA[2, 0] * rij[1]
                     particles["rho"][i] += wij * wmls * mass[j]
             else:
@@ -850,7 +852,7 @@ class BamBreakSolver:
 
                 for j in idx[i]:
                     rij = position[i] - position[j]
-                    wij = self.kernel(rij, self.ps.H)
+                    wij = self.kernel(rij, self.H)
                     mb = mass[j]
                     rho_b = particles["rho"][j]
 
@@ -868,7 +870,7 @@ class BamBreakSolver:
                     count = 0
                     for j in idx[i]:
                         rij = position[i] - position[j]
-                        wij = self.kernel(rij, self.ps.H)
+                        wij = self.kernel(rij, self.H)
                         sum_rho += mass[j] * wij
                         count += 1
 
@@ -879,40 +881,42 @@ class BamBreakSolver:
                         particles["rho"][i] = rho[i]
 
     def run_simulation(self, max_steps, draw_interval=1, reinitalize_interval=30):
-        visualizer = Visualizer(self.ps)
-        
+        visualizer = Visualizer(self.ps.particles["position"], self.ps.particles["pressure"], self.ps.particles["tag"])
+
         # 初始可视化
         visualizer.draw(0)
-        
+
         for i in range(max_steps):
             print(f"Step: {i}")
-            
+
             # 邻居搜索
-            idx = self.find_neighbors_within_distance(self.ps.particles["position"], 2 * self.ps.H)
-            
+            idx = self.find_neighbors_within_distance(self.ps.particles["position"], 2 * self.H)
+
             # 更新步骤
             self.change_rho(idx)
             self.change_p(i)
             self.change_v(idx)
             self.change_position(idx)
-            
             # 周期性密度重初始化
-            
+
             if i % reinitalize_interval == 0 and i != 0:
                 self.rein_rho(idx)
-                
+            
             # 周期性可视化
             if i % draw_interval == 0:
-                visualizer.draw(i)
-                
+               visualizer.draw(i)
+
+
 class Visualizer:
-    def __init__(self, particle_system):
-        self.ps = particle_system
-        
+    def __init__(self,position, pressure,tag):
+        self.position = position
+        self.pressure = pressure
+        self.tag = tag
+
     def draw(self, step, x_min=0, x_max=4, y_min=0, y_max=4):
         plt.clf()
         # 过滤在边界范围内的粒子
-        positions = self.ps.particles["position"]
+        positions = self.position
         within_boundary = (
             (positions[:, 0] >= x_min)
             & (positions[:, 0] <= x_max)
@@ -922,13 +926,15 @@ class Visualizer:
 
         # 只显示边界范围内的粒子
         visible_positions = positions[within_boundary]
-        visible_pressure = self.ps.particles["pressure"][within_boundary]
-        visible_tag = self.ps.particles["tag"][within_boundary]
+        visible_pressure = self.pressure[within_boundary]
+        visible_tag = self.tag[within_boundary]
 
         c = visible_pressure.copy()
         c[visible_tag] = 0
 
-        plt.scatter(visible_positions[:, 0], visible_positions[:, 1], c=c, cmap="jet", s=5)
+        plt.scatter(
+            visible_positions[:, 0], visible_positions[:, 1], c=c, cmap="jet", s=5
+        )
         plt.clim(0, 16000)  # 设置压力表示范围
         plt.colorbar(cmap="jet")
 
@@ -942,16 +948,13 @@ class Visualizer:
         plt.savefig(fname)
 
     def final_plot(self):
-        color = bm.where(self.ps.particles["tag"], "red", "blue")
-        tag = bm.where(self.ps.particles["tag"])
-        c = self.ps.particles["pressure"]
+        plt.clf()
+        color = bm.where(self.tag, "red", "blue")
+        tag = bm.where(self.tag)
+        c = self.pressure
         c[tag] = max(c)
-        plt.scatter(
-            self.ps.particles["position"][:, 0], 
-            self.ps.particles["position"][:, 1], 
-            c=c, cmap="jet", s=5
-        )
-        plt.colorbar(cmap="jet")
+        plt.scatter(self.position[:, 0], self.position[:, 1], c=c, cmap="jet", s=5,)
+        plt.colorbar(cmap="jet")# visualizer = Visualizer(self.ps)
         plt.clim(0, 16000)  # 设置压力表示范围
         plt.grid(True)
         plt.show()

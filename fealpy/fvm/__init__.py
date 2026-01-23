@@ -10,6 +10,7 @@ from .div_reconstruct import DivergenceReconstruct
 from .dirichlet_bc import DirichletBC
 from .neumann_bc import NeumannBC
 from .vector_decomposition import VectorDecomposition
+from .rhie_chow import RhieChowInterpolation
 
 from .poisson_fvm_model import PoissonFVMModel
 

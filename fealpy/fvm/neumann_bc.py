@@ -4,7 +4,7 @@ from fealpy.backend import backend_manager as bm
 
 class NeumannBC:
     
-    def __init__(self, mesh, gd, threshold=None):
+    def __init__(self, mesh, gd=None, threshold=None):
         
         self.mesh = mesh
         self.gd = gd

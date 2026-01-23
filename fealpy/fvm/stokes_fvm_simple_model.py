@@ -12,10 +12,12 @@ from fealpy.solver import spsolve
 
 from . import (
     ScalarDiffusionIntegrator,
+    ScalarCrossDiffusionIntegrator,
     ScalarSourceIntegrator,
     GradientReconstruct,
     DivergenceReconstruct,
     DirichletBC,
+    RhieChowInterpolation
 )
 
 class StokesFVMSimpleModel(ComputationalModel):
@@ -45,7 +47,7 @@ class StokesFVMSimpleModel(ComputationalModel):
 
     def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
         """Set the computational mesh."""
-        self.mesh = self.pde.init_mesh['uniform_qrad'](nx=nx, ny=ny)
+        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)
         self.cm = self.mesh.entity_measure('cell')
         
 
@@ -56,7 +58,7 @@ class StokesFVMSimpleModel(ComputationalModel):
         self.velocity_space = TensorFunctionSpace(self.space, shape=(2, -1))
         self.NC = self.mesh.number_of_cells()
 
-    def temporary_velocity(self, p) -> Tuple[TensorLike, TensorLike]:
+    def temporary_velocity(self, p,u0) -> Tuple[TensorLike, TensorLike]:
         """Solve for temporary velocity u* using the momentum equation."""
         bform = BilinearForm(self.velocity_space)
         bform.add_integrator(ScalarDiffusionIntegrator(q=self.p + 2))
@@ -69,42 +71,54 @@ class StokesFVMSimpleModel(ComputationalModel):
         dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
         B, f = dbc.DiffusionApply(B, f)
         
-        grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(p, self.pde.neumann_pressure)  # (NC, 2)
+        grad_p = GradientReconstruct(self.mesh).LSQ(p)  # (NC, 2)
+        # grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(p, self.pde.neumann_pressure)  # (NC, 2)
         # grad_p = GradientReconstruct(self.mesh).AverageGradientreDirichlet(p, self.pde.dirichlet_pressure)  # (NC, 2)
         p1 = bm.einsum('i,i->i', grad_p[:,0], self.cm)
         p2 = bm.einsum('i,i->i', grad_p[:,1], self.cm)
         p_grad_integrator = bm.concatenate((p1,p2))
         f = f - p_grad_integrator
-
         u = spsolve(B, f,"mumps")
+
+        cross = self.compute_cross_diffusion(u0)
+        for i in range(10):
+            rhs = f + cross
+            uh_new = spsolve(B, rhs)
+            err = bm.max(bm.abs(uh_new - u))
+            print(f"[Iter {i+1}] residual = {err}")
+            if err < 10e-5:
+                print("Converged.")
+                break
+            u = uh_new
+            cross = self.compute_cross_diffusion(u)
         return ap, u
     
-    def Ucell2edge(self,u,gd):
-        u = bm.stack([u[:self.NC],u[self.NC:]],axis=-1)
-        bd_edge = self.mesh.boundary_face_index()
-        edge_middle_point = self.mesh.entity_barycenter('edge')
-        e2c = self.mesh.edge_to_cell()
-        bdedgepoint = edge_middle_point[bd_edge]
-        bdedgeu = gd(bdedgepoint)
-        uf = bm.zeros((self.mesh.number_of_faces(), 2), dtype=u.dtype)
-        uf += (u[e2c[:,0]]+u[e2c[:,1]])/2
-        uf[bd_edge, :] = bdedgeu
-        uf = bm.reshape(uf, (-1, 2))
-        return uf
+    def compute_cross_diffusion(self, uh: TensorLike) -> TensorLike:
+        """Compute cross-diffusion term based on current velocity uh."""
+        lform = LinearForm(self.velocity_space)
+        U = bm.stack((uh[:self.NC], uh[self.NC:]), axis=1)
+        grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(U,self.pde.dirichlet_velocity)
+        # grad_u = GradientReconstruct(self.mesh).LSQ(uh)
+        grad_f = GradientReconstruct(self.mesh).reconstruct(grad_u)  # (NE, 2)
+        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f))
+        return lform.assembly()
     
     def pressure_correct(self, ap: TensorLike, uf: TensorLike) -> TensorLike:
         """Solve for pressure correction p' to enforce continuity."""
-
-        
+        cm = self.mesh.entity_measure('cell')
+        em = self.mesh.entity_measure('edge')
+        dp = 1/ap[:len(cm)]
+        e2c = self.mesh.edge_to_cell()
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        dp_edge = em*dp_edge
         div_u = DivergenceReconstruct(self.mesh).Reconstruct(uf)  # (NE,)
         
         bform2 = BilinearForm(self.space)
-        bform2.add_integrator(ScalarDiffusionIntegrator(q=2))
+        bform2.add_integrator(ScalarDiffusionIntegrator(q=2,coef=dp_edge))
         A = bform2.assembly()
-        LagA = self.mesh.entity_measure('cell')
-        div_u = ap[:len(LagA)]*div_u
-        A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
-                             bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
+        
+        A1 = COOTensor(bm.array([bm.zeros(len(cm), dtype=bm.int32),
+                             bm.arange(len(cm), dtype=bm.int32)]), cm, spshape=(1, len(cm)))
         A = BlockForm([[A, A1.T], [A1, None]])
         A = A.assembly_sparse_matrix(format='csr')
         b0 = bm.array([0])
@@ -113,22 +127,35 @@ class StokesFVMSimpleModel(ComputationalModel):
         p_c = sol[:-1]
         return p_c
 
-    def solve(self, max_iter: int = 10, tol: float = 1e-5) -> Tuple[TensorLike, TensorLike]:
+    def solve(self, max_iter: int = 100, tol: float = 1e-5, relax: float = 0.32) -> Tuple[TensorLike, TensorLike]:
         """Solve the Stokes equation using the SIMPLE algorithm."""
         p = bm.zeros(self.NC)
-        ap, u = self.temporary_velocity(p)
+        u = bm.zeros(2 * self.NC)
+        ap, u = self.temporary_velocity(p, u)
         self.residuals = []
+        bd_edge = self.mesh.boundary_face_index()
+        edge_middle_point = self.mesh.entity_barycenter('edge')
+        bdedgepoint = edge_middle_point[bd_edge]
+        bdedgeu = self.pde.dirichlet_velocity(bdedgepoint)
+        L2_p_corr0 = 10
         for i in range(max_iter):
-            uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
+            uf = RhieChowInterpolation(self.mesh).Interpolation(u,ap,p)
+            uf[bd_edge, :] = bdedgeu
+            # uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
             p_corr = self.pressure_correct(ap, uf)
             L2_p_corr = bm.sqrt(bm.sum(self.cm * (p_corr)**2))
+            delta_L2_p_corr0 = L2_p_corr - L2_p_corr0
             self.residuals.append(float(L2_p_corr))
-            self.logger.info(f"[Iter {i+1}] L2 norm of the pressure correction : {L2_p_corr:.6e}")
-            if L2_p_corr < tol:
+            self.logger.info(f"[Iter {i+1}] L2 norm of the delta pressure correction : {delta_L2_p_corr0}")
+            if delta_L2_p_corr0 > 0:
                 self.logger.info("Converged.")
                 break
-            p += 0.8*p_corr
-            _, u = self.temporary_velocity(p)
+            elif bm.abs(delta_L2_p_corr0) < tol:
+                self.logger.info("Converged.")
+                break
+            p += relax*p_corr
+            L2_p_corr0 = L2_p_corr
+            _, u = self.temporary_velocity(p,u)
 
         self.uh = u[:self.NC]
         self.vh = u[self.NC:]

@@ -68,7 +68,8 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         A = bform.assembly()
 
         f = LinearForm(uspace).add_integrator(ScalarSourceIntegrator(self.pde.source_u, q=2)).assembly()
-        grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
+        grad_p = GradientReconstruct(self.umesh).LSQ(p_u)
+        # grad_p = GradientReconstruct(self.umesh).AverageGradientreNeumann(p_u, self.pde.neumann_pressure)
         f -= bm.einsum('i,i->i', grad_p[:, 0], self.ucm)
         dbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
                           threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
@@ -88,7 +89,8 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         A = bform.assembly()
 
         f = LinearForm(vspace).add_integrator(ScalarSourceIntegrator(self.pde.source_v, q=2)).assembly()
-        grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
+        # grad_p = GradientReconstruct(self.vmesh).AverageGradientreNeumann(p_v,self.pde.neumann_pressure)
+        grad_p = GradientReconstruct(self.vmesh).LSQ(p_v)
         f -= bm.einsum('i,i->i', grad_p[:, 1], self.vcm)
         dbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
                           threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
@@ -102,13 +104,15 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         Solve for pressure correction p' to enforce continuity.
         """
         pspace = ScaledMonomialSpace2d(self.pmesh, 0)
+        p_edge = self.pmesh.entity_measure('edge')
+        p_edge2 = bm.einsum('i,i->i', p_edge,p_edge)
         A = BilinearForm(pspace).add_integrator(
-            ScalarDiffusionIntegrator(q=2,coef=1 / a_p_edge)
+            ScalarDiffusionIntegrator(q=2,coef=p_edge / a_p_edge)
         ).assembly()  
-        # print(1 / a_p_edge)
+        # print(1 / a_p_edge)p_edge
         # print(A.to_dense())
-        nbc = NeumannBC(self.pmesh, self.pde.neumann_pressure)
-        f = nbc.DiffusionApply(f)
+        # nbc = NeumannBC(self.pmesh, self.pde.neumann_pressure)
+        # f = nbc.DiffusionApply(f)
         LagA = self.pmesh.entity_measure('cell')
         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                              bm.arange(len(LagA), dtype=bm.int32)]), LagA, spshape=(1, len(LagA)))
@@ -127,21 +131,15 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         p = bm.zeros(self.ppoints.shape[0])
         # p = self.pde.pressure(self.ppoints)
         UNE = self.umesh.number_of_edges()
-        uf = bm.ones(UNE)
-        vf = bm.ones(UNE)
+        uf = bm.zeros(UNE)
+        vf = bm.zeros(UNE)
         self.residuals = []
 
-        uedge_centers = self.umesh.entity_barycenter('edge')
-        vedge_centers = self.vmesh.entity_barycenter('edge')
-        dist = bm.sum((uedge_centers[:, None, :] - vedge_centers[None, :, :])**2, axis=2)
-        vedge2uedge = bm.argmin(dist, axis=1)
+        vedge2uedge = self.staggered_mesh.get_dof_mapping_vedge2uedge()
         vf_umesh = vf[vedge2uedge]
         Uf = bm.stack([uf, vf_umesh], axis=1)
 
-        uedge_centers = self.umesh.entity_barycenter('edge')
-        vedge_centers = self.vmesh.entity_barycenter('edge')
-        dist = bm.sum((uedge_centers[:, None, :] - vedge_centers[None, :, :])**2, axis=2)
-        uedge2vedge = bm.argmin(dist, axis=0)
+        uedge2vedge = self.staggered_mesh.get_dof_mapping_uedge2vedge()
         uf_vmesh = uf[uedge2vedge]
         Vf = bm.stack([uf_vmesh, vf], axis=1)
         ue2c = self.umesh.edge_to_cell()
@@ -151,12 +149,7 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
             p_u, p_v = self.staggered_mesh.map_pressure_pcell_to_uvedge(p)
             uh, a_p_u = self.compute_temporary_velocity_u(p_u,Uf)
             vh, a_p_v = self.compute_temporary_velocity_v(p_v,Vf)
-            uf1 = (uh[ue2c[:,0]] + uh[ue2c[:,1]])/2
-            vf1 = (vh[ve2c[:,0]] + vh[ve2c[:,1]])/2
-            vf_umesh = vf1[vedge2uedge]
-            Uf = bm.stack([uf1, vf_umesh], axis=1)
-            uf_vmesh = uf1[uedge2vedge]
-            Vf = bm.stack([uf_vmesh, vf1], axis=1)
+            
             edge_vel, a_p_edge = self.staggered_mesh.map_velocity_uvcell_to_pedge(uh, vh, a_p_u, a_p_v)
             self.div_rhs = self.div.StagReconstruct(edge_vel)
             p_corr = self.correct_pressure_compute(-self.div_rhs, a_p_edge)
@@ -166,9 +159,34 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
             if err < tol:
                 self.logger.info("Converged.")
                 break
-            p += 0.8*p_corr  
+            ucell2pedge = self.staggered_mesh.get_dof_mapping_ucell2pedge()
+            vcell2pedge = self.staggered_mesh.get_dof_mapping_vcell2pedge()
+            pe2c = self.pmesh.edge_to_cell()
+            u_corr = (p_corr[pe2c[ucell2pedge,0]]-p_corr[pe2c[ucell2pedge,1]])/self.staggered_mesh.hx
+            v_corr = (p_corr[pe2c[vcell2pedge,0]]-p_corr[pe2c[vcell2pedge,1]])/self.staggered_mesh.hy
+            u_corr = self.ucm / a_p_u * u_corr
+            v_corr = self.vcm / a_p_v * v_corr
+            # if err < 1e-3:
+            #     p += 0.3*p_corr
+            # elif err < 1e-1:
+            #     p += 0.05*p_corr
+            # else:
+            #     p += 0.05*p_corr
+            p += 0.2*p_corr
+            uh += u_corr
+            vh += v_corr
+            uf1 = (uh[ue2c[:,0]] + uh[ue2c[:,1]])/2
+            vf1 = (vh[ve2c[:,0]] + vh[ve2c[:,1]])/2
+            vf_umesh = vf1[vedge2uedge]
+            Uf = bm.stack([uf1, vf_umesh], axis=1)
+            uf_vmesh = uf1[uedge2vedge]
+            Vf = bm.stack([uf_vmesh, vf1], axis=1)
+
         
         self.uh, self.vh, self.ph = uh, vh, p
+        self.edge_vel, _ = self.staggered_mesh.map_velocity_uvcell_to_pedge(uh, vh, a_p_u, a_p_v)
+        # print(self.edge_vel.shape)
+        # print(self.pmesh.number_of_edges())
         self.p_correct = p_corr
         return uh, vh, p
 
@@ -221,4 +239,52 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         plt.ylabel("Residual (log scale)")
         plt.grid(True, which="both", ls="--")
         plt.tight_layout()
+        plt.show()
+
+    def plot_streamline(self) -> None:
+        """Plot the streamlines of the velocity field."""
+        import matplotlib.pyplot as plt
+
+        nx, ny = 32, 32 # u.shape = (ny, nx) 通常
+        
+        c2e = self.pmesh.cell2edge
+        u = (self.edge_vel[c2e[:,1]]+self.edge_vel[c2e[:,3]])/2
+        v = (self.edge_vel[c2e[:,0]]+self.edge_vel[c2e[:,2]])/2
+        print("u shape:",u.shape)
+        print("v shape:",v.shape)
+        u2d = u.reshape((ny, nx),order="F")
+        v2d = v.reshape((ny, nx),order="F")
+        p2d = self.ph.reshape((ny, nx),order="F")
+
+        import numpy as np
+
+        dx = 1.0 / nx
+        dy = 1.0 / ny
+
+        x = (np.arange(nx) + 0.5) * dx
+        y = (np.arange(ny) + 0.5) * dy
+        X, Y = np.meshgrid(x, y)
+
+
+        import matplotlib.pyplot as plt
+
+        speed = np.sqrt(u2d**2 + v2d**2)
+
+        plt.figure(figsize=(6, 6))
+        plt.streamplot(
+            X, Y, u2d, v2d,
+            color=speed,
+            cmap="viridis",
+            density=1.5
+        )
+        plt.colorbar(label="|u|")
+        plt.axis("equal")
+        plt.title("Lid-driven cavity streamlines")
+        plt.show()
+
+        plt.figure(figsize=(6, 6))
+        plt.contourf(X, Y, p2d, levels=50, cmap="coolwarm")
+        plt.colorbar(label="p")
+        plt.axis("equal")
+        plt.title("Pressure contour")
         plt.show()

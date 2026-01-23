@@ -65,7 +65,7 @@ class PoissonFVMModel(ComputationalModel):
         self.logger.info(self.pde)
 
     def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
-        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)    
+        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)
 
     def set_space(self, degree: int = 0) -> None:
         self.p = degree
@@ -80,13 +80,11 @@ class PoissonFVMModel(ComputationalModel):
             f (ndarray): The source term vector.
         """
         bform = BilinearForm(self.space)
-        bform.add_integrator(ScalarDiffusionIntegrator(q=self.p + 2))
+        bform.add_integrator(ScalarDiffusionIntegrator(coef=1))
         A = bform.assembly()
-
         lform = LinearForm(self.space)
-        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p + 2))
+        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=2))
         f = lform.assembly()
-
         dbc = DirichletBC(self.mesh, self.pde.dirichlet)
         A, f = dbc.DiffusionApply(A, f)
         return A, f
@@ -102,12 +100,14 @@ class PoissonFVMModel(ComputationalModel):
             ndarray: Right-hand side vector from cross-diffusion.
         """
         lform = LinearForm(self.space)
-        grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(uh,self.pde.dirichlet)  # (NC, 2)
+        # grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(uh,self.pde.dirichlet)  # (NC, 2)
+        grad_u = GradientReconstruct(self.mesh).LSQ(uh)
         grad_f = GradientReconstruct(self.mesh).reconstruct(grad_u)  # (NE, 2)
-        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f, q=self.p + 2))
+        # grad_f = GradientReconstruct(self.mesh).reconstruct2(uh,grad_u)  # (NE, 2)
+        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f, coef=1))
         return lform.assembly()
 
-    def solve(self, max_iter=6, tol=1e-7) -> TensorLike:
+    def solve(self, max_iter=1, tol=1e-7) -> TensorLike:
         """
         Iteratively solve the linear system including cross-diffusion.
 
@@ -126,7 +126,6 @@ class PoissonFVMModel(ComputationalModel):
             rhs = f + cross
             uh_new = spsolve(A, rhs)
             err = bm.max(bm.abs(uh_new - uh))
-
             self.logger.info(f"[Iter {i+1}] residual = {err:.4e}")
             if err < tol:
                 self.logger.info("Converged.")
@@ -147,6 +146,8 @@ class PoissonFVMModel(ComputationalModel):
         cell_center = self.mesh.entity_barycenter('cell')
         self.uI = self.pde.solution(cell_center)
         self.error = bm.sqrt(bm.sum(self.mesh.entity_measure('cell') * (self.uI - self.uh)**2))
+        # l0error = bm.max(bm.abs(self.uI - self.uh))
+        # self.logger.info(f"L0 error = {l0error}")
         return self.error
 
     def plot(self) -> None:

@@ -242,6 +242,58 @@ class FlowPastCylinder:
         value[...,1] = 0
         return value
     
+    @cartesian
+    def velocity_dirichlet(self, p, t):
+        inlet = self.u_inflow_dirichlet(p)
+        is_inlet = self.is_inflow_boundary(p)
+
+        result = bm.zeros_like(p)
+        result[is_inlet] = inlet[is_inlet]
+        return result
+    
+    @cartesian
+    def pressure_dirichlet(self, p, t):
+        result = bm.zeros(p.shape[0], dtype=bm.float64)
+        return result
+    
+    @cartesian
+    def is_velocity_boundary(self, p):
+        is_out = self.is_outflow_boundary(p)
+        return ~is_out
+    
+    @cartesian
+    def is_pressure_boundary(self, p = None):
+        if p is None:
+            return 1
+        is_out = self.is_outflow_boundary(p)
+        return is_out
+    
+    @cartesian
+    def velocity(self, p, t):
+        """Compute exact solution of velocity."""
+        x = p[..., 0]
+        y = p[..., 1]
+        result = bm.zeros(p.shape, dtype=bm.float64)
+        return result
+    
+    @cartesian
+    def pressure(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        result = bm.zeros(p.shape[0], dtype=p.dtype)
+        return result
+    
+    @cartesian
+    def source(self, p, t):
+        """Compute exact source """
+        x = p[..., 0]
+        y = p[..., 1]
+        result = bm.zeros(p.shape, dtype=bm.float64)
+        result[..., 0] = bm.array(0.0)
+        result[..., 1] = bm.array(0.0)
+        return result
+
+    
 class ChannelFlowWithLevelSet:
     def __init__(self, domain ,eps=1e-12, rho=1, mu=0.001):
         self.eps = eps

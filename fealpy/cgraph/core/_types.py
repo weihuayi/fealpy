@@ -4,7 +4,8 @@ from typing import Protocol, NamedTuple, Any
 from collections.abc import Mapping
 
 __all__ = ["SlotStatus", "Slot", "TransSlot", "InputSlot", "OutputSlot",
-           "CNode", "NodeExceptionData", "NodeIOError", "NodeTopologyError"]
+           "CNode", "NodeExceptionData", "NodeIOError", "NodeTopologyError",
+           "NodeExecutionError"]
 
 
 class ParamPassingKind(IntEnum):
@@ -97,6 +98,11 @@ class NodeExceptionData():
 
 class NodeIOError(Exception):
     """Inappropriate input or output of nodes."""
+    pass
+
+
+class NodeExecutionError(Exception):
+    """Inappropriate execution of nodes."""
     pass
 
 

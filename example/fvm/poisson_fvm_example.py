@@ -10,9 +10,10 @@ def main():
     parser.add_argument('--pde', default=2, type=int,
                         help='PDE example ID from Poisson PDE manager.')
 
-    parser.add_argument('--nx', default=40, type=int,
+    parser.add_argument('--nx', default=10, type=int,
                         help='Number of cells in x-direction.')
-    parser.add_argument('--ny', default=40, type=int,
+    
+    parser.add_argument('--ny', default=10, type=int,
                         help='Number of cells in y-direction.')
 
     parser.add_argument('--space_degree', default=0, type=int,

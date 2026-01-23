@@ -91,7 +91,7 @@ class DirichletBC:
         A = D0.matmul(A.matmul(D0)) + D1
         return A, f
 
-    def DiffusionApply(self, A, b):
+    def DiffusionApply(self, A, b, coef=1.0):
         """
         Apply Dirichlet boundary conditions to the diffusion term.
 
@@ -125,10 +125,10 @@ class DirichletBC:
         D = bd_u.shape[1]
         bdIdx = bm.tile(bdIdx, D)
         A_0 = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
-        A = A + A_0
+        A = A + coef * A_0
         if D == 1:
             bd_correct = (bd_integrator[:, None] * bd_u).reshape(-1)
-            bm.add_at(b, bde2c, bd_correct)
+            bm.add_at(b, bde2c, coef * bd_correct)
         else:
             # Remove the extra axis from bd_u for computation
             bd_u = bm.squeeze(bd_u, axis=-1)
@@ -136,7 +136,7 @@ class DirichletBC:
             bd_correct = bm.transpose(bd_correct).flatten()
             new_arr = bde2c + NC
             bde2c = bm.concat([bde2c, new_arr])
-            bm.add_at(b, bde2c, bd_correct)
+            bm.add_at(b, bde2c, coef * bd_correct)
         return A, b
 
     def DivApply(self, b):
