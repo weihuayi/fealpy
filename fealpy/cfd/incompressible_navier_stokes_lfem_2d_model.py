@@ -113,7 +113,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         return gmres(*args, **kwargs)
 
     @variantmethod('main')
-    def run(self, maxstep = 10, tol = 1e-10):
+    def run(self, maxstep = 10, tol = 1e-10, vtk = False):
         self.run_str = "main"
         mesh = self.mesh         
         pde = self.pde
@@ -137,9 +137,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             u0[:] = u1
             p0[:] = p1
 
-            mesh.nodedata['ph'] = p1
-            mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
-            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+            if vtk == True :
+                mesh.nodedata['ph'] = p1
+                mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
+                mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
             uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
             self.timeline.advance()
@@ -170,18 +171,15 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uh1 = u0.space.function()
             uhs = u0.space.function()
             ph1 = p0.space.function()
+            pgdof = p0.space.number_of_global_dofs()
             x0 = bm.zeros_like(u0.space.function().array)
-            x1 = bm.zeros_like(p0.space.function().array)
+            
              
             A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
             uhs[:] = self.solve['cg'](A0, b0, x0)
-            isbd = BCu.boundary_dof_index
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
-            if self.equation.pressure_neumann == True:
-                ph1[:] = self.solve['cg'](A1, b1)[:-1]
-            else:
-                ph1[:] = self.solve['cg'](A1, b1, x1)
+            ph1[:] = self.solve['cg'](A1, b1)[:pgdof]
 
             A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, BC=BCu, return_form=False)
             uh1[:] = self.solve['cg'](A2, b2, x0)

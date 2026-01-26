@@ -27,8 +27,8 @@ class  NACA4Mesher:
     singular_points : array_like, optional
         Points where mesh refinement is needed, e.g., leading and trailing edges.
     """
-    def __init__(self, m=0.02, p=0.4, t=0.12, c = 1.0, alpha=0, N=50,
-                 box=(-0.5, 1.5, -0.3, 0.3), singular_points:TensorLike=None):
+    def __init__(self, m=0.06, p=0.4, t=0.18, c = 1.0, alpha=0, N=100,
+                 box=(-0.5, 2.0, -0.4, 0.4), singular_points:TensorLike=None):
         self.box = box
         self.naca_points = self.get_naca4_points(m, p, t, c, N)
         if alpha != 0:
@@ -230,11 +230,11 @@ class FlowPastFoil2D():
         self.mesh = self.init_mesh()
 
     def init_mesh(self):
-        m = 0.0  # 最大弯度
-        p = 0.0  # 弯度位置
-        t = 0.12  # 厚度
+        m = 0.06  # 最大弯度
+        p = 0.6  # 弯度位置
+        t = 0.18  # 厚度
         c = 1.0  # 弦长
-        alpha = 15.0  # 攻角
+        alpha = 5.0  # 攻角
         N = 100
 
         box = self.box
@@ -331,7 +331,7 @@ class FlowPastFoil2D():
         y = p[...,1]
         value = bm.zeros_like(p)
         # value[...,0] = 1.5 * 4 * (y-self.box[2])*(self.box[3]-y)/((0.41)**2)
-        value[...,0] = 1
+        value[...,0] = 1.5
         # value[...,1] = 0
         return value
     
