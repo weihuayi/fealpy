@@ -33,6 +33,156 @@ class Cylinder3D():
     #     mesh = TetrahedronMesh.from_box_minus_cylinder(**options)
     #     return mesh
 
+    # def init_mesh(self):
+    #     import gmsh
+    #     import numpy as np
+    #     from fealpy.mesh import TetrahedronMesh
+
+    #     # -----------------------
+    #     # Parameters
+    #     # -----------------------
+    #     L, H, W = 2.2, 0.41, 0.41
+    #     xc, yc = 0.2, 0.2
+    #     R = 0.05
+
+    #     lc_bulk = 0.08
+    #     lc_cyl = 0.03
+
+    #     # -----------------------
+    #     # Initialize gmsh
+    #     # -----------------------
+    #     gmsh.initialize()
+    #     gmsh.model.add("cylinder_flow_3d")
+    #     occ = gmsh.model.occ
+
+    #     # 强制纯四面体网格（关键）
+    #     gmsh.option.setNumber("Mesh.Algorithm3D", 1)   # Delaunay
+    #     gmsh.option.setNumber("Mesh.RecombineAll", 0)
+
+    #     # -----------------------
+    #     # Geometry
+    #     # -----------------------
+    #     box = occ.addBox(0, 0, 0, L, H, W)
+    #     cyl = occ.addCylinder(xc, yc, 0, 0, 0, W, R)
+    #     fluid, _ = occ.cut([(3, box)], [(3, cyl)])
+
+    #     occ.synchronize()
+
+    #     # -----------------------
+    #     # Physical surfaces
+    #     # -----------------------
+    #     surfaces = gmsh.model.getBoundary(fluid, oriented=False)
+
+    #     inlet, outlet, walls, cylinder, front_back = [], [], [], [], []
+
+    #     for dim, tag in surfaces:
+    #         x, y, z = gmsh.model.occ.getCenterOfMass(dim, tag)
+
+    #         if abs(x) < 1e-6:
+    #             inlet.append(tag)
+    #         elif abs(x - L) < 1e-6:
+    #             outlet.append(tag)
+    #         elif abs(y) < 1e-6 or abs(y - H) < 1e-6:
+    #             walls.append(tag)
+    #         elif abs(z) < 1e-6 or abs(z - W) < 1e-6:
+    #             front_back.append(tag)
+    #         else:
+    #             cylinder.append(tag)
+
+    #     gmsh.model.addPhysicalGroup(2, inlet, name="inlet")
+    #     gmsh.model.addPhysicalGroup(2, outlet, name="outlet")
+    #     gmsh.model.addPhysicalGroup(2, walls, name="walls")
+    #     gmsh.model.addPhysicalGroup(2, front_back, name="front_back")
+    #     gmsh.model.addPhysicalGroup(2, cylinder, name="cylinder")
+    #     gmsh.model.addPhysicalGroup(3, [fluid[0][1]], name="fluid")
+
+    #     # -----------------------
+    #     # Mesh size field
+    #     # -----------------------
+    #     gmsh.model.mesh.field.add("Distance", 1)
+    #     gmsh.model.mesh.field.setNumbers(1, "FacesList", cylinder)
+
+    #     gmsh.model.mesh.field.add("Threshold", 2)
+    #     gmsh.model.mesh.field.setNumber(2, "InField", 1)
+    #     gmsh.model.mesh.field.setNumber(2, "SizeMin", lc_cyl)
+    #     gmsh.model.mesh.field.setNumber(2, "SizeMax", lc_bulk)
+    #     gmsh.model.mesh.field.setNumber(2, "DistMin", 0.05)
+    #     gmsh.model.mesh.field.setNumber(2, "DistMax", 0.2)
+
+    #     gmsh.model.mesh.field.setAsBackgroundMesh(2)
+
+    #     # -----------------------
+    #     # Generate mesh
+    #     # -----------------------
+    #     gmsh.model.mesh.generate(3)
+
+    #     # -----------------------
+    #     # Extract nodes
+    #     # -----------------------
+    #     node_tags, node_coords, _ = gmsh.model.mesh.getNodes() 
+    #     elem_types, elem_tags, elem_node_tags = gmsh.model.mesh.getElements(3) 
+    #     tri_nodes = elem_node_tags[0].reshape(-1, 3) - 1 # 转为从0开始索引 
+    #     node_coords = bm.array(node_coords).reshape(-1, 3)[:, :2] 
+    #     tri_nodes = bm.array(tri_nodes, dtype=bm.int32) 
+
+    #     gmsh.fltk.run()
+
+    #     gmsh.finalize()
+
+    #     return TetrahedronMesh(node_tags, node_coords)
+
+    def init_mesh(self):
+        options = {
+        'init_point': (0.0, 0.0),
+        'chip_height': 0.41,
+        'inlet_length': 0.2,
+        'outlet_length': 0.2,
+        'auto_config' : False,
+        'thickness': 0.41,
+        'radius': 0.05,
+        'n_rows': 1,
+        'n_cols': 1,
+        'tan_angle': 0,
+        'n_stages': 1,
+        'stage_length': 2.5,
+        'lc': 0.02,
+        'backend': 'numpy',
+        'show_figure': False,
+        'space_degree': 3,
+        'pbar_log': True,
+        'log_level': 'INFO',
+        'method': 'Newton',
+        'run': 'main',
+        'solve': 'direct',
+        'apply_bc': 'cylinder',
+        'postprocess': 'res',
+        'maxit': 1,
+        'maxstep': 1000,
+        'tol': 1e-10,
+        'local_refine': True
+        }
+
+
+        bm.set_backend(options['backend'])
+
+        gmsh.initialize()
+        modeler = DLDMicrofluidicChipModeler3D(options)
+        modeler._apply_auto_config()
+        modeler.build(gmsh)
+        mesher = DLDMicrofluidicChipMesher3D(options)
+        mesher.generate(modeler, gmsh)
+        gmsh.fltk.run()
+        gmsh.finalize()
+
+        mesh = mesher.mesh
+
+        return mesh
+
+
+
+
+
+
     @cartesian
     def source(self, p: TensorLike, t) -> TensorLike:
         """Compute exact source """

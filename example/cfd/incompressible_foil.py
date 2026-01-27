@@ -6,12 +6,12 @@ from fealpy.decorator import cartesian
 options ={
     'backend': 'numpy',
     'pde': 3,
-    'box':[-0.5, 2.7, -1.0, 1.0],
+    'box':[-0.5, 2.7, -0.4, 0.4],
     'rho': 1.0,
     'mu': 0.001,
     'T0': 0.0,
-    'T1': 1.0,
-    'nt': 10000,
+    'T1': 4.0,
+    'nt': 40000,
     'init_mesh': 'tri',
     'lc': 0.04,
     'method': 'IPCS',
@@ -23,6 +23,7 @@ manager = CFDPDEModelManager('incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
 model = IncompressibleNSLFEM2DModel(pde=pde, mesh = mesh, options = options)
+print(type(model))
 model.equation.set_constitutive(1)
 model.equation.set_coefficient('viscosity', pde.mu)
 
@@ -35,6 +36,7 @@ tol = model.tol
 
 u0 = fem.uspace.interpolate(cartesian(lambda p: pde.velocity(p, model.timeline.T0)))
 p0 = fem.pspace.interpolate(cartesian(lambda p: pde.pressure(p, model.timeline.T0)))
+print(type(u0))
 
 mesh.nodedata['ph'] = p0
 mesh.nodedata['uh'] = u0.reshape(model.mesh.GD,-1).T

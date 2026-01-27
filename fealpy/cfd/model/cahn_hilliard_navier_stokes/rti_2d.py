@@ -50,7 +50,10 @@ class RayleignTaylor2D:
         '''
         x = p[...,0]
         y = p[...,1]
-        val =  bm.tanh((y-2-0.1*bm.cos(bm.pi*2*x))/(bm.sqrt(bm.tensor(2))*self.epsilon))
+        self.y = y
+        # val =  bm.tanh((y-2-0.1*bm.cos(bm.pi*2*x))/(bm.sqrt(bm.tensor(2))*self.epsilon))
+        # val =  (self.rho_up + self.rho_down)/(2)+(self.rho_up - self.rho_down)/(2) * bm.tanh((y-2)/(self.epsilon))
+        val =  bm.tanh((y-2)/(bm.sqrt(bm.tensor(2))*self.epsilon))
         return val
     
     @cartesian

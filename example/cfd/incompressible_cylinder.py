@@ -10,21 +10,22 @@ options ={
     'rho': 1.0,
     'mu': 0.001,
     'T0': 0.0,
-    'T1': 3.0,
-    'nt': 3000,
+    'T1': 0.05,
+    'nt': 50,
     'init_mesh': 'tri',
-    'box': [0.0, 2.2, 0.0, 0.41],
+    'box': [0, 2.5, 0, 0.41],
     'center': (0.5, 0.2),
     'cyl_axis': [0.0, 0.0, 1.0],
     'thickness': 10,
     'radius': 0.05,
     'n_circle': 10,
-    'lc': 0.1,
+    'lc': 0.05,
     'Lz': 0.41,
     'n_layer': 10,
     'method': 'IPCS',
     'solve': 'direct',
-    'run': 'main'
+    'run': 'main',
+    'local_refine': True
 }
 
 bm.set_backend(options['backend'])
@@ -32,6 +33,7 @@ bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
+mesh.to_vtk(f'test.vtu')
 model = IncompressibleNSLFEM2DModel(pde=pde, mesh = mesh, options = options)
 model.equation.set_constitutive(1)
 model.equation.set_coefficient('viscosity', pde.mu)
