@@ -10,8 +10,12 @@ parser.add_argument('--pde',
                     help='Index of the elastoplasticity model, default is 4.')
 
 parser.add_argument('--space_degree',
-                    default=2, type=int,
+                    default=1, type=int,
                     help='Polynomial degree for the finite element space.')
+
+parser.add_argument('--backend',
+                    default='numpy', type=str,
+                    help='Backend to use for computations, e.g., "numpy" or "pytorch".')
 
 parser.add_argument('--device',
                     default='cuda', type=str,
@@ -35,7 +39,7 @@ parser.add_argument('--log_level',
 # 解析参数                                                                                                                                                                                                                  
 options = vars(parser.parse_args())
 from fealpy.backend import backend_manager as bm
-bm.set_backend('pytorch')
+bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import PerforatedSquarePlateFEMModel
 model = PerforatedSquarePlateFEMModel(options)

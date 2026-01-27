@@ -10,15 +10,15 @@ parser.add_argument('--pde',
                     help='Index of the elastoplasticity model, default is 3.')
 
 parser.add_argument('--space_degree',
-                    default=1, type=int,
+                    default=2, type=int,
                     help='Polynomial degree for the finite element space.')
 
 parser.add_argument('--backend',
-                    default='pytorch', type=str,
+                    default='numpy', type=str,
                     help='Backend to use for computations, e.g., "numpy" or "pytorch".')
 
 parser.add_argument('--device',
-                    default='cuda', type=str,
+                    default='cpu', type=str,
                     help='Device to run the computations on, e.g., "cpu" or "cuda".')
 
 parser.add_argument('--linear_system',
