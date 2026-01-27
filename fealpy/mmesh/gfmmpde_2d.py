@@ -141,7 +141,10 @@ class GFMMPDE2d(Monitor, Interpolater):
             a = JJ * M_inv_cell[:, None, None]
             b = -bm.einsum('cmk,cm->ck', JJ, G_xi)
         else:  # 矩阵情况
-            M_cell_avg = bm.mean(M, axis=1)  # NC,TD,TD
+            if M.ndim == 3:
+                M_cell_avg = M
+            else:
+                M_cell_avg = bm.mean(M, axis=1)  # NC,TD,TD
             M_inv_cell = bm.linalg.inv(M_cell_avg)
             M_inv_cell2dof = bm.linalg.inv(M_node)[cell2dof]
             G_xi = bm.einsum('cid,cimn->cmnd',lgphi[:, 0, ...], M_inv_cell2dof)
@@ -268,7 +271,6 @@ class GFMMPDE2d(Monitor, Interpolater):
             pc_mea = x_n[1:] - x_n[:-1]
             sm = bm.zeros(part_NN, **self.kwargs0)
             sm = bm.index_add(sm, part_logic_cell, pc_mea[:, None])
-
             part_mesh = IntervalMesh(part_logic_node, part_logic_cell)
             space = LagrangeFESpace(part_mesh, p=1)
             qf = part_mesh.quadrature_formula(self.q)
@@ -423,6 +425,7 @@ class GFMMPDE2d(Monitor, Interpolater):
             self.construct(node)
             if error < self.tol:
                 break
+        return self.mesh , self.uh
               
     def preprocessor(self,fun_solver =None):
         """
@@ -442,7 +445,7 @@ class GFMMPDE2d(Monitor, Interpolater):
                     t = (i+1)/steps
                     self.uh = t * self.uh
                     self.mesh_redistributor()
-                    self.uh = pde.init_solution(self.mesh.node)
+                    self.uh = pde.moving_init_solution(self.mesh.node)
         else:
             for i in range(steps):
                 t = (i+1)/steps

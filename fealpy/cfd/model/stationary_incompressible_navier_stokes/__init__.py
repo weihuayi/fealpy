@@ -35,5 +35,7 @@ follow the existing examples to register them in the registry.
 """
 DATA_TABLE = {
     # example name: (file_name, class_name)
-    1: ("cylinder2d", "Cylinder2d")
+    1: ("cylinder2d", "Cylinder2d"),
+    2: ("cylinder3d", "Cylinder3d"),
+    3: ("airfoil_2d", "FlowPastFoil2D"),
 }

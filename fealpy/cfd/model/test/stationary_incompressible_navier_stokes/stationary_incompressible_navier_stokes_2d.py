@@ -98,7 +98,9 @@ class FromSympy(BoxMesher2d):
         return self.box
    
     @cartesian
-    def is_pressure_boundary(self, p):
+    def is_pressure_boundary(self, p=None):
+        if p is None:
+            return 0
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
         return result
     

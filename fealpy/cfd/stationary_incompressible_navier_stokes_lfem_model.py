@@ -218,6 +218,13 @@ class StationaryIncompressibleNSLFEMModel(ComputationalModel):
         from fealpy.solver import spsolve
         self.solve_str = 'direct'
         return spsolve(A, F, solver = solver)
+    
+    @solve.register('cg')
+    def solve(self, *args, **kwargs):
+        """Solve the linear system Ax = F using Conjugate Gradient method."""
+        self.solve_str = "cg"
+        from fealpy.solver import cg
+        return cg(*args, **kwargs)
 
     @variantmethod('L2')    
     def error(self, uh, ph):

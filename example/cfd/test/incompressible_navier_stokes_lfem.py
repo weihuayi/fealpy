@@ -13,7 +13,7 @@ parser.add_argument('--backend',
     help="Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
     
 parser.add_argument('--pde',
-    default=3, type=int,
+    default=1, type=int,
     help="Name of the PDE model, default is sinsin")
 
 parser.add_argument('--init_mesh',
@@ -21,15 +21,15 @@ parser.add_argument('--init_mesh',
     help="Type of initial mesh, default is tri")
 
 parser.add_argument('--nx',
-    default = 4, type=int,
+    default = 2, type=int,
     help="Number of divisions in the x direction, default is 8")
 
 parser.add_argument('--ny',
-    default = 4, type=int,
+    default = 2, type=int,
     help="Number of divisions in the y direction, default is 8")
 
 parser.add_argument('--nz',
-    default=8, type=int,
+    default=2, type=int,
     help="Number of divisions in the z direction, default is 8 (only for 3D problems)")
 
 parser.add_argument('--T0',
@@ -45,7 +45,7 @@ parser.add_argument('--nt',
     help="Number of time steps, default is 1000")
 
 parser.add_argument('--method',
-    default='Ossen', type=str,
+    default='IPCS', type=str,
     help="Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',
@@ -57,7 +57,7 @@ parser.add_argument('--run',
     help="Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
-    default=2, type=int,
+    default=3, type=int,
     help="Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',

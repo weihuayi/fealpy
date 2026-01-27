@@ -40,6 +40,5 @@ class GFMMPDE:
             (2,1): GFMMPDELagrange2d,
             # (3,1): GFMMPDELagrange3d,
         }
-
         MMClass = dim2class.get((GD,p))
         return MMClass(mesh,beta,space,config)

@@ -87,6 +87,9 @@ class Poissondata():
             return self.u(x,y,z)
         return self.u(x,y)
     
+    def moving_init_solution(self, p):
+        return self.solution(p)
+    
     def init_solution(self, p):
         return self.solution(p)
     
@@ -742,3 +745,67 @@ def newton_barycentric_triangle(target, cell_nodes,
         lam    = bm.set_at(lam,    act_sub_idx, lam_upd)
 
     return lam, success
+
+def matrix_absA(A, symmetric=True, flat=False, eps=1e-14):
+    """
+    批量计算矩阵“绝对值” |A|：
+      - 若 symmetric=True（默认），|A| = sqrt(A@A)（假设 A 对称）
+      - 若 symmetric=False，|A| = sqrt(A.T@A)（极分解的正定因子）
+    参数
+      A: (..., d, d) 或 (..., d*d)
+      symmetric: 是否按对称分支
+      flat: 若输入为展平 (Nv,d*d)，设为 True
+    返回
+      与 A 同批量形状的 (..., d, d)
+    """
+    if flat:
+        Nv, dd = A.shape
+        d = int(bm.sqrt(dd))
+        A = A.reshape(Nv, d, d)
+    else:
+        d = A.shape[-1]
+        A = bm.asarray(A)
+
+    # 数值对称化（仅在 symmetric=True 时）
+    if symmetric:
+        A_sym = 0.5 * (A + bm.swapaxes(A, -1, -2))
+    else:
+        A_sym = A
+
+    if d == 2 and symmetric:
+        # 闭式公式：|A| = (A^2 + |det A| I) / sqrt(tr(A^2) + 2|det A|)
+        a11 = A_sym[..., 0, 0]
+        a12 = A_sym[..., 0, 1]
+        a21 = A_sym[..., 1, 0]
+        a22 = A_sym[..., 1, 1]
+        detA = a11 * a22 - a12 * a21
+        abs_detA = bm.abs(detA)
+
+        A2 = A_sym @ A_sym  # (...,2,2)
+        trA2 = A2[..., 0, 0] + A2[..., 1, 1]
+        denom = bm.sqrt(bm.clip(trA2 + 2.0 * abs_detA, eps, None))
+
+        absA = A2.copy()
+        absA[..., 0, 0] += abs_detA
+        absA[..., 1, 1] += abs_detA
+        absA = absA / denom[..., None, None]
+
+        # 退化回退：若出现非有限值，退回逐元素绝对值
+        bad = ~bm.isfinite(absA).all(axis=(-2, -1))
+        if bm.any(bad):
+            absA[bad] = bm.abs(A_sym[bad])
+        return absA if not flat else absA.reshape(-1, d * d)
+
+    if symmetric:
+        # 对称：A = V Λ Vᵀ，|A| = V |Λ| Vᵀ
+        w, V = bm.linalg.eigh(A_sym)                    # (..., d), (..., d, d)
+        absw = bm.abs(w)
+        absA = (V * absw[..., None, :]) @ bm.swapaxes(V, -1, -2)
+    else:
+        # 非对称：|A| = sqrt(AᵀA) = V sqrt(Λ) Vᵀ
+        AtA = bm.swapaxes(A, -1, -2) @ A
+        w, V = bm.linalg.eigh(AtA)
+        sqrtw = bm.sqrt(bm.clip(w, 0.0, None))
+        absA = (V * sqrtw[..., None, :]) @ bm.swapaxes(V, -1, -2)
+
+    return absA if not flat else absA.reshape(-1, d * d)

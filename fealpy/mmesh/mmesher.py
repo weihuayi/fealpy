@@ -306,6 +306,23 @@ class MMesher(ComputationalModel):
                                   self.config.active_method,
                                   self.dim)
     
+    def update_solution(self, uh):
+        """
+        update the current solution
+        """
+        self.instance.uh = uh
+        return self
+    
+    def get_solution(self):
+        """
+        get the current solution
+        """
+        return self.instance.uh
+    
+    @property
+    def solver(self):
+        return self.instance
+    
     @staticmethod
     def _run_instance(instance, process, active_method,dim = 1):
         """

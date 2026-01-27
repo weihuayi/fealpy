@@ -7,4 +7,6 @@ from .poisson_penn_model import PoissonPENNModel
 from .poisson_pinn_model import PoissonPINNModel
 from .helmholtz_pinn_model import HelmholtzPINNModel
 from .poisson_rfm_model import PoissonRFMModel
+from .diffusion_reaction_penn_model import DiffusionReactionPENNModel
+from .diffusion_reaction_pinn_model import DiffusionReactionPINNModel
 

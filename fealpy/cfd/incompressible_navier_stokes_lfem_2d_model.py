@@ -77,7 +77,7 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
     
     @method.register("BDF2")
     def method(self):
-        from .simulation.fem import BDF2
+        from .simulation.fem.incompressible_ns import BDF2
         self.fem = BDF2(self.equation, self.mesh)
         self.method_str = "BDF2"
         return self.fem
@@ -97,9 +97,23 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
         self.solve_str = "direct"
         from fealpy.solver import spsolve
         return spsolve(A, F, solver=solver)
+    
+    @solve.register('cg')
+    def solve(self, *args, **kwargs):
+        """Solve the linear system Ax = F using Conjugate Gradient method."""
+        self.solve_str = "cg"
+        from fealpy.solver import cg
+        return cg(*args, **kwargs)
+    
+    @solve.register('gmres')
+    def solve(self, *args, **kwargs):
+        """Solve the linear system Ax = F using GMRES method."""
+        self.solve_str = "gmres"
+        from fealpy.solver import gmres
+        return gmres(*args, **kwargs)
 
     @variantmethod('main')
-    def run(self, maxstep = 10, tol = 1e-10):
+    def run(self, maxstep = 10, tol = 1e-10, vtk = False):
         self.run_str = "main"
         mesh = self.mesh         
         pde = self.pde
@@ -123,9 +137,10 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             u0[:] = u1
             p0[:] = p1
 
-            mesh.nodedata['ph'] = p1
-            mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
-            mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+            if vtk == True :
+                mesh.nodedata['ph'] = p1
+                mesh.nodedata['uh'] = u1.reshape(self.mesh.GD,-1).T
+                mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
 
             uerror, perror = self.error(u0, p0, t= self.timeline.next_time()) 
             self.timeline.advance()
@@ -156,19 +171,18 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             uh1 = u0.space.function()
             uhs = u0.space.function()
             ph1 = p0.space.function()
+            pgdof = p0.space.number_of_global_dofs()
+            x0 = bm.zeros_like(u0.space.function().array)
+            
              
             A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
-            uhs[:] = self.solve(A0, b0)
-            isbd = BCu.boundary_dof_index
+            uhs[:] = self.solve['cg'](A0, b0, x0)
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
-            if self.equation.pressure_neumann == True:
-                ph1[:] = self.solve(A1, b1)[:-1]
-            else:
-                ph1[:] = self.solve(A1, b1)
+            ph1[:] = self.solve['cg'](A1, b1)[:pgdof]
 
             A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, BC=BCu, return_form=False)
-            uh1[:] = self.solve(A2, b2)
+            uh1[:] = self.solve['cg'](A2, b2, x0)
             return uh1, ph1
         else:
             
