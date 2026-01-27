@@ -85,7 +85,6 @@ class PatchAntennaMesher:
 
         # 规范化孔（左下+尺寸）
         self.hole_defs = []
-
         for (hc_x, hc_y, hsx, hsy) in self.notches:
             if hsx <= 0 or hsy <= 0:
                 raise ValueError("notches 中孔尺寸 sx, sy 必须为正数")

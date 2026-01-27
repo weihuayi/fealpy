@@ -83,6 +83,27 @@ class EITDataGenerator():
         A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
         self.A_n = A_n.tocsr()
 
+    def set_sigma(self, sigma: Callable[[Tensor], Tensor]) -> None:
+        """Set the conductivity distribution.
+
+        Args:
+            sigma (Callable[[Tensor], Tensor]): Conductivity function.
+        """
+        space = self.space
+
+        bform = BilinearForm(space)
+        self._di.coef = sigma
+        self._di.clear() # clear the cached result as the coef has changed
+        bform.add_integrator(self._di)
+        self._A = bform.assembly(format='coo')
+
+        cdata_indices = self.cdata_indices
+        cdataT_indices = bm.flip(cdata_indices, axis=0)
+        A_n_indices = bm.concat([self._A.indices, cdata_indices, cdataT_indices], axis=1)
+        A_n_values = bm.concat([self._A.values, self.cdata, self.cdata], axis=-1)
+        A_n = COOTensor(A_n_indices, A_n_values, spshape=(self.gdof+1, self.gdof+1))
+        self.A_n = A_n.tocsr()
+
     def set_boundary(self, gn_source: Union[Callable[[Tensor], Tensor], Tensor],
                      batch_size: int=0, *, zero_integral=False) -> Tensor:
         """Set boundary current density.
@@ -107,7 +128,7 @@ class EITDataGenerator():
         # node is the integral of the current density function.
         if callable(gn_source):
             lform = LinearForm(self.space, batch_size=batch_size)
-            self._bsi.gn = gn_source
+            self._bsi.source = gn_source
             self._bsi.batched = (batch_size > 0)
             self._bsi.clear()
             lform.add_integrator(self._bsi)

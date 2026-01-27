@@ -63,7 +63,8 @@ class Config:
                  fun_solver:callable = None,
                  monitor:str = 'arc_length',
                  mol_meth:str = 'heatequ',
-                 int_meth:str = 'comass'):
+                 int_meth:str = 'comass',
+                 gamma:float = 1.0,):
         """
         @param r: parameter of the mollification method
         @param alpha: parameter of the mollification method
@@ -101,6 +102,7 @@ class Config:
         self.int_meth = int_meth
         self.parallel_mode = 'none'
         self.kappa = kappa
+        self.gamma = gamma
         self._check()
 
     def _check(self):

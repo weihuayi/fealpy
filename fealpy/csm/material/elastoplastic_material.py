@@ -79,7 +79,6 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         s = self.deviatoric_stress(stress)
         norm_s = bm.sqrt(bm.sum(s**2, axis=-1))
         seq = math.sqrt(3.0 / 2.0) * norm_s
-        print(seq.shape, alpha.shape)
         f = seq - (self.yield_stress + self.hardening_modulus * alpha)
         return f
 
@@ -344,7 +343,6 @@ class ElastoplasticMaterial(LinearElasticMaterial):
         nu = self.poisson_ratio
         H = self.hardening_modulus
         G = E / (2 * (1 + nu))
-        
         De = self.elastic_matrix()  # (NC, NQ, 3, 3)
 
         sigma_trial = bm.einsum('...ij,...j->...i', De, strain_total-strain_pl_n)  # (NC, NQ, 3)
@@ -354,12 +352,12 @@ class ElastoplasticMaterial(LinearElasticMaterial):
 
         f_trial = self.yield_function(sigma_trial, strain_e_n)  # (NC, NQ)
         is_plastic = f_trial > 0  # (NC, NQ) 
+        #is_plastic = bm.zeros_like(f_trial, dtype=bm.bool)
 
         gamma = f_trial / (3 * G + H)  # (NC, NQ)
-        stress_trial_e = bm.maximum(stress_trial_e, bm.array(1e-12))
-        # TODO:检查n的数学表达式是否正确
-        n = s_trial / (2 / 3 * stress_trial_e[..., None])  # (NC, NQ, 3)
 
+        stress_trial_e = bm.maximum(stress_trial_e, bm.array(1e-12))
+        n = s_trial / (2 / 3 * stress_trial_e[..., None])  # (NC, NQ, 3)
 
         sigma_np1 = bm.where(
             is_plastic[..., None],
@@ -381,17 +379,21 @@ class ElastoplasticMaterial(LinearElasticMaterial):
 
         NC = sigma_np1.shape[0]
         NQ = sigma_np1.shape[1]
-        Ctang = bm.broadcast_to(De, (NC, NQ, De.shape[2], De.shape[3]))  # (NC, NQ, 3, 3)
+        n = De.shape[-1]
+        Ctang = bm.broadcast_to(De, (NC, NQ, n, n))  # (NC, NQ, 3, 3)
        
         # Compute Ctang for plastic points
         if bm.any(is_plastic):
-            sigma_pl = bm.where(is_plastic[..., None], sigma_np1, 0.0)  # (NC, NQ, 3)
+            sigma_pl = sigma_np1 * is_plastic[..., None]
+            print(sigma_pl.shape)
             df = self.plastic_normal(sigma_pl)                          # (NC, NQ, 3)
             if  H == 0:
-                Ctang_plastic = self.elastico_plastic_matrix_backend(sigma_pl, df)  # (NC, NQ, 3, 3)
+                Ctang_plastic = self.elastico_plastic_matrix(sigma_pl, df)  # (NC, NQ, 3, 3)
             else:
                 Ctang_plastic = self.elastico_plastic_matrix_isotropic(sigma_pl)  # (NC, NQ, 3, 3)
             Ctang = bm.where(is_plastic[..., None, None], Ctang_plastic, De)  # (NC, NQ, 3, 3)
+            
+            
 
         return sigma_np1, strain_pl_n1, strain_e_n1, Ctang, is_plastic
 

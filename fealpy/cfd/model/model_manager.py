@@ -5,7 +5,8 @@ __all__ = ['CFDPDEModelManager', 'CFDTestModelManager']
 class CFDPDEModelManager(ModelManager):
     _registry = {
         "stationary_incompressible_navier_stokes": "fealpy.cfd.model.stationary_incompressible_navier_stokes",
-        "incompressible_navier_stokes": "fealpy.cfd.model.incompressible_navier_stokes"
+        "incompressible_navier_stokes": "fealpy.cfd.model.incompressible_navier_stokes",
+        "chann_hilliard_navier_stokes": "fealpy.cfd.model.cahn_hilliard_navier_stokes"
     }
 
 class CFDTestModelManager(ModelManager):

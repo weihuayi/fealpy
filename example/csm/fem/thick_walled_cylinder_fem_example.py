@@ -13,6 +13,22 @@ parser.add_argument('--space_degree',
                     default=1, type=int,
                     help='Polynomial degree for the finite element space.')
 
+parser.add_argument('--backend',
+                    default='pytorch', type=str,
+                    help='Backend to use for computations, e.g., "numpy" or "pytorch".')
+
+parser.add_argument('--device',
+                    default='cuda', type=str,
+                    help='Device to run the computations on, e.g., "cpu" or "cuda".')
+
+parser.add_argument('--linear_system',
+                    default='matrix_free', type=str,
+                    help='Type of linear system solver, e.g., "matrix_free" or "direct".')
+
+parser.add_argument('--solver',
+                    default='cg', type=str,
+                    help='Type of solver to use, e.g., "cg" for conjugate gradient.')
+
 parser.add_argument('--pbar_log',
                     default=False, action='store_true',
                     help='Show progress bar log.')
@@ -24,18 +40,19 @@ parser.add_argument('--log_level',
 options = vars(parser.parse_args())
 
 from fealpy.backend import backend_manager as bm
-bm.set_backend('pytorch')
+bm.set_backend(options['backend'])
 
 from fealpy.csm.fem import ThickWalledCylinderFEMModel
 model = ThickWalledCylinderFEMModel(options)
+"""
 # 网格可视化
 from matplotlib import pyplot as plt
 fig = plt.figure()
 axes = fig.add_subplot(111)
 mesh = model.mesh
 mesh.add_plot(axes) # 画出网格背景
-
-pde= model.pde
+plt.show()
+"""
 """
 node = mesh.entity('node')
 bdnode = node[ pde.dirichlet_boundary(node) ]
@@ -62,7 +79,5 @@ else:
         mesh.find_node(axes, showindex=True)
 plt.show()
 """
-
+pde= model.pde
 model.solve()
-
-

@@ -839,7 +839,8 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
     @classmethod
     def tetrahedron_grad_lambda_3d(cls, tet: Tensor, node: Tensor, localFace: Tensor) -> Tensor:
         NC = tet.shape[0]
-        Dlambda = torch.zeros((NC, 4, 3), dtype=node.dtype)
+        kwargs = cls.context(node)
+        Dlambda = torch.zeros((NC, 4, 3), **kwargs)
         volume = cls.simplex_measure(tet, node)
         for i in range(4):
             j, k, m = localFace[i]

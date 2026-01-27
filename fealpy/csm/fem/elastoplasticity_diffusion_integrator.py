@@ -49,7 +49,7 @@ class ElastoplasticDiffusionIntegrator(LinearElasticityIntegrator):
     '''
     def __init__(self, D_ep, material, q, method=None):
         super().__init__(material, q, method=method)
-        self.assembly.set(method)
+        # self.assembly.set(method)
         self.D_ep = D_ep  # 弹塑性材料矩阵
 
     @variantmethod

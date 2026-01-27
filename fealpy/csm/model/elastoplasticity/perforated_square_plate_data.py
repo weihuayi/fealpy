@@ -34,10 +34,10 @@ class PerforatedSquarePlateData():
         self.nu = 0.25           # Poisson's ratio
         self.hardening_modulus = 0              # Hardening modulus a in MPa
         self.yield_stress = 1100 # Initial yield stress in MPa
-        self.pressure = 500     # Applied internal pressure in MPa
+        self.pressure = 1000     # Applied internal pressure in MPa
 
         self.dim = 3
-        self.Ft_max = 500        # N: max traction force
+        self.Ft_max = 50        # N: max traction force
         self._eps = 1e-8
 
         self.lam = self.compute_lambda()
@@ -143,11 +143,12 @@ class PerforatedSquarePlateData():
         """
         施加面力 t = (p, 0, 0)，其中 p = 1000 N/m²
         """
-        pressure = 1000.0  # N/m²
+        pressure = self.pressure  # N/m²
         # 构造 (..., 3) 的牵引力向量
+        kwargs =bm.context(p)
         traction = bm.stack([
-            bm.full(p.shape[:-1], pressure, dtype=p.dtype),  # tx = p
-            bm.zeros(p.shape[:-1], dtype=p.dtype),           # ty = 0
-            bm.zeros(p.shape[:-1], dtype=p.dtype)            # tz = 0
+            bm.full(p.shape[:-1], pressure, **kwargs),  # tx = p
+            bm.zeros(p.shape[:-1], **kwargs),           # ty = 0
+            bm.zeros(p.shape[:-1],**kwargs)            # tz = 0
         ], axis=-1)
         return traction

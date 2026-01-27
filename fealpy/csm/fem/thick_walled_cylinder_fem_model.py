@@ -3,6 +3,7 @@ from typing import Union
 
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
+from fealpy.decorator import variantmethod
 
 from fealpy.mesh import Mesh
 from fealpy.mesher import AnnulusMesher
@@ -78,6 +79,7 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
         self.set_space_degree(options['space_degree'])
         self.set_space()
         self.set_material_parameters(E=21000, nu=0.3)  # Set material parameters
+        self.linear_system.set(options['linear_system'])  # Set linear system assembly method
         self.E = self.pde.E
         self.nu = self.pde.nu
         self.f = self.pde.Ft_max
@@ -130,7 +132,7 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
         Returns:
             Mesh: The initialized mesh object.
         '''
-        self.mesh = AnnulusMesher.init_mesh(self, R = 200, r = 100, theta0_deg=0, theta1_deg=90, center=(0,0), h =8)
+        self.mesh = AnnulusMesher.init_mesh(self, R = 200, r = 100, theta0_deg=0, theta1_deg=90, center=(0,0), h =2)
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
         NF = self.mesh.number_of_faces()
@@ -194,6 +196,7 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
         strain = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
         return strain
 
+    @variantmethod('direct')
     def linear_system(self, loading_neumann, D_ep, stress):
         '''
         Construct the linear system for the elastoplasticity problem.
@@ -211,7 +214,6 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
         '''
         elastoplasticintegrator= ElastoplasticDiffusionIntegrator(D_ep, material=self.pfcm,
                                     q=self.space.p+3)
-        KK = elastoplasticintegrator.assembly(self.space)
         bform = BilinearForm(self.space)
         bform.add_integrator(elastoplasticintegrator)
         K = bform.assembly(format='csr')
@@ -230,10 +232,46 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
         F_int = lform2.assembly()
 
         return K , F_int, F_ext
+    
+    @linear_system.register('matrix_free')
+    def linear_system(self, loading_neumann, D_ep, stress):
+        '''
+        Construct the linear system for the elastoplasticity problem.
+        
+        Parameters:
+            loading_neumann (callable): Function defining the Neumann boundary load vector.
+            D_ep (TensorLike): Elastoplastic material stiffness matrix.
+            stress (TensorLike): Stress tensor for the cells.
+
+        Returns:
+            Tuple[TensorLike, TensorLike, TensorLike]:
+                - K (TensorLike): Assembled stiffness matrix.
+                - F_int (TensorLike): Internal force vector.
+                - F_ext (TensorLike): External force vector.    
+        '''
+        elastoplasticintegrator= ElastoplasticDiffusionIntegrator(D_ep, material=self.pfcm,
+                                    q=self.space.p+3)
+        bform = BilinearForm(self.space)
+        bform.add_integrator(elastoplasticintegrator.const(self.space))
+        lform2 = LinearForm(self.space)
+        lform2.add_integrator(ScalarNeumannBCIntegrator(
+            source=loading_neumann,
+            threshold=self.pde.neumann_boundary,
+            q=self.space.scalar_space.p + 3
+        ).const(self.space))
+        F_ext = lform2.assembly()
+        lform2 = LinearForm(self.space)
+        elastoplasticintintegrator = ElastoplasticitySourceIntIntegrator(strain_matrix=self.B, stress=stress,
+            q=self.space.p + 3,
+        )
+        lform2.add_integrator(elastoplasticintintegrator)
+        F_int = lform2.assembly()
+
+        return bform , F_int, F_ext
        
     def solve(self):
 
-        tmr = timer()
+        tmr = timer(draw_pie_chart=False)
         next(tmr)
         
         u = self.space.function()  # 总位移
@@ -288,20 +326,32 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
                                                     stress=stress_trial)  
                 tmr.send(f'第{n}次线性系统组装时间')
                 R = F_int - F_ext
-                from fealpy.fem import DirichletBC
-                gd_uh = self.pde.dirichlet_bc
-                threshold = self.pde.is_dirichlet_boundary()
-                K, R = DirichletBC(self.space, gd=gd_uh,
-                                threshold=threshold).apply(K, R)
+                if self.options['linear_system'] == 'direct':
+                    from fealpy.fem import DirichletBC
+                    gd_uh = self.pde.dirichlet_bc
+                    threshold = self.pde.is_dirichlet_boundary()
+                    K, R = DirichletBC(self.space, gd=gd_uh,
+                                    threshold=threshold).apply(K, R)
+                else:
+                    from fealpy.fem import DirichletBCOperator
+                    gd_uh = self.pde.dirichlet_bc
+                    threshold = self.pde.is_dirichlet_boundary()
+                    uh = self.space.function()
+                    K = DirichletBCOperator(K, gd=gd_uh,
+                                    threshold=threshold)
+                    R = K.apply(R,uh)
+                
                 tmr.send(f'第{n}次边界条件处理时间')
                 if bm.linalg.norm(R) > 1e6:
                     print("Residual too large. Exiting.")
-                from fealpy.solver import spsolve
-                delta_du = spsolve(K, -R, 'scipy')
+                if self.options['solver'] == 'cg':
+                    from fealpy.solver.cg import cg
+                    delta_du = cg(K, -R, atol=1e-12, rtol=1e-8, maxit=2000)
+                else:
+                    from fealpy.solver import spsolve
+                    delta_du = spsolve(K, -R, 'scipy')
                 tmr.send(f'第{n}次线性系统求解时间')
                 delta_u += delta_du  # 累加位移增量
-                
-
                 norm_R = bm.linalg.norm(R)
                 norm_du = bm.linalg.norm(delta_du)
                 tmr.send(f'第{n}次残差和位移增量计算时间')
@@ -313,7 +363,6 @@ class ThickWalledCylinderFEMModel(ComputationalModel):
                     stress = stress_trial
                     strain_pl = strain_pl_trial 
                     strain_e = strain_e_trial
-                    print(strain_e.max())
                     strain_total = strain_total_trial
                 iter_count += 1
 

@@ -100,7 +100,8 @@ class BlockWithHoleMesher:
             'h': 0.8,
             'return_mesh': True,
             'return_hole': True,
-            'show_figure': True,
+            'show_figure': False,
+            'device':'cpu',
         }
 
         return options
@@ -114,6 +115,7 @@ class BlockWithHoleMesher:
         h = option['h']
         return_mesh = option['return_mesh']
         show_figure = option['show_figure']
+        device = option['device']
         
         length, width, height = block['length'], block['width'], block['height']
  
@@ -149,6 +151,8 @@ class BlockWithHoleMesher:
             tets_tags,evtags = gmsh.model.mesh.getElementsByType(4)
             evid = bm.array([vmap[j] for j in evtags])
             cell = evid.reshape((tets_tags.shape[-1],-1))
+            node = bm.array(node,dtype=bm.float64,device=device)
+            cell = bm.array(cell,dtype=bm.int32,device=device)
             self.mesh = TetrahedronMesh(node, cell)
 
         if show_figure:

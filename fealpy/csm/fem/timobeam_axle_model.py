@@ -20,26 +20,24 @@ from ..utils import CoordTransform
 
 
 class TimobeamAxleModel(ComputationalModel):
-        """
-        """
         def __init__(self, options):
-               self.options = options
-               super().__init__(
-                        pbar_log=options['pbar_log'],
-                        log_level=options['log_level'])
-               self.set_pde(options['pde'])
-               mesh = self.pde.init_mesh()
-               self.set_mesh(mesh)
-               self.set_space_degree(options['space_degree'])
+                self.options = options
+                super().__init__(
+                                pbar_log=options['pbar_log'],
+                                log_level=options['log_level'])
+                self.set_pde(options['pde'])
+                mesh = self.pde.init_mesh()
+                self.set_mesh(mesh)
+                self.set_space_degree(options['space_degree'])
 
-               self.GD = self.pde.geo_dimension()
-               self.beam_E = options['beam_E']
-               self.beam_nu = options['beam_nu']
-               self.axle_E = options['axle_E']
-               self.axle_nu = options['axle_nu']
-               
-               self.Timo, self.Axle = self.set_material()
-               self.set_space()
+                self.GD = self.pde.geo_dimension()
+                self.beam_E = options['beam_E']
+                self.beam_nu = options['beam_nu']
+                self.k_axle = options['k_axle']
+                self.axle_E = options['axle_E']
+              
+                self.Timo, self.Axle = self.set_material()
+                self.set_space()
         
         def __str__(self) -> str:
                 """Returns a formatted multi-line string summarizing the configuration of the Timoshenko beam model.
@@ -55,9 +53,8 @@ class TimobeamAxleModel(ComputationalModel):
                 s += f"  beam_E           : {self.beam_E}\n"
                 s += f"  beam_nu          : {self.beam_nu}\n"
                 s += f"  beam_mu          : {self.beam_E/(2*(1+self.beam_nu)):.3e}\n"  # 自动算梁剪切模量
+                s += f"  k_axle           : {self.k_axle}\n"
                 s += f"  axle_E           : {self.axle_E}\n"
-                s += f"  axle_nu          : {self.axle_nu}\n"
-                s += f"  axle_mu          : {self.axle_E/(2*(1+self.axle_nu)):.3e}\n"  # 自动算轴承剪切模量
                 s += ")"
                 self.logger.info(f"\n{s}")
                 return s
@@ -90,8 +87,8 @@ class TimobeamAxleModel(ComputationalModel):
                 
                 Axle = AxleMaterial(name="axle",
                                 model=self.pde,
-                                elastic_modulus=self.axle_E,
-                                poisson_ratio=self.axle_nu)
+                                k_axle=self.k_axle,
+                                elastic_modulus=self.axle_E)
                 return Timo, Axle
                 
         def timo_axle_system(self):
@@ -143,7 +140,7 @@ class TimobeamAxleModel(ComputationalModel):
                 K, F = self.apply_bc_penalty(K, F)
 
                 u = spsolve(K, F, solver='scipy')
-                # self.logger.info(f"Solution u:\n{u}")
+                self.logger.info(f"Solution u:\n{u}")
 
                 return u
         

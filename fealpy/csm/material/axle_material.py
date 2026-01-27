@@ -2,61 +2,37 @@ from typing import Optional, Tuple
 from builtins import float, str
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
-from fealpy.material.elastic_material import LinearElasticMaterial
 
 
-class AxleMaterial(LinearElasticMaterial):
-    """Material properties for 3D axles.
+class AxleMaterial():
+    """Material properties for 3D axle elements.
+    
     Parameters:
         name (str): The name of the material.
-        model (object): The model containing the axle's geometric and material properties.
-        E (float): The elastic modulus of the material.
-        mu (float): The shear modulus of the material.
+        model (object): The model containing the axle's geometric properties.
+        k_axle (float): The axle stiffness coefficient (N/m).
+        E (float, optional): Elastic modulus for stress calculation (Pa).
     """
     def __init__(self, 
                 name: str,
                 model,
-                elastic_modulus: Optional[float] = None,
-                poisson_ratio: Optional[float] = None,
-                shear_modulus: Optional[float] = None) -> None:
+                k_axle: float = 1.976e6,
+                elastic_modulus: Optional[float] = None) -> None:
         
-        super().__init__(name=name, 
-                        elastic_modulus= elastic_modulus, 
-                        poisson_ratio=poisson_ratio,
-                        shear_modulus=shear_modulus)
-        
-        self.E = self.get_property('elastic_modulus')
-        self.nu = self.get_property('poisson_ratio')
-        self.mu = self.get_property('shear_modulus')
+        self.model = model
+        self.k_axle = k_axle
+        self.E = elastic_modulus  # 仅用于应力计算
 
-        self.model = model 
-        
     def __str__(self) -> str:
         s = f"{self.__class__.__name__}(\n"
         s += "  === Material Parameters ===\n"
-        s += f"  Name              : {self.get_property('name')}\n"
-        s += f"  [axle]  E           : {self.E}\n"
-        s += f"  [axle]  nu          : {self.nu}\n"
-        s += f"  [axle]  mu          : {self.mu}\n"
+        s += f"  Name              : {self.name}\n"
+        s += f"  [axle]  k_axle    : {self.k_axle} N/m\n"
+        if self.E is not None:
+            s += f"  [axle]  E (for stress): {self.E} Pa\n"
         s += ")"
         return s
     
-    def linear_basis(self, x: float, l: float) -> TensorLike:
-        """Linear shape functions for a axle material.
-        Parameters:
-            x (float): Local coordinate along the axle axis.
-            l (float): Length of the axle element.
-        Returns:
-            b (TensorLike): Linear shape functions evaluated at xi.
-        """
-        xi = x / l  
-        t = 1.0 / l
-        b = bm.zeros((2, 2), dtype=bm.float64)
-        b[0, 0] = 1 - xi
-        b[0, 1] = xi
-        b[1, 0] = -t
-        b[1, 1] = t
-        return b
     
     def stress_matrix(self) -> TensorLike:
         """Returns the stress matrix for bar material."""
@@ -71,7 +47,7 @@ class AxleMaterial(LinearElasticMaterial):
                                disp,
                                coord_transform=None,
                                ele_indices=None) -> Tuple[TensorLike, TensorLike]:
-        """Calculate the strain and stress for bar elements.
+        """Calculate the strain and stress for axle elements.
             Compute axial strain: ε = (u1 - u0) / L
             Compute axial stress: σ = E * ε
         
@@ -84,8 +60,10 @@ class AxleMaterial(LinearElasticMaterial):
         Returns:
             Tuple[TensorLike, TensorLike]: Strain and stress vectors.
         """
+        if self.E is None:
+            raise ValueError("Elastic modulus (E) must be set for stress calculation")
+        
         NC = mesh.number_of_cells()
-        GD = mesh.geo_dimension()
         edge = mesh.entity('edge')
         l = mesh.entity_measure('cell')
         

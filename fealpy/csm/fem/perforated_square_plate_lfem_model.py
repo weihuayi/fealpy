@@ -3,6 +3,7 @@ from typing import Union
 
 from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
+from fealpy.decorator import variantmethod
 
 from fealpy.mesh import Mesh
 from fealpy.mesher import BlockWithHoleMesher
@@ -74,10 +75,14 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
         self.options = options
         super().__init__(pbar_log=options['pbar_log'], log_level=options['log_level'])
         self.set_pde(options['pde'])
-        self.set_init_mesh()
+        device = options['device']
+        self.set_init_mesh(device=device)
         self.set_space_degree(options['space_degree'])
         self.set_space()
+        
+        #kwargs = bm.context(self.mesh.entity('node'))
         self.set_material_parameters(E=10000, nu=0.25)  # Set material parameters
+        self.linear_system.set(options['linear_system'])  # Set linear system assembly method
         self.E = self.pde.E
         self.nu = self.pde.nu
         self.f = self.pde.Ft_max
@@ -120,7 +125,7 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
         NC = self.mesh.number_of_cells()
         self.logger.info(f"Mesh initialized with {NN} nodes, {NE} edges, {NF} faces, and {NC} cells.")
     """
-    def set_init_mesh(self):
+    def set_init_mesh(self, device):
         '''
         This method generates the mesh according to the domain and boundary conditions defined in the PDE data.
         
@@ -130,7 +135,22 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
         Returns:
             Mesh: The initialized mesh object.
         '''
-        mesher = BlockWithHoleMesher()
+        options = {
+            'block': {
+                'length': 10.0,
+                'width': 1.0,
+                'height': 10.0,
+            },
+            'cylinders': [
+                ((5.0, 0, 5.0), 1.0)
+            ],
+            'h': 1.0,
+            'return_mesh': True,
+            'return_hole': True,
+            'show_figure': False,
+            'device':device,
+        }
+        mesher = BlockWithHoleMesher(options)
         self.mesh = mesher.mesh
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -195,6 +215,7 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
         strain = bm.einsum('cqij,cj->cqi', self.B, uh_cell)
         return strain
 
+    @variantmethod('direct')
     def linear_system(self, loading_neumann, D_ep, stress):
         '''
         Construct the linear system for the elastoplasticity problem.
@@ -212,10 +233,9 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
         '''
         elastoplasticintegrator= ElastoplasticDiffusionIntegrator(D_ep, material=self.pfcm,
                                     q=self.space.p+3)
-        KK = elastoplasticintegrator.assembly(self.space)
         bform = BilinearForm(self.space)
         bform.add_integrator(elastoplasticintegrator)
-        K = bform.assembly(format='csr')
+        K = bform.assembly(format='coo')
         lform2 = LinearForm(self.space)
         lform2.add_integrator(ScalarNeumannBCIntegrator(
             source=loading_neumann,
@@ -231,6 +251,45 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
         F_int = lform2.assembly()
 
         return K , F_int, F_ext
+
+    @linear_system.register('matrix_free')
+    def linear_system(self, loading_neumann, D_ep, stress):
+        '''
+        Construct the linear system for the elastoplasticity problem.
+        
+        Parameters:
+            loading_neumann (callable): Function defining the Neumann boundary load vector.
+            D_ep (TensorLike): Elastoplastic material stiffness matrix.
+            stress (TensorLike): Stress tensor for the cells.
+
+        Returns:
+            Tuple[TensorLike, TensorLike, TensorLike]:
+                - K (TensorLike): Assembled stiffness matrix.
+                - F_int (TensorLike): Internal force vector.
+                - F_ext (TensorLike): External force vector.    
+        '''
+        
+        bform = BilinearForm(self.space)
+        bform.add_integrator(ElastoplasticDiffusionIntegrator(
+            D_ep, material=self.pfcm, q=self.space.p+3
+        ).const(self.space)
+        )
+        lform2 = LinearForm(self.space)
+        lform2.add_integrator(ScalarNeumannBCIntegrator(
+            source=loading_neumann,
+            threshold=self.pde.neumann_boundary,
+            q=self.space.scalar_space.p + 3
+        ).const(self.space)
+        )
+        F_ext = lform2.assembly()
+        lform2 = LinearForm(self.space)
+        elastoplasticintintegrator = ElastoplasticitySourceIntIntegrator(strain_matrix=self.B, stress=stress,
+            q=self.space.p + 3,
+        )
+        lform2.add_integrator(elastoplasticintintegrator)
+        F_int = lform2.assembly()
+
+        return bform , F_int, F_ext
        
     def solve(self):
 
@@ -238,10 +297,12 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
         next(tmr)
 
         u = self.space.function()  # 总位移
-        strain_pl = bm.zeros((self.NC, self.NQ, 6), dtype=bm.float64)
-        stress = bm.zeros((self.NC, self.NQ, 6), dtype=bm.float64)
-        strain_e = bm.zeros((self.NC, self.NQ), dtype=bm.float64)
-        strain_total = bm.zeros((self.NC, self.NQ, 6), dtype=bm.float64)
+        node = self.mesh.entity('node')
+        kwargs = bm.context(node)
+        strain_pl = bm.zeros((self.NC, self.NQ, 6), **kwargs)
+        stress = bm.zeros((self.NC, self.NQ, 6), **kwargs)
+        strain_e = bm.zeros((self.NC, self.NQ), **kwargs)
+        strain_total = bm.zeros((self.NC, self.NQ, 6), **kwargs)
 
         tol = 1e-6
         N = self.N
@@ -274,7 +335,6 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
                 stress_trial, strain_pl_trial, strain_e_trial, Ctang_trial, is_plastic = \
                     self.pfcm.material_point_update(strain_total_trial, strain_pl_old, strain_e_old)
                 tmr.send(f'第{n}次迭代：材料点更新计算时间')
-                    
                 #num_plastic = is_plastic.astype(bm.uint8).sum()
                 num_plastic = bm.sum(bm.astype(is_plastic, bm.uint8))
                 num_total = is_plastic.size
@@ -289,20 +349,39 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
                                                     stress=stress_trial)  
                 tmr.send(f'第{n}次迭代：线性系统组装时间')
                 R = F_int - F_ext
-                from fealpy.fem import DirichletBC
-                gd_uh = self.pde.dirichlet_bc
-                threshold = self.pde.is_dirichlet_boundary()
-                K, R = DirichletBC(self.space, gd=gd_uh,
-                                threshold=threshold).apply(K, R)
+                if self.options['linear_system'] == 'direct':
+                    from fealpy.fem import DirichletBC
+                    gd_uh = self.pde.dirichlet_bc
+                    threshold = self.pde.is_dirichlet_boundary()
+                    K, R = DirichletBC(self.space, gd=gd_uh,
+                                    threshold=threshold).apply(K, R)
+                else:
+                    from fealpy.fem import DirichletBCOperator
+                    gd_uh = self.pde.dirichlet_bc
+                    threshold = self.pde.is_dirichlet_boundary()
+                    uh = self.space.function()
+                    K = DirichletBCOperator(K, gd=gd_uh,
+                                    threshold=threshold)
+                    R = K.apply(R,uh)
                 tmr.send(f'第{n}次迭代：边界条件应用时间')
                 if bm.linalg.norm(R) > 1e6:
                     print("Residual too large. Exiting.")
-                from fealpy.solver import spsolve
-                delta_du = spsolve(K, -R, 'scipy')
-                tmr.send(f'第{n}次迭代：线性系统求解时间')
-                delta_u += delta_du  # 累加位移增量
+                tmr.send(f'第{n}次迭代：残差计算时间')
                 
-
+                if self.options['solver'] == 'cg':
+                    from fealpy.solver.cg import cg
+                    delta_du = cg(K, -R, atol=1e-12, rtol=1e-8
+                                , maxit=2000)
+                else:
+                    from fealpy.solver import spsolve
+                    if self.options["device"] == "cuda":
+                        delta_du = spsolve(K, -R, 'cupy')
+                    else:
+                        delta_du = spsolve(K, -R, 'scipy')
+                
+                tmr.send(f'第{n}次迭代：线性系统求解时间')
+                print(delta_u.device, delta_du.device)
+                delta_u += delta_du  # 累加位移增量
                 norm_R = bm.linalg.norm(R)
                 norm_du = bm.linalg.norm(delta_du)
                 print(f"  Iter {iter_count:02d}: ||R|| = {norm_R:.3e}, ||du|| = {norm_du:.3e}")
@@ -316,13 +395,13 @@ class PerforatedSquarePlateFEMModel(ComputationalModel):
                     print(strain_e.max())
                     strain_total = strain_total_trial
                 iter_count += 1
-
             # 更新总位移
             u += delta_u
             print(f"  u.max = {u.max():.4e}, u.min = {u.min():.4e}")
             self.show(displacement=u, n=n)
             tmr.send(f'第{n}次后处理时间')
             next(tmr)
+            
 
 
         return u, stress, strain_pl, strain_e

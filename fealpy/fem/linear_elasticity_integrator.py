@@ -21,7 +21,7 @@ class LinearElasticityIntegrator(LinearInt, OpInt, CellInt):
                  index: Index=_S,
                  method: Optional[str]=None) -> None:
         super().__init__()
-        self.assembly.set(method)
+        # self.assembly.set(method)
         self.material = material
         self.q = q
         self.index = index
