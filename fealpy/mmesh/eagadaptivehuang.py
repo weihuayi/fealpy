@@ -409,14 +409,15 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             total_steps = self.total_steps
         if h is None:
             h = self.t_span/self.step
-        atol = 1e-5
+        atol = 1e-6
         rtol = atol * 100
         
         I_h = []
         cm_min = []
         I_t = []
         time_mesh = [self.mesh.node]
-        
+        global j
+        j = 0
         for it in range(total_steps):
             self.monitor()
             self.mol_method()
@@ -444,7 +445,10 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                 def ode_system(t, y):
                     Xi_current = y.reshape(self.GD, self.NN).T
                     E_hat, A , g , trA = info_generator(Xi_current)
-                    v = self.vector_construction(A , g ,trA , E_hat)
+                    v = self.vector_construction(A , g ,trA , E_hat) 
+                    global j
+                    j += 1
+                    print(f"  ivp step {j} ")
                     return v.ravel(order = 'F')
                 
                 def jac(t, y):

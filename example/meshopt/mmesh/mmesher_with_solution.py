@@ -32,19 +32,19 @@ parser.add_argument('--case',
             6: 五个小圆形初值
                 ''')
 parser.add_argument('--tau',
-        default=0.01, type=float,
+        default=0.004, type=float,
         help='时间步长控制参数tau')
 parser.add_argument('--gamma',
-        default=1.5, type=float,
+        default=1.25, type=float,
         help='指数控制参数gamma')
 parser.add_argument('--mol_times',
         default=6, type=int,
         help='磨光次数')
 parser.add_argument('--mmesher',
-        default='EAGAdaptiveHuang', type=str,
+        default='MetricTensorAdaptive', type=str,
         help='移动网格算法名称')
 parser.add_argument('--method',
-        default='scipy', type=str,
+        default='BDF_LFP', type=str,
         help='ODE求解方法')
 parser.add_argument('--monitor',
         default='linear_int_error', type=str,
@@ -56,10 +56,10 @@ parser.add_argument("--plot_timemesh",
         default=False, type=bool,
         help='是否输出时间网格的动态图')
 parser.add_argument('--is_return_info',
-        default=True, type=bool,
+        default=False, type=bool,
         help='是否返回移动网格信息')
 parser.add_argument('--output_vtu',
-        default=True, type=bool,
+        default=False, type=bool,
         help='是否输出.vtu可视化文件')
 
 args = parser.parse_args()

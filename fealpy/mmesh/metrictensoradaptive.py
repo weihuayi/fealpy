@@ -25,9 +25,9 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         self.R = self.geo_core.R_matrix()
 
         self.cell2cell = self.mesh.cell_to_cell()
-        self.total_steps = 20
-        self.t_span = 0.2
-        self.step = 20
+        self.total_steps = 10
+        self.t_span = 0.1
+        self.step = 10
         self.BD_projector()
         self._build_jac_pattern()
         self.tol = self._caculate_tol()
@@ -512,7 +512,7 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         self.sm = bm.index_add(self.sm , self.mesh.cell , self.cm[:, None])
     
     def mesh_redistributor(self , total_steps=None, h = None,
-                           method='BDF_LBFGS',return_info = False, return_timemesh = False):
+                           method='BDF_LDF',return_info = False, return_timemesh = False):
         """
         逆变拉格朗日乘子法自适应网格算法
         1. 初始化 E, E_hat, M_inv (边矩阵, 目标度量张量的逆)
@@ -534,7 +534,8 @@ class MetricTensorAdaptive(Monitor, Interpolater):
         cm_min = []
         I_t = []
         time_mesh = [self.mesh.node]
-        
+        global j
+        j = 0
         for it in range(total_steps):
             self.monitor()
             self.mol_method()
@@ -563,6 +564,9 @@ class MetricTensorAdaptive(Monitor, Interpolater):
                     Xi_current = y.reshape(self.GD, self.NN).T
                     E_hat, A , g , trA = info_generator(Xi_current)
                     v = self.vector_construction(A , g ,trA , E_hat)
+                    global j
+                    j += 1
+                    print(f"  ivp step {j} ")
                     return v.ravel(order = 'F')
                 
                 def jac(t, y):
@@ -578,9 +582,11 @@ class MetricTensorAdaptive(Monitor, Interpolater):
                                             atol=atol, rtol=rtol)
                 y_last = sol.y[:, -1]
                 Xinew = y_last.reshape(self.GD, self.NN).T
-            else:
+            elif method == 'BDF_LFP':
                 Xinew = self.integrater(Xi, M_inv, h, atol=atol, rtol=rtol,
                                         newton_tol=1e-6, newton_maxit=20,)
+            else:
+                Xinew = self.LBFGS_integrater(Xi, M_inv, h, atol=atol, rtol=rtol)
             
             Xnew = self.linear_interpolate(Xi, Xinew , X)
             
@@ -598,9 +604,9 @@ class MetricTensorAdaptive(Monitor, Interpolater):
             
             self.uh = self.interpolate(Xnew)
             self._construct(Xnew)
-            if error < self.tol:
-                print(f"Converged at step {it+1} with error {error}")
-                break
+            # if error < self.tol:
+            #     print(f"Converged at step {it+1} with error {error}")
+            #     break
 
         ret = {"X": Xnew}
         if return_info:
