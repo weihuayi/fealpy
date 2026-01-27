@@ -23,6 +23,7 @@ class TrussTowerData3D:
         
         self.Av, self.Ao = self.cross_section_area() # Vertical/Other area
         self.Iv, self.Io = self.inertia() # Vertical/Other I
+        self.A, self.I, self.is_vertical = self.bar_sections()
         self.I1, self.I2 = self.structural_inertia()
     
     def __str__(self) -> str:
@@ -66,6 +67,43 @@ class TrussTowerData3D:
         I_vertical = bm.pi * (self.dov**4 - self.div**4) / 64
         I_other = bm.pi * (self.doo**4 - self.dio**4) / 64
         return I_vertical, I_other
+    
+    def bar_sections(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+        """Assign cross-sectional area and moment of inertia to each bar element.
+        
+        Returns:
+            A(ndarray): Cross-sectional area for each bar element.
+            I(ndarray): Area moment of inertia for each bar element.
+            is_vertical(ndarray): Boolean array indicating if each bar is vertical.
+        """
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        
+        # Calculate bar vectors
+        bar_vectors = node[cell[:, 1]] - node[cell[:, 0]] #(NC, 3)
+        
+        # Calculate bar lengths and unit vectors
+        bar_length = bm.linalg.norm(bar_vectors, axis=1, keepdims=True) # (NC, 1)
+        unit_vectors = bar_vectors / (bar_length + 1e-12) #(NC, 3)
+        
+        z_component = bm.abs(unit_vectors[:, 2]) # (NC,)
+        xy_component = bm.sqrt(unit_vectors[:, 0]**2 + unit_vectors[:, 1]**2) # (NC,)
+        
+        # A bar is vertical: (|cos(0)| > 0.95) & (|sin(0)| < 0.3)
+        is_vertical = (z_component > 0.95) & (xy_component<0.3)
+        
+        A = bm.zeros(NC, dtype=bm.float64)
+        I = bm.zeros(NC, dtype=bm.float64)
+        
+        A[is_vertical] = self.Av # Vertical columns area
+        A[~is_vertical] = self.Ao # Diagonal braces and horizontal bars area
+        
+        I[is_vertical] = self.Iv
+        I[~is_vertical] = self.Io # Other bars inertia
+        
+        return A, I, is_vertical
     
     def structural_inertia(self) -> Tuple[float, float]:
         """Compute structural area moment of inertia for buckling analysis.

@@ -15,8 +15,9 @@ from fealpy.solver import spsolve
 
 from ..model.truss import TrussPDEDataT
 from ..model import CSMModelManager
-from ..material.bar_meterial import BarMaterial
+from ..material.bar_material import BarMaterial
 from ..fem.bar_integrator import BarIntegrator
+from ..utils import CoordTransform
 
 
 class TrussTowerModel(ComputationalModel):
@@ -40,7 +41,6 @@ class TrussTowerModel(ComputationalModel):
         
         self.set_space()
         self.set_material()
-        self.set_bar_sections()
         self.Fc1, self.Fc2 = self.critical_buckling_load()
                
     def __str__(self) -> str:
@@ -68,7 +68,7 @@ class TrussTowerModel(ComputationalModel):
         self.logger.info(f"\n{s}")
         return s
                
-    def set_pde(self, pde: Union[TrussPDEDataT, int] = 4) -> None:
+    def set_pde(self, pde: Union[TrussPDEDataT, int] = 5) -> None:
         if isinstance(pde, int):
             self.pde = CSMModelManager("truss_tower").get_example(pde)
         else:
@@ -97,56 +97,6 @@ class TrussTowerModel(ComputationalModel):
             elastic_modulus=self.E,
             poisson_ratio=self.nu
         )
-    
-    def set_bar_sections(self):
-        """Assign cross-sectional areas to each bar element based on type.
-        
-        Returns:
-            A: (NC,) array of cross-sectional areas for each bar
-            I: (NC,) array of area moments of inertia for each bar
-            
-        Note: Bar classification,
-            - Vertical bars: mainly along z-axis (立柱)
-            - Other bars: diagonal braces and horizontal bars (斜撑和横杆)
-        """
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
-        
-        # Calculate bar vectors
-        bar_vectors = node[cell[:, 1]] - node[cell[:, 0]]  # (NC, 3)
-        
-        # Calculate bar lengths and unit vectors
-        bar_length = bm.linalg.norm(bar_vectors, axis=1, keepdims=True)  # (NC, 1)
-        unit_vectors = bar_vectors / (bar_length + 1e-12)  # (NC, 3)
-        
-        z_component = bm.abs(unit_vectors[:, 2])  # (NC,)
-        xy_component = bm.sqrt(unit_vectors[:, 0]**2 + unit_vectors[:, 1]**2)  # (NC,)
-        
-        # A bar is vertical: (|cos(θ)| > 0.95) & (|sin(θ)| < 0.3)
-        is_vertical = (z_component > 0.95) & (xy_component < 0.3)
-        
-        A = bm.zeros(NC, dtype=bm.float64)
-        I = bm.zeros(NC, dtype=bm.float64)
-        
-        A[is_vertical] = self.pde.Av   # Vertical columns area
-        A[~is_vertical] = self.pde.Ao  # Diagonal braces and horizontal bars area
-        
-        I[is_vertical] = self.pde.Iv   # Vertical columns inertia
-        I[~is_vertical] = self.pde.Io  # Other bars inertia
-        
-        # Store in model
-        self.A = A  # Cross-sectional areas (NC,)
-        self.I = I  # Area moments of inertia (NC,)
-        self.is_vertical = is_vertical  # Bar type flags (NC,)
-        
-        n_vertical = bm.sum(is_vertical)
-        n_other = NC - n_vertical
-        # self.logger.info(f"Vertical bars: {n_vertical} bars")
-        # self.logger.info(f"Other bars: {n_other} bars")
-        
-        return A, I
        
     def critical_buckling_load(self):
         """Compute critical buckling loads.
@@ -224,12 +174,12 @@ class TrussTowerModel(ComputationalModel):
         K = bm.zeros((NDOF, NDOF), dtype=bm.float64)
         
         # 获取立柱和斜杆的索引
-        vertical_indices = bm.where(self.is_vertical)[0]
-        other_indices = bm.where(~self.is_vertical)[0]
+        vertical_indices = bm.where(self.pde.is_vertical)[0]
+        other_indices = bm.where(~self.pde.is_vertical)[0]
 
         vertical_integrator = BarIntegrator(
                 space=self.space,
-                model=self,
+                model=self.pde,
                 material=self.material,
                 index=vertical_indices
             )
@@ -242,7 +192,7 @@ class TrussTowerModel(ComputationalModel):
         
         other_integrator = BarIntegrator(
                 space=self.space,
-                model=self,
+                 model=self.pde,
                 material=self.material,
                 index=other_indices
             )
@@ -302,17 +252,27 @@ class TrussTowerModel(ComputationalModel):
         """Compute axial strain and stress for axle elements."""
                 
         uh = disp.reshape(-1, 3)
+        coord_trans = CoordTransform(method='bar3d')
+        R = coord_trans.coord_transform_bar3d(self.mesh)
+                
         strain, stress = self.material.compute_strain_and_stress(
                         self.mesh,
                         uh,
+                        coord_transform=R,
                         ele_indices=None)
         
         # self.logger.info(f"strain: {strain}")
         # self.logger.info(f"stress: {stress}")
 
         return strain, stress
+    
+    def calculate_von_mises_stress(self, stress):
+        """Calculate von Mises stress for truss elements."""
+        mstress = self.material.calculate_mises_stress(stress)
+        # self.logger.info(f"mstress: {mstress}")
+        return mstress
 
-    def show(self, uh, strain, stress):
+    def show(self, uh, strain, stress, mstress):
         """Visualize displacement field, strain field, and stress field by saving to VTU files."""
         
         mesh = self.space.mesh
@@ -331,6 +291,9 @@ class TrussTowerModel(ComputationalModel):
 
         mesh.edgedata['stress'] = stress
         mesh.to_vtk(f"{save_path}/stress.vtu")
+        
+        mesh.edgedata['mises_stress'] = mstress
+        mesh.to_vtk(f"{save_path}/mises_stress.vtu")
 
     def geometric_stiffness_matrix(self, stress):
         """Assemble the global geometric stiffness matrix for buckling analysis.
@@ -345,11 +308,11 @@ class TrussTowerModel(ComputationalModel):
         
         Kg = bm.zeros((NDOF, NDOF), dtype=bm.float64)
         
-        vertical_indices = bm.where(self.is_vertical)[0]
-        other_indices = bm.where(~self.is_vertical)[0]
+        vertical_indices = bm.where(self.pde.is_vertical)[0]
+        other_indices = bm.where(~self.pde.is_vertical)[0]
         vertical_integrator = BarIntegrator(
                 space=self.space,
-                model=self,
+                 model=self.pde,
                 material=self.material,
                 index=vertical_indices,
                 method='geometric'
@@ -363,7 +326,7 @@ class TrussTowerModel(ComputationalModel):
             
         other_integrator = BarIntegrator(
                 space=self.space,
-                model=self,
+                model=self.pde,
                 material=self.material,
                 index=other_indices,
                 method='geometric'

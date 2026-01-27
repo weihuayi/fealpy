@@ -1,4 +1,4 @@
-from fealpy.typing import Tuple, TensorLike
+from fealpy.typing import Tuple, TensorLike, Index, _S
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh import EdgeMesh
 
@@ -23,7 +23,7 @@ class ChannelBeamData3D:
         
         self.L = self.length()
         self.Ax, self.Ay, self.Az = self.cross_section()
-        self.Ix, self.Iy, self.Iz = self.inertia()
+        self.J, self.Iy, self.Iz = self.inertia()
         
         self.e_z = 0.0148  # Shear center offset in z-direction (m)
         self.W_t = 8.64e-7  # Torsional section modulus
@@ -82,10 +82,10 @@ class ChannelBeamData3D:
             - Iy: Weak axis moment of inertia in m⁴
             - Iz: Strong axis moment of inertia in m⁴
         """
-        Ix = 5.18e-9
+        J = 5.18e-9
         Iy = 2.77e-8
         Iz = 1.69e-7
-        return Ix, Iy, Iz
+        return J, Iy, Iz
 
     def get_stress_points(self) -> TensorLike:
         """ Get the stress calculation points at the outermost corners of the 

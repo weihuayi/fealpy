@@ -1,9 +1,7 @@
 
-import os
-import pathlib
 from setuptools import setup, find_packages
 
-from lafemeit import __version__
+__version__ = "0.1.0"
 
 
 setup(
@@ -15,5 +13,5 @@ setup(
     author_email="",
     license="GNU",
     packages=find_packages(),
-    python_requires=">=3.8",
+    python_requires=">=3.10",
 )
