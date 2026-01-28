@@ -38,7 +38,7 @@ class Exp0003(BoxMesher2d):
         self.box = [-1, 1, -1, 1.0]
         super().__init__(self.box)
         self.mu = 1
-        self.beta = 0
+        self.beta = 10
         self.rho = 1.0
 
     def geo_dimension(self) -> int:
