@@ -18,3 +18,5 @@ from .mgstokes import MGStokes
 from .transferP1red import transferP1red, indofP1
 from .transferP2red import transferP2red, indofP2
 
+from .tpdv import DarcyForchheimerTPDv
+from .fast_solver import LinearElasticityHZFEMFastSolver

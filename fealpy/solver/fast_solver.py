@@ -13,22 +13,22 @@ class LinearElasticityHZFEMFastSolver:
 
         System: [M, B^T; B, 0] [x0; x1] = [F0; F1]
 
-        Parameters
-        ----------
-        A_full : csr_matrix
-            Block matrix of shape (ndof, ndof) partitioned as [M, B^T; B, 0].
-        F : TensorLike
-            Right-hand side vector concatenated as [F0; F1].
-        vspace : LagrangeFESpace
-            Finite element space for displacement, used to build AMG.
-        solver : {'gmres', 'minres'}
-            Krylov solver to use.
-        tol : float
-            Convergence tolerance.
-        restart : int
-            Restart parameter for GMRES.
-        maxiter : int or None
-            Maximum number of iterations.
+        Parameters:
+
+            A_full : csr_matrix
+                Block matrix of shape (ndof, ndof) partitioned as [M, B^T; B, 0].
+            F : TensorLike
+                Right-hand side vector concatenated as [F0; F1].
+            vspace : LagrangeFESpace
+                Finite element space for displacement, used to build AMG.
+            solver : {'gmres', 'minres'}
+                Krylov solver to use.
+            tol : float
+                Convergence tolerance.
+            restart : int
+                Restart parameter for GMRES.
+            maxiter : int or None
+                Maximum number of iterations.
         '''
         self.A_full = A_full
         self.F = F

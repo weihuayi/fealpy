@@ -3,7 +3,7 @@ import argparse
 # Argument parsing
 parser = argparse.ArgumentParser(description=
         """
-        Arbitrary-order HuZhang finite element method for solving linear elasticity problems
+        finite element method for solving Darcy-Forchheimer problems
         """)
 
 parser.add_argument('--backend',
@@ -11,16 +11,12 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default=3, type=int,
+                    default='3', type=int,
                     help='Name of the PDE model, default is 1')
 
 parser.add_argument('--init_mesh',
                     default='uniform_tri', type=str,
                     help='Type of mesh, default is uniform_tri')
-
-parser.add_argument('--space_degree',
-                    default=3, type=int,
-                    help='Degree of Lagrange finite element space, default is 3')
 
 parser.add_argument('--pbar_log',
                     default=True, type=bool,
@@ -32,10 +28,9 @@ parser.add_argument('--log_level',
 
 options = vars(parser.parse_args())
 
-
 from fealpy.backend import bm
 bm.set_backend(options['backend'])
 
-from fealpy.fem.linear_elasticity_huzhang_fem_model import LinearElasticityHuzhangFEMModel
-model = LinearElasticityHuzhangFEMModel(options)
-model.run['uniform_refine']()
+from fealpy.fem.darcyforchheimer_fem_model import DarcyForchheimerFEMModel
+model = DarcyForchheimerFEMModel(options)
+model.solve['TPDv']()

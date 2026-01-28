@@ -1,9 +1,10 @@
-from typing import Sequence
-from ...decorator import cartesian
-from ...backend import TensorLike
+from typing import Optional, Sequence
 from ...backend import backend_manager as bm
+from ...decorator import cartesian
+from ...typing import TensorLike
+from ...mesher import BoxMesher2d
 
-class ArctanData2D:
+class Exp0001(BoxMesher2d):
     """
     2D rotational-arctan Darcy-Forchheimer problem on Ω = [0,1]×[0,1]:
 
@@ -28,6 +29,8 @@ class ArctanData2D:
     """
     def __init__(self):
         # physical parameters
+        self.box = [0.0, 1.0, 0.0, 1.0]
+        super().__init__(self.box)
         self.mu = 2.0
         self.k = 4.0
         self.rho = 1.0
@@ -94,7 +97,9 @@ class ArctanData2D:
     def neumann(self, p: TensorLike, n: TensorLike) -> TensorLike:
         """Neumann boundary condition: u·n."""
         u = self.velocity(p)
-        return bm.sum(u * n, axis=-1)
+        if n.ndim == 2:
+            n = bm.expand_dims(n, axis=1)
+        return bm.einsum("fqd,fqd->fq", u, n)
 
     @cartesian
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
