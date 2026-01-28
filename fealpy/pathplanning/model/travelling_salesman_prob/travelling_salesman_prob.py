@@ -100,10 +100,10 @@ class TravellingSalesmanProb:
             Tensor: A tensor of shape (N,) where each value is the total route length of a solution.
         """
         x = bm.argsort(sol, axis=-1)
-        n = x.shape[1]
-        length = D[x[:, n - 1], x[:, 0]]
-        for i in range(1, n):
-            length = length + D[x[:, i - 1], x[:, i]]
+
+        x_next = bm.roll(x, shift=-1, axis=1)
+        length = bm.sum(D[x, x_next], axis=1)
+
         return length
 
     def solver(self):
