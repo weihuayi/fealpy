@@ -19,7 +19,7 @@ meviewer
 *.mat
 meshdata
 result*
-build
+/build
 __pycache__
 results
 results1
