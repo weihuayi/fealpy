@@ -40,12 +40,13 @@ class Exp0006(BoxMesher2d):
     def init_mesh(self):
         #box = [0, 1, 0, 1]
         box = [0, 2.2, 0, 0.41]
-        #center = [0.205, 0.205]
-        center = [0.2, 0.2]
+        center = [0.205, 0.205]
+        #center = [0.2, 0.1]
         radius = 0.05
         #h = 0.5
-        h = 0.01
-        n_circle = 168
+        h = 0.004
+        #n_circle = 168
+        n_circle = 1000
         #n_circle = 32
         #n_circle = 4
         self.box = box
@@ -240,7 +241,7 @@ class Exp0006(BoxMesher2d):
     def stream_function_boundary(self, p):
         #p = bm.array([0.25374, 0.21612])
         is_boundary_edge = self.is_cylinder_boundary(p)
-        value = self.stream_function_boundary1(bm.array([[[0, 0.2]]]))
+        value = self.stream_function_boundary1(bm.array([[[0, 0.1]]]))
         value1 = self.stream_function_boundary1(p)
         value1[is_boundary_edge] = bm.float64(value)
         return value1
