@@ -30,6 +30,10 @@ parser.add_argument('--h',
         default=0.3, type=str,
         help='Maximum mesh size')
 
+parser.add_argument('--position',
+        default=0, type=int,
+        help='position')
+
 parser.add_argument('--return_mesh',
                     default='True', type=str,
                     help='Whether to generate mesh, default is True')
