@@ -21,13 +21,13 @@ from fealpy.fvm import (
 
 
 duration = [0,1]
-nt = 10
+nt = 40
 tau = (duration[1] -duration[0]) / nt
 
 
 pde = PDEModelManager("navier_stokes").get_example(3)
-nx = 10
-ny = 10
+nx = 40
+ny = 40
 staggered_mesh = StaggeredMeshManager(pde.domain(), nx=nx, ny=ny)
 umesh = staggered_mesh.umesh
 vmesh = staggered_mesh.vmesh
@@ -167,7 +167,7 @@ def correct_pressure_compute(f: TensorLike, a_p_edge: TensorLike) -> TensorLike:
 
 def solve(u0,v0,p0):
     for n in range(nt):
-        # print(n)
+        print(n)
         t = duration[0] + n * tau
         p_u, p_v = staggered_mesh.map_pressure_pcell_to_uvedge(p0)
         u1,uap = compute_temporary_velocity_u(u0,v0,p_u,t)
@@ -197,32 +197,12 @@ def solve(u0,v0,p0):
         vgrad_p2 = GradientReconstruct(vmesh).LSQ(v_pcorr2)
         nabla_px2 = ugrad_p2[:, 0]
         nabla_py2 = vgrad_p2[:, 1]
-        # u3 = u2 - 1/uap*nabla_px2
-        # v3 = v2 - 1/vap*nabla_py2
         u3 = u2 - ucm/uap*nabla_px2
         v3 = v2 - vcm/vap*nabla_py2
-
         u0 = u3
         v0 = v3
         p0 = p2
-
-        # edge_vel3, _ = staggered_mesh.map_velocity_uvcell_to_pedge(u3, v3, uap, vap)
-        # div_rhs3 = DivergenceReconstruct(pmesh).StagReconstruct(edge_vel3)
-        # p_corr3 = correct_pressure_compute(-div_rhs3, a_p_edge)
-        # p3 = p2 + p_corr3
-        # u_pcorr3,v_pcorr3 = staggered_mesh.map_pressure_pcell_to_uvedge(p_corr3)
-        # ugrad_p3 = GradientReconstruct(umesh).LSQ(u_pcorr3)
-        # vgrad_p3 = GradientReconstruct(vmesh).LSQ(v_pcorr3)
-        # nabla_px3 = ugrad_p3[:, 0]
-        # nabla_py3 = vgrad_p3[:, 1]
-        # u4 = u3 - tau/uap*nabla_px3
-        # v4 = v3 - tau/vap*nabla_py3
-
-        # u0 = u4
-        # v0 = v4
-        # p0 = p3
     return u3,v3,p2
-    # return u4,v4,p3
 
 
 uh,vh,ph = solve(u0,v0,p0)
@@ -235,20 +215,7 @@ L2p = bm.sqrt(bm.sum(pcm * (ph - pI) ** 2))
 print(f"L2 error of u: {L2u}")
 print(f"L2 error of v: {L2v}")
 print(f"L2 error of p: {L2p}")
-# exit()
 
-def solve2(u0,v0):
-    for n in range(nt):
-        print(n)
-        t = duration[0] + n * tau
-        pu = pde.pressure(upoints,t)
-        pv = pde.pressure(vpoints,t)
-        u1,uap = compute_temporary_velocity_u(u0,v0,pu,t)
-        v1,vap = compute_temporary_velocity_v(u0,v0,pv,t)
-        u0 = u1
-        v0 = v1
-    return u1,v1
-# uh,vh = solve2(u0,v0)
 
 
 import matplotlib.pyplot as plt
