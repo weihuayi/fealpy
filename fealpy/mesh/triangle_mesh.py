@@ -68,7 +68,14 @@ class TriangleMesh(SimplexMesh, Plotable):
                 return bm.sqrt(bm.sum(nv ** 2, axis=1)) / 2.0
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
-  
+    
+    def reference_cell_measure(self):
+        """
+        Calculate the measure of the reference cell.
+        The measure of the reference triangle in 2D is 0.5
+        """
+        return 0.5
+    
     # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
                            qtype: str='legendre'): # TODO: other qtype
@@ -1402,6 +1409,71 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         return cls(node, cell)
 
+    @classmethod
+    def from_box_cross_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10, *,threshold=None,
+                            itype=None, ftype=None, device=None):
+        """Generate a cross triangle mesh for a box domain.
+
+        Parameters
+            box: list of float
+            nx: int
+            ny: int
+            threshold: function
+        Returns
+            TriangleMesh instance
+        """
+        from .quadrangle_mesh import QuadrangleMesh
+        node = bm.array([
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 1.0]], dtype=bm.float64) 
+
+        cell = bm.array([
+            [0, 1, 2, 3]], dtype=bm.int32) 
+
+        qmesh = QuadrangleMesh(node, cell)
+        qmesh = qmesh.from_box(box, nx=nx, ny=ny)
+        node = qmesh.entity('node')
+        cell = qmesh.entity('cell')
+        NN = qmesh.number_of_nodes()
+        NE = qmesh.number_of_edges()
+        NC = qmesh.number_of_cells()
+        bc = qmesh.entity_barycenter('cell') 
+        newNode = bm.concat([node, bc], axis=0)
+
+        newCell = bm.zeros((4*NC, 3), dtype=bm.int32) 
+        newCell[0:NC, 0] = range(NN, NN+NC)
+        newCell[0:NC, 1:3] = cell[:, 0:2]
+            
+        newCell[NC:2*NC, 0] = range(NN, NN+NC)
+        newCell[NC:2*NC, 1:3] = cell[:, 1:3]
+
+        newCell[2*NC:3*NC, 0] = range(NN, NN+NC)
+        newCell[2*NC:3*NC, 1:3] = cell[:, 2:4]
+
+        newCell[3*NC:4*NC, 0] = range(NN, NN+NC)
+        newCell[3*NC:4*NC, 1:3] = cell[:, [3, 0]] 
+
+        node = newNode
+        cell = newCell
+        if threshold is not None:
+            node = newNode
+            cell = newCell
+            bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = bm.zeros(NN, dtype=bm.bool, device=device)
+            isValidNode = bm.set_at(isValidNode, cell, True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=itype, device=device)
+            idxMap = bm.set_at(
+                idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=itype, device=device)
+            )
+            cell = idxMap[cell]
+        
+        return cls(node, cell)
+    
     ## @ingroup MeshGenerators
     @classmethod
     def from_unit_sphere_surface(cls, refine=0, *, itype=None, ftype=None, device=None):
@@ -1911,6 +1983,58 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.array(mesh.entity('cell'), dtype=itype, device=device)
 
         return cls(node, cell)
+    
+    def location(self, points):
+        """
+        Notes
+        -----
+        给定一组点 p , 找到这些点所在的单元
+
+        这里假设：
+
+        1. 所有点在网格内部，
+        2. 网格中没有洞
+        3. 区域还要是凸的
+        """
+        from scipy.spatial import KDTree
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NP = points.shape[0]
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.cell_to_cell()
+
+        start = bm.zeros(NN, dtype=self.itype)
+        start[cell[:, 0]] = range(NC)
+        start[cell[:, 1]] = range(NC)
+        start[cell[:, 2]] = range(NC)
+        tree = KDTree(node)
+        _, loc = tree.query(points)
+        start = start[loc]  # 设置一个初始单元位置
+
+        isNotOK = bm.ones(NP, dtype=bm.bool)
+        while bm.any(isNotOK):
+            idx = start[isNotOK]
+            pp = points[isNotOK]
+
+            v0 = node[cell[idx, 0]] - pp  # 所在单元的三个顶点
+            v1 = node[cell[idx, 1]] - pp
+            v2 = node[cell[idx, 2]] - pp
+
+            a = bm.zeros((len(idx), 3), dtype=self.ftype)
+            a[:, 0] = bm.cross(v1, v2)
+            a[:, 1] = bm.cross(v2, v0)
+            a[:, 2] = bm.cross(v0, v1)
+            lidx = bm.argmin(a, axis=-1)
+
+            # 最小面积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0
+
+            idx0, = bm.nonzero(isNotOK)
+            start[idx0[isOutCell]] = cell2cell[idx[isOutCell], lidx[isOutCell]]
+            isNotOK[idx0[~isOutCell]] = False
+
+        return start
 
 TriangleMesh.set_ploter('2d')
 

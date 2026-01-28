@@ -58,7 +58,7 @@ class IncompressibleNS(BaseEquation):
         self._coefs['convection'] = rho
         self._coefs['pressure'] = 1
         self._coefs['viscosity'] = mu
-        self._coefs['body_force'] = getattr(pde, 'body_force', 0)
+        self._coefs['body_force'] = getattr(pde, 'source', 0)
 
         # 设置变量
         self._variables['velocity'] = getattr(pde, 'init_velocity', None)

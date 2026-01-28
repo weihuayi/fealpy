@@ -8,12 +8,12 @@ from .HexahedronMesh import HexahedronMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
 from .StructureQuadMesh import StructureQuadMesh
 
-from fealpy.functionspace import LagrangeFiniteElementSpace
+from fealpy.old.functionspace import LagrangeFiniteElementSpace
 
-from ..geometry import dcircle, drectangle
-from ..geometry import ddiff
-from ..geometry import huniform
-from ..decorator import timer
+from ...geometry import dcircle, drectangle
+from ...geometry import ddiff
+from ...geometry import huniform
+from ...decorator import timer
 
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
