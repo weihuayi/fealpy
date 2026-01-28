@@ -3,9 +3,9 @@ import fealpy.cgraph as cgraph
 
 WORLD_GRAPH = cgraph.WORLD_GRAPH
 
-pde = cgraph.create("LinearElasticityEigen3d")           
-mesher = cgraph.create("Box3d")                      
-spacer = cgraph.create("TensorFunctionSpace")        
+pde = cgraph.create("LinearElasticityEigen3d")            # PDE 数据（示例）
+mesher = cgraph.create("Box3d")                      # 网格生成
+spacer = cgraph.create("TensorFunctionSpace")        # 函数空间节点
 isDDof = cgraph.create("BoundaryDof")
 eig_eq = cgraph.create("LinearElasticityEigenEquation")
 eigensolver = cgraph.create("EigenSolver")

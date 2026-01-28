@@ -457,10 +457,15 @@ class HuZhangFESpace2d(FunctionSpace):
             tensor_part = esframe[c2e[:, e]][:, None, edof.dof_tensor, :]
             phi[..., idx:idx+N, :] = scalar_part * tensor_part
             idx += N
-        scalar_phi_idx = multiindex_to_number(icdofs[0].dof_scalar)
-        scalar_part = phi_s[None, :, scalar_phi_idx, None]
-        tensor_part = csframe[:, None, icdofs[0].dof_tensor, :]
-        phi[..., idx:, :] = scalar_part * tensor_part
+
+        # 单元气泡基函数 - 只有当 p >= n+1 时才存在单元内部自由度
+        n = mesh.geo_dimension()
+        if p >= n + 1:
+            scalar_phi_idx = multiindex_to_number(icdofs[0].dof_scalar)
+            scalar_part = phi_s[None, :, scalar_phi_idx, None]
+            tensor_part = csframe[:, None, icdofs[0].dof_tensor, :]
+            phi[..., idx:, :] = scalar_part * tensor_part
+        
         return phi
 
     def div_basis(self, bc: TensorLike): 
@@ -521,12 +526,16 @@ class HuZhangFESpace2d(FunctionSpace):
             dphi[..., idx:idx+N, 1] = bm.sum(grad_scalar * frame[..., 1:], axis=-1)
             idx += N
 
-        scalar_phi_idx = multiindex_to_number(icdofs[0].dof_scalar)
-        grad_scalar = gphi_s[..., scalar_phi_idx, :]
-        frame = csframe[:, None, icdofs[0].dof_tensor]
-        dphi[..., idx:, 0] = bm.sum(grad_scalar * frame[..., :2], axis=-1)
-        dphi[..., idx:, 1] = bm.sum(grad_scalar * frame[..., 1:], axis=-1)
+        # 单元气泡基函数 - 只有当 p >= n+1 时才存在单元内部自由度
+        n = mesh.geo_dimension()
+        if p >= n + 1:
+            scalar_phi_idx = multiindex_to_number(icdofs[0].dof_scalar)
+            grad_scalar = gphi_s[..., scalar_phi_idx, :]
+            frame = csframe[:, None, icdofs[0].dof_tensor]
+            dphi[..., idx:, 0] = bm.sum(grad_scalar * frame[..., :2], axis=-1)
+            dphi[..., idx:, 1] = bm.sum(grad_scalar * frame[..., 1:], axis=-1)
         return dphi
+
 
     def hess_basis(self, bc: TensorLike, index: Index=_S, variable='x'):
         return self.mesh.hess_shape_function(bc, self.p, index=index, variables=variable)
