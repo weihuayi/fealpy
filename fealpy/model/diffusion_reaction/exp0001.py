@@ -8,18 +8,24 @@ class Exp0001(BoxMesher2d):
     """
     Exp0001 provides data and methods for a 2D elliptic PDE problem with a exponential exact solution.
     The model problem is:
+
         -div(A ∇u) + c u = f,   in Ω = (0, 1)^2
                 ∇u · n = 0,        on ∂Ω (Neumann)
+
     with the exact solution:
+    
         u(x, y) = cos(2πx)·cos(2πy)
+
     The diffusion coefficient A, reaction coefficient c, and source term f are defined as:
+
         A = [[10, 0], [0, 10]]
         c = 2
         f(x, y) = 2·cos(2πx)·cos(2πy) + 80π²·cos(2πx)·cos(2πy)
+
     Homogeneous Dirichlet or Neumann boundary conditions can be imposed on all boundaries.
     This class provides methods for mesh generation, coefficients, exact solution, gradient, flux, and boundary identification for use in finite element simulations.
     """
-    """"Cosine-Cosine Solution Data"""
+
     def __init__(self):
         self.box = [0.0, 1.0, 0.0, 1.0]
         super().__init__(box=self.box)
@@ -83,7 +89,7 @@ class Exp0001(BoxMesher2d):
         return val
     
     @cartesian
-    def grad_dirichlet(self, p, space):
+    def  grad_dirichlet(self, p):
         """Gradient of the Dirichlet boundary condition."""
         return bm.zeros_like(p[..., 0])
     
@@ -97,7 +103,19 @@ class Exp0001(BoxMesher2d):
         return val
 
     @cartesian
-    def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike:
+    def neumann(self, p: TensorLike, n: TensorLike) -> TensorLike:
+        """
+        Numann boundary data: g = ∂u/∂n
+        """
+        grad = self.gradient(p)
+        if len(grad.shape) == self.geo_dimension():
+            val = bm.sum(grad * n, axis=-1)
+        else:
+            val = bm.sum(grad * n[:, None, :], axis=-1)
+        return val
+    
+    @cartesian
+    def is_neumann_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point is on boundary."""        
         x, y = p[..., 0], p[..., 1]
         atol = 1e-12  # 绝对误差容限

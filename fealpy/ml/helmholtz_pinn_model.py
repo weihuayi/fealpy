@@ -141,69 +141,53 @@ class HelmholtzPINNModel(ComputationalModel):
         parser.add_argument('--pde',default=1, type=int,
                             help="Built-in PDE example ID for different Helmholtz problems, default is 1.")
         
-        parser.add_argument('--mesh_size',
-                            default=30, type=int,
+        parser.add_argument('--mesh_size', default=30, type=int,
                             help='Number of grid points along each dimension, default is 30.')
 
-        parser.add_argument('--complex', 
-                            default=True, type=bool,
+        parser.add_argument('--complex',  default=True, type=bool,
                             help="Enable complex-valued solution modeling, default is True")
 
-        parser.add_argument('--wave', 
-                            default=1.0, type=float,
+        parser.add_argument('--wave', default=1.0, type=float,
                             help="Wave number k for Helmholtz equation (Δu + k²u + f = 0), default is 1.0")
 
-        parser.add_argument('--sampling_mode', 
-                            default='random', type=str,
+        parser.add_argument('--sampling_mode', default='random', type=str,
                             help="Sampling method for collocation points: 'random' or 'linspace', default is 'random'")
 
-        parser.add_argument('--npde',
-                            default=400, type=int,
+        parser.add_argument('--npde', default=400, type=int,
                             help='Number of PDE samples, default is 400.')
 
-        parser.add_argument('--nbc',
-                            default=100, type=int,
+        parser.add_argument('--nbc', default=100, type=int,
                             help='Number of boundary condition samples, default is 100.')
         
-        parser.add_argument('--weights',
-                            default=(1, 30), type=tuple,
+        parser.add_argument('--weights', default=(1, 30), type=tuple,
                             help='The first value is the weight for the equation loss, and the second ' \
                             'value is the weight for the boundary loss., default is (1, 30).')
 
-        parser.add_argument('--hidden_size',
-                            default=(50, 50, 50, 50), type=tuple,
+        parser.add_argument('--hidden_size', default=(50, 50, 50, 50), type=tuple,
                             help='Default hidden sizes, default is (50, 50, 50, 50).')
 
-        parser.add_argument('--optimizer', 
-                            default="Adam",  type=str,
+        parser.add_argument('--optimizer', default="Adam",  type=str,
                             help='Optimizer to use for training, default is Adam')
 
-        parser.add_argument('--activation',
-                            default="Tanh", type=str,
+        parser.add_argument('--activation', default="Tanh", type=str,
                             help='Activation function, default is Tanh')
 
-        parser.add_argument('--lr',
-                            default=0.001, type=float,
+        parser.add_argument('--lr', default=0.001, type=float,
                             help='Learning rate for the optimizer, default is 0.001.')
 
-        parser.add_argument('--step_size',
-                            default=0, type=int,
+        parser.add_argument('--step_size', default=0, type=int,
                             help='Period of learning rate decay, default is 0.')
 
-        parser.add_argument('--gamma',
-                            default=0.99, type=float,
+        parser.add_argument('--gamma', default=0.99, type=float,
                             help='Multiplicative factor of learning rate decay. Default: 0.99.')
 
-        parser.add_argument('--epochs',
-                            default=3000, type=int,
+        parser.add_argument('--epochs', default=3000, type=int,
                             help='Number of training epochs, default is 3000.')
 
-        parser.add_argument('--pbar_log',
-                            default=True, type=bool,
+        parser.add_argument('--pbar_log', default=True, type=bool,
                             help='Whether to show progress bar, default is True')
 
-        parser.add_argument('--log_level',
-                            default='INFO', type=str,
+        parser.add_argument('--log_level', default='INFO', type=str,
                             help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
         options = vars(parser.parse_args())
         return options

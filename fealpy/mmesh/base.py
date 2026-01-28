@@ -23,22 +23,6 @@ class PREProcessor:
             self._meshtop_preparation()
             self._geometry_preparation()
             self._space_preparation()
-        elif self.method in ['PSMFEM','HousMMPDE']:
-            self._data_and_device()
-            self._isinstance_mesh_type()
-            logic_node = bm.copy(self.mesh.node)
-            logic_cell = bm.copy(self.mesh.cell)
-            if self.mesh_type =="LagrangeTriangleMesh":
-                self.logic_mesh = self.mesh_class.from_triangle_mesh(self.linermesh,self.p)
-            elif self.mesh_type == "LagrangeQuadrangleMesh":
-                self.logic_mesh = self.mesh_class.from_quadrangle_mesh(self.linermesh,self.p)
-            else:
-                self.logic_mesh = self.mesh_class(logic_node,logic_cell)
-            self.logic_cm = self.logic_mesh.entity_measure('cell')
-            self._meshtop_preparation()
-            self._geometry_preparation()
-            self._space_preparation()
-            self._logic_space_preparation()
             
         elif self.method == 'GFMMPDE':
             self._data_and_device()
@@ -74,6 +58,24 @@ class PREProcessor:
                 self.b_val0 = bcollection[0]
             self._space_preparation()
 
+        elif self.method in ['EAGAdaptiveHuang', 'EAGAdaptiveXHuang',"EAGAdaptiveFB","EAGAdaptiveXFB",
+                             "MetricTensorAdaptive","MetricTensorAdaptiveX"]:
+            self._data_and_device()
+            self._isinstance_mesh_type()
+            self._meshtop_preparation()
+            self._geometry_preparation()
+            self._space_preparation()
+            self.q = self.pspace.p + 2
+            qf = self.mesh.quadrature_formula(self.q)
+            self.bcs, self.ws = qf.get_quadrature_points_and_weights()
+            self.pcell2dof = self.pspace.cell_to_dof()
+            self.sm = bm.zeros(self.NN, **self.kwargs0)
+            self.sm = bm.index_add(self.sm , self.mesh.cell , self.cm[:, None])
+            logic_node = bm.copy(self.mesh.node)
+            logic_cell = bm.copy(self.mesh.cell)
+            self.logic_mesh = self.mesh_class(logic_node,logic_cell)
+            self.node2cell = self.mesh.node_to_cell()
+            
     def _meshtop_preparation(self):
         """
         save the mesh topology information
@@ -81,7 +83,7 @@ class PREProcessor:
         mesh = self.mesh
         self.node = mesh.entity('node')
         self.cell = mesh.entity('cell')
-            
+
         self.node2face = self.mesh.node_to_face().tocsr()
         
         self.isBdNode = mesh.boundary_node_flag()

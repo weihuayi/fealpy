@@ -6,26 +6,26 @@ import argparse
 # 解析参数
 options ={
     'backend': 'numpy',
-    'pde': 2,
+    'pde': 4,
     'rho': 1.0,
     'mu': 0.001,
     'T0': 0.0,
-    'T1': 6.0,
-    'nt': 6000,
+    'T1': 0.05,
+    'nt': 50,
     'init_mesh': 'tri',
-    'box': [0.0, 2.2, 0.0, 0.41],
-    'center': (0.2, 0.2),
+    'box': [0, 2.5, 0, 0.41],
+    'center': (0.5, 0.2),
+    'cyl_axis': [0.0, 0.0, 1.0],
+    'thickness': 10,
     'radius': 0.05,
-    'n_circle': 300,
+    'n_circle': 10,
     'lc': 0.05,
+    'Lz': 0.41,
+    'n_layer': 10,
     'method': 'IPCS',
     'solve': 'direct',
-    'apply_bc': 'cylinder',
-    'postprocess': 'res',
-    'run': 'main_cylinder',
-    'maxit': 5,
-    'maxstep': 10,
-    'tol': 1e-10
+    'run': 'main',
+    'local_refine': True
 }
 
 bm.set_backend(options['backend'])
@@ -33,6 +33,7 @@ bm.set_backend(options['backend'])
 manager = CFDPDEModelManager('incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
 mesh = pde.init_mesh()
+mesh.to_vtk(f'test.vtu')
 model = IncompressibleNSLFEM2DModel(pde=pde, mesh = mesh, options = options)
 model.equation.set_constitutive(1)
 model.equation.set_coefficient('viscosity', pde.mu)
@@ -128,22 +129,22 @@ delta_p = bm.zeros(model.timeline.NL-1)
 
 mesh.nodedata['ph'] = p0
 mesh.nodedata['uh'] = u0.reshape(model.mesh.GD,-1).T
-mesh.to_vtk(f'ns2d_{str(0).zfill(10)}.vtu')
+mesh.to_vtk(f'cylinder{str(mesh.GD)}d_{str(0).zfill(10)}.vtu')
 for i in range(model.timeline.NL-1):
     t  = model.timeline.current_time()
     model.logger.info(f"time={t}")
     
     u1,p1 = model.run['one_step'](u0, p0, maxstep, tol)
     
-    cd[i], cl[i], delta_p[i] = benchmark(u1, p1, u0)
-    print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
+    # cd[i], cl[i], delta_p[i] = benchmark(u1, p1, u0)
+    # print(f"Drag coefficient: {cd[i]}, \nLift coefficient: {cl[i]}, \nPressure difference: {delta_p[i]}")
     u0[:] = u1
     p0[:] = p1
 
-    if i < 20000 :
+    if i < 5000 :
         mesh.nodedata['ph'] = p1
         mesh.nodedata['uh'] = u1.reshape(model.mesh.GD,-1).T
-        mesh.to_vtk(f'ns2d_{str(i+1).zfill(10)}.vtu')
+        mesh.to_vtk(f'cylinder{str(mesh.GD)}d_{str(i+1).zfill(10)}.vtu')
 
     model.timeline.advance()
 

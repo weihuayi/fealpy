@@ -6,7 +6,7 @@ from fealpy.fem import (ScalarMassIntegrator, ScalarConvectionIntegrator,PressWo
                      ScalarDiffusionIntegrator)
 from fealpy.fem import (BilinearForm, LinearForm, BlockForm, LinearBlockForm)
 
-class CahnHilliardModel:
+class CahnHilliardFEM:
     def __init__(self, equation, space):
         self.space = space
         self.equation = equation
@@ -16,7 +16,6 @@ class CahnHilliardModel:
     def BForm(self):
         phispace = self.space
         q = self.q
-
         A00 = BilinearForm(phispace)
         self.BM_phi = ScalarMassIntegrator(q=q)
         self.BC_phi = ScalarConvectionIntegrator(q=q) 
@@ -51,21 +50,21 @@ class CahnHilliardModel:
         L1 = LinearForm(phispace)
         self.LS_mu = SourceIntegrator(q=q)
         L1.add_integrator(self.LS_mu)
-
         L = LinearBlockForm([L0, L1])
         return L
 
-    def update(self, u_0, u_1, phi_0, phi_1):
+    def update(self, u_0, u_1, phi_0, phi_1 , mv =  None):
         dt = self.dt
         s = self.s
-
+        if mv is None:
+            mv = self.space.function()
         cm = self.equation.coef_mobility
         cf = self.equation.coef_free_energy
         ci = self.equation.coef_interface
         
         #BilinearForm
         self.BM_phi.coef = 3/(2*dt)
-        self.BC_phi.coef = 2*u_1
+        self.BC_phi.coef = lambda bcs,index : 2*u_1(bcs, index) - mv(bcs, index)
 
         self.BD_phi.coef = cm
         

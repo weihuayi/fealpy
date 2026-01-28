@@ -57,6 +57,9 @@ from .tangent_face_mass_integrator import TangentFaceMassIntegrator
 from .dirichlet_bc import DirichletBC
 from .dirichlet_bc_operator import DirichletBCOperator
 
+### Periodic BC
+from .periodic_bc import PeriodicBC
+
 ### recovery estimate
 from .recovery_alg import RecoveryAlg
 

@@ -18,8 +18,6 @@ class Stokes(IterativeMethod):
         q = self.q
         
         A00 = BilinearForm(uspace)
-        self.u_BM_netwon = ScalarMassIntegrator(q=q)
-
         if self.equation.constitutive.value == 1:
             self.u_BVW = ScalarDiffusionIntegrator(q=q)
         elif self.equation.constitutive.value == 2:
@@ -27,7 +25,6 @@ class Stokes(IterativeMethod):
         else:
             raise ValueError(f"未知的粘性模型")
         
-        A00.add_integrator(self.u_BM_netwon)
         A00.add_integrator(self.u_BVW)
         
         A01 = BilinearForm((pspace, uspace))
