@@ -14,7 +14,7 @@ from .integrator import (
 )
 
 
-class MthLaplaceIntegrator(LinearInt, OpInt, CellInt):
+class PolyharmonicIntegrator(LinearInt, OpInt, CellInt):
     r"""The diffusion integrator for function spaces based on homogeneous meshes."""
     def __init__(self, m: int=1,coef: Optional[CoefLike]=None, q:
             Optional[int]=None, *,

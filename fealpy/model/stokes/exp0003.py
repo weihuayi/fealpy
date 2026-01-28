@@ -1,8 +1,8 @@
 from typing import Sequence
-from fealpy.decorator import cartesian
-from fealpy.backend import backend_manager as bm
-from fealpy.backend import TensorLike
-from fealpy.mesher import BoxMesher2d
+from ...decorator import cartesian
+from ...backend import backend_manager as bm
+from ...backend import TensorLike
+from ...mesher import BoxMesher2d
 
 class Exp0003(BoxMesher2d):
     """
@@ -156,3 +156,4 @@ class Exp0003(BoxMesher2d):
     def velocity_v(self, p: TensorLike) -> TensorLike:
         x, y = p[..., 0], p[..., 1]
         return -10 * x * (x - 1) * (2 * x - 1) * y**2 * (y - 1)**2
+>>>>>>> upstream/develop

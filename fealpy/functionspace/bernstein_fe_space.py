@@ -242,6 +242,99 @@ class BernsteinFESpace(FunctionSpace, Generic[_MT]):
         return gmphi
 
     @barycentric
+    def boundary_edge_basis(self, bcs: TensorLike, index: Index=_S, p=None)-> TensorLike:
+        bcs1 = bm.zeros((bcs.shape[0], 3)) 
+        bcs2 = bm.zeros((bcs.shape[0], 3)) 
+        bcs3 = bm.zeros((bcs.shape[0], 3)) 
+        bcs1[:,1:] = bcs
+        bcs2[:,2] = bcs[:,0]
+        bcs2[:,0] = bcs[:,1]
+        bcs3[:,:2] = bcs
+        phi1 = self.basis(bcs1, index=index, p=p) #(NC, NQ, ldof)
+        phi2 = self.basis(bcs2, index=index, p=p)
+        phi3 = self.basis(bcs3, index=index, p=p)
+        ephi =bm.concatenate([phi1, phi2, phi3]) 
+        edge2cell = self.mesh.edge_to_cell()
+        isbdedge = edge2cell[:, 0]  == edge2cell[:, 1]
+        BNE = bm.sum(isbdedge)
+        ldof = self.number_of_local_dofs()
+        phi = bm.zeros((BNE, bcs.shape[0],ldof))
+        phi = ephi[edge2cell[isbdedge, 3]] 
+        return phi  
+
+    @barycentric
+    def grad_m_boundary_edge_basis(self, bcs: TensorLike, m: int, index = _S):
+        """
+        @brief Compute the m-th order gradient of the basis function values at
+               the barycentric point `bc`. The gradient is a GD-dim and m-th
+               order sysmmetry tensor with shape (NQ, NC, ldof, N), where N is
+               the number of the gradients.  
+        @return TensorLike with shape (NQ, NC, ldof, N)
+               Where N is the number of the gradients, which is equal to the 
+               number of GD-dim and m-th order symmetry tensor.
+               For example, in the case of m = 3 and GD = 2, the order of gradient
+               is [xxx, xxy, xyy, yyy], and the shape of the output is 
+               (NQ, NC, ldof, 4), where 4 is the number of the gradients.
+               Additionally, 
+               时导数排列顺序: [xxx, xxy, xyy, yyy]
+               导数按顺序每个对应一个 A_d^m 的多重指标，对应 alpha 的导数有
+               m!/alpha! 个.
+        """
+        p = self.p
+        mesh = self.mesh
+        if(p - m <0): return bm.zeros([1, 1, 1, 1], dtype=self.ftype)
+
+        phi = self.boundary_edge_basis(bcs, p=p-m) #(BNE, NQ, ldof)
+        NQ = bcs.shape[0]
+
+        if m==0: return phi # 函数值
+        #phi = phi[0] # 去掉单元轴更方便 (NQ, ldof)
+
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+        BNE = bm.sum(mesh.boundary_edge_flag())
+        ldof = self.dof.number_of_local_dofs('cell')
+        glambda = mesh.grad_lambda()
+        isbdedge = mesh.boundary_edge_flag()
+        edge2cell = mesh.edge_to_cell()
+        glambda = glambda[edge2cell[isbdedge, 0]]
+
+        ## 获得张量对称部分的索引
+        symidx,_ = symmetry_index(GD, m)
+
+        ## 计算多重指标编号
+        if GD==2:
+            midx2num = lambda a : (a[:, 1]+a[:, 2])*(1+a[:, 1]+a[:, 2])//2 + a[:, 2]
+        elif GD==3:
+            midx2num = lambda a : (a[:, 1]+a[:, 2]+a[:, 3])*(1+a[:, 1]+a[:,
+                2]+a[:, 3])*(2+a[:, 1]+a[:, 2]+a[:, 3])//6 + (a[:, 2]+a[:,
+                    3])*(a[:, 2]+a[:, 3]+1)//2 + a[:, 3]
+
+        midxp_0 = bm.multi_index_matrix(p, GD) # p   次多重指标
+        midxp_1 = bm.multi_index_matrix(m, GD) # m   次多重指标
+
+        N, N1 = len(symidx), midxp_1.shape[0]
+        B = bm.zeros((N1, BNE, NQ, ldof), device=self.device, dtype=self.ftype)
+        symLambdaBeta = bm.zeros((N1, BNE, N), dtype=self.ftype, device=self.device)
+        for beta, Bi, symi in zip(midxp_1, B, symLambdaBeta):
+            midxp_0 -= beta[None, :]
+            idx = bm.where(bm.all(midxp_0>-1, axis=1))[0]
+            num = midx2num(midxp_0[idx]) 
+            beta = bm.to_numpy(beta)
+            fbeta = bm.tensor(factorial(beta))
+            beta = bm.array(beta)
+            symi = bm.set_at(symi,(slice(None)),symmetry_span_array(glambda, beta).reshape(BNE, -1)[:, symidx])
+            c = (factorial(m)**2)*comb(p, m)/bm.prod(fbeta,axis=0,dtype=self.itype) # 数
+            Bi = bm.set_at(Bi,(slice(None),slice(None),idx),c*phi[:,:, num])
+            midxp_0 += beta[None, :]
+        gmphi = bm.einsum('ieql, ien->eqln', B, symLambdaBeta[:, index])
+        return gmphi
+
+
+
+
+
+    @barycentric
     def value(self, uh: TensorLike, bcs: TensorLike, index: Index=_S) -> TensorLike:
         """
         """

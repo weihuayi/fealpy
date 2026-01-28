@@ -16,7 +16,7 @@ Index = Union[int, slice, TensorLike]
 Number = Union[int, float]
 _S = slice(None)
 
-class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
+class CrConformingFESpace2d(FunctionSpace, Generic[_MT]):
     def __init__(self, mesh: _MT, p: int, m: int, device=None):
         assert(p>4*m)
         self.mesh = mesh
@@ -335,10 +335,54 @@ class CmConformingFESpace2d(FunctionSpace, Generic[_MT]):
         bphi = self.bspace.basis(bcs)
         return bm.einsum('cil, cql->cqi', coeff, bphi)
 
+    def grad_basis(self, bcs, index=_S,  variable='x'):
+        coeff = self.coeff
+        bgphi = self.bspace.grad_m_basis(bcs, 1)
+        return bm.einsum('cil, cqlg->cqig', coeff, bgphi)
+
+
     def grad_m_basis(self, bcs, m):
         coeff = self.coeff
         bgmphi = self.bspace.grad_m_basis(bcs, m)
         return bm.einsum('cil, cqlg->cqig', coeff, bgmphi)
+
+    def boundary_edge_basis(self, bcs):
+        coeff = self.coeff
+        mesh = self.mesh 
+        isbdedge = mesh.boundary_edge_flag()
+        edge2cell = mesh.edge_to_cell()
+        coeff = coeff[edge2cell[isbdedge,0]]
+        bphi = self.bspace.boundary_edge_basis(bcs)
+        return bm.einsum('cil, cql->cqi', coeff, bphi)
+
+
+    def grad_m_boundary_edge_basis(self, bcs, m):
+        coeff = self.coeff
+        mesh = self.mesh 
+        isbdedge = mesh.boundary_edge_flag()
+        edge2cell = mesh.edge_to_cell()
+        coeff = coeff[edge2cell[isbdedge,0]]
+        bgmphi = self.bspace.grad_m_boundary_edge_basis(bcs, m)
+        return bm.einsum('cil, cqlg->cqig', coeff, bgmphi)
+
+    @barycentric
+    def grad_m_boundary_edge_value(self, uh, bcs, m):
+        gmphi = self.grad_m_boundary_edge_basis(bcs, m) # (NQ, 1, ldof)
+        cell2dof = self.cell_to_dof()
+        mesh = self.mesh
+        edge2cell = mesh.edge_to_cell()
+        isbdedge = mesh.boundary_face_flag()
+        edge2dof = cell2dof[edge2cell[isbdedge, 0]]
+        val = bm.einsum('cqlg, cl->cqg', gmphi, uh[edge2dof])
+        return val
+
+
+
+    def hess_basis(self, bcs):
+        coeff = self.coeff
+        bhessphi = self.bspace.hess_basis(bcs)
+        return bm.einsum('cil, cqlkg->cqikg', coeff, bhessphi)
+
 
 
     def boundary_interpolate(self, gd, uh, threshold=None, method="interp"):
