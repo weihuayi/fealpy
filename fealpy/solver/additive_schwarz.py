@@ -184,30 +184,3 @@ class AdditiveSchwarz:
                        shape=(gdof, gdof0), dtype=phi.dtype)
         
         return M
-
-from fealpy.functionspace import TensorFunctionSpace, LagrangeFESpace,RaviartThomasFESpace
-from fealpy.fem import BilinearForm, LinearForm, BlockForm, LinearBlockForm
-from fealpy.fem import ScalarSourceIntegrator, ScalarNeumannBCIntegrator, ScalarMassIntegrator, GradPressureIntegrator,DivIntegrator,DivIntegrator2,DirichletBC    
-from fealpy.solver import spsolve,GAMGSolver
-from fealpy.model import PDEModelManager
-
-pde = PDEModelManager('darcyforchheimer').get_example(9)
-mesh = pde.init_mesh['uniform_tri'](nx=8, ny=8)
-p = 6
-q = p+3
-unit = mesh.edge_unit_normal()
-uspace = RaviartThomasFESpace(mesh, p=p)
-u_bform = BilinearForm(uspace)
-Mu = ScalarMassIntegrator(coef=1,q=q)
-u_bform.add_integrator(Mu)
-u_bform.add_integrator(DivIntegrator2(coef=1,q=q))
-
-M = u_bform.assembly()
-
-ulform = LinearForm(uspace)
-ulform.add_integrator(ScalarSourceIntegrator(pde.f, q=q))
-b = bm.random.rand(M.shape[0]) 
-F = M@b
-
-Solver = AdditiveSchwarz(uspace, M, spacetype='Hdiv',type='face' )
-b = Solver.solve(F)
