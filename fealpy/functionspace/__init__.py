@@ -36,7 +36,9 @@ from .brezzi_douglas_marini_fe_space_3d import BrezziDouglasMariniFESpace3d
 from .interior_penalty_fe_space_2d import InteriorPenaltyFESpace2d
 
 ## VESpace
+from .scaled_monomial_space import ScaledMonomialSpace
 from .scaled_monomial_space_2d import ScaledMonomialSpace2d
+from .scaled_monomial_space_3d import ScaledMonomialSpace3d
 from .conforming_scalar_ve_space_2d import ConformingScalarVESpace2d
 from .non_conforming_scalar_ve_space_2d import NonConformingScalarVESpace2d
 

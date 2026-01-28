@@ -71,10 +71,11 @@ class ScalarConvectionIntegrator(LinearInt, OpInt, CellInt):
         J = space.mesh.jacobi_matrix(bcs)
         G = space.mesh.first_fundamental_form(J)
         d = bm.sqrt(bm.linalg.det(G))
-
+        phi = phi.reshape (*phi.shape[:3], -1)
         if is_tensor(coef):
             gphi = bm.einsum('cqi...j, cq...j->cqi...' ,gphi, coef)
-            result = bm.einsum('q, cqi, cqj , cq -> cij', ws*rm, phi, gphi, d)
+            gphi = gphi.reshape (*gphi.shape[:3], -1)
+            result = bm.einsum('q, cqid, cqjd , cq -> cij', ws*rm, phi, gphi, d)
         else:
             raise TypeError(f"coef should be Tensor, but got {type(coef)}.")
         return result

@@ -87,6 +87,9 @@ class Poissondata():
             return self.u(x,y,z)
         return self.u(x,y)
     
+    def moving_init_solution(self, p):
+        return self.solution(p)
+    
     def init_solution(self, p):
         return self.solution(p)
     
@@ -275,36 +278,51 @@ def quad_equ_solver(coef:list):
         if bm.any(is_linear):
             x = bm.concat([x, x_linear])
     return x
-    
-def cubic_equ_solver(coef:list):
-    """
-    @brief solve the cubic equation
-    @param a: the coefficient of x^3
-    @param b: the coefficient of x^2
-    @param c: the coefficient of x
-    @param d: the constant term
-    """
-    a,b,c,d = coef
-    kwarg = bm.context(a)
-    p = (3 * a * c - b**2) / (3 * a**2)
-    q = (2 * b**3 - 9 * a * b * c + 27 * a**2 * d) / (27 * a**3)
-    discriminant = (q / 2)**2 + (p / 3)**3
-    u1 = (-q / 2 + bm.sqrt(discriminant))**(1 / 3)
-    u2 = (-q / 2 - bm.sqrt(discriminant))**(1 / 3)
-    v1 = (-q / 2 - bm.sqrt(discriminant))**(1 / 3)
-    v2 = (-q / 2 + bm.sqrt(discriminant))**(1 / 3)
-    u = bm.where(discriminant >= 0, u1,u2)
-    v = bm.where(discriminant >= 0, v1,v2)
-    upv = u + v
-    umv = u - v
-    move_dis = b / (3 * a)
-    x1 = upv - move_dis
-    sq3 = bm.sqrt(bm.array([3]),**kwarg)
-    x2 = -upv / 2 + umv * sq3 * 1j / 2 - move_dis
-    x3 = -upv / 2 - umv * sq3 * 1j / 2 - move_dis
-    x = bm.concat([x1, x2, x3])
-    return x
 
+def cubic_equ_solver(coef: list):
+    """
+    更稳定的三次方程求解器，只返回实根
+    """
+    a, b, c, d = coef
+    kwarg = bm.context(a)
+    eps = 1e-12
+    
+    # 处理退化情况
+    is_quadratic = bm.abs(a) < eps
+    
+    if bm.all(is_quadratic):
+        # 全部是二次方程
+        return quad_equ_solver([b, c, d])
+    
+    # 标准化为首项系数为1的形式
+    a_norm = a[~is_quadratic]
+    b_norm = b[~is_quadratic] / a_norm
+    c_norm = c[~is_quadratic] / a_norm  
+    d_norm = d[~is_quadratic] / a_norm
+    
+    # Cardano 公式
+    p = c_norm - b_norm**2 / 3
+    q = (2 * b_norm**3 - 9 * b_norm * c_norm + 27 * d_norm) / 27
+    
+    discriminant = (q / 2)**2 + (p / 3)**3
+    
+    # 只处理有实根的情况，返回最可能的实根
+    # 对于正判别式，返回唯一实根
+    real_mask = discriminant >= 0
+    
+    if bm.any(real_mask):
+        sqrt_disc = bm.sqrt(discriminant[real_mask])
+        u = bm.sign(-q[real_mask]/2 + sqrt_disc) * bm.abs(-q[real_mask]/2 + sqrt_disc)**(1/3)
+        v = bm.sign(-q[real_mask]/2 - sqrt_disc) * bm.abs(-q[real_mask]/2 - sqrt_disc)**(1/3)
+        x = u + v - b_norm[real_mask] / 3
+        return x
+    else:
+        # 对于负判别式，使用三角方法求解（三个实根）
+        m = 2 * bm.sqrt(-p / 3)
+        theta = bm.arccos(3 * q / (p * m)) / 3
+        x1 = m * bm.cos(theta) - b_norm / 3
+        return x1  # 返回第一个根，通常是最接近期望的
+    
 def _compute_coef_general_2d(A,C):
     """
     @brief compute the coefficient of the quadratic equation
@@ -486,44 +504,308 @@ def _solve_quadratic_with_validation(a, b, c, p_coord, A_coord, B_coord, C_coord
 
 def _solve_quad_parametric_coords(target_points, quad_vertices):
     """
-    直接代数求解四边形参数坐标 (ξ,η) ∈ [0,1]x[0,1]
+    Solve parametric coordinates (xi, eta) for points in quadrilateral elements
+    split into two triangles.
 
     Parameter:
         target_points: 目标点坐标，形状为 (N, 2)
         quad_vertices: 四边形顶点坐标，形状为 (N, 4, 2)，四个顶点按逆时针顺序排列
     """
+    N = target_points.shape[0]
     # 四边形顶点按逆时针顺序：v0(0,0), v1(1,0), v2(1,1), v3(0,1)
     v0, v1, v2, v3 = quad_vertices[:, 0], quad_vertices[:, 1], quad_vertices[:, 2], quad_vertices[:, 3]
     p = target_points
+    kwarg = bm.context(target_points)
+    xi_eta = bm.zeros((N, 2), **kwarg)
     
-    # 双线性映射：x(ξ,η) = A + Bξ + Cη + Dξη
-    A = v0                          # 常数项
-    B = v1 - v0                     # ξ 项系数
-    C = v3 - v0                     # η 项系数  
-    D = v2 - v1 - v3 + v0          # ξη 项系数
+    ref_coords = bm.array([[0,0], [1,0], [1,1], [0,1]], **kwarg)
+    # 三角形1: v0(0,0), v1(1,0), v2(1,1)
+    tri1_physical = bm.stack([v0, v1, v2], axis=1)  # (N, 3, 2)
+    tri1_param = ref_coords[[0,1,2]]  # (3, 2)
+
+    # 三角形2: v0(0,0), v2(1,1), v3(0,1)
+    tri2_physical = bm.stack([v0, v2, v3], axis=1)  # (N, 3, 2)
+    tri2_param = ref_coords[[0,2,3]]  # (3, 2)
+
+    v_matrix = bm.permute_dims(tri1_physical[:,1:,:] - 
+                               tri1_physical[:,0:1,:], axes=(0, 2, 1))
+    v_b = p - tri1_physical[:,0,:]
+    inv_matrix = bm.linalg.inv(v_matrix)
+    lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
+    lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
+    valid = bm.all(lam > -1e-12, axis=1)
     
-    # 求解方程组：p = A + Bξ + Cη + Dξη
-    D_norm = bm.linalg.norm(D, axis=-1)
-    is_linear = D_norm < 1e-10
-    
-    xi_eta = bm.zeros((target_points.shape[0], 2), **bm.context(target_points))
-    
-    # 处理线性情况（平行四边形）
-    if bm.any(is_linear):
-        linear_mask = is_linear
-        rhs = p[linear_mask] - A[linear_mask]
-        matrix = bm.stack([B[linear_mask], C[linear_mask]], axis=-1)
-        try:
-            solution = bm.linalg.solve(matrix, rhs[..., None])[..., 0]
-            xi_eta = bm.set_at(xi_eta, linear_mask, solution)
-        except:
-            pass
-    # 处理非线性情况
-    if bm.any(~is_linear):
-        xi_eta_nl = _solve_bilinear_system(
-            p[~is_linear], A[~is_linear], B[~is_linear], 
-            C[~is_linear], D[~is_linear]
-        )
-        xi_eta = bm.set_at(xi_eta, ~is_linear, xi_eta_nl)
+    if bm.any(valid):
+        # 重心坐标转换为参数坐标
+        param1 = bm.einsum('ni,ij->nj', lam[valid], tri1_param)
+        xi_eta = bm.set_at(xi_eta, valid, param1)
+
+    remaining = ~valid
+    if bm.any(remaining):
+        v_matrix = bm.permute_dims(tri2_physical[remaining,1:,:] - 
+                                   tri2_physical[remaining,0:1,:], axes=(0, 2, 1))
+        v_b = p[remaining] - tri2_physical[remaining,0,:]
+        inv_matrix = bm.linalg.inv(v_matrix)
+        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
+        lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
+        param2 = bm.einsum('ni,ij->nj', lam, tri2_param)
+        xi_eta = bm.set_at(xi_eta, remaining, param2)
 
     return xi_eta
+
+def _solve_hex_parametric_coords(target_points, hex_vertices):
+    """
+    Solve parametric coordinates (xi, eta, zeta) for points in hexahedral elements.
+    split into 6 tetrahedras.
+
+    Parameters
+        target_points: TensorLike, shape (N, 3) - points to find coordinates for
+        hex_vertices: TensorLike, shape (N, 8, 3) - vertices of hexahedral elements
+    
+    Returns
+        TensorLike, shape (N, 3) - parametric coordinates (xi, eta, zeta)
+    """
+    N = target_points.shape[0]
+    # 八边形顶点按逆时针顺序：v0(0,0,0), v1(1,0,0), v2(1,1,0), v3(0,1,0),
+    # v4(0,0,1), v5(1,0,1), v6(1,1,1), v7(0,1,1)
+    v0, v1, v2, v3 = hex_vertices[:, 0], hex_vertices[:, 1], hex_vertices[:, 2], hex_vertices[:, 3]
+    v4, v5, v6, v7 = hex_vertices[:, 4], hex_vertices[:, 5], hex_vertices[:, 6], hex_vertices[:, 7]
+    p = target_points
+    kwarg = bm.context(target_points)
+    xi_eta_zeta = bm.zeros((N, 3), **kwarg)
+    found = bm.zeros(N, dtype=bm.bool)
+
+    ref_coords = bm.array([[0,0,0], [1,0,0], [1,1,0], [0,1,0],
+                           [0,0,1], [1,0,1], [1,1,1], [0,1,1]], **kwarg)
+    
+    # 六个四面体的物理坐标和参考坐标
+    tetrahedra_physical = [
+        bm.stack([v0, v1, v3, v4], axis=1),  # 四面体1
+        bm.stack([v5, v1, v4, v3], axis=1),  # 四面体2
+        bm.stack([v5, v4, v7, v3], axis=1),  # 四面体3
+        bm.stack([v1, v6, v2, v3], axis=1),  # 四面体4
+        bm.stack([v1, v5, v6, v3], axis=1),  # 四面体5
+        bm.stack([v5, v7, v6, v3], axis=1)   # 四面体6
+    ]
+    
+    tetrahedra_param = [
+        ref_coords[[0, 1, 3, 4]],
+        ref_coords[[5, 1, 4, 3]],
+        ref_coords[[5, 4, 7, 3]],
+        ref_coords[[1, 6, 2, 3]],
+        ref_coords[[1, 5, 6, 3]],
+        ref_coords[[5, 7, 6, 3]]
+    ]
+
+    for i in range(6):
+        if bm.all(found):
+            break
+        remaining = ~found
+        tet_physical = tetrahedra_physical[i][remaining]
+        tet_param = tetrahedra_param[i]
+
+        v_matrix = bm.permute_dims(tet_physical[:,1:,:] - 
+                                   tet_physical[:,0:1,:], axes=(0, 2, 1))
+        v_b = p[remaining] - tet_physical[:,0,:]
+        inv_matrix = bm.linalg.inv(v_matrix)
+        lam = bm.einsum('cij,cj->ci', inv_matrix, v_b)
+        lam = bm.concat([(1 - bm.sum(lam, axis=-1, keepdims=True)), lam], axis=-1)
+        # 检查点是否在四面体内
+        if i < 5:
+            in_tetra = bm.all(lam >= -2e-5, axis=1)
+            if bm.any(in_tetra):
+                param = bm.einsum('ni,ij->nj', lam[in_tetra], tet_param)
+                valid_indices = bm.where(remaining)[0][in_tetra]
+                xi_eta_zeta = bm.set_at(xi_eta_zeta, valid_indices, param)
+                found = bm.set_at(found, valid_indices, True)
+        else:
+            param = bm.einsum('ni,ij->nj', lam, tet_param)
+            xi_eta_zeta = bm.set_at(xi_eta_zeta, remaining, param)
+            
+    return xi_eta_zeta
+
+def newton_barycentric_triangle(target, cell_nodes,
+                                p: int,
+                                local_vnode_idx,
+                                shape_function,
+                                grad_shape_function,
+                                tol=1e-6, maxit=20, damping=True,):
+    """
+    牛顿迭代求二维曲边(高阶)三角形单元内点的重心坐标 lam (N,3).
+    Parameters:
+        target: (N,2) 目标物理点
+        cell_nodes: (N, Ndof, 2) 该单元所有几何节点(包含高阶)的物理坐标
+        p: 形函数次数
+        shape_function(lam, p): 输入 lam (N,3) -> (N, Ndof)
+        grad_shape_function(lam, p): 可选, 返回对重心坐标 λ0,λ1,λ2 的偏导 (N, Ndof, 3);
+                                     若为 None, 用差分近似
+        tol: 残差容差
+        maxit: 最大迭代次数
+        damping: 是否使用阻尼
+    Returns:
+        lam: (N,3) 重心坐标
+        success: (N,) bool 是否收敛
+        iters: (N,) int 实际迭代次数
+    """
+    kw = bm.context(target)
+    N = target.shape[0]
+    TD = 2
+    # 初始线性猜测(用前三个顶点仿射解)
+    v0 = cell_nodes[:, local_vnode_idx[0]]
+    v1 = cell_nodes[:, local_vnode_idx[1]]
+    v2 = cell_nodes[:, local_vnode_idx[2]]
+
+    A = bm.stack([ (v1 - v0), (v2 - v0) ], axis=1)  # (N,2,2)
+    rhs = (target - v0)[..., None]                       # (N,2,1)
+    # 线性解 xi_eta
+    invA = bm.linalg.inv(A)
+    xi_eta = bm.einsum('nij,njk->nik', invA, rhs)[...,0]  # (N,2)
+
+    def build_lam(xe):
+        return bm.concat([1 - xe.sum(axis=1, keepdims=True),
+                           xe[:,0:1], xe[:,1:2]], axis=1)
+    lam = build_lam(xi_eta)
+
+    success = bm.zeros(N, dtype=bm.bool)
+    i = 0
+    while bm.any(~success):
+        active = ~success
+        i += 1
+        if i > maxit:
+            print(f"Warning: Exceeding {maxit} iterations in Newton solver.")
+            break
+        if not bm.any(active):
+            break
+        act_idx = bm.where(active)[0]
+        lam_a   = lam[active]          # (Na,3)
+        cn_a    = cell_nodes[active]   # (Na,Ndof,2)
+        tgt_a   = target[active]       # (Na,2)
+        # print(f"Newton iteration {i}")
+        i += 1
+        Nval = shape_function(lam_a, p, variables='u')            # (Na,Ndof)
+        F    = bm.einsum('ni,nid->nd', Nval, cn_a) - tgt_a        # (Na,2)
+        res  = bm.linalg.norm(F, axis=1)
+
+        conv = res < tol
+        if bm.any(conv):
+            done_glb = act_idx[conv]
+            success  = bm.set_at(success, done_glb, True)
+            
+        if not bm.any(~success):
+            break
+        # 活跃里继续的
+        still_mask = ~conv
+        if not bm.any(still_mask):
+            continue
+        
+        act_sub_idx = act_idx[still_mask]
+        lam_a   = lam_a[still_mask]
+        F_a = F[still_mask]
+        xe_a = lam_a[:,1:3]  # (Na,2)
+        gN = grad_shape_function(lam_a, p,variables = 'u')  # (Na,Ndof,2)
+        
+        # Jacobian: J = Σ_i X_i ⊗ [dN_i/dξ, dN_i/dη] → (Na,2,2)
+        X_a = cn_a[still_mask]  # (Na,Ndof,2)
+        T = bm.einsum('...nij,nid->njd', gN, X_a)  # (Na,2,2)
+        # 重新排列成 J[n, phys_dim, param_dim]
+        J = bm.permute_dims(T, axes=(0, 2, 1))  # (Na,2,2)
+
+        # 解 J δ = -F
+        detJ = J[:,0,0]*J[:,1,1]-J[:,0,1]*J[:,1,0]
+        good = bm.abs(detJ) > 1e-14
+        delta = bm.zeros_like(F_a)
+        if bm.any(good):
+            invJ = bm.linalg.inv(J[good])
+            delta_good = bm.einsum('nij,nj->ni', invJ[good], -F_a[good])
+            delta = bm.set_at(delta, good, delta_good)
+        # 阻尼/线搜索
+        if damping:
+            base_mean = bm.mean(bm.linalg.norm(F_a, axis=1))
+            step = 1.0
+            for _ in range(10):
+                trial = xe_a + step*delta
+                lam_trial = build_lam(trial)
+                lam_trial = lam_trial / bm.sum(lam_trial, axis=1, keepdims=True)
+                N_trial = shape_function(lam_trial, p, variables='u')
+                F_trial = bm.einsum('ni,nid->nd', N_trial, X_a) - target[act_sub_idx]
+                if bm.mean(bm.linalg.norm(F_trial, axis=1)) <= base_mean * 0.98 or step < 1/64:
+                    xe_a = trial
+                    break
+                step *= 0.5
+        else:
+            xe_a = xe_a + 0.5*delta
+
+        lam_upd = build_lam(xe_a)
+        # 归一
+        lam_upd = lam_upd / bm.sum(lam_upd, axis=1, keepdims=True)
+
+        # 写回
+        xi_eta = bm.set_at(xi_eta, act_sub_idx, lam_upd[:,1:3])
+        
+        lam    = bm.set_at(lam,    act_sub_idx, lam_upd)
+
+    return lam, success
+
+def matrix_absA(A, symmetric=True, flat=False, eps=1e-14):
+    """
+    批量计算矩阵“绝对值” |A|：
+      - 若 symmetric=True（默认），|A| = sqrt(A@A)（假设 A 对称）
+      - 若 symmetric=False，|A| = sqrt(A.T@A)（极分解的正定因子）
+    参数
+      A: (..., d, d) 或 (..., d*d)
+      symmetric: 是否按对称分支
+      flat: 若输入为展平 (Nv,d*d)，设为 True
+    返回
+      与 A 同批量形状的 (..., d, d)
+    """
+    if flat:
+        Nv, dd = A.shape
+        d = int(bm.sqrt(dd))
+        A = A.reshape(Nv, d, d)
+    else:
+        d = A.shape[-1]
+        A = bm.asarray(A)
+
+    # 数值对称化（仅在 symmetric=True 时）
+    if symmetric:
+        A_sym = 0.5 * (A + bm.swapaxes(A, -1, -2))
+    else:
+        A_sym = A
+
+    if d == 2 and symmetric:
+        # 闭式公式：|A| = (A^2 + |det A| I) / sqrt(tr(A^2) + 2|det A|)
+        a11 = A_sym[..., 0, 0]
+        a12 = A_sym[..., 0, 1]
+        a21 = A_sym[..., 1, 0]
+        a22 = A_sym[..., 1, 1]
+        detA = a11 * a22 - a12 * a21
+        abs_detA = bm.abs(detA)
+
+        A2 = A_sym @ A_sym  # (...,2,2)
+        trA2 = A2[..., 0, 0] + A2[..., 1, 1]
+        denom = bm.sqrt(bm.clip(trA2 + 2.0 * abs_detA, eps, None))
+
+        absA = A2.copy()
+        absA[..., 0, 0] += abs_detA
+        absA[..., 1, 1] += abs_detA
+        absA = absA / denom[..., None, None]
+
+        # 退化回退：若出现非有限值，退回逐元素绝对值
+        bad = ~bm.isfinite(absA).all(axis=(-2, -1))
+        if bm.any(bad):
+            absA[bad] = bm.abs(A_sym[bad])
+        return absA if not flat else absA.reshape(-1, d * d)
+
+    if symmetric:
+        # 对称：A = V Λ Vᵀ，|A| = V |Λ| Vᵀ
+        w, V = bm.linalg.eigh(A_sym)                    # (..., d), (..., d, d)
+        absw = bm.abs(w)
+        absA = (V * absw[..., None, :]) @ bm.swapaxes(V, -1, -2)
+    else:
+        # 非对称：|A| = sqrt(AᵀA) = V sqrt(Λ) Vᵀ
+        AtA = bm.swapaxes(A, -1, -2) @ A
+        w, V = bm.linalg.eigh(AtA)
+        sqrtw = bm.sqrt(bm.clip(w, 0.0, None))
+        absA = (V * sqrtw[..., None, :]) @ bm.swapaxes(V, -1, -2)
+
+    return absA if not flat else absA.reshape(-1, d * d)

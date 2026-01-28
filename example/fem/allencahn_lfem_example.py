@@ -1,6 +1,6 @@
 from fealpy.backend import bm
 import argparse
-from fealpy.fem.allencahn_lfem_model import AllenCahnLFEMModel
+from fealpy.fem import AllenCahnLFEMModel
 
 # Argument parsing
 parser = argparse.ArgumentParser(description=
@@ -13,12 +13,12 @@ parser.add_argument('--backend',
         help='Default backend is numpy')
 
 parser.add_argument('--pde',
-                    default='sincoscos', type=str,
-                    help='Name of the PDE model, default is sincoscos')
+                    default=2, type=int,
+                    help='Name of the PDE model, default is 2')
 
 parser.add_argument('--init_mesh',
-                    default='tri', type=str,
-                    help='Type of mesh, default is tri, options are tri, quad, moving_tri, moving_quad')
+                    default='uniform_tri', type=str,
+                    help='Type of mesh, default is tri, options are uniform_tri, uniform_quad, moving_tri, moving_quad')
 
 parser.add_argument('--space_degree',
                     default=1, type=int,

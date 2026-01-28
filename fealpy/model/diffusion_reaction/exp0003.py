@@ -8,7 +8,7 @@ class Exp0003(BoxMesher2d):
     """
     2D Poisson problem with reaction term and piecewise linear boundary conditions:
     
-        -∇²u(x,y) - 0.2u(x,y) = f(x,y), (x,y) ∈ (-3,3)^2
+        -div(A ∇u) - 0.2u(x,y) = f(x,y), (x,y) ∈ (-3,3)^2
         u(x, y) = g(x, y),         on ∂Ω
         
     with the exact solution:
@@ -30,7 +30,7 @@ class Exp0003(BoxMesher2d):
 
     The diffusion coefficient A, reaction coefficient c are defined as:
         A = [[1, 0], [0, 1]]
-        c = 0.2
+        c = -0.2
 
     Reference:
         https://doi.org/10.1016/j.neucom.2024.128936
@@ -69,7 +69,7 @@ class Exp0003(BoxMesher2d):
 
     def reaction_coef(self) -> TensorLike:
         """Reaction coefficient (1/5)"""
-        return 0.2
+        return -0.2
 
     @cartesian
     def source(self, p: TensorLike) -> TensorLike:

@@ -2,7 +2,7 @@ import numpy as np
 
 from types import ModuleType
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from ..common import ranges
+from ...common import ranges
 from .Mesh import Mesh
 
 

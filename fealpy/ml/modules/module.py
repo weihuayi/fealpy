@@ -249,7 +249,7 @@ class TensorMapping(Module):
         if coordtype in {'cartesian', 'c'}:
 
             ps = mesh.bc_to_point(bcs)
-            val = self.from_numpy(ps.numpy(), device=device, last_dim=True).cpu()
+            val = self.from_numpy(ps.detach().numpy(), device=device, last_dim=True).cpu()
     
             if squeeze:
                 val = val.squeeze(-1)

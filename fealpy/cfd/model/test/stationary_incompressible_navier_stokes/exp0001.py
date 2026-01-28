@@ -60,9 +60,11 @@ class Exp0001(BoxMesher2d):
         self.box = [0.0, 1.0, 0.0, 1.0]
         self.eps = 1e-10
         self.mu = 1.0
-        self.rho = 2.0
+        self.rho = 1.0
         self.mesh = self.init_mesh(nx=options.get('nx', 8), ny=options.get('ny', 8))
         super().__init__(box=self.box)
+        self.mesh = self.init_mesh[options.get('init_mesh', 'uniform_tri')](nx=options.get('nx', 8), ny=options.get('ny', 8))
+        
 
     def __str__(self) -> str:
         """Return a nicely formatted, multi-line summary of the PDE configuration."""
@@ -80,6 +82,10 @@ class Exp0001(BoxMesher2d):
     def domain(self) -> Sequence[float]:
         """Return the computational domain [xmin, xmax, ymin, ymax]."""
         return self.box
+    
+    def pressure_integral_target(self) -> float:
+        """Integral of the exact pressure over the domain."""
+        return 0.0
  
     @cartesian
     def velocity(self, p: TensorLike) -> TensorLike:
@@ -111,13 +117,13 @@ class Exp0001(BoxMesher2d):
     @cartesian
     def is_velocity_boundary(self, p: TensorLike) -> TensorLike:
         """Check if point where velocity is defined is on boundary."""
-        # result = bm.ones_like(p[..., 0], dtype=bm.bool)
-        # return result
         return None
 
     @cartesian
-    def is_pressure_boundary(self, p: TensorLike) -> TensorLike:
+    def is_pressure_boundary(self, p: TensorLike = None) -> TensorLike:
         """Check if point where pressure is defined is on boundary."""
+        if p is None:
+            return 0
         result = bm.zeros_like(p[..., 0], dtype=bm.bool)
         return result
 

@@ -52,7 +52,7 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         mesh = getattr(space, 'mesh', None)
         Sf, e, d, index, bcs,phi = self.fetch(space)
         D = phi.shape[-1]
-        val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
+        # val = process_coef_func(coef, bcs=bcs, mesh=mesh, etype='cell', index=index)
         Sf_dot_Sf = bm.einsum('ij,ij->i', Sf, Sf)              
         e_dot_Sf = bm.einsum('ij,ij->i', e, Sf)                
         e_norm = bm.einsum('ij,ij->i', e, e)**0.5               
