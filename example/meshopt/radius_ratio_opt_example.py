@@ -86,7 +86,7 @@ def test_triangle_domain(P=0,optmethod='LBFGS'):
                 update_Preconditioner = update_Preconditioner,
                 MaxIters=100,
                 FunValDiff = 1e-4)
-        opt = PLBFGS(options)
+        opt = PNLCG(options)
 
     t1 = time.time()
     x, f, g = opt.run()
@@ -152,7 +152,7 @@ def test_square_hole(P=0, optmethod='LBFGS'):
                 update_Preconditioner = update_Preconditioner,
                 MaxIters=100,
                 FunValDiff = 1e-4)
-        opt = PLBFGS(options)
+        opt = PNLCG(options)
 
     t1 = time.time()
     x, f, g = opt.run()
@@ -213,7 +213,7 @@ def test_sphere(P=0,optmethod='LBFGS'):
                 update_Preconditioner = update_Preconditioner,
                 MaxIters=100,
                 FunValDiff = 1e-8)
-        opt = PLBFGS(options)
+        opt = PNLCG(options)
     t1 = time.time()
     x, f, g = opt.run()
     t2 = time.time()
@@ -269,7 +269,7 @@ def test_sphere_intersection(P=0,optmethod='LBFGS'):
                 update_Preconditioner = update_Preconditioner,
                 MaxIters=100,
                 FunValDiff = 1e-4)
-        opt = PLBFGS(options)
+        opt = PNLCG(options)
     t1 = time.time()
     x, f, g = opt.run()
     t2 = time.time()
