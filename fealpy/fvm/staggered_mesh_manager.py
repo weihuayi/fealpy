@@ -8,15 +8,15 @@ class StaggeredMeshManager:
         x_right = domain[1]
         y_bottom = domain[2]
         y_top = domain[3]
-        hx = (x_right-x_left)/ nx
-        hy = (y_top-y_bottom)/ ny
+        self.hx = (x_right-x_left)/ nx
+        self.hy = (y_top-y_bottom)/ ny
 
         self.umesh = QuadrangleMesh.from_box(
-            box=[-hx / 2 + x_left, hx / 2 + x_right, y_bottom, y_top],
+            box=[-self.hx / 2 + x_left, self.hx / 2 + x_right, y_bottom, y_top],
             nx=nx + 1, ny=ny
         )
         self.vmesh = QuadrangleMesh.from_box(
-            box=[x_left, x_right, -hy / 2 + y_bottom, hy / 2 + y_top],
+            box=[x_left, x_right, -self.hy / 2 + y_bottom, self.hy / 2 + y_top],
             nx=nx, ny=ny + 1
         )
         self.pmesh = QuadrangleMesh.from_box(box=domain, nx=nx, ny=ny)
@@ -55,7 +55,7 @@ class StaggeredMeshManager:
         uedge2vedge = bm.zeros(NE)  
         uedge2vedge[b] = a
         uedge2vedge[d] = c
-        return uedge2vedge
+        return uedge2vedge.astype(int)
     
     def get_dof_mapping_vedge2uedge(self):
         import numpy as np 
@@ -69,7 +69,7 @@ class StaggeredMeshManager:
         vedge2uedge = bm.zeros(NE)  
         vedge2uedge[a] = b
         vedge2uedge[c] = d
-        return vedge2uedge
+        return vedge2uedge.astype(int)
 
     def map_velocity_uvcell_to_pedge(self, u_cell, v_cell, ap_u, ap_v):
         ucell2pedge = self.get_dof_mapping_ucell2pedge()

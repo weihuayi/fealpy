@@ -7,13 +7,13 @@ from fealpy.fvm import NSFVMStaggeredSimpleModel
 def main():
     parser = argparse.ArgumentParser(description="Staggered FVM Navier-Stokes Solver")
 
-    parser.add_argument('--pde', default=1, type=int,
+    parser.add_argument('--pde', default=2, type=int,
                         help='Navier-Stokes PDE example ID')
     
-    parser.add_argument('--nx', default=20, type=int,
+    parser.add_argument('--nx', default=32, type=int,
                         help='Grid divisions in x-direction')
 
-    parser.add_argument('--ny', default=20, type=int,
+    parser.add_argument('--ny', default=32, type=int,
                         help='Grid divisions in y-direction')
     
     parser.add_argument('--backend',default='numpy', type=str,
@@ -26,9 +26,9 @@ def main():
                         default='INFO', type=str,
                         help='Log level, default is INFO, options are DEBUG, INFO, WARNING, ERROR, CRITICAL')
 
-    parser.add_argument('--max_iter', default=1000, type=int)
+    parser.add_argument('--max_iter', default=400, type=int)
 
-    parser.add_argument('--tol', default=1e-5, type=float)
+    parser.add_argument('--tol', default=4e-5, type=float)
 
     parser.add_argument('--plot', action='store_true')
 
@@ -45,9 +45,10 @@ def main():
     print(f"L2 error (v) = {verror}")
     print(f"L2 error (p) = {perror}")
     model.plot()
-    if options["plot"]:
-        model.plot()
-        model.plot_residual()
+    # model.plot_streamline()
+    # if options["plot"]:
+    #     model.plot()
+    #     model.plot_residual()
 
 
 if __name__ == "__main__":

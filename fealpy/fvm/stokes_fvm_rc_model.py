@@ -125,7 +125,8 @@ class StokesFVMRCModel(ComputationalModel):
         M1, M2 = self.assembly_pressure()
         M3 = BlockForm([[M1, M2]]).assembly_sparse_matrix(format='csr')
         dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
-        nbc = NeumannBC(self.mesh, self.pde.neumann_pressure)
+        # nbc = NeumannBC(self.mesh, self.pde.neumann_pressure)
+        nbc = NeumannBC(self.mesh)
         AB, f = dbc.DiffusionApply(AB, f)
         ap = AB.diags().values
         
@@ -147,8 +148,9 @@ class StokesFVMRCModel(ComputationalModel):
         e2c = mesh.edge_to_cell()
         ap_edge = (ap[e2c[:, 0]] + ap[e2c[:, 1]]) / 2
 
-        grad_p = GradientReconstruct(mesh).AverageGradientreNeumann(ph0, self.pde.neumann_pressure)
-        # grad_p = GradientReconstruct(mesh).test(ph0)
+        # grad_p = GradientReconstruct(mesh).AverageGradientreNeumann(ph0, self.pde.neumann_pressure)
+        # grad_p = GradientReconstruct(mesh).AverageGradientreDirichlet(ph0, self.pde.dirichlet_pressure)
+        grad_p = GradientReconstruct(mesh).LSQ(ph0)
         grad_f = GradientReconstruct(mesh).reconstruct(grad_p)
 
         x = mesh.boundary_face_index()
@@ -224,13 +226,15 @@ class StokesFVMRCModel(ComputationalModel):
         self.vI = self.pde.velocity_v(self.mesh.entity_barycenter("cell"))
         self.pI = self.pde.pressure(self.mesh.entity_barycenter("cell"))
 
-        uerror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.uh - self.uI)**2))
-        verror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.vh - self.vI)**2))
-        perror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph - self.pI)**2))
-        # uerror = bm.max(bm.abs(self.uh - self.uI))
-        # verror = bm.max(bm.abs(self.vh - self.vI))
-        # perror = bm.max(bm.abs(self.ph - self.pI))
-        return uerror, verror, perror
+        # uerror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.uh - self.uI)**2))
+        # verror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.vh - self.vI)**2))
+        # perror = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        # perror0 = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph0 - self.pI)**2))
+        uerror = bm.max(bm.abs(self.uh - self.uI))
+        verror = bm.max(bm.abs(self.vh - self.vI))
+        perror = bm.max(bm.abs(self.ph - self.pI))
+        perror0 = bm.max(bm.abs(self.ph0 - self.pI))
+        return uerror, verror, perror, perror0
     
 
     def plot(self) -> None:

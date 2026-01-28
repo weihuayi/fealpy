@@ -1,5 +1,5 @@
 from fealpy.backend import backend_manager as bm
-
+from .rhie_chow import RhieChowInterpolation
 class GradientReconstruct:
     def __init__(self, mesh):
         self.mesh = mesh
@@ -68,10 +68,39 @@ class GradientReconstruct:
         grad_u /= cell_measure[:, None]  # (NC, 2)
         return grad_u
 
+    def LSQ(self, U):
+        NC = self.mesh.number_of_cells()
+        c2c = self.mesh.cell_to_cell()
+        N = bm.concatenate((c2c[c2c].reshape(NC,-1), c2c), axis=1)
+        N_sorted = bm.sort(N, axis=1)
+        dup_mask = bm.zeros_like(N_sorted, dtype=bool)
+        dup_mask[:, 1:] = N_sorted[:, 1:] == N_sorted[:, :-1]
+        row_broadcast = bm.broadcast_to(
+            bm.arange(N.shape[0])[:, None], N_sorted.shape)
+        N_unique = N_sorted.copy()
+        N_unique[dup_mask] = row_broadcast[dup_mask]  
+        N = bm.sort(N_unique, axis=1)
+        cell_centers = self.mesh.entity_barycenter('cell')
+        d = cell_centers[N]-bm.ones((NC, N.shape[1], 2)) * cell_centers[:,None,:]
+        A = bm.sum(bm.einsum("hij,hik->hijk",d,d), axis=1)
+        u_ij = U[N]-bm.ones((NC, N.shape[1])) * U[:,None]
+        b = bm.sum(bm.einsum("hi,hij->hij",u_ij,d), axis=1)
+        gh = bm.linalg.solve(A, b[:,:,None]).squeeze(-1)  
+        return gh
+
     def reconstruct(self, grad_u):
         e2c = self.mesh.edge_to_cell()
         grad_i = grad_u[e2c[:, 0]]  # (NE, 2)
         grad_j = grad_u[e2c[:, 1]]  # (NE, 2)
         grad_f = 0.5 * (grad_i + grad_j)  # (NE, 2)
-
+        
+        return grad_f
+    
+    def reconstruct2(self, u,grad_u):
+        e2c = self.mesh.edge_to_cell()
+        grad_i = grad_u[e2c[:, 0]]  # (NE, 2)
+        grad_j = grad_u[e2c[:, 1]]  # (NE, 2)
+        grad_f = 0.5 * (grad_i + grad_j)  # (NE, 2)
+        gradientDifference = RhieChowInterpolation(self.mesh).GradientDifference(u)
+        grad_f = grad_f + gradientDifference
         return grad_f

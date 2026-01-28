@@ -21,7 +21,7 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         self.uh = uh
         self.grad_f = grad_f
         self.coef = coef
-        self.q = q
+        self.q = 2 if q is None else q
         self.index = index
         self.batched = batched
         self.assembly.set(method)
@@ -51,9 +51,13 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
     @variantmethod 
     def assembly(self, space: _FS) -> TensorLike:
         Tf,edge_to_cell,NC,phi= self.fetch(space)
+        if self.coef is None:
+            self.coef = bm.ones_like(Tf[:,0], dtype=space.ftype)
+        elif type(self.coef) in [int, float]:
+            self.coef = bm.full_like(Tf[:,0], fill_value=self.coef, dtype=space.ftype)
         D = phi.shape[-1]
         if D ==1:
-            Cross_diffusion = bm.einsum('ij,ij->i', Tf, self.grad_f)
+            Cross_diffusion = bm.einsum('ij,ij,i->i', Tf, self.grad_f, self.coef)
             NE = Cross_diffusion.shape[0]
             flux = bm.zeros((NE, 2))
             is_boundary = edge_to_cell[:, 0] == edge_to_cell[:, 1]

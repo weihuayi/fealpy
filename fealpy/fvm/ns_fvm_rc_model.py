@@ -103,7 +103,7 @@ class NSFVMRCModel(ComputationalModel):
             ConvectionIntegrator(q=2, coef=c)).assembly()
         M2 = BilinearForm(self.pspace).add_integrator(
             ConvectionIntegrator(q=2, coef=d)).assembly()
-
+        
         return M1, M2
 
     def lagrange_multiplier(self) -> TensorLike:
@@ -133,11 +133,13 @@ class NSFVMRCModel(ComputationalModel):
         nbc = NeumannBC(self.mesh, self.pde.neumann_pressure)
         AB, f = dbc.DiffusionApply(AB, f)
         ap = AB.diags().values
-        # f[:self.NC] = dbc.ConvectionApplyX(f[:self.NC],self.pde.dirichlet_velocity)
-        # f[self.NC:] = dbc.ConvectionApplyX(f[self.NC:],self.pde.dirichlet_velocity)
+        # dbc2 = DirichletBC(self.mesh, self.pde.pressure_dirichlet)
+        # f[:self.NC] = dbc2.ConvectionApplyX(f[:self.NC])
+        # f[self.NC:] = dbc2.ConvectionApplyX(f[self.NC:])
         M1 = nbc.ConvectionApplyX(M1, f[:self.NC])
         M2 = nbc.ConvectionApplyY(M2, f[self.NC:])
         
+        # dbc2.ConvectionApplyX(M1)
         M4 = BlockForm([[M1], [M2]]).assembly_sparse_matrix(format='csr')
 
         return AB, M3, M4, f, ap
@@ -153,8 +155,10 @@ class NSFVMRCModel(ComputationalModel):
         Sf = self.mesh.edge_normal()
         ap_edge = (ap[e2c[:, 0]] + ap[e2c[:, 1]]) / 2
         # grad_f1 = (ph0[e2c[:, 1]] - ph0[e2c[:, 0]]) / self.h
-        grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(ph0, self.pde.neumann_pressure)
+        # grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(ph0, self.pde.neumann_pressure)
+        grad_p = GradientReconstruct(self.mesh).LSQ(ph0)
         grad_f2 = GradientReconstruct(self.mesh).reconstruct(grad_p)
+        # grad_f2 = GradientReconstruct(self.mesh).reconstruct2(ph0, grad_p)
 
         x = self.mesh.boundary_face_index()
         mask = bm.ones(grad_f2.shape[0], dtype=bool)
@@ -174,7 +178,7 @@ class NSFVMRCModel(ComputationalModel):
         return M5,rc
 
 
-    def solve_rhie_chow(self, max_iter: int = 1, tol: float = 1e-7) -> Tuple:
+    def solve_rhie_chow(self, max_iter: int = 5, tol: float = 1e-7) -> Tuple:
         # Sf = self.mesh.edge_normal()
         # Uf = bm.stack([bm.ones_like(Sf[:,0]), bm.zeros_like(Sf[:,0])], axis=1)
         self.uI = self.pde.velocity_u(self.mesh.entity_barycenter("edge"))
@@ -228,9 +232,14 @@ class NSFVMRCModel(ComputationalModel):
         uerr = bm.max(bm.abs(self.uh - self.uI))
         verr = bm.max(bm.abs(self.vh - self.vI))
         perr = bm.max(bm.abs(self.ph - self.pI))
+        perr2 = bm.max(bm.abs(self.ph0 - self.pI))
+        err = self.ph - self.pI
+        print("err[210]:",err[210])
         # uerr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.uh - self.uI)**2))
         # verr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.vh - self.vI)**2))
         # perr = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph - self.pI)**2))
+        # perr2 = bm.sqrt(bm.sum(self.mesh.entity_measure("cell") * (self.ph0 - self.pI)**2))
+        self.logger.info(f"Max error (p) = {perr2}")
         return uerr, verr, perr
     
 

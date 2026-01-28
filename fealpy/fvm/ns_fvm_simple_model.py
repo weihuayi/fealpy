@@ -11,11 +11,13 @@ from fealpy.solver import spsolve
 
 from fealpy.fvm import (
     ScalarDiffusionIntegrator,
+    ScalarCrossDiffusionIntegrator,
     ScalarSourceIntegrator,
     ConvectionIntegrator,
     GradientReconstruct,
     DivergenceReconstruct,
     DirichletBC,
+    RhieChowInterpolation    
 )
 
 
@@ -45,7 +47,7 @@ class NSFVMSimpleModel(ComputationalModel):
 
     def set_mesh(self, nx: int, ny: int) -> None:
         """Initialize computational mesh."""
-        self.mesh = self.pde.init_mesh['uniform_qrad'](nx=nx, ny=ny)
+        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)
         self.cm = self.mesh.entity_measure('cell')
         self.NC = self.mesh.number_of_cells()
 
@@ -55,117 +57,141 @@ class NSFVMSimpleModel(ComputationalModel):
         self.space = ScaledMonomialSpace2d(self.mesh, self.p)
         self.velocity_space = TensorFunctionSpace(self.space, shape=(2, -1))
 
-    # --- SIMPLE components ----------------------------------------------------
+    def sum_duplicates_csr_manual(self,csr):
+        from fealpy.sparse import csr_matrix
+        indptr = csr.indptr       # shape (nrow+1,)
+        indices = csr.indices     # shape (nnz,)
+        data = csr.data           # shape (nnz,)
+        nrow, ncol = csr.shape
+        counts = indptr[1:] - indptr[:-1]
+        row = bm.repeat(bm.arange(nrow), counts)
+        flat_idx = row * ncol + indices
+        summed = bm.bincount(flat_idx, weights=data, minlength=nrow*ncol)
+        nnz_idx = bm.nonzero(summed)[0]
+        new_data = summed[nnz_idx]
+        new_row, new_col = divmod(nnz_idx, ncol)
+        return csr_matrix((new_data, (new_row, new_col)), shape=csr.shape)
 
-    def temporary_velocity(self, p, uf) -> Tuple[TensorLike, TensorLike]:
+# --- SIMPLE components ----------------------------------------------------
+
+    def temporary_velocity(self, p, uf, u0) -> Tuple[TensorLike, TensorLike]:
         """Solve momentum eqn for intermediate velocity u*."""
         # Diffusion
         bform = BilinearForm(self.velocity_space)
         bform.add_integrator(ScalarDiffusionIntegrator(q=self.p + 2))
+        # Convection
+        bform.add_integrator(ConvectionIntegrator(q=self.p + 2, coef=uf))
         B = bform.assembly()
-
         # Source
         lform = LinearForm(self.velocity_space)
         lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p + 2))
         f = lform.assembly()
-
         dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
         B, f = dbc.DiffusionApply(B, f)
-
-        C = BilinearForm(self.velocity_space).add_integrator(
-            ConvectionIntegrator(q=self.p + 2, coef=uf)).assembly()
-        B = B + C
-        # f = dbc.ConvectionApplyX(f)
-
+        #fealpy中的稀疏矩阵是有问题的,需要手动合并重复的行列项
+        B = self.sum_duplicates_csr_manual(B)
         ap = B.diags().values
-
-        grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(
-            p, self.pde.neumann_pressure
-        )  # (NC, 2)
+        grad_p = GradientReconstruct(self.mesh).LSQ(p)  # (NC, 2)
         p1 = bm.einsum('i,i->i', grad_p[:,0], self.cm)
         p2 = bm.einsum('i,i->i', grad_p[:,1], self.cm)
         p_grad_integrator = bm.concatenate((p1,p2))
         f = f - p_grad_integrator
         u = spsolve(B, f, "mumps")
-        return ap, u
 
-    def Ucell2edge(self, u, gd):
-        """Interpolate cell-centered u to face velocities uf."""
-        u = bm.stack([u[:self.NC], u[self.NC:]], axis=-1)
-        bd_edge = self.mesh.boundary_face_index()
-        edge_middle_point = self.mesh.entity_barycenter("edge")
-        e2c = self.mesh.edge_to_cell()
-
-        bdedgepoint = edge_middle_point[bd_edge]
-        bdedgeu = gd(bdedgepoint)
-
-        uf = bm.zeros((self.mesh.number_of_faces(), 2), dtype=u.dtype)
-        uf += (u[e2c[:, 0]] + u[e2c[:, 1]]) / 2
-        uf[bd_edge, :] = bdedgeu
-        uf = bm.reshape(uf, (-1, 2))
-        return uf
-
-    def rhie_chow(self, uf, ph0, ap_edge):
-        """Rhie-Chow interpolation to face velocity."""
-        avargrad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(
-            ph0, self.pde.neumann_pressure
-        )  # (NC, 2)
-        avargrad_f = GradientReconstruct(self.mesh).reconstruct(avargrad_p)
-        x = self.mesh.boundary_face_index()
-        e2c = self.mesh.edge_to_cell()
-        dp = self.cm / ap_edge[:len(self.cm)]
-        df = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
-        mask = bm.ones(avargrad_f.shape[0], dtype=bool)
-        mask[x] = False
-        uf[mask] += bm.einsum("i,ij->ij", df[mask], avargrad_f[mask])
-        return uf,df
-
-
-    def pressure_correct(self, ap: TensorLike, uf: TensorLike,p) -> TensorLike:
-        """Solve pressure correction equation."""
-        div_u = DivergenceReconstruct(self.mesh).Reconstruct(uf)  # (NC,)
+        cross = self.compute_cross_diffusion(u0)
+        for i in range(10):
+            rhs = f + cross
+            uh_new = spsolve(B, rhs)
+            err = bm.max(bm.abs(uh_new - u))
+            print(f"[Iter {i+1}] residual = {err}")
+            if err < 10e-5:
+                # print("Converged.")
+                break
+            u = uh_new
+            cross = self.compute_cross_diffusion(u)
         
+        return ap, u
+    
+    def compute_cross_diffusion(self, uh: TensorLike) -> TensorLike:
+        """Compute cross-diffusion term based on current velocity uh."""
+        lform = LinearForm(self.velocity_space)
+        U = bm.stack((uh[:self.NC], uh[self.NC:]), axis=1)
+        grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(U,self.pde.dirichlet_velocity)
+        # grad_u = GradientReconstruct(self.mesh).LSQ(uh)
+        grad_f = GradientReconstruct(self.mesh).reconstruct(grad_u)  # (NE, 2)
+        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f))
+        return lform.assembly()
+    
+    def pressure_correct(self, ap: TensorLike, uf: TensorLike,p) -> TensorLike:
+        """Solve pressure correction equation.
+        在这里实际上是有问题的,理论上计算dp_edge的程序应该是:
+        dp = cm/ap[:len(cm)]
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        但是随着网格加密,使用此dp_edge会导致求出的压力修正过大,必须使用非常小的松弛因子比如0.001才能使迭代收敛.
+        所以进行了改动,使用dp = 1/ap[:len(cm)],然后计算
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        dp_edge = dp_edge*em
+        最终不需要过大的收敛因子,而且迭代次数也相对会减少一些.
+        但这样做,在算法原理上是矛盾的,而且随着网格的加密,松弛因子仍然要不断减小,大概是网格加密一倍,松弛因子就要减小到原来的一半.
+        这个问题需要进一步研究.
+        """
+        cm = self.mesh.entity_measure('cell')
+        em = self.mesh.entity_measure('edge')
+        dp = 1/ap[:len(cm)]
+        e2c = self.mesh.edge_to_cell()
+        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
+        dp_edge = dp_edge*em
+        div_u = DivergenceReconstruct(self.mesh).Reconstruct(uf)  # (NC,)
         bform2 = BilinearForm(self.space)
-        bform2.add_integrator(ScalarDiffusionIntegrator(q=2))
+        bform2.add_integrator(ScalarDiffusionIntegrator(q=2,coef=dp_edge))
         A = bform2.assembly()
-
         LagA = self.mesh.entity_measure("cell")
-        div_u = ap[:len(LagA)]*div_u
         A1 = COOTensor(bm.array([bm.zeros(len(LagA), dtype=bm.int32),
                  bm.arange(len(LagA), dtype=bm.int32)]),LagA,
             spshape=(1, len(LagA)),
         )
         A = BlockForm([[A, A1.T], [A1, None]])
         A = A.assembly_sparse_matrix(format="csr")
-
         b0 = bm.array([0])
         b = bm.concatenate([-div_u, b0], axis=0)
-
         sol = spsolve(A, b, "mumps")
         p_c = sol[:-1]
         return p_c
 
-    def solve(self, max_iter: int = 100, tol: float = 1e-5) -> Tuple[TensorLike, TensorLike]:
+    def solve(self, max_iter: int = 100, tol: float = 1e-5, relax: float = 0.32) -> Tuple[TensorLike, TensorLike]:
         """Main SIMPLE loop."""
         p = bm.zeros(self.NC)
         uf = bm.zeros((self.mesh.number_of_faces(), 2))
-
-        ap, u = self.temporary_velocity(p, uf)
+        u = bm.zeros(2 * self.NC)
+        ap, u = self.temporary_velocity(p, uf, u)
         self.residuals = []
-
+        bd_edge = self.mesh.boundary_face_index()
+        edge_middle_point = self.mesh.entity_barycenter('edge')
+        bdedgepoint = edge_middle_point[bd_edge]
+        bdedgeu = self.pde.dirichlet_velocity(bdedgepoint)
+        L2_p_corr0 = 100
         for i in range(max_iter):
-            uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
-            p_c = self.pressure_correct(ap, uf,p)
-            L2p_c = bm.sqrt(bm.sum(self.cm * (p_c) ** 2))
-            self.residuals.append(float(L2p_c))
-            self.logger.info(f"[Iter {i+1}] pressure_correct = {L2p_c:.4e}")
-
-            if L2p_c < tol:
+            uf = RhieChowInterpolation(self.mesh).Interpolation(u,ap,p)
+            uf[bd_edge, :] = bdedgeu
+            p_corr = self.pressure_correct(ap, uf, p)
+            L2_p_corr = bm.sqrt(bm.sum(self.cm * (p_corr)**2))
+            delta_L2_p_corr0 = L2_p_corr - L2_p_corr0
+            self.residuals.append(float(L2_p_corr))
+            self.logger.info(f"[Iter {i+1}] L2 norm of the delta pressure correction : {delta_L2_p_corr0}")
+            # if delta_L2_p_corr0 > 0:
+            #     print("L2_p_corr:",L2_p_corr)
+            #     self.logger.info("Converged.")
+            #     break
+            # elif bm.abs(delta_L2_p_corr0) < tol:
+            #     self.logger.info("Converged.")
+            #     break
+            if bm.abs(delta_L2_p_corr0) < tol:
                 self.logger.info("Converged.")
                 break
+            p += relax*p_corr
+            L2_p_corr0 = L2_p_corr
 
-            p += 0.8*p_c
-            _, u = self.temporary_velocity(p, uf)
+            _, u = self.temporary_velocity(p,uf,u)
 
         self.uh = u[:self.NC]
         self.vh = u[self.NC:]
