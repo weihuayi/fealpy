@@ -1162,4 +1162,3 @@ class GearBoxModalLinearFEMModel(ComputationalModel):
         x = spsolve(A, rhs)  # 若崩/警告或残差巨大 => (A-σM) 奇异或预处理不当
         res = np.linalg.norm(A @ x - rhs) / np.linalg.norm(rhs)
         self.logger.info(f"Test (S - σM) solve residual ~ {res: .2e}")
-

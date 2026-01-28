@@ -124,8 +124,10 @@ class ElastoplasticIntegrator(LinearElasticityIntegrator):
         if isinstance(mesh, TensorMesh):
             KK = bm.einsum('c, cq, cqki, cqkl, cqlj -> cij',
                             ws, detJ, B, D_ep, B)
+            print("dsdadadada")
         else:
             KK = bm.einsum('q, c, cqki, cqkl, cqlj -> cij',
                             ws, cm, B, D_ep, B)
+            print("dsdadadada2222")
         
         return KK # (NC, tdof, tdof)

@@ -6,6 +6,15 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == '__main__':
+    a = bm.arange(16).reshape((4, 4))
+    print(a)
+    row_idx = bm.array([0, 1, 2], dtype=bm.int32)
+    col_idx = bm.array([0, 1, 2], dtype=bm.int32)
+    b = a[row_idx[:, None, None], col_idx]
+    print(b)
+
+
+
     box = [-0.5, 1.5, -0.3, 0.3]
     h = 0.01
     halos = bm.array([

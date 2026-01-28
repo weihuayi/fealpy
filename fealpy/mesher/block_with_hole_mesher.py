@@ -33,6 +33,32 @@ class BlockWithHoleMesher:
             h : float
                 Maximum mesh element size.
 
+            position : int
+                Index of the quarter block location.
+
+                The domain is divided into four equal sub-blocks, and `position`
+                specifies which quarter is selected:
+
+                    position = 0 : lower-left block
+                    position = 1 : lower-right block
+                    position = 2 : upper-right block
+                    position = 3 : upper-left block
+
+                See the schematic illustration below.
+
+                * * * * * * * * * * * * * * *
+                *            *              *
+                *            *              *
+                *    3       *         2    *
+                *           * *             *
+                *         *    *            *
+                * * * *  *       * * * *  * *
+                *        *       *          *
+                *    0     * * *       1    *
+                *            *              *
+                *            *              *
+                * * * * * * * * * * * * * * * 
+
             return_mesh : bool
                 If True, generate and store the tetrahedral mesh.
 
@@ -47,6 +73,8 @@ class BlockWithHoleMesher:
             The tetrahedral volume mesh, available only if return_mesh=True.
         holes : List[TensorLike] or None
             A list of node coordinates on the annular surfaces of cylindrical holes, available only if return_hole=True.
+    
+    
     """
     def __init__(self, options: Optional[dict] = None):
         self.options = options
@@ -100,7 +128,8 @@ class BlockWithHoleMesher:
             'h': 0.8,
             'return_mesh': True,
             'return_hole': True,
-            'show_figure': True,
+            'show_figure': False,
+            'device':'cpu',
         }
 
         return options
@@ -112,20 +141,47 @@ class BlockWithHoleMesher:
         block = option['block']
         cylinders = option['cylinders']
         h = option['h']
+        pos = option['position']
+
         return_mesh = option['return_mesh']
         show_figure = option['show_figure']
+        device = option['device']
         
         length, width, height = block['length'], block['width'], block['height']
  
         gmsh.initialize()
         gmsh.model.add("HollowBlock")
 
-        main_block = gmsh.model.occ.addBox(
+        if pos == 0:
+            main_block = gmsh.model.occ.addBox(
             0.0, 0.0, 0.0,
-            length,
+            0.5 * length ,
             width,
-            height
+            0.5 * height
         )
+        elif pos == 1:
+            main_block = gmsh.model.occ.addBox(
+            0.5 * length, 0.0, 0.0,
+            0.5 * length,
+            width,
+            0.5 * height
+        )
+        elif pos == 2:
+            main_block = gmsh.model.occ.addBox(
+            0.5 * length, 0.0, 0.5 * height,
+            0.5 * length,
+            width,
+            0.5 * height
+        )
+        elif pos == 3:
+            main_block = gmsh.model.occ.addBox(
+            0.0, 0.0, 0.5 * height,
+            0.5 * length,
+            width,
+            0.5 * height
+        )
+        else:
+            raise ValueError(f'position must in {0, 1, 2, 3}')
 
         cylinder_tags = []
         for center, r in cylinders:
@@ -149,6 +205,8 @@ class BlockWithHoleMesher:
             tets_tags,evtags = gmsh.model.mesh.getElementsByType(4)
             evid = bm.array([vmap[j] for j in evtags])
             cell = evid.reshape((tets_tags.shape[-1],-1))
+            node = bm.array(node,dtype=bm.float64,device=device)
+            cell = bm.array(cell,dtype=bm.int32,device=device)
             self.mesh = TetrahedronMesh(node, cell)
 
         if show_figure:
