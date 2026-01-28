@@ -1,1 +1,1 @@
-from .cahn_hilliard import CahnHilliardModel
+from .cahn_hilliard_fem import CahnHilliardFEM

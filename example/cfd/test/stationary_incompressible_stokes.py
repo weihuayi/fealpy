@@ -51,7 +51,7 @@ parser.add_argument('--run',
     help = "Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
-    default = 3, type = int,
+    default = 5, type = int,
     help = "Maximum number of iterations for the solver, default is 5")
 
 # 解析参数

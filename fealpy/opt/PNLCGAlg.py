@@ -84,15 +84,15 @@ class PNLCG(Optimizer):
                 print(f'nfval = {self.NF}, f = {falpha}, gnorm = {gnorm}')
 
             if bm.abs(falpha - f) < options["FunValDiff"]:
-                print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
+                print(f"Convergence achieved after {i} iterations, the function value difference is less than tolerance {options['FunValDiff']}")
                 return x, f, g
             
             if gnorm < options["NormGradTol"]:
-                print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {self.problem.NormGradTol}")
+                print(f"Convergence achieved after {i} iterations, the norm of current gradient is smaller than tolerance {options['NormGradTol']}")
                 return x, f, g
             
             if alpha < options["StepLengthTol"]:
-                print(f"The step length is smaller than the tolerance {self.problem.StepLengthTol}")
+                print(f"Quit at {i} iterations, Step length {alpha} is smaller than the tolerance {options['StepLengthTol']}")
                 return x, f, g
             x = xalpha
             f = falpha

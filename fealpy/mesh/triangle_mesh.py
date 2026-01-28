@@ -1186,6 +1186,31 @@ class TriangleMesh(SimplexMesh, Plotable):
     def show_function(self, plot, uh, cmap=None):
         pass
 
+    def order_edge(self, start_num: int = 0):
+        """
+        串联边界节点，返回有序的边界节点索引数组，只支持单连通区域。
+        """
+        edge = self.entity('edge')
+        is_boundary_edge = self.boundary_edge_flag()
+        boundary_edges = edge[is_boundary_edge]
+
+        edge_adj = {}
+        for u, v in boundary_edges:
+            edge_adj.setdefault(u, []).append(v)
+            edge_adj.setdefault(v, []).append(u)
+
+        current = start_num
+        prev = -1
+        bedge_index = [current]
+
+        for _ in range(len(boundary_edges)):
+            next_nodes = [v for v in edge_adj[current] if v != prev]
+            if not next_nodes: break
+            prev, current = current, next_nodes[0]
+            bedge_index.append(current)
+
+        return bm.array(bedge_index[:-1])
+
     @classmethod
     def show_lattice(cls, p=1, showmultiindex=False):
         """
@@ -1409,6 +1434,71 @@ class TriangleMesh(SimplexMesh, Plotable):
 
         return cls(node, cell)
 
+    @classmethod
+    def from_box_cross_mesh(cls, box=[0, 1, 0, 1], nx=10, ny=10, *,threshold=None,
+                            itype=None, ftype=None, device=None):
+        """Generate a cross triangle mesh for a box domain.
+
+        Parameters
+            box: list of float
+            nx: int
+            ny: int
+            threshold: function
+        Returns
+            TriangleMesh instance
+        """
+        from .quadrangle_mesh import QuadrangleMesh
+        node = bm.array([
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 1.0]], dtype=bm.float64) 
+
+        cell = bm.array([
+            [0, 1, 2, 3]], dtype=bm.int32) 
+
+        qmesh = QuadrangleMesh(node, cell)
+        qmesh = qmesh.from_box(box, nx=nx, ny=ny)
+        node = qmesh.entity('node')
+        cell = qmesh.entity('cell')
+        NN = qmesh.number_of_nodes()
+        NE = qmesh.number_of_edges()
+        NC = qmesh.number_of_cells()
+        bc = qmesh.entity_barycenter('cell') 
+        newNode = bm.concat([node, bc], axis=0)
+
+        newCell = bm.zeros((4*NC, 3), dtype=bm.int32) 
+        newCell[0:NC, 0] = range(NN, NN+NC)
+        newCell[0:NC, 1:3] = cell[:, 0:2]
+            
+        newCell[NC:2*NC, 0] = range(NN, NN+NC)
+        newCell[NC:2*NC, 1:3] = cell[:, 1:3]
+
+        newCell[2*NC:3*NC, 0] = range(NN, NN+NC)
+        newCell[2*NC:3*NC, 1:3] = cell[:, 2:4]
+
+        newCell[3*NC:4*NC, 0] = range(NN, NN+NC)
+        newCell[3*NC:4*NC, 1:3] = cell[:, [3, 0]] 
+
+        node = newNode
+        cell = newCell
+        if threshold is not None:
+            node = newNode
+            cell = newCell
+            bc = bm.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = bm.zeros(NN, dtype=bm.bool, device=device)
+            isValidNode = bm.set_at(isValidNode, cell, True)
+            node = node[isValidNode]
+            idxMap = bm.zeros(NN, dtype=itype, device=device)
+            idxMap = bm.set_at(
+                idxMap, isValidNode, bm.arange(isValidNode.sum(), dtype=itype, device=device)
+            )
+            cell = idxMap[cell]
+        
+        return cls(node, cell)
+    
     ## @ingroup MeshGenerators
     @classmethod
     def from_unit_sphere_surface(cls, refine=0, *, itype=None, ftype=None, device=None):

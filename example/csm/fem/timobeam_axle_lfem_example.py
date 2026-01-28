@@ -31,13 +31,13 @@ parser.add_argument('--beam_nu',
                 default=0.276, type=float,
                 help='Type of mesh, default is the beam Poisson ratio')
 
+parser.add_argument('--k_axle',
+                default=1.976e6, type=float,
+                help='Type of mesh, default is the axle stiffness coefficient')
+
 parser.add_argument('--axle_E',
                 default=1.976e6, type=float,
                 help='Type of mesh, default is the axle Young modulus')
-
-parser.add_argument('--axle_nu',
-                default=-0.5, type=float,
-                help='Type of mesh, default is the axle Poisson ratio')
 
 parser.add_argument('--pbar_log',
                 default=True, type=bool,

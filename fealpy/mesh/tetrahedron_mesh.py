@@ -364,7 +364,8 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         edge = self.entity('edge')
         face2edge = self.face_to_edge()
         edge2ipoint = self.edge_to_ipoint(p)
-        face2ipoint = bm.zeros((NF, fdof), dtype=self.itype)
+        
+        face2ipoint = bm.zeros((NF, fdof), **self.ikwargs)
 
         faceIdx = self.multi_index_matrix(p, TD-1, dtype=self.ftype)
         isEdgeIPoint = (faceIdx == 0)
@@ -1550,7 +1551,7 @@ class TetrahedronMesh(SimplexMesh, Plotable):
         NC = len(cell)
         NV = cell.shape[-1]
 
-        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype), cell), axis=1)
+        cell = bm.concatenate((bm.zeros((len(cell), 1), dtype=cell.dtype, device=cell.device), cell), axis=1)
         cell = bm.set_at(cell, (slice(NC), 0), NV)
 
         if etype == 'cell':

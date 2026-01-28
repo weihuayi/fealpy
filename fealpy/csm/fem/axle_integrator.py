@@ -41,17 +41,15 @@ class AxleIntegrator(LinearInt, OpInt, CellInt):
 
         mesh = space.mesh
         cells = bm.arange(mesh.number_of_cells()) if self.index is _S else self.index
-        NC = len(cells)
-        
-        k_axle = getattr(self.material, "k_axle", 1.976e6) # Axle stiffness
-        kx, ky, kz = k_axle, k_axle, k_axle
 
-        K0 = bm.array([[kx, 0, 0],
-                      [0, ky, 0],
-                      [0, 0, kz]], dtype=bm.float64)
+        
+        k_axle = self.material.k_axle
+        K0 = bm.array([[k_axle, 0, 0],
+                      [0, k_axle, 0],
+                      [0, 0, k_axle]], dtype=bm.float64)
         
         # 转动刚度矩阵（假设远大于平动）
-        K_zeros = bm.ones((3, 3), dtype=bm.float64)*kx*1e3
+        K_zeros = bm.ones((3, 3), dtype=bm.float64)*k_axle*1e3
         
         # 水平拼接每一行
         row1 = bm.concatenate(( K0,      K_zeros,  -K0,     K_zeros), axis=1)

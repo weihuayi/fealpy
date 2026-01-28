@@ -57,11 +57,11 @@ class GradientDescent(Optimizer):
                 print(f'nfval = {self.NF}, f = {f0}, gnorm = {gnorm}')
 
             if diff < options["FunValDiff"]:
-                print(f"Convergence achieved after {i} iterations, the function value difference is less than FunValDiff")
+                print(f"Convergence achieved after {i} iterations, the function value difference is less than torerance {options['FunValDiff']}")
                 return x0, f0, g0
 
             if (gnorm < options['NormGradTol']):
-                print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {self.problem.NormGradTol}")
+                print(f"Convergence achieved after {i} iterations, the norm of current gradient is smaller than tolerance {options['NormGradTol']}")
                 return x0, f0, g0
         print(f"Reached the Maximum number of iterations {options['MaxIters']} times")
         return x0, f0, g0
