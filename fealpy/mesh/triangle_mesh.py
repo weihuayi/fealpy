@@ -1186,6 +1186,31 @@ class TriangleMesh(SimplexMesh, Plotable):
     def show_function(self, plot, uh, cmap=None):
         pass
 
+    def order_edge(self, start_num: int = 0):
+        """
+        串联边界节点，返回有序的边界节点索引数组，只支持单连通区域。
+        """
+        edge = self.entity('edge')
+        is_boundary_edge = self.boundary_edge_flag()
+        boundary_edges = edge[is_boundary_edge]
+
+        edge_adj = {}
+        for u, v in boundary_edges:
+            edge_adj.setdefault(u, []).append(v)
+            edge_adj.setdefault(v, []).append(u)
+
+        current = start_num
+        prev = -1
+        bedge_index = [current]
+
+        for _ in range(len(boundary_edges)):
+            next_nodes = [v for v in edge_adj[current] if v != prev]
+            if not next_nodes: break
+            prev, current = current, next_nodes[0]
+            bedge_index.append(current)
+
+        return bm.array(bedge_index[:-1])
+
     @classmethod
     def show_lattice(cls, p=1, showmultiindex=False):
         """
