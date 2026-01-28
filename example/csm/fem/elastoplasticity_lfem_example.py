@@ -9,6 +9,10 @@ parser.add_argument('--pde',
                     default=1, type=int,
                     help='Index of the elastoplasticity model, default is 1.')
 
+parser.add_argument('--init_mesh',
+                    default='tri_threshold', type=str,
+                    help='Type of mesh to use, default is tri_threshold.')
+
 parser.add_argument('--space_degree',
                     default=1, type=int,
                     help='Polynomial degree for the finite element space.')
@@ -28,7 +32,6 @@ bm.set_backend('numpy')
 
 from fealpy.csm.fem import ElastoplasticityFEMModel
 model = ElastoplasticityFEMModel(options)
-'''
 # 网格可视化
 from matplotlib import pyplot as plt
 fig = plt.figure()
@@ -36,8 +39,8 @@ axes = fig.add_subplot(111)
 mesh = model.mesh
 mesh.add_plot(axes) # 画出网格背景
 mesh.find_cell(axes, showindex=True) # 找到单元重心
-plt.show()
-'''
+#plt.show()
+
 model.solve()
 
 

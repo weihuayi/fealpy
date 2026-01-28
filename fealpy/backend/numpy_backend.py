@@ -476,9 +476,87 @@ class NumPyBackend(BackendProxy, backend_name='numpy'):
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         return R # (..., ldof, bc)
 
-    @staticmethod
-    def simplex_hess_shape_function(bc: NDArray, p: int, mi=None) -> NDArray:
-        raise NotImplementedError
+    @classmethod
+    def simplex_hess_shape_function(cls,bc: NDArray, p: int, mi=None) -> NDArray:
+        TD = bc.shape[-1] - 1
+
+        if mi is None:
+            try:
+                mi = cls.multi_index_matrix(p, TD)
+            except Exception:
+                from itertools import product
+                mi = np.array([m for m in product(range(p+1), repeat=TD+1) if sum(m) == p], dtype=int)
+
+        ldof = mi.shape[0]
+
+        # p = 0  => 常数基函数，Hessian 全 0
+        if p == 0:
+            shape = bc.shape[:-1] + (ldof, TD+1, TD+1)
+            return np.zeros(shape, dtype=bc.dtype)
+
+        # --- 构造 1/(p*b - r) 以及其平方的前缀和 ---
+        r = np.arange(0, p, dtype=bc.dtype).reshape((-1, 1))             # (p,1)
+        denom = (p * bc[..., None, :]) - r                              # (..., p, TD+1)
+        # 避免除以 0
+        eps = 1e-14
+        denom = denom + eps * (denom == 0)
+        inv = 1.0 / denom                                               # (..., p, TD+1)
+        inv2 = inv * inv
+
+        # axis_p 是 p 轴在数组中的索引（依赖 bc 的维度）
+        axis_p = bc.ndim - 1
+        csum = np.cumsum(inv, axis=axis_p)      # sum_{r=0..m-1} 1/(p b - r)
+        csum2 = np.cumsum(inv2, axis=axis_p)    # sum_{r=0..m-1} 1/(p b - r)^2
+
+        # 把 m 从 0..p 表示成长度 p+1 的数组（m=0 时和为 0）
+        shape_m = bc.shape[:-1] + (p+1, TD+1)
+        S1 = np.zeros(shape_m, dtype=bc.dtype)   # sum 1/(...)
+        S2 = np.zeros(shape_m, dtype=bc.dtype)   # sum 1/(...)^2
+        if p > 0:
+            S1[..., 1:, :] = csum
+            S2[..., 1:, :] = csum2
+
+        # f'/f 和 f''/f 对数导数
+        fprime_over_f = p * S1
+        fsecond_over_f = (p * p) * (S1 * S1 - S2)
+
+        # 计算每个因子 f_m(b) 的值
+        if p > 0:
+            c = np.arange(1, p+1, dtype=np.int_)
+            P = 1.0 / np.multiply.accumulate(c)
+            t = np.arange(0, p)
+        else:
+            P = np.array([], dtype=bc.dtype)
+            t = np.array([], dtype=bc.dtype)
+
+        A = np.ones(bc.shape[:-1] + (p+1, TD+1), dtype=bc.dtype)
+        if p > 0:
+            A[..., 1:, :] = p * bc[..., None, :] - t.reshape(-1, 1)
+            np.cumprod(A, axis=axis_p, out=A)
+            A[..., 1:, :] *= P.reshape(-1, 1)
+        # 取出每个 dof 的对应 f_{m_j}(b_j)
+        idx = np.arange(TD+1)
+        Q = A[..., mi, idx]                # (..., ldof, TD+1)
+        # 基函数值 phi = prod_j Q[..., j]
+        phi = np.prod(Q, axis=-1)          # (..., ldof)
+
+        # pick S 和 T 对应到 mi
+        S_sel = fprime_over_f[..., mi, idx]   # (..., ldof, TD+1)
+        T_sel = fsecond_over_f[..., mi, idx]  # (..., ldof, TD+1)
+
+        # off-diagonal: phi * S_i * S_j
+        S_outer = S_sel[..., :, None] * S_sel[..., None, :]  # (..., ldof, TD+1, TD+1)
+
+        # 构建 H，先放 S_outer，然后把对角项替换为 phi * T_i
+        H = S_outer.copy()
+        # 把对角项设为 T_sel
+        for ii in range(TD+1):
+            H[..., ii, ii] = T_sel[..., ii]
+
+        phi_exp = phi[..., None, None]
+        H *= phi_exp
+
+        return H
 
     @staticmethod
     def tensor_measure(entity: NDArray, node: NDArray) -> NDArray:

@@ -4,18 +4,24 @@ from .euler_bernoulli_beam_diffusion_integrator import EulerBernoulliBeamDiffusi
 from .euler_bernoulli_beam_uniform_source_integrator   import EulerBernoulliBeamSourceIntegrator
 from .euler_bernoulli_beam_concentrated_source_integrator import EulerBernoulliBeamPLSourceIntegrator
 from .elastoplasticity_source_internal_integrator import ElastoplasticitySourceIntIntegrator
+from .bar_integrator import BarIntegrator
 
 from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
-
+from .axle_integrator import AxleIntegrator
 from .elastoplastic_integrator import ElastoplasticIntegrator
 
-from .timoshenko_beam_integrator import TimoshenkoBeamIntegrator
-
-from .elastoplastic_integrator import ElastoplasticIntegrator
 
 
 ### Model Operator
 from .euler_bernoulli_beam_fem_model import EulerBernoulliBeamFEMModel
-from .timoshenko_beam_model import TimoshenkoBeamModel
+from .timobeam_axle_model import TimobeamAxleModel
 from .elastoplasticity_fem_model import ElastoplasticityFEMModel
+from .thick_walled_cylinder_fem_model import ThickWalledCylinderFEMModel
 from .gear_box_modal_linear_fem_model import GearBoxModalLinearFEMModel
+from .channel_beam_model import ChannelBeamModel
+from .truss_tower_model import TrussTowerModel
+from .bar_model import BarModel
+from .perforated_square_plate_lfem_model import PerforatedSquarePlateFEMModel
+from .channel_beam_model import ChannelBeamModel
+from .truss_tower_model import TrussTowerModel
+from .truss_model import TrussModel

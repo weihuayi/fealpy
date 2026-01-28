@@ -61,15 +61,15 @@ class ElastoplasticitySourceIntIntegrator(LinearInt, SrcInt, CellInt):
         self.q = q
         self.set_region(region)
         self.batched = batched
-        self.assembly.set(method)
+        # self.assembly.set(method)
 
-    @enable_cache
+    #@enable_cache
     def to_global_dof(self, space: _FS, /, indices=None) -> TensorLike:
         if indices is None:
             return space.cell_to_dof()
         return space.cell_to_dof(index=self.entity_selection(indices))
 
-    @enable_cache
+    #@enable_cache
     def fetch(self, space: _FS, /, inidces=None):
         """
         Fetch the necessary data for integration, including basis functions, weights, and measures.

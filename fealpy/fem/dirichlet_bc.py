@@ -119,7 +119,7 @@ class DirichletBC():
         f = self.apply_vector(f, A, uh, gd, check=check)
         A = self.apply_matrix(A, check=check)
         return A, f
-
+    
     def apply_matrix(self, matrix: _ST, *, check=True) -> _ST:
         """Apply Dirichlet boundary condition to left-hand-size matrix only.
 
@@ -138,7 +138,7 @@ class DirichletBC():
         bdIdx = bm.zeros(A.shape[0], **kwargs)
         bdIdx = bm.set_at(bdIdx, isDDof.reshape(-1), 1)
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        if isinstance(A, COOTensor):
+        if isinstance(A, COOTensor): 
             D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0], format='coo')
         elif isinstance(A, CSRTensor):
             D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0], format='csr')

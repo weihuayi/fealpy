@@ -12,6 +12,7 @@ from .polygon_mesh import PolygonMesh
 from .halfedge_mesh import HalfEdgeMesh2d
 from .dart_mesh import DartMesh
 from .prism_mesh import PrismMesh
+from .tensorprism_mesh import TensorPrismMesh
 
 from .uniform_mesh import UniformMesh
 from .uniform_mesh_1d import UniformMesh1d
@@ -24,3 +25,4 @@ from .lagrange_quadrangle_mesh import LagrangeQuadrangleMesh
 from .edge_mesh import EdgeMesh
 from .inp_file_parser import InpFileParser
 from .bdf_file_parser import BdfFileParser, NodeSection, ElementSection
+from .m_file_parser import MFileParser
