@@ -431,13 +431,12 @@ class TIS_MarinePredatorsAlg(Optimizer):
             if bm.random.rand(1) < FADs:
                 self.x = self.x + CF * ((self.lb + bm.random.rand(self.N, self.dim) * (self.ub - self.lb)) * 
                                         (bm.random.rand(self.N, self.dim) < FADs))
-                self.x = self.x + (self.lb - self.x) * (self.x < self.lb) + (self.ub - self.x) * (self.x > self.ub)
             else:
                 # Social learning component
                 self.x = self.x + ((FADs * (1 - bm.random.rand(1)) + bm.random.rand(1)) * 
                                    (self.x[bm.random.randint(0, self.N, (self.N,))] - 
                                     self.x[bm.random.randint(0, self.N, (self.N,))]))
-                self.x = self.x + (self.lb - self.x) * (self.x < self.lb) + (self.ub - self.x) * (self.x > self.ub)
+            self.x = bm.clip(self.x, self.lb, self.ub)
             
             # Evaluation and tracking
             self.fun(self.x)

@@ -19,7 +19,7 @@ parser.add_argument('--pde',
     help = "Name of the PDE model, default is exp0001")
 
 parser.add_argument('--init_mesh',
-    default = 'tri', type = str,
+    default = 'uniform_tri', type = str,
     help = "Type of initial mesh, default is tri")
 
 parser.add_argument('--nx',
@@ -51,7 +51,7 @@ parser.add_argument('--run',
     help = "Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
-    default = 1, type = int,
+    default = 3, type = int,
     help = "Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',
@@ -64,11 +64,11 @@ parser.add_argument('--tol',
 
 # 解析参数
 options = vars(parser.parse_args())
-
 bm.set_backend(options['backend'])
 manager = CFDTestModelManager('stationary_incompressible_navier_stokes')
 pde = manager.get_example(options['pde'], **options)
-model = StationaryIncompressibleNSLFEMModel(pde=pde, options = options)
+mesh = pde.mesh
+model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
 model.equation.set_constitutive(1)  # 设置粘性模型
 model.run()
-model.__str__()
+# model.__str__()

@@ -8,6 +8,8 @@ from .mesh_base import SimplexMesh, estr2dim
 from .plot import Plotable
 from fealpy.sparse import csr_matrix
 from fealpy.sparse import CSRTensor,COOTensor
+
+
 class TriangleMesh(SimplexMesh, Plotable):
     def __init__(self, node: TensorLike, cell: TensorLike) -> None:
         """
@@ -66,7 +68,14 @@ class TriangleMesh(SimplexMesh, Plotable):
                 return bm.sqrt(bm.sum(nv ** 2, axis=1)) / 2.0
         else:
             raise ValueError(f"Unsupported entity or top-dimension: {etype}")
-  
+    
+    def reference_cell_measure(self):
+        """
+        Calculate the measure of the reference cell.
+        The measure of the reference triangle in 2D is 0.5
+        """
+        return 0.5
+    
     # quadrature
     def quadrature_formula(self, q: int, etype: Union[int, str]='cell',
                            qtype: str='legendre'): # TODO: other qtype
@@ -1699,6 +1708,65 @@ class TriangleMesh(SimplexMesh, Plotable):
             return cls(node, cell), U.flatten(), V.flatten()
         else:
             return cls(node, cell)
+        
+    @classmethod        
+    def from_square_hole(cls, box = [0,1,0,1], scenter = [0.5,0.5], r=0.2 , h = 0.05):
+        import gmsh
+        gmsh.initialize()
+        lc = h
+
+        # 外框为矩形区域
+        t0,t1,t2,t3 = box
+        gmsh.model.geo.addPoint(t0, t2, 0, lc, 1)
+        gmsh.model.geo.addPoint(t1, t2, 0, lc, 2)
+        gmsh.model.geo.addPoint(t1, t3, 0, lc, 3)
+        gmsh.model.geo.addPoint(t0, t3, 0, lc, 4)
+
+        gmsh.model.geo.addLine(1, 2, 1)
+        gmsh.model.geo.addLine(3, 2, 2)
+        gmsh.model.geo.addLine(3, 4, 3)
+        gmsh.model.geo.addLine(4, 1, 4)
+
+        gmsh.model.geo.addCurveLoop([4, 1, -2, 3], 1)
+
+        # 圆的圆心和水平方向上的两个端点
+        c0,c1 = scenter
+        a0,a1 = c0-r, c1
+        b0,b1 = c0+r, c1
+        gmsh.model.geo.addPoint(c0,c1,0,lc,5)
+        gmsh.model.geo.addPoint(a0,a1,0,lc,6)
+        gmsh.model.geo.addPoint(b0,b1,0,lc,7)
+
+        gmsh.model.geo.addCircleArc(6,5,7,tag=5)
+        gmsh.model.geo.addCircleArc(7,5,6,tag=6)
+
+        gmsh.model.geo.addCurveLoop([5,6],2)
+
+        gmsh.model.geo.addPlaneSurface([1,2], 1)
+
+        gmsh.model.geo.synchronize() 
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),lc)
+
+        gmsh.model.mesh.generate(2)
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node_tags = bm.from_numpy(node_tags)
+        node_coords = bm.from_numpy(node_coords)
+        node = node_coords.reshape((-1, 3))[:, :2]
+
+        # 节点编号映射
+        nodetags_map = dict({int(j): i for i, j in enumerate(node_tags)})
+
+        # 获取单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+
+        # 节点编号映射到单元
+        evid = bm.array([nodetags_map[int(j)] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1], -1))
+
+        gmsh.finalize()
+        return cls(node, cell)
 
     ### 界面网格 ###
     # NOTE: 均匀网格改成作为一个参数传入，避免循环内调用本函数时反复实例化。
@@ -1850,6 +1918,58 @@ class TriangleMesh(SimplexMesh, Plotable):
         cell = bm.array(mesh.entity('cell'), dtype=itype, device=device)
 
         return cls(node, cell)
+    
+    def location(self, points):
+        """
+        Notes
+        -----
+        给定一组点 p , 找到这些点所在的单元
+
+        这里假设：
+
+        1. 所有点在网格内部，
+        2. 网格中没有洞
+        3. 区域还要是凸的
+        """
+        from scipy.spatial import KDTree
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NP = points.shape[0]
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.cell_to_cell()
+
+        start = bm.zeros(NN, dtype=self.itype)
+        start[cell[:, 0]] = range(NC)
+        start[cell[:, 1]] = range(NC)
+        start[cell[:, 2]] = range(NC)
+        tree = KDTree(node)
+        _, loc = tree.query(points)
+        start = start[loc]  # 设置一个初始单元位置
+
+        isNotOK = bm.ones(NP, dtype=bm.bool)
+        while bm.any(isNotOK):
+            idx = start[isNotOK]
+            pp = points[isNotOK]
+
+            v0 = node[cell[idx, 0]] - pp  # 所在单元的三个顶点
+            v1 = node[cell[idx, 1]] - pp
+            v2 = node[cell[idx, 2]] - pp
+
+            a = bm.zeros((len(idx), 3), dtype=self.ftype)
+            a[:, 0] = bm.cross(v1, v2)
+            a[:, 1] = bm.cross(v2, v0)
+            a[:, 2] = bm.cross(v0, v1)
+            lidx = bm.argmin(a, axis=-1)
+
+            # 最小面积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0
+
+            idx0, = bm.nonzero(isNotOK)
+            start[idx0[isOutCell]] = cell2cell[idx[isOutCell], lidx[isOutCell]]
+            isNotOK[idx0[~isOutCell]] = False
+
+        return start
 
 TriangleMesh.set_ploter('2d')
 

@@ -1,7 +1,10 @@
+from typing import Union
 from fealpy.backend import backend_manager as bm
 from fealpy.decorator import variantmethod
 from fealpy.model import ComputationalModel
-from fealpy.cfd.equation.stationary_stokes import StationaryStokes
+from fealpy.mesh import Mesh
+from fealpy.utils import timer
+from fealpy.cfd.equation.stationary_incompressible_stokes import StationaryIncompressibleStokes
 
 class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
     """
@@ -63,7 +66,7 @@ class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
         super().__init__(pbar_log=True, log_level="INFO")
         self.options = options
         self.pde = pde
-        self.equation = StationaryStokes(pde)
+        self.equation = StationaryIncompressibleStokes(pde)
         
         if mesh is None:
             if hasattr(pde, 'init_mesh'):
@@ -104,9 +107,9 @@ class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
         """
         Use Newton iteration method to solve the Navier-Stokes equations.
         """
-        from .simulation.fem.stationary_stokes.stokes import Stokes
+        from .simulation.fem.stationary_incompressible_stokes.stokes import Stokes
         self.fem = Stokes(self.equation, self.mesh)
-        self.method_str = "Stokes"
+        self.method_str = "Newton"
         return self.fem
     
     def update_mesh(self, mesh):
@@ -116,8 +119,8 @@ class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
         self.mesh = mesh
         self.fem.update_mesh(mesh)
     
-    def update(self):   
-        self.fem.update()
+    def update(self, u0):   
+        self.fem.update(u0)
     
     def linear_system(self):
         """
@@ -128,15 +131,12 @@ class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
         return BForm, LForm
     
     
-    
     @variantmethod('one_step')
     def run(self):
         self.run_str = 'one_step'
         BForm, LForm = self.linear_system()  
         self.fem.update()
         A = BForm.assembly() 
-        # import ipdb
-        # ipdb.set_trace()
         b = LForm.assembly()
         A, b = self.fem.apply_bc(A, b, self.pde)
         A, b = self.fem.lagrange_multiplier(A, b)
@@ -153,25 +153,18 @@ class StationaryIncompressibleStokesLFEMModel(ComputationalModel):
     def run(self, maxit = 5):
         self.run_str = 'uniform_refine'
         maxit = self.maxit if self.options is not None else maxit
-        u_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
-        p_errorMatrix = bm.zeros((1, maxit), dtype=bm.float64)
+        maxstep = self.maxstep if self.options is not None else maxstep
+        tol = self.tol if self.options is not None else tol
         for i in range(maxit):
             self.logger.info(f"number of cells: {self.mesh.number_of_cells()}")
-            uh, ph = self.run['one_step']()
-            uerror, perror = self.error(uh, ph)
-            u_errorMatrix[0, i] = uerror
-            p_errorMatrix[0, i] = perror
-            order_u = bm.log2(u_errorMatrix[0,:-1]/u_errorMatrix[0,1:])
-            order_p = bm.log2(p_errorMatrix[0,:-1]/p_errorMatrix[0,1:])
-            self.pde.mesh.uniform_refine()
-        self.logger.info(f"速度最终误差:" + ",".join(f"{uerror:.15e}" for uerror in u_errorMatrix[0,]))
-        self.logger.info(f"order_u: " + ", ".join(f"{order_u:.15e}" for order_u in order_u))
-        self.logger.info(f"压力最终误差:" + ",".join(f"{perror:.15e}" for perror in p_errorMatrix[0,]))  
-        self.logger.info(f"order_p: " + ", ".join(f"{order_p:.15e}" for order_p in order_p))
-        return uh, ph
+            uh1, ph1 = self.run['one_step']()
+            uerror, perror = self.error(uh1, ph1)
+            self.logger.info(f"error_u: {uerror}, error_p: {perror}")
+            self.mesh.uniform_refine()
+        return uh1, ph1
 
     @variantmethod('direct')
-    def solve(self, A, F, solver='scipy'):
+    def solve(self, A, F, solver='mumps'):
         from fealpy.solver import spsolve
         self.solve_str = 'direct'
         return spsolve(A, F, solver = solver)

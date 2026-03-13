@@ -32,54 +32,6 @@ class DirichletBC:
         self.gd = gd
         self.threshold = threshold
 
-    def DiffusionApply(self, A, b):
-        """
-        Apply Dirichlet boundary conditions to the diffusion term.
-
-        This method modifies the system matrix `A` and right-hand side vector `b` to 
-        incorporate Dirichlet boundary conditions for the diffusion term, using boundary 
-        edge contributions and vector/scalar field handling.
-
-        Args:
-            A (sparse matrix): System matrix to be modified.
-            b (ndarray): Right-hand side vector to be modified.
-
-        Returns:
-            tuple: (A, b)
-                - A (sparse matrix): Modified system matrix with boundary conditions applied.
-                - b (ndarray): Modified right-hand side vector with boundary contributions.
-        """
-        bd_edge = self.mesh.boundary_face_index()
-        e2c = self.mesh.edge_to_cell()
-        NC = self.mesh.number_of_cells()
-        _, d = VectorDecomposition(self.mesh).centroid_vector_calculation()
-        Ef_abs = VectorDecomposition(self.mesh).Sor()
-        bd_integrator = Ef_abs[bd_edge] / d[bd_edge]
-        bde2c = e2c[bd_edge, 0]
-        edge_middle_point = self.mesh.entity_barycenter('edge')
-        bdedgepoint = edge_middle_point[bd_edge]
-        # Scalar field: bd_u shape (NE,), 2D vector field: (NE, 2), 3D vector field: (NE, 3)
-        bd_u = self.gd(bdedgepoint)[..., None]
-        bdIdx = bm.zeros(NC)
-        bm.add_at(bdIdx, bde2c, bd_integrator)
-        # Determine field dimension (scalar, 2D, or 3D) based on bd_u's second axis
-        D = bd_u.shape[1]
-        bdIdx = bm.tile(bdIdx, D)
-        A_0 = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
-        A = A + A_0
-        if D == 1:
-            bd_correct = (bd_integrator[:, None] * bd_u).reshape(-1)
-            bm.add_at(b, bde2c, bd_correct)
-        else:
-            # Remove the extra axis from bd_u for computation
-            bd_u = bm.squeeze(bd_u, axis=-1)
-            bd_correct = bd_integrator[:, None] * bd_u
-            bd_correct = bm.transpose(bd_correct).flatten()
-            new_arr = bde2c + NC
-            bde2c = bm.concat([bde2c, new_arr])
-            bm.add_at(b, bde2c, bd_correct)
-        return A, b
-
     def ThresholdApply(self, A, f, uh=None):
         """
         Apply Dirichlet boundary conditions to selected boundary cells based on a threshold.
@@ -139,6 +91,54 @@ class DirichletBC:
         A = D0.matmul(A.matmul(D0)) + D1
         return A, f
 
+    def DiffusionApply(self, A, b):
+        """
+        Apply Dirichlet boundary conditions to the diffusion term.
+
+        This method modifies the system matrix `A` and right-hand side vector `b` to 
+        incorporate Dirichlet boundary conditions for the diffusion term, using boundary 
+        edge contributions and vector/scalar field handling.
+
+        Args:
+            A (sparse matrix): System matrix to be modified.
+            b (ndarray): Right-hand side vector to be modified.
+
+        Returns:
+            tuple: (A, b)
+                - A (sparse matrix): Modified system matrix with boundary conditions applied.
+                - b (ndarray): Modified right-hand side vector with boundary contributions.
+        """
+        bd_edge = self.mesh.boundary_face_index()
+        e2c = self.mesh.edge_to_cell()
+        NC = self.mesh.number_of_cells()
+        _, d = VectorDecomposition(self.mesh).centroid_vector_calculation()
+        Ef_abs = VectorDecomposition(self.mesh).Sor()
+        bd_integrator = Ef_abs[bd_edge] / d[bd_edge]
+        bde2c = e2c[bd_edge, 0]
+        edge_middle_point = self.mesh.entity_barycenter('edge')
+        bdedgepoint = edge_middle_point[bd_edge]
+        # Scalar field: bd_u shape (NE,), 2D vector field: (NE, 2), 3D vector field: (NE, 3)
+        bd_u = self.gd(bdedgepoint)[..., None]
+        bdIdx = bm.zeros(NC)
+        bm.add_at(bdIdx, bde2c, bd_integrator)
+        # Determine field dimension (scalar, 2D, or 3D) based on bd_u's second axis
+        D = bd_u.shape[1]
+        bdIdx = bm.tile(bdIdx, D)
+        A_0 = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
+        A = A + A_0
+        if D == 1:
+            bd_correct = (bd_integrator[:, None] * bd_u).reshape(-1)
+            bm.add_at(b, bde2c, bd_correct)
+        else:
+            # Remove the extra axis from bd_u for computation
+            bd_u = bm.squeeze(bd_u, axis=-1)
+            bd_correct = bd_integrator[:, None] * bd_u
+            bd_correct = bm.transpose(bd_correct).flatten()
+            new_arr = bde2c + NC
+            bde2c = bm.concat([bde2c, new_arr])
+            bm.add_at(b, bde2c, bd_correct)
+        return A, b
+
     def DivApply(self, b):
         """
         Apply Dirichlet boundary conditions to the divergence term.
@@ -169,4 +169,26 @@ class DirichletBC:
         new_arr = bde2c + NC
         bde2c = bm.concat([bde2c, new_arr])
         bm.add_at(b, bde2c, -bd_correct)
+        return b
+    
+    def ConvectionApplyX(self,b):
+        Sf = self.mesh.edge_normal()
+        bdedge = self.mesh.boundary_face_index()
+        epoints = self.mesh.entity_barycenter('face')[bdedge, :]
+        bdu = self.gd(epoints)
+        bdflux1 = bm.einsum('ij,i->i', Sf[bdedge, :], bdu)
+        e2c = self.mesh.edge_to_cell()
+        bde2c = e2c[bdedge, 0]
+        bm.add_at(b, bde2c, -bdflux1)
+        return b
+    
+    def ConvectionApplyY(self,b):
+        Sf = self.mesh.edge_normal()
+        bdedge = self.mesh.boundary_face_index()
+        epoints = self.mesh.entity_barycenter('face')[bdedge, :]
+        bdv = self.gd(epoints)
+        bdflux2 = bm.einsum('ij,i->i', Sf[bdedge, :], bdv)
+        e2c = self.mesh.edge_to_cell()
+        bde2c = e2c[bdedge, 0]
+        bm.add_at(b, bde2c, -bdflux2)
         return b

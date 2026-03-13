@@ -12,3 +12,9 @@ from .dld_microfluidic_chip_mesher_3d import DLDMicrofluidicChipMesher3D
 from .naca0012_mesher import NACA0012Mesher
 from .stp_mesher import STPSurfaceMesher
 from .box_with_sphere_mesher import BoxWithSphereMesher
+from .ellipse_mesher import EllipseMesher
+from .torus_mesher import TorusMesher
+from .ellipsoid_mesher import EllipsoidMesher
+from .patch_antenna_mesher import PatchAntennaMesher
+from .wpr_mesher import WPRMesher
+from .block_with_hole_mesher import BlockWithHoleMesher

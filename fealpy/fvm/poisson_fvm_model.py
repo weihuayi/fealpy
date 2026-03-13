@@ -14,6 +14,7 @@ from ..fvm import (
     ScalarSourceIntegrator,
     ScalarCrossDiffusionIntegrator,
     DirichletBC,
+    GradientReconstruct,
 )
 
 
@@ -64,7 +65,7 @@ class PoissonFVMModel(ComputationalModel):
         self.logger.info(self.pde)
 
     def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
-        self.mesh = self.pde.init_mesh['uniform_quad'](nx=nx, ny=ny)    
+        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)    
 
     def set_space(self, degree: int = 0) -> None:
         self.p = degree
@@ -101,10 +102,12 @@ class PoissonFVMModel(ComputationalModel):
             ndarray: Right-hand side vector from cross-diffusion.
         """
         lform = LinearForm(self.space)
-        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, q=self.p + 2))
+        grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(uh,self.pde.dirichlet)  # (NC, 2)
+        grad_f = GradientReconstruct(self.mesh).reconstruct(grad_u)  # (NE, 2)
+        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f, q=self.p + 2))
         return lform.assembly()
 
-    def solve(self, max_iter=6, tol=1e-6) -> TensorLike:
+    def solve(self, max_iter=6, tol=1e-7) -> TensorLike:
         """
         Iteratively solve the linear system including cross-diffusion.
 
@@ -142,9 +145,9 @@ class PoissonFVMModel(ComputationalModel):
             float: The L2 norm of the error.
         """
         cell_center = self.mesh.entity_barycenter('cell')
-        u_exact = self.pde.solution(cell_center)
-        error = bm.sqrt(bm.sum(self.mesh.entity_measure('cell') * (u_exact - self.uh)**2))
-        return error
+        self.uI = self.pde.solution(cell_center)
+        self.error = bm.sqrt(bm.sum(self.mesh.entity_measure('cell') * (self.uI - self.uh)**2))
+        return self.error
 
     def plot(self) -> None:
         """
@@ -153,25 +156,28 @@ class PoissonFVMModel(ComputationalModel):
         import matplotlib.pyplot as plt
         cell_center = self.mesh.entity_barycenter('cell')  
         x, y = cell_center[:, 0], cell_center[:, 1]
-        z_num = self.uh                     
-        z_exact = self.pde.solution(cell_center)
 
         fig = plt.figure(figsize=(10, 5))
-        ax1 = fig.add_subplot(1, 2, 1, projection='3d')
-        ax1.plot_trisurf(x, y, z_num, cmap='viridis', linewidth=0.2)
+        ax1 = fig.add_subplot(1, 3, 1, projection='3d')
+        ax1.plot_trisurf(x, y, self.uh, cmap='viridis', linewidth=0.2)
         ax1.set_title("Numerical Solution (FVM)")
         ax1.set_xlabel("x")
         ax1.set_ylabel("y")
-        ax1.set_zlabel("u_h")
+        # ax1.set_zlabel("u_h")
         
-        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
-        ax2.plot_trisurf(x, y, z_exact, cmap='plasma', linewidth=0.2)
+        ax2 = fig.add_subplot(1, 3, 2, projection='3d')
+        ax2.plot_trisurf(x, y, self.uI, cmap='plasma', linewidth=0.2)
         ax2.set_title("Exact Solution")
         ax2.set_xlabel("x")
         ax2.set_ylabel("y")
-        ax2.set_zlabel("u_exact")
+        # ax2.set_zlabel("u_exact")
 
+        ax3 = fig.add_subplot(1, 3, 3, projection='3d')
+        ax3.plot_trisurf(x, y, self.uI - self.uh, cmap='plasma', linewidth=0.2)
+        ax3.set_title("Error (Exact - Numerical)")
+        ax3.set_xlabel("x")
+        ax3.set_ylabel("y")
+        # ax3.set_zlabel("Error")
         plt.tight_layout()
         plt.show()
-
 

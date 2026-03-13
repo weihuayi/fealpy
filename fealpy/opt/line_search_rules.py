@@ -72,35 +72,37 @@ class StrongWolfeLineSearch(LineSearch):
         return alpha, xc, fc, gc
 
 class ArmijoLineSearch(LineSearch):
-    def __init__(self, beta=0.6, sigma=0.01):
+    def __init__(self, beta=0.6, sigma=0.001,max_iter=20):
         self.beta = beta
         self.sigma = sigma
+        self.max_iter = max_iter
     
-    def search(self, x, objective, direction):
-        x = x[-1]
-        alpha = 1
-        f, g = objective(x)  
-        while True:
-            f_new, _ = objective(x + alpha * direction)  
-            if f_new <= f + self.sigma * alpha * (g @ direction):
-                break
+    def search(self, x, objective, direction,alpha):
+        alpha = min(1.0, 2*alpha)
+        f, g = objective(x)
+        gtd = bm.dot(g, direction)
+        for _iter in range(self.max_iter):
+            f_new, _ = objective(x + alpha*direction)  
+            if f_new <= f + self.sigma*alpha*gtd:
+                return alpha
             alpha *= self.beta
         return alpha
 
-class   PowellLineSearch(LineSearch):
-    def __init__(self, beta=0.6, sigma1=0.01,sigma2=0.01, c=0.9):
+class PowellLineSearch(LineSearch):
+    def __init__(self, beta=0.6, sigma1=0.001,sigma2=0.01, c=0.9,max_iter=20):
         self.beta = beta
         self.sigma1 = sigma1
         self.sigma2 = sigma2
         self.c = c
+        self.max_iter = max_iter
 
-    def search(self, x, objective, direction):
-        x = x[-1]
-        alpha = 1
-        f, g = objective(x)  
+    def search(self, x, objective, direction,alpha):
+        alpha = min(1,2*alpha)
+        f, g = objective(x)
+        gtd = bm.dot(g, direction)
         while True:
-            f_new, g_new = objective(x + alpha * direction)  
-            if f_new <= f + self.sigma1 * alpha * (g @ direction):
+            f_new, g_new = objective(x + alpha*direction)  
+            if f_new <= f + self.sigma1*alpha*gtd:
                 break
             alpha *= self.beta
         k = alpha
@@ -111,15 +113,13 @@ class   PowellLineSearch(LineSearch):
             alpha += self.sigma2  * (k/self.beta - k)
         return alpha
 
-class   GoldsteinLineSearch(LineSearch):  
-   
+class GoldsteinLineSearch(LineSearch):   
     def __init__(self, beta=0.6, sigma=0.1):
         self.beta = beta
         self.sigma = sigma
 
-    def search(self, x, objective, direction):
-        x = x[-1]
-        alpha = 1
+    def search(self, x, objective, direction,alpha):
+        alpha = min(1,2*alpha)
         f, g = objective(x)  
         while True:
             f_new, _ = objective(x + alpha * direction) 
@@ -144,7 +144,7 @@ class GrippoLineSearch(LineSearch):
         n = len(x)
         f, g = objective(x[-1])
 
-    # 获取最近的步长
+        # 获取最近的步长
         if n < self.step:
             f_max = max(objective(x[i])[0] for i in range(n))
         else:
@@ -158,7 +158,7 @@ class GrippoLineSearch(LineSearch):
 
         return alpha
 
-class   ZhangHagerLineSearch(LineSearch): 
+class ZhangHagerLineSearch(LineSearch): 
     def __init__(self, gamma=0.85, eta=0.2, c=1e-3):
         self.gamma = gamma
         self.eta = eta
@@ -179,11 +179,9 @@ class   ZhangHagerLineSearch(LineSearch):
         return alpha, C
 
 class ExactLineSearch(LineSearch):
-
     def __init__(self, step_length_bounds=(0, 0.3)):
         self.step_length_bounds = step_length_bounds  # 步长范围
        
-
     def search(self, x,objective, direction):
 
         def f(p):
