@@ -196,8 +196,3 @@ class Exp0013(Exp0012):
     @cartesian
     def dirichlet_velocity_w(self, p: TensorLike) -> TensorLike:
         return self.base_velocity(p)[..., 2]
-
-    velocity_dirichlet = dirichlet_velocity
-    velocity_dirichlet_u = dirichlet_velocity_u
-    velocity_dirichlet_v = dirichlet_velocity_v
-    velocity_dirichlet_w = dirichlet_velocity_w

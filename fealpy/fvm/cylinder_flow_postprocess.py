@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -16,6 +17,13 @@ from .benchmark_postprocess import (
     write_dict_csv,
     write_solution_vtk,
 )
+from .fvm_geometry import FVMGeometry
+
+
+@dataclass(frozen=True)
+class CylinderSolutionFields:
+    velocity: TensorLike
+    pressure: TensorLike
 
 
 def _as_numpy(values: TensorLike) -> np.ndarray:
@@ -61,25 +69,28 @@ def _wall_velocity(case, points: TensorLike) -> TensorLike:
     """Return cylinder wall velocity for force post-processing."""
     if hasattr(case, "cylinder_wall_velocity"):
         return case.cylinder_wall_velocity(points)
-    return bm.zeros(points.shape, dtype=points.dtype)
+    return bm.zeros(
+        points.shape,
+        dtype=points.dtype,
+        device=bm.get_device(points),
+    )
 
 
 def _wall_sn_grad_viscous_force(
-    mesh,
+    geometry: FVMGeometry,
     case,
     cylinder_faces: TensorLike,
     owner: TensorLike,
     sf: TensorLike,
-    uh: TensorLike,
-    vh: TensorLike,
+    velocity: TensorLike,
 ) -> TensorLike:
     """Return wall viscous force using a one-sided normal gradient.
 
     This matches the force-postprocessing convention used by OpenFOAM wall
     patches more closely than sampling the owner-cell reconstructed gradient.
     """
-    face_centers = mesh.entity_barycenter("face")[cylinder_faces]
-    cell_centers = mesh.entity_barycenter("cell")[owner]
+    face_centers = geometry.face_center[cylinder_faces]
+    cell_centers = geometry.cell_center[owner]
     area = bm.sqrt(bm.einsum("ij,ij->i", sf, sf))
     normal = sf / area[:, None]
     normal_distance = bm.abs(
@@ -88,7 +99,6 @@ def _wall_sn_grad_viscous_force(
     if bool(bm.to_numpy(bm.any(normal_distance <= 0.0))):
         raise ValueError("Cylinder wall normal distance must be positive.")
 
-    velocity = bm.stack([uh, vh], axis=-1)
     delta_velocity = _wall_velocity(case, face_centers) - velocity[owner]
     grad = delta_velocity[:, :, None] * normal[:, None, :] / normal_distance[:, None, None]
     strain = grad + bm.swapaxes(grad, 1, 2)
@@ -103,12 +113,10 @@ def _cell_gradient_viscous_force(
     case,
     owner: TensorLike,
     sf: TensorLike,
-    uh: TensorLike,
-    vh: TensorLike,
+    velocity: TensorLike,
     velocity_gradient,
 ) -> TensorLike:
     """Return viscous force from the owner-cell reconstructed gradient."""
-    velocity = bm.stack([uh, vh], axis=-1)
     grad = velocity_gradient.cell_gradient(velocity)[owner]
     strain = grad + bm.swapaxes(grad, 1, 2)
     traction = bm.einsum("nij,nj->ni", strain, sf)
@@ -119,11 +127,11 @@ def cylinder_force_coefficients(
     mesh,
     case,
     *,
-    uh: TensorLike,
-    vh: TensorLike,
+    velocity: TensorLike,
     pressure: TensorLike,
     velocity_gradient=None,
     viscous_method: str = "wall_sn_grad",
+    geometry: FVMGeometry | None = None,
 ) -> dict[str, float | int]:
     """Integrate pressure and viscous force over the cylinder boundary.
 
@@ -131,26 +139,27 @@ def cylinder_force_coefficients(
     is the force exerted by the fluid on the cylinder,
     ``p n - mu dev(gradU + gradU.T) n`` integrated per unit depth by default.
     """
-    boundary_faces = mesh.boundary_face_index()
-    face_centers = mesh.entity_barycenter("face")[boundary_faces]
+    geometry = FVMGeometry(mesh) if geometry is None else geometry
+    boundary_faces = bm.nonzero(geometry.is_boundary)[0]
+    face_centers = geometry.face_center[boundary_faces]
     cylinder_flag = case.is_cylinder_boundary(face_centers)
     cylinder_faces = boundary_faces[cylinder_flag]
     if cylinder_faces.shape[0] == 0:
         raise ValueError("No cylinder boundary faces were selected.")
 
-    owner = mesh.edge_to_cell()[cylinder_faces, 0]
-    sf = mesh.edge_normal()[cylinder_faces]
+    owner = geometry.owner[cylinder_faces]
+    sf = geometry.S_f[cylinder_faces]
     pressure_force = pressure[owner, None] * sf
 
     if viscous_method == "wall_sn_grad":
         viscous_force = _wall_sn_grad_viscous_force(
-            mesh, case, cylinder_faces, owner, sf, uh, vh
+            geometry, case, cylinder_faces, owner, sf, velocity
         )
     elif viscous_method == "cell_gradient":
         viscous_force = bm.zeros_like(pressure_force)
         if velocity_gradient is not None:
             viscous_force = _cell_gradient_viscous_force(
-                case, owner, sf, uh, vh, velocity_gradient
+                case, owner, sf, velocity, velocity_gradient
             )
     elif viscous_method == "none":
         viscous_force = bm.zeros_like(pressure_force)
@@ -200,40 +209,45 @@ def cylinder_force_coefficients(
 def solution_summary(
     model,
     case,
+    solve_result,
     *,
     viscous_method: str = "wall_sn_grad",
+    force: dict | None = None,
+    probes: dict | None = None,
 ) -> dict[str, float | int | bool]:
     """Return scalar field diagnostics for a solved cylinder-flow model."""
-    velocity = bm.stack([model.uh, model.vh], axis=-1)
-    speed = bm.sqrt(model.uh**2 + model.vh**2)
-    force = cylinder_force_coefficients(
-        model.mesh,
-        case,
-        uh=model.uh,
-        vh=model.vh,
-        pressure=model.ph,
-        velocity_gradient=getattr(model, "velocity_gradient", None),
-        viscous_method=viscous_method,
-    )
-    probes = pressure_drop(model.mesh.entity_barycenter("cell"), model.ph)
+    velocity = solve_result.velocity
+    pressure = solve_result.pressure
+    speed = bm.linalg.norm(velocity, axis=1)
+    if force is None:
+        force = cylinder_force_coefficients(
+            model.mesh,
+            case,
+            velocity=velocity,
+            pressure=pressure,
+            velocity_gradient=getattr(model, "velocity_gradient", None),
+            viscous_method=viscous_method,
+            geometry=getattr(model, "fvm_geometry", None),
+        )
+    if probes is None:
+        probes = pressure_drop(model.fvm_geometry.cell_center, pressure)
     return {
-        "cells": int(model.mesh.number_of_cells()),
-        "faces": int(model.mesh.number_of_faces()),
+        "cells": int(model.fvm_geometry.NC),
+        "faces": int(model.fvm_geometry.NF),
         "finite_fields": bool(
             bm.to_numpy(
-                bm.all(bm.isfinite(model.uh))
-                & bm.all(bm.isfinite(model.vh))
-                & bm.all(bm.isfinite(model.ph))
+                bm.all(bm.isfinite(velocity))
+                & bm.all(bm.isfinite(pressure))
             )
         ),
         "speed_max": _as_float(bm.max(speed)),
         "speed_mean": _as_float(bm.mean(speed)),
-        "u_min": _as_float(bm.min(model.uh)),
-        "u_max": _as_float(bm.max(model.uh)),
-        "v_min": _as_float(bm.min(model.vh)),
-        "v_max": _as_float(bm.max(model.vh)),
-        "pressure_min": _as_float(bm.min(model.ph)),
-        "pressure_max": _as_float(bm.max(model.ph)),
+        "u_min": _as_float(bm.min(velocity[:, 0])),
+        "u_max": _as_float(bm.max(velocity[:, 0])),
+        "v_min": _as_float(bm.min(velocity[:, 1])),
+        "v_max": _as_float(bm.max(velocity[:, 1])),
+        "pressure_min": _as_float(bm.min(pressure)),
+        "pressure_max": _as_float(bm.max(pressure)),
         **{f"force_{key}": value for key, value in force.items()},
         **{f"pressure_drop_{key}": value for key, value in probes.items()},
     }
@@ -305,16 +319,21 @@ def strouhal_summary(
     return result
 
 
-def plot_cylinder_overview(model, case, output: str | Path) -> None:
+def plot_cylinder_overview(
+    model,
+    case,
+    solve_result,
+    output: str | Path,
+) -> None:
     """Write a compact PNG overview of speed, pressure, and velocity vectors."""
     import matplotlib.pyplot as plt
 
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
-    points = _as_numpy(model.mesh.entity_barycenter("cell"))
-    speed = _as_numpy(bm.sqrt(model.uh**2 + model.vh**2))
-    pressure = _as_numpy(model.ph)
-    velocity = _as_numpy(bm.stack([model.uh, model.vh], axis=-1))
+    points = _as_numpy(model.fvm_geometry.cell_center)
+    speed = _as_numpy(bm.linalg.norm(solve_result.velocity, axis=1))
+    pressure = _as_numpy(solve_result.pressure)
+    velocity = _as_numpy(solve_result.velocity)
 
     fig, axes = plt.subplots(2, 1, figsize=(12.0, 6.0), sharex=True)
     fields = ((speed, "speed", "viridis"), (pressure, "pressure", "coolwarm"))
@@ -355,8 +374,10 @@ def plot_cylinder_overview(model, case, output: str | Path) -> None:
 def write_cylinder_outputs(
     model,
     case,
+    solve_result,
     output_dir: str | Path,
     *,
+    velocity_gradient,
     residuals: Iterable[dict] | None = None,
     force_history: Iterable[dict] | None = None,
     strouhal_start_time: float | None = None,
@@ -371,14 +392,19 @@ def write_cylinder_outputs(
 
     write_solution_vtk(
         model.mesh,
-        model.uh,
-        model.vh,
-        model.ph,
+        solve_result.velocity,
+        solve_result.pressure,
         output_dir / "solution.vtu",
         fields=fields,
-        velocity_gradient=getattr(model, "velocity_gradient", None),
+        velocity_gradient=velocity_gradient,
+        geometry=getattr(model, "fvm_geometry", None),
     )
-    plot_cylinder_overview(model, case, output_dir / "flow_overview.png")
+    plot_cylinder_overview(
+        model,
+        case,
+        solve_result,
+        output_dir / "flow_overview.png",
+    )
 
     if residuals is not None:
         write_dict_csv(output_dir / "residual_history.csv", scalarize_rows(residuals))
@@ -395,16 +421,41 @@ def write_cylinder_outputs(
         )
         write_dict_csv(output_dir / "strouhal_summary.csv", [strouhal])
 
-    summary = solution_summary(model, case, viscous_method=viscous_method)
+    force = cylinder_force_coefficients(
+        model.mesh,
+        case,
+        velocity=solve_result.velocity,
+        pressure=solve_result.pressure,
+        velocity_gradient=velocity_gradient,
+        viscous_method=viscous_method,
+        geometry=getattr(model, "fvm_geometry", None),
+    )
+    probes = pressure_drop(
+        model.fvm_geometry.cell_center,
+        solve_result.pressure,
+    )
+    summary = solution_summary(
+        model,
+        case,
+        solve_result,
+        viscous_method=viscous_method,
+        force=force,
+        probes=probes,
+    )
     if residuals is not None:
         residual_rows = list(residuals)
         if residual_rows:
+            final_residual = scalarize_rows([residual_rows[-1]])[0]
             summary.update(
                 {
                     "iterations": len(residual_rows),
-                    "last_mass": residual_rows[-1].get("mass"),
-                    "last_pressure_correction": residual_rows[-1].get(
-                        "pressure_correction"
+                    "last_mass": final_residual.get(
+                        "mass",
+                        final_residual.get("mass_relative_l2"),
+                    ),
+                    "last_pressure_correction": final_residual.get(
+                        "pressure_correction",
+                        final_residual.get("pressure_correction_l2"),
                     ),
                 }
             )
@@ -413,16 +464,6 @@ def write_cylinder_outputs(
     if strouhal is not None:
         summary.update({f"strouhal_{key}": value for key, value in strouhal.items()})
 
-    force = cylinder_force_coefficients(
-        model.mesh,
-        case,
-        uh=model.uh,
-        vh=model.vh,
-        pressure=model.ph,
-        velocity_gradient=getattr(model, "velocity_gradient", None),
-        viscous_method=viscous_method,
-    )
-    probes = pressure_drop(model.mesh.entity_barycenter("cell"), model.ph)
     write_dict_csv(output_dir / "force_summary.csv", [force])
     write_dict_csv(output_dir / "pressure_drop.csv", [probes])
     (output_dir / "summary.json").write_text(

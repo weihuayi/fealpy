@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import CylinderFlowCase, FVMLinearSolverConfig, NSFVMSimpleModel
+from fealpy.fvm import (
+    CylinderFlowCase,
+    NSFVMSimpleModel,
+    steady_ns_high_accuracy_simple_profile,
+)
 from fealpy.fvm.cylinder_flow_postprocess import write_cylinder_outputs
 from fealpy.fvm.benchmark_postprocess import re_label
 
@@ -46,21 +51,41 @@ def build_case(args) -> CylinderFlowCase:
 
 def build_simple_options(case: CylinderFlowCase, args) -> dict:
     """Return ``NSFVMSimpleModel`` options for the cylinder benchmark."""
+    base = steady_ns_high_accuracy_simple_profile()
+    shared_interpolation = args.face_interpolation_method
+    profile = replace(
+        base,
+        discretization=replace(
+            base.discretization,
+            pressure_gradient_method=args.pressure_gradient_method,
+            velocity_gradient_method=args.velocity_gradient_method,
+            momentum_face_interpolation=shared_interpolation,
+            pressure_response_interpolation=shared_interpolation,
+            rhie_chow_velocity_interpolation=shared_interpolation,
+            face_flux_correction_scheme="none",
+            face_flux_quadrature_order=3,
+        ),
+        iteration=replace(
+            base.iteration,
+            max_iterations=args.max_iter,
+            pressure_relaxation=args.relax,
+            momentum_equation_relaxation=0.7,
+            momentum_relative_tolerance=(
+                args.tol
+                if args.tol_momentum is None
+                else args.tol_momentum
+            ),
+            mass_relative_tolerance=(
+                args.tol if args.tol_mass is None else args.tol_mass
+            ),
+        ),
+    )
     options = {
         "pde": case,
         "mesh_type": "improved_tri",
-        "space_degree": int(args.space_degree),
+        "profile": profile,
         "pbar_log": args.pbar_log,
         "log_level": args.log_level,
-        "linear_solver_config": FVMLinearSolverConfig(
-            backend=args.backend,
-            device=args.device,
-            solver=args.linear_solver,
-        ),
-        "pressure_gradient_method": args.pressure_gradient_method,
-        "velocity_gradient_method": args.velocity_gradient_method,
-        "rhie_chow_pressure_gradient_method": args.rhie_chow_pressure_gradient_method,
-        "face_interpolation_method": args.face_interpolation_method,
     }
     if args.engineering_boundary_conditions:
         options["boundary_conditions"] = case.engineering_boundary_conditions
@@ -79,13 +104,7 @@ def run_simple_cylinder(args):
 
     case = build_case(args)
     model = NSFVMSimpleModel(build_simple_options(case, args))
-    model.solve(
-        max_iter=args.max_iter,
-        tol=args.tol,
-        relax=args.relax,
-        tol_mass=args.tol_mass,
-        tol_pressure_correction=args.tol_pressure_correction,
-    )
+    solve_result = model.solve()
 
     output_dir = (
         Path(args.output_dir)
@@ -99,8 +118,12 @@ def run_simple_cylinder(args):
     outputs = write_cylinder_outputs(
         model,
         case,
+        solve_result,
         output_dir,
-        residuals=model.residuals,
+        velocity_gradient=(
+            model.solver.spatial_face_velocity.boundary.gradient
+        ),
+        residuals=solve_result.residual_history,
         run_summary={
             "solver": "NSFVMSimpleModel",
             "re": case.re,
@@ -114,16 +137,14 @@ def run_simple_cylinder(args):
             "wake_mesh_size": args.wake_mesh_size,
             "max_iter": args.max_iter,
             "tol": args.tol,
+            "tol_momentum": args.tol_momentum,
+            "tol_mass": args.tol_mass,
             "relax": args.relax,
             "engineering_boundary_conditions": args.engineering_boundary_conditions,
             "pressure_gradient_method": args.pressure_gradient_method,
             "velocity_gradient_method": args.velocity_gradient_method,
-            "rhie_chow_pressure_gradient_method": (
-                args.rhie_chow_pressure_gradient_method
-            ),
             "face_interpolation_method": args.face_interpolation_method,
             "force_viscous_method": args.force_viscous_method,
-            "linear_solver": args.linear_solver,
         },
         viscous_method=args.force_viscous_method,
         fields=tuple(args.output_fields),
@@ -150,7 +171,6 @@ def create_parser() -> argparse.ArgumentParser:
         default="profile",
         choices=("profile", "zero"),
     )
-    parser.add_argument("--space_degree", default=0, type=int)
     parser.add_argument(
         "--pressure_gradient_method",
         default="layered_lsq",
@@ -162,15 +182,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--velocity_gradient_method",
-        default="layered_lsq",
-        choices=(
-            "layered_lsq",
-            "face_weighted_lsq",
-            "green_gauss",
-        ),
-    )
-    parser.add_argument(
-        "--rhie_chow_pressure_gradient_method",
         default="layered_lsq",
         choices=(
             "layered_lsq",
@@ -191,7 +202,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max_iter", default=1000, type=int)
     parser.add_argument("--tol", default=1.0e-6, type=float)
     parser.add_argument("--tol_mass", default=None, type=float)
-    parser.add_argument("--tol_pressure_correction", default=None, type=float)
+    parser.add_argument("--tol_momentum", default=None, type=float)
     parser.add_argument("--relax", default=0.03, type=float)
     parser.add_argument(
         "--engineering_boundary_conditions",
@@ -200,7 +211,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--backend", default="numpy", type=str)
     parser.add_argument("--device", default="cpu", choices=("cpu", "cuda"))
-    parser.add_argument("--linear_solver", default="auto", type=str)
     parser.add_argument("--log_level", default="WARNING", type=str)
     parser.add_argument("--pbar_log", default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("--output_dir", default=None, type=str)

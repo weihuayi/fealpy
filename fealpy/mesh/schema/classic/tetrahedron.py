@@ -25,6 +25,7 @@ class TetrahedronSchema(ShapedEntitySchema):
         "segment": [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]],
         "point": [[0], [1], [2], [3]],
     }
+    ref_measure = 1 / 6
 
     @classmethod
     def barycenter(cls, ctx: EntityContext, index: Index | None) -> Tensor:

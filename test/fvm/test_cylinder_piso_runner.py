@@ -24,15 +24,13 @@ def test_piso_cylinder_runner_writes_standard_outputs(tmp_path: Path):
             "0.045",
             "--wake_mesh_size",
             "0.09",
-            "--nt",
+            "--time_steps",
             "2",
             "--duration",
             "0",
             "0.02",
             "--n_correctors",
             "2",
-            "--linear_solver",
-            "scipy",
             "--vtk_interval",
             "1",
             "--output_dir",
@@ -63,19 +61,16 @@ def test_piso_cylinder_parser_accepts_face_weighted_lsq_gradient_method():
             "face_weighted_lsq",
             "--velocity_gradient_method",
             "face_weighted_lsq",
-            "--rhie_chow_pressure_gradient_method",
-            "face_weighted_lsq",
         ]
     )
 
     assert args.pressure_gradient_method == "face_weighted_lsq"
     assert args.velocity_gradient_method == "face_weighted_lsq"
-    assert args.rhie_chow_pressure_gradient_method == "face_weighted_lsq"
 
 
-def test_piso_cylinder_uses_patch_velocity_dirichlet_only():
+def test_piso_cylinder_uses_patch_dirichlet_velocity_only():
     bm.set_backend("numpy")
-    from fealpy.fvm import CylinderFlowCase, FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import CylinderFlowCase, NSFVMPISOModel
 
     case = CylinderFlowCase(
         mesh_size=0.18,
@@ -87,20 +82,22 @@ def test_piso_cylinder_uses_patch_velocity_dirichlet_only():
         {
             "pde": case,
             "mesh_type": "improved_tri",
-            "space_degree": 0,
             "duration": (0.0, 0.02),
-            "nt": 2,
+            "time_steps": 2,
             "n_correctors": 2,
             "boundary_conditions": case.engineering_boundary_conditions,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
             "log_level": "ERROR",
             "pbar_log": False,
         }
     )
 
-    selected_faces, selected_velocity = model.boundary_conditions.boundary_face_velocity(
-        "velocity",
-        mesh=model.mesh,
+    selected_faces = (
+        model.solver.spatial_face_velocity.boundary
+        .dirichlet_operator.faces
+    )
+    selected_velocity = (
+        model.solver.spatial_face_velocity.boundary
+        .dirichlet_operator.values
     )
     face_centers = model.mesh.entity_barycenter("face")[selected_faces]
 
@@ -110,9 +107,9 @@ def test_piso_cylinder_uses_patch_velocity_dirichlet_only():
     assert not bool(bm.to_numpy(bm.any(case.is_outlet_boundary(face_centers))))
 
 
-def test_piso_pressure_flux_includes_pressure_dirichlet_outlet():
+def test_piso_pressure_flux_includes_dirichlet_pressure_outlet():
     bm.set_backend("numpy")
-    from fealpy.fvm import CylinderFlowCase, FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import CylinderFlowCase, NSFVMPISOModel
 
     case = CylinderFlowCase(
         mesh_size=0.18,
@@ -123,35 +120,43 @@ def test_piso_pressure_flux_includes_pressure_dirichlet_outlet():
         {
             "pde": case,
             "mesh_type": "improved_tri",
-            "space_degree": 0,
             "duration": (0.0, 0.02),
-            "nt": 2,
+            "time_steps": 2,
             "n_correctors": 2,
             "boundary_conditions": case.engineering_boundary_conditions,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
             "log_level": "ERROR",
             "pbar_log": False,
         }
     )
 
-    a_p = bm.ones(2 * model.NC)
+    a_p = bm.ones(model.NC)
     pressure = bm.ones(model.NC)
-    coef = model.pressure_response_face_coefficient(
-        a_p,
-        model.controls.face_interpolation_method,
+    coef = model.solver.pressure_equation.face_response_coefficient(
+        a_p
     )
-    flux = model.pressure_orthogonal_flux(pressure, coef)
-    flux = flux - model.pressure_nonorthogonal_cross_flux(
+    equation = model.solver.pressure_equation
+    flux = equation.orthogonal_flux(pressure, coef)
+    flux = flux - equation.nonorthogonal_cross_flux(
         pressure,
         coef,
-        interpolation_method=model.controls.face_interpolation_method,
+        interpolation_method=(
+            model.solver.controls.pressure_response_interpolation
+        ),
+        pressure_gradient=(
+            model.solver.pressure_system.boundary.gradient.cell_gradient(
+                pressure
+            )
+        ),
+        gradient_boundary=(
+            model.solver.pressure_system.boundary.gradient.boundary
+        ),
     )
-    flux = model.add_pressure_dirichlet_flux(
+    flux = equation.add_dirichlet_flux(
         flux,
         pressure,
         coef,
-        model.pressure_dirichlet_value,
-        model.pressure_dirichlet_threshold,
+        model.solver.pressure_system.boundary.dirichlet_operator.faces,
+        model.solver.pressure_system.boundary.dirichlet_operator.values,
     )
     boundary_faces = model.mesh.boundary_face_index()
     face_centers = model.mesh.entity_barycenter("face")[boundary_faces]
@@ -163,7 +168,7 @@ def test_piso_pressure_flux_includes_pressure_dirichlet_outlet():
 
 def test_piso_cylinder_open_outlet_short_run_stays_bounded():
     bm.set_backend("numpy")
-    from fealpy.fvm import CylinderFlowCase, FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import CylinderFlowCase, NSFVMPISOModel
 
     case = CylinderFlowCase(
         mesh_size=0.18,
@@ -174,23 +179,21 @@ def test_piso_cylinder_open_outlet_short_run_stays_bounded():
         {
             "pde": case,
             "mesh_type": "improved_tri",
-            "space_degree": 0,
             "duration": (0.0, 1.5),
-            "nt": 30,
+            "time_steps": 30,
             "n_correctors": 4,
-            "momentum_nonorthogonal_max_iter": 2,
-            "pressure_nonorthogonal_max_iter": 2,
+            "momentum_nonorthogonal_max_iterations": 10,
+            "pressure_nonorthogonal_max_iterations": 10,
             "boundary_conditions": case.engineering_boundary_conditions,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
             "log_level": "ERROR",
             "pbar_log": False,
         }
     )
-    model.solve()
-    speed = bm.sqrt(model.uh**2 + model.vh**2)
-    _, boundary_velocity = model.boundary_conditions.boundary_face_velocity(
-        "velocity",
-        mesh=model.mesh,
+    result = model.solve()
+    speed = bm.linalg.norm(result.velocity, axis=1)
+    boundary_velocity = (
+        model.solver.spatial_face_velocity.boundary
+        .dirichlet_operator.values
     )
     inlet_speed = bm.max(bm.sqrt(boundary_velocity[:, 0] ** 2 + boundary_velocity[:, 1] ** 2))
 
@@ -201,7 +204,7 @@ def test_piso_cylinder_open_outlet_short_run_stays_bounded():
 def test_piso_cylinder_history_reports_outlet_backflow_flux(tmp_path: Path):
     bm.set_backend("numpy")
     import pytest
-    from fealpy.fvm import CylinderFlowCase, FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import CylinderFlowCase, NSFVMPISOModel
     CylinderPISOHistory = load_piso_example().CylinderPISOHistory
 
     case = CylinderFlowCase(
@@ -213,12 +216,10 @@ def test_piso_cylinder_history_reports_outlet_backflow_flux(tmp_path: Path):
         {
             "pde": case,
             "mesh_type": "improved_tri",
-            "space_degree": 0,
             "duration": (0.0, 0.02),
-            "nt": 2,
+            "time_steps": 2,
             "n_correctors": 2,
             "boundary_conditions": case.engineering_boundary_conditions,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
             "log_level": "ERROR",
             "pbar_log": False,
         }

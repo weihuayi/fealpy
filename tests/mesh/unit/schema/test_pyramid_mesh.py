@@ -12,8 +12,8 @@ PYRAMID_DATA = [
             [
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0],
                 [1.0, 1.0, 0.0],
+                [0.0, 1.0, 0.0],
                 [0.5, 0.5, 1.0],
             ],
             dtype=bm.float64,
@@ -25,9 +25,9 @@ PYRAMID_DATA = [
         "tangent_shape": (1, 3, 3),
         "local_edges": [
             [0, 1],
+            [1, 2],
             [2, 3],
-            [0, 2],
-            [1, 3],
+            [3, 0],
             [0, 4],
             [1, 4],
             [2, 4],
@@ -118,7 +118,7 @@ class TestPyramidMesh:
         phi = PyramidSchema.geometry_shape_function(bcs)
         _assert_allclose(
             phi,
-            bm.asarray([[0.09375, 0.03125, 0.28125, 0.09375, 0.5]], dtype=bm.float64),
+            bm.asarray([[0.09375, 0.03125, 0.09375, 0.28125, 0.5]], dtype=bm.float64),
             "Collapsed pyramid shape-function values should match hand calculation.",
         )
         _assert_allclose(
@@ -148,8 +148,8 @@ class TestPyramidMesh:
         reference_vertices = [
             (0.0, 0.0, 0.0),
             (1.0, 0.0, 0.0),
-            (0.0, 1.0, 0.0),
             (1.0, 1.0, 0.0),
+            (0.0, 1.0, 0.0),
             (0.0, 0.0, 1.0),
         ]
         for i, ref_vertex in enumerate(reference_vertices):

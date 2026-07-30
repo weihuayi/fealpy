@@ -84,8 +84,8 @@ class StokesFVMRCModel(ComputationalModel):
         self.velocity_gradient = GradientReconstruct(
             self.mesh,
             method="green_gauss",
-            gd=self.pde.dirichlet_velocity,
-            bc_type="dirichlet",
+            boundary_value=self.pde.dirichlet_velocity,
+            boundary_type="dirichlet",
         )
         self.fvm_geometry = FVMGeometry(self.mesh)
         self.velocity_dirichlet_bc = DirichletBC(
@@ -118,6 +118,7 @@ class StokesFVMRCModel(ComputationalModel):
                 uh,
                 grad_f,
                 geometry=self.fvm_geometry,
+                method="bounded_over_relaxed",
                 boundary_policy="all",
             )
         )
@@ -163,7 +164,11 @@ class StokesFVMRCModel(ComputationalModel):
         M3 = BlockForm([[M1, M2]]).assembly_sparse_matrix(format='csr')
         # nbc = NeumannBC(self.mesh, self.pde.neumann_pressure)
         nbc = NeumannBC(self.mesh)
-        AB, f = self.velocity_dirichlet_bc.apply_diffusion(AB, f)
+        AB, f = self.velocity_dirichlet_bc.apply_diffusion(
+            AB,
+            f,
+            components=self.GD,
+        )
         ap = self._matrix_diagonal(AB)
 
         M1 = nbc.ConvectionApplyX(M1, f[:self.NC])

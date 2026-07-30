@@ -13,6 +13,22 @@ def _box_space(nx=2, ny=1):
     return mesh, ScaledMonomialSpace2d(mesh, 0)
 
 
+def _bad_two_triangle_space():
+    bm.set_backend("numpy")
+    node = bm.array(
+        [
+            [0.0, 0.0],
+            [0.0, 1.0],
+            [-0.01, -1.0],
+            [0.01, 1.0],
+        ],
+        dtype=bm.float64,
+    )
+    cell = bm.array([[0, 1, 2], [0, 3, 1]], dtype=bm.int32)
+    mesh = TriangleMesh(node, cell)
+    return mesh, ScaledMonomialSpace2d(mesh, 0)
+
+
 def test_scalar_diffusion_local_matrix_matches_orthogonal_flux_formula():
     from fealpy.fvm import FVMGeometry
     from fealpy.fvm.scalar_diffusion_integrator import scalar_diffusion_local_matrix
@@ -20,14 +36,18 @@ def test_scalar_diffusion_local_matrix_matches_orthogonal_flux_formula():
     mesh, space = _box_space(nx=2, ny=1)
     geometry = FVMGeometry(mesh)
     coef = np.linspace(0.8, 1.4, mesh.number_of_faces())
-    qf = mesh.quadrature_formula(2, "face")
-    bcs, _ = qf.get_quadrature_points_and_weights()
-    phi = space.basis(bcs)
-    _, mag_E_f, _ = geometry.over_relaxed_decomposition()
+    orthogonal_factor = geometry.diffusion_face_decomposition(
+        "over_relaxed"
+    ).orthogonal_factor
 
-    local = scalar_diffusion_local_matrix(space, geometry, phi, coef=coef)
+    local = scalar_diffusion_local_matrix(
+        space,
+        space.number_of_local_dofs(),
+        coef=coef,
+        orthogonal_factor=orthogonal_factor,
+    )
 
-    expected_coef = np.asarray(mag_E_f) / np.asarray(geometry.mag_d_f) * coef
+    expected_coef = np.asarray(orthogonal_factor) * coef
     expected = expected_coef[:, None, None] * np.array(
         [[1.0, -1.0], [-1.0, 1.0]]
     )
@@ -40,40 +60,15 @@ def test_scalar_diffusion_rejects_cell_wise_coefficient():
 
     mesh, space = _box_space(nx=2, ny=1)
     geometry = FVMGeometry(mesh)
-    qf = mesh.quadrature_formula(2, "face")
-    bcs, _ = qf.get_quadrature_points_and_weights()
-    phi = space.basis(bcs)
-
     with pytest.raises(ValueError, match="face-wise"):
         scalar_diffusion_local_matrix(
             space,
-            geometry,
-            phi,
+            space.number_of_local_dofs(),
             coef=np.ones(mesh.number_of_cells()),
+            orthogonal_factor=geometry.diffusion_face_decomposition(
+                "over_relaxed"
+            ).orthogonal_factor,
         )
-
-
-def test_scalar_diffusion_integrator_delegates_local_matrix_construction(monkeypatch):
-    import fealpy.fvm.scalar_diffusion_integrator as diffusion_module
-    from fealpy.fvm import ScalarDiffusionIntegrator
-
-    mesh, space = _box_space(nx=1, ny=1)
-    calls = []
-
-    def counted_local_matrix(space_arg, geometry, phi, *, coef=None):
-        calls.append((space_arg, geometry, phi, coef))
-        return bm.zeros((mesh.number_of_faces(), 2, 2), dtype=space.ftype)
-
-    monkeypatch.setattr(
-        diffusion_module,
-        "scalar_diffusion_local_matrix",
-        counted_local_matrix,
-    )
-
-    BilinearForm(space).add_integrator(ScalarDiffusionIntegrator()).assembly()
-
-    assert len(calls) == 1
-    assert calls[0][0] is space
 
 
 def test_scalar_diffusion_integrator_expands_face_stencil_for_tensor_space():
@@ -87,3 +82,37 @@ def test_scalar_diffusion_integrator_expands_face_stencil_for_tensor_space():
     ).assembly()
 
     assert matrix.shape == (2 * scalar_space.number_of_global_dofs(),) * 2
+
+
+def test_scalar_diffusion_variants_use_selected_Ef():
+    from fealpy.fem import BilinearForm
+    from fealpy.fvm import FVMGeometry, ScalarDiffusionIntegrator
+
+    mesh, space = _bad_two_triangle_space()
+    geometry = FVMGeometry(mesh)
+
+    ordinary = BilinearForm(space).add_integrator(
+        ScalarDiffusionIntegrator(
+            geometry=geometry,
+            method="over_relaxed",
+        )
+    ).assembly()
+    bounded = BilinearForm(space).add_integrator(
+        ScalarDiffusionIntegrator(
+            geometry=geometry,
+            method="bounded_over_relaxed",
+            nonorthogonal_eps=0.05,
+        )
+    ).assembly()
+
+    assert not np.allclose(
+        np.asarray(ordinary.to_dense()),
+        np.asarray(bounded.to_dense()),
+    )
+
+
+def test_scalar_diffusion_rejects_unknown_method():
+    from fealpy.fvm import ScalarDiffusionIntegrator
+
+    with pytest.raises(ValueError, match="unknown diffusion method"):
+        ScalarDiffusionIntegrator(method="misspelled")

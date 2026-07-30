@@ -16,11 +16,11 @@ class QuadrilateralSchema(ShapedEntitySchema):
     name = "quad"
     top_dim = 2
     OFace = {
-        "segment": [[0, 1], [1, 3], [3, 2], [2, 0]],
+        "segment": [[0, 1], [1, 2], [2, 3], [3, 0]],
         "point": [[0], [1], [2], [3]],
     }
     SFace = {
-        "segment": [[0, 1], [1, 3], [2, 3], [0, 2]],
+        "segment": [[0, 1], [1, 2], [2, 3], [0, 3]],
         "point": [[0], [1], [2], [3]],
     }
     orientation = [
@@ -28,6 +28,7 @@ class QuadrilateralSchema(ShapedEntitySchema):
         (2, 3, 0, 1), (0, 2, 1, 3), (1, 0, 3, 2), (3, 1, 2, 0),
     ]
     ccw = [0, 1, 3, 2]
+    _tp_to_contract = [0, 1, 3, 2]
 
     @classmethod
     def multi_index(cls, order: tuple[int, ...], *, internal: bool = False, tensorprod: bool = True) -> Tensor:
@@ -58,7 +59,7 @@ class QuadrilateralSchema(ShapedEntitySchema):
     def bc_to_point(cls, ctx: EntityContext, bcs: tuple[Tensor, ...], index: Index | None) -> Tensor:
         bcs = _require_bcs_tuple(bcs, "quadrilateral bc_to_point", 2)
         quad = ctx.sector.indices if index is None else ctx.sector.indices[index]
-        points = ctx.block.positions[quad]
+        points = ctx.block.positions[quad[:, [0, 1, 3, 2]]]
         bc0 = bcs[0].reshape(-1, 2)
         bc1 = bcs[1].reshape(-1, 2)
         bc = bm.einsum("im,jn->ijmn", bc1, bc0).reshape(-1, 4)
@@ -148,7 +149,7 @@ class QuadrilateralSchema(ShapedEntitySchema):
             quad = bm.reshape(quad, (1, -1))
         if bcs is None:
             if not ref:
-                points = ctx.block.positions[quad[:, [0, 1, 3, 2]]]
+                points = ctx.block.positions[quad]
                 vr = 0.5 * ((points[:, 1, :] - points[:, 0, :]) + (points[:, 2, :] - points[:, 3, :]))
                 vs = 0.5 * ((points[:, 3, :] - points[:, 0, :]) + (points[:, 2, :] - points[:, 1, :]))
                 jac = bm.stack([vr, vs], axis=-1)
@@ -205,8 +206,9 @@ class QuadrilateralSchema(ShapedEntitySchema):
     ) -> Tensor:
         bcs = _require_bcs_tuple(bcs, "quadrilateral jacobi_matrix", 2)
         node = ctx.block.positions
-        cell = ctx.sector.indices
+        cell = ctx.sector.indices if index is None else ctx.sector.indices[index]
         gphi = cls.grad_shape_function_reference(bcs, p=(1, 1)) # (NQ, num_shape, ref_dim)
+        cell = cell[:, cls._tp_to_contract]
         J = bm.einsum('cim, qin -> cqmn', node[cell], gphi) # (NC, NQ, GD, ref_dim)
 
         return J
@@ -214,7 +216,7 @@ class QuadrilateralSchema(ShapedEntitySchema):
     @classmethod
     def measure(cls, ctx: EntityContext, index: Index | None) -> Tensor:
         quad = ctx.sector.indices if index is None else ctx.sector.indices[index]
-        points = ctx.block.positions[quad[:, [0, 1, 3, 2]]]
+        points = ctx.block.positions[quad]
         v0 = points[:, 1, :] - points[:, 0, :]
         v1 = points[:, 2, :] - points[:, 0, :]
         v2 = points[:, 3, :] - points[:, 0, :]
@@ -231,20 +233,22 @@ class QuadrilateralSchema(ShapedEntitySchema):
     @classmethod
     def normal(cls, ctx: EntityContext, index: Index | None) -> Tensor:
         quad = ctx.sector.indices if index is None else ctx.sector.indices[index]
-        points = ctx.block.positions[quad[:, [0, 1, 3, 2]]]
-        v0 = points[:, 1, :] - points[:, 0, :]
-        v1 = points[:, 2, :] - points[:, 0, :]
-        v2 = points[:, 3, :] - points[:, 0, :]
-        if points.shape[-1] == 2:
-            cross01 = v0[:, 0] * v1[:, 1] - v0[:, 1] * v1[:, 0]
-            cross12 = v1[:, 0] * v2[:, 1] - v1[:, 1] * v2[:, 0]
-            return cross01 + cross12
-        return bm.cross(v0, v1) + bm.cross(v1, v2)
+        points = ctx.block.positions[quad]
+        gd = int(points.shape[2])
+        if gd == 2:
+            return bm.zeros((points.shape[0], 0, gd), **bm.context(points))
+        if gd == 3:
+            v1 = points[:, 1, :] - points[:, 0, :]
+            v2 = points[:, 2, :] - points[:, 0, :]
+            v3 = points[:, 3, :] - points[:, 0, :]
+            normal = bm.cross(v1, v2) + bm.cross(v2, v3)
+            return bm.expand_dims(normal, axis=1)
+        raise ValueError(f"unsupported geometric dimension: {gd}")
 
     @classmethod
     def tangent(cls, ctx: EntityContext, index: Index | None) -> Tensor:
         quad = ctx.sector.indices if index is None else ctx.sector.indices[index]
-        points = ctx.block.positions[quad[:, [0, 1, 3, 2]]]
+        points = ctx.block.positions[quad]
         vr = 0.5 * ((points[:, 1, :] - points[:, 0, :]) + (points[:, 2, :] - points[:, 3, :]))
         vs = 0.5 * ((points[:, 3, :] - points[:, 0, :]) + (points[:, 2, :] - points[:, 1, :]))
         return bm.stack([vr, vs], axis=1)

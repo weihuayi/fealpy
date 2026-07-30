@@ -49,12 +49,12 @@ def _build_single_hex_view():
         [
             [0.0, 0.0, 0.0],
             [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
             [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
             [0.0, 0.0, 1.0],
             [1.0, 0.0, 1.0],
-            [0.0, 1.0, 1.0],
             [1.0, 1.0, 1.0],
+            [0.0, 1.0, 1.0],
         ],
         dtype=bm.float64,
     )
@@ -71,12 +71,12 @@ def _build_rectangular_hex_view():
         [
             [10.0, -1.0, 2.0],
             [12.0, -1.0, 2.0],
-            [10.0, 2.0, 2.0],
             [12.0, 2.0, 2.0],
+            [10.0, 2.0, 2.0],
             [10.0, -1.0, 7.0],
             [12.0, -1.0, 7.0],
-            [10.0, 2.0, 7.0],
             [12.0, 2.0, 7.0],
+            [10.0, 2.0, 7.0],
         ],
         dtype=bm.float64,
     )
@@ -182,16 +182,16 @@ class TestHexahedronSchema:
 
         _assert_shape(
             points,
-            (1, 2, 2, 2, 3),
-            "Tensor-product barycentric coordinates map to a tensor grid of points",
+            (1, 8, 3),
+            "Tensor-product barycentric coordinates map to flattened (NC, NQ, GD) points",
         )
         _assert_allclose(
-            points[0, 0, 0, 0],
+            points[0, 0],
             bm.asarray([0.8, 0.3, 0.6], dtype=bm.float64),
             "Non-symmetric tensor-product coordinates should map as (u1, v1, w1)",
         )
         _assert_allclose(
-            points[0, 1, 1, 1],
+            points[0, 7],
             bm.asarray([0.35, 0.9, 0.25], dtype=bm.float64),
             "Second tensor-product sample should preserve each coordinate direction",
         )
@@ -218,7 +218,7 @@ class TestHexahedronSchema:
         )
         points = hex_view.schema.bc_to_point(ctx, bcs, None)
         _assert_allclose(
-            points[0, 0, 0, 0],
+            points[0, 0],
             bm.asarray([11.6, -0.1, 5.0], dtype=bm.float64),
             "Tensor-product coordinates should scale and translate in physical space",
         )
@@ -241,12 +241,12 @@ class TestHexahedronSchema:
             [[
                 [0.28, 0.0, 0.08, 0.0, 0.14, 0.0],
                 [0.0, 0.28, 0.32, 0.0, 0.56, 0.0],
-                [0.12, 0.0, 0.0, 0.08, 0.06, 0.0],
                 [0.0, 0.12, 0.0, 0.32, 0.24, 0.0],
+                [0.12, 0.0, 0.0, 0.08, 0.06, 0.0],
                 [0.42, 0.0, 0.12, 0.0, 0.0, 0.14],
                 [0.0, 0.42, 0.48, 0.0, 0.0, 0.56],
-                [0.18, 0.0, 0.0, 0.12, 0.0, 0.06],
                 [0.0, 0.18, 0.0, 0.48, 0.0, 0.24],
+                [0.18, 0.0, 0.0, 0.12, 0.0, 0.06],
             ]],
             dtype=bm.float64,
         )
@@ -254,12 +254,12 @@ class TestHexahedronSchema:
             [[
                 [-0.28, -0.08, -0.14],
                 [0.28, -0.32, -0.56],
-                [-0.12, 0.08, -0.06],
                 [0.12, 0.32, -0.24],
+                [-0.12, 0.08, -0.06],
                 [-0.42, -0.12, 0.14],
                 [0.42, -0.48, 0.56],
-                [-0.18, 0.12, 0.06],
                 [0.18, 0.48, 0.24],
+                [-0.18, 0.12, 0.06],
             ]],
             dtype=bm.float64,
         )
@@ -275,12 +275,12 @@ class TestHexahedronSchema:
             [[[
                 [-0.14, -0.08 / 3.0, -0.028],
                 [0.14, -0.32 / 3.0, -0.112],
-                [-0.06, 0.08 / 3.0, -0.012],
                 [0.06, 0.32 / 3.0, -0.048],
+                [-0.06, 0.08 / 3.0, -0.012],
                 [-0.21, -0.04, 0.028],
                 [0.21, -0.16, 0.112],
-                [-0.09, 0.04, 0.012],
                 [0.09, 0.16, 0.048],
+                [-0.09, 0.04, 0.012],
             ]]],
             dtype=bm.float64,
         )

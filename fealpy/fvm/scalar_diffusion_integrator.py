@@ -15,6 +15,13 @@ from fealpy.sparse import CSRTensor
 from .fvm_geometry import FVMGeometry
 
 
+def _local_dof_count(space: _FS) -> int:
+    scalar_space = getattr(space, "scalar_space", None)
+    if scalar_space is None:
+        return int(space.number_of_local_dofs())
+    return int(space.dof_numel * scalar_space.number_of_local_dofs())
+
+
 class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
     """Assemble the implicit two-point diffusion contribution.
 
@@ -32,13 +39,19 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
                  index: Index=_S,
                  geometry: Optional[FVMGeometry]=None,
                  batched: bool=False,
-                 method: Optional[str]=None) -> None:
+                 method: str="over_relaxed",
+                 nonorthogonal_eps: float=0.05) -> None:
         super().__init__()
         self.coef = coef
         self.q = 2 if q is None else q
         self.index = index
         self.geometry = geometry
         self.batched = batched
+        if nonorthogonal_eps <= 0.0:
+            raise ValueError("nonorthogonal_eps must be positive.")
+        self.nonorthogonal_eps = float(nonorthogonal_eps)
+        if method not in self.assembly:
+            raise ValueError(f"unknown diffusion method: {method!r}")
         self.assembly.set(method)
 
     @enable_cache
@@ -63,23 +76,42 @@ class ScalarDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         index = self.index
         mesh = getattr(space, 'mesh', None)
         geometry = self.geometry if self.geometry is not None else FVMGeometry(mesh, index=index)
-        q = self.q
-        qf = mesh.quadrature_formula(q, 'face')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        basis = space.basis(bcs, index=index)
-        return geometry, index, bcs, basis
+        return geometry
 
-    @variantmethod
+    @variantmethod("over_relaxed")
     def assembly(self, space: _FS) -> TensorLike:
-        geometry, _, _, basis = self.fetch(space)
-        return scalar_diffusion_local_matrix(space, geometry, basis, coef=self.coef)
+        geometry = self.fetch(space)
+        decomposition = geometry.diffusion_face_decomposition("over_relaxed")
+        return scalar_diffusion_local_matrix(
+            space,
+            _local_dof_count(space),
+            coef=self.coef,
+            orthogonal_factor=decomposition.orthogonal_factor,
+        )
+
+    @assembly.register("bounded_over_relaxed")
+    def assembly(self, space: _FS) -> TensorLike:
+        geometry = self.fetch(space)
+        decomposition = geometry.diffusion_face_decomposition(
+            "bounded_over_relaxed", eps=self.nonorthogonal_eps
+        )
+        return scalar_diffusion_local_matrix(
+            space,
+            _local_dof_count(space),
+            coef=self.coef,
+            orthogonal_factor=decomposition.orthogonal_factor,
+        )
+
+    @assembly.register("uncorrected")
+    def assembly(self, space: _FS) -> TensorLike:
+        return self.assembly["over_relaxed"](space)
 
 def scalar_diffusion_local_matrix(
     space: _FS,
-    geometry: FVMGeometry,
-    basis: TensorLike,
+    local_dofs: int,
     *,
     coef: Optional[CoefLike]=None,
+    orthogonal_factor: TensorLike,
 ) -> TensorLike:
     """Return local two-point matrices for the orthogonal diffusion flux.
 
@@ -87,37 +119,41 @@ def scalar_diffusion_local_matrix(
     Cell-wise coefficients must be interpolated to faces before calling this
     function.
 
-    Future cleanup directions:
-
-    - Add an explicit face-coefficient construction function if cell-wise or
-      callable diffusion coefficients are needed.  The interpolation strategy
-      should be selected deliberately, for example linear for smooth
-      coefficients or harmonic for jump coefficients.
-    - Keep ``over_relaxed_decomposition`` fixed for the current production
-      route.  If minimum-correction, orthogonal-only, or bounded variants are
-      needed, expose the decomposition strategy as an explicit option.
-    - Revisit the local matrix layout before using this function with 3D,
-      higher-order, or non-two-cell face spaces.
-    - Consider caching ``mag_E_f / mag_d_f`` and the component base matrix only
-      after profiler data shows repeated assembly cost is significant.
+    ``orthogonal_factor`` is supplied by ``DiffusionFaceDecomposition`` so the
+    implicit matrix uses exactly the same face split as the explicit and
+    boundary diffusion terms.
     """
-    D = basis.shape[-1]
-    _, mag_E_f, _ = geometry.over_relaxed_decomposition()
+    D = int(local_dofs)
     if coef is None:
-        face_coef = bm.ones_like(mag_E_f, dtype=space.ftype)
+        face_coef = bm.ones_like(orthogonal_factor, dtype=space.ftype)
     elif isinstance(coef, (int, float)):
-        face_coef = bm.full_like(mag_E_f, fill_value=coef, dtype=space.ftype)
+        face_coef = bm.full_like(
+            orthogonal_factor, fill_value=coef, dtype=space.ftype
+        )
     else:
-        face_coef = bm.array(coef, dtype=space.ftype)
+        face_coef = bm.array(
+            coef,
+            dtype=space.ftype,
+            device=bm.get_device(orthogonal_factor),
+        )
         if face_coef.shape == ():
-            face_coef = bm.ones_like(mag_E_f, dtype=space.ftype) * face_coef
-        elif face_coef.ndim != 1 or face_coef.shape[0] != mag_E_f.shape[0]:
+            face_coef = (
+                bm.ones_like(orthogonal_factor, dtype=space.ftype) * face_coef
+            )
+        elif (
+            face_coef.ndim != 1
+            or face_coef.shape[0] != orthogonal_factor.shape[0]
+        ):
             raise ValueError(
                 "coef must be scalar or face-wise for ScalarDiffusionIntegrator."
             )
 
-    face_strength = bm.einsum("i,i->i", mag_E_f / geometry.mag_d_f, face_coef)
-    direction_matrix = bm.array([[1.0, -1.0], [-1.0, 1.0]], dtype=space.ftype)
+    face_strength = orthogonal_factor * face_coef
+    direction_matrix = bm.array(
+        [[1.0, -1.0], [-1.0, 1.0]],
+        dtype=space.ftype,
+        device=bm.get_device(orthogonal_factor),
+    )
     eye_D = bm.eye(D, dtype=space.ftype, device=bm.get_device(space))
     base_matrix = bm.einsum("ij,pq->ipjq", eye_D, direction_matrix).reshape(
         2 * D, 2 * D
@@ -145,19 +181,26 @@ class ScalarDiffusionMatrixAssembler:
         space: _FS,
         *,
         geometry: Optional[FVMGeometry] = None,
+        method: str = "over_relaxed",
+        nonorthogonal_eps: float = 0.05,
     ) -> None:
         self.space = space
         self.mesh = getattr(space, "mesh", None)
         self.geometry = geometry if geometry is not None else FVMGeometry(self.mesh)
-        self.NC = self.mesh.number_of_cells()
+        self.NC = self.geometry.NC
         self.sparse_shape = (self.NC, self.NC)
+        if nonorthogonal_eps <= 0.0:
+            raise ValueError("nonorthogonal_eps must be positive.")
+        self.nonorthogonal_eps = float(nonorthogonal_eps)
+        if method not in self.diffusion_face_factor:
+            raise ValueError(f"unknown diffusion method: {method!r}")
+        self.diffusion_face_factor.set(method)
 
         internal = bm.nonzero(self.geometry.is_internal)[0]
         owner = self.geometry.owner[internal]
         neighbour = self.geometry.neighbour[internal]
-        _, mag_E_f, _ = self.geometry.over_relaxed_decomposition()
         self.internal = internal
-        self.face_factor = mag_E_f[internal] / self.geometry.mag_d_f[internal]
+        self.face_factor = self.diffusion_face_factor()
 
         rows = bm.concatenate([owner, owner, neighbour, neighbour])
         cols = bm.concatenate([owner, neighbour, owner, neighbour])
@@ -209,12 +252,32 @@ class ScalarDiffusionMatrixAssembler:
         )
         self.col = bm.astype(col, owner.dtype)
 
+    @variantmethod("over_relaxed")
+    def diffusion_face_factor(self) -> TensorLike:
+        decomposition = self.geometry.diffusion_face_decomposition("over_relaxed")
+        return decomposition.orthogonal_factor[self.internal]
+
+    @diffusion_face_factor.register("bounded_over_relaxed")
+    def diffusion_face_factor(self) -> TensorLike:
+        decomposition = self.geometry.diffusion_face_decomposition(
+            "bounded_over_relaxed", eps=self.nonorthogonal_eps
+        )
+        return decomposition.orthogonal_factor[self.internal]
+
+    @diffusion_face_factor.register("uncorrected")
+    def diffusion_face_factor(self) -> TensorLike:
+        return self.diffusion_face_factor["over_relaxed"]()
+
     def assembly(self, coef: TensorLike) -> CSRTensor:
         """Return the scalar diffusion matrix for the current face coefficient."""
         if isinstance(coef, (int, float)):
             coef_f = bm.full_like(self.face_factor, fill_value=coef)
         else:
-            coef = bm.array(coef, dtype=self.face_factor.dtype)
+            coef = bm.array(
+                coef,
+                dtype=self.face_factor.dtype,
+                device=bm.get_device(self.face_factor),
+            )
             if coef.shape == ():
                 coef_f = bm.full_like(self.face_factor, fill_value=coef)
             else:

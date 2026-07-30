@@ -19,14 +19,21 @@ from .benchmark_postprocess import (
     write_dict_csv,
     write_solution_vtk,
 )
+from .fvm_geometry import FVMGeometry
+from .gradient_reconstruct import GradientReconstruct
+from .piso_result import PisoSnapshot
 
 
 def _as_numpy(values: TensorLike) -> np.ndarray:
     return np.asarray(bm.to_numpy(values))
 
 
-def _as_backend(values: np.ndarray) -> TensorLike:
-    return bm.array(values, dtype=bm.float64)
+def _as_backend(values: np.ndarray, reference: TensorLike) -> TensorLike:
+    return bm.array(
+        values,
+        dtype=reference.dtype,
+        device=bm.get_device(reference),
+    )
 
 
 def sample_centerline(
@@ -56,7 +63,7 @@ def sample_centerline(
         [selected_values[inverse == i].mean() for i in range(unique_coordinates.size)]
     )
     profile = np.column_stack([unique_coordinates, averaged_values])
-    return _as_backend(profile)
+    return _as_backend(profile, points)
 
 
 def centerline_velocity_profiles(
@@ -194,35 +201,34 @@ class CavitySnapshotWriter:
         self,
         config: CavityOutputConfig,
         *,
+        geometry: FVMGeometry,
+        velocity_gradient: GradientReconstruct,
         domain: tuple[float, float, float, float] = (0.0, 1.0, 0.0, 1.0),
-        nt: int | None = None,
+        total_steps: int | None = None,
         boundary_margin: float = 0.05,
     ) -> None:
         self.config = config
+        self.geometry = geometry
+        self.velocity_gradient = velocity_gradient
         self.domain = domain
-        self.nt = nt
+        self.total_steps = total_steps
         self.boundary_margin = boundary_margin
         self.history: list[dict] = []
         self._previous_velocity = None
 
     def __call__(
         self,
-        *,
-        step: int,
-        time: float,
-        model,
-        cell_velocity,
-        face_velocity=None,
-        pressure=None,
-        flux=None,
+        snapshot: PisoSnapshot,
     ) -> None:
-        uh = cell_velocity[:, 0]
-        vh = cell_velocity[:, 1]
-        velocity = bm.stack([uh, vh], axis=-1)
-        speed = bm.sqrt(uh**2 + vh**2)
+        step = snapshot.step
+        time = snapshot.time
+        cell_velocity = snapshot.velocity
+        pressure = snapshot.pressure
+        flux = snapshot.face_flux
+        speed = bm.linalg.norm(cell_velocity, axis=1)
         vortex = primary_vortex_summary(
-            model.mesh.entity_barycenter("cell"),
-            velocity,
+            self.geometry.cell_center,
+            cell_velocity,
             domain=self.domain,
             boundary_margin=self.boundary_margin,
         )
@@ -231,19 +237,26 @@ class CavitySnapshotWriter:
             "time": float(time),
             "max_speed": scalarize_value(bm.max(speed)),
             "velocity_update": self._velocity_update(cell_velocity),
-            "mass_residual": self._mass_residual(model, flux),
+            "mass_residual": self._mass_residual(flux),
             "vortex_x": vortex["x"],
             "vortex_y": vortex["y"],
         }
         self.history.append(row)
 
-        is_final = self.nt is not None and int(step) == int(self.nt)
+        is_final = (
+            self.total_steps is not None
+            and int(step) == int(self.total_steps)
+        )
         if self.config.write_vtk and should_write_snapshot(
             step, time, self.config, is_final=is_final
         ):
-            self.write_snapshot(model, step, cell_velocity, pressure)
+            self.write_snapshot(
+                step,
+                cell_velocity,
+                pressure,
+            )
 
-        self._previous_velocity = bm.array(cell_velocity)
+        self._previous_velocity = bm.copy(cell_velocity)
 
     def _velocity_update(self, cell_velocity):
         if self._previous_velocity is None:
@@ -251,26 +264,28 @@ class CavitySnapshotWriter:
         delta = cell_velocity - self._previous_velocity
         return scalarize_value(bm.max(bm.abs(delta)))
 
-    @staticmethod
-    def _mass_residual(model, flux):
-        if flux is None or not hasattr(model, "divergence_from_flux"):
+    def _mass_residual(self, flux):
+        if flux is None:
             return None
-        imbalance = model.divergence_from_flux(flux)
+        imbalance = self.geometry.scatter_face_flux_to_cells(flux)
         return scalarize_value(bm.max(bm.abs(imbalance)))
 
-    def write_snapshot(self, model, step: int, cell_velocity, pressure) -> None:
+    def write_snapshot(
+        self,
+        step: int,
+        cell_velocity,
+        pressure,
+    ) -> None:
         snapshot_dir = self.config.output_dir / f"{int(step):06d}"
         snapshot_dir.mkdir(parents=True, exist_ok=True)
-        uh = cell_velocity[:, 0]
-        vh = cell_velocity[:, 1]
         write_solution_vtk(
-            model.mesh,
-            uh,
-            vh,
+            self.geometry.mesh,
+            cell_velocity,
             pressure,
             snapshot_dir / "solution.vtu",
             fields=self.config.fields,
-            velocity_gradient=getattr(model, "velocity_gradient", None),
+            velocity_gradient=self.velocity_gradient,
+            geometry=self.geometry,
         )
 
     def write_time_history(self) -> None:
@@ -281,7 +296,10 @@ def write_benchmark_outputs(
     model,
     output_dir: str | Path,
     *,
+    velocity: TensorLike,
+    pressure: TensorLike,
     residuals: Iterable[dict] | None = None,
+    velocity_gradient: TensorLike | None = None,
     domain: tuple[float, float, float, float] = (0.0, 1.0, 0.0, 1.0),
     boundary_margin: float = 0.05,
     run_summary: dict | None = None,
@@ -291,8 +309,7 @@ def write_benchmark_outputs(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    points = model.mesh.entity_barycenter("cell")
-    velocity = bm.stack([model.uh, model.vh], axis=-1)
+    points = model.fvm_geometry.cell_center
     u_profile, v_profile = centerline_velocity_profiles(points, velocity)
     vortex = primary_vortex_summary(
         points,
@@ -306,12 +323,11 @@ def write_benchmark_outputs(
     write_dict_csv(output_dir / "vortex_summary.csv", [vortex])
     write_solution_vtk(
         model.mesh,
-        model.uh,
-        model.vh,
-        model.ph,
+        velocity,
+        pressure,
         output_dir / "solution.vtu",
         fields=fields,
-        velocity_gradient=getattr(model, "velocity_gradient", None),
+        velocity_gradient=velocity_gradient,
     )
 
     if residuals is not None:

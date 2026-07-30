@@ -54,7 +54,6 @@ class MeshPloter:
             box = None,
             showaxis = False,
             entity = None,
-            entities = None,
             index = slice(None),
         )
 
@@ -71,7 +70,6 @@ class MeshPloter:
                 box: Sequence[float] = ...,
                 showaxis = False,
                 entity: Any = ...,
-                entities: Any = ...,
                 index: slice = ...) -> list[Collection]: ...
     @overload
     def __call__(self, axes: Axes | ModuleType, *args, **kwargs) -> list[Collection]: ...
@@ -115,80 +113,35 @@ class MeshPloter:
         if isinstance(axes, Axes3D):
             axes.set_zlim(box[4:6])
 
-    @staticmethod
-    def _as_entity_specs(entity, entities) -> list[str | int] | None:
-        value = entities if entities is not None else entity
-        if value is None:
-            return None
-        if isinstance(value, (str, int)):
-            return [value]
-        return list(value)
-
-    def _entity_dim(self, spec: str | int) -> int:
-        if isinstance(spec, int):
-            return spec if spec >= 0 else self.mesh.top_dimension() + 1 + spec
-        alias = _ENTITY_ALIASES.get(spec)
-        if alias == 'cell':
-            return self.mesh.top_dimension()
-        if alias == 'face':
-            return self.mesh.top_dimension() - 1
-        if alias == 'edge':
-            return 1
-        if alias == 'node':
-            return 0
-        return self.mesh.block.get_sector(spec).schema.top_dim
-
-    def _selected_specs(self, kwargs) -> list[str | int]:
-        specs = self._as_entity_specs(kwargs.get('entity'), kwargs.get('entities'))
-        if specs is None:
-            return [self.mesh.top_dimension()]
-        return specs
-
-    def _sectors_by_dim(self, dim: int):
-        for name, sector in self.mesh.block.sectors.items():
-            if sector.schema.top_dim == dim:
-                yield name, sector
-
-    def _sectors_by_spec(self, spec: str | int):
-        if isinstance(spec, int):
-            yield from self._sectors_by_dim(self._entity_dim(spec))
-            return
-
-        alias = _ENTITY_ALIASES.get(spec)
-        if alias in {'cell', 'face', 'edge', 'node'}:
-            yield from self._sectors_by_dim(self._entity_dim(alias))
-            return
-
-        yield spec, self.mesh.block.get_sector(spec)
-
     def _draw_nodes(self, axes: Axes, node: NDArray, kwargs) -> list[Collection]:
-        return [A.scatter(axes=axes, points=node, color=kwargs['nodecolor'],
+        return [A.scatter(axes=axes, points=node[kwargs['index']], color=kwargs['nodecolor'],
                           marker=kwargs['marker'], markersize=kwargs['markersize'])]
 
     def _draw_edges(self, axes: Axes, node: NDArray, indices: NDArray, kwargs) -> list[Collection]:
         if indices.size == 0:
             return []
-        return [A.line(axes=axes, points=node, struct=indices,
+        return [A.line(axes=axes, points=node, struct=indices[kwargs['index']],
                        color=kwargs['edgecolor'], linewidths=kwargs['linewidths'])]
 
     def _draw_polygons(self, axes: Axes, node: NDArray, indices: NDArray, kwargs) -> list[Collection]:
         if indices.size == 0:
             return []
-        return [A.poly(axes=axes, points=node, struct=indices,
+        return [A.poly(axes=axes, points=node, struct=indices[kwargs['index']],
                        edgecolor=kwargs['edgecolor'], cellcolor=kwargs['cellcolor'],
                        linewidths=kwargs['linewidths'], alpha=kwargs['alpha'])]
 
     def _draw_surface(self, axes: Axes, node: NDArray, sector, kwargs) -> list[Collection]:
         collections: list[Collection] = []
         view = self.mesh.Entity(sector.schema_name)
-        surface_dim = sector.schema.top_dim - 1
+        index = kwargs.get('index', slice(None))
+        kwargs['index'] = slice(None)
 
-        for _, face_sector in self._sectors_by_dim(surface_dim):
-            face_view = self.mesh.Entity(face_sector.schema_name)
-            relation = view.to(face_view).tgt_indices
+        for face_name in sector.schema.OFace.keys():
+            face_view = self.mesh.Entity(face_name)
+            relation = view.to(face_view).tgt_indices[index]
             face_index = np.unique(np.asarray(relation).reshape(-1))
             face_index = face_index[np.asarray(face_view.boundary().mask)[face_index]]
-            indices = np.asarray(face_sector.indices)[face_index]
+            indices = np.asarray(face_view.indices)[face_index]
             if indices.ndim == 1:
                 indices = indices.reshape(1, -1)
             collections.extend(self._draw_polygons(axes, node, indices, kwargs))
@@ -227,20 +180,18 @@ class MeshPloter:
         node = self._node_array()
         collections: list[Collection] = []
 
-        specs = self._selected_specs(kwargs)
+        from ..schema.registry import schema_name_multi_parser
+        entity = kwargs.get('entity')
+        assert isinstance(entity, (str, int))
+        names = schema_name_multi_parser(
+            entity,
+            self.mesh.top_dimension(),
+            self.mesh.block.sectors.keys()
+        )
         # surface_drawn = False
-        drawn: set[str] = set()
-        for spec in specs:
-            for name, sector in self._sectors_by_spec(spec):
-                if name in drawn:
-                    continue
-                # if sector.schema.top_dim == 3:
-                #     collections.extend(self._draw_surface(axes, node, sector, kwargs))
-                #     surface_drawn = True
-                #     drawn.add(name)
-                #     continue
-                collections.extend(self._draw_sector(axes, node, sector, kwargs))
-                drawn.add(name)
+        for name in names:
+            sector = self.mesh.block.get_sector(name)
+            collections.extend(self._draw_sector(axes, node, sector, kwargs))
 
         return collections
 

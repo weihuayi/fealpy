@@ -2,74 +2,117 @@ import numpy as np
 import pytest
 
 
-def _model_options(nx=4, ny=4, nt=1, *, recommended_defaults=False):
+def _model_options(
+    nx=4,
+    ny=4,
+    time_steps=1,
+    *,
+    recommended_defaults=False,
+):
+    from fealpy.fvm import (
+        CollocatedPressureSystemControls,
+        PressureClosureKind,
+    )
+
     options = {
         "pde": 3,
         "nx": nx,
         "ny": ny,
-        "nt": nt,
+        "time_steps": time_steps,
         "duration": (0, 1),
-        "space_degree": 0,
         "pbar_log": False,
         "log_level": "WARNING",
     }
     if not recommended_defaults:
-        options.update(
-            {
-                "pressure_constraint": "gauge",
-                "momentum_solve_strategy": "vector",
-            }
+        options["pressure_system_controls"] = (
+            CollocatedPressureSystemControls(
+                pure_neumann_closure=PressureClosureKind.GAUGE,
+            )
         )
     return options
 
 
-def test_piso_solver_and_model_share_collocated_operator_base():
-    from fealpy.fvm import CollocatedPisoSolver, CollocatedSimpleSolver, NSFVMPISOModel, NSFVMSimpleModel
-    from fealpy.fvm.collocated_ns_components import CollocatedNSFVMComponents
-
-    assert issubclass(CollocatedPisoSolver, CollocatedNSFVMComponents)
-    assert issubclass(NSFVMPISOModel, CollocatedPisoSolver)
-    assert issubclass(CollocatedSimpleSolver, CollocatedNSFVMComponents)
-    assert issubclass(NSFVMSimpleModel, CollocatedSimpleSolver)
-
-
 def test_piso_model_uses_recommended_default_linear_policy():
-    from fealpy.fvm import NSFVMPISOModel
+    from fealpy.fvm import NSFVMPISOModel, ThirdPartyLinearSolver
 
     model = NSFVMPISOModel(
-        _model_options(nx=2, ny=2, nt=1, recommended_defaults=True)
+        _model_options(nx=2, ny=2, time_steps=1, recommended_defaults=True)
     )
 
-    assert model.momentum_linear_solver == "scipy_bicgstab"
-    assert model.pressure_nullspace_linear_solver == "petsc_gmres_hypre"
-    assert not hasattr(model.linear_solver.config, "momentum_solver")
+    assert isinstance(
+        model.solver.momentum.algebra.linear_solver,
+        ThirdPartyLinearSolver,
+    )
+    assert isinstance(
+        model.solver.pressure_system.closure.linear_solver,
+        ThirdPartyLinearSolver,
+    )
+def test_piso_solver_reuses_boundary_geometry():
+    from fealpy.fvm import NSFVMPISOModel
+
+    model = NSFVMPISOModel(_model_options(nx=2, ny=2, time_steps=1))
+
+    assert model.fvm_geometry is model.solver.discretization.geometry
+
+
+def test_piso_pressure_state_boundary_inherits_diffusion_configuration():
+    from fealpy.backend import backend_manager as bm
+    from fealpy.fvm import NSFVMPISOModel, PDEBoundaryConditions
+
+    options = _model_options(nx=2, ny=2, time_steps=1)
+    options.update(
+        {
+            "diffusion_method": "bounded_over_relaxed",
+            "diffusion_nonorthogonal_eps": 0.1,
+            "boundary_conditions": lambda mesh, pde: PDEBoundaryConditions(
+                mesh,
+                dirichlet_velocity=pde.dirichlet_velocity,
+                dirichlet_pressure=lambda p: p[..., 0],
+                dirichlet_pressure_selector=lambda p: bm.ones(
+                    p.shape[:-1],
+                    dtype=bm.bool,
+                ),
+            ),
+        }
+    )
+    model = NSFVMPISOModel(options)
+
+    pressure_bc = (
+        model.solver.pressure_system.boundary.dirichlet_operator
+    )
+    assert pressure_bc.diffusion_method == "bounded_over_relaxed"
+    assert pressure_bc.nonorthogonal_eps == 0.1
 
 
 def test_collocated_momentum_diffusion_matrix_is_cached():
     from fealpy.fvm import NSFVMPISOModel
 
-    model = NSFVMPISOModel(_model_options(nx=2, ny=2, nt=1))
+    model = NSFVMPISOModel(_model_options(nx=2, ny=2, time_steps=1))
 
-    assert model.momentum_diffusion_matrix(model.mu) is model.momentum_diffusion_matrix(model.mu)
+    spatial = model.solver.momentum.spatial_operator
+    assert (
+        spatial.diffusion_matrix_template
+        is spatial.diffusion_matrix_template
+    )
 
 
 def test_collocated_momentum_time_components_match_cell_diagonal():
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
 
-    model = NSFVMPISOModel(_model_options(nx=2, ny=2, nt=1))
+    model = NSFVMPISOModel(_model_options(nx=2, ny=2, time_steps=1))
     velocity = bm.arange(2 * model.NC, dtype=bm.float64).reshape(model.NC, 2)
-    density = 3.0
-    time_step = 0.25
-
-    matrix = model.momentum_time_matrix(density, time_step)
-    source = model.momentum_time_source(velocity, density, time_step)
-    expected_diagonal = density * model.cm / time_step
+    equation = model.solver.momentum
+    matrix = equation.time_matrix()
+    source = equation.time_source(velocity)
+    expected_diagonal = (
+        equation.density * model.fvm_geometry.cell_measure / model.solver.controls.tau
+    )
     expected_source = (velocity * expected_diagonal[:, None]).flatten(order="F")
 
     assert np.allclose(
         np.asarray(bm.to_numpy(matrix.diags().values)),
-        np.asarray(bm.to_numpy(bm.concatenate([expected_diagonal, expected_diagonal]))),
+        np.asarray(bm.to_numpy(expected_diagonal)),
     )
     assert np.allclose(np.asarray(bm.to_numpy(source)), np.asarray(bm.to_numpy(expected_source)))
 
@@ -77,16 +120,23 @@ def test_collocated_momentum_time_components_match_cell_diagonal():
 def test_piso_pressure_free_flux_matches_velocity_route():
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
+    from fealpy.fvm.collocated_velocity_pressure_coupling import (
+        remove_pressure_response,
+    )
 
-    model = NSFVMPISOModel(_model_options(nx=2, ny=2, nt=1))
+    model = NSFVMPISOModel(_model_options(nx=2, ny=2, time_steps=1))
     velocity = bm.arange(2 * model.NC, dtype=bm.float64).reshape(model.NC, 2)
     pressure = bm.arange(model.NC, dtype=bm.float64)
-    a_p = bm.ones(2 * model.NC)
+    a_p = bm.ones(model.NC)
 
-    pressure_free_velocity, flux = model.pressure_free_flux(velocity, pressure, a_p)
-    expected_velocity = model.pressure_free_velocity(velocity, pressure, a_p)
-    expected_flux = model.face_flux(
-        model.face_interpolate_cell_vector(expected_velocity, method=model.controls.face_interpolation_method)
+    pressure_free_velocity, flux = model.solver.pressure_free_flux(velocity, pressure, a_p)
+    expected_velocity = remove_pressure_response(
+        velocity,
+        model.solver.pressure_gradient.cell_gradient(pressure),
+        model.solver.discretization.cell_response(a_p),
+    )
+    expected_flux = model.solver.spatial_face_velocity.compute_flux(
+        model.solver.spatial_face_velocity.interpolate(expected_velocity)
     )
 
     assert np.allclose(np.asarray(bm.to_numpy(pressure_free_velocity)), np.asarray(bm.to_numpy(expected_velocity)))
@@ -96,73 +146,105 @@ def test_piso_pressure_free_flux_matches_velocity_route():
 def test_piso_pressure_correction_step_uses_pressure_free_flux(monkeypatch):
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
-    import fealpy.fvm.collocated_piso_solver as piso_module
-
-    model = NSFVMPISOModel(_model_options(nx=2, ny=2, nt=1))
+    import fealpy.fvm.collocated_piso_solver as piso_solver
+    model = NSFVMPISOModel(_model_options(nx=2, ny=2, time_steps=1))
     nf = model.mesh.number_of_faces()
     nc = model.NC
-    pressure_free_velocity = bm.ones((nc, 2), dtype=model.cm.dtype)
-    pressure_free_flux = bm.ones(nf, dtype=model.cm.dtype) * 0.25
+    pressure_free_velocity = bm.ones((nc, 2), dtype=model.fvm_geometry.cell_measure.dtype)
+    pressure_free_flux = bm.ones(nf, dtype=model.fvm_geometry.cell_measure.dtype) * 0.25
     seen = []
 
     def record_pressure_free_flux(intermediate_velocity, pressure, a_p):
         seen.append((intermediate_velocity, pressure, a_p))
         return pressure_free_velocity, pressure_free_flux
 
-    monkeypatch.setattr(model, "pressure_free_flux", record_pressure_free_flux)
-    monkeypatch.setattr(model, "transient_face_flux_correction", lambda *args, **kwargs: bm.zeros(nf))
     monkeypatch.setattr(
-        piso_module,
-        "apply_boundary_flux_constraint",
-        lambda flux, boundary_faces, boundary_velocity, face_normal, **kwargs: flux,
+        model.solver,
+        "pressure_free_flux",
+        record_pressure_free_flux,
     )
     monkeypatch.setattr(
-        model,
-        "solve_pressure_state_equation",
-        lambda rhs, a_p, **kwargs: (
-            bm.zeros(nc),
-            bm.zeros(nf),
-            {
-                "orthogonal_flux": bm.zeros(nf),
-                "cross_flux": bm.zeros(nf),
-                "boundary_pressure_flux": bm.zeros(nf),
-            },
+        model.solver,
+        "transient_face_flux_correction",
+        lambda *args, **kwargs: bm.zeros(nf),
+    )
+    monkeypatch.setattr(
+        model.solver.spatial_face_velocity,
+        "enforce_boundary_flux",
+        lambda flux: flux,
+    )
+    from fealpy.fvm.collocated_pressure_system import (
+        PisoPressureResult,
+        PressureFluxParts,
+    )
+
+    monkeypatch.setattr(
+        model.solver.pressure_system,
+        "solve",
+        lambda rhs, a_p, **kwargs: PisoPressureResult(
+            pressure=bm.zeros(nc),
+            pressure_flux=bm.zeros(nf),
+            flux_parts=PressureFluxParts(
+                orthogonal_flux=bm.zeros(nf),
+                cross_flux=bm.zeros(nf),
+                boundary_pressure_flux=bm.zeros(nf),
+            ),
+            face_response_coefficient=bm.zeros(nf),
+            nonorthogonal_iterations=0,
+            nonorthogonal_residual=None,
+            nonorthogonal_relative_update=0.0,
+            linear_solves=(),
         ),
     )
-    monkeypatch.setattr(model, "velocity_pressure_correction", lambda u_free, pressure_state, a_p: u_free)
+    monkeypatch.setattr(
+        piso_solver,
+        "correct_cell_velocity",
+        lambda u_free, pressure_state, a_p, **kwargs: u_free,
+    )
 
-    next_velocity, _, phi = model.pressure_correction_step(
+    from fealpy.fvm.piso_result import (
+        PisoPressureCorrectionStepResult,
+    )
+
+    result = model.solver.pressure_correction_step(
         bm.zeros((nc, 2)),
         bm.zeros(nc),
-        bm.ones(2 * nc),
-        None,
-        None,
+        bm.ones(nc),
+        bm.zeros((nc, 2)),
+        bm.zeros((nf, 2)),
     )
 
     assert len(seen) == 1
-    assert np.allclose(np.asarray(bm.to_numpy(next_velocity)), np.asarray(bm.to_numpy(pressure_free_velocity)))
-    assert np.allclose(np.asarray(bm.to_numpy(phi)), np.asarray(bm.to_numpy(pressure_free_flux)))
+    assert isinstance(result, PisoPressureCorrectionStepResult)
+    assert np.allclose(np.asarray(bm.to_numpy(result.velocity)), np.asarray(bm.to_numpy(pressure_free_velocity)))
+    assert np.allclose(np.asarray(bm.to_numpy(result.face_flux)), np.asarray(bm.to_numpy(pressure_free_flux)))
+    assert result.diagnostics is None
 
 
-def test_rhie_chow_face_velocity_uses_explicit_boundary_velocity():
+def test_rhie_chow_face_velocity_uses_resolved_boundary_velocity():
     from fealpy.fvm import NSFVMPISOModel
 
     model = NSFVMPISOModel(_model_options())
     u = np.ones((model.NC, 2))
-    ap = np.ones(2 * model.NC)
+    ap = np.ones(model.NC)
     pressure = np.zeros(model.NC)
+    response = (
+        model.solver.pressure_equation.face_response_coefficient(ap)
+    )
     boundary_faces = model.mesh.boundary_face_index()
-    boundary_velocity = np.zeros((boundary_faces.shape[0], 2))
-
-    face_velocity = model.rhie_chow_face_velocity(
+    face_velocity = model.solver.rhie_chow_face_velocity(
         u,
-        ap,
         pressure,
-        boundary_faces=boundary_faces,
-        boundary_velocity=boundary_velocity,
+        response,
     )
 
-    assert np.allclose(np.asarray(face_velocity[boundary_faces]), 0.0)
+    assert np.allclose(
+        np.asarray(face_velocity[boundary_faces]),
+        np.asarray(
+            model.solver.spatial_face_velocity.boundary
+            .dirichlet_face_values
+        ),
+    )
 
 
 def test_piso_transient_flux_correction_uses_limited_ddtcorr(monkeypatch):
@@ -176,26 +258,33 @@ def test_piso_transient_flux_correction_uses_limited_ddtcorr(monkeypatch):
     response = bm.ones(nf) * 2.0
     face_flux_returns = [old_face_flux, old_cell_flux]
 
-    monkeypatch.setattr(model, "face_flux", lambda face_velocity: face_flux_returns.pop(0))
     monkeypatch.setattr(
-        model,
-        "face_interpolate_cell_vector",
-        lambda cell_velocity, method: bm.zeros((nf, 2), dtype=model.cm.dtype),
+        model.solver.spatial_face_velocity,
+        "compute_flux",
+        lambda face_velocity: face_flux_returns.pop(0),
     )
     monkeypatch.setattr(
-        model,
-        "pressure_response_face_coefficient",
-        lambda a_p, interpolation_method: response,
+        model.solver.spatial_face_velocity,
+        "interpolate",
+        lambda cell_velocity: bm.zeros((nf, 2), dtype=model.fvm_geometry.cell_measure.dtype),
+    )
+    monkeypatch.setattr(
+        model.solver.pressure_equation,
+        "face_response_coefficient",
+        lambda a_p: response,
     )
 
-    correction = model.transient_face_flux_correction(
+    correction = model.solver.transient_face_flux_correction(
         bm.zeros((model.NC, 2)),
         bm.zeros((nf, 2)),
-        bm.ones(2 * model.NC),
+        bm.ones(model.NC),
     )
 
     boundary = np.asarray(
-        bm.to_numpy(model.face_to_cell[:, 0] == model.face_to_cell[:, 1])
+        bm.to_numpy(
+            model.solver.discretization.geometry.face_to_cell[:, 0]
+            == model.solver.discretization.geometry.face_to_cell[:, 1]
+        )
     )
     flux_correction = np.asarray(bm.to_numpy(old_face_flux - old_cell_flux))
     coeff = 1.0 - np.minimum(
@@ -207,7 +296,7 @@ def test_piso_transient_flux_correction_uses_limited_ddtcorr(monkeypatch):
         np.asarray(bm.to_numpy(response))
         * coeff
         * flux_correction
-        / model.controls.tau
+        / model.solver.controls.tau
     )
 
     assert face_flux_returns == []
@@ -215,52 +304,52 @@ def test_piso_transient_flux_correction_uses_limited_ddtcorr(monkeypatch):
     assert np.allclose(np.asarray(bm.to_numpy(correction))[boundary], 0.0)
 
 
-def test_piso_rejects_removed_momentum_explicit_correction_option():
+def test_piso_rejects_unknown_options():
     from fealpy.fvm import NSFVMPISOModel
 
-    options = _model_options(nx=2, ny=2, nt=1)
+    options = _model_options(nx=2, ny=2, time_steps=1)
     options["momentum_explicit_correction"] = "openfoam"
 
-    with pytest.raises(ValueError, match="momentum_explicit_correction.*no longer"):
-        NSFVMPISOModel(options)
-
-
-def test_piso_rejects_inconsistent_rhie_chow_face_interpolation():
-    from fealpy.fvm import NSFVMPISOModel
-
-    options = _model_options(nx=2, ny=2, nt=1)
-    options.update({"face_interpolation_method": "linear", "rhie_chow_velocity_interpolation": "average"})
-
-    with pytest.raises(ValueError, match="rhie_chow_velocity_interpolation"):
+    with pytest.raises(
+        ValueError,
+        match="unsupported NSFVMPISOModel options: momentum_explicit_correction",
+    ):
         NSFVMPISOModel(options)
 
 
 def test_piso_snapshot_callback_respects_interval_and_start_step():
-    from fealpy.fvm import FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import NSFVMPISOModel, PisoSnapshot
 
-    options = _model_options(nx=2, ny=2, nt=4)
+    options = _model_options(nx=2, ny=2, time_steps=4)
     options.update(
         {
             "snapshot_interval": 2,
             "snapshot_start_step": 2,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
             "log_level": "ERROR",
         }
     )
     model = NSFVMPISOModel(options)
-    called_steps = []
+    snapshots = []
 
-    model.solve(snapshot_callback=lambda *, step, **kwargs: called_steps.append(step))
+    model.solve(snapshot_callback=snapshots.append)
 
-    assert called_steps == [2, 4]
+    assert [snapshot.step for snapshot in snapshots] == [2, 4]
+    assert all(isinstance(snapshot, PisoSnapshot) for snapshot in snapshots)
+    assert all(not hasattr(snapshot, "solver") for snapshot in snapshots)
+    assert snapshots[-1].velocity.shape == (model.NC, model.GD)
+    assert snapshots[-1].face_velocity.shape[1] == model.GD
+    assert snapshots[-1].pressure.shape == (model.NC,)
+    assert snapshots[-1].face_flux.shape == (
+        snapshots[-1].face_velocity.shape[0],
+    )
 
 
 def test_piso_face_interpolation_option_reaches_momentum_convection(monkeypatch):
-    from fealpy.fvm import FVMLinearSolverConfig, NSFVMPISOModel
-    import fealpy.fvm.collocated_ns_components as collocated_components
+    from fealpy.fvm import NSFVMPISOModel
+    import fealpy.fvm.collocated_momentum_equation as momentum_equation
 
     seen = []
-    original = collocated_components.ConvectionMatrixAssembler
+    original = momentum_equation.ConvectionMatrixAssembler
 
     class RecordingConvectionMatrixAssembler(original):
         def __init__(self, *args, **kwargs):
@@ -268,33 +357,42 @@ def test_piso_face_interpolation_option_reaches_momentum_convection(monkeypatch)
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr(
-        collocated_components,
+        momentum_equation,
         "ConvectionMatrixAssembler",
         RecordingConvectionMatrixAssembler,
     )
-    options = _model_options(nx=2, ny=2, nt=1)
+    options = _model_options(nx=2, ny=2, time_steps=1)
     options.update(
         {
-            "face_interpolation_method": "linear",
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
+            "momentum_face_interpolation": "linear",
             "log_level": "ERROR",
         }
     )
     model = NSFVMPISOModel(options)
     U0, Uf0, p0 = model.initial_solution()
 
-    model.temporary_velocity(U0, Uf0, p0, t=model.controls.tau)
+    model.solver.momentum.predict(
+        U0,
+        Uf0,
+        p0,
+        time=model.solver.controls.tau,
+        pressure_gradient=model.solver.pressure_gradient.cell_gradient(p0),
+    )
 
     assert seen == ["linear"]
-    assert model.rhie_chow.velocity_interpolation == "linear"
+    assert (
+        model.solver.momentum.spatial_operator.face_interpolation
+        == "linear"
+    )
 
 
 def test_piso_face_interpolation_option_reaches_pressure_response(monkeypatch):
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
+    import fealpy.fvm.collocated_pressure_equation as pressure_equation_module
 
-    options = _model_options(nx=2, ny=2, nt=1)
-    options["face_interpolation_method"] = "linear"
+    options = _model_options(nx=2, ny=2, time_steps=1)
+    options["pressure_response_interpolation"] = "linear"
     model = NSFVMPISOModel(options)
     seen = []
     nf = model.mesh.number_of_faces()
@@ -303,11 +401,17 @@ def test_piso_face_interpolation_option_reaches_pressure_response(monkeypatch):
         seen.append(method)
         return bm.zeros(nf, dtype=cell_values.dtype)
 
-    monkeypatch.setattr(model, "face_interpolate_cell_scalar", record_scalar)
+    monkeypatch.setattr(
+        pressure_equation_module,
+        "interpolate_cell_to_face",
+        lambda values, *, geometry, method: record_scalar(
+            values,
+            method=method,
+        ),
+    )
 
-    model.pressure_response_face_coefficient(
-        bm.ones(2 * model.NC),
-        model.controls.face_interpolation_method,
+    model.solver.pressure_equation.face_response_coefficient(
+        bm.ones(model.NC),
     )
 
     assert seen == ["linear"]
@@ -316,92 +420,140 @@ def test_piso_face_interpolation_option_reaches_pressure_response(monkeypatch):
 def test_piso_face_interpolation_option_reaches_pressure_free_flux(monkeypatch):
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
-    import fealpy.fvm.collocated_piso_solver as piso_module
-
-    options = _model_options(nx=2, ny=2, nt=1)
-    options["face_interpolation_method"] = "linear"
+    import fealpy.fvm.collocated_piso_solver as piso_solver
+    options = _model_options(nx=2, ny=2, time_steps=1)
+    options["rhie_chow_velocity_interpolation"] = "linear"
     model = NSFVMPISOModel(options)
     seen = []
     nf = model.mesh.number_of_faces()
 
     def record_vector(cell_velocity, method=None):
         seen.append(method)
-        return bm.zeros((nf, 2), dtype=model.cm.dtype)
+        return bm.zeros((nf, 2), dtype=model.fvm_geometry.cell_measure.dtype)
 
-    monkeypatch.setattr(model, "face_interpolate_cell_vector", record_vector)
-    monkeypatch.setattr(model, "pressure_free_velocity", lambda intermediate_velocity, pressure, a_p: intermediate_velocity)
-    monkeypatch.setattr(model, "face_flux", lambda face_velocity: bm.zeros(nf))
-    monkeypatch.setattr(model, "transient_face_flux_correction", lambda *args, **kwargs: bm.zeros(nf))
     monkeypatch.setattr(
-        piso_module,
-        "apply_boundary_flux_constraint",
-        lambda flux, boundary_faces, boundary_velocity, face_normal, **kwargs: flux,
-    )
-    monkeypatch.setattr(
-        model,
-        "solve_pressure_state_equation",
-        lambda rhs, a_p, **kwargs: (
-            bm.zeros(model.NC),
-            bm.zeros(nf),
-            {
-                "orthogonal_flux": bm.zeros(nf),
-                "cross_flux": bm.zeros(nf),
-                "boundary_pressure_flux": bm.zeros(nf),
-            },
+        model.solver.spatial_face_velocity,
+        "interpolate",
+        lambda cell_velocity: record_vector(
+            cell_velocity,
+            method=model.solver.spatial_face_velocity.interpolation,
         ),
     )
-    monkeypatch.setattr(model, "velocity_pressure_correction", lambda pressure_free_velocity, pressure_state, a_p: pressure_free_velocity)
+    monkeypatch.setattr(
+        piso_solver,
+        "remove_pressure_response",
+        lambda intermediate_velocity, pressure, a_p, **kwargs: (
+            intermediate_velocity
+        ),
+    )
+    monkeypatch.setattr(
+        model.solver.spatial_face_velocity,
+        "compute_flux",
+        lambda face_velocity: bm.zeros(nf),
+    )
+    monkeypatch.setattr(
+        model.solver,
+        "transient_face_flux_correction",
+        lambda *args, **kwargs: bm.zeros(nf),
+    )
+    monkeypatch.setattr(
+        model.solver.spatial_face_velocity,
+        "enforce_boundary_flux",
+        lambda flux: flux,
+    )
+    from fealpy.fvm.collocated_pressure_system import (
+        PisoPressureResult,
+        PressureFluxParts,
+    )
 
-    model.pressure_correction_step(bm.zeros((model.NC, 2)), bm.zeros(model.NC), bm.ones(2 * model.NC), None, None)
+    monkeypatch.setattr(
+        model.solver.pressure_system,
+        "solve",
+        lambda rhs, a_p, **kwargs: PisoPressureResult(
+            pressure=bm.zeros(model.NC),
+            pressure_flux=bm.zeros(nf),
+            flux_parts=PressureFluxParts(
+                orthogonal_flux=bm.zeros(nf),
+                cross_flux=bm.zeros(nf),
+                boundary_pressure_flux=bm.zeros(nf),
+            ),
+            face_response_coefficient=bm.zeros(nf),
+            nonorthogonal_iterations=0,
+            nonorthogonal_residual=None,
+            nonorthogonal_relative_update=0.0,
+            linear_solves=(),
+        ),
+    )
+    monkeypatch.setattr(
+        piso_solver,
+        "correct_cell_velocity",
+        lambda pressure_free_velocity, pressure_state, a_p, **kwargs: (
+            pressure_free_velocity
+        ),
+    )
+
+    model.solver.pressure_correction_step(
+        bm.zeros((model.NC, 2)),
+        bm.zeros(model.NC),
+        bm.ones(model.NC),
+        bm.zeros((model.NC, 2)),
+        bm.zeros((nf, 2)),
+    )
 
     assert seen == ["linear"]
 
 
 def test_piso_momentum_nonorthogonal_correction_uses_picard_loop(monkeypatch):
     from fealpy.backend import backend_manager as bm
-    from fealpy.fvm import FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import NSFVMPISOModel
 
-    options = _model_options(nx=2, ny=2, nt=1)
+    options = _model_options(nx=2, ny=2, time_steps=1)
     options.update(
         {
-            "momentum_nonorthogonal_max_iter": 2,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
+            "momentum_nonorthogonal_max_iterations": 2,
             "log_level": "ERROR",
         }
     )
     model = NSFVMPISOModel(options)
     U0, Uf0, p0 = model.initial_solution()
-    source_inputs = []
     solves = []
+    linear_solver = model.solver.momentum.algebra.linear_solver
+    original_solve = linear_solver.solve
 
-    def boundary_corrected_source(velocity):
-        source_inputs.append(tuple(velocity.shape))
-        return bm.zeros(2 * model.NC, dtype=U0.dtype)
-
-    def solve_momentum(matrix, rhs, *, solver=None):
+    def solve_momentum(matrix, rhs):
         solves.append(1)
-        return bm.ones(2 * model.NC, dtype=U0.dtype) * len(solves)
+        return original_solve(matrix, rhs)
 
-    monkeypatch.setattr(model, "boundary_corrected_momentum_explicit_source", boundary_corrected_source, raising=False)
-    monkeypatch.setattr(model.linear_solver, "solve", solve_momentum)
+    monkeypatch.setattr(linear_solver, "solve", solve_momentum)
 
-    U, _, _ = model.temporary_velocity(U0, Uf0, p0, t=model.controls.tau)
+    predictor = model.solver.momentum.predict(
+        U0,
+        Uf0,
+        p0,
+        time=model.solver.controls.tau,
+        pressure_gradient=model.solver.pressure_gradient.cell_gradient(p0),
+    )
+    U = predictor.cell_velocity
 
-    assert source_inputs == [tuple(U0.shape), tuple(U0.shape)]
-    assert len(solves) == 2
-    assert model.last_momentum_nonorthogonal_iterations == 2
-    assert np.allclose(np.asarray(bm.to_numpy(U)), 2.0)
+    assert U.shape == U0.shape
+    assert len(solves) == model.GD * (
+        1 + predictor.nonorthogonal_iterations
+    )
+    assert predictor.nonorthogonal_iterations <= 2
+    assert (
+        predictor.nonorthogonal_residual.relative
+        <= model.solver.controls.momentum_nonorthogonal_rtol
+    )
 
 
 def test_piso_zero_momentum_nonorthogonal_still_solves_base_equation(monkeypatch):
     from fealpy.backend import backend_manager as bm
-    from fealpy.fvm import FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import NSFVMPISOModel
 
-    options = _model_options(nx=2, ny=2, nt=1)
+    options = _model_options(nx=2, ny=2, time_steps=1)
     options.update(
         {
-            "momentum_nonorthogonal_max_iter": 0,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
+            "momentum_nonorthogonal_max_iterations": 0,
             "log_level": "ERROR",
         }
     )
@@ -412,90 +564,78 @@ def test_piso_zero_momentum_nonorthogonal_still_solves_base_equation(monkeypatch
     def forbidden_cross_source(velocity):
         raise AssertionError("zero nonorthogonal corrections should not build cross RHS")
 
-    def solve_momentum(matrix, rhs, *, solver=None):
+    def solve_momentum(matrix, rhs):
+        from fealpy.fvm import LinearSolveDiagnostics, LinearSolveResult
+
         solves.append(1)
-        return bm.ones(2 * model.NC, dtype=U0.dtype)
+        return LinearSolveResult(
+            solution=bm.ones(model.NC, dtype=U0.dtype),
+            diagnostics=LinearSolveDiagnostics(
+                provider="test",
+                solver="ones",
+                iterations=None,
+                converged=True,
+                provider_code=None,
+                relative_residual=0.0,
+            ),
+        )
 
-    monkeypatch.setattr(model, "boundary_corrected_momentum_explicit_source", forbidden_cross_source, raising=False)
-    monkeypatch.setattr(model.linear_solver, "solve", solve_momentum)
+    monkeypatch.setattr(
+        model.solver.momentum.spatial_operator,
+        "nonorthogonal_rhs",
+        forbidden_cross_source,
+    )
+    monkeypatch.setattr(
+        model.solver.momentum.algebra.linear_solver,
+        "solve",
+        solve_momentum,
+    )
 
-    U, _, _ = model.temporary_velocity(U0, Uf0, p0, t=model.controls.tau)
+    predictor = model.solver.momentum.predict(
+        U0,
+        Uf0,
+        p0,
+        time=model.solver.controls.tau,
+        pressure_gradient=model.solver.pressure_gradient.cell_gradient(p0),
+    )
+    U = predictor.cell_velocity
 
-    assert len(solves) == 1
-    assert model.last_momentum_nonorthogonal_iterations == 0
+    assert len(solves) == model.GD
+    assert predictor.nonorthogonal_iterations == 0
     assert np.allclose(np.asarray(bm.to_numpy(U)), 1.0)
 
 
-def test_piso_pressure_nonorthogonal_iterations_count_total_solves(monkeypatch):
+def test_piso_pressure_nonorthogonal_stops_on_complete_residual():
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
-    import fealpy.fvm.collocated_piso_solver as piso_module
 
-    options = _model_options(nx=2, ny=2, nt=1)
-    options["pressure_nonorthogonal_max_iter"] = 2
+    options = _model_options(nx=2, ny=2, time_steps=1)
+    options["pressure_nonorthogonal_max_iterations"] = 2
     model = NSFVMPISOModel(options)
-    nf = model.mesh.number_of_faces()
     nc = model.NC
-    solves = []
 
-    class FakeSolver:
-        def solve(self, matrix, rhs, *, solver=None):
-            pressure_value = float(len(solves) + 1)
-            solves.append(pressure_value)
-            pressure = bm.ones(nc, dtype=model.cm.dtype) * pressure_value
-            if matrix.shape[1] == nc:
-                return pressure
-            return bm.concatenate([pressure, bm.zeros(1, dtype=model.cm.dtype)])
-
-    model.linear_solver = FakeSolver()
-    monkeypatch.setattr(
-        model,
-        "pressure_free_flux",
-        lambda intermediate_velocity, pressure, a_p: (
-            bm.zeros((nc, 2), dtype=model.cm.dtype),
-            bm.zeros(nf, dtype=model.cm.dtype),
-        ),
-    )
-    monkeypatch.setattr(model, "transient_face_flux_correction", lambda *args, **kwargs: bm.zeros(nf, dtype=model.cm.dtype))
-    monkeypatch.setattr(
-        piso_module,
-        "apply_boundary_flux_constraint",
-        lambda flux, boundary_faces, boundary_velocity, face_normal, **kwargs: flux,
-    )
-    monkeypatch.setattr(model, "divergence_from_flux", lambda flux: bm.zeros(nc, dtype=model.cm.dtype))
-    monkeypatch.setattr(model, "velocity_pressure_correction", lambda pressure_free_velocity, pressure_state, a_p: pressure_free_velocity)
-    monkeypatch.setattr(model, "pressure_orthogonal_flux", lambda pressure, coef: bm.ones(nf, dtype=model.cm.dtype) * pressure[0] * 10.0)
-    monkeypatch.setattr(
-        model,
-        "pressure_nonorthogonal_cross_flux",
-        lambda pressure, coef, *, interpolation_method: (
-            bm.ones(nf, dtype=model.cm.dtype) * pressure[0]
-        ),
-    )
-    monkeypatch.setattr(model, "add_pressure_dirichlet_flux", lambda flux, pressure, coef, dirichlet_value, threshold: flux)
-
-    _, pressure, corrected_flux, diagnostics = model.pressure_correction_step(
-        bm.zeros((nc, 2), dtype=model.cm.dtype),
-        bm.zeros(nc, dtype=model.cm.dtype),
-        bm.ones(2 * nc, dtype=model.cm.dtype),
-        None,
-        None,
-        return_diagnostics=True,
+    result = model.solver.pressure_system.solve(
+        bm.zeros(nc, dtype=model.fvm_geometry.cell_measure.dtype),
+        bm.ones(nc, dtype=model.fvm_geometry.cell_measure.dtype),
+        initial_pressure_state=bm.zeros(nc, dtype=model.fvm_geometry.cell_measure.dtype),
     )
 
-    assert solves == [1.0, 2.0]
-    assert np.allclose(np.asarray(bm.to_numpy(pressure)), 2.0)
-    assert np.allclose(np.asarray(bm.to_numpy(corrected_flux)), 19.0)
-    assert diagnostics["pressure_nonorthogonal_iterations"] == 2
+    assert np.allclose(np.asarray(bm.to_numpy(result.pressure)), 0.0)
+    assert result.nonorthogonal_iterations == 0
+    assert result.nonorthogonal_residual.relative == 0.0
+    assert result.flux_parts.cross_flux.shape == (
+        model.mesh.number_of_faces(),
+    )
 
 
 def test_piso_pressure_nonorthogonal_first_rhs_uses_entering_pressure(monkeypatch):
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
-    import fealpy.fvm.collocated_piso_solver as piso_module
+    from fealpy.fvm.solver_diagnostics import EquationResidual
+    import fealpy.fvm.collocated_pressure_system as pressure_system_module
 
-    options = _model_options(nx=2, ny=2, nt=1)
-    options["pressure_nonorthogonal_max_iter"] = 2
+    options = _model_options(nx=2, ny=2, time_steps=1)
+    options["pressure_nonorthogonal_max_iterations"] = 2
     model = NSFVMPISOModel(options)
     nf = model.mesh.number_of_faces()
     nc = model.NC
@@ -503,55 +643,89 @@ def test_piso_pressure_nonorthogonal_first_rhs_uses_entering_pressure(monkeypatc
     solve_values = []
 
     class FakeSolver:
-        def solve(self, matrix, rhs, *, solver=None):
+        def solve(self, matrix, rhs):
+            from fealpy.fvm import (
+                LinearSolveDiagnostics,
+                LinearSolveResult,
+            )
+
             pressure_value = float(len(solve_values) + 2)
             solve_values.append(pressure_value)
-            pressure = bm.ones(nc, dtype=model.cm.dtype) * pressure_value
-            return bm.concatenate([pressure, bm.zeros(1, dtype=model.cm.dtype)])
+            pressure = (
+                bm.ones(nc, dtype=model.fvm_geometry.cell_measure.dtype)
+                * pressure_value
+            )
+            return LinearSolveResult(
+                solution=bm.concatenate(
+                    [
+                        pressure,
+                        bm.zeros(
+                            1,
+                            dtype=model.fvm_geometry.cell_measure.dtype,
+                        ),
+                    ]
+                ),
+                diagnostics=LinearSolveDiagnostics(
+                    provider="test",
+                    solver="sequence",
+                    iterations=None,
+                    converged=True,
+                    provider_code=None,
+                    relative_residual=0.0,
+                ),
+            )
 
-    model.linear_solver = FakeSolver()
+    model.solver.pressure_system.closure.linear_solver = FakeSolver()
+    equation = model.solver.pressure_equation
     monkeypatch.setattr(
-        model,
-        "pressure_free_flux",
-        lambda intermediate_velocity, pressure, a_p: (
-            bm.zeros((nc, 2), dtype=model.cm.dtype),
-            bm.zeros(nf, dtype=model.cm.dtype),
+        equation,
+        "divergence_from_flux",
+        lambda flux: bm.ones(nc, dtype=model.fvm_geometry.cell_measure.dtype) * flux[0],
+    )
+    monkeypatch.setattr(
+        equation,
+        "nonorthogonal_cross_flux",
+        lambda pressure, coef, *, interpolation_method,
+        gradient_boundary, pressure_gradient: (
+            bm.ones(nf, dtype=model.fvm_geometry.cell_measure.dtype) * pressure[0]
         ),
     )
-    monkeypatch.setattr(model, "transient_face_flux_correction", lambda *args, **kwargs: bm.zeros(nf, dtype=model.cm.dtype))
     monkeypatch.setattr(
-        piso_module,
-        "apply_boundary_flux_constraint",
-        lambda flux, boundary_faces, boundary_velocity, face_normal, **kwargs: flux,
+        equation,
+        "orthogonal_flux",
+        lambda pressure, coef: bm.zeros(nf, dtype=model.fvm_geometry.cell_measure.dtype),
     )
-    monkeypatch.setattr(model, "divergence_from_flux", lambda flux: bm.ones(nc, dtype=model.cm.dtype) * flux[0])
     monkeypatch.setattr(
-        model,
-        "pressure_nonorthogonal_cross_flux",
-        lambda pressure, coef, *, interpolation_method: (
-            bm.ones(nf, dtype=model.cm.dtype) * pressure[0]
-        ),
+        equation,
+        "add_dirichlet_flux",
+        lambda flux, pressure, coef, faces, values: flux,
     )
-    monkeypatch.setattr(model, "pressure_orthogonal_flux", lambda pressure, coef: bm.zeros(nf, dtype=model.cm.dtype))
-    monkeypatch.setattr(model, "add_pressure_dirichlet_flux", lambda flux, pressure, coef, dirichlet_value, threshold: flux)
-    monkeypatch.setattr(model, "velocity_pressure_correction", lambda pressure_free_velocity, pressure_state, a_p: pressure_free_velocity)
+    closure = model.solver.pressure_system.closure
+    original_rhs = closure.rhs
 
-    def record_assembled_system(rhs, coef, cross_rhs):
+    def record_rhs(rhs, cross_rhs, coef):
         captured_cross_rhs.append(np.asarray(bm.to_numpy(cross_rhs)).copy())
-        return object(), bm.zeros(nc + 1, dtype=model.cm.dtype)
+        return original_rhs(rhs, cross_rhs, coef)
 
-    monkeypatch.setattr(model, "assemble_pressure_state_system", record_assembled_system)
-
-    entering_pressure = bm.ones(nc, dtype=model.cm.dtype) * 7.0
-    model.pressure_correction_step(
-        bm.zeros((nc, 2), dtype=model.cm.dtype),
-        entering_pressure,
-        bm.ones(2 * nc, dtype=model.cm.dtype),
-        None,
-        None,
+    monkeypatch.setattr(closure, "rhs", record_rhs)
+    monkeypatch.setattr(
+        pressure_system_module,
+        "normalized_equation_residual",
+        lambda lhs, rhs: EquationResidual(
+            absolute=0.0,
+            relative=0.0,
+            scale=1.0,
+        ),
     )
 
-    assert solve_values == [2.0, 3.0]
+    entering_pressure = bm.ones(nc, dtype=model.fvm_geometry.cell_measure.dtype) * 7.0
+    model.solver.pressure_system.solve(
+        bm.zeros(nc, dtype=model.fvm_geometry.cell_measure.dtype),
+        bm.ones(nc, dtype=model.fvm_geometry.cell_measure.dtype),
+        initial_pressure_state=entering_pressure,
+    )
+
+    assert solve_values == [2.0]
     assert np.allclose(captured_cross_rhs[0], 7.0)
     assert np.allclose(captured_cross_rhs[1], 2.0)
 
@@ -560,8 +734,8 @@ def test_piso_zero_pressure_nonorthogonal_solves_base_system_once(monkeypatch):
     from fealpy.backend import backend_manager as bm
     from fealpy.fvm import NSFVMPISOModel
 
-    options = _model_options(nx=2, ny=2, nt=1)
-    options["pressure_nonorthogonal_max_iter"] = 0
+    options = _model_options(nx=2, ny=2, time_steps=1)
+    options["pressure_nonorthogonal_max_iterations"] = 0
     model = NSFVMPISOModel(options)
     nc = model.NC
     nf = model.mesh.number_of_faces()
@@ -569,77 +743,166 @@ def test_piso_zero_pressure_nonorthogonal_solves_base_system_once(monkeypatch):
     solves = []
 
     class FakeSolver:
-        def solve(self, matrix, rhs, *, solver=None):
-            solves.append(1)
-            return bm.concatenate([
-                bm.ones(nc, dtype=model.cm.dtype) * 3.0,
-                bm.zeros(1, dtype=model.cm.dtype),
-            ])
+        def solve(self, matrix, rhs):
+            from fealpy.fvm import (
+                LinearSolveDiagnostics,
+                LinearSolveResult,
+            )
 
-    model.linear_solver = FakeSolver()
+            solves.append(1)
+            return LinearSolveResult(
+                solution=bm.concatenate(
+                    [
+                        bm.ones(
+                            nc,
+                            dtype=model.fvm_geometry.cell_measure.dtype,
+                        )
+                        * 3.0,
+                        bm.zeros(
+                            1,
+                            dtype=model.fvm_geometry.cell_measure.dtype,
+                        ),
+                    ]
+                ),
+                diagnostics=LinearSolveDiagnostics(
+                    provider="test",
+                    solver="constant",
+                    iterations=None,
+                    converged=True,
+                    provider_code=None,
+                    relative_residual=0.0,
+                ),
+            )
+
+    model.solver.pressure_system.closure.linear_solver = FakeSolver()
+    equation = model.solver.pressure_equation
     monkeypatch.setattr(
-        model,
-        "pressure_nonorthogonal_cross_flux",
-        lambda pressure, coef, *, interpolation_method: (_ for _ in ()).throw(
+        equation,
+        "nonorthogonal_cross_flux",
+        lambda pressure, coef, *, interpolation_method,
+        gradient_boundary, pressure_gradient: (_ for _ in ()).throw(
             AssertionError("zero nonorthogonal corrections should not build cross flux")
         ),
     )
-    monkeypatch.setattr(model, "pressure_orthogonal_flux", lambda pressure, coef: bm.ones(nf, dtype=model.cm.dtype))
-    monkeypatch.setattr(model, "add_pressure_dirichlet_flux", lambda flux, pressure, coef, dirichlet_value, threshold: flux)
+    monkeypatch.setattr(
+        equation,
+        "orthogonal_flux",
+        lambda pressure, coef: bm.ones(nf, dtype=model.fvm_geometry.cell_measure.dtype),
+    )
+    monkeypatch.setattr(
+        equation,
+        "add_dirichlet_flux",
+        lambda flux, pressure, coef, faces, values: flux,
+    )
 
-    def record_system(rhs, coef, cross_rhs):
+    closure = model.solver.pressure_system.closure
+    original_rhs = closure.rhs
+
+    def record_rhs(rhs, cross_rhs, coef):
         assembled_cross_rhs.append(np.asarray(bm.to_numpy(cross_rhs)).copy())
-        return object(), bm.zeros(nc + 1, dtype=model.cm.dtype)
+        return original_rhs(rhs, cross_rhs, coef)
 
-    monkeypatch.setattr(model, "assemble_pressure_state_system", record_system)
+    monkeypatch.setattr(closure, "rhs", record_rhs)
 
-    pressure, pressure_flux, _ = model.solve_pressure_state_equation(
-        bm.zeros(nc, dtype=model.cm.dtype),
-        bm.ones(2 * nc, dtype=model.cm.dtype),
-        initial_pressure_state=bm.ones(nc, dtype=model.cm.dtype),
+    result = model.solver.pressure_system.solve(
+        bm.zeros(nc, dtype=model.fvm_geometry.cell_measure.dtype),
+        bm.ones(nc, dtype=model.fvm_geometry.cell_measure.dtype),
+        initial_pressure_state=bm.ones(nc, dtype=model.fvm_geometry.cell_measure.dtype),
     )
 
     assert len(solves) == 1
-    assert model.last_pressure_nonorthogonal_iterations == 0
+    assert result.nonorthogonal_iterations == 0
     assert np.allclose(assembled_cross_rhs[0], 0.0)
-    assert np.allclose(np.asarray(bm.to_numpy(pressure)), 3.0)
-    assert np.allclose(np.asarray(bm.to_numpy(pressure_flux)), 1.0)
+    assert np.allclose(np.asarray(bm.to_numpy(result.pressure)), 3.0)
+    assert np.allclose(
+        np.asarray(bm.to_numpy(result.pressure_flux)),
+        1.0,
+    )
 
 
 def test_piso_corrector_diagnostics_can_be_enabled_without_callback():
-    from fealpy.fvm import FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import NSFVMPISOModel
 
-    options = _model_options(nx=2, ny=2, nt=1)
+    options = _model_options(nx=2, ny=2, time_steps=1)
     options.update(
         {
             "diagnostics_enabled": True,
-            "linear_solver_config": FVMLinearSolverConfig(solver="scipy"),
             "log_level": "ERROR",
         }
     )
     model = NSFVMPISOModel(options)
 
-    model.solve()
+    result = model.solve()
 
-    assert len(model.corrector_diagnostics) == model.controls.n_correctors
-    first = model.corrector_diagnostics[0]
-    assert first["step"] == 1
-    assert first["corrector"] == 1
-    assert "pressure_free_divergence_linf" in first
-    assert "rhie_chow_flux_error_linf" in first
+    assert (
+        len(result.corrector_diagnostics)
+        == model.solver.controls.n_correctors
+    )
+    first = result.corrector_diagnostics[0]
+    assert first.step == 1
+    assert first.corrector == 1
+    assert (
+        first.pressure_correction.pressure_free_divergence_linf
+        >= 0.0
+    )
+    assert first.rhie_chow_flux_error_linf >= 0.0
 
 
 def test_piso_corrector_callback_still_enables_diagnostics():
-    from fealpy.fvm import FVMLinearSolverConfig, NSFVMPISOModel
+    from fealpy.fvm import NSFVMPISOModel
 
-    options = _model_options(nx=2, ny=2, nt=1)
-    options.update({"linear_solver_config": FVMLinearSolverConfig(solver="scipy"), "log_level": "ERROR"})
+    options = _model_options(nx=2, ny=2, time_steps=1)
+    options.update({"log_level": "ERROR"})
     model = NSFVMPISOModel(options)
     rows = []
 
-    model.solve(corrector_callback=lambda **row: rows.append(row))
+    result = model.solve(corrector_callback=rows.append)
 
-    assert len(rows) == model.controls.n_correctors
-    assert model.corrector_diagnostics == rows
-    assert rows[0]["step"] == 1
-    assert rows[0]["corrector"] == 1
+    assert len(rows) == model.solver.controls.n_correctors
+    assert list(result.corrector_diagnostics) == rows
+    assert rows[0].step == 1
+    assert rows[0].corrector == 1
+
+
+def test_piso_pressure_step_skips_diagnostic_only_divergence(monkeypatch):
+    from fealpy.backend import backend_manager as bm
+    from fealpy.fvm import NSFVMPISOModel
+
+    model = NSFVMPISOModel(
+        _model_options(nx=2, ny=2, time_steps=1)
+    )
+    solver = model.solver
+    nc = solver.discretization.NC
+    nf = solver.discretization.NF
+    calls = 0
+    original = solver.pressure_equation.divergence_from_flux
+
+    def count(face_flux):
+        nonlocal calls
+        calls += 1
+        return original(face_flux)
+
+    monkeypatch.setattr(
+        solver.pressure_equation,
+        "divergence_from_flux",
+        count,
+    )
+    solver.pressure_correction_step(
+        bm.zeros((nc, solver.discretization.GD)),
+        bm.zeros(nc),
+        bm.ones(nc),
+        bm.zeros((nc, solver.discretization.GD)),
+        bm.zeros((nf, solver.discretization.GD)),
+    )
+    calls_without_diagnostics = calls
+    calls = 0
+    solver.pressure_correction_step(
+        bm.zeros((nc, solver.discretization.GD)),
+        bm.zeros(nc),
+        bm.ones(nc),
+        bm.zeros((nc, solver.discretization.GD)),
+        bm.zeros((nf, solver.discretization.GD)),
+        return_diagnostics=True,
+    )
+
+    assert calls == calls_without_diagnostics + 1

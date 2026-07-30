@@ -30,21 +30,37 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         """
         self.mesh = mesh
         self.device = mesh.device
+        self.p = p
+        self.GD = 2
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
+
+        if p == 0 and hasattr(mesh, "Entities"):
+            cell_views = mesh.Entities(-1)
+            if not cell_views:
+                raise ValueError("ScaledMonomialSpace2d requires at least one cell sector.")
+
+            self.ikwargs = bm.context(cell_views[0].indices)
+            centers = [view.barycenter() for view in cell_views]
+            measures = [view.measure() for view in cell_views]
+            self.fkwargs = bm.context(centers[0])
+            self.cellbarycenter = (
+                bm.concatenate(centers, axis=0) if bc is None else bc
+            )
+            self.cellmeasure = bm.concatenate(measures, axis=0)
+            self.cellsize = bm.sqrt(self.cellmeasure)
+            return
+
         self.ikwargs = bm.context(mesh.cell[0]) if mesh.meshtype =='polygon' else bm.context(mesh.cell)
         self.fkwargs = bm.context(mesh.node)
         self.cellbarycenter = mesh.entity_barycenter('cell') if bc is None else bc
-        self.p = p
         self.cellmeasure = mesh.entity_measure('cell')
 
         self.cellsize = bm.sqrt(self.cellmeasure)
-        self.GD = 2
 
         q = q if q is not None else p+3
 
         mtype = mesh.meshtype
-
-        self.itype = self.mesh.itype
-        self.ftype = self.mesh.ftype
 
     def multi_index_matrix(self, p=None):
         """
@@ -71,7 +87,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         multiIndex = bm.set_at(multiIndex, (...,0), idx0 - multiIndex[...,1])
         return multiIndex
 
-    def cell_to_dof(self, p=None):
+    def cell_to_dof(self, p=None, *, index=_S):
         """
         Compute the mapping from cell degrees of freedom to global degrees of freedom.
         Parameters:
@@ -81,7 +97,7 @@ class ScaledMonomialSpace2d(FunctionSpace, Generic[_MT]):
         NC = mesh.number_of_cells()
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = bm.arange(NC*ldof).reshape(NC, ldof)
-        return cell2dof
+        return cell2dof[index]
 
     def number_of_local_dofs(self, p=None, doftype='cell'):
         """

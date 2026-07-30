@@ -55,5 +55,5 @@ class Exp0007(BoxMesher2d):
         val = bm.zeros(p.shape)
         return val   
     
-    velocity_dirichlet = velocity
-    pressure_dirichlet = pressure 
+    dirichlet_velocity = velocity
+    dirichlet_pressure = pressure

@@ -214,7 +214,15 @@ Relation 不负责：
 
 ### 6.1 设计目标
 
-计算视图层提供用户 API 的唯一入口。用户不需要直接操作 Storage。
+计算视图层提供用户 API 的唯一入口。用户不需要直接操作 Storage。针对网格视图 `Mesh` 和实体视图 `EntityView`，我们约定：
+
+**1. 视图是接口**
+
+视图不是算法实现的载体，不能在视图类中实现数学算法。
+
+**2. 视图是外壳**
+
+视图在初始化时只能做属性赋值。
 
 ### 6.2 Mesh API
 
@@ -317,23 +325,56 @@ cell_to_edge
 
 ## 九、模块结构
 
-目录结构：
-
-```
+```text
 mesh/
- ├─ schema
- │   ├─ entity_schema.py
- │   └─ registry.py
- │
- ├─ storage
- │   ├─ mesh_storage.py
- │   ├─ entity_block.py
- │   └─ relation.py
- │
- ├─ view
- │   ├─ mesh.py
- │   └─ entity_view.py
+	#---------- 核心骨架 ----------#
+	schema/                   # 形状格式 | 存放实体算法
+		classic/                  # 经典低阶形状
+			...
+		entity_schema.py          # 基类
+		registry.py               # 提供 名字-形状类 映射
+		utils.py                  # 工具函数
+	
+	stoarge/                  # 网格存储 | 存放网格数据结构
+		mesh_storage.py           # 网格数据结构
+		relation.py               # 拓扑关系存储结构
+	
+	view/                     # 计算视图 | 定义用户接口
+		entity_view.py            # 实体视图
+		mesh.py                   # 网格视图
+		fealpy_api.py             # 老接口兼容性视图
+	
+	#---------- 算法类 ----------#	
+	topology/                 # 算法：拓扑构造、推断
+		boundary.py               # 边界实体推断
+		builder.py                # 网格构造（construct）算法、拓扑关系推导
+	
+	ipoints.py                # 算法：插值点位置、全局编号、全局映射
+	join.py                   # 算法：简单合并网格
+	merge.py                  # 算法：按距离合并重复点
+	transform.py              # 算法：参考单元到物理单元变换
+	uniform_refine.py         # 算法：均匀加密
+	
+	#---------- 工具类 ----------#
+	plotting/                 # 工具：基于 Matplotlib 的网格绘图
+		artist.py
+		classic.py
+	
+	vtk_writter.py            # 工具：VTK 存储
+	vtk_reader.py             # 工具：VTK 读取
+	
+	#---------- 兼容层 ----------#
+	factory.py                # 提供 TriangleMesh 等类
+	mesh_base.py              # 提供 SimplexMesh 等类
 ```
+
+> [!NOTE]
+> 形成 Mesh 模块核心骨架的，是 `schema/`、`storage/` 和 `view/`。
+
+**重要文档**：
+
+- [实体函数表](kb/design/mesh/mesh_entity_functions.md)
+- [计算视图接口表](kb/design/mesh/mesh_interface)
 
 ## 十、总结
 

@@ -1,9 +1,10 @@
 """Finite-volume Dirichlet boundary-condition algebra."""
 
 from fealpy.backend import backend_manager as bm
-from fealpy.sparse import spdiags
+from fealpy.sparse import CSRTensor, spdiags
+from fealpy.typing import TensorLike
 
-from .fvm_geometry import FVMGeometry, boundary_face_flag
+from .fvm_geometry import FVMGeometry
 
 
 class DirichletBC:
@@ -16,64 +17,41 @@ class DirichletBC:
     and SIMPLE/PISO iteration rules live outside this class.
     """
 
-    def __init__(self, mesh, gd, threshold=None, geometry=None, component=None):
-        """Store boundary value data for later algebraic application.
-
-        Args:
-            mesh: Computational mesh for the control-volume domain.
-            gd: Callable returning prescribed values at physical points.
-            threshold: Optional selector for applying values on part of the boundary.
-            geometry: Optional reusable FVM geometry.  When omitted, the class
-                constructs one for standalone Poisson/tests/debug calls.
-            component: Optional component index for applying a vector boundary
-                function to a scalar component system.
-        """
-        self.mesh = mesh
-        self.gd = gd
-        self.threshold = threshold
+    def __init__(
+        self,
+        geometry: FVMGeometry,
+        faces: TensorLike,
+        values: TensorLike,
+        *,
+        diffusion_method: str = "over_relaxed",
+        nonorthogonal_eps: float = 0.05,
+    ) -> None:
+        """Store one explicit fixed-mesh Dirichlet patch."""
+        if not isinstance(geometry, FVMGeometry):
+            raise TypeError("geometry must be an FVMGeometry.")
         self.geometry = geometry
-        self.component = component
+        self.faces = faces
+        self.values = values
+        if self.faces.ndim != 1:
+            raise ValueError("faces must have shape (N,).")
+        if self.values.shape[0] != self.faces.shape[0]:
+            raise ValueError("values must have one entry per face.")
+        if nonorthogonal_eps <= 0.0:
+            raise ValueError("nonorthogonal_eps must be positive.")
+        self.nonorthogonal_eps = float(nonorthogonal_eps)
+        if diffusion_method not in {
+            "over_relaxed",
+            "bounded_over_relaxed",
+            "uncorrected",
+        }:
+            raise ValueError(
+                f"unknown diffusion method: {diffusion_method!r}"
+            )
+        self.diffusion_method = diffusion_method
 
-    def system_components(self, b, A=None):
-        """Return the number of component-major fields represented by ``b``."""
-        NC = self.mesh.number_of_cells()
-        if A is not None and (A.shape[0] != A.shape[1] or A.shape[0] != b.shape[0]):
-            raise ValueError("DirichletBC expects a square matrix matching the RHS size.")
-        if b.shape[0] == NC:
-            return 1
-        if b.shape[0] % NC == 0:
-            return b.shape[0] // NC
-        raise ValueError("RHS size must be NC or an integer multiple of NC.")
-
-    def matrix_components(self, A):
-        """Return the number of component-major fields represented by ``A``."""
-        NC = self.mesh.number_of_cells()
-        if A.shape[0] != A.shape[1]:
-            raise ValueError("DirichletBC expects a square matrix.")
-        if A.shape[0] == NC:
-            return 1
-        if A.shape[0] % NC == 0:
-            return A.shape[0] // NC
-        raise ValueError("matrix size must be NC or an integer multiple of NC.")
-
-    def boundary_values(self, points, components: int):
+    def boundary_values(self, components: int) -> TensorLike:
         """Return boundary values compatible with the algebraic system shape."""
-        value = bm.array(self.gd(points))
-        if self.component is not None:
-            if components != 1:
-                raise ValueError("component can only be used with scalar component systems.")
-            if value.ndim == 1:
-                if self.component != 0:
-                    raise ValueError("scalar boundary data only has component 0.")
-                return value
-            if value.ndim == 2:
-                if self.component < 0 or self.component >= value.shape[1]:
-                    raise ValueError(
-                        f"component {self.component} is out of bounds for boundary data "
-                        f"with {value.shape[1]} components."
-                    )
-                return value[:, self.component]
-            raise ValueError(f"Unsupported boundary value shape {value.shape}.")
+        value = self.values
 
         if components == 1:
             if value.ndim == 1:
@@ -92,45 +70,54 @@ class DirichletBC:
             )
         return value
 
-    def diffusion_boundary_data(self, coef=1.0, threshold=None, dtype=None):
+    def diffusion_boundary_data(
+        self,
+        coef: float | TensorLike = 1.0,
+    ) -> tuple[TensorLike, TensorLike]:
         """Return owner cells, implicit coefficients, and points for Dirichlet faces."""
-        threshold = self.threshold if threshold is None else threshold
-        geometry = self.geometry if self.geometry is not None else FVMGeometry(self.mesh)
-        boundary_faces = bm.nonzero(geometry.is_boundary)[0]
-        _, mag_E_f, _ = geometry.over_relaxed_decomposition()
-        boundary_integrator = (
-            mag_E_f[boundary_faces] / geometry.mag_d_f[boundary_faces]
+        geometry = self.geometry
+        decomposition = geometry.diffusion_face_decomposition(
+            self.diffusion_method,
+            eps=self.nonorthogonal_eps,
         )
-        boundary_points = geometry.face_center[boundary_faces]
+        boundary_faces = self.faces
+        boundary_integrator = decomposition.orthogonal_factor[
+            boundary_faces
+        ]
         if not isinstance(coef, (int, float)):
-            coef = bm.array(coef)
             if coef.shape == ():
                 pass
-            elif coef.ndim == 1 and coef.shape[0] == self.mesh.number_of_faces():
+            elif coef.ndim == 1 and coef.shape[0] == geometry.NF:
                 coef = coef[boundary_faces]
             else:
                 raise ValueError("coef must be scalar or face-wise.")
         boundary_integrator = coef * boundary_integrator
-        if threshold is not None:
-            boundary_flag = boundary_face_flag(boundary_points, threshold)
-            boundary_faces = boundary_faces[boundary_flag]
-            boundary_integrator = boundary_integrator[boundary_flag]
-            boundary_points = boundary_points[boundary_flag]
-        if dtype is not None:
-            boundary_integrator = bm.array(boundary_integrator, dtype=dtype)
-        return geometry.owner[boundary_faces], boundary_integrator, boundary_points
+        return geometry.owner[boundary_faces], boundary_integrator
 
-    def apply_diffusion_matrix(self, A, coef=1.0, threshold=None):
+    def apply_diffusion_matrix(
+        self,
+        A: CSRTensor,
+        coef: float | TensorLike = 1.0,
+        *,
+        components: int,
+    ) -> CSRTensor:
         """Add the implicit Dirichlet diffusion diagonal to ``A``."""
-        NC = self.mesh.number_of_cells()
-        components = self.matrix_components(A)
-        dtype = getattr(getattr(A, "values", None), "dtype", None)
-        boundary_owner, boundary_integrator, _ = self.diffusion_boundary_data(
+        NC = self.geometry.NC
+        if components < 1:
+            raise ValueError("components must be positive.")
+        expected = components * NC
+        if A.shape != (expected, expected):
+            raise ValueError(
+                "matrix shape must match the explicit component count."
+            )
+        boundary_owner, boundary_integrator = self.diffusion_boundary_data(
             coef=coef,
-            threshold=threshold,
-            dtype=dtype,
         )
-        boundary_diagonal = bm.zeros(NC, dtype=boundary_integrator.dtype)
+        boundary_diagonal = bm.zeros(
+            NC,
+            dtype=boundary_integrator.dtype,
+            device=bm.get_device(boundary_integrator),
+        )
         boundary_diagonal = bm.index_add(
             boundary_diagonal,
             boundary_owner,
@@ -147,30 +134,42 @@ class DirichletBC:
             index_dtype=A.itype,
         )
 
-    def apply_diffusion_rhs(self, b, coef=1.0, threshold=None):
+    def apply_diffusion_rhs(
+        self,
+        b: TensorLike,
+        coef: float | TensorLike = 1.0,
+        *,
+        components: int,
+    ) -> TensorLike:
         """Add the explicit Dirichlet diffusion RHS contribution to ``b``."""
-        NC = self.mesh.number_of_cells()
-        components = self.system_components(b)
-        boundary_owner, boundary_integrator, boundary_points = self.diffusion_boundary_data(
+        NC = self.geometry.NC
+        if components < 1 or b.shape != (components * NC,):
+            raise ValueError(
+                "RHS shape must match the explicit component count."
+            )
+        boundary_owner, boundary_integrator = self.diffusion_boundary_data(
             coef=coef,
-            threshold=threshold,
-            dtype=b.dtype,
         )
-        boundary_value = self.boundary_values(boundary_points, components)
+        boundary_value = self.boundary_values(components)
         if components == 1:
             boundary_rhs = boundary_integrator * boundary_value
-            boundary_rhs = bm.array(boundary_rhs, dtype=b.dtype)
             return bm.index_add(b, boundary_owner, boundary_rhs, axis=0)
 
         boundary_rhs = boundary_integrator[:, None] * boundary_value
         boundary_rhs = bm.swapaxes(boundary_rhs, 0, 1).flatten()
-        boundary_rhs = bm.array(boundary_rhs, dtype=b.dtype)
         indices = bm.concat(
             [boundary_owner + component * NC for component in range(components)]
         )
         return bm.index_add(b, indices, boundary_rhs, axis=0)
 
-    def apply_diffusion(self, A, b, coef=1.0, threshold=None):
+    def apply_diffusion(
+        self,
+        A: CSRTensor,
+        b: TensorLike,
+        coef: float | TensorLike = 1.0,
+        *,
+        components: int,
+    ) -> tuple[CSRTensor, TensorLike]:
         """Add boundary-face Dirichlet contribution for diffusion operators.
 
         For a boundary face, the prescribed value contributes an implicit
@@ -187,13 +186,26 @@ class DirichletBC:
                 - A (sparse matrix): Modified system matrix with boundary conditions applied.
                 - b (ndarray): Modified right-hand side vector with boundary contributions.
         """
-        self.system_components(b, A)
         return (
-            self.apply_diffusion_matrix(A, coef=coef, threshold=threshold),
-            self.apply_diffusion_rhs(b, coef=coef, threshold=threshold),
+            self.apply_diffusion_matrix(
+                A,
+                coef=coef,
+                components=components,
+            ),
+            self.apply_diffusion_rhs(
+                b,
+                coef=coef,
+                components=components,
+            ),
         )
 
-    def apply_convection(self, b, coef, threshold=None):
+    def apply_convection(
+        self,
+        b: TensorLike,
+        coef: TensorLike,
+        *,
+        components: int,
+    ) -> TensorLike:
         """
         Apply Dirichlet boundary values to a finite-volume convection RHS.
 
@@ -201,40 +213,30 @@ class DirichletBC:
         contributions. On boundary faces the prescribed value contributes the
         known flux ``-(coef_f · S_f) g_D`` to the owner cell RHS.
         """
-        if coef is None:
-            return b
-
-        threshold = self.threshold if threshold is None else threshold
-        geometry = self.geometry if self.geometry is not None else FVMGeometry(self.mesh)
-        boundary_faces = bm.nonzero(geometry.is_boundary)[0]
-        NC = self.mesh.number_of_cells()
-        components = self.system_components(b)
+        geometry = self.geometry
+        boundary_faces = self.faces
+        NC = geometry.NC
+        if components < 1 or b.shape != (components * NC,):
+            raise ValueError(
+                "RHS shape must match the explicit component count."
+            )
         Sf = geometry.S_f[boundary_faces]
-        boundary_points = geometry.face_center[boundary_faces]
-        coef = bm.array(coef)
-        if coef.ndim == 1 and coef.shape[0] == self.mesh.number_of_faces():
+        if coef.ndim == 1 and coef.shape[0] == geometry.NF:
             flux = coef[boundary_faces]
-        elif coef.ndim == 2 and coef.shape[0] == self.mesh.number_of_faces():
+        elif coef.ndim == 2 and coef.shape[0] == geometry.NF:
             flux = bm.einsum("ij,ij->i", coef[boundary_faces], Sf)
         else:
             raise ValueError("coef must be a face-wise scalar flux or vector face field.")
 
-        if threshold is not None:
-            boundary_flag = boundary_face_flag(boundary_points, threshold)
-            boundary_faces = boundary_faces[boundary_flag]
-            boundary_points = boundary_points[boundary_flag]
-            flux = flux[boundary_flag]
-
         boundary_owner = geometry.owner[boundary_faces]
-        boundary_value = self.boundary_values(boundary_points, components)
+        boundary_value = self.boundary_values(components)
 
         if components == 1:
-            boundary_rhs = bm.array(flux * boundary_value, dtype=b.dtype)
+            boundary_rhs = flux * boundary_value
             b = bm.index_add(b, boundary_owner, boundary_rhs, axis=0, alpha=-1)
             return b
 
         boundary_rhs = -flux[:, None] * boundary_value
-        boundary_rhs = bm.array(boundary_rhs, dtype=b.dtype)
         indices = bm.concat(
             [boundary_owner + component * NC for component in range(components)]
         )

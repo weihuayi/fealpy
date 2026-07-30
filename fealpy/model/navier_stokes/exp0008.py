@@ -60,10 +60,10 @@ class ElbowPipeStokesFluidModel:
     pressure_neumann: bool = True
     pressure_integral_target_value: float = 0.0
     state_system_is_linear: bool = False
-    velocity_dirichlet_data: Any = field(init=False)
-    velocity_dirichlet_threshold: Any = None
-    pressure_dirichlet_data: Any = 0.0
-    pressure_dirichlet_threshold: Any = None
+    dirichlet_velocity_data: Any = field(init=False)
+    dirichlet_velocity_threshold: Any = None
+    dirichlet_pressure_data: Any = 0.0
+    dirichlet_pressure_threshold: Any = None
     mesh: Any = None
     velocity_space: Any = None
     pressure_space: Any = None
@@ -75,7 +75,7 @@ class ElbowPipeStokesFluidModel:
         self.viscosity = float(self.viscosity)
         self.mu = float(self.viscosity)
         self.inlet_max_velocity = float(self.inlet_max_velocity)
-        self.velocity_dirichlet_data = _build_elbow_inflow_profile(
+        self.dirichlet_velocity_data = _build_elbow_inflow_profile(
             self.inlet_x,
             self.inlet_ymin,
             self.inlet_ymax,
@@ -91,8 +91,8 @@ class ElbowPipeStokesFluidModel:
         self.pressure_space = pressure_space
         self.uspace = velocity_space
         self.pspace = pressure_space
-        self.velocity_dirichlet_threshold = self.is_velocity_boundary(velocity_space)
-        self.pressure_dirichlet_threshold = self.is_pressure_boundary(pressure_space)
+        self.dirichlet_velocity_threshold = self.is_velocity_boundary(velocity_space)
+        self.dirichlet_pressure_threshold = self.is_pressure_boundary(pressure_space)
         return velocity_space, pressure_space
 
     def build_state_spaces(self, mesh: Any, geometry_contract: Any = None) -> tuple[Any, Any]:
@@ -198,14 +198,14 @@ class ElbowPipeStokesFluidModel:
         return bm.zeros(coords[..., 0].shape, dtype=float)
 
     @cartesian
-    def pressure_dirichlet(self, p: Any) -> Any:
+    def dirichlet_pressure(self, p: Any) -> Any:
         return self.outlet_pressure(p)
 
     def pressure_integral_target(self) -> float:
         return float(self.pressure_integral_target_value)
 
     @cartesian
-    def velocity_dirichlet(self, p: Any) -> Any:
+    def dirichlet_velocity(self, p: Any) -> Any:
         coords = bm.asarray(p, dtype=float)
         result = bm.zeros_like(coords, dtype=float)
         inlet = self.inlet_velocity(coords)

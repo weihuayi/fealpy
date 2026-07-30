@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Callable
 from dataclasses import dataclass
-from typing import Literal
+from pathlib import Path
+from typing import Any, Literal, Self
 
 from ...backend import bm
 from ...backend import Tensor, Index
@@ -36,6 +37,44 @@ class Mesh(MeshView):
             self.itype = bm.int32
 
         self.device = getattr(self.block.positions, "device", None)
+
+    @classmethod
+    def read(cls, filename: str | Path, file_format: str | None = None) -> Self:
+        """Read a mesh from a file and return a new Mesh instance."""
+        from ..mesh_io import read
+        block = read(filename, file_format=file_format)
+        return cls(block)
+
+    def write(
+        self,
+        filename: str | Path,
+        entity: str | list[str] | None = None,
+        file_format: str | None = None,
+        **kwargs: Any
+    ) -> None:
+        """Write selected entity sectors to a mesh file.
+
+        Parameters:
+            filename (str | Path): Output file path.
+            entity (str | list[str] | None): Name or names of entity to write.
+                If ``None``, all top-dimensional entities (cells) are written.
+                Default is ``None``.
+            file_format (str | None): Format of the output file.
+            **kwargs: Additional keyword arguments passed to the meshio writer.
+        """
+        from ..mesh_io import write
+        if entity is None:
+            entity_names = _Reg.schema_name_multi_parser(
+                "cell", self.top_dimension(), self.block.sectors.keys()
+            )
+        elif not isinstance(entity, (list, tuple)):
+            entity = [entity]
+            entity_names: list[str] = []
+            for e in entity:
+                entity_names.extend(_Reg.schema_name_multi_parser(
+                    e, self.top_dimension(), self.block.sectors.keys()
+                ))
+        return write(filename, self.block, entity_names, file_format=file_format, **kwargs)
 
     @property
     def localEdge(self) -> Tensor:
@@ -717,3 +756,83 @@ class Mesh(MeshView):
         """Provides a plotting interface for the mesh."""
         from ..plotting.classic import MeshPloter
         return MeshPloter(self)
+
+    def find_node(
+        self,
+        ax,
+        color = '#990000',
+        showindex: bool = False,
+        multiindex = None,
+        fontcolor: str = 'k',
+        fontsize: int = 24
+    ):
+        from ..plotting.classic import EntityFinder
+        return EntityFinder(self)(
+            ax,
+            etype='node',
+            color=color,
+            showindex=showindex,
+            multiindex=multiindex,
+            fontcolor=fontcolor,
+            fontsize=fontsize
+        )
+
+    def find_edge(
+        self,
+        ax,
+        color = '#009900',
+        showindex: bool = False,
+        multiindex = None,
+        fontcolor: str = 'k',
+        fontsize: int = 24
+    ):
+        from ..plotting.classic import EntityFinder
+        return EntityFinder(self)(
+            ax,
+            etype='edge',
+            color=color,
+            showindex=showindex,
+            multiindex=multiindex,
+            fontcolor=fontcolor,
+            fontsize=fontsize
+        )
+
+    def find_face(
+        self,
+        ax,
+        color = '#009999',
+        showindex: bool = False,
+        multiindex = None,
+        fontcolor: str = 'k',
+        fontsize: int = 24
+    ):
+        from ..plotting.classic import EntityFinder
+        return EntityFinder(self)(
+            ax,
+            etype='face',
+            color=color,
+            showindex=showindex,
+            multiindex=multiindex,
+            fontcolor=fontcolor,
+            fontsize=fontsize
+        )
+
+    def find_cell(
+        self,
+        ax,
+        color = '#0000CC',
+        showindex: bool = False,
+        multiindex = None,
+        fontcolor: str = 'k',
+        fontsize: int = 24
+    ):
+        from ..plotting.classic import EntityFinder
+        return EntityFinder(self)(
+            ax,
+            etype='cell',
+            color=color,
+            showindex=showindex,
+            multiindex=multiindex,
+            fontcolor=fontcolor,
+            fontsize=fontsize
+        )

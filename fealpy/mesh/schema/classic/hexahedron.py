@@ -17,22 +17,22 @@ class HexahedronSchema(ShapedEntitySchema):
     top_dim = 3
     OFace = {
         "quad": [
-            [0, 1, 3, 2], [4, 5, 7, 6],
-            [0, 4, 6, 2], [1, 3, 7, 5],
-            [0, 1, 5, 4], [3, 2, 6, 7],
+            [0, 3, 2, 1], [4, 5, 6, 7],
+            [0, 1, 5, 4], [2, 3, 7, 6],
+            [0, 4, 7, 3], [1, 2, 6, 5],
         ],
         "segment": [
-            [0, 1], [1, 3], [3, 2], [2, 0],
+            [0, 1], [1, 2], [2, 3], [3, 0],
             [0, 4], [1, 5], [2, 6], [3, 7],
-            [4, 5], [5, 7], [7, 6], [6, 4],
+            [4, 5], [5, 6], [6, 7], [7, 4],
         ],
         "point": [[0], [1], [2], [3], [4], [5], [6], [7]],
     }
     SFace = {
         "quad": [
             [0, 1, 2, 3], [4, 5, 6, 7],
-            [0, 2, 4, 6], [1, 3, 5, 7],
             [0, 1, 4, 5], [2, 3, 6, 7],
+            [0, 3, 4, 7], [1, 2, 5, 6],
         ],
         "segment": [
             [0, 1], [1, 2], [2, 3], [0, 3],
@@ -41,6 +41,7 @@ class HexahedronSchema(ShapedEntitySchema):
         ],
         "point": [[0], [1], [2], [3], [4], [5], [6], [7]],
     }
+    _tp_to_contract = [0, 1, 3, 2, 4, 5, 7, 6]
 
     @classmethod
     def barycenter(cls, ctx: EntityContext, index: Index | None) -> Tensor:
@@ -61,11 +62,12 @@ class HexahedronSchema(ShapedEntitySchema):
         cell = ctx.sector.indices if index is None else ctx.sector.indices[index]
         if len(cell.shape) == 1:
             cell = bm.reshape(cell, (1, -1))
-        points = ctx.block.positions[cell]
+        # Contract order is bottom/top cyclic; tensor-product order is different.
+        points = ctx.block.positions[cell[:, [0, 1, 3, 2, 4, 5, 7, 6]]]
         points = bm.reshape(points, (-1, 2, 2, 2, cls.geo_dimension(ctx)))
         u, v, w = bcs
-        NC = cell.shape[0]
-        return bm.einsum("ia,jb,kc,ncbae->nkjie", u, v, w, points).reshape(NC, -1, 3)
+        result = bm.einsum("ia,jb,kc,ncbae->nkjie", u, v, w, points)
+        return bm.reshape(result, (result.shape[0], -1, result.shape[-1]))
 
     @classmethod
     def shape_function(
@@ -84,7 +86,7 @@ class HexahedronSchema(ShapedEntitySchema):
             bm.simplex_shape_function(bcs[1], p[1], mi1),
             bm.simplex_shape_function(bcs[0], p[0], mi0),
         )
-        return phi
+        return phi[..., cls._tp_to_contract] if phi.shape[-1] == 8 else phi
 
     @classmethod
     def grad_shape_function_barycentric(
@@ -123,7 +125,7 @@ class HexahedronSchema(ShapedEntitySchema):
             ],
             axis=-1,
         )
-        return gphi
+        return gphi[..., cls._tp_to_contract, :] if gphi.shape[-2] == 8 else gphi
 
     @classmethod
     def grad_shape_function_reference(
@@ -152,12 +154,12 @@ class HexahedronSchema(ShapedEntitySchema):
         index: Index | None,
     ) -> Tensor:
         bcs = _require_bcs_tuple(bcs, "hexahedron jacobi_matrix", 3)
+        node = ctx.block.positions
         cell = ctx.sector.indices if index is None else ctx.sector.indices[index]
         if len(cell.shape) == 1:
             cell = bm.reshape(cell, (1, -1))
-
         gphi = cls.grad_shape_function_reference(bcs, p=(1, 1, 1))
-        return bm.einsum("cim,qin->cqmn", ctx.block.positions[cell], gphi)
+        return bm.einsum("cim,qin->cqmn", node[cell], gphi)
 
     @classmethod
     def multi_index(cls, order: tuple[int, ...], *, internal: bool = False, tensorprod: bool = True) -> Tensor:
@@ -223,6 +225,7 @@ class HexahedronSchema(ShapedEntitySchema):
             ref_row(z, v1*w1, z, u1*w1, z, u1*v1),
         ], axis=1)
         if ref:
+            ref_grad = ref_grad[..., cls._tp_to_contract, :]
             grad = bm.broadcast_to(ref_grad[None, :, :, :], (cell.shape[0], ref_grad.shape[0], 8, 6))
             return grad[:, 0, :, :] if squeeze_q else grad
 
@@ -236,6 +239,7 @@ class HexahedronSchema(ShapedEntitySchema):
             bm.stack([-v1*w1,  u0*w1,  u0*v1], axis=-1),
             bm.stack([ v1*w1,  u1*w1,  u1*v1], axis=-1),
         ], axis=1)
+        dphi = dphi[:, cls._tp_to_contract, :]
         points = ctx.block.positions[cell]
         J = bm.einsum("qit,cid->cqtd", dphi, points)
         Jt = bm.einsum("cqtd->cqdt", J)
@@ -256,7 +260,7 @@ class HexahedronSchema(ShapedEntitySchema):
         cell = ctx.sector.indices if index is None else ctx.sector.indices[index]
         if len(cell.shape) == 1:
             cell = bm.reshape(cell, (1, -1))
-        points = ctx.block.positions[cell]
+        points = ctx.block.positions[cell[:, cls._tp_to_contract]]
         points = bm.reshape(points, (-1, 2, 2, 2, 3))
         du = bm.broadcast_to(bm.asarray([-1.0, 1.0], dtype=ctx.block.positions.dtype)[None, :], u.shape)
         dv = bm.broadcast_to(bm.asarray([-1.0, 1.0], dtype=ctx.block.positions.dtype)[None, :], v.shape)
@@ -299,6 +303,6 @@ class HexahedronSchema(ShapedEntitySchema):
             cell = bm.reshape(cell, (1, -1))
         points = ctx.block.positions[cell]
         t0 = points[:, 1, :] - points[:, 0, :]
-        t1 = points[:, 2, :] - points[:, 0, :]
+        t1 = points[:, 3, :] - points[:, 0, :]
         t2 = points[:, 4, :] - points[:, 0, :]
         return bm.stack([t0, t1, t2], axis=1)

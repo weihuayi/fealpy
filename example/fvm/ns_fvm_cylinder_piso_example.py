@@ -14,13 +14,20 @@ benchmark run.
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 import json
 import math
 from pathlib import Path
 
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import CylinderFlowCase, FVMLinearSolverConfig, NSFVMPISOModel
+from fealpy.fvm import (
+    CylinderFlowCase,
+    NSFVMPISOModel,
+    PisoCorrectorDiagnostic,
+    PisoSnapshot,
+)
 from fealpy.fvm.cylinder_flow_postprocess import (
+    CylinderSolutionFields,
     cylinder_force_coefficients,
     pressure_drop,
     write_cylinder_outputs,
@@ -83,23 +90,28 @@ def build_piso_options(case: CylinderFlowCase, args) -> dict:
     options = {
         "pde": case,
         "mesh_type": "improved_tri",
-        "space_degree": int(args.space_degree),
         "duration": tuple(float(value) for value in args.duration),
-        "nt": int(args.nt),
+        "time_steps": int(args.time_steps),
         "n_correctors": int(args.n_correctors),
         "pbar_log": args.pbar_log,
         "log_level": args.log_level,
-        "linear_solver_config": FVMLinearSolverConfig(
-            backend=args.backend,
-            device=args.device,
-            solver=args.linear_solver,
-        ),
         "pressure_gradient_method": args.pressure_gradient_method,
         "velocity_gradient_method": args.velocity_gradient_method,
-        "rhie_chow_pressure_gradient_method": args.rhie_chow_pressure_gradient_method,
-        "face_interpolation_method": args.face_interpolation_method,
-        "momentum_nonorthogonal_max_iter": args.momentum_nonorthogonal_max_iter,
-        "pressure_nonorthogonal_max_iter": args.pressure_nonorthogonal_max_iter,
+        "momentum_face_interpolation": (
+            args.momentum_face_interpolation
+        ),
+        "pressure_response_interpolation": (
+            args.pressure_response_interpolation
+        ),
+        "rhie_chow_velocity_interpolation": (
+            args.rhie_chow_velocity_interpolation
+        ),
+        "momentum_nonorthogonal_max_iterations": (
+            args.momentum_nonorthogonal_max_iterations
+        ),
+        "pressure_nonorthogonal_max_iterations": (
+            args.pressure_nonorthogonal_max_iterations
+        ),
         "use_transient_flux_correction": args.use_transient_flux_correction,
         "snapshot_interval": args.snapshot_interval,
         "snapshot_start_step": args.snapshot_start_step,
@@ -120,6 +132,7 @@ class CylinderPISOHistory:
         self,
         case: CylinderFlowCase,
         *,
+        model: NSFVMPISOModel,
         output_dir: Path,
         fields: tuple[str, ...],
         viscous_method: str,
@@ -131,6 +144,11 @@ class CylinderPISOHistory:
         if vtk_start_step < 1:
             raise ValueError("vtk_start_step must be positive.")
         self.case = case
+        self.model = model
+        self.geometry = model.fvm_geometry
+        self.velocity_gradient = (
+            model.solver.spatial_face_velocity.boundary.gradient
+        )
         self.output_dir = Path(output_dir)
         self.fields = fields
         self.viscous_method = viscous_method
@@ -138,42 +156,49 @@ class CylinderPISOHistory:
         self.vtk_start_step = int(vtk_start_step)
         self.rows: list[dict] = []
         self.force_rows: list[dict] = []
-        self.corrector_rows: list[dict] = []
+        self.corrector_rows: list[PisoCorrectorDiagnostic] = []
         self._previous_velocity = None
 
     def __call__(
         self,
-        *,
-        step: int,
-        time: float,
-        model,
-        cell_velocity,
-        face_velocity=None,
-        pressure=None,
-        flux=None,
+        snapshot: PisoSnapshot,
     ) -> None:
+        step = snapshot.step
+        time = snapshot.time
+        cell_velocity = snapshot.velocity
+        pressure = snapshot.pressure
+        flux = snapshot.face_flux
         speed = bm.sqrt(cell_velocity[:, 0] ** 2 + cell_velocity[:, 1] ** 2)
         row = {
             "step": int(step),
             "time": float(time),
-            "mass": self._mass_residual(model, flux),
+            "mass": self._mass_residual(flux),
             "velocity_update": self._velocity_update(cell_velocity),
             "speed_max": self._scalar(bm.max(speed)),
             "speed_mean": self._scalar(bm.mean(speed)),
         }
-        row.update(self._outlet_flux_diagnostics(model, self.case, flux))
+        row.update(
+            self._outlet_flux_diagnostics(
+                self.model,
+                self.case,
+                flux,
+            )
+        )
         self.rows.append(row)
 
         force = cylinder_force_coefficients(
-            model.mesh,
+            self.model.mesh,
             self.case,
-            uh=cell_velocity[:, 0],
-            vh=cell_velocity[:, 1],
+            velocity=cell_velocity,
             pressure=pressure,
-            velocity_gradient=getattr(model, "velocity_gradient", None),
+            velocity_gradient=self.velocity_gradient,
             viscous_method=self.viscous_method,
+            geometry=self.geometry,
         )
-        probes = pressure_drop(model.mesh.entity_barycenter("cell"), pressure)
+        probes = pressure_drop(
+            self.model.mesh.entity_barycenter("cell"),
+            pressure,
+        )
         self.force_rows.append(
             {
                 "step": int(step),
@@ -189,17 +214,19 @@ class CylinderPISOHistory:
             and (step - self.vtk_start_step) % self.vtk_interval == 0
         ):
             write_solution_vtk(
-                model.mesh,
-                cell_velocity[:, 0],
-                cell_velocity[:, 1],
+                self.model.mesh,
+                cell_velocity,
                 pressure,
                 self.output_dir / "snapshots" / f"solution_{int(step):06d}.vtu",
                 fields=self.fields,
-                velocity_gradient=getattr(model, "velocity_gradient", None),
+                velocity_gradient=self.velocity_gradient,
             )
         self._previous_velocity = bm.array(cell_velocity)
 
-    def record_corrector(self, **row) -> None:
+    def record_corrector(
+        self,
+        row: PisoCorrectorDiagnostic,
+    ) -> None:
         self.corrector_rows.append(row)
 
     def _velocity_update(self, cell_velocity):
@@ -207,11 +234,16 @@ class CylinderPISOHistory:
             return 0.0
         return self._scalar(bm.max(bm.abs(cell_velocity - self._previous_velocity)))
 
-    @classmethod
-    def _mass_residual(cls, model, flux):
+    def _mass_residual(self, flux):
         if flux is None:
             return None
-        return cls._scalar(bm.max(bm.abs(model.divergence_from_flux(flux))))
+        return self._scalar(
+            bm.max(
+                bm.abs(
+                    self.geometry.scatter_face_flux_to_cells(flux)
+                )
+            )
+        )
 
     @classmethod
     def _outlet_flux_diagnostics(cls, model, case, flux):
@@ -268,13 +300,14 @@ def run_piso_cylinder(args):
     output_fields = tuple(args.output_fields)
     history = CylinderPISOHistory(
         case,
+        model=model,
         output_dir=output_dir,
         fields=output_fields,
         viscous_method=args.force_viscous_method,
         vtk_interval=args.vtk_interval,
         vtk_start_step=args.vtk_start_step,
     )
-    model.solve(
+    result = model.solve(
         snapshot_callback=history,
         corrector_callback=(
             history.record_corrector if args.piso_corrector_diagnostics else None
@@ -284,12 +317,24 @@ def run_piso_cylinder(args):
     corrector_diagnostics_path = None
     if args.piso_corrector_diagnostics:
         corrector_diagnostics_path = output_dir / "piso_corrector_diagnostics.csv"
-        write_dict_csv(corrector_diagnostics_path, scalarize_rows(history.corrector_rows))
+        write_dict_csv(
+            corrector_diagnostics_path,
+            scalarize_rows(
+                [asdict(row) for row in history.corrector_rows]
+            ),
+        )
 
     outputs = write_cylinder_outputs(
         model,
         case,
+        CylinderSolutionFields(
+            velocity=result.velocity,
+            pressure=result.pressure,
+        ),
         output_dir,
+        velocity_gradient=(
+            model.solver.spatial_face_velocity.boundary.gradient
+        ),
         residuals=history.rows,
         force_history=history.force_rows,
         strouhal_start_time=args.strouhal_start_time,
@@ -306,7 +351,7 @@ def run_piso_cylinder(args):
             "cylinder_mesh_size": args.cylinder_mesh_size,
             "wake_mesh_size": args.wake_mesh_size,
             "duration": tuple(float(value) for value in args.duration),
-            "nt": args.nt,
+            "time_steps": args.time_steps,
             "n_correctors": args.n_correctors,
             "snapshot_interval": args.snapshot_interval,
             "snapshot_start_step": args.snapshot_start_step,
@@ -314,18 +359,26 @@ def run_piso_cylinder(args):
             "vtk_start_step": args.vtk_start_step,
             "strouhal_start_time": args.strouhal_start_time,
             "strouhal_min_lift_amplitude": args.strouhal_min_lift_amplitude,
-            "momentum_nonorthogonal_max_iter": args.momentum_nonorthogonal_max_iter,
-            "pressure_nonorthogonal_max_iter": args.pressure_nonorthogonal_max_iter,
+            "momentum_nonorthogonal_max_iterations": (
+                args.momentum_nonorthogonal_max_iterations
+            ),
+            "pressure_nonorthogonal_max_iterations": (
+                args.pressure_nonorthogonal_max_iterations
+            ),
             "engineering_boundary_conditions": args.engineering_boundary_conditions,
             "pressure_gradient_method": args.pressure_gradient_method,
             "velocity_gradient_method": args.velocity_gradient_method,
-            "rhie_chow_pressure_gradient_method": (
-                args.rhie_chow_pressure_gradient_method
+            "momentum_face_interpolation": (
+                args.momentum_face_interpolation
             ),
-            "face_interpolation_method": args.face_interpolation_method,
+            "pressure_response_interpolation": (
+                args.pressure_response_interpolation
+            ),
+            "rhie_chow_velocity_interpolation": (
+                args.rhie_chow_velocity_interpolation
+            ),
             "piso_corrector_diagnostics": args.piso_corrector_diagnostics,
             "force_viscous_method": args.force_viscous_method,
-            "linear_solver": args.linear_solver,
         },
         viscous_method=args.force_viscous_method,
         fields=output_fields,
@@ -504,8 +557,7 @@ def create_parser() -> argparse.ArgumentParser:
         default="profile",
         choices=("profile", "zero"),
     )
-    parser.add_argument("--space_degree", default=0, type=int)
-    parser.add_argument("--nt", default=400, type=int)
+    parser.add_argument("--time_steps", default=400, type=int)
     parser.add_argument("--duration", nargs=2, default=(0.0, 20.0), type=float)
     parser.add_argument("--n_correctors", default=4, type=int)
     parser.add_argument("--snapshot_interval", default=1, type=int)
@@ -514,8 +566,16 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--vtk_start_step", default=1, type=int)
     parser.add_argument("--strouhal_start_time", default=None, type=float)
     parser.add_argument("--strouhal_min_lift_amplitude", default=1.0e-3, type=float)
-    parser.add_argument("--momentum_nonorthogonal_max_iter", default=1, type=int)
-    parser.add_argument("--pressure_nonorthogonal_max_iter", default=3, type=int)
+    parser.add_argument(
+        "--momentum_nonorthogonal_max_iterations",
+        default=20,
+        type=int,
+    )
+    parser.add_argument(
+        "--pressure_nonorthogonal_max_iterations",
+        default=20,
+        type=int,
+    )
     parser.add_argument(
         "--pressure_gradient_method",
         default="layered_lsq",
@@ -527,12 +587,17 @@ def create_parser() -> argparse.ArgumentParser:
         choices=("layered_lsq", "face_weighted_lsq", "green_gauss"),
     )
     parser.add_argument(
-        "--rhie_chow_pressure_gradient_method",
-        default="layered_lsq",
-        choices=("layered_lsq", "face_weighted_lsq", "green_gauss"),
+        "--momentum_face_interpolation",
+        default="average",
+        choices=("average", "linear"),
     )
     parser.add_argument(
-        "--face_interpolation_method",
+        "--pressure_response_interpolation",
+        default="average",
+        choices=("average", "linear"),
+    )
+    parser.add_argument(
+        "--rhie_chow_velocity_interpolation",
         default="average",
         choices=("average", "linear"),
     )
@@ -577,7 +642,6 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stop_on_failure", default=False, action="store_true")
     parser.add_argument("--backend", default="numpy", type=str)
     parser.add_argument("--device", default="cpu", choices=("cpu", "cuda"))
-    parser.add_argument("--linear_solver", default="auto", type=str)
     parser.add_argument("--log_level", default="WARNING", type=str)
     parser.add_argument(
         "--pbar_log",

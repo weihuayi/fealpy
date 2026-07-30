@@ -35,6 +35,7 @@ class PrismSchema(ShapedEntitySchema):
         ],
         "point": [[0], [1], [2], [3], [4], [5]],
     }
+    ref_measure = 0.5
 
     @classmethod
     def _entity(cls, ctx: EntityContext, index: Index | None = None) -> Tensor:
@@ -51,7 +52,10 @@ class PrismSchema(ShapedEntitySchema):
     @classmethod
     def _tp_points(cls, ctx: EntityContext, index: Index | None = None) -> Tensor:
         prism = cls._entity(ctx, index)
-        return ctx.block.positions[prism[:, [0, 3, 1, 4, 2, 5]]]
+        # ``shape_function`` orders the six nodes as triangle vertices on the
+        # bottom layer followed by the corresponding vertices on the top
+        # layer.  This is also the schema's contract order.
+        return ctx.block.positions[prism]
 
     @classmethod
     def barycenter(cls, ctx: EntityContext, index: Index | None) -> Tensor:
@@ -115,11 +119,14 @@ class PrismSchema(ShapedEntitySchema):
 
         mi0 = _MI.multi_index_matrix(p[0], 3)
         mi1 = _MI.multi_index_matrix(p[1], 2)
+        # Keep quadrature points triangle-major, matching
+        # TensorProductQuadrature.  Reorder the interleaved basis values to
+        # the schema contract: bottom triangle vertices, then top vertices.
         phi = bm.tensorprod(
-            bm.simplex_shape_function(bcs[1], p[1], mi1),
             bm.simplex_shape_function(bcs[0], p[0], mi0),
+            bm.simplex_shape_function(bcs[1], p[1], mi1),
         )
-        return phi
+        return phi[:, [0, 2, 4, 1, 3, 5]]
 
     @classmethod
     def grad_shape_function(
@@ -147,6 +154,7 @@ class PrismSchema(ShapedEntitySchema):
             gphi0[:, None, :, None, :] * phi1[None, :, None, :, None],
             phi0[:, None, :, None, None] * gphi1[None, :, None, :, :],
         ], axis=-1).reshape(-1, phi0.shape[1] * phi1.shape[1], 3)
+        ref = ref[:, [0, 2, 4, 1, 3, 5], :]
 
         if variables == "u":
             return ref
@@ -189,7 +197,11 @@ class PrismSchema(ShapedEntitySchema):
         g1 = phi0[:, None, :, None, None] * R1[None, :, None, :, :]
 
         gphi = bm.concat([g0, g1], axis=-1)
-        return bm.reshape(gphi, (-1, num_shape, 5))
+        gphi = bm.reshape(gphi, (-1, num_shape, 5))
+        # The intermediate tensor-product expansion is interleaved by
+        # triangle vertex and interval endpoint.  The schema contract keeps
+        # all bottom vertices first, followed by all top vertices.
+        return gphi[:, [0, 2, 4, 1, 3, 5], :]
 
     @classmethod
     def grad_shape_function_reference(

@@ -16,19 +16,19 @@ class PyramidSchema(ShapedEntitySchema):
     name = "pyramid"
     top_dim = 3
     OFace = {
-        "quad": [[0, 2, 3, 1]],
-        "tri": [[0, 1, 4], [2, 4, 3], [0, 4, 2], [1, 3, 4]],
+        "quad": [[0, 3, 2, 1]],
+        "tri": [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]],
         "segment": [
-            [0, 1], [2, 3], [0, 2], [1, 3],
+            [0, 1], [1, 2], [2, 3], [3, 0],
             [0, 4], [1, 4], [2, 4], [3, 4],
         ],
         "point": [[0], [1], [2], [3], [4]],
     }
     SFace = {
         "quad": [[0, 1, 2, 3]],
-        "tri": [[0, 1, 4], [2, 3, 4], [0, 2, 4], [1, 3, 4]],
+        "tri": [[0, 1, 4], [1, 2, 4], [2, 3, 4], [0, 3, 4]],
         "segment": [
-            [0, 1], [2, 3], [0, 2], [1, 3],
+            [0, 1], [1, 2], [2, 3], [0, 3],
             [0, 4], [1, 4], [2, 4], [3, 4],
         ],
         "point": [[0], [1], [2], [3], [4]],
@@ -56,8 +56,9 @@ class PyramidSchema(ShapedEntitySchema):
         lu0, lu1, lv0, lv1, lw0, lw1 = cls._split_bcs(bcs)
         phi0 = cls._product(lu0, lv0, lw0)
         phi1 = cls._product(lu1, lv0, lw0)
-        phi2 = cls._product(lu0, lv1, lw0)
-        phi3 = cls._product(lu1, lv1, lw0)
+        # The schema uses cyclic base order (u0v0, u1v0, u1v1, u0v1).
+        phi2 = cls._product(lu1, lv1, lw0)
+        phi3 = cls._product(lu0, lv1, lw0)
         phi4 = cls._product(bm.ones_like(lu0), bm.ones_like(lv0), lw1)
         return bm.stack([phi0, phi1, phi2, phi3, phi4], axis=-1)
 
@@ -78,14 +79,14 @@ class PyramidSchema(ShapedEntitySchema):
             -cls._product(lu1, lv0, bm.ones_like(lw0)),
         ], axis=-1)
         g2 = bm.stack([
-            -cls._product(bm.ones_like(lu0), lv1, lw0),
-            cls._product(lu0, bm.ones_like(lv1), lw0),
-            -cls._product(lu0, lv1, bm.ones_like(lw0)),
-        ], axis=-1)
-        g3 = bm.stack([
             cls._product(bm.ones_like(lu1), lv1, lw0),
             cls._product(lu1, bm.ones_like(lv1), lw0),
             -cls._product(lu1, lv1, bm.ones_like(lw0)),
+        ], axis=-1)
+        g3 = bm.stack([
+            -cls._product(bm.ones_like(lu0), lv1, lw0),
+            cls._product(lu0, bm.ones_like(lv1), lw0),
+            -cls._product(lu0, lv1, bm.ones_like(lw0)),
         ], axis=-1)
         g4 = bm.stack([z, z, o], axis=-1)
         return bm.stack([g0, g1, g2, g3, g4], axis=1)

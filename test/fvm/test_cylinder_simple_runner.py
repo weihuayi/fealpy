@@ -28,8 +28,6 @@ def test_cylinder_simple_runner_writes_standard_outputs(tmp_path: Path):
             "2",
             "--tol",
             "1e-3",
-            "--linear_solver",
-            "scipy",
             "--output_dir",
             str(tmp_path),
         ]

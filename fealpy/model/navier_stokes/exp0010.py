@@ -61,7 +61,7 @@ class Exp0010(BoxMesher2d):
         return self.mu * (4.0 - 8.0 * x)
 
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
+    def dirichlet_pressure(self, p: TensorLike) -> TensorLike:
         return self.pressure(p)
 
     @cartesian

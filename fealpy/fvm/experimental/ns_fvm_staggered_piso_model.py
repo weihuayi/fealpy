@@ -129,7 +129,7 @@ class NSFVMStaggeredPISOModel(ComputationalModel):
             self.pde.velocity_dirichlet_u,
             threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10),
         )
-        A, rhs = dbc.apply_diffusion(A, rhs)
+        A, rhs = dbc.apply_diffusion(A, rhs, components=1)
         A, rhs = dbc.ThresholdApply(A, rhs)
         a_p = A.diags().values
         return spsolve(A, rhs, "mumps"), a_p
@@ -179,7 +179,7 @@ class NSFVMStaggeredPISOModel(ComputationalModel):
             self.pde.velocity_dirichlet_v,
             threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10),
         )
-        A, rhs = dbc.apply_diffusion(A, rhs)
+        A, rhs = dbc.apply_diffusion(A, rhs, components=1)
         A, rhs = dbc.ThresholdApply(A, rhs)
         a_p = A.diags().values
         return spsolve(A, rhs, "mumps"), a_p

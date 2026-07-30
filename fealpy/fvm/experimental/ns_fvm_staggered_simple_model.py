@@ -81,7 +81,7 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         f -= bm.einsum('i,i->i', grad_p[:, 0], self.ucm)
         dbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
                           threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
-        A, f = dbc.apply_diffusion(A, f)
+        A, f = dbc.apply_diffusion(A, f, components=1)
         A, f = dbc.ThresholdApply(A, f)
         uap = A.diags().values
         return spsolve(A, f,"mumps"), uap
@@ -100,7 +100,7 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
         f -= bm.einsum('i,i->i', grad_p[:, 1], self.vcm)
         dbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
                           threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
-        A, f = dbc.apply_diffusion(A, f)
+        A, f = dbc.apply_diffusion(A, f, components=1)
         A, f = dbc.ThresholdApply(A, f)
         vap = A.diags().values
         return spsolve(A, f,"mumps"), vap
@@ -204,9 +204,19 @@ class NSFVMStaggeredSimpleModel(ComputationalModel):
             p_corr = self.correct_pressure_compute(-self.div_rhs, a_p_edge)
             p_update = pressure_relax * p_corr
             residual = {
-                "mass": staggered_mass_residual(self.pmesh, edge_vel),
-                "pressure_update": relative_l2_update(self.pmesh, p_update, p),
-                "pressure_correction": cell_l2_norm(self.pmesh, p_corr),
+                "mass": staggered_mass_residual(
+                    self.div.geometry,
+                    edge_vel,
+                ),
+                "pressure_update": relative_l2_update(
+                    p_update,
+                    p,
+                    geometry=self.div.geometry,
+                ),
+                "pressure_correction": cell_l2_norm(
+                    p_corr,
+                    geometry=self.div.geometry,
+                ),
             }
             self.residuals.append(residual)
             residual["pressure_relax"] = pressure_relax

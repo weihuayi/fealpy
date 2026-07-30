@@ -27,6 +27,7 @@ class TriangleSchema(ShapedEntitySchema):
         (0, 1, 2), (1, 2, 0), (2, 0, 1),
         (0, 2, 1), (2, 1, 0), (1, 0, 2),
     ]
+    ref_measure = 0.5
 
     @classmethod
     def _selected_triangles(cls, ctx: EntityContext, index: Index | None) -> Tensor:

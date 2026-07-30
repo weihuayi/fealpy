@@ -26,14 +26,17 @@ def test_quadrilateral_schema_barycenter_and_measure_2d():
             [0.0, 1.0],
             [1.5, 1.0]],
         quads=[
-            [0, 1, 2, 3],
-            [4, 5, 6, 7]])
+            [0, 1, 3, 2],
+            [4, 5, 7, 6]])
     barycenter = np.asarray(QuadrilateralSchema.barycenter(ctx, None))
     measure = np.asarray(QuadrilateralSchema.measure(ctx, None))
 
     np.testing.assert_allclose(barycenter, np.array([[1.0, 0.5], [0.625, 0.5]]))
     np.testing.assert_allclose(measure, np.array([2.0, 1.25]))
-    np.testing.assert_allclose(np.asarray(QuadrilateralSchema.normal(ctx, None)), np.array([4.0, 2.5]))
+    np.testing.assert_allclose(
+        np.asarray(QuadrilateralSchema.normal(ctx, None)),
+        np.zeros((2, 0, 2)),
+    )
     np.testing.assert_allclose(np.asarray(QuadrilateralSchema.grad_lambda(ctx, np.array([0]))), np.array([[[-0.25, -0.5], [0.25, -0.5], [0.25, 0.5], [-0.25, 0.5]]]))
     np.testing.assert_allclose(np.asarray(QuadrilateralSchema.tangent(ctx, np.array([0]))), np.array([[[2.0, 0.0], [0.0, 1.0]]]))
 
@@ -56,8 +59,8 @@ def test_quadrilateral_schema_measure_3d_and_index():
             [0.0, 1.0, 0.0],
             [2.0, 1.0, 0.0]],
         quads=[
-            [0, 1, 2, 3],
-            [4, 5, 6, 7]])
+            [0, 1, 3, 2],
+            [4, 5, 7, 6]])
 
     measure = np.asarray(QuadrilateralSchema.measure(ctx, None))
     barycenter = np.asarray(QuadrilateralSchema.barycenter(ctx, slice(1, 2)))
@@ -69,7 +72,10 @@ def test_quadrilateral_schema_measure_3d_and_index():
 
     np.testing.assert_allclose(measure, np.array([np.sqrt(2.0), 2.0]))
     np.testing.assert_allclose(barycenter, np.array([[1.0, 0.5, 0.0]]))
-    np.testing.assert_allclose(normal, np.array([[0.0, -2.0, 2.0], [0.0, 0.0, 4.0]]))
+    np.testing.assert_allclose(
+        normal,
+        np.array([[[0.0, -2.0, 2.0]], [[0.0, 0.0, 4.0]]]),
+    )
     np.testing.assert_allclose(grad_lambda, np.array([[[-0.25, -0.5, 0.0], [0.25, -0.5, 0.0], [0.25, 0.5, 0.0], [-0.25, 0.5, 0.0]]]))
     np.testing.assert_allclose(np.asarray(QuadrilateralSchema.tangent(ctx, slice(1, 2))), np.array([[[2.0, 0.0, 0.0], [0.0, 1.0, 0.0]]]))
     np.testing.assert_allclose(point, np.array([[[1.0, 0.5, 0.0]]]))

@@ -198,7 +198,7 @@ class Exp0009(CircleMesher):
         return self.neumann_pressure(p)
 
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
+    def dirichlet_pressure(self, p: TensorLike) -> TensorLike:
         return self.pressure(p)
 
     def pressure_integral_target(self) -> float:

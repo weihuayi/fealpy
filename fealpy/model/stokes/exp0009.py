@@ -36,16 +36,16 @@ class ObstacleStokesFluidModel:
     body_force: Any = 0.0
     pressure_neumann: bool = True
     pressure_integral_target: float = 0.0
-    velocity_dirichlet_data: Any = field(init=False)
-    velocity_dirichlet_threshold: Any = None
-    pressure_dirichlet_data: Any = 0.0
-    pressure_dirichlet_threshold: Any = None
+    dirichlet_velocity_data: Any = field(init=False)
+    dirichlet_velocity_threshold: Any = None
+    dirichlet_pressure_data: Any = 0.0
+    dirichlet_pressure_threshold: Any = None
     velocity_space: Any = None
     pressure_space: Any = None
     mesh: Any = None
 
     def __post_init__(self) -> None:
-        self.velocity_dirichlet_data = _build_inflow_profile(self.box)
+        self.dirichlet_velocity_data = _build_inflow_profile(self.box)
 
     def state_spaces(self, mesh: Any, geometry_contract: Any = None) -> tuple[Any, Any]:
         scalar_velocity_space = LagrangeFESpace(mesh, p=2)
@@ -54,8 +54,8 @@ class ObstacleStokesFluidModel:
         self.mesh = mesh
         self.velocity_space = velocity_space
         self.pressure_space = pressure_space
-        self.velocity_dirichlet_threshold = self.is_velocity_boundary
-        self.pressure_dirichlet_threshold = self.is_pressure_boundary
+        self.dirichlet_velocity_threshold = self.is_velocity_boundary
+        self.dirichlet_pressure_threshold = self.is_pressure_boundary
         return velocity_space, pressure_space
 
     def build_state_spaces(self, mesh: Any, geometry_contract: Any = None) -> tuple[Any, Any]:
@@ -78,11 +78,11 @@ class ObstacleStokesFluidModel:
         return bm.zeros(coords[..., 0].shape, dtype=bool)
 
     @cartesian
-    def velocity_dirichlet(self, p: Any) -> Any:
+    def dirichlet_velocity(self, p: Any) -> Any:
         return _build_inflow_profile(self.box)(p)
 
     @cartesian
-    def pressure_dirichlet(self, p: Any) -> Any:
+    def dirichlet_pressure(self, p: Any) -> Any:
         coords = bm.asarray(p, dtype=float)
         return bm.zeros(coords[..., 0].shape, dtype=float)
 

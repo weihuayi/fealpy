@@ -2,6 +2,7 @@
 
 from fealpy.backend import backend_manager as bm
 
+from ..fvm_geometry import FVMGeometry
 from ..simple_residual import normalized_flux_residual
 
 
@@ -16,6 +17,7 @@ class StaggeredDivergenceReconstruct:
 
     def __init__(self, mesh):
         self.mesh = mesh
+        self.geometry = FVMGeometry(mesh)
 
     def StagReconstruct(self, edge_velocity):
         signed_face_measure = bm.sum(self.mesh.edge_normal(), axis=1)
@@ -27,11 +29,16 @@ class StaggeredDivergenceReconstruct:
         return bm.index_add(div_u, pe2c[mask, 1], flux[mask], axis=0, alpha=-1)
 
 
-def staggered_mass_residual(mesh, edge_velocity):
+def staggered_mass_residual(geometry, edge_velocity):
     """Mass residual for scalar staggered velocities on pressure faces."""
+    mesh = geometry.mesh
     signed_face_measure = bm.sum(mesh.edge_normal(), axis=1)
     face_flux = edge_velocity * signed_face_measure
     cell_flux_imbalance = StaggeredDivergenceReconstruct(mesh).StagReconstruct(
         edge_velocity
     )
-    return normalized_flux_residual(mesh, cell_flux_imbalance, face_flux)
+    return normalized_flux_residual(
+        cell_flux_imbalance,
+        face_flux,
+        geometry=geometry,
+    )

@@ -175,7 +175,7 @@ class Exp0002(BoxMesher2d):
         x, y = p[..., 0], p[..., 1]
         return bm.zeros_like(x)
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike) -> TensorLike:
+    def dirichlet_pressure(self, p: TensorLike) -> TensorLike:
         """Optional: prescribed pressure on boundary (usually for stability)."""
         return self.pressure(p)
     

@@ -66,7 +66,11 @@ class LidDrivenCavityCase(BoxMesher2d):
 
     @cartesian
     def source(self, p: TensorLike, t: float | None = None) -> TensorLike:
-        return bm.zeros(p.shape, dtype=p.dtype)
+        return bm.zeros(
+            p.shape,
+            dtype=p.dtype,
+            device=bm.get_device(p),
+        )
 
     @cartesian
     def dirichlet_velocity(self, p: TensorLike) -> TensorLike:
@@ -77,13 +81,18 @@ class LidDrivenCavityCase(BoxMesher2d):
         return bm.stack([u, v], axis=-1)
 
     @cartesian
-    def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
-        return self.dirichlet_velocity(p)
-
     @cartesian
     def velocity_0(self, p: TensorLike, t: float = 0.0) -> TensorLike:
-        return bm.zeros(p.shape, dtype=p.dtype)
+        return bm.zeros(
+            p.shape,
+            dtype=p.dtype,
+            device=bm.get_device(p),
+        )
 
     @cartesian
     def pressure_0(self, p: TensorLike, t: float = 0.0) -> TensorLike:
-        return bm.zeros(p.shape[:-1], dtype=p.dtype)
+        return bm.zeros(
+            p.shape[:-1],
+            dtype=p.dtype,
+            device=bm.get_device(p),
+        )

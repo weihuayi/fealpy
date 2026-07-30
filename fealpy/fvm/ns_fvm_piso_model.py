@@ -1,44 +1,39 @@
 """Manufactured-case adapter for the collocated PISO solver."""
 
-from inspect import signature
-from typing import Tuple
+from typing import Any
 
 from fealpy.typing import TensorLike
-from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
 from fealpy.model import PDEModelManager
 
-from .collocated_piso_solver import CollocatedPisoSolver
+from .collocated_piso_solver import (
+    CollocatedPisoSolver,
+    PisoCorrectorCallback,
+    PisoSnapshotCallback,
+)
+from .collocated_pressure_system import (
+    CollocatedPressureSystemControls,
+)
+from .collocated_linear_solvers import (
+    CollocatedNSLinearSolvers,
+    build_collocated_ns_linear_solvers,
+)
 from .cell_average_error import cell_average_l2_error
-from .engineering_boundary_conditions import BoundaryConditionData
+from .engineering_boundary_conditions import (
+    EngineeringBoundaryConditions,
+    PDEBoundaryConditions,
+    resolve_piso_boundary_conditions,
+)
+from .piso_result import PisoSolveResult
 from .solver_controls import PisoSolverControls, positive_scalar
 
 
-def _call_boundary_condition_factory(factory, mesh, pde):
-    try:
-        parameters = list(signature(factory).parameters.values())
-    except (TypeError, ValueError):
-        return factory(mesh, pde)
-
-    accepts_varargs = any(
-        parameter.kind == parameter.VAR_POSITIONAL for parameter in parameters
-    )
-    positional = [
-        parameter
-        for parameter in parameters
-        if parameter.kind
-        in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
-    ]
-    if accepts_varargs or len(positional) >= 2:
-        return factory(mesh, pde)
-    return factory(mesh)
-
-
-class NSFVMPISOModel(ComputationalModel, CollocatedPisoSolver):
+class NSFVMPISOModel(ComputationalModel):
     """Finite-volume PISO model for PDE examples with exact solutions."""
 
-    def __init__(self, options):
+    def __init__(self, options: dict[str, Any]) -> None:
         self.options = options
+        self._validate_options()
         ComputationalModel.__init__(
             self,
             pbar_log=options.get("pbar_log", False),
@@ -67,8 +62,6 @@ class NSFVMPISOModel(ComputationalModel, CollocatedPisoSolver):
         self.mu = positive_scalar(mu_value, "mu")
 
         mesh_type = options.get("mesh_type", "uniform_quad")
-        if mesh_type == "uniform_qrad":
-            mesh_type = "uniform_quad"
         mesh_type = mesh_type or getattr(pde, "default_mesh_type", "uniform_quad")
         mesh_refine = int(options.get("mesh_refine", 0) or 0)
         if mesh_refine < 0:
@@ -87,127 +80,146 @@ class NSFVMPISOModel(ComputationalModel, CollocatedPisoSolver):
             if mesh_refine > 0:
                 if not hasattr(mesh, "uniform_refine"):
                     raise ValueError("mesh does not provide uniform_refine().")
-                mesh.uniform_refine(mesh_refine)
+                for _ in range(mesh_refine):
+                    mesh.uniform_refine()
 
         boundary_input = options.get("boundary_conditions")
         if boundary_input is None:
-            velocity_dirichlet = getattr(pde, "velocity_dirichlet", None)
-            if velocity_dirichlet is None:
-                velocity_dirichlet = pde.dirichlet_velocity
-            boundary_input = BoundaryConditionData(velocity_dirichlet)
-        elif callable(boundary_input) and not hasattr(boundary_input, "dirichlet_threshold"):
-            boundary_input = _call_boundary_condition_factory(boundary_input, mesh, pde)
-        self.engineering_bc = (
-            boundary_input
-            if options.get("boundary_conditions") is not None
-            and hasattr(boundary_input, "to_pde_boundary")
-            else None
-        )
-        if isinstance(boundary_input, BoundaryConditionData):
-            boundary_conditions = boundary_input.to_pde_boundary(mesh)
-        elif hasattr(boundary_input, "to_pde_boundary"):
-            boundary_conditions = boundary_input.to_pde_boundary()
+            boundary_input = PDEBoundaryConditions(
+                mesh,
+                dirichlet_velocity=pde.dirichlet_velocity,
+            )
+        elif callable(boundary_input):
+            boundary_input = boundary_input(mesh, pde)
+
+        if isinstance(boundary_input, EngineeringBoundaryConditions):
+            self.engineering_bc = boundary_input
+        elif isinstance(boundary_input, PDEBoundaryConditions):
+            self.engineering_bc = None
         else:
-            boundary_conditions = boundary_input
-        default_pressure_nonorthogonal_iter = 1 if mesh_type == "uniform_quad" else 3
-        if "momentum_explicit_correction" in options:
-            raise ValueError(
-                "momentum_explicit_correction is no longer a PISO option; "
-                "boundary-corrected explicit momentum correction is always used."
+            raise TypeError(
+                "boundary_conditions must be PDEBoundaryConditions, "
+                "EngineeringBoundaryConditions, or a factory(mesh, pde) "
+                "returning one of these types."
             )
-        if "transient_flux_correction_limiter" in options:
-            raise ValueError(
-                "transient_flux_correction_limiter has been removed from PISO; "
-                "the limited ddtCorr route is now always used when "
-                "use_transient_flux_correction is enabled."
+        controls = PisoSolverControls.from_mapping(options)
+        pressure_system_controls = options.get(
+            "pressure_system_controls"
+        )
+        if pressure_system_controls is None:
+            pressure_system_controls = CollocatedPressureSystemControls()
+        if not isinstance(
+            pressure_system_controls,
+            CollocatedPressureSystemControls,
+        ):
+            raise TypeError(
+                "pressure_system_controls must be "
+                "CollocatedPressureSystemControls."
             )
-        nt = options.get("nt", 20)
-        n_correctors = options.get("n_correctors", 2)
-        snapshot_interval = options.get("snapshot_interval", 1)
-        snapshot_start_step = options.get("snapshot_start_step", 1)
-        momentum_nonorthogonal_max_iter = options.get("momentum_nonorthogonal_max_iter", 1)
-        pressure_nonorthogonal_max_iter = options.get(
-            "pressure_nonorthogonal_max_iter",
-            default_pressure_nonorthogonal_iter,
+        boundary_conditions = resolve_piso_boundary_conditions(
+            mesh,
+            boundary_input,
+            controls,
+            pressure_system_controls,
         )
-        controls = PisoSolverControls(
-            space_degree=options.get("space_degree", 0),
-            duration=tuple(options.get("duration", (0, 1))),
-            nt=20 if nt is None else int(nt),
-            n_correctors=2 if n_correctors is None else int(n_correctors),
-            snapshot_interval=1 if snapshot_interval is None else int(snapshot_interval),
-            snapshot_start_step=1 if snapshot_start_step is None else int(snapshot_start_step),
-            pressure_gradient_method=options.get("pressure_gradient_method", "layered_lsq"),
-            velocity_gradient_method=options.get("velocity_gradient_method", "layered_lsq"),
-            rhie_chow_pressure_gradient_method=options.get("rhie_chow_pressure_gradient_method", "layered_lsq"),
-            face_interpolation_method=options.get("face_interpolation_method", "average"),
-            rhie_chow_velocity_interpolation=options.get("rhie_chow_velocity_interpolation"),
-            pressure_constraint=options.get("pressure_constraint", "nullspace"),
-            momentum_solve_strategy=options.get("momentum_solve_strategy", "component"),
-            momentum_component_matrix_policy=options.get(
-                "momentum_component_matrix_policy",
-                "shared",
-            ),
-            momentum_linear_solver=options.get(
-                "momentum_linear_solver",
-                "scipy_bicgstab",
-            ),
-            pressure_linear_solver=options.get("pressure_linear_solver"),
-            pressure_gauge_linear_solver=options.get("pressure_gauge_linear_solver"),
-            pressure_nullspace_linear_solver=options.get(
-                "pressure_nullspace_linear_solver",
-                "petsc_gmres_hypre",
-            ),
-            use_transient_flux_correction=bool(options.get("use_transient_flux_correction", True)),
-            momentum_nonorthogonal_max_iter=(
-                1 if momentum_nonorthogonal_max_iter is None else int(momentum_nonorthogonal_max_iter)
-            ),
-            momentum_nonorthogonal_tol=float(options.get("momentum_nonorthogonal_tol", 1.0e-5)),
-            pressure_nonorthogonal_max_iter=(
-                default_pressure_nonorthogonal_iter
-                if pressure_nonorthogonal_max_iter is None
-                else int(pressure_nonorthogonal_max_iter)
-            ),
-            pressure_nonorthogonal_tol=float(options.get("pressure_nonorthogonal_tol", 1.0e-5)),
-            diagnostics_enabled=bool(options.get("diagnostics_enabled", False)),
-        )
-        CollocatedPisoSolver.__init__(
-            self,
-            mesh=mesh,
+        linear_solvers = options.get("linear_solvers")
+        if linear_solvers is None:
+            linear_solvers = build_collocated_ns_linear_solvers()
+        if not isinstance(
+            linear_solvers,
+            CollocatedNSLinearSolvers,
+        ):
+            raise TypeError(
+                "linear_solvers must be "
+                "CollocatedNSLinearSolvers."
+            )
+        self.linear_solvers = linear_solvers
+        self.solver = CollocatedPisoSolver(
             diffusion_coef=self.mu,
             convection_coef=self.rho,
             source=pde.source,
             boundary_conditions=boundary_conditions,
             controls=controls,
-            linear_solver=options.get("linear_solver"),
-            linear_solver_config=options.get("linear_solver_config"),
-            logger=self.logger,
+            linear_solvers=linear_solvers,
         )
+        self.mesh = mesh
+        self.fvm_geometry = boundary_conditions.physical.geometry
+        self.NC = self.fvm_geometry.NC
+        self.GD = self.fvm_geometry.GD
+
+    def close(self) -> None:
+        """Release third-party linear-solver resources owned by this model."""
+        self.linear_solvers.close()
+
+    def _validate_options(self) -> None:
+        allowed = set(PisoSolverControls.option_names()) | {
+            "pde",
+            "mesh_type",
+            "mesh_refine",
+            "nx",
+            "ny",
+            "nz",
+            "rho",
+            "mu",
+            "error_quadrature_order",
+            "boundary_conditions",
+            "linear_solvers",
+            "pressure_system_controls",
+            "pbar_log",
+            "log_level",
+        }
+        unsupported = set(self.options).difference(allowed)
+        if unsupported:
+            names = ", ".join(sorted(unsupported))
+            raise ValueError(f"unsupported NSFVMPISOModel options: {names}")
 
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}:\n"
-            f"  Mesh shape: {self.mesh.number_of_cells()} cells\n"
+            f"  Mesh shape: {self.NC} cells\n"
             f"  PDE type: {type(self.pde).__name__}\n"
-            f"  Time steps: {self.controls.nt}\n"
-            f"  PISO correctors: {self.controls.n_correctors}\n"
+            f"  Time steps: {self.solver.controls.time_steps}\n"
+            f"  PISO correctors: {self.solver.controls.n_correctors}\n"
             f"  Momentum nonorthogonal corrections: "
-            f"{self.controls.momentum_nonorthogonal_max_iter}\n"
+            f"{self.solver.controls.momentum_nonorthogonal_max_iterations}\n"
             f"  Pressure nonorthogonal corrections: "
-            f"{self.controls.pressure_nonorthogonal_max_iter}\n"
+            f"{self.solver.controls.pressure_nonorthogonal_max_iterations}\n"
         )
 
-    def initial_solution(self) -> Tuple[TensorLike, TensorLike, TensorLike]:
+    def initial_solution(self) -> tuple[TensorLike, TensorLike, TensorLike]:
         """Return the initial velocity, face velocity, and pressure fields."""
-        t0 = self.controls.duration[0]
-        U0 = self.pde.velocity_0(self.cell_center, t0)
-        Uf0 = self.pde.velocity_0(self.face_center, t0)
-        p0 = self.pde.pressure_0(self.cell_center, t0)
+        t0 = self.solver.controls.duration[0]
+        cell_center = self.fvm_geometry.cell_center
+        face_center = self.fvm_geometry.face_center
+        U0 = self.pde.velocity_0(cell_center, t0)
+        Uf0 = self.pde.velocity_0(face_center, t0)
+        p0 = self.pde.pressure_0(cell_center, t0)
         return U0, Uf0, p0
 
-    def compute_error(self) -> Tuple[float, float, float]:
+    def solve(
+        self,
+        *,
+        snapshot_callback: PisoSnapshotCallback | None = None,
+        corrector_callback: PisoCorrectorCallback | None = None,
+    ) -> PisoSolveResult:
+        """Run one PISO solve from the PDE initial fields."""
+        initial_velocity, initial_face_velocity, initial_pressure = (
+            self.initial_solution()
+        )
+        return self.solver.solve(
+            initial_velocity,
+            initial_face_velocity,
+            initial_pressure,
+            snapshot_callback=snapshot_callback,
+            corrector_callback=corrector_callback,
+        )
+
+    def compute_error(
+        self,
+        result: PisoSolveResult,
+    ) -> tuple[float, ...]:
         """Compute final-time errors against exact control-volume averages."""
-        t = self.controls.duration[1]
+        t = self.solver.controls.duration[1]
 
         def exact_velocity(points):
             return self.pde.velocity(points, t)
@@ -215,36 +227,65 @@ class NSFVMPISOModel(ComputationalModel, CollocatedPisoSolver):
         def exact_pressure(points):
             return self.pde.pressure(points, t)
 
-        velocity_error, velocity_average = cell_average_l2_error(
+        velocity_error, self.exact_velocity = cell_average_l2_error(
             self.mesh,
             exact_velocity,
-            self.velocity,
+            result.velocity,
             q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
         )
-        perror, self.pI = cell_average_l2_error(
+        pressure_error, self.exact_pressure = cell_average_l2_error(
             self.mesh,
             exact_pressure,
-            self.ph,
+            result.pressure,
             q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
         )
-        self.uI = velocity_average[:, 0]
-        self.vI = velocity_average[:, 1] if self.GD > 1 else bm.zeros_like(self.uI)
-        if self.GD > 2:
-            self.wI = velocity_average[:, 2]
-        return tuple(velocity_error[i] for i in range(self.GD)) + (perror,)
+        return tuple(velocity_error[i] for i in range(self.GD)) + (pressure_error,)
 
-    def plot(self) -> None:
+    def plot(self, result: PisoSolveResult) -> None:
         """Plot numerical and exact solution errors for u, v, and p."""
         import matplotlib.pyplot as plt
 
-        cell_centers = self.mesh.entity_barycenter("cell")
+        t = self.solver.controls.duration[1]
+
+        def exact_velocity(points):
+            return self.pde.velocity(points, t)
+
+        def exact_pressure(points):
+            return self.pde.pressure(points, t)
+
+        _, exact_cell_velocity = cell_average_l2_error(
+            self.mesh,
+            exact_velocity,
+            result.velocity,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        _, exact_cell_pressure = cell_average_l2_error(
+            self.mesh,
+            exact_pressure,
+            result.pressure,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        cell_centers = self.fvm_geometry.cell_center
         x, y = cell_centers[:, 0], cell_centers[:, 1]
 
         fig = plt.figure(figsize=(15, 10))
         titles = [
-            ("Error u", self.uh - self.uI),
-            ("Error v", self.vh - self.vI),
-            ("Error p", self.ph - self.pI),
+            (
+                "Error u",
+                result.velocity[:, 0] - exact_cell_velocity[:, 0],
+            ),
+            (
+                "Error v",
+                result.velocity[:, 1] - exact_cell_velocity[:, 1],
+            ),
+            (
+                "Error p",
+                result.pressure - exact_cell_pressure,
+            ),
         ]
         for i, (title, data) in enumerate(titles):
             ax = fig.add_subplot(2, 3, i + 1, projection="3d")

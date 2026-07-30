@@ -91,35 +91,25 @@ class Exp0004(BoxMesher2d):
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
-        
-        # 计算 Δu1 = ∂²u1/∂x² + ∂²u1/∂y²
-        # u1 = 10x²(x-1)²y(y-1)(2y-1)cos(t)
-        
-        # 计算 ∂²u1/∂x²
-        term1_x = 240*x**2*y*(y-1)*(2*y-1)*bm.cos(t) - 240*x**3*y*(y-1)*(2*y-1)*bm.cos(t)
-        term2_x = 80*x*y*(y-1)*(2*y-1)*bm.cos(t) - 240*x**2*y*(y-1)*(2*y-1)*bm.cos(t)
-        term3_x = 20*y*(y-1)*(2*y-1)*bm.cos(t) - 80*x*y*(y-1)*(2*y-1)*bm.cos(t) + 60*x**2*y*(y-1)*(2*y-1)*bm.cos(t)
-        
-        # 计算 ∂²u1/∂y²
-        term1_y = 10*x**2*(x-1)**2*(24*y-12)*bm.cos(t)
-        term2_y = 10*x**2*(x-1)**2*(12*y**2-12*y+2)*bm.cos(t)
-        
-        d2u1_dx2 = 20*x**2*(x-1)**2*y*(y-1)*(2*y-1)*bm.cos(t) + 80*x*(2*x-2)*y*(y-1)*(2*y-1)*bm.cos(t) + 20*y*(x-1)**2*(y-1)*(2*y-1)*bm.cos(t)
-        d2u1_dy2 = 10*x**2*(x-1)**2*(24*y-12)*bm.cos(t)
-        
-        # 简化计算
-        result[..., 0] = 40*x**2*y*(x-1)**2*bm.cos(t) + 20*x**2*y*(y-1)*(2*y-1)*bm.cos(t) + 40*x**2*(x-1)**2*(y-1)*bm.cos(t) + 20*x**2*(x-1)**2*(2*y-1)*bm.cos(t) + 40*x*y*(2*x-2)*(y-1)*(2*y-1)*bm.cos(t) + 20*y*(x-1)**2*(y-1)*(2*y-1)*bm.cos(t)
-        
-        # 计算 Δu2 = ∂²u2/∂x² + ∂²u2/∂y²
-        # u2 = -10x(x-1)(2x-1)y²(y-1)²cos(t)
-        
-        # 计算 ∂²u2/∂x²
-        d2u2_dx2 = -10*y**2*(y-1)**2*(24*x-12)*bm.cos(t)
-        
-        # 计算 ∂²u2/∂y²
-        d2u2_dy2 = -20*x*y**2*(x-1)*(2*x-1)*bm.cos(t) - 40*x*y**2*(y-1)**2*bm.cos(t) - 40*x*y*(x-1)*(2*x-1)*(2*y-2)*bm.cos(t) - 20*x*(x-1)*(2*x-1)*(y-1)**2*bm.cos(t) - 40*y**2*(x-1)*(y-1)**2*bm.cos(t) - 20*y**2*(2*x-1)*(y-1)**2*bm.cos(t)
-        
-        result[..., 1] = -20*x*y**2*(x-1)*(2*x-1)*bm.cos(t) - 40*x*y**2*(y-1)**2*bm.cos(t) - 40*x*y*(x-1)*(2*x-1)*(2*y-2)*bm.cos(t) - 20*x*(x-1)*(2*x-1)*(y-1)**2*bm.cos(t) - 40*y**2*(x-1)*(y-1)**2*bm.cos(t) - 20*y**2*(2*x-1)*(y-1)**2*bm.cos(t) - 10*y**2*(y-1)**2*(24*x-12)*bm.cos(t)
+        cos_t = bm.cos(t)
+
+        # u1 = 10 a(x)b(y)cos(t),
+        # a''(x) = 12x² - 12x + 2, b''(y) = 12y - 6.
+        a = x**2 * (x - 1)**2
+        b = y * (y - 1) * (2*y - 1)
+        result[..., 0] = 10 * (
+            (12*x**2 - 12*x + 2) * b
+            + a * (12*y - 6)
+        ) * cos_t
+
+        # u2 = -10 c(x)d(y)cos(t),
+        # c''(x) = 12x - 6, d''(y) = 12y² - 12y + 2.
+        c = x * (x - 1) * (2*x - 1)
+        d = y**2 * (y - 1)**2
+        result[..., 1] = -10 * (
+            (12*x - 6) * d
+            + c * (12*y**2 - 12*y + 2)
+        ) * cos_t
         
         return result
     
@@ -179,7 +169,7 @@ class Exp0004(BoxMesher2d):
         return 0
 
     @cartesian
-    def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
+    def dirichlet_velocity(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
@@ -187,20 +177,20 @@ class Exp0004(BoxMesher2d):
     
     
     @cartesian
-    def velocity_dirichlet_u(self, p: TensorLike) -> TensorLike:
+    def dirichlet_velocity_u(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         # y = p[..., 1]
         result = bm.zeros(x.shape, dtype=bm.float64)
         return result
     @cartesian
-    def velocity_dirichlet_v(self, p: TensorLike) -> TensorLike:
+    def dirichlet_velocity_v(self, p: TensorLike) -> TensorLike:
         # x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(y.shape, dtype=bm.float64)
         return result
 
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike, t) -> TensorLike:
+    def dirichlet_pressure(self, p: TensorLike, t) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
         return None

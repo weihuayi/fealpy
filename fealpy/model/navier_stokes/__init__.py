@@ -34,6 +34,7 @@ class NavierStokesPDEDataProtocol(Protocol):
 
     # --- Dirichlet boundary conditions ---
     def dirichlet_velocity(self, p: TensorLike) -> TensorLike: ...
+    def dirichlet_pressure(self, p: TensorLike) -> TensorLike: ...
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike: ...
 
     # --- Optional: Neumann-type boundary support ---
@@ -56,4 +57,6 @@ DATA_TABLE = {
     11: ("exp0011", "Exp0011"),
     12: ("exp0012", "Exp0012"),
     13: ("exp0013", "Exp0013"),
+    14: ("exp0014", "Exp0014"),
+    15: ("exp0015", "Exp0015"),
 }

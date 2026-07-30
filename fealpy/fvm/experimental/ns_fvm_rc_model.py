@@ -86,8 +86,8 @@ class NSFVMRCModel(ComputationalModel):
         self.velocity_gradient = GradientReconstruct(
             self.mesh,
             method="green_gauss",
-            gd=self.pde.dirichlet_velocity,
-            bc_type="dirichlet",
+            boundary_value=self.pde.dirichlet_velocity,
+            boundary_type="dirichlet",
         )
         self.fvm_geometry = FVMGeometry(self.mesh)
         self.velocity_dirichlet_bc = DirichletBC(
@@ -108,7 +108,11 @@ class NSFVMRCModel(ComputationalModel):
 
         f = LinearForm(self.uspace).add_integrator(
             ScalarSourceIntegrator(self.pde.source, q=2)).assembly()
-        f = self.velocity_dirichlet_bc.apply_convection(f, uf)
+        f = self.velocity_dirichlet_bc.apply_convection(
+            f,
+            uf,
+            components=self.GD,
+        )
         if u0 is not None:
             f = f + self.compute_cross_diffusion(u0)
     
@@ -125,6 +129,7 @@ class NSFVMRCModel(ComputationalModel):
                 uh,
                 grad_f,
                 geometry=self.fvm_geometry,
+                method="bounded_over_relaxed",
                 boundary_policy="all",
             )
         )
@@ -169,7 +174,11 @@ class NSFVMRCModel(ComputationalModel):
         M1, M2 = self.assembly_pressure()
         M3 = BlockForm([[M1, M2]]).assembly_sparse_matrix(format='csr')
         nbc = NeumannBC(self.mesh, self.pde.neumann_pressure)
-        AB, f = self.velocity_dirichlet_bc.apply_diffusion(AB, f)
+        AB, f = self.velocity_dirichlet_bc.apply_diffusion(
+            AB,
+            f,
+            components=self.GD,
+        )
         ap = self._matrix_diagonal(AB)
         if callable(getattr(self.pde, "pressure_dirichlet", None)):
             f = f - self._pressure_boundary_force()

@@ -63,6 +63,6 @@ def test_poisson_compute_error_compares_against_cell_average():
             "mesh_type": "uniform_quad",
         }
     )
-    model.uh = cell_average(model.mesh, model.pde.solution, q=4)
+    model.solution = cell_average(model.mesh, model.pde.solution, q=4)
 
     assert float(model.compute_error()) < 1.0e-13

@@ -1,17 +1,22 @@
 """Manufactured-case adapter for the collocated SIMPLE Stokes solve."""
 
-from typing import Tuple
-
-from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel, PDEModelManager
 
 from .collocated_simple_solver import CollocatedSimpleSolver
 from .cell_average_error import cell_average_l2_error
-from .engineering_boundary_conditions import BoundaryConditionData
-from .solver_controls import SimpleSolverControls, positive_scalar
+from .engineering_boundary_conditions import (
+    PDEBoundaryConditions,
+    resolve_simple_boundary_conditions,
+)
+from .collocated_linear_solvers import CollocatedNSLinearSolvers
+from .solver_controls import positive_scalar
+from .steady_ns_solver_profiles import (
+    SteadyNSSimpleProfile,
+    steady_ns_high_accuracy_simple_profile,
+)
 
 
-class StokesFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
+class StokesFVMSimpleModel(ComputationalModel):
     """Finite-volume SIMPLE model for Stokes PDE examples."""
 
     def __init__(self, options):
@@ -26,22 +31,46 @@ class StokesFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
         self.error_quadrature_order = int(options.get("error_quadrature_order", 4))
         mesh = self._init_mesh(options)
         self.mu = self._init_diffusion_coef(options)
-        CollocatedSimpleSolver.__init__(
-            self,
-            mesh=mesh,
+        profile = options.get("profile")
+        if profile is None:
+            profile = steady_ns_high_accuracy_simple_profile()
+        if not isinstance(profile, SteadyNSSimpleProfile):
+            raise TypeError("profile must be a SteadyNSSimpleProfile.")
+        self.profile = profile
+        boundary_conditions = resolve_simple_boundary_conditions(
+            mesh,
+            PDEBoundaryConditions(
+                mesh,
+                dirichlet_velocity=self.pde.dirichlet_velocity,
+            ),
+            profile.discretization,
+            profile.pressure_system,
+        )
+        linear_solvers = options.get("linear_solvers")
+        if linear_solvers is None:
+            linear_solvers = profile.build_linear_solvers()
+        if not isinstance(
+            linear_solvers,
+            CollocatedNSLinearSolvers,
+        ):
+            raise TypeError(
+                "linear_solvers must be CollocatedNSLinearSolvers."
+            )
+        self.linear_solvers = linear_solvers
+        self.solver = CollocatedSimpleSolver(
             diffusion_coef=self.mu,
             convection_coef=0.0,
             source=self.pde.source,
-            boundary_conditions=BoundaryConditionData(
-                self.pde.dirichlet_velocity
-            ).to_pde_boundary(mesh),
-            controls=self._simple_controls_from_options(options),
-            linear_solver=options.get("linear_solver"),
-            linear_solver_config=options.get("linear_solver_config"),
+            boundary_conditions=boundary_conditions,
+            discretization_controls=profile.discretization,
+            iteration_controls=profile.iteration,
+            linear_solvers=linear_solvers,
             logger=self.logger,
-            pbar_log=options.get("pbar_log", False),
-            log_level=options.get("log_level", "WARNING"),
         )
+        self.mesh = mesh
+        self.fvm_geometry = boundary_conditions.physical.geometry
+        self.NC = self.fvm_geometry.NC
+        self.GD = self.fvm_geometry.GD
 
     def _validate_options(self) -> None:
         allowed = {
@@ -50,23 +79,11 @@ class StokesFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
             "mesh_refine",
             "nx",
             "ny",
+            "nz",
             "mu",
-            "space_degree",
-            "pressure_gradient_method",
-            "velocity_gradient_method",
-            "rhie_chow_pressure_gradient_method",
-            "face_interpolation_method",
-            "momentum_face_interpolation",
-            "pressure_response_interpolation",
-            "rhie_chow_velocity_interpolation",
-            "momentum_equation_relaxation",
-            "momentum_nonorthogonal_max_iter",
-            "momentum_nonorthogonal_tol",
-            "pressure_nonorthogonal_max_iter",
-            "pressure_nonorthogonal_tol",
             "error_quadrature_order",
-            "linear_solver",
-            "linear_solver_config",
+            "profile",
+            "linear_solvers",
             "pbar_log",
             "log_level",
         }
@@ -78,9 +95,13 @@ class StokesFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}:\n"
-            f"  Mesh shape: {self.mesh.number_of_cells()} cells\n"
+            f"  Mesh shape: {self.NC} cells\n"
             f"  PDE type: {type(self.pde).__name__}\n"
         )
+
+    def close(self) -> None:
+        """Release third-party linear-solver resources owned by this model."""
+        self.linear_solvers.close()
 
     @staticmethod
     def _resolve_stokes_pde(pde):
@@ -101,16 +122,17 @@ class StokesFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
         if getattr(self.pde, "supports_geometric_refine", False):
             return self.pde.init_mesh[mesh_type](mesh_refine=mesh_refine)
 
-        mesh_options = {}
-        if "nx" in options:
-            mesh_options["nx"] = int(options["nx"])
-        if "ny" in options:
-            mesh_options["ny"] = int(options["ny"])
+        mesh_options = {
+            name: int(options[name])
+            for name in ("nx", "ny", "nz")
+            if options.get(name) is not None
+        }
         mesh = self.pde.init_mesh[mesh_type](**mesh_options)
         if mesh_refine == 0:
             return mesh
         if hasattr(mesh, "uniform_refine"):
-            mesh.uniform_refine(mesh_refine)
+            for _ in range(mesh_refine):
+                mesh.uniform_refine()
             return mesh
         raise ValueError("mesh does not provide uniform_refine().")
 
@@ -122,76 +144,54 @@ class StokesFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
                 return positive_scalar(getattr(self.pde, name), "mu")
         return 1.0
 
-    @staticmethod
-    def _simple_controls_from_options(options):
-        return SimpleSolverControls(
-            space_degree=options.get("space_degree", 0),
-            pressure_gradient_method=options.get(
-                "pressure_gradient_method", "layered_lsq"
-            ),
-            velocity_gradient_method=options.get(
-                "velocity_gradient_method", "layered_lsq"
-            ),
-            rhie_chow_pressure_gradient_method=options.get(
-                "rhie_chow_pressure_gradient_method", "layered_lsq"
-            ),
-            face_interpolation_method=options.get("face_interpolation_method", "average"),
-            momentum_face_interpolation=options.get("momentum_face_interpolation"),
-            pressure_response_interpolation=options.get(
-                "pressure_response_interpolation"
-            ),
-            rhie_chow_velocity_interpolation=options.get(
-                "rhie_chow_velocity_interpolation"
-            ),
-            momentum_equation_relaxation=options.get(
-                "momentum_equation_relaxation", 0.7
-            ),
-            momentum_nonorthogonal_max_iter=options.get(
-                "momentum_nonorthogonal_max_iter", 10
-            ),
-            momentum_nonorthogonal_tol=options.get(
-                "momentum_nonorthogonal_tol", 1.0e-4
-            ),
-            pressure_nonorthogonal_max_iter=options.get(
-                "pressure_nonorthogonal_max_iter", 10
-            ),
-            pressure_nonorthogonal_tol=options.get(
-                "pressure_nonorthogonal_tol", 1.0e-5
-            ),
-        )
+    def solve(self):
+        """Run one cold-start SIMPLE solve and return its immutable result."""
+        return self.solver.solve()
 
-    def compute_error(self) -> Tuple[float, float, float]:
+    def compute_error(self, result) -> tuple[float, ...]:
         """Compute errors against exact control-volume averages."""
-        velocity_error, velocity_average = cell_average_l2_error(
+        velocity_error, exact_velocity = cell_average_l2_error(
             self.mesh,
             self.pde.velocity,
-            self.velocity,
+            result.velocity,
             q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
         )
-        perror, self.pI = cell_average_l2_error(
+        pressure_error, exact_pressure = cell_average_l2_error(
             self.mesh,
             self.pde.pressure,
-            self.ph,
+            result.pressure,
             q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
         )
-        self.uI = velocity_average[:, 0]
-        self.vI = velocity_average[:, 1] if self.GD > 1 else bm.zeros_like(self.uI)
-        if self.GD > 2:
-            self.wI = velocity_average[:, 2]
-        return tuple(velocity_error[i] for i in range(self.GD)) + (perror,)
+        return tuple(velocity_error[i] for i in range(self.GD)) + (pressure_error,)
 
-    def plot(self) -> None:
+    def plot(self, result) -> None:
         """Plot numerical and exact solution errors for u, v, and p."""
         import matplotlib.pyplot as plt
 
-        cell_centers = self.mesh.entity_barycenter("cell")
+        _, exact_velocity = cell_average_l2_error(
+            self.mesh,
+            self.pde.velocity,
+            result.velocity,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        _, exact_pressure = cell_average_l2_error(
+            self.mesh,
+            self.pde.pressure,
+            result.pressure,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        cell_centers = self.fvm_geometry.cell_center
         x, y = cell_centers[:, 0], cell_centers[:, 1]
 
         fig = plt.figure(figsize=(15, 10))
         titles = [
-            ("Error u", self.uh - self.uI),
-            ("Error v", self.vh - self.vI),
-            ("Error p", self.ph - self.pI),
+            ("Error u", result.velocity[:, 0] - exact_velocity[:, 0]),
+            ("Error v", result.velocity[:, 1] - exact_velocity[:, 1]),
+            ("Error p", result.pressure - exact_pressure),
         ]
         for i, (title, data) in enumerate(titles):
             ax = fig.add_subplot(2, 3, i + 1, projection="3d")
@@ -200,13 +200,17 @@ class StokesFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
         plt.tight_layout()
         plt.show()
 
-    def plot_residual(self) -> None:
+    def plot_residual(self, result) -> None:
         """Plot residual decay curve."""
         import matplotlib.pyplot as plt
 
-        mass = [residual["mass"] for residual in self.residuals]
+        mass = [
+            residual.mass_relative_l2
+            for residual in result.residual_history
+        ]
         pressure_correction = [
-            residual["pressure_correction"] for residual in self.residuals
+            residual.pressure_correction_l2
+            for residual in result.residual_history
         ]
         plt.figure(figsize=(8, 5))
         plt.semilogy(mass, marker="o", linestyle="-", color="b", label="mass")

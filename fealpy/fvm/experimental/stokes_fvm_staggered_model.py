@@ -82,7 +82,7 @@ class StokesFVMStaggeredModel(ComputationalModel):
             ScalarSourceIntegrator(self.pde.source_u, q=2)).assembly()
         udbc = DirichletBC(self.umesh, self.pde.dirichlet_velocity_u,
                            threshold=lambda x: (bm.abs(x) < 1e-10) | (bm.abs(x - 1) < 1e-10))
-        Au, fu = udbc.apply_diffusion(Au, fu)
+        Au, fu = udbc.apply_diffusion(Au, fu, components=1)
         Au, fu = udbc.ThresholdApply(Au, fu)
         return Au, fu
 
@@ -94,7 +94,7 @@ class StokesFVMStaggeredModel(ComputationalModel):
             ScalarSourceIntegrator(self.pde.source_v, q=2)).assembly()
         vdbc = DirichletBC(self.vmesh, self.pde.dirichlet_velocity_v,
                            threshold=lambda y: (bm.abs(y) < 1e-10) | (bm.abs(y - 1) < 1e-10))
-        Av, fv = vdbc.apply_diffusion(Av, fv)
+        Av, fv = vdbc.apply_diffusion(Av, fv, components=1)
         Av, fv = vdbc.ThresholdApply(Av, fv)
         return Av, fv
 

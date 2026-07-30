@@ -1,209 +1,300 @@
-from typing import Union
+"""Cell-centred finite-volume model for scalar Poisson problems."""
 
 from fealpy.typing import TensorLike
 from fealpy.backend import backend_manager as bm
 from fealpy.model import PDEModelManager, ComputationalModel
-
-from fealpy.functionspace import ScaledMonomialSpace2d
+from fealpy.functionspace import ScaledMonomialSpace
 from fealpy.fem import BilinearForm, LinearForm
 
-from fealpy.solver import spsolve
-
-from ..fvm import (
-    ScalarDiffusionIntegrator,
-    ScalarSourceIntegrator,
-    ScalarCrossDiffusionIntegrator,
-    DirichletBC,
-    FVMGeometry,
+from .cell_average_error import cell_average_l2_error
+from .dirichlet_bc import DirichletBC
+from .face_gradient import reconstruct_face_gradient
+from .fvm_geometry import FVMGeometry
+from .fvm_linear_solver import FVMLinearSolver
+from .gradient_reconstruct import (
     GradientReconstruct,
-    cell_average_l2_error,
-    reconstruct_face_gradient,
+    ResolvedGradientBoundary,
+)
+from .scalar_cross_diffusion_integrator import ScalarCrossDiffusionIntegrator
+from .scalar_diffusion_integrator import ScalarDiffusionIntegrator
+from .scalar_source_integrator import ScalarSourceIntegrator
+from .solver_controls import PoissonSolverControls
+from .solver_diagnostics import (
+    equation_residual_converged,
+    normalized_equation_residual,
 )
 
 
 class PoissonFVMModel(ComputationalModel):
-    """
-    A 2D Poisson equation solver using the finite volume method (FVM).
-
-    This model iteratively solves the diffusion problem with optional cross-diffusion,
-    and supports structured quadrilateral meshes.
-
-    Parameters:
-        options (dict): Configuration dictionary for model setup.
-            - 'pde': PDE data or index
-            - 'nx', 'ny': mesh divisions
-            - 'space_degree': polynomial degree of test space
-            - 'pbar_log', 'log_level': logging controls
-
-    Attributes:
-        mesh : The initialized computational mesh.
-        space : The finite volume function space.
-        pde : The PDE model object.
-        uh : Numerical solution vector (computed after calling `solve`).
-    """
+    """Solve a scalar Poisson problem with deferred non-orthogonal correction."""
 
     def __init__(self, options):
         self.options = options
-        super().__init__(pbar_log=options.get("pbar_log", False),
-                         log_level=options.get("log_level", "WARNING"))
-        self.set_pde(options["pde"])
-        self.set_mesh(options["nx"], options["ny"])
-        self.set_space(options["space_degree"])
+        self._validate_options()
+        super().__init__(
+            pbar_log=options.get("pbar_log", False),
+            log_level=options.get("log_level", "WARNING"),
+        )
+        pde_input = options["pde"]
+        self.pde = (
+            PDEModelManager("poisson").get_example(pde_input)
+            if isinstance(pde_input, int)
+            else pde_input
+        )
+        self.logger.info(self.pde)
+        self.controls = PoissonSolverControls.from_mapping(options)
         self.error_quadrature_order = int(options.get("error_quadrature_order", 4))
-        self.nonorthogonal_correction_method = options.get("nonorthogonal_correction_method", "bounded_over_relaxed")
-        self.nonorthogonal_limit_coeff = options.get("nonorthogonal_limit_coeff", 0.5)
+
+        mesh_type = (
+            options.get("mesh_type")
+            or getattr(self.pde, "default_mesh_type", "uniform_tri")
+        )
+        mesh_refine = int(options.get("mesh_refine", 0) or 0)
+        if mesh_refine < 0:
+            raise ValueError("mesh_refine must be non-negative.")
+        if getattr(self.pde, "supports_geometric_refine", False):
+            self.mesh = self.pde.init_mesh[mesh_type](mesh_refine=mesh_refine)
+        else:
+            mesh_options = {
+                name: int(options[name])
+                for name in ("nx", "ny", "nz")
+                if options.get(name) is not None
+            }
+            self.mesh = self.pde.init_mesh[mesh_type](**mesh_options)
+            if mesh_refine > 0:
+                if not hasattr(self.mesh, "uniform_refine"):
+                    raise ValueError("mesh does not provide uniform_refine().")
+                for _ in range(mesh_refine):
+                    self.mesh.uniform_refine()
+
+        self.p = self.controls.space_degree
+        self.space = ScaledMonomialSpace(self.mesh, self.p)
+        self.fvm_geometry = FVMGeometry(self.mesh)
+        self.cell_measure = self.fvm_geometry.cell_measure
+        boundary_faces = bm.nonzero(self.fvm_geometry.is_boundary)[0]
+        boundary_values = bm.array(
+            self.pde.dirichlet(
+                self.fvm_geometry.face_center[boundary_faces]
+            ),
+            dtype=self.fvm_geometry.cell_center.dtype,
+            device=bm.get_device(self.fvm_geometry.cell_center),
+        )
+        empty_faces = boundary_faces[:0]
+        self.gradient_boundary = ResolvedGradientBoundary(
+            dirichlet_faces=boundary_faces,
+            dirichlet_values=boundary_values,
+            neumann_faces=empty_faces,
+            neumann_sn_grad=bm.zeros(
+                0,
+                dtype=self.fvm_geometry.cell_center.dtype,
+                device=bm.get_device(self.fvm_geometry.cell_center),
+            ),
+        )
+        self.face_gradient_boundary = ResolvedGradientBoundary.empty(
+            self.fvm_geometry,
+        )
+        self.gradient = GradientReconstruct(
+            self.fvm_geometry,
+            self.gradient_boundary,
+            method=self.controls.gradient_method,
+            layer_weights=self.controls.gradient_layer_weights,
+            boundary_weight=self.controls.gradient_boundary_weight,
+        )
+        self.dirichlet_boundary = DirichletBC(
+            self.fvm_geometry,
+            boundary_faces,
+            boundary_values,
+            diffusion_method=self.controls.diffusion_method,
+            nonorthogonal_eps=self.controls.diffusion_nonorthogonal_eps,
+        )
+        self.linear_solver = options.get("linear_solver")
+        if self.linear_solver is None:
+            self.linear_solver = FVMLinearSolver("scipy")
+
+    def _validate_options(self) -> None:
+        allowed = set(PoissonSolverControls.option_names()) | {
+            "pde",
+            "mesh_type",
+            "mesh_refine",
+            "nx",
+            "ny",
+            "nz",
+            "error_quadrature_order",
+            "linear_solver",
+            "pbar_log",
+            "log_level",
+        }
+        unsupported = set(self.options).difference(allowed)
+        if unsupported:
+            names = ", ".join(sorted(unsupported))
+            raise ValueError(f"unsupported PoissonFVMModel options: {names}")
 
     def __str__(self) -> str:
-        """Return a summary of the model configuration."""
         return (
             f"{self.__class__.__name__}:\n"
-            f"  Mesh: {self.mesh.number_of_cells()} cells\n"
+            f"  Mesh: {self.fvm_geometry.NC} cells\n"
             f"  Space degree: {self.p}\n"
             f"  PDE type: {type(self.pde).__name__}\n"
         )
 
-    def set_pde(self, pde: Union[str, object]) -> None:
-        if isinstance(pde, int):
-            self.pde = PDEModelManager('poisson').get_example(pde)
-        else:
-            self.pde = pde
-
-        self.logger.info(self.pde)
-
-    def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
-        mesh_type = self.options.get("mesh_type", "uniform_tri")
-        init_mesh = self.pde.init_mesh[mesh_type]
-        try:
-            self.mesh = init_mesh(nx=nx, ny=ny)
-        except TypeError as exc:
-            unexpected_size_args = "nx" in str(exc) or "ny" in str(exc)
-            if not unexpected_size_args:
-                raise
-            self.mesh = init_mesh()
-
-    def set_space(self, degree: int = 0) -> None:
-        self.p = degree
-        self.space = ScaledMonomialSpace2d(self.mesh, self.p)
-        self.gradient = GradientReconstruct(self.mesh)
-        self.fvm_geometry = FVMGeometry(self.mesh)
-    
     def assemble_base_system(self) -> tuple:
-        """
-        Assemble the base linear system A·u = f without nonlinear terms.
-
-        Returns:
-            A (spmatrix): The system matrix from diffusion term.
-            f (ndarray): The source term vector.
-        """
+        """Assemble the implicit two-point diffusion system."""
         bform = BilinearForm(self.space)
-        bform.add_integrator(ScalarDiffusionIntegrator(coef=1))
-        A = bform.assembly()
-        lform = LinearForm(self.space)
-        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=2))
-        f = lform.assembly()
-        dbc = DirichletBC(self.mesh, self.pde.dirichlet)
-        A, f = dbc.apply_diffusion(A, f)
-        return A, f
-
-    def compute_cross_diffusion(self, uh) -> TensorLike:
-        """
-        Assemble the nonlinear cross-diffusion term.
-
-        Parameters:
-            uh (TensorLike): Current solution vector.
-
-        Returns:
-            ndarray: Right-hand side vector from cross-diffusion.
-        """
-        lform = LinearForm(self.space)
-        grad_u = self.gradient.cell_gradient(uh)
-        grad_f = reconstruct_face_gradient(self.mesh, grad_u)
-        lform.add_integrator(
-            ScalarCrossDiffusionIntegrator(
-                uh,
-                grad_f,
+        bform.add_integrator(
+            ScalarDiffusionIntegrator(
                 coef=1,
                 geometry=self.fvm_geometry,
-                correction_method=self.nonorthogonal_correction_method,
-                limit_coeff=self.nonorthogonal_limit_coeff,
+                method=self.controls.diffusion_method,
+                nonorthogonal_eps=self.controls.diffusion_nonorthogonal_eps,
+            )
+        )
+        matrix = bform.assembly()
+        lform = LinearForm(self.space)
+        lform.add_integrator(
+            ScalarSourceIntegrator(
+                self.pde.source,
+                q=2,
+                geometry=self.fvm_geometry,
+            )
+        )
+        rhs = lform.assembly()
+        return self.dirichlet_boundary.apply_diffusion(
+            matrix,
+            rhs,
+            components=1,
+        )
+
+    def compute_cross_diffusion(self, cell_values) -> TensorLike:
+        """Assemble the explicit non-orthogonal diffusion correction."""
+        gradient = self.gradient.cell_gradient(cell_values)
+        face_gradient = reconstruct_face_gradient(
+            self.fvm_geometry,
+            gradient,
+            cell_values,
+            interpolation_method="average",
+            boundary=self.face_gradient_boundary,
+        )
+        lform = LinearForm(self.space)
+        lform.add_integrator(
+            ScalarCrossDiffusionIntegrator(
+                cell_values,
+                face_gradient,
+                coef=1,
+                geometry=self.fvm_geometry,
+                method=self.controls.diffusion_method,
+                boundary_policy="all",
+                cross_flux_limiter=self.controls.cross_flux_limiter,
+                limit_coeff=self.controls.cross_flux_limit_coeff,
+                nonorthogonal_eps=self.controls.diffusion_nonorthogonal_eps,
             )
         )
         return lform.assembly()
 
-    def solve(self, max_iter=1, tol=1e-7) -> TensorLike:
-        """
-        Iteratively solve the linear system including cross-diffusion.
+    def diffusion_residual(self, matrix, rhs, solution):
+        """Return the full corrected diffusion residual and explicit RHS."""
+        cross = self.compute_cross_diffusion(solution)
+        return matrix @ solution - rhs - cross, cross
 
-        Parameters:
-            max_iter (int): Maximum number of fixed-point iterations.
-            tol (float): Convergence tolerance for residual.
+    def solve(self) -> TensorLike:
+        """Solve the full deferred-correction equation to configured tolerance."""
+        controls = self.controls
+        matrix, rhs = self.assemble_base_system()
+        solution = self.linear_solver.solve(matrix, rhs).solution
+        initial_residual = None
+        relative_update = 0.0
 
-        Returns:
-            uh (ndarray): The numerical solution.
-        """
-        A, f = self.assemble_base_system()
-        uh = spsolve(A, f)
+        for iteration in range(controls.nonorthogonal_max_iter + 1):
+            _, cross = self.diffusion_residual(matrix, rhs, solution)
+            lhs = matrix @ solution
+            corrected_rhs = rhs + cross
+            metrics = normalized_equation_residual(lhs, corrected_rhs)
+            absolute = metrics.absolute
+            relative = metrics.relative
+            if initial_residual is None:
+                initial_residual = absolute
 
-        for i in range(max_iter):
-            cross = self.compute_cross_diffusion(uh)
-            rhs = f + cross
-            uh_new = spsolve(A, rhs)
-            err = bm.max(bm.abs(uh_new - uh))
-            self.logger.info(f"[Iter {i+1}] residual = {err:.4e}")
-            if err < tol:
-                self.logger.info("Converged.")
+            self.logger.info(
+                "[NonOrth %d] absolute = %.4e, relative = %.4e",
+                iteration,
+                absolute,
+                relative,
+            )
+            if equation_residual_converged(
+                metrics,
+                rtol=controls.nonorthogonal_rtol,
+                atol=controls.nonorthogonal_atol,
+            ):
+                self.solution = solution
+                self.nonorthogonal_diagnostics = {
+                    "converged": True,
+                    "iterations": iteration,
+                    "initial_residual": initial_residual,
+                    "final_residual": absolute,
+                    "relative_residual": relative,
+                    "relative_update": relative_update,
+                    "relaxation": controls.nonorthogonal_relaxation,
+                    "reached_max_iter": False,
+                }
+                return solution
+
+            if iteration == controls.nonorthogonal_max_iter:
                 break
-            
-            uh = uh_new
 
-        self.uh = uh
-        return uh
+            trial = self.linear_solver.solve(
+                matrix,
+                corrected_rhs,
+            ).solution
+            relaxation = controls.nonorthogonal_relaxation
+            next_solution = (1.0 - relaxation) * solution + relaxation * trial
+            update_norm = float(
+                bm.to_numpy(bm.linalg.norm(next_solution - solution))
+            )
+            solution_norm = float(bm.to_numpy(bm.linalg.norm(next_solution)))
+            relative_update = update_norm / max(solution_norm, 1.0e-30)
+            solution = next_solution
+
+        self.nonorthogonal_diagnostics = {
+            "converged": False,
+            "iterations": controls.nonorthogonal_max_iter,
+            "initial_residual": initial_residual,
+            "final_residual": absolute,
+            "relative_residual": relative,
+            "relative_update": relative_update,
+            "relaxation": controls.nonorthogonal_relaxation,
+            "reached_max_iter": True,
+        }
+        raise RuntimeError(
+            "non-orthogonal correction did not converge before max_iter"
+        )
 
     def compute_error(self) -> float:
-        """
-        Compute the L2 error against the exact solution.
-
-        Returns:
-            float: The L2 norm of the error.
-        """
-        self.error, self.uI = cell_average_l2_error(
+        """Return the L2 error against the exact control-volume average."""
+        self.error, self.exact_solution = cell_average_l2_error(
             self.mesh,
             self.pde.solution,
-            self.uh,
+            self.solution,
             q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
         )
-        # l0error = bm.max(bm.abs(self.uI - self.uh))
-        # self.logger.info(f"L0 error = {l0error}")
         return self.error
 
     def plot(self) -> None:
-        """
-        Plot the numerical and exact solution using matplotlib.
-        """
+        """Plot the numerical solution, exact cell average, and their error."""
         import matplotlib.pyplot as plt
-        cell_center = self.mesh.entity_barycenter('cell')  
+
+        cell_center = self.fvm_geometry.cell_center
         x, y = cell_center[:, 0], cell_center[:, 1]
-
         fig = plt.figure(figsize=(10, 5))
-        ax1 = fig.add_subplot(1, 3, 1, projection='3d')
-        ax1.plot_trisurf(x, y, self.uh, cmap='viridis', linewidth=0.2)
-        ax1.set_title("Numerical Solution (FVM)")
-        ax1.set_xlabel("x")
-        ax1.set_ylabel("y")
-        # ax1.set_zlabel("u_h")
-        
-        ax2 = fig.add_subplot(1, 3, 2, projection='3d')
-        ax2.plot_trisurf(x, y, self.uI, cmap='plasma', linewidth=0.2)
-        ax2.set_title("Exact Solution")
-        ax2.set_xlabel("x")
-        ax2.set_ylabel("y")
-        # ax2.set_zlabel("u_exact")
-
-        ax3 = fig.add_subplot(1, 3, 3, projection='3d')
-        ax3.plot_trisurf(x, y, self.uI - self.uh, cmap='plasma', linewidth=0.2)
-        ax3.set_title("Error (Exact - Numerical)")
-        ax3.set_xlabel("x")
-        ax3.set_ylabel("y")
-        # ax3.set_zlabel("Error")
+        fields = (
+            ("Numerical Solution (FVM)", self.solution, "viridis"),
+            ("Exact Solution", self.exact_solution, "plasma"),
+            ("Error (Exact - Numerical)", self.exact_solution - self.solution, "plasma"),
+        )
+        for index, (title, values, cmap) in enumerate(fields, start=1):
+            axis = fig.add_subplot(1, 3, index, projection="3d")
+            axis.plot_trisurf(x, y, values, cmap=cmap, linewidth=0.2)
+            axis.set_title(title)
+            axis.set_xlabel("x")
+            axis.set_ylabel("y")
         plt.tight_layout()
         plt.show()

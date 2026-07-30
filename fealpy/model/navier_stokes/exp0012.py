@@ -199,13 +199,8 @@ class Exp0012(BoxMesher3d):
     def dirichlet_velocity_w(self, p: TensorLike) -> TensorLike:
         return self.velocity_w(p)
 
-    velocity_dirichlet = dirichlet_velocity
-    velocity_dirichlet_u = dirichlet_velocity_u
-    velocity_dirichlet_v = dirichlet_velocity_v
-    velocity_dirichlet_w = dirichlet_velocity_w
-
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike, t=None):
+    def dirichlet_pressure(self, p: TensorLike, t=None):
         return self.pressure(p)
 
     @cartesian

@@ -23,6 +23,7 @@ class EntitySchema:
     SFace: ClassVar[dict[str, list[list[int]]]] = {}
     orientation: ClassVar[list[tuple[int, ...]]] = []
     ccw: ClassVar[list[int] | None] = None
+    ref_measure: ClassVar[float | None] = None
 
     ### [Entity Topology] ###
 
@@ -36,9 +37,6 @@ class EntitySchema:
                 of boundary entities.
             - mask: Tensor of shape (num_entity,) containing a boolean mask
                 indicating whether each entity is a boundary entity.
-            - count: Tensor of shape (num_entity,) containing the count of
-                adjacent top-dimensional entities for each entity, or None if
-                not applicable.
         """
         raise NotImplementedError()
 

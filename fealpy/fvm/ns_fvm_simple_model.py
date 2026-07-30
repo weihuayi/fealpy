@@ -1,42 +1,29 @@
 """Manufactured-case adapter for the collocated SIMPLE solver."""
 
-from inspect import signature
-from typing import Tuple
-
-from fealpy.backend import backend_manager as bm
 from fealpy.model import ComputationalModel
 from fealpy.model import PDEModelManager
 
 from .collocated_simple_solver import CollocatedSimpleSolver
 from .cell_average_error import cell_average_l2_error
-from .engineering_boundary_conditions import BoundaryConditionData
-from .solver_controls import SimpleSolverControls, positive_scalar
+from .engineering_boundary_conditions import (
+    EngineeringBoundaryConditions,
+    PDEBoundaryConditions,
+    resolve_simple_boundary_conditions,
+)
+from .collocated_linear_solvers import CollocatedNSLinearSolvers
+from .solver_controls import positive_scalar
+from .steady_ns_solver_profiles import (
+    SteadyNSSimpleProfile,
+    steady_ns_high_accuracy_simple_profile,
+)
 
 
-def _call_boundary_condition_factory(factory, mesh, pde):
-    try:
-        parameters = list(signature(factory).parameters.values())
-    except (TypeError, ValueError):
-        return factory(mesh, pde)
-
-    accepts_varargs = any(
-        parameter.kind == parameter.VAR_POSITIONAL for parameter in parameters
-    )
-    positional = [
-        parameter
-        for parameter in parameters
-        if parameter.kind
-        in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
-    ]
-    if accepts_varargs or len(positional) >= 2:
-        return factory(mesh, pde)
-    return factory(mesh)
-
-
-class NSFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
+class NSFVMSimpleModel(ComputationalModel):
     """Finite Volume SIMPLE model for PDE examples with exact solutions."""
 
     def __init__(self, options):
+        self.options = options
+        self._validate_options()
         ComputationalModel.__init__(
             self,
             pbar_log=options.get("pbar_log", False),
@@ -82,112 +69,149 @@ class NSFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
             if mesh_refine > 0:
                 if not hasattr(mesh, "uniform_refine"):
                     raise ValueError("mesh does not provide uniform_refine().")
-                mesh.uniform_refine(mesh_refine)
+                for _ in range(mesh_refine):
+                    mesh.uniform_refine()
 
         boundary_input = options.get("boundary_conditions")
         if boundary_input is None:
-            boundary_input = BoundaryConditionData(pde.dirichlet_velocity)
-        elif callable(boundary_input) and not hasattr(boundary_input, "dirichlet_threshold"):
-            boundary_input = _call_boundary_condition_factory(boundary_input, mesh, pde)
-        self.engineering_bc = (
-            boundary_input
-            if options.get("boundary_conditions") is not None
-            and hasattr(boundary_input, "to_pde_boundary")
-            else None
-        )
-        if isinstance(boundary_input, BoundaryConditionData):
-            boundary_conditions = boundary_input.to_pde_boundary(mesh)
-        elif hasattr(boundary_input, "to_pde_boundary"):
-            boundary_conditions = boundary_input.to_pde_boundary()
+            boundary_input = PDEBoundaryConditions(
+                mesh,
+                dirichlet_velocity=pde.dirichlet_velocity,
+            )
+        elif callable(boundary_input):
+            boundary_input = boundary_input(mesh, pde)
+
+        if isinstance(boundary_input, EngineeringBoundaryConditions):
+            self.engineering_bc = boundary_input
+        elif isinstance(boundary_input, PDEBoundaryConditions):
+            self.engineering_bc = None
         else:
-            boundary_conditions = boundary_input
-        controls = SimpleSolverControls(
-            space_degree=options.get("space_degree", 0),
-            pressure_gradient_method=options.get("pressure_gradient_method", "layered_lsq"),
-            velocity_gradient_method=options.get("velocity_gradient_method", "layered_lsq"),
-            rhie_chow_pressure_gradient_method=options.get("rhie_chow_pressure_gradient_method", "layered_lsq"),
-            pressure_response_scheme=options.get("pressure_response_scheme", "simple"),
-            face_interpolation_method=options.get("face_interpolation_method", "average"),
-            momentum_face_interpolation=options.get("momentum_face_interpolation"),
-            pressure_response_interpolation=options.get("pressure_response_interpolation"),
-            rhie_chow_velocity_interpolation=options.get("rhie_chow_velocity_interpolation"),
-            pressure_constraint=options.get("pressure_constraint", "nullspace"),
-            momentum_solve_strategy=options.get("momentum_solve_strategy", "component"),
-            momentum_component_matrix_policy=options.get(
-                "momentum_component_matrix_policy",
-                "shared",
-            ),
-            momentum_linear_solver=options.get(
-                "momentum_linear_solver",
-                "scipy_bicgstab",
-            ),
-            pressure_linear_solver=options.get("pressure_linear_solver"),
-            pressure_gauge_linear_solver=options.get("pressure_gauge_linear_solver"),
-            pressure_nullspace_linear_solver=options.get(
-                "pressure_nullspace_linear_solver",
-                "petsc_gmres_hypre",
-            ),
-            momentum_equation_relaxation=options.get("momentum_equation_relaxation", 0.7),
-            momentum_nonorthogonal_max_iter=options.get("momentum_nonorthogonal_max_iter", 10),
-            momentum_nonorthogonal_tol=options.get("momentum_nonorthogonal_tol", 1.0e-4),
-            pressure_nonorthogonal_max_iter=options.get("pressure_nonorthogonal_max_iter", 10),
-            pressure_nonorthogonal_tol=options.get("pressure_nonorthogonal_tol", 1.0e-5),
+            raise TypeError(
+                "boundary_conditions must be PDEBoundaryConditions, "
+                "EngineeringBoundaryConditions, or a factory(mesh, pde) "
+                "returning one of these types."
+            )
+        profile = options.get("profile")
+        if profile is None:
+            profile = steady_ns_high_accuracy_simple_profile()
+        if not isinstance(profile, SteadyNSSimpleProfile):
+            raise TypeError("profile must be a SteadyNSSimpleProfile.")
+        self.profile = profile
+        boundary_conditions = resolve_simple_boundary_conditions(
+            mesh,
+            boundary_input,
+            profile.discretization,
+            profile.pressure_system,
         )
-        CollocatedSimpleSolver.__init__(
-            self,
-            mesh=mesh,
+        linear_solvers = options.get("linear_solvers")
+        if linear_solvers is None:
+            linear_solvers = profile.build_linear_solvers()
+        if not isinstance(
+            linear_solvers,
+            CollocatedNSLinearSolvers,
+        ):
+            raise TypeError(
+                "linear_solvers must be CollocatedNSLinearSolvers."
+            )
+        self.linear_solvers = linear_solvers
+        self.solver = CollocatedSimpleSolver(
             diffusion_coef=self.mu,
             convection_coef=self.rho,
             source=pde.source,
             boundary_conditions=boundary_conditions,
-            controls=controls,
-            linear_solver=options.get("linear_solver"),
-            linear_solver_config=options.get("linear_solver_config"),
+            discretization_controls=profile.discretization,
+            iteration_controls=profile.iteration,
+            linear_solvers=linear_solvers,
             logger=self.logger,
-            pbar_log=options.get("pbar_log", False),
-            log_level=options.get("log_level", "WARNING"),
         )
+        self.mesh = mesh
+        self.fvm_geometry = boundary_conditions.physical.geometry
+        self.NC = self.fvm_geometry.NC
+        self.GD = self.fvm_geometry.GD
+
+    def _validate_options(self) -> None:
+        allowed = {
+            "pde",
+            "mesh_type",
+            "mesh_refine",
+            "nx",
+            "ny",
+            "nz",
+            "rho",
+            "mu",
+            "error_quadrature_order",
+            "boundary_conditions",
+            "profile",
+            "linear_solvers",
+            "pbar_log",
+            "log_level",
+        }
+        unsupported = set(self.options).difference(allowed)
+        if unsupported:
+            names = ", ".join(sorted(unsupported))
+            raise ValueError(f"unsupported NSFVMSimpleModel options: {names}")
 
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}:\n"
-            f"  Mesh shape: {self.mesh.number_of_cells()} cells\n"
+            f"  Mesh shape: {self.NC} cells\n"
             f"  PDE type: {type(self.pde).__name__}\n"
         )
 
-    def compute_error(self) -> Tuple[float, ...]:
+    def solve(self):
+        """Run one cold-start SIMPLE solve and return its immutable result."""
+        return self.solver.solve()
+
+    def close(self) -> None:
+        """Release third-party linear-solver resources owned by this model."""
+        self.linear_solvers.close()
+
+    def compute_error(self, result) -> tuple[float, ...]:
         """Compute errors against exact control-volume averages."""
-        velocity = getattr(self, "velocity", bm.stack([self.uh, self.vh], axis=-1))
-        velocity_error, velocity_average = cell_average_l2_error(
+        velocity_error, exact_velocity = cell_average_l2_error(
             self.mesh,
             self.pde.velocity,
-            velocity,
+            result.velocity,
             q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
         )
-        perror, self.pI = cell_average_l2_error(
+        pressure_error, exact_pressure = cell_average_l2_error(
             self.mesh,
             self.pde.pressure,
-            self.ph,
+            result.pressure,
             q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
         )
-        self.uI = velocity_average[:, 0]
-        self.vI = velocity_average[:, 1] if self.GD > 1 else bm.zeros_like(self.uI)
-        if self.GD > 2:
-            self.wI = velocity_average[:, 2]
-        return tuple(velocity_error[i] for i in range(self.GD)) + (perror,)
+        return tuple(velocity_error[i] for i in range(self.GD)) + (
+            pressure_error,
+        )
 
-    def plot(self) -> None:
+    def plot(self, result) -> None:
         """Plot numerical and exact solution errors for u, v, and p."""
         import matplotlib.pyplot as plt
 
-        cell_centers = self.mesh.entity_barycenter("cell")
+        _, exact_velocity = cell_average_l2_error(
+            self.mesh,
+            self.pde.velocity,
+            result.velocity,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        _, exact_pressure = cell_average_l2_error(
+            self.mesh,
+            self.pde.pressure,
+            result.pressure,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        cell_centers = self.fvm_geometry.cell_center
         x, y = cell_centers[:, 0], cell_centers[:, 1]
 
         fig = plt.figure(figsize=(15, 10))
         titles = [
-            ("Error u", self.uh - self.uI),
-            ("Error v", self.vh - self.vI),
-            ("Error p", self.ph - self.pI),
+            ("Error u", result.velocity[:, 0] - exact_velocity[:, 0]),
+            ("Error v", result.velocity[:, 1] - exact_velocity[:, 1]),
+            ("Error p", result.pressure - exact_pressure),
         ]
         for i, (title, data) in enumerate(titles):
             ax = fig.add_subplot(2, 3, i + 1, projection="3d")
@@ -196,13 +220,17 @@ class NSFVMSimpleModel(ComputationalModel, CollocatedSimpleSolver):
         plt.tight_layout()
         plt.show()
 
-    def plot_residual(self) -> None:
+    def plot_residual(self, result) -> None:
         """Plot SIMPLE residual decay for manufactured-case examples."""
         import matplotlib.pyplot as plt
 
-        mass = [residual["mass"] for residual in self.residuals]
+        mass = [
+            residual.mass_relative_l2
+            for residual in result.residual_history
+        ]
         pressure_correction = [
-            residual["pressure_correction"] for residual in self.residuals
+            residual.pressure_correction_l2
+            for residual in result.residual_history
         ]
         plt.figure(figsize=(8, 5))
         plt.semilogy(mass, marker="o", linestyle="-", color="b", label="mass")

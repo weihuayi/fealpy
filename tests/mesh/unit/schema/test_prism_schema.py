@@ -97,9 +97,7 @@ class TestPrismSchema:
         grad_ref = schema.grad_shape_function_reference(bcs, p=(1, 1))
         grad_ref_legacy = schema.grad_shape_function(ctx, bcs, p=(1, 1), variables="u")
 
-        # Current shape_function order:
-        # [lambda0*mu0, lambda1*mu0, lambda2*mu0,
-        #  lambda0*mu1, lambda1*mu1, lambda2*mu1]
+        # Contract order: bottom triangle vertices followed by top vertices.
         expected_phi = np.array([[
             1.0 / 6.0,
             1.0 / 12.0,
@@ -109,25 +107,23 @@ class TestPrismSchema:
             1.0 / 6.0,
         ]])
 
-        # New grad_* functions use tensor-product dof order:
-        # [lambda0*mu0, lambda0*mu1, lambda1*mu0,
-        #  lambda1*mu1, lambda2*mu0, lambda2*mu1]
+        # Gradients use the same bottom-then-top vertex order.
         expected_grad_bary = np.array([[
             [1.0 / 3.0, 0.0,       0.0,       1.0 / 2.0, 0.0],
-            [2.0 / 3.0, 0.0,       0.0,       0.0,       1.0 / 2.0],
             [0.0,       1.0 / 3.0, 0.0,       1.0 / 4.0, 0.0],
-            [0.0,       2.0 / 3.0, 0.0,       0.0,       1.0 / 4.0],
             [0.0,       0.0,       1.0 / 3.0, 1.0 / 4.0, 0.0],
+            [2.0 / 3.0, 0.0,       0.0,       0.0,       1.0 / 2.0],
+            [0.0,       2.0 / 3.0, 0.0,       0.0,       1.0 / 4.0],
             [0.0,       0.0,       2.0 / 3.0, 0.0,       1.0 / 4.0],
         ]])
 
         expected_grad_ref = np.array([[
             [-1.0 / 3.0, -1.0 / 3.0, -1.0 / 2.0],
-            [-2.0 / 3.0, -2.0 / 3.0,  1.0 / 2.0],
-            [ 1.0 / 3.0,  0.0,       -1.0 / 4.0],
-            [ 2.0 / 3.0,  0.0,        1.0 / 4.0],
-            [ 0.0,        1.0 / 3.0, -1.0 / 4.0],
-            [ 0.0,        2.0 / 3.0,  1.0 / 4.0],
+            [1.0 / 3.0, 0.0, -1.0 / 4.0],
+            [0.0, 1.0 / 3.0, -1.0 / 4.0],
+            [-2.0 / 3.0, -2.0 / 3.0, 1.0 / 2.0],
+            [2.0 / 3.0, 0.0, 1.0 / 4.0],
+            [0.0, 2.0 / 3.0, 1.0 / 4.0],
         ]])
 
         assert phi.shape == (1, 6)
@@ -153,11 +149,10 @@ class TestPrismSchema:
         tangent = schema.tangent(ctx, None)
         tangent_index = schema.tangent(ctx, slice(1, 2))
 
-        # Matches the current source behavior: bc_to_point uses shape_function order
-        # together with _tp_points ordering.
+        # The prism contract is bottom vertices followed by top vertices.
         expected_point = np.array([
-            [[5.0 / 12.0, 1.0 / 3.0,  7.0 / 12.0]],
-            [[5.0 / 12.0, 1.0 / 3.0, 19.0 / 12.0]],
+            [[1.0 / 4.0, 1.0 / 4.0,  2.0 / 3.0]],
+            [[1.0 / 4.0, 1.0 / 4.0,  5.0 / 3.0]],
         ])
 
         expected_barycenter = np.array([
@@ -196,11 +191,11 @@ class TestPrismSchema:
         expected_G = np.tile(np.eye(3), (2, 1, 1, 1))
         expected_grad_ref = np.array([[
             [-1.0 / 3.0, -1.0 / 3.0, -1.0 / 2.0],
-            [-2.0 / 3.0, -2.0 / 3.0,  1.0 / 2.0],
-            [ 1.0 / 3.0,  0.0,       -1.0 / 4.0],
-            [ 2.0 / 3.0,  0.0,        1.0 / 4.0],
-            [ 0.0,        1.0 / 3.0, -1.0 / 4.0],
-            [ 0.0,        2.0 / 3.0,  1.0 / 4.0],
+            [1.0 / 3.0, 0.0, -1.0 / 4.0],
+            [0.0, 1.0 / 3.0, -1.0 / 4.0],
+            [-2.0 / 3.0, -2.0 / 3.0, 1.0 / 2.0],
+            [2.0 / 3.0, 0.0, 1.0 / 4.0],
+            [0.0, 2.0 / 3.0, 1.0 / 4.0],
         ]])
 
         assert J.shape == (2, 1, 3, 3)

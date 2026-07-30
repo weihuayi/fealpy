@@ -98,6 +98,13 @@ class PointSchema(ShapedEntitySchema):
         return bm.einsum("...j,cjd->c...d", bcs[0], points[:, None, :])
 
     @classmethod
+    def jacobi_matrix(cls, ctx: EntityContext, bcs: tuple[Tensor, ...], index: Index | None) -> Tensor:
+        """Return the unit Jacobian for a zero-dimensional entity."""
+        points = cls._indices(ctx, index)
+        nq = int(bcs[0].shape[0])
+        return bm.ones((points.shape[0], nq, 1, 1), dtype=ctx.block.positions.dtype)
+
+    @classmethod
     def grad_lambda(
         cls,
         ctx: EntityContext,

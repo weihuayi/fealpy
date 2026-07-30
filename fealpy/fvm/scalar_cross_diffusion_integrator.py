@@ -11,12 +11,8 @@ from fealpy.fem.integrator import LinearInt, OpInt, FaceInt, enable_cache
 from .fvm_geometry import FVMGeometry
 
 
-_SUPPORTED_CORRECTION_METHODS = {
-    "orthogonal",
-    "bounded_over_relaxed",
-    "limited",
-}
 _BOUNDARY_POLICIES = {"all", "zero"}
+_CROSS_FLUX_LIMITERS = {"none", "orthogonal_flux_ratio"}
 
 
 class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
@@ -26,15 +22,17 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
     operator level it is the cross-diffusion source induced by the tangential
     correction vector in the face-vector decomposition.
 
-    The implicit matrix part is handled by ``ScalarDiffusionIntegrator``.  This
-    integrator only scatters a face correction flux,
+    The implicit matrix part is handled by ``ScalarDiffusionIntegrator``.  The
+    same ``method`` name must be passed to both integrators so that ``E_f`` and
+    ``T_f`` come from one face-vector decomposition.  This integrator scatters
+    the face correction flux
 
         coef_f * C_f · grad(phi)_f,
 
-    to owner/neighbour cells.  The default ``bounded_over_relaxed`` method uses
-    the bounded over-relaxed ``T_f`` from ``FVMGeometry``.  For ordinary
-    non-coupled boundary faces, that correction flux is zero by default because
-    boundary diffusion is already handled by the boundary condition layer.
+    to owner/neighbour cells.  The default ``over_relaxed`` method uses the
+    ordinary over-relaxed ``T_f``.  Boundary fluxes are retained by default;
+    callers that require zero boundary correction must select
+    ``boundary_policy="zero"`` explicitly.
     """
 
     def __init__(
@@ -47,14 +45,14 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         face_flux_correction=None,
         correction_vector=None,
         geometry=None,
-        correction_method: str="bounded_over_relaxed",
-        boundary_policy: Optional[str]=None,
+        boundary_policy: str="all",
+        cross_flux_limiter: str="none",
         limit_coeff: float=0.5,
         limiter_small: float=1.0e-30,
         nonorthogonal_eps: float=0.05,
         index: Index=_S,
         batched: bool=False,
-        method: Optional[str]=None,
+        method: str="over_relaxed",
     ) -> None:
         super().__init__()
         self.uh = uh
@@ -63,12 +61,14 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         self.face_flux_correction = face_flux_correction
         self.correction_vector = correction_vector
         self.geometry = geometry
-        if correction_method not in _SUPPORTED_CORRECTION_METHODS:
-            raise ValueError(f"Unsupported correction_method: {correction_method!r}")
-        if boundary_policy is not None and boundary_policy not in _BOUNDARY_POLICIES:
+        if boundary_policy not in _BOUNDARY_POLICIES:
             raise ValueError(f"Unsupported boundary_policy: {boundary_policy!r}")
-        self.correction_method = correction_method
         self.boundary_policy = boundary_policy
+        if cross_flux_limiter not in _CROSS_FLUX_LIMITERS:
+            raise ValueError(
+                f"unknown cross_flux_limiter: {cross_flux_limiter!r}"
+            )
+        self.cross_flux_limiter = cross_flux_limiter
         self.limit_coeff = limit_coeff
         self.limiter_small = limiter_small
         if nonorthogonal_eps <= 0.0:
@@ -77,6 +77,8 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         self.q = 2 if q is None else q
         self.index = index
         self.batched = batched
+        if method not in self.assembly:
+            raise ValueError(f"unknown diffusion method: {method!r}")
         self.assembly.set(method)
 
     @enable_cache
@@ -90,24 +92,78 @@ class ScalarCrossDiffusionIntegrator(LinearInt, OpInt, FaceInt):
         geometry = self.geometry if self.geometry is not None else FVMGeometry(mesh, index=index)
         return geometry.face_to_cell, geometry
 
-    @variantmethod
+    @variantmethod("over_relaxed")
     def assembly(self, space: _FS) -> TensorLike:
         face_to_cell, geometry = self.fetch(space)
+        decomposition = geometry.diffusion_face_decomposition(
+            "over_relaxed"
+        )
+        return self._assemble_from_vector(
+            space,
+            face_to_cell,
+            geometry,
+            decomposition.T_f,
+            decomposition.orthogonal_factor,
+        )
+
+    @assembly.register("bounded_over_relaxed")
+    def assembly(self, space: _FS) -> TensorLike:
+        face_to_cell, geometry = self.fetch(space)
+        decomposition = geometry.diffusion_face_decomposition(
+            "bounded_over_relaxed", eps=self.nonorthogonal_eps
+        )
+        return self._assemble_from_vector(
+            space,
+            face_to_cell,
+            geometry,
+            decomposition.T_f,
+            decomposition.orthogonal_factor,
+        )
+
+    @assembly.register("uncorrected")
+    def assembly(self, space: _FS) -> TensorLike:
+        face_to_cell, geometry = self.fetch(space)
+        decomposition = geometry.diffusion_face_decomposition("uncorrected")
+        return self._assemble_from_vector(
+            space,
+            face_to_cell,
+            geometry,
+            bm.zeros_like(geometry.S_f),
+            decomposition.orthogonal_factor,
+        )
+
+    def _assemble_from_vector(
+        self,
+        space: _FS,
+        face_to_cell: TensorLike,
+        geometry: FVMGeometry,
+        correction_vector: TensorLike,
+        orthogonal_factor: TensorLike,
+    ) -> TensorLike:
         face_flux = scalar_cross_diffusion_face_flux(
             space,
             geometry,
             face_to_cell,
-            uh=self.uh,
             grad_f=self.grad_f,
             coef=self.coef,
             face_flux_correction=self.face_flux_correction,
-            correction_vector=self.correction_vector,
-            correction_method=self.correction_method,
+            correction_vector=(
+                self.correction_vector
+                if self.correction_vector is not None
+                else correction_vector
+            ),
             boundary_policy=self.boundary_policy,
-            limit_coeff=self.limit_coeff,
-            limiter_small=self.limiter_small,
-            nonorthogonal_eps=self.nonorthogonal_eps,
         )
+        if self.cross_flux_limiter == "orthogonal_flux_ratio":
+            face_flux = limit_cross_diffusion_face_flux(
+                face_flux,
+                self.uh,
+                geometry,
+                orthogonal_factor=orthogonal_factor,
+                coef=self.coef,
+                limit_coeff=self.limit_coeff,
+                limiter_small=self.limiter_small,
+            )
         return geometry.scatter_face_flux_to_cells(face_flux)
 
 
@@ -116,53 +172,34 @@ def scalar_cross_diffusion_face_flux(
     geometry: FVMGeometry,
     face_to_cell: TensorLike,
     *,
-    uh=None,
     grad_f=None,
     coef: Optional[CoefLike]=None,
     face_flux_correction=None,
     correction_vector=None,
-    correction_method: str="bounded_over_relaxed",
-    boundary_policy: Optional[str]=None,
-    limit_coeff: float=0.5,
-    limiter_small: float=1.0e-30,
-    nonorthogonal_eps: float=0.05,
+    boundary_policy: str="all",
 ) -> TensorLike:
-    """Return owner-oriented explicit non-orthogonal correction flux.
-
-    Future cleanup directions:
-
-    - ``limited`` is intentionally kept in this function for now.  If the
-      limiter becomes a stable production route, move only that formula into a
-      clearly named top-level function rather than back into the integrator.
-    - The validation here duplicates part of ``ScalarCrossDiffusionIntegrator``
-      so that this function can be called directly by future solver kernels.
-      Remove the duplication only after the intended public surface is fixed.
-    - ``coef`` currently supports scalar values or face-wise arrays.  Extend
-      this function deliberately if cell-wise, callable, or tensor coefficients
-      become necessary.
-    """
-    if correction_method not in _SUPPORTED_CORRECTION_METHODS:
-        raise ValueError(f"Unsupported correction_method: {correction_method!r}")
-    if boundary_policy is not None and boundary_policy not in _BOUNDARY_POLICIES:
+    """Return owner-oriented flux for a preselected correction vector."""
+    if boundary_policy not in _BOUNDARY_POLICIES:
         raise ValueError(f"Unsupported boundary_policy: {boundary_policy!r}")
-    if nonorthogonal_eps <= 0.0:
-        raise ValueError("nonorthogonal_eps must be positive.")
 
-    user_face_flux = face_flux_correction is not None
-    user_correction_vector = correction_vector is not None
     if face_flux_correction is not None:
-        face_flux = bm.array(face_flux_correction, dtype=space.ftype)
+        face_flux = bm.array(
+            face_flux_correction,
+            dtype=space.ftype,
+            device=bm.get_device(geometry.cell_center),
+        )
     else:
         if grad_f is None:
             raise ValueError("grad_f is required when face_flux_correction is not provided.")
-        if correction_vector is not None:
-            correction_vector = bm.array(correction_vector, dtype=space.ftype)
-        elif correction_method == "orthogonal":
-            correction_vector = bm.zeros_like(geometry.S_f)
-        else:
-            # Boundary handling is a scheme-level decision; raw geometry still
-            # exposes the bounded over-relaxed T_f on all faces.
-            correction_vector = geometry.bounded_over_relaxed_decomposition(eps=nonorthogonal_eps)[2]
+        if correction_vector is None:
+            raise ValueError(
+                "correction_vector is required when face_flux_correction is not provided."
+            )
+        correction_vector = bm.array(
+            correction_vector,
+            dtype=space.ftype,
+            device=bm.get_device(grad_f),
+        )
 
         if grad_f.ndim == 2:
             face_flux = bm.einsum("ij,ij->i", correction_vector, grad_f)
@@ -174,60 +211,18 @@ def scalar_cross_diffusion_face_flux(
         shape_source = face_flux[:, 0] if face_flux.ndim == 2 else face_flux
         if coef is None:
             face_coef = bm.ones_like(shape_source, dtype=space.ftype)
-        elif type(coef) in [int, float]:
+        elif isinstance(coef, (int, float)):
             face_coef = bm.full_like(shape_source, fill_value=coef, dtype=space.ftype)
         else:
-            face_coef = coef
+            face_coef = bm.array(
+                coef,
+                dtype=space.ftype,
+                device=bm.get_device(face_flux),
+            )
         if face_flux.ndim == 1:
             face_flux = bm.einsum("i,i->i", face_coef, face_flux)
         else:
             face_flux = face_flux * face_coef[:, None]
-
-        if correction_method == "limited":
-            if face_flux.ndim != 1:
-                raise ValueError("limited correction currently supports scalar face flux only.")
-            if uh is None:
-                raise ValueError("uh is required when correction_method='limited'.")
-
-            if getattr(uh, "dtype", None) is None:
-                uh = bm.array(uh, dtype=space.ftype)
-            elif uh.dtype != space.ftype:
-                uh = bm.astype(uh, space.ftype)
-            if uh.ndim != 1:
-                raise ValueError("limited correction currently supports scalar cell values only.")
-
-            is_internal = face_to_cell[:, 0] != face_to_cell[:, 1]
-            owner = face_to_cell[:, 0]
-            neighbour = face_to_cell[:, 1]
-            _, mag_E_f, _ = geometry.bounded_over_relaxed_decomposition(eps=nonorthogonal_eps)
-            orthogonal_coeff = mag_E_f / geometry.mag_d_f
-            orthogonal_flux = bm.zeros_like(face_flux)
-            cell_jump = bm.abs(uh[neighbour[is_internal]] - uh[owner[is_internal]])
-            orthogonal_flux = bm.set_at(
-                orthogonal_flux,
-                is_internal,
-                orthogonal_coeff[is_internal] * cell_jump,
-            )
-            limiter = bm.ones_like(face_flux)
-            limited = limit_coeff * orthogonal_flux[is_internal]
-            full = (1.0 - limit_coeff) * bm.abs(face_flux[is_internal])
-            limiter = bm.set_at(
-                limiter,
-                is_internal,
-                bm.minimum(
-                    limited / (full + limiter_small),
-                    bm.ones_like(full),
-                ),
-            )
-            face_flux = face_flux * limiter
-
-    if boundary_policy is None:
-        if user_face_flux or user_correction_vector:
-            boundary_policy = "all"
-        elif correction_method in ("bounded_over_relaxed", "limited"):
-            boundary_policy = "zero"
-        else:
-            boundary_policy = "all"
 
     if boundary_policy == "all":
         return face_flux
@@ -238,6 +233,79 @@ def scalar_cross_diffusion_face_flux(
     if face_flux.ndim == 2:
         return bm.where(is_boundary[:, None], 0.0, face_flux)
     raise ValueError(f"Unsupported face_flux_correction shape: {face_flux.shape}")
+
+
+def limit_cross_diffusion_face_flux(
+    face_flux: TensorLike,
+    uh: TensorLike,
+    geometry: FVMGeometry,
+    *,
+    orthogonal_factor: TensorLike,
+    coef: Optional[CoefLike]=None,
+    limit_coeff: float,
+    limiter_small: float,
+) -> TensorLike:
+    """Limit scalar cross-diffusion relative to its implicit face flux."""
+    if face_flux.ndim != 1:
+        raise ValueError("cross-flux limiting currently supports scalar face flux only.")
+    if uh is None:
+        raise ValueError(
+            "uh is required with cross_flux_limiter='orthogonal_flux_ratio'."
+        )
+    uh = bm.array(
+        uh,
+        dtype=face_flux.dtype,
+        device=bm.get_device(face_flux),
+    )
+    if uh.ndim != 1:
+        raise ValueError("cross-flux limiting currently supports scalar cell values only.")
+    if not 0.0 <= limit_coeff <= 1.0:
+        raise ValueError("limit_coeff must be in [0, 1].")
+    if limiter_small <= 0.0:
+        raise ValueError("limiter_small must be positive.")
+
+    internal = geometry.is_internal
+    owner = geometry.owner
+    neighbour = geometry.neighbour
+    orthogonal_factor = bm.array(
+        orthogonal_factor,
+        dtype=face_flux.dtype,
+        device=bm.get_device(face_flux),
+    )
+    if orthogonal_factor.shape != face_flux.shape:
+        raise ValueError("orthogonal_factor must have one value per face.")
+    if coef is None:
+        face_coef = bm.ones_like(face_flux)
+    elif isinstance(coef, (int, float)):
+        face_coef = bm.full_like(face_flux, fill_value=coef)
+    else:
+        face_coef = bm.array(
+            coef,
+            dtype=face_flux.dtype,
+            device=bm.get_device(face_flux),
+        )
+        if face_coef.shape == ():
+            face_coef = bm.full_like(face_flux, fill_value=face_coef)
+        elif face_coef.shape != face_flux.shape:
+            raise ValueError("coef must be scalar or have one value per face.")
+    orthogonal_flux = bm.zeros_like(face_flux)
+    cell_jump = bm.abs(uh[neighbour[internal]] - uh[owner[internal]])
+    orthogonal_flux = bm.set_at(
+        orthogonal_flux,
+        internal,
+        bm.abs(face_coef[internal]) * orthogonal_factor[internal] * cell_jump,
+    )
+    numerator = limit_coeff * orthogonal_flux[internal]
+    denominator = (
+        (1.0 - limit_coeff) * bm.abs(face_flux[internal]) + limiter_small
+    )
+    limiter = bm.ones_like(face_flux)
+    limiter = bm.set_at(
+        limiter,
+        internal,
+        bm.minimum(numerator / denominator, bm.ones_like(numerator)),
+    )
+    return face_flux * limiter
 
 
 class CrossDiffusionRHSAssembler:
@@ -259,44 +327,98 @@ class CrossDiffusionRHSAssembler:
     face geometry and scatter layout supplied by ``FVMGeometry``.
     """
 
-    def __init__(self, space: _FS, *, geometry: Optional[FVMGeometry]=None) -> None:
+    def __init__(
+        self,
+        space: _FS,
+        *,
+        geometry: Optional[FVMGeometry]=None,
+        method: str="over_relaxed",
+        cross_flux_limiter: str="none",
+        nonorthogonal_eps: float=0.05,
+    ) -> None:
         self.space = space
         self.mesh = getattr(space, "mesh", None)
         self.geometry = geometry if geometry is not None else FVMGeometry(self.mesh)
         self.face_to_cell = self.geometry.face_to_cell
         self.is_tensor_space = getattr(space, "scalar_space", None) is not None
         self.dof_priority = getattr(space, "dof_priority", True)
+        if cross_flux_limiter not in _CROSS_FLUX_LIMITERS:
+            raise ValueError(
+                f"unknown cross_flux_limiter: {cross_flux_limiter!r}"
+            )
+        self.cross_flux_limiter = cross_flux_limiter
+        if nonorthogonal_eps <= 0.0:
+            raise ValueError("nonorthogonal_eps must be positive.")
+        self.nonorthogonal_eps = float(nonorthogonal_eps)
+        if method not in self.assembly:
+            raise ValueError(f"unknown diffusion method: {method!r}")
+        self.assembly.set(method)
 
-    def assembly(
+    @variantmethod("over_relaxed")
+    def assembly(self, **kwargs) -> TensorLike:
+        decomposition = self.geometry.diffusion_face_decomposition(
+            "over_relaxed"
+        )
+        return self._assembly_from_vector(
+            decomposition.T_f,
+            decomposition.orthogonal_factor,
+            **kwargs,
+        )
+
+    @assembly.register("bounded_over_relaxed")
+    def assembly(self, **kwargs) -> TensorLike:
+        decomposition = self.geometry.diffusion_face_decomposition(
+            "bounded_over_relaxed", eps=self.nonorthogonal_eps
+        )
+        return self._assembly_from_vector(
+            decomposition.T_f,
+            decomposition.orthogonal_factor,
+            **kwargs,
+        )
+
+    @assembly.register("uncorrected")
+    def assembly(self, **kwargs) -> TensorLike:
+        decomposition = self.geometry.diffusion_face_decomposition("uncorrected")
+        return self._assembly_from_vector(
+            bm.zeros_like(self.geometry.S_f),
+            decomposition.orthogonal_factor,
+            **kwargs,
+        )
+
+    def _assembly_from_vector(
         self,
+        correction_vector: TensorLike,
+        orthogonal_factor: TensorLike,
         *,
         uh=None,
         grad_f=None,
         coef: Optional[CoefLike]=None,
         face_flux_correction=None,
-        correction_vector=None,
-        correction_method: str="bounded_over_relaxed",
-        boundary_policy: Optional[str]=None,
+        boundary_policy: str="all",
         limit_coeff: float=0.5,
         limiter_small: float=1.0e-30,
-        nonorthogonal_eps: float=0.05,
     ) -> TensorLike:
         """Return the explicit correction RHS for the current face gradients."""
         face_flux = scalar_cross_diffusion_face_flux(
             self.space,
             self.geometry,
             self.face_to_cell,
-            uh=uh,
             grad_f=grad_f,
             coef=coef,
             face_flux_correction=face_flux_correction,
             correction_vector=correction_vector,
-            correction_method=correction_method,
             boundary_policy=boundary_policy,
-            limit_coeff=limit_coeff,
-            limiter_small=limiter_small,
-            nonorthogonal_eps=nonorthogonal_eps,
         )
+        if self.cross_flux_limiter == "orthogonal_flux_ratio":
+            face_flux = limit_cross_diffusion_face_flux(
+                face_flux,
+                uh,
+                self.geometry,
+                orthogonal_factor=orthogonal_factor,
+                coef=coef,
+                limit_coeff=limit_coeff,
+                limiter_small=limiter_small,
+            )
         rhs = self.geometry.scatter_face_flux_to_cells(face_flux)
         if not self.is_tensor_space or rhs.ndim == 1:
             return rhs

@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import FVMLinearSolverConfig, LidDrivenCavityCase, NSFVMPISOModel
+from fealpy.fvm import LidDrivenCavityCase, NSFVMPISOModel
 from fealpy.fvm.lid_driven_cavity_postprocess import (
     CavityOutputConfig,
     CavitySnapshotWriter,
@@ -21,14 +21,13 @@ def build_piso_options(
     nx: int,
     ny: int,
     mesh_type: str,
-    nt: int,
+    time_steps: int,
     duration: tuple[float, float],
     n_correctors: int,
     backend: str,
     log_level: str,
     rho: float | None = None,
     mu: float | None = None,
-    space_degree: int = 0,
     pbar_log: bool = False,
     device: str = "cpu",
 ) -> dict:
@@ -37,17 +36,11 @@ def build_piso_options(
         "nx": int(nx),
         "ny": int(ny),
         "mesh_type": mesh_type,
-        "space_degree": int(space_degree),
         "duration": tuple(duration),
-        "nt": int(nt),
+        "time_steps": int(time_steps),
         "n_correctors": int(n_correctors),
         "pbar_log": pbar_log,
         "log_level": log_level,
-        "linear_solver_config": FVMLinearSolverConfig(
-            backend=backend,
-            device=device,
-            solver="auto",
-        ),
     }
     if rho is not None:
         options["rho"] = float(rho)
@@ -73,7 +66,7 @@ def run_piso_cavity(args):
         nx=args.nx,
         ny=args.ny,
         mesh_type=args.mesh_type,
-        nt=args.nt,
+        time_steps=args.time_steps,
         duration=duration,
         n_correctors=args.n_correctors,
         backend=args.backend,
@@ -81,7 +74,6 @@ def run_piso_cavity(args):
         log_level=args.log_level,
         rho=args.rho,
         mu=args.mu,
-        space_degree=args.space_degree,
         pbar_log=args.pbar_log,
     )
     output_dir = (
@@ -97,19 +89,25 @@ def run_piso_cavity(args):
         write_interval_time=args.write_interval_time,
         fields=tuple(args.output_fields),
     )
+    model = NSFVMPISOModel(options)
     snapshot_writer = CavitySnapshotWriter(
         output_config,
+        geometry=model.fvm_geometry,
+        velocity_gradient=(
+            model.solver.spatial_face_velocity.boundary.gradient
+        ),
         domain=tuple(case.domain()),
-        nt=args.nt,
+        total_steps=args.time_steps,
     )
 
-    model = NSFVMPISOModel(options)
-    model.solve(snapshot_callback=snapshot_writer)
+    result = model.solve(snapshot_callback=snapshot_writer)
     snapshot_writer.write_time_history()
 
     outputs = write_benchmark_outputs(
         model,
         output_dir,
+        velocity=result.velocity,
+        pressure=result.pressure,
         domain=tuple(case.domain()),
         run_summary={
             "solver": "NSFVMPISOModel",
@@ -121,7 +119,7 @@ def run_piso_cavity(args):
             "ny": args.ny,
             "mesh_type": args.mesh_type,
             "duration": duration,
-            "nt": args.nt,
+            "time_steps": args.time_steps,
             "n_correctors": args.n_correctors,
             "write_interval_steps": args.write_interval_steps,
             "write_interval_time": args.write_interval_time,
@@ -144,8 +142,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--nx", default=32, type=int)
     parser.add_argument("--ny", default=32, type=int)
     parser.add_argument("--mesh_type", default="uniform_quad", type=str)
-    parser.add_argument("--space_degree", default=0, type=int)
-    parser.add_argument("--nt", default=200, type=int)
+    parser.add_argument("--time_steps", default=200, type=int)
     parser.add_argument("--duration", nargs=2, default=(0.0, 5.0), type=float)
     parser.add_argument("--n_correctors", default=4, type=int)
     parser.add_argument("--backend", default="numpy", type=str)
