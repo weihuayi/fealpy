@@ -6,3 +6,4 @@ gmsh
 vtk
 pyevtk
 tqdm
+ipython
