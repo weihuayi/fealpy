@@ -106,8 +106,13 @@ class EntityMPI:
                         for par_id in range(self.mpi_size)]
         return self._comm.scatter(send_buf, root=root)
 
-    def refs(self, size: int) -> Tensor:
+    def refs(self, size: int | None = None) -> Tensor:
         """Return the reference count of this entity in each partition."""
+        if size is None:
+            if self._global_indices is None:
+                raise ValueError("global indices are required to count references "
+                                 "without size.")
+            size = self._global_indices.shape[0]
         count = bm.ones((size,), dtype=bm.int32)
         for pair in self._sharing_pairs:
             if pair is None:
