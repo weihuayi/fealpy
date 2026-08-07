@@ -1,7 +1,7 @@
 import argparse
 
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import StokesFVMStaggeredSimpleModel  
+from fealpy.fvm.experimental import StokesFVMStaggeredSimpleModel
 
 
 def main():
@@ -44,10 +44,9 @@ def main():
     print(f"L2 error (u) = {uerror}")
     print(f"L2 error (v) = {verror}")
     print(f"L2 error (p) = {perror}")
-    model.plot()
+    # model.plot()
     if options["plot"]:
         model.plot()
-        model.plot_residual()
 
 
 if __name__ == "__main__":

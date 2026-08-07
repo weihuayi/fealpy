@@ -1,11 +1,62 @@
 from . import Monitor
 from . import Interpolater
 from .config import *
-from scipy.integrate import solve_ivp
 from fealpy.utils import timer
 from .metric_shared import GeometricDiscreteCore
 from scipy.sparse.linalg import LinearOperator,cg
 from scipy.sparse import coo_matrix
+import numpy as np
+from .metrictensoradaptive import (
+    _mta_A_from_C_kernel,
+    _mta_c_kernel,
+    _mta_jac_values_kernel,
+    _mta_vector_assembly_kernel,
+    njit,
+)
+
+
+if njit is not None:
+    @njit(cache=True)
+    def _eag_huang_idxi_kernel(A, g, trA, E_hat, rho, gamma, mu):
+        nc = A.shape[0]
+        local = np.empty((nc, 3, 2), dtype=np.float64)
+        p = gamma
+        dg_const = (2.0 ** p) * (1.0 - 2.0 * mu) * (gamma * 0.5)
+        det_floor = 1.0e-14
+        for n in range(nc):
+            e00 = E_hat[n, 0, 0]
+            e01 = E_hat[n, 0, 1]
+            e10 = E_hat[n, 1, 0]
+            e11 = E_hat[n, 1, 1]
+            det = e00 * e11 - e01 * e10
+            inv00 = e11 / det
+            inv01 = -e01 / det
+            inv10 = -e10 / det
+            inv11 = e00 / det
+
+            g_eff = g[n] if g[n] > det_floor else det_floor
+            tr_eff = trA[n] if trA[n] > det_floor else det_floor
+            td = mu * gamma * (tr_eff ** (p - 1.0))
+            tgg = dg_const * (g_eff ** (gamma * 0.5))
+            b00 = td * (inv00 * A[n, 0, 0] + inv01 * A[n, 1, 0]) + tgg * inv00
+            b01 = td * (inv00 * A[n, 0, 1] + inv01 * A[n, 1, 1]) + tgg * inv01
+            b10 = td * (inv10 * A[n, 0, 0] + inv11 * A[n, 1, 0]) + tgg * inv10
+            b11 = td * (inv10 * A[n, 0, 1] + inv11 * A[n, 1, 1]) + tgg * inv11
+            scale = 2.0 * rho[n]
+            b00 *= scale
+            b01 *= scale
+            b10 *= scale
+            b11 *= scale
+
+            local[n, 0, 0] = -(b00 + b10)
+            local[n, 0, 1] = -(b01 + b11)
+            local[n, 1, 0] = b00
+            local[n, 1, 1] = b01
+            local[n, 2, 0] = b10
+            local[n, 2, 1] = b11
+        return local
+else:
+    _eag_huang_idxi_kernel = None
 
 class EAGAdaptiveHuang(Monitor, Interpolater):
     def __init__(self, mesh, beta, space, config:Config):
@@ -17,22 +68,21 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self.maxit = config.maxit
         self.pre_steps = config.pre_steps
         self.gamma = config.gamma
-        self.dt = self.tau * self.t_max
         
         self.geo_core = GeometricDiscreteCore(mesh)
         self.R = self.geo_core.R_matrix()
 
         self.cell2cell = self.mesh.cell_to_cell()
         self.total_steps = 10
-        self.t_span = 0.1
+        self.t_span = self.t_max
         self.step = 10
         self.BD_projector()
         self._build_jac_pattern()
-        self.tol = self._caculate_tol()
+        self.tol = config.tol if config.tol is not None else self._caculate_tol()
         
     def _prepare_ivp_cache(self, X, M,theta):
         """
-        预计算在一个 solve_ivp 步进内不变的量，减少 jac/ode 回调重复开销。
+        预计算在一个 ODE 步进内不变的量，减少 jac/ode 回调重复开销。
         """
         E_K     = self.edge_matrix(X)           # (NC,d,d)
         E_K_inv = bm.linalg.inv(E_K)            # (NC,d,d)
@@ -51,6 +101,13 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         return self.geo_core.edge_matrix(X)
     
     def A(self,E , E_hat , M_inv):
+        cache = getattr(self, '_ivp_cache', None)
+        if (self.GD == 2 and _mta_A_from_C_kernel is not None and
+                cache is not None and E is cache.get('E_K') and 'C_K' in cache):
+            return _mta_A_from_C_kernel(
+                np.asarray(E_hat, dtype=np.float64),
+                np.asarray(cache['C_K'], dtype=np.float64),
+            )
         return self.geo_core.A(E , E_hat , M_inv)
     
     def rho(self,M):
@@ -61,6 +118,12 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
     
     def balance(self,M_node, theta, power=None , mixed=True):
         return self.geo_core.balance(M_node, theta, power, mixed)
+
+    def _det_floor(self):
+        return float(getattr(self.config, "huang_det_floor", 1.0e-14))
+
+    def _positive_det(self, g):
+        return bm.maximum(g, self._det_floor())
     
     def I_func(self,trA , rho , g):
         """
@@ -69,7 +132,9 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         d = self.GD
         gamma = self.gamma
         mu = 1/3
-        I  = rho * ( mu * trA**(d*gamma/2) + d**(d*gamma/2) * (1 - 2 * mu) * g**(gamma/2) )
+        g_eff = self._positive_det(g)
+        trA_eff = bm.maximum(trA, self._det_floor())
+        I  = rho * ( mu * trA_eff**(d*gamma/2) + d**(d*gamma/2) * (1 - 2 * mu) * g_eff**(gamma/2) )
         I = bm.sum(self.cm * I)
         return I
     
@@ -80,7 +145,8 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         d = self.GD
         gamma = self.gamma
         mu = 1/3
-        TdA = ( mu * (d * gamma / 2) * trA**(d * gamma / 2 - 1))[..., None, None] *self.I_p
+        trA_eff = bm.maximum(trA, self._det_floor())
+        TdA = ( mu * (d * gamma / 2) * trA_eff**(d * gamma / 2 - 1))[..., None, None] *self.I_p
         return TdA
     
     def Tdg(self , g):
@@ -90,8 +156,16 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         d = self.GD
         gamma = self.gamma
         mu = 1/3
-        Tdg = d**(d * gamma / 2) * (1 - 2 * mu) * (gamma / 2) * g**(gamma / 2 - 1)
+        g_eff = self._positive_det(g)
+        Tdg = d**(d * gamma / 2) * (1 - 2 * mu) * (gamma / 2) * g_eff**(gamma / 2 - 1)
         return Tdg
+
+    def Tdg_times_g(self, g):
+        d = self.GD
+        gamma = self.gamma
+        mu = 1/3
+        g_eff = self._positive_det(g)
+        return d**(d * gamma / 2) * (1 - 2 * mu) * (gamma / 2) * g_eff**(gamma / 2)
     
     def lam(self , theta):
         """
@@ -111,12 +185,21 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             rho (Tensor): 权重函数 rho (NC,)
             theta (float): 积分全局乘子
         """
+        if self.GD == 2 and _eag_huang_idxi_kernel is not None:
+            return _eag_huang_idxi_kernel(
+                np.asarray(A, dtype=np.float64),
+                np.asarray(g, dtype=np.float64),
+                np.asarray(trA, dtype=np.float64),
+                np.asarray(E_hat, dtype=np.float64),
+                np.asarray(rho, dtype=np.float64),
+                float(self.gamma),
+                float(getattr(self, "_woven_mu", 1.0 / 3.0)),
+            )
         E_hat_inv = bm.linalg.inv(E_hat)
         TdA = self.TdA(trA )
-        Tdg = self.Tdg(g)
         
         term0 = E_hat_inv @ A @ TdA
-        term1 = (Tdg * g)[..., None, None] * E_hat_inv
+        term1 = self.Tdg_times_g(g)[..., None, None] * E_hat_inv
 
         lam = self.lam(theta)
         Idxi_grad_part = 2/lam * rho[..., None, None] * (term0 + term1) # (NC, GD, GD)
@@ -148,7 +231,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self.I = geo.I
         self.J = geo.J
     
-    def vector_construction(self, A , g ,trA , E_hat):
+    def vector_construction(self, A , g ,trA , E_hat, return_local=False):
         """
         构造全局移动向量场
         Parameters:
@@ -167,33 +250,48 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             theta   = cache['theta']
 
         Idxi = self.Idxi_from_Ehat(A , g ,trA , E_hat, rho, theta)  # (NC, GD+1, GD)
-        cell = self.cell
-        cm = self.cm
-        global_vector = bm.zeros((self.NN, self.GD), dtype=bm.float64)
-        global_vector = bm.index_add(global_vector , cell , cm[:,None,None] * Idxi)
-        
-        tau = self.tau
-        v = -1/tau * global_vector * P_diag[:, None]  # (NN, GD)
-        
-        # 边界投影和角点固定
-        Bi_Lnode_normal = self.Bi_Lnode_normal
-        Bdinnernode_idx = self.Bdinnernode_idx
-        dot = bm.sum(Bi_Lnode_normal * v[Bdinnernode_idx],axis=1)
-        v = bm.set_at(v , Bdinnernode_idx ,
-                        v[Bdinnernode_idx] - dot[:,None] * Bi_Lnode_normal)
-        vertice_idx = self.Vertices_idx
-        v = bm.set_at(v , vertice_idx , 0.0)
+        if self.GD == 2 and _mta_vector_assembly_kernel is not None:
+            v = _mta_vector_assembly_kernel(
+                np.asarray(self.cell, dtype=np.int64),
+                np.asarray(self.cm, dtype=np.float64),
+                np.asarray(Idxi, dtype=np.float64),
+                np.asarray(P_diag, dtype=np.float64),
+                np.asarray(self.Bdinnernode_idx, dtype=np.int64),
+                np.asarray(self.Bi_Lnode_normal, dtype=np.float64),
+                np.asarray(self.Vertices_idx, dtype=np.int64),
+                float(self.tau),
+                int(self.NN),
+            )
+        else:
+            cell = self.cell
+            cm = self.cm
+            global_vector = bm.zeros((self.NN, self.GD), dtype=bm.float64)
+            global_vector = bm.index_add(global_vector , cell , cm[:,None,None] * Idxi)
+            
+            tau = self.tau
+            v = -1/tau * global_vector * P_diag[:, None]  # (NN, GD)
+            
+            # 边界投影和角点固定
+            Bi_Lnode_normal = self.Bi_Lnode_normal
+            Bdinnernode_idx = self.Bdinnernode_idx
+            dot = bm.sum(Bi_Lnode_normal * v[Bdinnernode_idx],axis=1)
+            v = bm.set_at(v , Bdinnernode_idx ,
+                            v[Bdinnernode_idx] - dot[:,None] * Bi_Lnode_normal)
+            vertice_idx = self.Vertices_idx
+            v = bm.set_at(v , vertice_idx , 0.0)
+        if return_local:
+            return v, Idxi
         return v
     
-    def JAC_functional(self,A, g, trA, E_hat,M_inv, theta):
+    def JAC_functional(self,A, g, trA, E_hat,M_inv, theta, local=None):
         d = self.GD
         NC = self.NC
         assert d == 2, "当前实现针对 2D；3D 可按相同张量结构扩展"
         E_K = self._ivp_cache['E_K']
-        rho = self.rho(self.M)
+        rho = self._ivp_cache['rho']
         # 差分步长（相对尺度 + 绝对下限，数值稳健）
-        local = self.Idxi_from_Ehat(A , g ,trA, E_hat , rho , theta)   # (NC, d+1, d)
-        local = local   # 去权重后的局部向量
+        if local is None:
+            local = self.Idxi_from_Ehat(A , g ,trA, E_hat , rho , theta)   # (NC, d+1, d)
         
         B = d * d
         k_idx, c_idx = bm.meshgrid(bm.arange(d), bm.arange(d), indexing='ij')
@@ -245,6 +343,23 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         cm = self.cm
         rxx, ryy, rxy, ryx = self.rxx, self.ryy, self.rxy, self.ryx
         P_diag = self._ivp_cache['P_diag']
+        if d == 2 and _mta_jac_values_kernel is not None:
+            V = _mta_jac_values_kernel(
+                np.asarray(D2_all, dtype=np.float64),
+                np.asarray(self.cm, dtype=np.float64),
+                np.asarray(P_diag, dtype=np.float64),
+                np.asarray(self.rxx, dtype=np.float64),
+                np.asarray(self.ryy, dtype=np.float64),
+                np.asarray(self.rxy, dtype=np.float64),
+                np.asarray(self.ryx, dtype=np.float64),
+                np.asarray(self.rr_x_all, dtype=np.int64),
+                np.asarray(self.rr_y_all, dtype=np.int64),
+                np.asarray(self.rr_x0, dtype=np.int64),
+                np.asarray(self.rr_y0, dtype=np.int64),
+                float(self.tau),
+            )
+            JAC = coo_matrix((V, (self.I, self.J)),shape=(2*NN, 2*NN)).tocsr()
+            return JAC
 
         # 打包：把 (NC,c,d) 压成按 c 分段的 (c*NC*(d+1),)，并在最前加 j=0 列（负和）
         def pack_all(D2_comp_all):
@@ -392,6 +507,105 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         self.cm = self.mesh.entity_measure('cell')
         self.sm = bm.zeros(self.NN, **self.kwargs0)
         self.sm = bm.index_add(self.sm , self.mesh.cell , self.cm[:, None])
+
+    def sundials_integrater(self, Xi, M_inv, h, atol=1e-6, rtol=1e-4):
+        try:
+            import sksundae as sun
+        except ImportError as exc:
+            raise ImportError(
+                "method='SUNDIALS' requires scikit-SUNDAE. "
+                "Install it with: conda install -c conda-forge scikit-sundae"
+            ) from exc
+
+        NN = self.NN
+        GD = self.GD
+        Nvar = NN * GD
+        y0 = np.asarray(Xi.ravel(order='F'), dtype=np.float64)
+        theta = self._ivp_cache['theta']
+        pattern = coo_matrix(
+            (np.ones(len(self.I), dtype=np.float64),
+             (np.asarray(self.I, dtype=np.int64), np.asarray(self.J, dtype=np.int64))),
+            shape=(Nvar, Nvar),
+        ).tocsc()
+        pattern.sort_indices()
+
+        info_cache = {'y': None, 'value': None}
+        rhs_cache = {'y': None, 'value': None}
+        local_cache = {'y': None, 'value': None}
+
+        def same_state(cache, y):
+            cached_y = cache['y']
+            return cached_y is not None and cached_y.shape == y.shape and np.array_equal(cached_y, y)
+
+        def info_update(y):
+            if same_state(info_cache, y):
+                return info_cache['value']
+            Yi = y.reshape(GD, NN).T
+            E_hat = self.edge_matrix(Yi)
+            A = self.A(self._ivp_cache['E_K'], E_hat, M_inv)
+            g = bm.linalg.det(A)
+            trA = bm.trace(A, axis1=-2, axis2=-1)
+            value = (A, g, trA, E_hat)
+            info_cache['y'] = np.asarray(y, dtype=np.float64).copy()
+            info_cache['value'] = value
+            return value
+
+        def rhsfn(t, y, yp):
+            if same_state(rhs_cache, y):
+                yp[:] = rhs_cache['value']
+                return
+            A, g, trA, E_hat = info_update(y)
+            v, local = self.vector_construction(A, g, trA, E_hat, return_local=True)
+            value = np.asarray(v.ravel(order='F'), dtype=np.float64)
+            rhs_cache['y'] = np.asarray(y, dtype=np.float64).copy()
+            rhs_cache['value'] = value.copy()
+            local_cache['y'] = rhs_cache['y'].copy()
+            local_cache['value'] = local
+            yp[:] = value
+
+        def jacfn(t, y, yp, JJ):
+            A, g, trA, E_hat = info_update(y)
+            local = local_cache['value'] if same_state(local_cache, y) else None
+            J = self.JAC_functional(A, g, trA, E_hat, M_inv, theta, local=local).tocsc()
+            J.sort_indices()
+            if np.array_equal(J.indptr, pattern.indptr) and np.array_equal(J.indices, pattern.indices):
+                JJ[:] = J.data
+                return
+
+            JJ[:] = 0.0
+            for col in range(Nvar):
+                p0, p1 = pattern.indptr[col], pattern.indptr[col + 1]
+                j0, j1 = J.indptr[col], J.indptr[col + 1]
+                if p0 == p1 or j0 == j1:
+                    continue
+                rows = pattern.indices[p0:p1]
+                jrows = J.indices[j0:j1]
+                pos = np.searchsorted(rows, jrows)
+                valid = pos < rows.size
+                valid[valid] &= rows[pos[valid]] == jrows[valid]
+                JJ[p0 + pos[valid]] = J.data[j0:j1][valid]
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Custom sparse Jacobian approximation will be ignored.*",
+                category=UserWarning,
+            )
+            solver = sun.cvode.CVODE(
+                rhsfn,
+                method='BDF',
+                first_step=h,
+                rtol=rtol,
+                atol=atol,
+                linsolver='sparse',
+                sparsity=pattern,
+                jacfn=jacfn,
+            )
+        sol = solver.solve(np.array([0.0, self.t_span], dtype=np.float64), y0)
+        if not sol.success:
+            raise RuntimeError(f"SUNDIALS/CVODE failed: {sol.message}")
+        return sol.y[-1].reshape(GD, NN).T
     
     def mesh_redistributor(self , total_steps=None, h = None,
                            method='BDF_LBFGS',return_info = False, return_timemesh = False):
@@ -408,7 +622,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         if total_steps is None:
             total_steps = self.total_steps
         if h is None:
-            h = self.t_span/self.step
+            h = self.tau if self.tau is not None else self.t_span/self.step
         atol = 1e-6
         rtol = atol * 100
         
@@ -418,6 +632,30 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         time_mesh = [self.mesh.node]
         global j
         j = 0
+        if method == 'BDF_SMW':
+            self._smw_stats = {
+                'factor_count': 0,
+                'factor_backend': None,
+                'rank2_updates': 0,
+                'rank1_updates': 0,
+                'max_rank': 0,
+                'line_fail': 0,
+                'small_solve_fail': 0,
+                'b0_solve_count': 0,
+                'b0_solve_call_count': 0,
+                'multi_rhs_solve_count': 0,
+                'saved_w_solves': 0,
+                'symbolic_factor_count': 0,
+                'numeric_factor_count': 0,
+                'rank_stack_updates': 0,
+                'last_res': None,
+            }
+            self._smw_mumps_cache = {
+                'ctx': None,
+                'indptr': None,
+                'indices': None,
+                'shape': None,
+            }
         for it in range(total_steps):
             self.monitor()
             self.mol_method()
@@ -428,6 +666,11 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             
             theta = self.theta(M)
             self._prepare_ivp_cache(X, M,theta)
+            if self.GD == 2 and _mta_c_kernel is not None:
+                self._ivp_cache['C_K'] = _mta_c_kernel(
+                    np.asarray(self._ivp_cache['E_K_inv'], dtype=np.float64),
+                    np.asarray(M_inv, dtype=np.float64),
+                )
             E_K = self._ivp_cache['E_K']
 
             I_base = bm.eye(self.GD, **self.kwargs0)
@@ -441,29 +684,12 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                 trA = bm.trace(A, axis1=1, axis2=2)
                 return E_hat , A , g , trA
             
-            if method == 'scipy':
-                def ode_system(t, y):
-                    Xi_current = y.reshape(self.GD, self.NN).T
-                    E_hat, A , g , trA = info_generator(Xi_current)
-                    v = self.vector_construction(A , g ,trA , E_hat) 
-                    global j
-                    j += 1
-                    print(f"  ivp step {j} ")
-                    return v.ravel(order = 'F')
-                
-                def jac(t, y):
-                    Xi_current = y.reshape(self.GD, self.NN).T
-                    E_hat, A , g , trA = info_generator(Xi_current)
-                    J_y = self.JAC_functional(A ,  g ,trA, E_hat, M_inv,theta)
-                    return J_y
-                
-                t_span = [0,self.t_span]
-                y0 = Xi.ravel(order = 'F')
-                sol = solve_ivp(ode_system, t_span, y0, jac=jac, method='BDF',
-                                            first_step=h,
-                                            atol=atol, rtol=rtol)
-                y_last = sol.y[:, -1]
-                Xinew = y_last.reshape(self.GD, self.NN).T
+            if method == 'BDF_SMW':
+                Xinew = self.integrater(Xi, M_inv, h, atol=atol, rtol=rtol,
+                                        newton_tol=1e-6, newton_maxit=20,
+                                        solver='smw')
+            elif method in ('SUNDIALS', 'CVODE', 'SUNDIALS_CVODE'):
+                Xinew = self.sundials_integrater(Xi, M_inv, h, atol=atol, rtol=rtol)
             else:
                 Xinew = self.integrater(Xi, M_inv, h, atol=atol, rtol=rtol,
                                         newton_tol=1e-6, newton_maxit=20,)
@@ -479,8 +705,13 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             if return_timemesh:
                 time_mesh.append(Xnew)
             
-            error = bm.max(bm.linalg.norm(Xnew - self.node,axis=1))
-            print(f"step {it+1}/{self.total_steps} , error: {error}")
+            physical_error = bm.max(bm.linalg.norm(Xnew - self.node,axis=1))
+            logic_error = bm.max(bm.linalg.norm(Xinew - Xi,axis=1))
+            error = min(float(physical_error), float(logic_error))
+            print(
+                f"step {it+1}/{self.total_steps} , "
+                f"physical_error: {physical_error}, logic_error: {logic_error}"
+            )
             
             self.uh = self.interpolate(Xnew)
             self._construct(Xnew)
@@ -489,6 +720,12 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
                 break
 
         ret = {"X": Xnew}
+        if method == 'BDF_SMW':
+            print("SMW stats:", self._smw_stats)
+            cache = getattr(self, '_smw_mumps_cache', None)
+            if cache is not None and cache.get('ctx') is not None:
+                cache['ctx'].destroy()
+                cache['ctx'] = None
         if return_info:
             I_h_array = bm.array(I_h , **self.kwargs0)
             I_t = (I_h_array[1:] - I_h_array[:-1])
@@ -540,17 +777,42 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
     def integrater(self, Xi, M_inv, h, atol=1e-6, rtol=1e-4,
                                       newton_tol=1e-6, newton_maxit=20, 
                                       cg_tol=1e-8,
-                                      h_min=None, h_max=None):
+                                      h_min=None, h_max=None,
+                                      solver='lfp'):
         """
-        用隐式Euler(BDF1) + 拟牛顿 + cg 做时间积分替代 solve_ivp
+        用隐式Euler(BDF1) + 拟牛顿 + cg 做时间积分
         """
+        if solver == 'smw':
+            from .metrictensoradaptive import MetricTensorAdaptive
+            eag_jac = self.JAC_functional
+
+            def jac_adapter(A, trA, g, E_hat, M_inv, local=None):
+                theta = self._ivp_cache['theta']
+                return eag_jac(A, g, trA, E_hat, M_inv, theta, local=local)
+
+            self.JAC_functional = jac_adapter
+            try:
+                return MetricTensorAdaptive.integrater(
+                    self, Xi, M_inv, h, atol=atol, rtol=rtol,
+                    newton_tol=newton_tol, newton_maxit=newton_maxit,
+                    cg_tol=cg_tol, h_min=h_min, h_max=h_max,
+                    solver='smw'
+                )
+            finally:
+                self.JAC_functional = eag_jac
+
         NN = self.NN
         GD = self.GD
         Nvar = NN * GD
         y = Xi.ravel(order='F')
         last_delta = None  # GMRES 的初始猜测
         h_max = h_max or h * 10
-        h_min = h_min or h * 0.1
+        h_min = h_min or h * 1e-6
+        bdf_iter_stats = {
+            'nonlinear_total': 0,
+            'nonlinear_last': 0,
+            'nonlinear_max': 0,
+        }
         
         def info_update(y_new):
             Yi = y_new.reshape(GD, NN).T
@@ -563,6 +825,7 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
         def single_step(y_new,y , h , last_delta):
             r_pre = None
             for nit in range(newton_maxit):
+                bdf_iter_stats['nonlinear_total'] += 1
                 # 计算 f 和残差 r = F(y_new)
                 A, g, trA, E_hat = info_update(y_new)
                 f = self.vector_construction(A, g, trA, E_hat).ravel(order='F')
@@ -615,24 +878,84 @@ class EAGAdaptiveHuang(Monitor, Interpolater):
             return y_new , last_delta , r
             
         total_time = 0.0
+        bdf_step_count = 0
+        bdf_accepted_count = 0
+        bdf_rejected_count = 0
+        bdf_nonfinite_error_count = 0
+        bdf_min_h = float(h)
+        bdf_last_h = float(h)
+        bdf_last_scaled_error = np.nan
+        bdf_max_steps = getattr(self, "bdf_max_steps", None)
 
-        while total_time < self.t_span:
-            if total_time + h > self.t_span:
-                h = self.t_span - total_time
-            # Newton 迭代求解 F(y_new) = y_new - y - h * f(t_np1, y_new) = 0
-            y_new = y.copy()
-            
-            y_new , last_delta, res = single_step( y_new , y , h , last_delta)
-            
-            tol_vector = atol + rtol * bm.abs(y)
-            scaled_error = bm.max(bm.abs(res) / tol_vector)
+        try:
+            while total_time < self.t_span:
+                if bdf_max_steps is not None and bdf_step_count >= bdf_max_steps:
+                    self._last_bdf_step_count = bdf_step_count
+                    self._last_bdf_accepted_count = bdf_accepted_count
+                    self._last_bdf_rejected_count = bdf_rejected_count
+                    self._last_bdf_total_time = float(total_time)
+                    raise RuntimeError(
+                        f"BDF step limit exceeded: max_steps={bdf_max_steps}, "
+                        f"accepted={bdf_accepted_count}, rejected={bdf_rejected_count}, "
+                        f"t={total_time}, target={self.t_span}"
+                    )
+                bdf_step_count += 1
+                if total_time + h > self.t_span:
+                    h = self.t_span - total_time
+                # Newton 迭代求解 F(y_new) = y_new - y - h * f(t_np1, y_new) = 0
+                y_new = y.copy()
+                
+                nonlinear_before = bdf_iter_stats['nonlinear_total']
+                y_new , last_delta, res = single_step( y_new , y , h , last_delta)
+                nonlinear_this_step = bdf_iter_stats['nonlinear_total'] - nonlinear_before
+                bdf_iter_stats['nonlinear_last'] = nonlinear_this_step
+                bdf_iter_stats['nonlinear_max'] = max(
+                    bdf_iter_stats['nonlinear_max'],
+                    nonlinear_this_step,
+                )
+                
+                tol_vector = atol + rtol * bm.abs(y)
+                scaled_error = bm.max(bm.abs(res) / tol_vector)
+                scaled_error_value = float(scaled_error)
+                bdf_last_scaled_error = scaled_error_value
+                bdf_last_h = float(h)
+                bdf_min_h = min(bdf_min_h, float(h))
 
-            # 5. 步长自适应 (理论正确)
-            if scaled_error <= 1.0:
-                # 接受步长
-                total_time += h
-                y = y_new
-            h = bm.clip((1.0 / scaled_error)**0.5 * h, h_min, h_max)
+                if not np.isfinite(scaled_error_value):
+                    bdf_rejected_count += 1
+                    bdf_nonfinite_error_count += 1
+                    h = max(0.5 * float(h), float(h_min))
+                    continue
+
+                # 5. 步长自适应 (理论正确)
+                if scaled_error <= 1.0:
+                    # 接受步长
+                    total_time += h
+                    y = y_new
+                    bdf_accepted_count += 1
+                else:
+                    bdf_rejected_count += 1
+                h = bm.clip((1.0 / scaled_error)**0.5 * h, h_min, h_max)
+        finally:
+            self._last_bdf_step_count = bdf_step_count
+            self._last_bdf_accepted_count = bdf_accepted_count
+            self._last_bdf_rejected_count = bdf_rejected_count
+            self._last_bdf_total_time = float(total_time)
+            self._last_bdf_h = bdf_last_h
+            self._last_bdf_min_h = bdf_min_h
+            self._last_bdf_scaled_error = bdf_last_scaled_error
+            self._last_bdf_nonfinite_error_count = bdf_nonfinite_error_count
+            self._last_bdf_nonlinear_iteration_count = bdf_iter_stats['nonlinear_last']
+            self._last_bdf_max_nonlinear_iteration_count = bdf_iter_stats['nonlinear_max']
+            self._bdf_total_step_count = getattr(self, "_bdf_total_step_count", 0) + bdf_step_count
+            self._bdf_total_accepted_count = getattr(self, "_bdf_total_accepted_count", 0) + bdf_accepted_count
+            self._bdf_total_rejected_count = getattr(self, "_bdf_total_rejected_count", 0) + bdf_rejected_count
+            self._bdf_total_nonfinite_error_count = getattr(self, "_bdf_total_nonfinite_error_count", 0) + bdf_nonfinite_error_count
+            self._bdf_total_nonlinear_iteration_count = (
+                getattr(self, "_bdf_total_nonlinear_iteration_count", 0)
+                + bdf_iter_stats['nonlinear_total']
+            )
+            self._bdf_stage_count = getattr(self, "_bdf_stage_count", 0) + 1
 
         Xi_new = y.reshape(GD, NN).T
         return Xi_new

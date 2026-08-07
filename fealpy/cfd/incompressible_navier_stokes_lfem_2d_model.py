@@ -176,13 +176,15 @@ class IncompressibleNSLFEM2DModel(ComputationalModel):
             
              
             A0, b0 = self.fem.predict_velocity(u0, p0, BC=BCu, return_form=False)
-            uhs[:] = self.solve['cg'](A0, b0, x0)
+            # uhs[:] = self.solve['cg'](A0, b0, x0)
+            uhs[:] = self.solve['direct'](A0, b0)
 
             A1, b1 = self.fem.pressure(uhs, p0, BC=BCp, return_form=False)
-            ph1[:] = self.solve['cg'](A1, b1)[:pgdof]
+            ph1[:] = self.solve['direct'](A1, b1)[:pgdof]
 
             A2, b2 = self.fem.correct_velocity(uhs, p0, ph1, BC=BCu, return_form=False)
-            uh1[:] = self.solve['cg'](A2, b2, x0)
+            # uh1[:] = self.solve['cg'](A2, b2, x0)
+            uh1[:] = self.solve['direct'](A2, b2)
             return uh1, ph1
         else:
             

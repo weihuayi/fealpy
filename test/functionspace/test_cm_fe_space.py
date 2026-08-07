@@ -3,7 +3,7 @@ from fealpy.pde.biharmonic_triharmonic_2d import get_flist
 import numpy as np
 import pytest
 import sympy as sp
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace.cm_conforming_fe_space import CmConformingFESpace2d
 from cm_fe_space_data import *
 

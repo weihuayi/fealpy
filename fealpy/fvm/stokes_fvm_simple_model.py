@@ -1,206 +1,228 @@
-from typing import Union, Tuple
+"""Manufactured-case adapter for the collocated SIMPLE Stokes solve."""
 
-from fealpy.typing import TensorLike
-from fealpy.backend import backend_manager as bm
-from fealpy.model import PDEModelManager, ComputationalModel
-from fealpy.sparse import COOTensor
+from fealpy.model import ComputationalModel, PDEModelManager
 
-from fealpy.functionspace import ScaledMonomialSpace2d, TensorFunctionSpace
-from fealpy.fem import BilinearForm, LinearForm, BlockForm
-
-from fealpy.solver import spsolve
-
-from . import (
-    ScalarDiffusionIntegrator,
-    ScalarCrossDiffusionIntegrator,
-    ScalarSourceIntegrator,
-    GradientReconstruct,
-    DivergenceReconstruct,
-    DirichletBC,
-    RhieChowInterpolation
+from .collocated_simple_solver import CollocatedSimpleSolver
+from .cell_average_error import cell_average_l2_error
+from .engineering_boundary_conditions import (
+    PDEBoundaryConditions,
+    resolve_simple_boundary_conditions,
+)
+from .collocated_linear_solvers import CollocatedNSLinearSolvers
+from .solver_controls import positive_scalar
+from .steady_ns_solver_profiles import (
+    SteadyNSSimpleProfile,
+    steady_ns_high_accuracy_simple_profile,
 )
 
+
 class StokesFVMSimpleModel(ComputationalModel):
-    """
-    The Stokes equation in two-dimensional cases is solved by the finite volume method
-    using the SIMPLE algorithm. The velocity and pressure are iteratively corrected
-    to satisfy the continuity equation.
-    """
+    """Finite-volume SIMPLE model for Stokes PDE examples."""
+
     def __init__(self, options):
         self.options = options
-        super().__init__(pbar_log=options.get("pbar_log", False),
-                         log_level=options.get("log_level", "WARNING"))
-        self.set_pde(options["pde"])
-        self.set_mesh(options["nx"], options["ny"])
-        self.set_space(options["space_degree"])
+        self._validate_options()
+        ComputationalModel.__init__(
+            self,
+            pbar_log=options.get("pbar_log", False),
+            log_level=options.get("log_level", "WARNING"),
+        )
+        self.pde = self._resolve_stokes_pde(options["pde"])
+        self.error_quadrature_order = int(options.get("error_quadrature_order", 4))
+        mesh = self._init_mesh(options)
+        self.mu = self._init_diffusion_coef(options)
+        profile = options.get("profile")
+        if profile is None:
+            profile = steady_ns_high_accuracy_simple_profile()
+        if not isinstance(profile, SteadyNSSimpleProfile):
+            raise TypeError("profile must be a SteadyNSSimpleProfile.")
+        self.profile = profile
+        boundary_conditions = resolve_simple_boundary_conditions(
+            mesh,
+            PDEBoundaryConditions(
+                mesh,
+                dirichlet_velocity=self.pde.dirichlet_velocity,
+            ),
+            profile.discretization,
+            profile.pressure_system,
+        )
+        linear_solvers = options.get("linear_solvers")
+        if linear_solvers is None:
+            linear_solvers = profile.build_linear_solvers()
+        if not isinstance(
+            linear_solvers,
+            CollocatedNSLinearSolvers,
+        ):
+            raise TypeError(
+                "linear_solvers must be CollocatedNSLinearSolvers."
+            )
+        self.linear_solvers = linear_solvers
+        self.solver = CollocatedSimpleSolver(
+            diffusion_coef=self.mu,
+            convection_coef=0.0,
+            source=self.pde.source,
+            boundary_conditions=boundary_conditions,
+            discretization_controls=profile.discretization,
+            iteration_controls=profile.iteration,
+            linear_solvers=linear_solvers,
+            logger=self.logger,
+        )
+        self.mesh = mesh
+        self.fvm_geometry = boundary_conditions.physical.geometry
+        self.NC = self.fvm_geometry.NC
+        self.GD = self.fvm_geometry.GD
+
+    def _validate_options(self) -> None:
+        allowed = {
+            "pde",
+            "mesh_type",
+            "mesh_refine",
+            "nx",
+            "ny",
+            "nz",
+            "mu",
+            "error_quadrature_order",
+            "profile",
+            "linear_solvers",
+            "pbar_log",
+            "log_level",
+        }
+        unsupported = set(self.options).difference(allowed)
+        if unsupported:
+            names = ", ".join(sorted(unsupported))
+            raise ValueError(f"unsupported StokesFVMSimpleModel options: {names}")
 
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}:\n"
-            f"  Mesh shape: {self.mesh.number_of_cells()} cells\n"
+            f"  Mesh shape: {self.NC} cells\n"
             f"  PDE type: {type(self.pde).__name__}\n"
         )
 
-    def set_pde(self, pde: Union[str, object]) -> None:
-        """Set the PDE model."""
-        self.pde = PDEModelManager("stokes").get_example(pde) if isinstance(pde, int) else pde
+    def close(self) -> None:
+        """Release third-party linear-solver resources owned by this model."""
+        self.linear_solvers.close()
 
-    def set_mesh(self, nx: int = 10, ny: int = 10) -> None:
-        """Set the computational mesh."""
-        self.mesh = self.pde.init_mesh['uniform_tri'](nx=nx, ny=ny)
-        self.cm = self.mesh.entity_measure('cell')
-        
+    @staticmethod
+    def _resolve_stokes_pde(pde):
+        return PDEModelManager("stokes").get_example(pde) if isinstance(pde, int) else pde
 
-    def set_space(self, degree: int = 0) -> None:
-        """Set the function spaces for velocity and pressure."""
-        self.p = degree
-        self.space = ScaledMonomialSpace2d(self.mesh, self.p)
-        self.velocity_space = TensorFunctionSpace(self.space, shape=(2, -1))
-        self.NC = self.mesh.number_of_cells()
+    def _init_mesh(self, options):
+        mesh_type = (
+            options.get("mesh_type")
+            or getattr(self.pde, "default_mesh_type", "uniform_quad")
+        )
+        mesh_type = {"quad": "uniform_quad", "tri": "uniform_tri"}.get(
+            mesh_type, mesh_type
+        )
+        mesh_refine = int(options.get("mesh_refine", 0))
+        if mesh_refine < 0:
+            raise ValueError("mesh_refine must be non-negative.")
 
-    def temporary_velocity(self, p,u0) -> Tuple[TensorLike, TensorLike]:
-        """Solve for temporary velocity u* using the momentum equation."""
-        bform = BilinearForm(self.velocity_space)
-        bform.add_integrator(ScalarDiffusionIntegrator(q=self.p + 2))
-        B = bform.assembly()
-        ap = B.diags().values
-        lform = LinearForm(self.velocity_space)
-        lform.add_integrator(ScalarSourceIntegrator(self.pde.source, q=self.p + 2))
-        f = lform.assembly()
+        if getattr(self.pde, "supports_geometric_refine", False):
+            return self.pde.init_mesh[mesh_type](mesh_refine=mesh_refine)
 
-        dbc = DirichletBC(self.mesh, self.pde.dirichlet_velocity)
-        B, f = dbc.DiffusionApply(B, f)
-        
-        grad_p = GradientReconstruct(self.mesh).LSQ(p)  # (NC, 2)
-        # grad_p = GradientReconstruct(self.mesh).AverageGradientreNeumann(p, self.pde.neumann_pressure)  # (NC, 2)
-        # grad_p = GradientReconstruct(self.mesh).AverageGradientreDirichlet(p, self.pde.dirichlet_pressure)  # (NC, 2)
-        p1 = bm.einsum('i,i->i', grad_p[:,0], self.cm)
-        p2 = bm.einsum('i,i->i', grad_p[:,1], self.cm)
-        p_grad_integrator = bm.concatenate((p1,p2))
-        f = f - p_grad_integrator
-        u = spsolve(B, f,"mumps")
+        mesh_options = {
+            name: int(options[name])
+            for name in ("nx", "ny", "nz")
+            if options.get(name) is not None
+        }
+        mesh = self.pde.init_mesh[mesh_type](**mesh_options)
+        if mesh_refine == 0:
+            return mesh
+        if hasattr(mesh, "uniform_refine"):
+            for _ in range(mesh_refine):
+                mesh.uniform_refine()
+            return mesh
+        raise ValueError("mesh does not provide uniform_refine().")
 
-        cross = self.compute_cross_diffusion(u0)
-        for i in range(10):
-            rhs = f + cross
-            uh_new = spsolve(B, rhs)
-            err = bm.max(bm.abs(uh_new - u))
-            print(f"[Iter {i+1}] residual = {err}")
-            if err < 10e-5:
-                print("Converged.")
-                break
-            u = uh_new
-            cross = self.compute_cross_diffusion(u)
-        return ap, u
-    
-    def compute_cross_diffusion(self, uh: TensorLike) -> TensorLike:
-        """Compute cross-diffusion term based on current velocity uh."""
-        lform = LinearForm(self.velocity_space)
-        U = bm.stack((uh[:self.NC], uh[self.NC:]), axis=1)
-        grad_u = GradientReconstruct(self.mesh).AverageGradientreDirichlet(U,self.pde.dirichlet_velocity)
-        # grad_u = GradientReconstruct(self.mesh).LSQ(uh)
-        grad_f = GradientReconstruct(self.mesh).reconstruct(grad_u)  # (NE, 2)
-        lform.add_integrator(ScalarCrossDiffusionIntegrator(uh, grad_f))
-        return lform.assembly()
-    
-    def pressure_correct(self, ap: TensorLike, uf: TensorLike) -> TensorLike:
-        """Solve for pressure correction p' to enforce continuity."""
-        cm = self.mesh.entity_measure('cell')
-        em = self.mesh.entity_measure('edge')
-        dp = 1/ap[:len(cm)]
-        e2c = self.mesh.edge_to_cell()
-        dp_edge = (dp[e2c[:,0]]+dp[e2c[:,1]])/2
-        dp_edge = em*dp_edge
-        div_u = DivergenceReconstruct(self.mesh).Reconstruct(uf)  # (NE,)
-        
-        bform2 = BilinearForm(self.space)
-        bform2.add_integrator(ScalarDiffusionIntegrator(q=2,coef=dp_edge))
-        A = bform2.assembly()
-        
-        A1 = COOTensor(bm.array([bm.zeros(len(cm), dtype=bm.int32),
-                             bm.arange(len(cm), dtype=bm.int32)]), cm, spshape=(1, len(cm)))
-        A = BlockForm([[A, A1.T], [A1, None]])
-        A = A.assembly_sparse_matrix(format='csr')
-        b0 = bm.array([0])
-        b = bm.concatenate([-div_u, b0], axis=0)
-        sol = spsolve(A, b,"mumps")
-        p_c = sol[:-1]
-        return p_c
+    def _init_diffusion_coef(self, options):
+        if options.get("mu") is not None:
+            return positive_scalar(options["mu"], "mu")
+        for name in ("viscosity", "mu"):
+            if hasattr(self.pde, name):
+                return positive_scalar(getattr(self.pde, name), "mu")
+        return 1.0
 
-    def solve(self, max_iter: int = 100, tol: float = 1e-5, relax: float = 0.32) -> Tuple[TensorLike, TensorLike]:
-        """Solve the Stokes equation using the SIMPLE algorithm."""
-        p = bm.zeros(self.NC)
-        u = bm.zeros(2 * self.NC)
-        ap, u = self.temporary_velocity(p, u)
-        self.residuals = []
-        bd_edge = self.mesh.boundary_face_index()
-        edge_middle_point = self.mesh.entity_barycenter('edge')
-        bdedgepoint = edge_middle_point[bd_edge]
-        bdedgeu = self.pde.dirichlet_velocity(bdedgepoint)
-        L2_p_corr0 = 10
-        for i in range(max_iter):
-            uf = RhieChowInterpolation(self.mesh).Interpolation(u,ap,p)
-            uf[bd_edge, :] = bdedgeu
-            # uf = self.Ucell2edge(u, self.pde.dirichlet_velocity)
-            p_corr = self.pressure_correct(ap, uf)
-            L2_p_corr = bm.sqrt(bm.sum(self.cm * (p_corr)**2))
-            delta_L2_p_corr0 = L2_p_corr - L2_p_corr0
-            self.residuals.append(float(L2_p_corr))
-            self.logger.info(f"[Iter {i+1}] L2 norm of the delta pressure correction : {delta_L2_p_corr0}")
-            if delta_L2_p_corr0 > 0:
-                self.logger.info("Converged.")
-                break
-            elif bm.abs(delta_L2_p_corr0) < tol:
-                self.logger.info("Converged.")
-                break
-            p += relax*p_corr
-            L2_p_corr0 = L2_p_corr
-            _, u = self.temporary_velocity(p,u)
+    def solve(self):
+        """Run one cold-start SIMPLE solve and return its immutable result."""
+        return self.solver.solve()
 
-        self.uh = u[:self.NC]
-        self.vh = u[self.NC:]
-        self.ph = p
-        return self.uh, self.vh, self.ph
+    def compute_error(self, result) -> tuple[float, ...]:
+        """Compute errors against exact control-volume averages."""
+        velocity_error, exact_velocity = cell_average_l2_error(
+            self.mesh,
+            self.pde.velocity,
+            result.velocity,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        pressure_error, exact_pressure = cell_average_l2_error(
+            self.mesh,
+            self.pde.pressure,
+            result.pressure,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        return tuple(velocity_error[i] for i in range(self.GD)) + (pressure_error,)
 
-    def compute_error(self) -> Tuple[float, float]:
-        """Compute errors for velocity and pressure."""
-        cell_centers = self.mesh.entity_barycenter('cell')
-        self.uI = self.pde.velocity(cell_centers)[:, 0]
-        self.vI = self.pde.velocity(cell_centers)[:, 1]
-        self.pI = self.pde.pressure(cell_centers)
-        uerror = bm.sqrt(bm.sum(self.cm * (self.uh - self.uI)**2))
-        verror = bm.sqrt(bm.sum(self.cm * (self.vh - self.vI)**2))
-        perror = bm.sqrt(bm.sum(self.cm * (self.ph - self.pI)**2))
-        # uerror = bm.max(bm.abs(self.uh - self.uI))
-        # verror = bm.max(bm.abs(self.vh - self.vI))
-        # perror = bm.max(bm.abs(self.ph - self.pI))
-        return uerror, verror, perror
-
-    def plot(self) -> None:
-        """Plot numerical and exact solutions for u, v, and p."""
+    def plot(self, result) -> None:
+        """Plot numerical and exact solution errors for u, v, and p."""
         import matplotlib.pyplot as plt
-        cell_centers = self.mesh.entity_barycenter('cell')
+
+        _, exact_velocity = cell_average_l2_error(
+            self.mesh,
+            self.pde.velocity,
+            result.velocity,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        _, exact_pressure = cell_average_l2_error(
+            self.mesh,
+            self.pde.pressure,
+            result.pressure,
+            q=self.error_quadrature_order,
+            geometry=self.fvm_geometry,
+        )
+        cell_centers = self.fvm_geometry.cell_center
         x, y = cell_centers[:, 0], cell_centers[:, 1]
 
         fig = plt.figure(figsize=(15, 10))
         titles = [
-            ("Error u", self.uh - self.uI),
-            ("Error v", self.vh - self.vI),
-            ("Error p", self.ph - self.pI),
+            ("Error u", result.velocity[:, 0] - exact_velocity[:, 0]),
+            ("Error v", result.velocity[:, 1] - exact_velocity[:, 1]),
+            ("Error p", result.pressure - exact_pressure),
         ]
         for i, (title, data) in enumerate(titles):
-            ax = fig.add_subplot(2, 3, i + 1, projection='3d')
-            ax.plot_trisurf(x, y, data, cmap='viridis')
+            ax = fig.add_subplot(2, 3, i + 1, projection="3d")
+            ax.plot_trisurf(x, y, data, cmap="viridis")
             ax.set_title(title)
         plt.tight_layout()
         plt.show()
 
-    def plot_residual(self) -> None:
-
+    def plot_residual(self, result) -> None:
+        """Plot residual decay curve."""
         import matplotlib.pyplot as plt
+
+        mass = [
+            residual.mass_relative_l2
+            for residual in result.residual_history
+        ]
+        pressure_correction = [
+            residual.pressure_correction_l2
+            for residual in result.residual_history
+        ]
         plt.figure(figsize=(8, 5))
-        plt.semilogy(self.residuals, marker='o', linestyle='-', color='b')
-        plt.title("Pressure Correction Residual vs Iteration")
+        plt.semilogy(mass, marker="o", linestyle="-", color="b", label="mass")
+        plt.semilogy(
+            pressure_correction,
+            marker="s",
+            linestyle="-",
+            color="r",
+            label="pressure correction",
+        )
+        plt.legend()
+        plt.title("SIMPLE Residuals vs Iteration")
         plt.xlabel("Iteration")
         plt.ylabel("Residual (log scale)")
         plt.grid(True, which="both", ls="--")

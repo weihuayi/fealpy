@@ -44,9 +44,9 @@ class MeshPloter(Generic[_MT]):
     mesh: _MT
 
     def __init__(self, mesh: _MT) -> None:
-        if not isinstance(mesh, Mesh):
-            raise TypeError("MeshPloter only works for Mesh type, "
-                            f"but got {self.__class__.__name__}.")
+        # if not isinstance(mesh, Mesh):
+        #     raise TypeError("MeshPloter only works for Mesh type, "
+        #                     f"but got {self.__class__.__name__}.")
         self.mesh = mesh
 
         # This is the default parameter for ALL Ploters

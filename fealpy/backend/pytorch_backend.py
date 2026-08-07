@@ -476,6 +476,8 @@ class PyTorchBackend(BackendProxy, backend_name='pytorch'):
         else:
             src_shape = a.shape[:axis] + index.shape + a.shape[axis+1:]
             src = torch.broadcast_to(src, src_shape).reshape(src_flat_shape)
+            if src.dtype != a.dtype:
+                src = src.to(dtype=a.dtype)
 
         return a.index_add_(axis, index.ravel(), src, alpha=alpha)
 

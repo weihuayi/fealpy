@@ -115,3 +115,22 @@ class test_speye():
 
         assert bm.allclose(csr_diags.toarray(), expected_diag)
         assert bm.allclose(coo_diags.toarray(), expected_diag)
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_spdiags_index_dtype(backend):
+    bm.set_backend(backend)
+    data = bm.array([1, 2, 3, 4], dtype=bm.float64)
+
+    csr_diags = spdiags(data, 0, 4, 4, format="csr", index_dtype=bm.int32)
+    coo_diags = spdiags(data, 0, 4, 4, format="coo", index_dtype=bm.int32)
+
+    assert csr_diags.crow.dtype == bm.int32
+    assert csr_diags.col.dtype == bm.int32
+    assert coo_diags.indices.dtype == bm.int32
+    expected = bm.array(
+        [[1, 0, 0, 0], [0, 2, 0, 0], [0, 0, 3, 0], [0, 0, 0, 4]],
+        dtype=data.dtype,
+    )
+    assert bm.allclose(csr_diags.toarray(), expected)
+    assert bm.allclose(coo_diags.toarray(), expected)

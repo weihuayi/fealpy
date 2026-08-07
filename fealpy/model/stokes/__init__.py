@@ -34,6 +34,7 @@ class StokesPDEDataProtocol(Protocol):
 
     # --- Dirichlet boundary conditions ---
     def dirichlet_velocity(self, p: TensorLike) -> TensorLike: ...
+    def dirichlet_pressure(self, p: TensorLike) -> TensorLike: ...
     def is_dirichlet_boundary(self, p: TensorLike) -> TensorLike: ...
 
     # --- Optional: Neumann-type boundary support ---
@@ -53,4 +54,3 @@ DATA_TABLE = {
     7: ("exp0007", "Exp0007"),
     8: ("exp0008", "Exp0008"),
 }
-

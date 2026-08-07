@@ -199,7 +199,79 @@ class CSRTensor(SparseTensor):
                          bm.copy(self._values), self._spshape)
 
     def coalesce(self, accumulate: bool=True) -> 'CSRTensor':
-        raise NotImplementedError
+        """Sum duplicated ``(row, col)`` entries and return canonical CSR.
+
+        Kyle/Edwin update: Kyle provided the backend-generic duplicate-summing
+        algorithm used here; Edwin requested its integration into FEALPy's
+        ``CSRTensor`` so sparse matrix additions return canonical CSR.  If this
+        path fails, report it directly instead of adding local solver-side
+        sparse format workarounds.
+        """
+        nrow, ncol = self.sparse_shape
+        if self.nnz == 0:
+            values = self._values
+            if values is not None:
+                values = bm.zeros(values.shape[:-1] + (0,), **bm.context(values))
+            return CSRTensor(
+                bm.zeros((nrow + 1,), **bm.context(self._crow)),
+                bm.zeros((0,), **bm.context(self._col)),
+                values,
+                self._spshape,
+            )
+
+        backend = bm.get_current_backend("CSRTensor.coalesce")
+        if (
+            getattr(backend, "backend_name", None) == "numpy"
+            and self._values is not None
+            and self._values.ndim == 1
+        ):
+            mat = self.to_scipy()
+            mat.sum_duplicates()
+            return CSRTensor.from_scipy(mat)
+
+        count = self._crow[1:] - self._crow[:-1]
+        row = bm.repeat(
+            bm.arange(nrow, dtype=self._crow.dtype, device=bm.get_device(self._crow)),
+            count,
+        )
+        flat = bm.astype(row, bm.int64) * ncol + bm.astype(self._col, bm.int64)
+        order = bm.argsort(flat)
+        flat = flat[order]
+
+        group_start = bm.ones(
+            (self.nnz,), dtype=bm.bool, device=bm.get_device(self._col)
+        )
+        group_start = bm.set_at(group_start, slice(1, None), flat[1:] != flat[:-1])
+        unique_flat = flat[group_start]
+        group_id = bm.cumsum(group_start, axis=0) - 1
+
+        new_row = unique_flat // ncol
+        new_col = unique_flat % ncol
+        counts_per_row = bm.bincount(new_row, minlength=nrow)
+        counts_per_row = bm.astype(counts_per_row, self._crow.dtype)
+        new_crow = bm.concat(
+            [
+                bm.zeros((1,), **bm.context(self._crow)),
+                bm.cumsum(counts_per_row, axis=0),
+            ],
+            axis=0,
+        )
+        new_col = bm.astype(new_col, self._col.dtype)
+
+        if self._values is None:
+            if accumulate:
+                new_values = bm.bincount(group_id, minlength=unique_flat.shape[0])
+            else:
+                new_values = None
+        else:
+            sorted_values = self._values[..., order]
+            new_values = bm.zeros(
+                self._values.shape[:-1] + (unique_flat.shape[0],),
+                **bm.context(self._values),
+            )
+            new_values = bm.index_add(new_values, group_id, sorted_values, axis=-1)
+
+        return CSRTensor(new_crow, new_col, new_values, self._spshape)
 
     @overload
     def reshape(self, shape: Size, /) -> 'CSRTensor': ...
@@ -287,23 +359,75 @@ class CSRTensor(SparseTensor):
         """
         self_indices = bm.stack(self.nonzero_slice, axis=0)
         if isinstance(other, CSRTensor):
-            other_indices = bm.stack(other.nonzero_slice, axis=0)
             check_shape_match(self.shape, other.shape)
             check_spshape_match(self.sparse_shape, other.sparse_shape)
-            
-            new_indices = bm.concat((self_indices, other_indices), axis=1)
-            context = bm.context(new_indices)
-            if self._values is None:
-                if other._values is None:
-                    self._values = bm.zeros((self._crow[-1], ), **context) + 1.0
-                    other._values = bm.zeros((other._crow[-1], ), **context) + 1.0
-                else:
-                    self._values = bm.zeros((self._crow[-1], ), **context) + 1.0
+
+            nrow = self.sparse_shape[0]
+            self_count = self._crow[1:] - self._crow[:-1]
+            other_count = other._crow[1:] - other._crow[:-1]
+            new_count = self_count + other_count
+            new_crow = bm.concat(
+                [
+                    bm.zeros((1,), **bm.context(self._crow)),
+                    bm.cumsum(new_count, axis=0),
+                ],
+                axis=0,
+            )
+            total_nnz = self.nnz + other.nnz
+
+            row_context = bm.context(self._crow)
+            self_row = bm.repeat(bm.arange(nrow, **row_context), self_count)
+            other_row = bm.repeat(bm.arange(nrow, **row_context), other_count)
+            self_local = bm.arange(self.nnz, **row_context) - bm.repeat(
+                self._crow[:-1], self_count
+            )
+            other_local = bm.arange(other.nnz, **row_context) - bm.repeat(
+                other._crow[:-1], other_count
+            )
+            self_pos = new_crow[self_row] + self_local
+            other_pos = new_crow[other_row] + self_count[other_row] + other_local
+
+            new_col = bm.zeros((total_nnz,), **bm.context(self._col))
+            new_col = bm.index_add(new_col, self_pos, self._col, axis=0)
+            new_col = bm.index_add(new_col, other_pos, other._col, axis=0)
+
+            if self._values is None and other._values is None:
+                unit_context = {"device": bm.get_device(self._col)}
+                self_values = bm.ones((self.nnz,), **unit_context)
+                other_values = bm.ones((other.nnz,), **unit_context)
+            elif self._values is None:
+                shape = other._values.shape[:-1] + (self.nnz,)
+                self_values = bm.ones(shape, device=bm.get_device(other._values))
+                other_values = other._values
+            elif other._values is None:
+                shape = self._values.shape[:-1] + (other.nnz,)
+                self_values = self._values
+                other_values = bm.ones(shape, device=bm.get_device(self._values))
             else:
-                if other._values is None:
-                    other._values = bm.zeros((other._crow[-1], ), **context) + 1.0
-            new_values = bm.concat((self._values, other._values*alpha), axis=-1)
-            return COOTensor(new_indices, new_values, self.sparse_shape).tocsr()
+                self_values = self._values
+                other_values = other._values
+
+            other_values = other_values * alpha
+            probe = bm.sum(self_values) + bm.sum(other_values) * 0
+            value_context = bm.context(probe)
+            self_values = self_values + bm.zeros(self_values.shape, **value_context)
+            other_values = other_values + bm.zeros(other_values.shape, **value_context)
+            new_values = bm.zeros(
+                self_values.shape[:-1] + (total_nnz,),
+                **value_context,
+            )
+            new_values = bm.index_add(new_values, self_pos, self_values, axis=-1)
+            new_values = bm.index_add(
+                new_values,
+                other_pos,
+                other_values,
+                axis=-1,
+            )
+            # Kyle/Edwin update: CSR addition must return canonical CSR.  This
+            # relies on Kyle's duplicate-summing path and keeps downstream
+            # diagonal extraction, nnz-based checks, and iterative solver inputs
+            # consistent after matrix additions.
+            return CSRTensor(new_crow, new_col, new_values, self.sparse_shape).coalesce()
 
         elif isinstance(other, TensorLike):
             check_shape_match(self.shape, other.shape)
@@ -560,31 +684,8 @@ class CSRTensor(SparseTensor):
         return CSRTensor(new_crow, new_col, new_values, spshape=(new_row_shape, new_col_shape))
     
     def sum_duplicates(self):
-        indptr, indices, data = self.indptr, self.indices, self.data
-        nrow, ncol = self.shape
-
-        counts = indptr[1:] - indptr[:-1]
-        row = bm.repeat(bm.arange(nrow), counts)         
-        flat = row * ncol + indices                     
-        summed = bm.bincount(flat, weights=data, minlength=nrow * ncol)
-
-        nnz = bm.nonzero(summed)[0]
-        if nnz.size == 0:
-
-            return CSRTensor((bm.zeros((nrow + 1,), dtype=indptr.dtype),
-                            bm.zeros((0,), dtype=indices.dtype),
-                            bm.zeros((0,), dtype=data.dtype)),
-                            spshape=(nrow, ncol))
-
-        order = bm.argsort(nnz)          
-        nnz = nnz[order]
-        new_data = summed[nnz]
-        new_row = nnz // ncol
-        new_col = nnz % ncol
-
-        counts_per_row = bm.bincount(new_row, minlength=nrow)
-        indptr_new = bm.empty((nrow + 1,), dtype=indptr.dtype)
-        indptr_new[0] = 0
-        indptr_new[1:] = bm.cumsum(counts_per_row)
-
-        return CSRTensor(indptr_new, new_col, new_data, spshape=(nrow, ncol))
+        # Kyle/Edwin update: keep SciPy-style ``sum_duplicates`` as an alias of
+        # the canonical CSR coalesce implementation.  Kyle provided the
+        # duplicate-summing algorithm now used by ``coalesce``; Edwin requested
+        # this integration for large sparse FVM/FEM systems.
+        return self.coalesce()

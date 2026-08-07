@@ -1,7 +1,7 @@
 import pytest
 
 from fealpy.functionspace import LagrangeFESpace
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian
 from fealpy.levelset.ls_fem_solver import LSFEMSolver
 from fealpy.levelset.ls_fem_solver import LSSolver

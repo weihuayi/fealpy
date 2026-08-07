@@ -194,7 +194,7 @@ class TestQuadrangleMeshInterfaces:
     @pytest.mark.parametrize("meshdata", mesh_from_triangle_data)
     def test_mesh_from_triangle(self, meshdata, backend):
         bm.set_backend(backend)
-        from fealpy.mesh.triangle_mesh import TriangleMesh
+        from fealpy.mesh import TriangleMesh
         tri_node = bm.from_numpy(meshdata['tri_node'])
         tri_cell = bm.from_numpy(meshdata['tri_cell'])
         tri_mesh = TriangleMesh(tri_node, tri_cell)

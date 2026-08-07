@@ -14,7 +14,7 @@ from functools import partial
 import jax.numpy as jnp
 import numpy as np
 import h5py
-import pyvista
+# import pyvista
 from typing import Dict
 import enum
 from fealpy.backend.jax.jax_md import space

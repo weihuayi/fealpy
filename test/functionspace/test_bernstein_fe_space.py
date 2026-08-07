@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace.bernstein_fe_space import BernsteinFESpace
 
 from bernstein_fe_space_data import *

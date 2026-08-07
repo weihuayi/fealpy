@@ -42,6 +42,9 @@ class ScalarBurgersData:
         return self.T
     
     def set_mesh(self,nx = 40, ny = 40, meshtype='tri'):
+        self.nx = nx
+        self.ny = ny
+        self.meshtype = meshtype
         vertices = bm.array([[self.D[0], self.D[2]],
                              [self.D[1], self.D[2]],
                              [self.D[1], self.D[3]],

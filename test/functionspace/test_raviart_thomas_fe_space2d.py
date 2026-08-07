@@ -5,7 +5,7 @@ import pytest
 from fealpy.functionspace.raviart_thomas_fe_space_2d import RTDof2d
 from fealpy.functionspace.raviart_thomas_fe_space_2d import RTFiniteElementSpace2d
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
 from RaviartThomasFiniteElementSpace2d_data import *
 

@@ -15,7 +15,7 @@ create_directory(os.path.expanduser("~/.local/include"))
 create_directory(os.path.expanduser("~/.local/lib"))
 
 
-__version__ = "3.4.0"
+__version__ = "4.0.1"
 
 here = pathlib.Path(__file__).parent.resolve()
 long_description = (here / "README.md").read_text(encoding="utf-8")
@@ -56,5 +56,5 @@ setup(
     },
     ext_modules=ext_modules,
     include_package_data=True,
-    python_requires=">=3.10",
+    python_requires=">=3.12",
 )

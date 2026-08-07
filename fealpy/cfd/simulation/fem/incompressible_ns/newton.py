@@ -27,7 +27,7 @@ class Newton(IterativeMethod):
         self.u_BM = ScalarMassIntegrator(q=q)
         self.u_BM_netwon = ScalarMassIntegrator(q=q)
         self.u_BC = ScalarConvectionIntegrator(q=q)
-        #self.u_BF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold) 
+        # self.u_BF = FluidBoundaryFrictionIntegrator(q=q, threshold=threshold) 
         
         if self.equation.constitutive.value == 1:
             self.u_BVW = ScalarDiffusionIntegrator(q=q)

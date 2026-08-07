@@ -81,3 +81,18 @@ class IterativeMethod(FEM, ABC):
                 method='interp')
             A, b = BC.apply(A, b)
         return A, b
+    
+    @apply_bc.register("dirichlet_dof")
+    def apply_bc(self, A, b, pde, t=None):
+        if t is None:
+            is_u_bd_dof = pde.is_velocity_boundary(self.uspace)
+            is_p_bd_dof = pde.is_pressure_boundary(self.pspace)
+            is_bd_dof = bm.concatenate([is_u_bd_dof, is_p_bd_dof])
+            BC = DirichletBC(
+                (self.uspace, self.pspace), 
+                gd=(pde.velocity_dirichlet, pde.pressure_dirichlet), 
+                threshold=(is_u_bd_dof, is_p_bd_dof),
+                method='interp')
+            A, b = BC.apply(A, b)
+        return A, b
+    

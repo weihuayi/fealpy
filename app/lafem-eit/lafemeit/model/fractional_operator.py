@@ -17,6 +17,7 @@ _S = slice(None, None, None)
 
 __all__ = [
     'Fractional',
+    'FractionalDoF',
     'FractionalWithHighcut',
     'MultiChannelFractional',
     'RegressiveFractional',
@@ -111,6 +112,11 @@ class Fractional(_EigenvalueBase):
     __call__: Callable[[Tensor], Tensor]
 
     def forward(self, gdvn: Tensor):
+        return torch.einsum('ki, ...k -> ...i', self.matrix(), gdvn)
+
+
+class FractionalDoF(Fractional):
+    def forward(self, gdvn: Tensor):
         return torch.einsum('ik, ...k -> ...i', self.matrix(), gdvn)
 
 
@@ -194,7 +200,7 @@ class MultiChannelFractional(_EigenvalueBase):
     __call__: Callable[[Tensor], Tensor]
 
     def forward(self, data: Tensor) -> Tensor: # [n_channel, n_dof] -> [n_channel, n_dof]
-        return torch.einsum('cik, ...ck -> ...ci', self.matrix(), data)
+        return torch.einsum('cki, ...ck -> ...ci', self.matrix(), data)
 
 
 class RegressiveFractional(_EigenvalueBase):

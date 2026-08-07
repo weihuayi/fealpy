@@ -76,3 +76,7 @@ tags
 *env
 tmp
 *.msh
+/agents/
+AGENTS.md
+.codex
+.codex/

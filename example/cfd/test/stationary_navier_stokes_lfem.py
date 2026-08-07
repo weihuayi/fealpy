@@ -15,7 +15,7 @@ parser.add_argument('--backend',
     help = "Default backend is numpy. You can also choose pytorch, jax, tensorflow, etc.")
     
 parser.add_argument('--pde',
-    default = 1, type = str,
+    default = 5, type = str,
     help = "Name of the PDE model, default is exp0001")
 
 parser.add_argument('--init_mesh',
@@ -35,7 +35,7 @@ parser.add_argument('--nz',
     help = "Number of divisions in the z direction, default is 8 (only for 3D problems)")
 
 parser.add_argument('--method',
-    default = 'Ossen', type = str,
+    default = 'Newton', type = str,
     help = "Method for solving the PDE, default is Newton, options are Newton, Ossen, Stokes")
 
 parser.add_argument('--solve',
@@ -47,11 +47,11 @@ parser.add_argument('--apply_bc',
     help = "Type of boundary condition application, default is dirichlet, options are dirichlet, neumann, cylinder, None")
 
 parser.add_argument('--run',
-    default = 'uniform_refine', type = str,
+    default = 'main', type = str,
     help = "Type of refinement strategy, default is uniform_refine")
 
 parser.add_argument('--maxit',
-    default = 3, type = int,
+    default = 1, type = int,
     help = "Maximum number of iterations for the solver, default is 5")
 
 parser.add_argument('--maxstep',
@@ -61,6 +61,10 @@ parser.add_argument('--maxstep',
 parser.add_argument('--tol',
     default = 1e-10, type = float,
     help = "Tolerance for the solver, default is 1e-10")
+parser.add_argument('--error_com',
+    default = False, type = float,
+    help = "Compute the error, default is Ture")
+
 
 # 解析参数
 options = vars(parser.parse_args())
@@ -70,5 +74,7 @@ pde = manager.get_example(options['pde'], **options)
 mesh = pde.mesh
 model = StationaryIncompressibleNSLFEMModel(pde=pde, mesh = mesh, options = options)
 model.equation.set_constitutive(1)  # 设置粘性模型
-model.run()
+uh, ph = model.run()
+mesh.nodedata["uh"] = uh.reshape(3, -1).T
+mesh.to_vtk("stationary_navier_stokes_lfem.vtu")
 # model.__str__()

@@ -32,7 +32,7 @@ from fealpy.backend import bm
 bm.set_backend('numpy')
 
 from fealpy.mesh import LagrangeTriangleMesh
-from fealpy.fvm import DLDMicrofluidicChipFVMModel
+from fealpy.fvm.experimental import DLDMicrofluidicChipFVMModel
 from fealpy.mmesh.tool import high_order_meshploter
 
 box = [-1.0, 1.0, -1.0, 1.0]

@@ -30,6 +30,28 @@ class ScaledMonomialSpace3d(FunctionSpace, Generic[_MT]):
         self.p = p
         self.GD = 3
         self.mesh = mesh
+        self.device = mesh.device
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
+
+        if p == 0 and hasattr(mesh, "Entities"):
+            cell_views = mesh.Entities(-1)
+            if not cell_views:
+                raise ValueError("ScaledMonomialSpace3d requires at least one cell sector.")
+
+            self.ikwargs = bm.context(cell_views[0].indices)
+            centers = [view.barycenter() for view in cell_views]
+            measures = [view.measure() for view in cell_views]
+            self.fkwargs = bm.context(centers[0])
+            self.cellbarycenter = (
+                bm.concatenate(centers, axis=0) if bc is None else bc
+            )
+            self.q = q if q is not None else p + 3
+            self.cm = bm.concatenate(measures, axis=0)
+            self.cellmeasure = self.cm
+            self.csize = self.cm**(1/3)
+            return
+
         mtype = mesh.meshtype
         
         self.ikwargs = bm.context(mesh.cell[0]) if mtype =='polyhedron' else bm.context(mesh.cell)
@@ -58,12 +80,12 @@ class ScaledMonomialSpace3d(FunctionSpace, Generic[_MT]):
     def geo_dimension(self):
         return self.GD
     
-    def cell_to_dof(self, p = None):
+    def cell_to_dof(self, p=None, *, index=_S):
         mesh = self.mesh
         NC = mesh.number_of_cells()
         cdof = self.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = bm.arange(NC*cdof).reshape(NC, cdof)
-        return cell2dof
+        return cell2dof[index]
     
     def face_to_dof(self, p = None):
         mesh = self.mesh
@@ -216,6 +238,10 @@ class ScaledMonomialSpace3d(FunctionSpace, Generic[_MT]):
         """
         p = self.p if p is None else p
         h = self.csize
+        if isinstance(point, tuple):
+            # This fallback only supports the current p=0 FVM assembly path.
+            # High-order tensor-mesh support needs explicit physical points.
+            point = point[0]
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         if p == 0:
             shape = len(point.shape)*(1, )
@@ -260,6 +286,10 @@ class ScaledMonomialSpace3d(FunctionSpace, Generic[_MT]):
         h = self.fsize
         bc = self.facebarycenter
         frame = self.faceframe
+        if isinstance(point, tuple):
+            # This fallback only supports the current p=0 FVM assembly path.
+            # High-order tensor-mesh support needs explicit physical points.
+            point = point[0]
         
         fdof = self.number_of_local_dofs(p=p, doftype='face')
         if p == 0:
@@ -297,6 +327,10 @@ class ScaledMonomialSpace3d(FunctionSpace, Generic[_MT]):
 
         """
         p = self.p if p is None else p
+        if isinstance(point, tuple):
+            # This fallback only supports the current p=0 FVM assembly path.
+            # High-order tensor-mesh support needs explicit physical points.
+            point = point[0]
         if p == 0:
             shape = len(point.shape)*(1, )
             return bm.array([1.0], **self.fkwargs).reshape(shape)

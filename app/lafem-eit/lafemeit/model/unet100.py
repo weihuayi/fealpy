@@ -95,14 +95,15 @@ class Unet(nn.Module):
 
 class EITModel(nn.Module):
     def __init__(self, n_channel: int, mesh: TriangleMesh, frac: nn.Module,
-                 *, network_dtype=float32) -> None:
+                 size: int, *, network_dtype=float32) -> None:
         super().__init__()
         self.n_channel = n_channel
+        self.size = size
         solver = LaplaceFEMSolver(mesh, p=1)
         self.df_prepor = DataPreprocessor(solver)
         self.df_solver = DataFeature(solver, bc_filter=frac) # [N, 8, 64*64]
         self.bn = nn.BatchNorm2d(n_channel, momentum=0.01, dtype=mesh.ftype)
-        self.coordinate = mesh.entity('node').reshape(64, 64, 2).permute(2, 0, 1) # [2, 64, 64]
+        self.coordinate = mesh.entity('node').reshape(size, size, 2).permute(2, 0, 1) # [2, size, size]
         self.unet = Unet(n_channel+2, dtype=network_dtype)
         self.network_dtype = network_dtype
 
@@ -111,13 +112,12 @@ class EITModel(nn.Module):
         coor = self.coordinate[None, ...].repeat(N, 1, 1, 1)
         gnvn = self.df_prepor(input)
         del input
-        phi = self.df_solver(gnvn).reshape(N, self.n_channel, 64, 64)
+        phi = self.df_solver(gnvn).reshape(N, self.n_channel, self.size, self.size)
         phi = self.bn(phi)
         phi = torch.cat([phi, coor], dim=1)
         del coor
         phi = phi.to(self.network_dtype)
         phi = self.unet(phi)
-        phi = torch.sigmoid_(phi)
         return phi
 
     __call__: Callable[[Tensor], Tensor]
@@ -152,7 +152,7 @@ def build_eit_model(
         raise NotImplementedError(f'Unknown type: {fractype}')
 
     frac.from_npz(eigen_file)
-    model = EITModel(n_channel, mesh, frac, network_dtype=float32)
+    model = EITModel(n_channel, mesh, frac, ext + 1, network_dtype=float32)
     model.to(device)
 
     FULL_NAME = (name + '_' + tag) if tag else name

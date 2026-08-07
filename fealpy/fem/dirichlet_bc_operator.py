@@ -27,7 +27,7 @@ class DirichletBCOperator():
         self.boundary_dof_index = bm.nonzero(isDDof)[0]
         self.shape = form.shape 
 
-    def init_solution(self):
+    def init_solution(self, dtype=None):
         """
         Generate the init solution with correct Dirichlet boundary
         condition.
@@ -37,7 +37,7 @@ class DirichletBCOperator():
         TODO:
             1. deal with device
         """
-        uh = bm.zeros(self.shape[1], dtype=self.form._spaces[0].ftype)
+        uh = bm.zeros(self.shape[1], dtype=dtype if dtype else self.form._spaces[0].ftype)
         self.form._spaces[0].boundary_interpolate(self.gd, uh,
                 threshold=self.is_boundary_dof)
         return uh

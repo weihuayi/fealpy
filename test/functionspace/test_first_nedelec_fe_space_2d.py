@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace.first_nedelec_fe_space_2d import FirstNedelecDof2d
 from fealpy.functionspace.first_nedelec_fe_space_2d import FirstNedelecFiniteElementSpace2d
 

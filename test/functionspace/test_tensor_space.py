@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace,TensorFunctionSpace
 from fealpy.typing import TensorLike, Size, _S
 

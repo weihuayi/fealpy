@@ -5,7 +5,7 @@ import pytest
 from fealpy.functionspace.brezzi_douglas_marini_fe_space_2d import BDMDof
 from fealpy.functionspace.brezzi_douglas_marini_fe_space_2d import BrezziDouglasMariniFESpace2d
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 
 from BrezziDouglasMariniFiniteElementSpace2d_data import *
 

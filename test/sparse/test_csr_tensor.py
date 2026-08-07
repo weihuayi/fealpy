@@ -75,6 +75,51 @@ def test_tril(backend):
     assert bm.all(bm.equal(tril_tensor.col, expected_col))
     assert bm.allclose(tril_tensor.values, expected_values)
 
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_coalesce_sums_duplicate_entries(backend):
+    bm.set_backend(backend)
+    csr = CSRTensor(
+        bm.tensor([0, 3, 5, 5]),
+        bm.tensor([0, 0, 2, 1, 1]),
+        bm.tensor([1.0, 2.0, 4.0, 5.0, 6.0], dtype=bm.float64),
+        (3, 3),
+    )
+
+    result = csr.coalesce()
+
+    assert result.nnz == 3
+    assert bm.all(bm.equal(result.crow, bm.tensor([0, 2, 3, 3])))
+    assert bm.all(bm.equal(result.col, bm.tensor([0, 2, 1])))
+    assert bm.allclose(result.values, bm.tensor([3.0, 4.0, 11.0], dtype=bm.float64))
+    assert bm.allclose(result.diags().values, bm.tensor([3.0, 11.0], dtype=bm.float64))
+
+
+@pytest.mark.parametrize("backend", ALL_BACKENDS)
+def test_add_csr_tensor_coalesces_duplicate_entries(backend):
+    bm.set_backend(backend)
+    csr1 = CSRTensor(
+        bm.tensor([0, 2, 3]),
+        bm.tensor([0, 1, 1]),
+        bm.tensor([1.0, 2.0, 3.0], dtype=bm.float64),
+        (2, 2),
+    )
+    csr2 = CSRTensor(
+        bm.tensor([0, 2, 3]),
+        bm.tensor([0, 1, 1]),
+        bm.tensor([4.0, 5.0, 6.0], dtype=bm.float64),
+        (2, 2),
+    )
+
+    result = csr1 + csr2
+
+    assert result.nnz == 3
+    assert bm.all(bm.equal(result.crow, bm.tensor([0, 2, 3])))
+    assert bm.all(bm.equal(result.col, bm.tensor([0, 1, 1])))
+    assert bm.allclose(result.values, bm.tensor([5.0, 7.0, 9.0], dtype=bm.float64))
+    assert bm.allclose(result.diags().values, bm.tensor([5.0, 9.0], dtype=bm.float64))
+
 def create_csr_tensor(crow, col, values, shape):
     return CSRTensor(crow=crow, col=col, values=values, spshape=shape)
 

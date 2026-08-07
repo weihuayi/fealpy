@@ -1,7 +1,9 @@
 
+import numpy as np
+
 from ..backend import backend_manager as bm
 from ..sparse import COOTensor, CSRTensor
-import numpy as np
+
 
 def _mumps_solve(A, b):
     """Solve a linear system using MUMPS.
@@ -45,8 +47,8 @@ def _scipy_solve(A, b):
     Returns:
         Tensor: The solution of the linear system.
     """
-    from scipy.sparse.linalg import spsolve as spsol 
     from scipy.sparse import csr_matrix
+    from scipy.sparse.linalg import spsolve as spsol
 
     A = A.to_scipy()
     b = bm.to_numpy(b)
@@ -103,7 +105,7 @@ def _cupy_solve(A, b):
         x = cp.asnumpy(x)
     return x
 
-def spsolve(A:[COOTensor, CSRTensor], b, solver:str="mumps"):
+def spsolve(A:[COOTensor, CSRTensor], b, solver:str="scipy"):
     """Solve a linear system using a direct solver.
 
     Parameters:
@@ -153,7 +155,7 @@ def _mumps_spsolve_triangular(A:[COOTensor, CSRTensor], b, lower=True):
     Returns:
         Tensor: The solution of the linear system.
     """
-    from .mumps import DMumpsContext 
+    from .mumps import DMumpsContext
 
     x = b.copy()
     ctx = DMumpsContext()

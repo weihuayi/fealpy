@@ -110,10 +110,10 @@ class NPZDataset(Dataset):
         if len(self.channel_keys) != 0:
             channels = [datadict[key] for key in self.channel_keys]
             if not self.keep_dim and len(channels) == 1:
-                data = channels[0]
+                data = torch.from_numpy(channels[0])
             else:
-                data = np.stack(channels, axis=0)
-            pair = torch.from_numpy(data), torch.from_numpy(label)
+                data = tuple(torch.from_numpy(c) for c in channels)
+            pair = (*data, torch.from_numpy(label))
         else:
             pair = (torch.from_numpy(label), )
 

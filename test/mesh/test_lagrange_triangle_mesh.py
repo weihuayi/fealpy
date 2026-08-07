@@ -5,7 +5,7 @@ import pytest
 from fealpy.pde.surface_poisson_model import SurfaceLevelSetPDEData
 from fealpy.geometry.implicit_surface import SphereSurface
 from fealpy.geometry.implicit_curve import CircleCurve
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.lagrange_triangle_mesh import LagrangeTriangleMesh
 from fealpy.functionspace.lagrange_fe_space import LagrangeFESpace

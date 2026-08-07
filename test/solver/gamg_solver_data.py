@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import (
         BilinearForm, ScalarDiffusionIntegrator,LinearForm,DirichletBC

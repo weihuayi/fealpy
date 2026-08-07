@@ -8,15 +8,16 @@ from .csr_tensor import CSRTensor
 
 
 @overload
-def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int) -> CSRTensor: ...
+def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
+            *, index_dtype=None) -> CSRTensor: ...
 @overload
 def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
-            format: Literal['csr']) -> CSRTensor: ...
+            format: Literal['csr'], *, index_dtype=None) -> CSRTensor: ...
 @overload
 def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
-            format: Literal['coo']) -> COOTensor: ...
+            format: Literal['coo'], *, index_dtype=None) -> COOTensor: ...
 def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
-            format: Optional[str] = 'csr'):
+            format: Optional[str] = 'csr', *, index_dtype=None):
     """Return a sparse matrix from diagonals.
 
     Parameters:
@@ -31,11 +32,13 @@ def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
         format (str): format of the result, default to "csr".
     """
     is_scalar = False
+    index_dtype = bm.int64 if index_dtype is None else index_dtype
     if data.ndim > 2:
         raise ValueError(f'the data must be a 2-D tensor, but got {data.ndim}-D')
 
     if isinstance(diags, TensorLike):
         diags = diags.flatten()
+        diags = bm.astype(diags, index_dtype)
         if len(diags) > 1:
             if data.shape[0] != len(diags):
                 raise ValueError(f'number of diagonals data: {data.shape[0]} does not match the number of diags: {len(diags)}')
@@ -62,7 +65,7 @@ def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
         else:
             raise ValueError(f'number of diagonals data: {data.shape[0]} does not match the number of diags: 1')
 
-    diags_inds = bm.arange(len_diags, device=bm.get_device(data), dtype=bm.int64)
+    diags_inds = bm.arange(len_diags, device=bm.get_device(data), dtype=index_dtype)
     row = diags_inds - diags
 
     mask = (row >= 0)
@@ -83,7 +86,15 @@ def spdiags(data: TensorLike, diags: Union[TensorLike, int], M: int, N: int,
     if format == 'coo':
         return diag_tensor
 
-    return diag_tensor.tocsr()
+    csr = diag_tensor.tocsr()
+    if csr.crow.dtype == index_dtype and csr.col.dtype == index_dtype:
+        return csr
+    return CSRTensor(
+        bm.astype(csr.crow, index_dtype),
+        bm.astype(csr.col, index_dtype),
+        csr.values,
+        csr.sparse_shape,
+    )
 
 def vstack(blocks: TensorLike, format: Optional[str] = 'csr', dtype=None):
     if not isinstance(blocks, list) or not blocks: 

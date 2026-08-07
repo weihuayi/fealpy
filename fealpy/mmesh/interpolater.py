@@ -4,6 +4,11 @@ from .config import *
 from .tool import (_solve_quad_parametric_coords,
                    _solve_hex_parametric_coords,
                    newton_barycentric_triangle)
+import numpy as np
+
+
+def _to_numpy(a):
+    return np.asarray(bm.to_numpy(a))
 
 
 class Interpolater(PREProcessor):
@@ -67,53 +72,6 @@ class Interpolater(PREProcessor):
         sol = bm.asarray(sol,**self.kwargs0)
         return sol
     
-    # @variantmethod('comass')
-    # def interpolate(self,moved_node:TensorLike):
-    #     """
-    #     conservation of mass interpolation method
-        
-    #     Parameters
-    #         moved_node: TensorLike, new node positions
-    #     Returns
-    #         TensorLike: interpolated solution
-    #     """
-    #     delta_x = self.node - moved_node
-    #     pspace = self.pspace
-    #     pcell2dof = self.pcell2dof
-    #     if pspace.p > self.p:
-    #         delta_x = self.high_order_batch(delta_x, pspace.p)  # 高阶插值处理
-
-    #     bcs = self.bcs
-    #     ws = self.ws
-    #     phi = pspace.basis(bcs)
-    #     gphi = pspace.grad_basis(bcs)
-    #     GDOF = pspace.number_of_global_dofs()
-    #     rm = self.rm
-    #     cm = self.d * rm
-    #     M = self.mass
-        
-    #     d_v = bm.einsum('cqi , cid -> cqd', phi, delta_x[pcell2dof])
-    #     # P = bm.einsum('...,c...id,cid,c...j ,c... -> cij',ws, gphi,delta_x[pcell2dof],phi,cm)
-
-    #     # I,J = self.I,self.J
-    #     # indices = bm.stack([I.ravel(), J.ravel()], axis=0)
-    #     # P = COOTensor(indices=indices, values=P.ravel(), spshape=(GDOF,GDOF))
-    #     # P.tocsr()
-        
-    #     def ODEs(t,y):
-             
-    #         y = bm.asarray(y,**self.kwargs0)
-    #         source = bm.einsum('cqid , ci ,cqd -> cq ',gphi,y[pcell2dof],d_v)
-    #         f = bm.einsum('q,cq,cqi,cq->ci', ws, source,phi, cm)
-    #         k = bm.zeros_like(y, **self.kwargs0)
-    #         k = bm.index_add(k, pcell2dof, f)
-    #         # f = spsolve(M, P @ y, solver=self.solver)
-    #         f = cg(M, k, atol=1e-8,returninfo=True)[0]
-    #         return f
-        
-    #     sol = solve_ivp(ODEs,[0,1],y0=self.uh,method='RK23').y[:,-1]
-    #     sol = bm.asarray(sol,**self.kwargs0)
-    #     return sol
 
     @interpolate.register('linear')
     def interpolate(self, moved_node: TensorLike):
@@ -123,6 +81,9 @@ class Interpolater(PREProcessor):
         Parameters
             moved_node: TensorLike, new node positions
         """
+        if self.mesh_type == "TriangleMesh":
+            return self._tri_linear_interpolate_robust(moved_node)
+
         node2cell = self.node2cell
         i, j = node2cell.row, node2cell.col
         p = self.pspace.p # physical space polynomial degree
@@ -157,6 +118,150 @@ class Interpolater(PREProcessor):
         
         new_uh = self.high_order_batch(new_uh, p)  # 高阶插值处理
         return new_uh
+
+    def _tri_barycentric_numpy(self, points, cells, *, ref_node=None):
+        if len(points) == 0:
+            return np.zeros((0, 3), dtype=np.float64)
+        if ref_node is None:
+            ref_node = _to_numpy(self.node)
+        cell = _to_numpy(self.cell).astype(np.int64, copy=False)
+        cnode = ref_node[cell[cells]]
+        x0 = cnode[:, 0, :]
+        e1 = cnode[:, 1, :] - x0
+        e2 = cnode[:, 2, :] - x0
+        rhs = points - x0
+        det = e1[:, 0] * e2[:, 1] - e2[:, 0] * e1[:, 1]
+        safe = np.where(np.abs(det) > 1.0e-14, det, np.copysign(1.0e-14, det + (det == 0.0)))
+        l1 = (e2[:, 1] * rhs[:, 0] - e2[:, 0] * rhs[:, 1]) / safe
+        l2 = (-e1[:, 1] * rhs[:, 0] + e1[:, 0] * rhs[:, 1]) / safe
+        l0 = 1.0 - l1 - l2
+        return np.stack([l0, l1, l2], axis=1)
+
+    def _tri_select_candidates_numpy(self, owner, bary, nodes, cells, moved_np, *, tol):
+        if len(nodes) == 0:
+            return
+        lam = self._tri_barycentric_numpy(moved_np[nodes], cells)
+        score = np.min(lam, axis=1)
+        valid = score >= -tol
+        if not np.any(valid):
+            return
+        nodes_v = np.asarray(nodes[valid], dtype=np.int64)
+        cells_v = np.asarray(cells[valid], dtype=np.int64)
+        lam_v = lam[valid]
+        score_v = score[valid]
+        order = np.lexsort((-score_v, nodes_v))
+        nodes_s = nodes_v[order]
+        cells_s = cells_v[order]
+        lam_s = lam_v[order]
+        unique_nodes, first = np.unique(nodes_s, return_index=True)
+        owner[unique_nodes] = cells_s[first]
+        bary[unique_nodes] = lam_s[first]
+
+    def _tri_find_with_matplotlib(self, owner, bary, unresolved, moved_np, *, tol):
+        if len(unresolved) == 0:
+            return unresolved
+        try:
+            import matplotlib.tri as mtri
+        except Exception:
+            return unresolved
+
+        node = _to_numpy(self.node)
+        cell = _to_numpy(self.cell).astype(np.int64, copy=False)
+        try:
+            finder = mtri.Triangulation(node[:, 0], node[:, 1], cell).get_trifinder()
+            cells = np.asarray(finder(moved_np[unresolved, 0], moved_np[unresolved, 1]), dtype=np.int64)
+        except Exception:
+            return unresolved
+        ok = cells >= 0
+        if np.any(ok):
+            nodes_ok = unresolved[ok]
+            cells_ok = cells[ok]
+            lam = self._tri_barycentric_numpy(moved_np[nodes_ok], cells_ok)
+            inside = np.min(lam, axis=1) >= -tol
+            if np.any(inside):
+                nodes_hit = nodes_ok[inside]
+                owner[nodes_hit] = cells_ok[inside]
+                bary[nodes_hit] = lam[inside]
+        return unresolved[owner[unresolved] < 0]
+
+    def _tri_nearest_cell_fallback(self, owner, bary, unresolved, moved_np, *, k=16):
+        if len(unresolved) == 0:
+            return unresolved
+        node = _to_numpy(self.node)
+        cell = _to_numpy(self.cell).astype(np.int64, copy=False)
+        centroids = np.mean(node[cell], axis=1)
+        try:
+            from scipy.spatial import cKDTree
+            kk = min(k, len(centroids))
+            _, cand = cKDTree(centroids).query(moved_np[unresolved], k=kk)
+            cand = np.atleast_2d(cand)
+            if cand.shape[0] != len(unresolved):
+                cand = cand.T
+        except Exception:
+            dist2 = np.sum((moved_np[unresolved, None, :] - centroids[None, :, :]) ** 2, axis=2)
+            kk = min(k, len(centroids))
+            cand = np.argpartition(dist2, kth=kk - 1, axis=1)[:, :kk]
+
+        for local, node_id in enumerate(unresolved):
+            cells = np.asarray(cand[local], dtype=np.int64).reshape(-1)
+            pts = np.repeat(moved_np[node_id][None, :], len(cells), axis=0)
+            lam = self._tri_barycentric_numpy(pts, cells)
+            best = int(np.argmax(np.min(lam, axis=1)))
+            lam_best = lam[best]
+            lam_best = np.maximum(lam_best, 0.0)
+            s = float(np.sum(lam_best))
+            if s <= 0.0:
+                lam_best[:] = 1.0 / 3.0
+            else:
+                lam_best /= s
+            owner[node_id] = cells[best]
+            bary[node_id] = lam_best
+        return unresolved[owner[unresolved] < 0]
+
+    def _tri_evaluate_from_locator(self, owner, bary):
+        cell = _to_numpy(self.cell).astype(np.int64, copy=False)
+        uh = _to_numpy(self.uh)
+        pcell2dof = _to_numpy(self.pcell2dof).astype(np.int64, copy=False)
+        valid = owner >= 0
+        if uh.ndim == 1:
+            out = np.zeros(self.NN, dtype=uh.dtype)
+        else:
+            out = np.zeros((self.NN,) + uh.shape[1:], dtype=uh.dtype)
+        if not np.any(valid):
+            return bm.asarray(out, **self.kwargs0)
+        nodes = np.where(valid)[0]
+        cells = owner[nodes]
+        if self.pspace.p == 1:
+            values = uh[cell[cells]]
+            out[nodes] = np.einsum("ni,ni...->n...", bary[nodes], values)
+        else:
+            phi = _to_numpy(self.mesh.shape_function(bm.asarray(bary[nodes], **self.kwargs0), self.pspace.p))
+            values = uh[pcell2dof[cells]]
+            out[nodes] = np.einsum("ni,ni...->n...", phi, values)
+        return bm.asarray(out, **self.kwargs0)
+
+    def _tri_linear_interpolate_robust(self, moved_node: TensorLike):
+        moved_np = np.asarray(_to_numpy(moved_node), dtype=np.float64)
+        owner = -np.ones(self.NN, dtype=np.int64)
+        bary = np.zeros((self.NN, 3), dtype=np.float64)
+        tol = float(getattr(self.config, "triangle_interpolation_tol", 2.0e-5))
+
+        node2cell = self.node2cell
+        nodes = np.asarray(node2cell.row, dtype=np.int64)
+        cells = np.asarray(node2cell.col, dtype=np.int64)
+        self._tri_select_candidates_numpy(owner, bary, nodes, cells, moved_np, tol=tol)
+
+        unresolved = np.where(owner < 0)[0]
+        unresolved = self._tri_find_with_matplotlib(owner, bary, unresolved, moved_np, tol=tol)
+        fallback_count = int(len(unresolved))
+        unresolved = self._tri_nearest_cell_fallback(owner, bary, unresolved, moved_np)
+        if len(unresolved) > 0:
+            print(f"[linear] Warning: {len(unresolved)} triangle nodes remain unresolved after fallback.")
+        if fallback_count > 0:
+            print(f"[linear] Fallback interpolated {fallback_count - len(unresolved)} triangle nodes.")
+
+        new_uh = self._tri_evaluate_from_locator(owner, bary)
+        return self.high_order_batch(new_uh, self.pspace.p)
         
     def _tri_interpolate_batch(self,nodes, cells,new_uh, interpolated,moved_node):
         """

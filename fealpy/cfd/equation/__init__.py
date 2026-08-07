@@ -1,3 +1,6 @@
 from .incompressible_ns import IncompressibleNS
 from .cahn_hilliard import CahnHilliard
 from .stationary_incompressible_ns import StationaryIncompressibleNS
+from .stationary_specific_dissipation_rate import StationarySpecificDissipationRate
+from .stationary_turbulent_kinetic_energy import StationaryTurbulentKineticEnergy
+from .stationary_incompressible_rans import StationaryIncompressibleRANS

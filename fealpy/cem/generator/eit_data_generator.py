@@ -167,7 +167,7 @@ class EITDataGenerator():
         uh = spsolve(self.A_n, self.b_.T, solver='scipy').T
 
         if return_full:
-            return uh[:-1]
+            return uh[..., :-1]
 
         # NOTE: interpolation points on nodes are arranged firstly,
         # therefore the value on the boundary nodes can be fetched like this:

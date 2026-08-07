@@ -1,0 +1,69 @@
+name: FEALPy Mesh CI (MVP)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature/mesh* # 支持通配符，兼容 feature/mesh 和 feature/mesh-02-test-system 等
+  pull_request:
+    branches:
+      - main
+      - develop
+      - feature/mesh*
+
+# 优化 1：强制使用 Node.js 24，彻底消灭弃用警告
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    name: Mesh Module Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 环境与依赖缓存 (Setup Python & Cache)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip' 
+
+      - name: 安装测试依赖 (Install Dependencies)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov numpy scipy 
+          pip install -e .
+
+      - name: 打印环境自白书 (Print Environment Info)
+        run: |
+          echo "=== 操作系统信息 ==="
+          uname -a
+          echo "=== Python 版本 ==="
+          python --version
+          echo "=== 核心依赖版本 ==="
+          pip show numpy scipy pytest
+
+      # 优化 2 & 4：精准定位 unit 目录，并开启代码覆盖率检查
+      - name: 运行极速单元测试 (Fast Unit Tests)
+        run: |
+          pytest tests/mesh/unit/ \
+            --cov=fealpy.mesh \
+            --cov-report=xml \
+            --junitxml=test-report.xml
+
+      # 优化 3：上传测试报告，即使测试失败（failure()）也强制上传，便于本地排查
+      - name: 上传测试报告 (Upload Test Artifacts)
+        if: always() 
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report-python${{ matrix.python-version }}
+          path: |
+            test-report.xml
+            coverage.xml
+          retention-days: 7 # 仅保留7天，防止无意义地挤占 500MB 免费存储额度

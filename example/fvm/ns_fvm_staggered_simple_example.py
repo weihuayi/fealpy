@@ -1,19 +1,19 @@
 import argparse
 
 from fealpy.backend import backend_manager as bm
-from fealpy.fvm import NSFVMStaggeredSimpleModel  
+from fealpy.fvm.experimental import NSFVMStaggeredSimpleModel
 
 
 def main():
     parser = argparse.ArgumentParser(description="Staggered FVM Navier-Stokes Solver")
 
-    parser.add_argument('--pde', default=2, type=int,
+    parser.add_argument('--pde', default=1, type=int,
                         help='Navier-Stokes PDE example ID')
     
-    parser.add_argument('--nx', default=32, type=int,
+    parser.add_argument('--nx', default=40, type=int,
                         help='Grid divisions in x-direction')
 
-    parser.add_argument('--ny', default=32, type=int,
+    parser.add_argument('--ny', default=40, type=int,
                         help='Grid divisions in y-direction')
     
     parser.add_argument('--backend',default='numpy', type=str,
@@ -28,7 +28,9 @@ def main():
 
     parser.add_argument('--max_iter', default=400, type=int)
 
-    parser.add_argument('--tol', default=4e-5, type=float)
+    parser.add_argument('--tol', default=1e-5, type=float)
+
+    parser.add_argument('--relax', default=0.32, type=float)
 
     parser.add_argument('--plot', action='store_true')
 
@@ -39,16 +41,14 @@ def main():
     model = NSFVMStaggeredSimpleModel(options)
     print(model)
 
-    model.solve(max_iter=options["max_iter"], tol=options["tol"])
+    model.solve(max_iter=options["max_iter"], tol=options["tol"], relax=options["relax"])
     uerror, verror, perror = model.compute_error()
     print(f"L2 error (u) = {uerror}")
     print(f"L2 error (v) = {verror}")
     print(f"L2 error (p) = {perror}")
-    model.plot()
-    # model.plot_streamline()
-    # if options["plot"]:
-    #     model.plot()
-    #     model.plot_residual()
+    # model.plot()
+    if options["plot"]:
+        model.plot()
 
 
 if __name__ == "__main__":

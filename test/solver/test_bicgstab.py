@@ -7,7 +7,7 @@ from fealpy.utils import timer
 from fealpy import logger
 
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.fem import (
     BilinearForm,

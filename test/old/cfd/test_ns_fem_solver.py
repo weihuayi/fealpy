@@ -13,7 +13,7 @@ from scipy.sparse import spdiags, bmat, csr_matrix, hstack, vstack
 
 from fealpy.functionspace import LagrangeFESpace
 from fealpy.functionspace import LagrangeFiniteElementSpace
-#from fealpy.mesh.triangle_mesh import TriangleMesh
+#from fealpy.mesh import TriangleMesh
 from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian
 from fealpy.cfd import NSFEMSolver 

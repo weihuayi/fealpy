@@ -5,7 +5,7 @@ from scipy.sparse import csr_matrix
 from fealpy.backend import backend_manager as bm
 
 from fealpy.backend import backend_manager as bm
-from fealpy.mesh.triangle_mesh import TriangleMesh
+from fealpy.mesh import TriangleMesh
 from fealpy.mesh import PolygonMesh
 from fealpy.functionspace import ScaledMonomialSpace2d
 

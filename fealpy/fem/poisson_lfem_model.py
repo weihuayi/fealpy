@@ -21,7 +21,7 @@ class PoissonLFEMModel(ComputationalModel):
     def set_pde(self, pde: Union[PoissonPDEDataT, str]="coscos"):
         """
         """
-        if isinstance(pde, str):
+        if isinstance(pde, int):
             self.pde = self.pdm.get_example(pde)
         else:
             self.pde = pde

@@ -70,10 +70,10 @@ class Exp0002(BoxMesher2d):
         x, y = p[..., 0], p[..., 1]
         atol = 1e-12  # 绝对误差容限
     
-        # 检查是否接近 x=±1 或 y=±1
+        # 检查是否接近 x=0, x=1, y=0 或 y=1
         on_boundary = (
-            (bm.abs(x - 1.) < atol) | (bm.abs(x + 1.) < atol) |
-            (bm.abs(y - 1.) < atol) | (bm.abs(y + 1.) < atol)
+            (bm.abs(x) < atol) | (bm.abs(x - 1.) < atol) |
+            (bm.abs(y) < atol) | (bm.abs(y - 1.) < atol)
         )
         return on_boundary 
     

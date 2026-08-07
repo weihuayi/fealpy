@@ -109,7 +109,7 @@ class Exp0003(BoxMesher2d):
         return 0
 
     @cartesian
-    def velocity_dirichlet(self, p: TensorLike) -> TensorLike:
+    def dirichlet_velocity(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(p.shape, dtype=bm.float64)
@@ -117,20 +117,20 @@ class Exp0003(BoxMesher2d):
     
     
     @cartesian
-    def velocity_dirichlet_u(self, p: TensorLike) -> TensorLike:
+    def dirichlet_velocity_u(self, p: TensorLike) -> TensorLike:
         x = p[..., 0]
         # y = p[..., 1]
         result = bm.zeros(x.shape, dtype=bm.float64)
         return result
     @cartesian
-    def velocity_dirichlet_v(self, p: TensorLike) -> TensorLike:
+    def dirichlet_velocity_v(self, p: TensorLike) -> TensorLike:
         # x = p[..., 0]
         y = p[..., 1]
         result = bm.zeros(y.shape, dtype=bm.float64)
         return result
 
     @cartesian
-    def pressure_dirichlet(self, p: TensorLike, t) -> TensorLike:
+    def dirichlet_pressure(self, p: TensorLike, t) -> TensorLike:
         x = p[..., 0]
         y = p[..., 1]
         return None
