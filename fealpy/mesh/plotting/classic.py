@@ -126,8 +126,12 @@ class MeshPloter:
     def _draw_polygons(self, axes: Axes, node: NDArray, indices: NDArray, kwargs) -> list[Collection]:
         if indices.size == 0:
             return []
+        cellcolor = kwargs['cellcolor']
+        if isinstance(cellcolor, np.ndarray) and np.isreal(cellcolor).all():
+            mapper = array_color_map(cellcolor.ravel(), 'rainbow')
+            cellcolor = mapper.to_rgba(cellcolor.ravel())
         return [A.poly(axes=axes, points=node, struct=indices[kwargs['index']],
-                       edgecolor=kwargs['edgecolor'], cellcolor=kwargs['cellcolor'],
+                       edgecolor=kwargs['edgecolor'], cellcolor=cellcolor,
                        linewidths=kwargs['linewidths'], alpha=kwargs['alpha'])]
 
     def _draw_surface(self, axes: Axes, node: NDArray, sector, kwargs) -> list[Collection]:
@@ -182,6 +186,8 @@ class MeshPloter:
 
         from ..schema.registry import schema_name_multi_parser
         entity = kwargs.get('entity')
+        if entity is None:
+            entity = self.mesh.top_dimension()
         assert isinstance(entity, (str, int))
         names = schema_name_multi_parser(
             entity,

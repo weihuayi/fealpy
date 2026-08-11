@@ -213,10 +213,16 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
         return result
     
     @barycentric
-    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike: 
+    def value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
         if isinstance(bc, tuple):
-            TD = len(bc)
-        else :
+            if len(bc) == 1:
+                # 单纯形 bc 被积分基础设施包装为 1-tuple，从张量形状推断 TD
+                TD = bc[0].shape[-1] - 1
+            else:
+                # 张量积型单元 (四边形/六面体)，TD = 积分公式个数
+                TD = len(bc)
+        else:
+            # 单纯形单元 (三角形/四面体)，TD = 重心坐标个数 - 1
             TD = bc.shape[-1] - 1
         phi = self.basis(bc, index=index)
         e2dof = self.dof.entity_to_dof(TD, index=index)
@@ -226,8 +232,14 @@ class LagrangeFESpace(FunctionSpace, Generic[_MT]):
     @barycentric
     def grad_value(self, uh: TensorLike, bc: TensorLike, index: Index=_S) -> TensorLike:
         if isinstance(bc, tuple):
-            TD = len(bc)
-        else :
+            if len(bc) == 1:
+                # 单纯形 bc 被积分基础设施包装为 1-tuple，从张量形状推断 TD
+                TD = bc[0].shape[-1] - 1
+            else:
+                # 张量积型单元 (四边形/六面体)，TD = 积分公式个数
+                TD = len(bc)
+        else:
+            # 单纯形单元 (三角形/四面体)，TD = 重心坐标个数 - 1
             TD = bc.shape[-1] - 1
         gphi = self.grad_basis(bc, index=index)
         e2dof = self.dof.entity_to_dof(TD, index=index)

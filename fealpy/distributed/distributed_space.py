@@ -55,7 +55,7 @@ def distribute_space(
 
     pmesh, mcomm = distributed_mesh
     root_entity = mcomm.entities[mcomm.root_entity_name]
-    face_entity_name = "tri" if "tri" in mcomm.entities else "segment"
+    face_entity_name = pmesh.Entity("face:0").sector.schema_name
     face_entity = mcomm.entities[face_entity_name]
     edge_entity = mcomm.entities["segment"]
     all_cell_global_indices = comm.gather(root_entity._global_indices, root=root)
@@ -73,7 +73,6 @@ def distribute_space(
         assert all_face_global_indices is not None
         assert all_edge_global_indices is not None
 
-        is3D = space.mesh.top_dimension() == 3 # type: ignore
         cell2dof = space.cell_to_dof()
         face2dof = space.face_to_dof()
         edge2dof = space.edge_to_dof()  # type: ignore[attr-defined]
@@ -84,7 +83,6 @@ def distribute_space(
         gdata = {
             "space_type": type(space),
             "p": getattr(space, "p"),
-            "is3D": is3D,
             "NDOF": space.number_of_global_dofs(),
         }
 
