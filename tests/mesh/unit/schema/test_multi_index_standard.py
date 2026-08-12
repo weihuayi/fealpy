@@ -3,7 +3,7 @@ import pytest
 
 from fealpy.backend import backend_manager as bm
 from fealpy.mesh.schema import (
-    PointSchema,
+    NodeSchema,
     SegmentSchema,
     TriangleSchema,
     QuadrilateralSchema,
@@ -19,8 +19,8 @@ def to_numpy(value):
 
 
 def test_simplex_multi_index_shape_is_num_points_by_num_vertices():
-    assert PointSchema.multi_index((3,)).shape == (1, 1)
-    np.testing.assert_array_equal(to_numpy(PointSchema.multi_index((3,))), [[3]])
+    assert NodeSchema.multi_index((3,)).shape == (1, 1)
+    np.testing.assert_array_equal(to_numpy(NodeSchema.multi_index((3,))), [[3]])
 
     np.testing.assert_array_equal(to_numpy(SegmentSchema.multi_index((2,))), [[2, 0], [1, 1], [0, 2]])
     assert SegmentSchema.multi_index((2,)).shape == (3, 2)

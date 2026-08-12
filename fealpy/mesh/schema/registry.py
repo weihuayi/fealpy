@@ -8,7 +8,7 @@ __all__ = ["SCHEMA_REGISTRY"]
 
 
 SCHEMA_REGISTRY: dict[str, type[EntitySchema]] = {
-	"point": PointSchema,
+	"node": NodeSchema,
 	"segment": SegmentSchema,
 	"tri": TriangleSchema,
 	"quad": QuadrilateralSchema,

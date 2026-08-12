@@ -1,6 +1,6 @@
 
 from .hexahedron import HexahedronSchema
-from .point import PointSchema
+from .node import NodeSchema
 from .prism import PrismSchema
 from .pyramid import PyramidSchema
 from .quadrilateral import QuadrilateralSchema

@@ -241,9 +241,9 @@ def read_mesh_from_vtu(
         )
         cell_indices_by_schema[schema_name] = cell_indices
 
-    if not block.has_sector("point"):
+    if not block.has_sector("node"):
         point_indices = bm.arange(positions.shape[0], dtype=np.int64).reshape((-1, 1))
-        block.add_sector(EntitySector("point", point_indices), root=not root_names)
+        block.add_sector(EntitySector("node", point_indices), root=not root_names)
 
     for name, values in _iter_data_arrays(grid.GetPointData(), vnp):
         if values.shape[0] != positions.shape[0]:
@@ -251,7 +251,7 @@ def read_mesh_from_vtu(
                 f"Point attributes {name!r} has incompatible leading dimension: "
                 f"expected {positions.shape[0]}, got {values.shape[0]}."
             )
-        block.get_sector("point").attributes[name] = values
+        block.get_sector("node").attributes[name] = values
 
     cell_data_arrays = _iter_data_arrays(grid.GetCellData(), vnp)
     for schema_name, cell_indices in cell_indices_by_schema.items():

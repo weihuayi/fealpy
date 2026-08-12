@@ -141,7 +141,7 @@ def test_triangle_schema_local_entity_relation_size_and_boundary():
 
     assert TriangleSchema.size(ctx) == 2
     assert TriangleSchema.local_entity("segment") == [[1, 2], [2, 0], [0, 1]]
-    assert TriangleSchema.local_entity("point") == [[0], [1], [2]]
+    assert TriangleSchema.local_entity("node") == [[0], [1], [2]]
 
     edge_relation = TriangleSchema.relation(ctx, "segment")
     edge_sector = to_numpy(ctx.block.get_sector("segment").indices)
@@ -152,9 +152,9 @@ def test_triangle_schema_local_entity_relation_size_and_boundary():
         np.sort(expected_edges, axis=-1),
     )
 
-    node_relation = TriangleSchema.relation(ctx, "point")
-    point_sector = to_numpy(ctx.block.get_sector("point").indices).reshape(-1)
-    related_nodes = point_sector[to_numpy(node_relation.tgt_indices)]
+    node_relation = TriangleSchema.relation(ctx, "node")
+    node_sector = to_numpy(ctx.block.get_sector("node").indices).reshape(-1)
+    related_nodes = node_sector[to_numpy(node_relation.tgt_indices)]
     np.testing.assert_array_equal(related_nodes, to_numpy(ctx.sector.indices))
 
     boundary = TriangleSchema.boundary(ctx)

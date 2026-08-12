@@ -18,10 +18,10 @@ class SegmentSchema(ShapedEntitySchema):
     name = "segment"
     top_dim = 1
     OFace = {
-        "point": [[0], [1]]
+        "node": [[0], [1]]
     }
     SFace = {
-        "point": [[0], [1]]
+        "node": [[0], [1]]
     }
     orientation = [(0, 1), (1, 0)]
 

@@ -91,14 +91,14 @@ class MeshView:
     def is_simplex_mesh(self) -> bool:
         """Check if the mesh is a simplex mesh."""
         for name in self.block.sectors.keys():
-            if name not in {"point", "segment", "tri", "tet"}:
+            if name not in {"node", "segment", "tri", "tet"}:
                 return False
         return True
 
     def is_tensor_mesh(self) -> bool:
         """Check if the mesh is a tensor mesh."""
         for name in self.block.sectors.keys():
-            if name not in {"point", "segment", "quad", "hex"}:
+            if name not in {"node", "segment", "quad", "hex"}:
                 return False
         return True
 
