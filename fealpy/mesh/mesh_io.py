@@ -16,7 +16,7 @@ __all__ = ["read", "write"]
 
 
 _MESHIO_TO_FEALPY = {
-    "vertex": "point",
+    "vertex": "node",
     "line": "segment",
     "triangle": "tri",
     "quad": "quad",
@@ -44,8 +44,8 @@ def read(filename: str | Path, file_format: str | None) -> MeshBlock:
     grouped: dict[str, list[np.ndarray]] = {}
     for cell_type, values in cells:
         schema = _MESHIO_TO_FEALPY[cell_type]
-        if schema == "point":
-            raise NotImplementedError("Point meshes are not supported by mesh IO yet")
+        if schema == "node":
+            raise NotImplementedError("Node meshes are not supported by mesh IO yet")
         grouped.setdefault(schema, []).append(values)
 
     block = MeshBlock(positions=bm.asarray(np.asarray(data.points)))

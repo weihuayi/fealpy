@@ -17,7 +17,7 @@ __all__ = [
 
 # Keep the mapping by constant name to avoid importing vtk at module import time.
 SCHEMA_TO_VTK_CELL_TYPE_NAME: dict[str, str] = {
-	"point": "VTK_VERTEX",
+	"node": "VTK_VERTEX",
 	"segment": "VTK_LINE",
 	"tri": "VTK_TRIANGLE",
 	"quad": "VTK_QUAD",
@@ -75,7 +75,7 @@ def _resolve_vtk_cell_type(schema_name: str, vtk_mod) -> int:
 
 
 def _iter_block_cells(schema_name: str, indices: np.ndarray) -> Iterable[np.ndarray]:
-	if schema_name == "point":
+	if schema_name == "node":
 		if indices.ndim == 1:
 			for idx in indices:
 				yield np.asarray([idx], dtype=np.int64)
@@ -85,7 +85,7 @@ def _iter_block_cells(schema_name: str, indices: np.ndarray) -> Iterable[np.ndar
 				yield np.asarray(row, dtype=np.int64)
 			return
 		raise ValueError(
-			"Point entity indices must have shape (N,) or (N, 1), "
+			"Node entity indices must have shape (N,) or (N, 1), "
 			f"got shape {indices.shape}."
 		)
 
@@ -203,7 +203,7 @@ def write_mesh_to_vtu(
 		for key, value in sector.attributes.items():
 			if value is None:
 				continue
-			if schema_name == "point":
+			if schema_name == "node":
 				point_attributes_records.append((key, value))
 			else:
 				cell_attributes_records.append((schema_name, key, start, end, value))

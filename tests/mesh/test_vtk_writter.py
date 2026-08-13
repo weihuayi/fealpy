@@ -1,7 +1,7 @@
 import numpy as np
 
 from fealpy.mesh.storage import EntitySector, MeshBlock
-from fealpy.mesh.view.mesh import Mesh
+from fealpy.mesh.view import Mesh
 from fealpy.mesh import vtk_writter as vw
 
 
@@ -85,7 +85,7 @@ def _build_mesh() -> Mesh:
         dtype=float,
     )
     node_block = EntitySector(
-        schema_name="point",
+        schema_name="node",
         indices=np.array([0, 1, 2], dtype=np.int64),
         attributes={"temperature": np.array([10.0, 20.0, 30.0], dtype=float)},
     )

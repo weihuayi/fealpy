@@ -27,10 +27,10 @@ def test_topology_relation_connector_connects_existing_lower_sector():
     TopologyBuilder.construct(block)
 
     old_segment = block.get_sector("segment").indices.copy()
-    old_point = block.get_sector("point").indices.copy()
-    block.relations.pop(("segment", "point"), None)
+    old_node = block.get_sector("node").indices.copy()
+    block.relations.pop(("segment", "node"), None)
 
-    relation = TopRelationConnector.connect(block, "segment", "point")
+    relation = TopRelationConnector.connect(block, "segment", "node")
 
     np.testing.assert_array_equal(
         to_numpy(relation.tgt_indices),
@@ -41,6 +41,6 @@ def test_topology_relation_connector_connects_existing_lower_sector():
         to_numpy(old_segment),
     )
     np.testing.assert_array_equal(
-        to_numpy(block.get_sector("point").indices),
-        to_numpy(old_point),
+        to_numpy(block.get_sector("node").indices),
+        to_numpy(old_node),
     )

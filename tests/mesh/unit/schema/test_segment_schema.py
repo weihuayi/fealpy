@@ -139,9 +139,9 @@ class TestSegmentSchema:
         assert segment_view.size() == 4
         assert segment_view.top_dimension() == 1
         assert segment_view.geo_dimension() == mesh.geo_dimension() == 2
-        assert SegmentSchema.local_entity("point") == [[0], [1]]
-        assert SegmentSchema.OFace == {"point": [[0], [1]]}
-        assert SegmentSchema.SFace == {"point": [[0], [1]]}
+        assert SegmentSchema.local_entity("node") == [[0], [1]]
+        assert SegmentSchema.OFace == {"node": [[0], [1]]}
+        assert SegmentSchema.SFace == {"node": [[0], [1]]}
 
     @pytest.mark.parametrize("backend", BACKENDS, ids=BACKEND_IDS)
     def test_multi_index_via_schema_behind_user_view(self, backend):

@@ -9,10 +9,10 @@ from .base import (
 )
 
 
-__all__ = ["PointSchema", "PointQuadrature"]
+__all__ = ["NodeSchema", "NodeQuadrature"]
 
 
-class PointQuadrature:
+class NodeQuadrature:
     def __init__(self, *, dtype=None):
         dtype = bm.float64 if dtype is None else dtype
         self.quadpts = (bm.asarray([[1.0]], dtype=dtype),)
@@ -34,8 +34,8 @@ class PointQuadrature:
         return self.get_quadrature_point_and_weight(i)
 
 
-class PointSchema(ShapedEntitySchema):
-    name = "point"
+class NodeSchema(ShapedEntitySchema):
+    name = "node"
     top_dim = 0
     OFace = {}
     SFace = {}
@@ -128,7 +128,7 @@ class PointSchema(ShapedEntitySchema):
             raise ValueError(f"unsupported point quadrature type: {qtype!r}")
         if q < 1:
             raise ValueError(f"point quadrature order must be positive, got {q}")
-        return PointQuadrature()
+        return NodeQuadrature()
 
     @classmethod
     def measure(cls, ctx: EntityContext, index: Index | None) -> Tensor:

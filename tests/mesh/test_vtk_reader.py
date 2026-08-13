@@ -173,7 +173,7 @@ def test_read_mesh_from_vtu_rebuilds_grouped_entities_and_attributes(fake_vtk_mo
     np.testing.assert_array_equal(mesh.block.get_sector("tri").attributes["RegionId"], np.array([11, 13]))
     np.testing.assert_array_equal(mesh.block.get_sector("segment").attributes["boundary"], np.array([9]))
     np.testing.assert_allclose(
-        mesh.block.get_sector("point").attributes["temperature"],
+        mesh.block.get_sector("node").attributes["temperature"],
         np.array([10.0, 20.0, 30.0, 40.0]),
     )
 
