@@ -1,6 +1,6 @@
 # FEALPy | Design | 计算软件互操作架构设计
 
-- **版本**：v0.2
+- **版本**：v0.3
 - **状态**：草案
 - **入库位置**：`kb/design/interop/interop_architecture.md`
 - **启用条件**：当设计、实现、评审或演化 FEALPy 与外部计算软件、计算数据标准或模型交换协议之间的互操作能力，或判断相关能力与 FEALPy 核心领域模块的边界时，本文件应作为架构设计依据
@@ -52,7 +52,7 @@
 
 ### 1.4 当前成熟度
 
-v0.2 是基于 FEALPy 新 Mesh 架构、当前 Abaqus/Nastran 实际需求及相关外部实践研究形成的初始架构设计。
+v0.3 是基于 FEALPy 新 Mesh 架构、当前 Abaqus/Nastran 实际需求、相关外部实践研究以及 EntitySet 首版实现形成的架构设计基线。
 
 本文档中的对象主位、核心依赖方向、语义保真和增量演进原则具有较高的预期稳定性；具体外部表示、适配接口、公共 API 和物理代码结构仍需通过实际互操作场景持续检验。
 
@@ -237,17 +237,20 @@ $$
 S\subseteq E_s.
 $$
 
-当前已经形成的设计方向是：
+当前代码中的存储结构为：
 
 ```text
 MeshBlock
-└── EntitySector
-    └── EntitySet
+├── sectors: dict[str, EntitySector]
+└── entity_sets: dict[str, EntitySet]
+    └── sector_id ──► EntitySector
 ```
 
-即 EntitySet 严格归属于一个 EntitySector，EntitySector 严格归属于一个 MeshBlock。
+`EntitySet` 已在 `fealpy.mesh.storage.mesh_storage` 中实现为独立的 `dataclass(slots=True)`，包含 `name`、`sector_id` 和 `indices` 三个字段。`MeshBlock` 通过 `entity_sets: dict[str, EntitySet]` 统一持有实体集合，`EntitySet.sector_id` 标识其引用的 `EntitySector`，`indices` 表示该目标实体域中的实体索引。
 
-这一对象关系应同步进入 Mesh 设计资产，并由 Mesh 侧继续维护具体存储方式和 API。当前 `MeshBlock`、`EntitySector` 已有实现基础；EntitySet 仍属于需要同步进入 Mesh 设计和实现的前置能力。
+因此，EntitySet 在语义上归属于一个 EntitySector，在存储上由 MeshBlock 与 EntitySector 平级持有并通过 `sector_id` 建立引用。这一对象及其具体存储方式和 API 属于 Mesh 的主维护边界。
+
+当前实现只建立了数据结构和 `MeshBlock.entity_sets` 存储入口，尚未提供 EntitySet 专用的增删查接口、`sector_id` 引用完整性检查、`indices` 范围检查或相应测试，也尚未将 `EntitySet` 加入 `mesh_storage.__all__`。这些未实现部分不得表述为已验证能力或稳定公共 API。
 
 外部系统中的 NSET、ELSET、physical group 等对象是否以及如何映射为 EntitySet，由具体适配器依据其语义判断。
 
@@ -389,7 +392,7 @@ $$
 
 这一职责不负责定义外部计算语义。
 
-v0.2 不要求立即建立统一 `DataSource` 类。
+v0.3 不要求立即建立统一 `DataSource` 类。
 
 ### 6.2 编解码器
 
@@ -524,7 +527,7 @@ abaqus/
 
 ### 7.3 公共互操作基础设施按实际共性形成
 
-v0.2 不预设必须存在 `_core` 目录。
+v0.3 不预设必须存在 `_core` 目录。
 
 当多个外部语义域或互操作载体已经暴露出稳定共享机制时，可以进一步评估公共承载位置，例如：
 
@@ -551,7 +554,7 @@ from fealpy.interop.abaqus import read_inp
 
 内部模块可以随实际复杂度继续拆分，只要不必要地破坏公共调用方式。
 
-v0.2 暂不定义统一的：
+v0.3 暂不定义统一的：
 
 ```python
 fealpy.interop.read(...)
@@ -656,7 +659,7 @@ $$
 
 例如，一个对象可以是“部分支持 + 精确映射”，表示只覆盖其中部分语义，但已覆盖部分能够被准确转换；也可以是“支持 + 有损映射”，表示整体可以转换，但某些语义只能降级表达。
 
-v0.2 不要求立即将这两个维度实现为 enum 或统一报告类，但不允许通过静默忽略信息伪装完整成功。
+v0.3 不要求立即将这两个维度实现为 enum 或统一报告类，但不允许通过静默忽略信息伪装完整成功。
 
 ### 8.7 往返转换
 
@@ -811,9 +814,9 @@ Nastran 可作为后续重要压力测试来源。
 
 ### 10.3 当前开放问题
 
-以下问题当前缺少足够实践证据，v0.2 不提前冻结：
+以下问题当前缺少足够实践证据，v0.3 不提前冻结：
 
-- EntitySet 第一版最终采用简单映射还是独立 class；
+- EntitySet 的稳定公共导出、专用操作接口以及引用与索引一致性检查如何设计；
 - 是否以及何时需要统一转换诊断报告对象；
 - 是否需要公共互操作注册机制；
 - 外部语义域是否需要物化为 Python 对象；
@@ -827,6 +830,16 @@ Nastran 可作为后续重要压力测试来源。
 这些问题应通过后续纵向切片、V&V 和实际维护结果逐步回答。
 
 ## 附录 A：本文件版本演进记录
+
+- **v0.3**：
+  - 变更人：魏华祎
+  - AI 协作整理：Codex
+  - 变更时间：2026-08-13
+  - 变更摘要：
+    - 根据当前代码同步 EntitySet 已采用独立 `dataclass(slots=True)` 的实现事实
+    - 明确 EntitySet 由 `MeshBlock.entity_sets` 持有，并通过 `sector_id` 引用 EntitySector
+    - 区分 EntitySet 的已实现数据结构与尚未实现的公共导出、操作接口、一致性检查和测试
+    - 将 EntitySet 的开放问题从存储形态选择调整为公共 API 与不变量保障
 
 - **v0.2**：
   - 变更人：魏华祎
