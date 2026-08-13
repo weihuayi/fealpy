@@ -1,24 +1,24 @@
 
 from typing import List, Generator, Tuple
-from time import time
+from time import perf_counter
 
 
 def _timer_core() -> Generator[None, str, List[Tuple[str, float]]]:
     tag_list: List[str] = [None, ]
-    time_list: List[float] = [time(), ]
+    time_list: List[float] = [perf_counter(), ]
 
     while True:
         tag = yield
         if tag is None:
             break
         tag_list.append(tag)
-        time_list.append(time())
+        time_list.append(perf_counter())
 
     return list(zip(tag_list, time_list))
 
 
 def timer() -> Generator[None, str, None]:
-    """A generator function that acts as a timer to measure the elapsed time between events.
+    """Measure elapsed time between events with a monotonic high-resolution clock.
 
     Usage:
 
