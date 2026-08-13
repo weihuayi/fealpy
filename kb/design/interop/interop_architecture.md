@@ -2,7 +2,7 @@
 
 - **版本**：v0.2
 - **状态**：草案
-- **入库位置**：`kb/design/interop/interop-architecture.md`
+- **入库位置**：`kb/design/interop/interop_architecture.md`
 - **启用条件**：当设计、实现、评审或演化 FEALPy 与外部计算软件、计算数据标准或模型交换协议之间的互操作能力，或判断相关能力与 FEALPy 核心领域模块的边界时，本文件应作为架构设计依据
 - **适用范围**：FEALPy 计算软件互操作模块，以及其与 FEALPy 核心领域模块之间的对象边界、转换关系和依赖关系
 

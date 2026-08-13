@@ -20,11 +20,17 @@ class EntitySector:
         from ..schema import SCHEMA_REGISTRY
         return SCHEMA_REGISTRY[self.schema_name]
 
+@dataclass(slots=True)
+class EntitySet:
+    name: str
+    sector_id: str
+    indices: Tensor
 
 @dataclass(slots=True)
 class MeshBlock:
     positions: Tensor
     sectors: dict[str, EntitySector] = field(default_factory=dict)
+    entity_sets: dict[str, EntitySet] = field(default_factory=dict)
     relations: dict[tuple[str, str], Relation] = field(default_factory=dict)
     root_entity_names: list[str] = field(default_factory=list)
     _cache_boundary_info: dict[str, Any] | None = None
