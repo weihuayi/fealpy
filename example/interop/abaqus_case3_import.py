@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from time import perf_counter
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INPUT = REPOSITORY_ROOT / "data" / "case3" / "box_case3.inp"
@@ -55,32 +54,34 @@ def main() -> None:
             "Provide it with --input if Case3 is stored elsewhere."
         )
 
+    from fealpy import logger
     from fealpy.interop.abaqus import read_inp
+    from fealpy.utils import timer
 
-    started = perf_counter()
+    example_logger = logger.getChild("example.interop.abaqus_case3")
+    example_logger.setLevel("INFO")
+    tmr = timer()
+    next(tmr)
+
     mesh = read_inp(input_path)
-    import_seconds = perf_counter() - started
+    tmr.send("Import Abaqus C3D4 mesh")
 
     NN = mesh.number_of_nodes()
     NC = mesh.number_of_cells()
-    NF = mesh.number_of_faces()
+    example_logger.info(f"Imported {NN} nodes and {NC} C3D4 elements")
+    example_logger.info("Support coverage: C3D4 mesh geometry only")
 
-    print(f"Imported {NN} nodes and {NC} C3D4 elements")
-    print(f"Import time: {import_seconds:.3f} s")
-    print("Support coverage: C3D4 mesh geometry only")
-
-    started = perf_counter()
     mesh.construct(exclude=["segment", "node"])
     face = mesh.entity("face")
     bdindex = mesh.boundary_face_index()
-    topology_seconds = perf_counter() - started
+    tmr.send("Construct boundary surface topology")
 
+    NF = mesh.number_of_faces()
     NBF = int(bdindex.shape[0])
-    print(
+    example_logger.info(
         f"Constructed {NF} unique triangles; "
         f"selected {NBF} boundary triangles"
     )
-    print(f"Surface topology time: {topology_seconds:.3f} s")
 
     if args.no_show:
         import matplotlib
@@ -88,7 +89,6 @@ def main() -> None:
         matplotlib.use("Agg")
     from matplotlib import pyplot as plt
 
-    started = perf_counter()
     figure = plt.figure(figsize=(10, 8))
     axes = figure.add_subplot(111, projection="3d")
     mesh.add_plot(
@@ -107,14 +107,14 @@ def main() -> None:
         output_path = args.output.expanduser().resolve()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         figure.savefig(output_path, dpi=150, bbox_inches="tight")
-        print(f"Wrote image: {output_path}")
+        example_logger.info(f"Wrote image: {output_path}")
 
-    render_seconds = perf_counter() - started
-    print(f"Render time: {render_seconds:.3f} s")
+    tmr.send("Render boundary mesh")
 
     if not args.no_show:
         plt.show()
     plt.close(figure)
+    tmr.send(None)
 
 
 if __name__ == "__main__":
