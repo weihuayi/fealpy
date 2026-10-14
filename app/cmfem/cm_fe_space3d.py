@@ -44,9 +44,6 @@ class CmDof3d:
         rows = bm.concatenate(lattice.layers[f])
         local_vertices = cell[:, list(f)]
         global_vertices = entities[entity_index]
-        if dim == 0:
-            global_vertices = global_vertices[:, None]
-
         block = bm.zeros((cell.shape[0], block_size), dtype=bm.int32)
         normal = bm.tolist(alpha[rows][:, list(opposite)])
         for permutation in permutations(range(dim+1)):
@@ -87,11 +84,7 @@ class CmDof3d:
         cell = mesh.entity('cell')
         c2e = mesh.cell_to_edge()
         c2f = mesh.cell_to_face()
-        blocks = []
-        for v, f in enumerate(self.lattice.simplex.subsimplices[0]):
-            blocks.append(self._entity_block(
-                0, f, cell[:, v], bm.arange(nn, dtype=bm.int32), 0, nv
-            ))
+        blocks = [self._n2dof[cell].reshape(nc, 4*nv)]
         edge_offset = nn*nv
         for e, f in enumerate(self.lattice.simplex.subsimplices[1]):
             blocks.append(self._entity_block(
@@ -165,10 +158,7 @@ class CmFESpace3d(CmFESpace):
         dim = entity.shape[1]-1
         tangent = point[entity[:, 1:]] - point[entity[:, :1]]
         tangent = bm.swapaxes(tangent, 1, 2)
-        q, r = bm.linalg.qr(tangent, mode='reduced')
-        diagonal = r[:, bm.arange(dim), bm.arange(dim)]
-        sign = bm.where(diagonal < 0, -1.0, 1.0)
-        q = q*sign[:, None, :]
+        q, _ = bm.linalg.qr(tangent, mode='reduced')
         projector = identity[None, :, :] - bm.einsum('ndi,nei->nde', q, q)
 
         residual = projector
@@ -584,11 +574,6 @@ class CmFESpace3d(CmFESpace):
     def is_boundary_dof(self):
         """Mark essential boundary DoFs for ``r=(4m,2m,m,0)``, ``m=1,2``."""
         m = self.r[2]
-        if m not in (1, 2) or self.r != (4*m, 2*m, m, 0):
-            raise NotImplementedError(
-                "3D boundary DoFs currently require r=(4m,2m,m,0), m=1 or 2."
-            )
-
         flag = bm.zeros(self.number_of_global_dofs(), dtype=bm.bool)
 
         face_dof = self.dof.face_to_internal_dof()

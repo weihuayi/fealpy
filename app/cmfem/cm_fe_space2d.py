@@ -4,7 +4,7 @@ from fealpy.backend import backend_manager as bm
 from fealpy.sparse import CSRTensor
 
 from cm_fe_space import CmFESpace
-from symmetric_tensor import SymmetricTensor, symmetric_span_array, symmetry_multiplicity
+from symmetric_tensor import SymmetricTensor, symmetric_span_array
 
 
 class CmDof2d:
@@ -160,7 +160,7 @@ class CmFESpace2d(CmFESpace):
         normal and boundary edges use the outward unit normal.
         """
         mesh = self.mesh
-        identity = bm.eye(2, dtype=self.ftype, device=self.device)
+        identity = bm.eye(2, dtype=self.ftype)
         vertex_frame = bm.tile(identity[None, :, :], (mesh.number_of_nodes(), 1, 1))
 
         edge = mesh.entity('edge')
@@ -170,7 +170,7 @@ class CmFESpace2d(CmFESpace):
         tangent = tangent / bm.sqrt(bm.sum(tangent**2, axis=1))[:, None]
         projector = identity[None, :, :] - tangent[:, :, None]*tangent[:, None, :]
         pivot = bm.argmax(bm.sum(projector**2, axis=1), axis=1)
-        normal = projector[bm.arange(len(edge), device=self.device), :, pivot]
+        normal = projector[bm.arange(len(edge)), :, pivot]
         normal = normal / bm.sqrt(bm.sum(normal**2, axis=1))[:, None]
 
         midpoint = (points[edge[:, 0]] + points[edge[:, 1]])/2
@@ -212,7 +212,7 @@ class CmFESpace2d(CmFESpace):
                     # Normalization makes the edge-direction coefficients geometry independent.
                     weights = [(-1)**e[v] * comb(alpha[i], e[i]) * comb(alpha[j], e[j])
                                for e in bm.tolist(increments)]
-                    weights = bm.array(weights, dtype=self.ftype, device=self.device)
+                    weights = bm.array(weights, dtype=self.ftype)
                     values = bm.broadcast_to(weights[None, :], (nc, len(weights)))
                     base = [0, 0, 0]
                     base[v] = alpha[v]
@@ -233,7 +233,7 @@ class CmFESpace2d(CmFESpace):
                 eta = bm.multi_index_matrix(s, 2, dtype=bm.int32)
                 weights = [factorial(s) / (factorial(a)*factorial(b)*factorial(c))
                            for a, b, c in bm.tolist(eta)]
-                weights = bm.array(weights, dtype=self.ftype, device=self.device)
+                weights = bm.array(weights, dtype=self.ftype)
                 values = weights[None, :] * bm.prod(
                     direction[:, None, :]**eta[None, :, :], axis=2
                 )
@@ -245,7 +245,7 @@ class CmFESpace2d(CmFESpace):
                     row_values.append(values)
 
         # Cell block: Bernstein coefficients give one unit diagonal entry per row.
-        values = bm.ones((nc, 1), dtype=self.ftype, device=self.device)
+        values = bm.ones((nc, 1), dtype=self.ftype)
         for row in lattice.indices((0, 1, 2)):
             beta = lattice.multi_index[row][None, :]
             row_indices.append(beta)
@@ -265,7 +265,7 @@ class CmFESpace2d(CmFESpace):
 
         ndof = self.number_of_local_dofs()
         return CSRTensor(
-            bm.array(indptr, dtype=bm.int32, device=self.device),
+            bm.array(indptr, dtype=bm.int32),
             bm.concatenate(columns), bm.concatenate(data, axis=1), (ndof, ndof)
         )
 
@@ -382,9 +382,6 @@ class CmFESpace2d(CmFESpace):
     def is_boundary_dof(self):
         """Mark essential polyharmonic boundary DoFs for ``r=(2m,m,0)``."""
         m = self.r[1]
-        if self.r[0] != 2*m:
-            raise NotImplementedError("Boundary DoFs currently require r[0] == 2*r[1].")
-
         flag = bm.zeros(self.number_of_global_dofs(), dtype=bm.bool)
         edge_dof = self.dof.edge_to_internal_dof()[self.boundary_edge_flag]
         flag = bm.set_at(flag, edge_dof, True)

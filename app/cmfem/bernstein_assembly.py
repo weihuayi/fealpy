@@ -23,12 +23,3 @@ def bernstein_stiffness(space, order, q=None):
     matrix = bm.einsum('cab,abij,c->cij', geo, integral, measure)
     permutation = space.lattice.permutation
     return matrix[:, permutation, :][:, :, permutation]
-
-
-def smooth_stiffness(space, order, q=None):
-    """Transform local Bernstein matrices to the smooth basis with ``C``."""
-    matrix = bernstein_stiffness(space, order, q)
-    coefficient = space.coeff
-    matrix = coefficient @ matrix
-    matrix = matrix @ bm.swapaxes(coefficient, -1, -2)
-    return (matrix+bm.swapaxes(matrix, -1, -2))/2

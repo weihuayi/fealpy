@@ -21,7 +21,7 @@ x, y, z = sp.symbols('x y z')
 
 
 def _print_row(n, dofs, errors, previous):
-    """Print one error-and-rate row for Tables 4 and 7."""
+    """Print one error-and-rate row for Tables 3 and 6."""
     rates = (bm.full(len(errors), float('nan')) if previous is None
              else bm.log2(previous/errors))
     error_text = ' '.join(f'{value:.6e}' for value in errors)
@@ -29,36 +29,68 @@ def _print_row(n, dofs, errors, previous):
     print(f'n={n:<2d} DoF={dofs:<7d} errors=[{error_text}] rates=[{rate_text}]', flush=True)
 
 
-def _local_condition(space):
-    """Compute the local-matrix data reported in Table 1."""
-    D = space.D.to_dense()[0]
-    orders = []
-    for faces in space.lattice.simplex.subsimplices:
-        for f in faces:
-            for s, rows in enumerate(space.lattice.layers[f]):
-                orders.extend([s]*len(rows))
-    scale = bm.array([factorial(space.p)//factorial(space.p-s)
-                      for s in orders])
-    raw = scale[:, None]*D
-    nnz = int(bm.sum(bm.abs(raw) > 1.0e-10))
-    return D.shape[0], nnz, bm.linalg.cond(raw), bm.linalg.cond(D), bm.max(scale)
-
-
-def local_conditioning_example():
-    """Reproduce the two three-dimensional entries in Table 1."""
+def normalization_example():
+    """Reproduce the 3D local-matrix comparison in the response to Referee 1."""
     node = bm.array(((0.0, 0.0, 0.0), (1.0, 0.0, 0.0),
                      (1.0, 1.0, 0.0), (1.0, 1.0, 1.0)))
     cell = bm.array(((0, 1, 2, 3),), dtype=bm.int32)
     print('\nLocal DoF--Bernstein matrix: 3D')
     for p in (9, 11):
         space = CmFESpace3d(TetrahedronMesh(node, cell), p, (4, 2, 1, 0))
-        size, nnz, raw_cond, cond, ratio = _local_condition(space)
+        D = space.D.to_dense()[0]
+        orders = []
+        for faces in space.lattice.simplex.subsimplices:
+            for f in faces:
+                for s, rows in enumerate(space.lattice.layers[f]):
+                    orders.extend([s]*len(rows))
+        scale = bm.array([factorial(p)//factorial(p-s) for s in orders])
+        raw = scale[:, None]*D
+        size = D.shape[0]
+        nnz = int(bm.sum(bm.abs(raw) > 1.0e-10))
+        raw_cond = bm.linalg.cond(raw)
+        cond = bm.linalg.cond(D)
+        ratio = bm.max(scale)
         print(f'(3,1,{p}) N={size:<3d} nnz={nnz:<4d} '
               f'cond_raw={raw_cond:.4e} cond={cond:.4e} ratio={ratio}')
 
 
+def _shape_mesh(eps, family='T'):
+    """Construct a tetrahedron from the families in Section 6.3."""
+    cell = bm.array(((0, 1, 2, 3),), dtype=bm.int32)
+    if family == 'T':
+        t = eps/2**0.5
+        node = bm.array(((1.0, 0.0, t), (-1.0, 0.0, t),
+                         (0.0, 1.0, -t), (0.0, -1.0, -t)))
+    else:
+        node = bm.array(((0.0, 0.0, 0.0), (eps, 0.0, 0.0),
+                         (1.0, eps, 0.0), (0.0, 0.0, 1.0)))
+    return TetrahedronMesh(node, cell)
+
+
+def local_conditioning_example():
+    """Study the shape and degree dependence of local D in Section 6.3."""
+    cases = ((1, 9, (4, 2, 1, 0)), (1, 11, (4, 2, 1, 0)))
+    for family in ('T', 'S'):
+        for m, p, r in cases:
+            for j in range(7):
+                eps = 2.0**(-j)
+                mesh = _shape_mesh(eps, family)
+                space = CmFESpace3d(mesh, p, r)
+                cond = bm.linalg.cond(space.D.to_dense()[0])
+                print(f'shape: family={family} d=3 m={m} k={p:<2d} '
+                      f'eps={eps:.6f} kappa={cond:.6e}', flush=True)
+
+    for p in range(9, 19):
+        for eps in (1.0, 1/8, 1/64):
+            mesh = _shape_mesh(eps)
+            space = CmFESpace3d(mesh, p, (4, 2, 1, 0))
+            cond = bm.linalg.cond(space.D.to_dense()[0])
+            print(f'degree: family=T d=3 m=1 k={p:<2d} '
+                  f'eps={eps:.6f} kappa={cond:.6e}', flush=True)
+
+
 def interpolation_example(ns, q=12, error_batch=512):
-    """Reproduce the three-dimensional C1 interpolation test in Table 4."""
+    """Reproduce the three-dimensional C1 interpolation test in Table 3."""
     expression = sp.sin(2*sp.pi*x)*sp.sin(2*sp.pi*y)*sp.sin(2*sp.pi*z)
     exact = ManufacturedPDE(expression, 3).derivatives(4)
     previous = None
@@ -74,7 +106,7 @@ def interpolation_example(ns, q=12, error_batch=512):
 
 def biharmonic_example(ns, q=12, batch_size=1, stiffness_q=8,
                        error_batch=512):
-    """Reproduce the three-dimensional C1 biharmonic test in Table 7."""
+    """Reproduce the three-dimensional C1 biharmonic test in Table 6."""
     expression = sp.sin(5*x)*sp.sin(5*y)*sp.sin(5*z)
     pde = DoubleLaplacePDE(expression, dimension=3)
     exact = pde.derivatives(4)
@@ -106,7 +138,7 @@ def biharmonic_example(ns, q=12, batch_size=1, stiffness_q=8,
 
 
 def conditioning_example(degrees=range(9, 19)):
-    """Reproduce the 3D Jacobi-scaled stiffness conditions in Figure 5."""
+    """Reproduce the 3D Jacobi-scaled stiffness conditions in Figure 7."""
     mesh = TetrahedronMesh.from_box(nx=2, ny=2, nz=2)
     print('\n3D Jacobi-scaled condition numbers: m=1', flush=True)
     for p in degrees:
@@ -128,7 +160,7 @@ def conditioning_example(degrees=range(9, 19)):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     examples = ('all', 'interpolation', 'biharmonic',
-                'conditioning', 'local-conditioning')
+                'conditioning', 'normalization', 'local-conditioning')
     parser.add_argument('example', nargs='?', default='all', choices=examples)
     parser.add_argument('--max-n', type=int, default=2)
     parser.add_argument('--min-n', type=int, default=1)
@@ -148,5 +180,7 @@ if __name__ == '__main__':
                            args.stiffness_q, args.error_batch)
     if args.example in ('all', 'conditioning'):
         conditioning_example()
+    if args.example in ('all', 'normalization'):
+        normalization_example()
     if args.example in ('all', 'local-conditioning'):
         local_conditioning_example()

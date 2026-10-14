@@ -7,7 +7,7 @@ from fealpy.sparse import CSRTensor
 def spmv(A: CSRTensor, x):
     """Compute ``y[K] = A[K] @ x[K]`` for every cell ``K``."""
     nrow = A.sparse_shape[0]
-    y = bm.zeros((x.shape[0], nrow), dtype=x.dtype, device=bm.get_device(x))
+    y = bm.zeros((x.shape[0], nrow), dtype=x.dtype)
     for i in range(nrow):
         start, end = int(A.crow[i]), int(A.crow[i+1])
         col = A.col[start:end]
@@ -43,51 +43,3 @@ def spsolve_triangular(A: CSRTensor, b, lower=True, unit_diagonal=False):
             value = value / diagonal[:, None]
         x = bm.set_at(x, (slice(None), i, slice(None)), value)
     return x[..., 0] if vector_rhs else x
-
-
-def transpose(A: CSRTensor):
-    """Transpose a shared CSR pattern and permute its cellwise values."""
-    nrow, ncol = A.sparse_shape
-    entries = []
-    for row in range(nrow):
-        start, end = int(A.crow[row]), int(A.crow[row+1])
-        entries.extend((int(A.col[k]), row, k) for k in range(start, end))
-    entries.sort()
-    counts = [0]*ncol
-    for row, _, _ in entries:
-        counts[row] += 1
-    crow = [0]
-    for count in counts:
-        crow.append(crow[-1]+count)
-    col = bm.array([col for _, col, _ in entries], dtype=bm.int32)
-    position = bm.array([k for _, _, k in entries], dtype=bm.int32)
-    values = A.values[..., position]
-    return CSRTensor(bm.array(crow, dtype=bm.int32), col, values, (ncol, nrow))
-
-
-def sparse_congruence(A: CSRTensor, M):
-    """Compute cellwise ``A.T @ M @ A`` without densifying ``A``."""
-    nc, n, _ = M.shape
-    values = A.values
-    if values.ndim == 1:
-        values = values[None, :]
-    right = bm.zeros_like(M)
-    for row in range(n):
-        start, end = int(A.crow[row]), int(A.crow[row+1])
-        col = A.col[start:end]
-        update = M[:, :, row, None]*values[:, None, start:end]
-        right = bm.set_at(
-            right, (slice(None), slice(None), col),
-            right[:, :, col]+update
-        )
-
-    result = bm.zeros_like(M)
-    for row in range(n):
-        start, end = int(A.crow[row]), int(A.crow[row+1])
-        col = A.col[start:end]
-        update = values[:, start:end, None]*right[:, row, None, :]
-        result = bm.set_at(
-            result, (slice(None), col, slice(None)),
-            result[:, col, :]+update
-        )
-    return result

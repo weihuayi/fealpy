@@ -26,15 +26,13 @@ class SimplexLattice:
     """
 
     def __init__(self, d, k, r):
-        self._is_valid(d, k, r)
-
         self.d, self.k, self.r = d, k, r
         self.simplex = Simplex(d)
 
         self.multi_index = bm.multi_index_matrix(k, d, dtype=bm.int32)
 
         alpha = self.multi_index
-        used = bm.zeros(alpha.shape[0], dtype=bm.bool, device=bm.get_device(alpha))  # Multi-indices already assigned to a subsimplex.
+        used = bm.zeros(alpha.shape[0], dtype=bm.bool)  # Multi-indices already assigned to a subsimplex.
         self.layers = {}  # Multi-index rows in every layer of each subsimplex.
         blocks = []       # Layer blocks ordered by increasing simplex dimension.
         for ell, faces in enumerate(self.simplex.subsimplices):
@@ -60,13 +58,3 @@ class SimplexLattice:
         """Return original row indices of a block or layer ``s``."""
         layers = self.layers[f]
         return bm.concatenate(layers) if s is None else layers[s]
-
-    def _is_valid(self, d, k, r):
-        """Check d>0, r[l]>=2*r[l+1]>=0, r[d]=0, and k>=2*r[0]+1."""
-        if d <= 0 or len(r) != d+1 or r[-1] != 0:
-            raise ValueError("Require d>0, r=(r0,...,rd), rd=0.")
-        for l in range(d):
-            if r[l] < 2*r[l+1] or r[l] < 0:
-                raise ValueError("Require r[l]>=2*r[l+1]>=0.")
-        if k < 2*r[0]+1:
-            raise ValueError("Require k>=2*r[0]+1.")
