@@ -7,7 +7,7 @@ from fealpy.sparse import COOTensor
 from simplex_lattice import SimplexLattice
 from sparse_tensor_ops import spmv, spsolve_triangular
 from symmetric_tensor import symmetry_multiplicity
-from bernstein_assembly import smooth_stiffness
+from bernstein_assembly import bernstein_stiffness
 
 
 class CmFESpace(FunctionSpace):
@@ -87,14 +87,17 @@ class CmFESpace(FunctionSpace):
 
     def stiffness_matrix(self, order=None, q=None, batch_size=None,
                          method='bernstein'):
+        """Assemble stiffness using ``method='bernstein'`` or ``'quadrature'``."""
         if order is None:
             order = self.r[-2]+1
         if method == 'bernstein':
-            local = smooth_stiffness(self, order, q)
-        elif method == 'quadrature':
-            local = self._quadrature_stiffness(order, q, batch_size)
+            local = bernstein_stiffness(self, order, q)
+            coefficient = self.coeff
+            local = coefficient @ local
+            local = local @ bm.swapaxes(coefficient, -1, -2)
+            local = (local+bm.swapaxes(local, -1, -2))/2
         else:
-            raise ValueError("method must be 'bernstein' or 'quadrature'.")
+            local = self._quadrature_stiffness(order, q, batch_size)
 
         dof = self.cell_to_dof()
         shape = local.shape

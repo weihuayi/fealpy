@@ -38,8 +38,6 @@ class SymmetricTensor:
         Repeated states are merged by direction counts, avoiding explicit
         enumeration of all ``s!`` permutations.
         """
-        if self.order != other.order:
-            raise ValueError("Tensor orders must match.")
         if self.batched or other.batched:
             left = self.alpha if self.batched else (self.alpha,)
             right = other.alpha if other.batched else (other.alpha,)
@@ -47,10 +45,8 @@ class SymmetricTensor:
                 # Contract every pair of 2D frame multi-indices in one batch.
                 a, multiplicity = symmetric_span_array(self.vectors, self.order)
                 b, _ = symmetric_span_array(other.vectors, self.order)
-                ai = bm.array([alpha[1] for alpha in left], dtype=bm.int32,
-                              device=bm.get_device(a))
-                bi = bm.array([beta[1] for beta in right], dtype=bm.int32,
-                              device=bm.get_device(b))
+                ai = bm.array([alpha[1] for alpha in left], dtype=bm.int32)
+                bi = bm.array([beta[1] for beta in right], dtype=bm.int32)
                 result = bm.einsum(
                     '...aq,...bq,q->...ab',
                     a[..., ai, :], b[..., bi, :], multiplicity
@@ -69,8 +65,7 @@ class SymmetricTensor:
             return bm.sum(self.vectors[..., 0, :]*other.vectors[..., 0, :], axis=-1)**self.order
         gram = bm.einsum('...id,...jd->...ij', self.vectors, other.vectors)
         zero = (0,)*len(other.alpha)
-        states = {zero: bm.ones(gram.shape[:-2], dtype=gram.dtype,
-                               device=bm.get_device(gram))}
+        states = {zero: bm.ones(gram.shape[:-2], dtype=gram.dtype)}
         remaining = self.order
         for i, count in enumerate(self.alpha):
             for _ in range(count):
@@ -108,8 +103,7 @@ def symmetric_span_array(frame, s):
         multiplicity = symmetry_multiplicity(s, d, dtype=frame.dtype)
         return tensor, multiplicity
 
-    coefficients = bm.ones(frame.shape[:-2] + (1, 1),
-                           dtype=frame.dtype, device=bm.get_device(frame))
+    coefficients = bm.ones(frame.shape[:-2] + (1, 1), dtype=frame.dtype)
     for degree in range(1, s+1):
         # The first ``degree`` rows use direction 0; the last row uses direction 1.
         previous = bm.concatenate((coefficients, coefficients[..., -1:, :]), axis=-2)

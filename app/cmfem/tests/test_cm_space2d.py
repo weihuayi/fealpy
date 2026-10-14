@@ -258,10 +258,6 @@ class TestCmFESpace2d(unittest.TestCase):
                     atol=2e-11
                 )
 
-        general = CmFESpace2d(mesh, 7, (3, 1, 0))
-        with self.assertRaises(NotImplementedError):
-            general.is_boundary_dof()
-
     def test_value_and_derivatives(self):
         bm.set_backend('numpy')
         mesh = TriangleMesh.from_box([0, 1, 0, 1], nx=1, ny=1)

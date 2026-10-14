@@ -27,19 +27,18 @@ class PolyharmonicPDE:
         self._solution = sp.lambdify(self.symbols, expression, 'numpy')
         self._source = sp.lambdify(self.symbols, operator, 'numpy')
 
-    def _evaluate(self, function, point):
-        coordinate = tuple(point[..., i] for i in range(self.dimension))
-        value = bm.asarray(function(*coordinate))
-        return value + bm.zeros(point.shape[:-1], dtype=point.dtype)
-
     def solution(self, point):
-        return self._evaluate(self._solution, point)
+        coordinate = tuple(point[..., i] for i in range(self.dimension))
+        value = self._solution(*coordinate)
+        return value + bm.zeros(point.shape[:-1], dtype=point.dtype)
 
     def dirichlet(self, point):
         return self.solution(point)
 
     def source(self, point):
-        return self._evaluate(self._source, point)
+        coordinate = tuple(point[..., i] for i in range(self.dimension))
+        value = self._source(*coordinate)
+        return value + bm.zeros(point.shape[:-1], dtype=point.dtype)
 
     @lru_cache(maxsize=None)
     def derivatives(self, order):
@@ -61,7 +60,7 @@ class PolyharmonicPDE:
             def evaluate(point, function=function, degree=degree):
                 coordinate = tuple(point[..., i] for i in range(self.dimension))
                 shape = point.shape[:-1]
-                values = [bm.broadcast_to(bm.asarray(value), shape)
+                values = [bm.broadcast_to(value, shape)
                           for value in function(*coordinate)]
                 return values[0] if degree == 0 else bm.stack(values, axis=-1)
 
@@ -88,9 +87,6 @@ class ManufacturedPDE(PolyharmonicPDE):
         self.order = None
         self.symbols = sp.symbols('x y z')[:dimension]
         self._solution = sp.lambdify(self.symbols, expression, 'numpy')
-
-    def source(self, point):
-        raise NotImplementedError("Interpolation data have no source term.")
 
 
 class LaplacePDE(PolyharmonicPDE):
